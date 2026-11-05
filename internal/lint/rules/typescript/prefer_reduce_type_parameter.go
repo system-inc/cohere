@@ -218,7 +218,10 @@ var PreferReduceTypeParameter = rule.Rule{
 					// insert anchors on the callee before parentheses were skipped only in the
 					// sense that upstream anchors on the member expression; measured, that puts the
 					// text inside a parenthesized callee, which is what the installed build writes.
-					typeText := ruleContext.SourceFile.Text()[rule.TokenRange(ruleContext.SourceFile, assertedType).Pos():assertedType.End()]
+					typeText := ruleContext.SourceFile.Text()[rule.TokenRange(
+						ruleContext.SourceFile,
+						assertedType,
+					).Pos():assertedType.End()]
 					fixes = append(fixes, ruleContext.InsertAfter(callee, "<"+typeText+">"))
 				}
 

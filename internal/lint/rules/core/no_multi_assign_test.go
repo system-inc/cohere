@@ -59,12 +59,22 @@ func TestNoMultiAssignFires(test *testing.T) {
 		{"parentheses across lines", "var a =\n((b))\n = (c)", "", 1},
 		{"a string containing an equals sign", "a = b = '=' + c + 'foo';", "", 1},
 		{"an arithmetic right-hand side, bare", "a = b = 7 * 12 + 5;", "", 1},
-		{"a member assignment in a declarator under ignoreNonDeclaration", "const x = {};\nconst y = x.one = 1;", "{\"ignoreNonDeclaration\": true}", 1},
+		{
+			"a member assignment in a declarator under ignoreNonDeclaration",
+			"const x = {};\nconst y = x.one = 1;",
+			"{\"ignoreNonDeclaration\": true}",
+			1,
+		},
 		{"a bare chain under empty options", "let a, b;a = b = 1", "{}", 1},
 		{"a bare chain under an explicit false", "let x, y;x = y = 'baz'", "{\"ignoreNonDeclaration\": false}", 1},
 		{"a declarator chain under ignoreNonDeclaration", "const a = b = 1", "{\"ignoreNonDeclaration\": true}", 1},
 		{"a class field chain", "class C { field = foo = 0 }", "", 1},
-		{"a class field chain under ignoreNonDeclaration", "class C { field = foo = 0 }", "{\"ignoreNonDeclaration\": true}", 1},
+		{
+			"a class field chain under ignoreNonDeclaration",
+			"class C { field = foo = 0 }",
+			"{\"ignoreNonDeclaration\": true}",
+			1,
+		},
 	}
 
 	for _, testCase := range cases {
@@ -104,7 +114,11 @@ func TestNoMultiAssignStaysSilent(test *testing.T) {
 		{"two const declarators in a for head", "for(const a = 0, b = 0;;){}", ""},
 		{"an export with no initializer", "export let a, b;", ""},
 		{"an export with one initializer", "export let a,\n b = 0;", ""},
-		{"member chain under ignoreNonDeclaration", "const x = {};const y = {};x.one = y.one = 1;", "{\"ignoreNonDeclaration\": true}"},
+		{
+			"member chain under ignoreNonDeclaration",
+			"const x = {};const y = {};x.one = y.one = 1;",
+			"{\"ignoreNonDeclaration\": true}",
+		},
 		{"a bare chain under ignoreNonDeclaration", "let a, b;a = b = 1", "{\"ignoreNonDeclaration\": true}"},
 		{"an assignment inside a computed key", "class C { [foo = 0] = 0 }", ""},
 	}
@@ -221,8 +235,12 @@ func TestNoMultiAssignIgnoreNonDeclarationDropsOnlyTheBareChain(test *testing.T)
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoMultiAssign, multiAssignFile,
-				testCase.sourceText, decodedMultiAssignOptions(test, `{"ignoreNonDeclaration": false}`)), "unexpectedChain")
+			rule_testing.ExpectFindings(
+				test,
+				rule_testing.RunWithOptions(test, NoMultiAssign, multiAssignFile,
+					testCase.sourceText, decodedMultiAssignOptions(test, `{"ignoreNonDeclaration": false}`)),
+				"unexpectedChain",
+			)
 			rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoMultiAssign, multiAssignFile,
 				testCase.sourceText, decodedMultiAssignOptions(test, `{"ignoreNonDeclaration": true}`)))
 		})
@@ -335,7 +353,10 @@ func TestNoMultiAssignMessage(test *testing.T) {
 	if got := result.Diagnostics[0].Message.Id; got != "unexpectedChain" {
 		test.Errorf("message id is %q, want %q", got, "unexpectedChain")
 	}
-	if got := result.Diagnostics[0].Message.Description; !strings.HasPrefix(got, "This chains one assignment inside another") {
+	if got := result.Diagnostics[0].Message.Description; !strings.HasPrefix(
+		got,
+		"This chains one assignment inside another",
+	) {
 		test.Errorf("message description starts %q, which is not the sentence this rule reports", got)
 	}
 }

@@ -27,27 +27,57 @@ const (
 // The rule's two messages and the options they pick from, whose wording lives in
 // `policy/messages/consistency-require-matching-return-type.json`.
 var (
-	consistencyRequireMatchingReturnTypeBareText          = policy.MessageOf("nexus/consistency-require-matching-return-type", consistencyRequireMatchingReturnTypeBareId)
-	consistencyRequireMatchingReturnTypeUndefinedText     = policy.MessageOf("nexus/consistency-require-matching-return-type", consistencyRequireMatchingReturnTypeUndefinedId)
-	consistencyRequireMatchingReturnTypeConstructorReason = consistencyRequireMatchingReturnTypeUndefinedText.Option("voidReason", "constructor")
-	consistencyRequireMatchingReturnTypeSetterReason      = consistencyRequireMatchingReturnTypeUndefinedText.Option("voidReason", "setter")
+	consistencyRequireMatchingReturnTypeBareText = policy.MessageOf(
+		"nexus/consistency-require-matching-return-type",
+		consistencyRequireMatchingReturnTypeBareId,
+	)
+	consistencyRequireMatchingReturnTypeUndefinedText = policy.MessageOf(
+		"nexus/consistency-require-matching-return-type",
+		consistencyRequireMatchingReturnTypeUndefinedId,
+	)
+	consistencyRequireMatchingReturnTypeConstructorReason = consistencyRequireMatchingReturnTypeUndefinedText.Option(
+		"voidReason",
+		"constructor",
+	)
+	consistencyRequireMatchingReturnTypeSetterReason = consistencyRequireMatchingReturnTypeUndefinedText.Option(
+		"voidReason",
+		"setter",
+	)
 )
 
 // consistencyRequireMatchingReturnTypeSources says where a value verdict's type came from, in the
 // bare-return message.
 var consistencyRequireMatchingReturnTypeSources = map[consistencyRequireMatchingReturnTypeOrigin]policy.MessageOption{
-	consistencyRequireMatchingReturnTypeFromAnnotation: consistencyRequireMatchingReturnTypeBareText.Option("source", "annotation"),
-	consistencyRequireMatchingReturnTypeFromSignature:  consistencyRequireMatchingReturnTypeBareText.Option("source", "signature"),
-	consistencyRequireMatchingReturnTypeInferred:       consistencyRequireMatchingReturnTypeBareText.Option("source", "inferred"),
+	consistencyRequireMatchingReturnTypeFromAnnotation: consistencyRequireMatchingReturnTypeBareText.Option(
+		"source",
+		"annotation",
+	),
+	consistencyRequireMatchingReturnTypeFromSignature: consistencyRequireMatchingReturnTypeBareText.Option(
+		"source",
+		"signature",
+	),
+	consistencyRequireMatchingReturnTypeInferred: consistencyRequireMatchingReturnTypeBareText.Option(
+		"source",
+		"inferred",
+	),
 }
 
 // consistencyRequireMatchingReturnTypeVoidReasons says why a `void` type makes a verdict void, by where
 // the type came from, in the undefined-return message. One option per source rather than a source
 // inside the reason, since phrases do not nest.
 var consistencyRequireMatchingReturnTypeVoidReasons = map[consistencyRequireMatchingReturnTypeOrigin]policy.MessageOption{
-	consistencyRequireMatchingReturnTypeFromAnnotation: consistencyRequireMatchingReturnTypeUndefinedText.Option("voidReason", "annotatedVoid"),
-	consistencyRequireMatchingReturnTypeFromSignature:  consistencyRequireMatchingReturnTypeUndefinedText.Option("voidReason", "signatureVoid"),
-	consistencyRequireMatchingReturnTypeInferred:       consistencyRequireMatchingReturnTypeUndefinedText.Option("voidReason", "inferredVoid"),
+	consistencyRequireMatchingReturnTypeFromAnnotation: consistencyRequireMatchingReturnTypeUndefinedText.Option(
+		"voidReason",
+		"annotatedVoid",
+	),
+	consistencyRequireMatchingReturnTypeFromSignature: consistencyRequireMatchingReturnTypeUndefinedText.Option(
+		"voidReason",
+		"signatureVoid",
+	),
+	consistencyRequireMatchingReturnTypeInferred: consistencyRequireMatchingReturnTypeUndefinedText.Option(
+		"voidReason",
+		"inferredVoid",
+	),
 }
 
 // consistencyRequireMatchingReturnTypeCanonicalUndefined is the only `return undefined` text the
@@ -198,22 +228,37 @@ var ConsistencyRequireMatchingReturnType = rule.Rule{
 							verdict.source,
 						),
 					}
-					if verdict.admitsUndefined && consistencyRequireMatchingReturnTypeText(ruleContext, node) == "return;" {
-						ruleContext.ReportNodeWithFixes(node, message, rule.ReplaceRange(rule.TokenRange(ruleContext.SourceFile, node), "return undefined;"))
+					if verdict.admitsUndefined &&
+						consistencyRequireMatchingReturnTypeText(ruleContext, node) == "return;" {
+						ruleContext.ReportNodeWithFixes(
+							node,
+							message,
+							rule.ReplaceRange(rule.TokenRange(ruleContext.SourceFile, node), "return undefined;"),
+						)
 						return
 					}
 					ruleContext.ReportNode(node, message)
 
 				case consistencyRequireMatchingReturnTypeKindVoid:
-					if expression == nil || !consistencyRequireMatchingReturnTypeIsGlobalUndefined(ruleContext, expression) {
+					if expression == nil ||
+						!consistencyRequireMatchingReturnTypeIsGlobalUndefined(ruleContext, expression) {
 						return
 					}
 					message := rule.Message{
-						Id:          consistencyRequireMatchingReturnTypeUndefinedId,
-						Description: consistencyRequireMatchingReturnTypeUndefinedText.Render(verdict.voidValues(), verdict.voidReason),
+						Id: consistencyRequireMatchingReturnTypeUndefinedId,
+						Description: consistencyRequireMatchingReturnTypeUndefinedText.Render(
+							verdict.voidValues(),
+							verdict.voidReason,
+						),
 					}
-					if consistencyRequireMatchingReturnTypeCanonicalUndefined.MatchString(consistencyRequireMatchingReturnTypeText(ruleContext, node)) {
-						ruleContext.ReportNodeWithFixes(node, message, rule.ReplaceRange(rule.TokenRange(ruleContext.SourceFile, node), "return;"))
+					if consistencyRequireMatchingReturnTypeCanonicalUndefined.MatchString(
+						consistencyRequireMatchingReturnTypeText(ruleContext, node),
+					) {
+						ruleContext.ReportNodeWithFixes(
+							node,
+							message,
+							rule.ReplaceRange(rule.TokenRange(ruleContext.SourceFile, node), "return;"),
+						)
 						return
 					}
 					ruleContext.ReportNode(node, message)
@@ -274,7 +319,10 @@ func consistencyRequireMatchingReturnTypeContainer(node *ast.Node) *ast.Node {
 }
 
 // consistencyRequireMatchingReturnTypeJudge decides whether a function is void, a value, or unknowable.
-func consistencyRequireMatchingReturnTypeJudge(ruleContext rule.Context, function *ast.Node) consistencyRequireMatchingReturnTypeVerdict {
+func consistencyRequireMatchingReturnTypeJudge(
+	ruleContext rule.Context,
+	function *ast.Node,
+) consistencyRequireMatchingReturnTypeVerdict {
 	flags := ast.GetFunctionFlags(function)
 	isAsync := flags&ast.FunctionFlagsAsync != 0
 	isGenerator := flags&ast.FunctionFlagsGenerator != 0
@@ -298,12 +346,31 @@ func consistencyRequireMatchingReturnTypeJudge(ruleContext rule.Context, functio
 	// 1. The declared annotation is the author's statement, and is final even when it is `any`.
 	if annotation := function.Type(); annotation != nil {
 		declared := checker.Checker_getTypeFromTypeNode(ruleContext.TypeChecker, annotation)
-		return consistencyRequireMatchingReturnTypeClassify(ruleContext, declared, true, isAsync, isGenerator, functionKind, consistencyRequireMatchingReturnTypeFromAnnotation)
+		return consistencyRequireMatchingReturnTypeClassify(
+			ruleContext,
+			declared,
+			true,
+			isAsync,
+			isGenerator,
+			functionKind,
+			consistencyRequireMatchingReturnTypeFromAnnotation,
+		)
 	}
 
 	// 2. The contextual signature, passed over when it says nothing.
-	if contextual := consistencyRequireMatchingReturnTypeContextualReturnType(ruleContext, function); contextual != nil {
-		verdict := consistencyRequireMatchingReturnTypeClassify(ruleContext, contextual, false, isAsync, isGenerator, functionKind, consistencyRequireMatchingReturnTypeFromSignature)
+	if contextual := consistencyRequireMatchingReturnTypeContextualReturnType(
+		ruleContext,
+		function,
+	); contextual != nil {
+		verdict := consistencyRequireMatchingReturnTypeClassify(
+			ruleContext,
+			contextual,
+			false,
+			isAsync,
+			isGenerator,
+			functionKind,
+			consistencyRequireMatchingReturnTypeFromSignature,
+		)
 		if verdict.kind != consistencyRequireMatchingReturnTypeKindUnknown {
 			return verdict
 		}
@@ -316,7 +383,15 @@ func consistencyRequireMatchingReturnTypeJudge(ruleContext rule.Context, functio
 	}
 	if function.Kind == ast.KindGetAccessor {
 		// A get accessor's type is the property's type, which is its return type.
-		return consistencyRequireMatchingReturnTypeClassify(ruleContext, functionType, false, isAsync, isGenerator, functionKind, consistencyRequireMatchingReturnTypeInferred)
+		return consistencyRequireMatchingReturnTypeClassify(
+			ruleContext,
+			functionType,
+			false,
+			isAsync,
+			isGenerator,
+			functionKind,
+			consistencyRequireMatchingReturnTypeInferred,
+		)
 	}
 	signatures := type_checking.GetCallSignatures(ruleContext.TypeChecker, functionType)
 	if len(signatures) == 0 {
@@ -325,7 +400,15 @@ func consistencyRequireMatchingReturnTypeJudge(ruleContext rule.Context, functio
 	var agreed consistencyRequireMatchingReturnTypeVerdict
 	for index, signature := range signatures {
 		returnType := checker.Checker_getReturnTypeOfSignature(ruleContext.TypeChecker, signature)
-		verdict := consistencyRequireMatchingReturnTypeClassify(ruleContext, returnType, false, isAsync, isGenerator, functionKind, consistencyRequireMatchingReturnTypeInferred)
+		verdict := consistencyRequireMatchingReturnTypeClassify(
+			ruleContext,
+			returnType,
+			false,
+			isAsync,
+			isGenerator,
+			functionKind,
+			consistencyRequireMatchingReturnTypeInferred,
+		)
 		if index == 0 {
 			agreed = verdict
 			continue
@@ -345,7 +428,10 @@ func consistencyRequireMatchingReturnTypeJudge(ruleContext rule.Context, functio
 // The checker's own `getContextualSignature` is not reachable through the shim, so this rebuilds it
 // from the contextual type: the apparent type's single call signature, or, for a union, each member's
 // single signature with members that have none skipped, their return types unioned.
-func consistencyRequireMatchingReturnTypeContextualReturnType(ruleContext rule.Context, function *ast.Node) *checker.Type {
+func consistencyRequireMatchingReturnTypeContextualReturnType(
+	ruleContext rule.Context,
+	function *ast.Node,
+) *checker.Type {
 	var contextual *checker.Type
 	switch {
 	case function.Kind == ast.KindFunctionExpression, function.Kind == ast.KindArrowFunction:
@@ -355,7 +441,10 @@ func consistencyRequireMatchingReturnTypeContextualReturnType(ruleContext rule.C
 		// whose parent is the object literal itself. Measured: through that call the method's
 		// contextual `() => void` went unread, and only a fixture whose inferred type disagrees with
 		// its context could see it. The checker's own path for a method is this one.
-		contextual = ruleContext.TypeChecker.GetContextualTypeForObjectLiteralElement(function, checker.ContextFlagsSignature)
+		contextual = ruleContext.TypeChecker.GetContextualTypeForObjectLiteralElement(
+			function,
+			checker.ContextFlagsSignature,
+		)
 	default:
 		return nil
 	}
@@ -376,7 +465,10 @@ func consistencyRequireMatchingReturnTypeContextualReturnType(ruleContext rule.C
 		case 0:
 			continue
 		case 1:
-			if returnType := checker.Checker_getReturnTypeOfSignature(ruleContext.TypeChecker, signatures[0]); returnType != nil {
+			if returnType := checker.Checker_getReturnTypeOfSignature(
+				ruleContext.TypeChecker,
+				signatures[0],
+			); returnType != nil {
 				returnTypes = append(returnTypes, returnType)
 			}
 		default:
@@ -482,7 +574,10 @@ func consistencyRequireMatchingReturnTypeClassify(
 //
 // The reference guard is a crash guard as well as a narrowing: `Checker_getTypeArguments` panics on a
 // type that is not a reference.
-func consistencyRequireMatchingReturnTypeGeneratorReturn(ruleContext rule.Context, returnType *checker.Type) *checker.Type {
+func consistencyRequireMatchingReturnTypeGeneratorReturn(
+	ruleContext rule.Context,
+	returnType *checker.Type,
+) *checker.Type {
 	if checker.Type_flags(returnType)&checker.TypeFlagsObject == 0 ||
 		checker.Type_objectFlags(returnType)&checker.ObjectFlagsReference == 0 {
 		return nil
@@ -529,7 +624,8 @@ func consistencyRequireMatchingReturnTypeFunctionKind(function *ast.Node, isAsyn
 		noun = "method"
 	case ast.KindFunctionExpression, ast.KindArrowFunction:
 		noun = "function expression"
-		if function.Parent != nil && (function.Parent.Kind == ast.KindCallExpression || function.Parent.Kind == ast.KindNewExpression) {
+		if function.Parent != nil &&
+			(function.Parent.Kind == ast.KindCallExpression || function.Parent.Kind == ast.KindNewExpression) {
 			noun = "callback"
 		}
 	default:

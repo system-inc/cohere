@@ -115,7 +115,8 @@ func TestIsAlwaysInvalidatingTypeDeclinesWithoutAChecker(test *testing.T) {
 // Every identifier in a small fixture has a syntactic source, so the nil-node guard is unexercised
 // there -- a mutation sweep confirmed it: deleting that guard passes every other test in this file.
 // The corpus is where the case actually lives: 645 of 40,241 identifiers over 100 files carried no
-// node, which is the 1.5% that `high_level_intermediate_representation.go` documents as having no direct syntactic source.
+// node, which is the 1.5% that `high_level_intermediate_representation.go` documents as having no direct syntactic
+// source.
 //
 // The assertion is that the predicate answers rather than panicking, and that it answers false. A
 // nodeless identifier has no type to ask about, and both upstream call sites use a true answer to

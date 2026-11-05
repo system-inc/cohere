@@ -77,7 +77,13 @@ func TestAbbreviationVocabularyCarriesEveryWordInOrder(test *testing.T) {
 		test.Run(testCase.form, func(test *testing.T) {
 			test.Parallel()
 			if !slices.Equal(testCase.got, testCase.want) {
-				test.Errorf("%d entries %v, want %d %v", len(testCase.got), testCase.got, len(testCase.want), testCase.want)
+				test.Errorf(
+					"%d entries %v, want %d %v",
+					len(testCase.got),
+					testCase.got,
+					len(testCase.want),
+					testCase.want,
+				)
 			}
 		})
 	}
@@ -102,7 +108,10 @@ func TestAbbreviationVocabularyJudgesEveryForm(test *testing.T) {
 		}
 		judged++
 	}
-	for _, entry := range append(append([]*abbreviation.Entry{}, vocabulary.EarlyPrefixes...), vocabulary.LatePrefixes...) {
+	for _, entry := range append(
+		append([]*abbreviation.Entry{}, vocabulary.EarlyPrefixes...),
+		vocabulary.LatePrefixes...,
+	) {
 		name := entry.Abbreviation + "Widget"
 		finding, found := findAbbreviation(name)
 		if !found || finding.form != "prefix" || finding.message.Id != abbreviatedIdentifierText.Id {
@@ -167,15 +176,33 @@ func TestAbbreviationVocabularyRefusesAMalformedFile(test *testing.T) {
 	}{
 		{"a misspelled form", `{"abbreviations": [{"abbreviation": "val", "expansion": "value", "suffx": {}}]}`},
 		{"an entry with no form", `{"abbreviations": [{"abbreviation": "val", "expansion": "value"}]}`},
-		{"an unknown whole style", `{"abbreviations": [{"abbreviation": "val", "expansion": "value", "whole": {"style": "loud"}}]}`},
+		{
+			"an unknown whole style",
+			`{"abbreviations": [{"abbreviation": "val", "expansion": "value", "whole": {"style": "loud"}}]}`,
+		},
 		{"a rename with no expansion", `{"abbreviations": [{"abbreviation": "val", "whole": {"style": "plain"}}]}`},
-		{"an unknown prefix phase", `{"abbreviations": [{"abbreviation": "val", "expansion": "value", "prefix": {"phase": "middle"}}]}`},
-		{"an uppercase abbreviation", `{"abbreviations": [{"abbreviation": "Val", "expansion": "value", "segment": {}}]}`},
-		{"a duplicate entry", `{"abbreviations": [{"abbreviation": "val", "expansion": "value", "segment": {}}, {"abbreviation": "val", "expansion": "value", "segment": {}}]}`},
-		{"an unknown matcher", `{"abbreviations": [{"abbreviation": "ms", "expansion": "m", "suffix": {"matcher": "seconds"}}]}`},
+		{
+			"an unknown prefix phase",
+			`{"abbreviations": [{"abbreviation": "val", "expansion": "value", "prefix": {"phase": "middle"}}]}`,
+		},
+		{
+			"an uppercase abbreviation",
+			`{"abbreviations": [{"abbreviation": "Val", "expansion": "value", "segment": {}}]}`,
+		},
+		{
+			"a duplicate entry",
+			`{"abbreviations": [{"abbreviation": "val", "expansion": "value", "segment": {}}, {"abbreviation": "val", "expansion": "value", "segment": {}}]}`,
+		},
+		{
+			"an unknown matcher",
+			`{"abbreviations": [{"abbreviation": "ms", "expansion": "m", "suffix": {"matcher": "seconds"}}]}`,
+		},
 		{"a broken prefix", `{"abbreviations":[{"abbreviation":"v(","expansion":"v","prefix":{"phase":"late"}}]}`},
 		{"a broken segment", `{"abbreviations":[{"abbreviation":"v(","expansion":"v","segment":{}}]}`},
-		{"a retired per-word messageId", `{"abbreviations": [{"abbreviation": "val", "expansion": "value", "whole": {"messageId": "noVal", "style": "plain"}}]}`},
+		{
+			"a retired per-word messageId",
+			`{"abbreviations": [{"abbreviation": "val", "expansion": "value", "whole": {"messageId": "noVal", "style": "plain"}}]}`,
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {

@@ -101,7 +101,17 @@ var classMethodsUseThisFiresCases = []classMethodsUseThisCase{
 		name:    "invalid-11",
 		source:  "class A { foo(){} 'bar'(){} 123(){} [`baz`](){} [a](){} [f(a)](){} get quux(){} set[a](b){} *quuux(){} }",
 		options: "",
-		ids:     []string{"missingThis", "missingThis", "missingThis", "missingThis", "missingThis", "missingThis", "missingThis", "missingThis", "missingThis"},
+		ids: []string{
+			"missingThis",
+			"missingThis",
+			"missingThis",
+			"missingThis",
+			"missingThis",
+			"missingThis",
+			"missingThis",
+			"missingThis",
+			"missingThis",
+		},
 	},
 	{
 		name:    "invalid-12",

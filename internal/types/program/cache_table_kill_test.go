@@ -70,13 +70,23 @@ func TestAWriterKilledBeforeItsRenameLeavesTheOldTable(test *testing.T) {
 			directory := test.TempDir()
 			// Outside the table's directory, which the write after the kill cleans.
 			marker := filepath.Join(test.TempDir(), "held")
-			if writeCacheTableError := WriteCacheTable(directory, tableSaying("old"), identity, sections, PathAnchor{}); writeCacheTableError != nil {
+			if writeCacheTableError := WriteCacheTable(
+				directory,
+				tableSaying("old"),
+				identity,
+				sections,
+				PathAnchor{},
+			); writeCacheTableError != nil {
 				test.Fatal(writeCacheTableError)
 			}
 
 			writer := exec.Command(os.Args[0], "-test.run=^TestAWriterKilledBeforeItsRenameLeavesTheOldTable$")
-			writer.Env = append(os.Environ(), "COHERE_TEST_WRITE_TABLE="+directory, fmt.Sprintf("COHERE_TEST_STOP_AT_RENAME=%d", stopAt),
-				"COHERE_TEST_HELD_MARKER="+marker)
+			writer.Env = append(
+				os.Environ(),
+				"COHERE_TEST_WRITE_TABLE="+directory,
+				fmt.Sprintf("COHERE_TEST_STOP_AT_RENAME=%d", stopAt),
+				"COHERE_TEST_HELD_MARKER="+marker,
+			)
 			if startError := writer.Start(); startError != nil {
 				test.Fatal(startError)
 			}
@@ -115,7 +125,9 @@ func TestAWriterKilledBeforeItsRenameLeavesTheOldTable(test *testing.T) {
 			if run := read.Runs["--no-fix"]; run == nil || string(run.Output) != wantRun {
 				test.Errorf("the run after the kill is %v, want the %s one", run, wantRun)
 			}
-			if read.Findings == nil || len(read.Findings.Entries) != 1 || read.Findings.Entries[0].Path != wantFindings {
+			if read.Findings == nil ||
+				len(read.Findings.Entries) != 1 ||
+				read.Findings.Entries[0].Path != wantFindings {
 				test.Errorf("the findings after the kill are %v, want the old ones", read.Findings)
 			}
 			if _, statError := os.Stat(temporary); statError != nil {
@@ -123,11 +135,19 @@ func TestAWriterKilledBeforeItsRenameLeavesTheOldTable(test *testing.T) {
 			}
 
 			// And the next run rebuilds cleanly over what the killed one left, its temporary included.
-			if writeCacheTableError := WriteCacheTable(directory, tableSaying("rebuilt"), identity, sections, PathAnchor{}); writeCacheTableError != nil {
+			if writeCacheTableError := WriteCacheTable(
+				directory,
+				tableSaying("rebuilt"),
+				identity,
+				sections,
+				PathAnchor{},
+			); writeCacheTableError != nil {
 				test.Fatalf("the write after the kill failed: %v", writeCacheTableError)
 			}
 			rebuilt, err := ReadCacheTable(directory, identity, sections, PathAnchor{})
-			if err != nil || string(rebuilt.Runs["--no-fix"].Output) != "rebuilt" || rebuilt.Findings.Entries[0].Path != "/rebuilt.ts" {
+			if err != nil ||
+				string(rebuilt.Runs["--no-fix"].Output) != "rebuilt" ||
+				rebuilt.Findings.Entries[0].Path != "/rebuilt.ts" {
 				test.Errorf("the table after the rebuild is not the rebuilt one: %v", err)
 			}
 		})

@@ -71,7 +71,12 @@ type optionReadFindings struct {
 
 // findUnreadOptionFields loads the packages matching patterns and reports each option field no
 // non-test file reads.
-func findUnreadOptionFields(test *testing.T, moduleRoot string, rulesRoot string, patterns ...string) optionReadFindings {
+func findUnreadOptionFields(
+	test *testing.T,
+	moduleRoot string,
+	rulesRoot string,
+	patterns ...string,
+) optionReadFindings {
 	test.Helper()
 	loaded := loadRules(test, moduleRoot, patterns...)
 
@@ -119,8 +124,14 @@ func findUnreadOptionFields(test *testing.T, moduleRoot string, rulesRoot string
 			findings.unread = append(findings.unread, described)
 		}
 	}
-	sort.Slice(findings.fields, func(first, second int) bool { return findings.fields[first].key < findings.fields[second].key })
-	sort.Slice(findings.unread, func(first, second int) bool { return findings.unread[first].key < findings.unread[second].key })
+	sort.Slice(
+		findings.fields,
+		func(first, second int) bool { return findings.fields[first].key < findings.fields[second].key },
+	)
+	sort.Slice(
+		findings.unread,
+		func(first, second int) bool { return findings.unread[first].key < findings.unread[second].key },
+	)
 	return findings
 }
 
@@ -130,7 +141,13 @@ func findUnreadOptionFields(test *testing.T, moduleRoot string, rulesRoot string
 // same.
 //
 // Mutates: seen the walk marks each type it enters, so a recursive type is walked once
-func collectOptionFields(valueType types.Type, fileSet *token.FileSet, rulesRoot string, fields map[*types.Var]optionField, seen map[types.Type]bool) {
+func collectOptionFields(
+	valueType types.Type,
+	fileSet *token.FileSet,
+	rulesRoot string,
+	fields map[*types.Var]optionField,
+	seen map[types.Type]bool,
+) {
 	unaliased := types.Unalias(valueType)
 	if seen[unaliased] {
 		return
@@ -161,7 +178,14 @@ func collectOptionFields(valueType types.Type, fileSet *token.FileSet, rulesRoot
 // collectOptionFields records a type's.
 //
 // Mutates: fields the walk records every exported field it reaches, so one map gathers a whole tree
-func collectOptionStructFields(structure *types.Struct, owner string, fileSet *token.FileSet, rulesRoot string, fields map[*types.Var]optionField, seen map[types.Type]bool) {
+func collectOptionStructFields(
+	structure *types.Struct,
+	owner string,
+	fileSet *token.FileSet,
+	rulesRoot string,
+	fields map[*types.Var]optionField,
+	seen map[types.Type]bool,
+) {
 	for index := range structure.NumFields() {
 		field := structure.Field(index)
 		tag := reflect.StructTag(structure.Tag(index)).Get("json")
@@ -327,7 +351,10 @@ func TestEveryOptionFieldARuleDecodesIsRead(test *testing.T) {
 	// The floor is the control against a walk that loaded nothing or a matcher that stopped matching.
 	test.Logf("%d option fields reachable from a decode, %d unread", len(findings.fields), len(findings.unread))
 	if len(findings.fields) < 400 {
-		test.Fatalf("found only %d option fields, so this walk examined too little to mean anything", len(findings.fields))
+		test.Fatalf(
+			"found only %d option fields, so this walk examined too little to mean anything",
+			len(findings.fields),
+		)
 	}
 }
 

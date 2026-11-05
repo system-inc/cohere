@@ -25,13 +25,22 @@ func TestResolveFailsLoudlyWhenNothingIsInstalled(test *testing.T) {
 		test.Fatalf("resolved %q with nothing installed, which is the fallback that prints green over zero files", path)
 	}
 	if !errors.Is(resolveError, ErrNoBinary) {
-		test.Fatalf("error did not identify as ErrNoBinary, so a caller cannot tell a missing platform from a broken lookup: %v", resolveError)
+		test.Fatalf(
+			"error did not identify as ErrNoBinary, so a caller cannot tell a missing platform from a broken lookup: %v",
+			resolveError,
+		)
 	}
 
 	// The message has to be actionable on its own, because the person reading it is looking at a
 	// failed install and has no other source of truth about what was wanted.
 	message := resolveError.Error()
-	for _, required := range []string{runtime.GOOS, runtime.GOARCH, CurrentPlatformPackageName(), DispatcherPackageName, BinaryOverrideVariable} {
+	for _, required := range []string{
+		runtime.GOOS,
+		runtime.GOARCH,
+		CurrentPlatformPackageName(),
+		DispatcherPackageName,
+		BinaryOverrideVariable,
+	} {
 		if !strings.Contains(message, required) {
 			test.Errorf("the failure never mentions %q, so it does not say what was missing: %s", required, message)
 		}
@@ -96,7 +105,10 @@ func TestResolveReportsABinaryThatIsNotExecutable(test *testing.T) {
 		test.Fatalf("the failure does not name the file that cannot run: %v", resolveError)
 	}
 	if errors.Is(resolveError, ErrNoBinary) {
-		test.Fatalf("a present-but-unrunnable binary reported as a missing platform, which sends the reader hunting the wrong bug: %v", resolveError)
+		test.Fatalf(
+			"a present-but-unrunnable binary reported as a missing platform, which sends the reader hunting the wrong bug: %v",
+			resolveError,
+		)
 	}
 }
 
@@ -114,7 +126,12 @@ func TestOverrideTakesPrecedence(test *testing.T) {
 		test.Fatalf("the override did not resolve: %v", resolveError)
 	}
 	if path != override {
-		test.Fatalf("resolved %s while %s pointed at %s — a developer would read results from the wrong binary as their own", path, BinaryOverrideVariable, override)
+		test.Fatalf(
+			"resolved %s while %s pointed at %s — a developer would read results from the wrong binary as their own",
+			path,
+			BinaryOverrideVariable,
+			override,
+		)
 	}
 }
 
@@ -133,7 +150,8 @@ func TestOverrideFailsLoudlyWhenItPointsAtNothing(test *testing.T) {
 	if resolveError == nil {
 		test.Fatalf("a broken override silently fell back to %s", path)
 	}
-	if !strings.Contains(resolveError.Error(), missing) || !strings.Contains(resolveError.Error(), BinaryOverrideVariable) {
+	if !strings.Contains(resolveError.Error(), missing) ||
+		!strings.Contains(resolveError.Error(), BinaryOverrideVariable) {
 		test.Fatalf("the failure does not say what was set or where it pointed: %v", resolveError)
 	}
 }

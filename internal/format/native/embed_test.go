@@ -158,7 +158,11 @@ func TestGraphqlTemplatesMatchTheFork(test *testing.T) {
 			test.Fatal(err)
 		}
 		// The fork really formatted the GraphQL: the cramped fragment is broken out.
-		for _, substring := range []string{"fragment UserFields on User {\n", "mutation ($input: CreatePostInput!) {", "const blank = gql``;"} {
+		for _, substring := range []string{
+			"fragment UserFields on User {\n",
+			"mutation ($input: CreatePostInput!) {",
+			"const blank = gql``;",
+		} {
 			if !strings.Contains(expected, substring) {
 				test.Fatalf("printWidth %d: the fork's output lacks %q:\n%s", width, substring, expected)
 			}

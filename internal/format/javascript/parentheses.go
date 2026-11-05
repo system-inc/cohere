@@ -47,7 +47,10 @@ func needsParentheses(path *Path, options *Options) bool {
 		if arrowFunctionBody != nil &&
 			!arrowFunctionBody.Is("SequenceExpression") && // these have parens added anyway
 			!arrowFunctionBody.Is("AssignmentExpression") &&
-			startsWithNoLookaheadToken(arrowFunctionBody, func(leftmostNode Node) bool { return leftmostNode == current }) {
+			startsWithNoLookaheadToken(
+				arrowFunctionBody,
+				func(leftmostNode Node) bool { return leftmostNode == current },
+			) {
 			return true
 		}
 	}

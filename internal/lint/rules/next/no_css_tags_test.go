@@ -104,8 +104,8 @@ func TestNoCssTagsIsSilent(test *testing.T) {
 	}
 }
 
-// TestNoCssTagsDecodesEntities reads its attribute as ESLint does, with HTML entities decoded: typescript-estree decodes a
-// JSX attribute string before any rule sees it. Each row's verdict is the installed
+// TestNoCssTagsDecodesEntities reads its attribute as ESLint does, with HTML entities decoded: typescript-estree
+// decodes a JSX attribute string before any rule sees it. Each row's verdict is the installed
 // @next/eslint-plugin-next 16.3.1's under the typescript-eslint parser (#51y9jh2).
 func TestNoCssTagsDecodesEntities(test *testing.T) {
 	test.Parallel()
@@ -115,8 +115,16 @@ func TestNoCssTagsDecodesEntities(test *testing.T) {
 		source string
 		ids    []string
 	}{
-		{`an encoded letter in rel`, `export const C = () => <link rel="style&#115;heet" href="/a.css" />;`, []string{messageNoCssTags.Id}},
-		{`encoded slashes in an absolute href`, `export const C = () => <link rel="stylesheet" href="https:&#47;&#47;example.com/a.css" />;`, []string{}},
+		{
+			`an encoded letter in rel`,
+			`export const C = () => <link rel="style&#115;heet" href="/a.css" />;`,
+			[]string{messageNoCssTags.Id},
+		},
+		{
+			`encoded slashes in an absolute href`,
+			`export const C = () => <link rel="stylesheet" href="https:&#47;&#47;example.com/a.css" />;`,
+			[]string{},
+		},
 	} {
 		test.Run(row.name, func(test *testing.T) {
 			test.Parallel()

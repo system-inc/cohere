@@ -44,7 +44,12 @@ func (options TailwindLocationOptions) Location() DesignSystemLocation {
 	if configurationPath == "" {
 		configurationPath = options.TailwindConfig
 	}
-	return DesignSystemLocation{Anchor: options.anchor, Cwd: options.Cwd, ConfigPath: configurationPath, Tsconfig: options.Tsconfig}
+	return DesignSystemLocation{
+		Anchor:     options.anchor,
+		Cwd:        options.Cwd,
+		ConfigPath: configurationPath,
+		Tsconfig:   options.Tsconfig,
+	}
 }
 
 // anchorAt records where the config was written. Promoted onto every options struct that embeds
@@ -223,7 +228,11 @@ func skipWithoutTailwind(ruleContext rule.Context, err error) bool {
 // it reads with, as upstream's getTailwindConfigPath resolves them. Exported for zero config's
 // detection of cohere:tailwind (internal/lint/housesets), so a project whose settings name its
 // stylesheet is found by the same search its rules then make.
-func ConfiguredEntryPoint(projectRoot string, location DesignSystemLocation, fileExists func(path string) bool) (string, string, error) {
+func ConfiguredEntryPoint(
+	projectRoot string,
+	location DesignSystemLocation,
+	fileExists func(path string) bool,
+) (string, string, error) {
 	anchor := location.Anchor
 	if anchor == "" {
 		anchor = projectRoot
@@ -267,7 +276,12 @@ func LocationInSettings(settings map[string]json.RawMessage, anchor string) (Des
 		_ = json.Unmarshal(written[key], &value)
 		return value
 	}
-	location := TailwindLocationOptions{EntryPoint: read("entryPoint"), TailwindConfig: read("tailwindConfig"), Cwd: read("cwd"), Tsconfig: read("tsconfig")}
+	location := TailwindLocationOptions{
+		EntryPoint:     read("entryPoint"),
+		TailwindConfig: read("tailwindConfig"),
+		Cwd:            read("cwd"),
+		Tsconfig:       read("tsconfig"),
+	}
 	location.anchorAt(anchor)
 	named := location.Location()
 	return named, !named.isDefault()
@@ -279,8 +293,16 @@ func WritesSettings(settings map[string]json.RawMessage) bool {
 }
 
 // loadConfiguredDesignSystem is upstream's resolution for a rule that named a location.
-func loadConfiguredDesignSystem(projectRoot string, fileSystem *rule.RecordingFS, location DesignSystemLocation) DesignSystemResult {
-	entryPoint, packageRoot, err := ConfiguredEntryPoint(projectRoot, location, func(path string) bool { return fileSystem.FileExists(tspath.RootedFilePath(path)) })
+func loadConfiguredDesignSystem(
+	projectRoot string,
+	fileSystem *rule.RecordingFS,
+	location DesignSystemLocation,
+) DesignSystemResult {
+	entryPoint, packageRoot, err := ConfiguredEntryPoint(
+		projectRoot,
+		location,
+		func(path string) bool { return fileSystem.FileExists(tspath.RootedFilePath(path)) },
+	)
 	if err != nil {
 		return DesignSystemResult{Err: err}
 	}
@@ -320,7 +342,12 @@ func (location DesignSystemLocation) cwdFrom(projectRoot string) string {
 // tailwindcss's, with the tsconfig upstream would find from cwd in front of it. Every question about
 // the disk goes through fileSystem, so the tsconfig, everything it extends and every path it maps are
 // inputs the run cache signs.
-func stylesheetResolverAt(cwd string, configured string, packageRoot string, fileSystem *rule.RecordingFS) (tailwindengine.StylesheetResolver, error) {
+func stylesheetResolverAt(
+	cwd string,
+	configured string,
+	packageRoot string,
+	fileSystem *rule.RecordingFS,
+) (tailwindengine.StylesheetResolver, error) {
 	fileExists := func(path string) bool { return fileSystem.FileExists(tspath.RootedFilePath(path)) }
 	readFile := func(path string) (string, bool) { return fileSystem.ReadFile(tspath.RootedFilePath(path)) }
 	next := tailwindengine.NodeStylesheetResolver(packageRoot)

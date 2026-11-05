@@ -60,10 +60,16 @@ func TestASignalDuringABuildEndsTheToolAndWhatItStarted(test *testing.T) {
 // A build that ends on its own reports its own result, untouched by the grouping.
 func TestABuildToolThatEndsReportsItsOwnExit(test *testing.T) {
 	test.Parallel()
-	if runBuildToolUntilError := runBuildToolUntil(exec.Command("/bin/sh", "-c", "exit 0"), make(chan os.Signal)); runBuildToolUntilError != nil {
+	if runBuildToolUntilError := runBuildToolUntil(
+		exec.Command("/bin/sh", "-c", "exit 0"),
+		make(chan os.Signal),
+	); runBuildToolUntilError != nil {
 		test.Errorf("a tool that succeeded reported %v", runBuildToolUntilError)
 	}
-	if runBuildToolUntilError := runBuildToolUntil(exec.Command("/bin/sh", "-c", "exit 3"), make(chan os.Signal)); runBuildToolUntilError == nil {
+	if runBuildToolUntilError := runBuildToolUntil(
+		exec.Command("/bin/sh", "-c", "exit 3"),
+		make(chan os.Signal),
+	); runBuildToolUntilError == nil {
 		test.Error("a tool that failed reported success")
 	}
 }

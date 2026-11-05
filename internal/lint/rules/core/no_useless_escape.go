@@ -513,7 +513,13 @@ func isUselessPatternEscape(pattern string, index int, flags regexsyntax.RegexFl
 // The caret carries an extra condition, and it is the reason this cannot be a symmetric test. A
 // caret at the very start of a negated class is the negation rather than a member, so a `^` escaped
 // immediately after it is not separating a pair at all and stays a finding.
-func isReservedDoublePunctuatorEscape(pattern string, escapeStart int, escapeEnd int, escaped rune, enclosing *classSpan) bool {
+func isReservedDoublePunctuatorEscape(
+	pattern string,
+	escapeStart int,
+	escapeEnd int,
+	escaped rune,
+	enclosing *classSpan,
+) bool {
 	if !strings.ContainsRune(regexClassSetReservedDoublePuncts, escaped) {
 		return false
 	}

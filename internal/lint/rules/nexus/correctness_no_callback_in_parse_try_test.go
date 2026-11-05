@@ -107,7 +107,11 @@ func correctnessNoCallbackInParseTryExpect(test *testing.T, result rule_testing.
 	text := result.SourceFile.Text()
 	for index, diagnostic := range diagnostics {
 		if len(diagnostic.Fixes) != 0 || len(diagnostic.Suggestions) != 0 {
-			test.Fatalf("expected no fix and no suggestion, got %d and %d", len(diagnostic.Fixes), len(diagnostic.Suggestions))
+			test.Fatalf(
+				"expected no fix and no suggestion, got %d and %d",
+				len(diagnostic.Fixes),
+				len(diagnostic.Suggestions),
+			)
 		}
 		if got := text[diagnostic.Range.Pos():diagnostic.Range.End()]; got != want[index] {
 			test.Fatalf("finding %d is %q, want %q", index, got, want[index])
@@ -217,7 +221,10 @@ func TestCorrectnessNoCallbackInParseTryFiresOnClaudeStream(test *testing.T) {
 func TestCorrectnessNoCallbackInParseTryStaysSilentOnFixedClaudeStream(test *testing.T) {
 	test.Parallel()
 
-	rule_testing.ExpectClean(test, correctnessNoCallbackInParseTryRun(test, correctnessNoCallbackInParseTryClaudeStream(true)))
+	rule_testing.ExpectClean(
+		test,
+		correctnessNoCallbackInParseTryRun(test, correctnessNoCallbackInParseTryClaudeStream(true)),
+	)
 }
 
 // The new copy at `XStreamApi.ts:45`, under an empty catch.
@@ -231,7 +238,10 @@ func TestCorrectnessNoCallbackInParseTryFiresOnXStream(test *testing.T) {
 func TestCorrectnessNoCallbackInParseTryStaysSilentOnFixedXStream(test *testing.T) {
 	test.Parallel()
 
-	rule_testing.ExpectClean(test, correctnessNoCallbackInParseTryRun(test, correctnessNoCallbackInParseTryXStream(true)))
+	rule_testing.ExpectClean(
+		test,
+		correctnessNoCallbackInParseTryRun(test, correctnessNoCallbackInParseTryXStream(true)),
+	)
 }
 
 func TestCorrectnessNoCallbackInParseTryFires(test *testing.T) {
@@ -604,7 +614,10 @@ func TestCorrectnessNoCallbackInParseTryStaysSilent(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 
-			rule_testing.ExpectClean(test, correctnessNoCallbackInParseTryRun(test, correctnessNoCallbackInParseTrySource(testCase.lines...)))
+			rule_testing.ExpectClean(
+				test,
+				correctnessNoCallbackInParseTryRun(test, correctnessNoCallbackInParseTrySource(testCase.lines...)),
+			)
 		})
 	}
 }

@@ -75,38 +75,130 @@ var preferDestructuringCleanCases = []preferDestructuringCase{
 	{name: "upstream valid[0]", source: `var [foo] = array;`, optionsJson: ""},
 	{name: "upstream valid[1]", source: `var { foo } = object;`, optionsJson: ""},
 	{name: "upstream valid[2]", source: `var foo;`, optionsJson: ""},
-	{name: "upstream valid[3]", source: `var foo = object.bar;`, optionsJson: `[{"VariableDeclarator": {"object": true}}]`},
+	{
+		name:        "upstream valid[3]",
+		source:      `var foo = object.bar;`,
+		optionsJson: `[{"VariableDeclarator": {"object": true}}]`,
+	},
 	{name: "upstream valid[4]", source: `var foo = object.bar;`, optionsJson: `[{"object": true}]`},
-	{name: "upstream valid[5]", source: `var foo = object.bar;`, optionsJson: `[{"VariableDeclarator": {"object": true}}, {"enforceForRenamedProperties": false}]`},
-	{name: "upstream valid[6]", source: `var foo = object.bar;`, optionsJson: `[{"object": true}, {"enforceForRenamedProperties": false}]`},
-	{name: "upstream valid[7]", source: `var foo = object['bar'];`, optionsJson: `[{"VariableDeclarator": {"object": true}}, {"enforceForRenamedProperties": false}]`},
-	{name: "upstream valid[8]", source: `var foo = object[bar];`, optionsJson: `[{"object": true}, {"enforceForRenamedProperties": false}]`},
-	{name: "upstream valid[9]", source: `var { bar: foo } = object;`, optionsJson: `[{"VariableDeclarator": {"object": true}}, {"enforceForRenamedProperties": true}]`},
-	{name: "upstream valid[10]", source: `var { bar: foo } = object;`, optionsJson: `[{"object": true}, {"enforceForRenamedProperties": true}]`},
-	{name: "upstream valid[11]", source: `var { [bar]: foo } = object;`, optionsJson: `[{"VariableDeclarator": {"object": true}}, {"enforceForRenamedProperties": true}]`},
-	{name: "upstream valid[12]", source: `var { [bar]: foo } = object;`, optionsJson: `[{"object": true}, {"enforceForRenamedProperties": true}]`},
-	{name: "upstream valid[13]", source: `var foo = array[0];`, optionsJson: `[{"VariableDeclarator": {"array": false}}]`},
+	{
+		name:        "upstream valid[5]",
+		source:      `var foo = object.bar;`,
+		optionsJson: `[{"VariableDeclarator": {"object": true}}, {"enforceForRenamedProperties": false}]`,
+	},
+	{
+		name:        "upstream valid[6]",
+		source:      `var foo = object.bar;`,
+		optionsJson: `[{"object": true}, {"enforceForRenamedProperties": false}]`,
+	},
+	{
+		name:        "upstream valid[7]",
+		source:      `var foo = object['bar'];`,
+		optionsJson: `[{"VariableDeclarator": {"object": true}}, {"enforceForRenamedProperties": false}]`,
+	},
+	{
+		name:        "upstream valid[8]",
+		source:      `var foo = object[bar];`,
+		optionsJson: `[{"object": true}, {"enforceForRenamedProperties": false}]`,
+	},
+	{
+		name:        "upstream valid[9]",
+		source:      `var { bar: foo } = object;`,
+		optionsJson: `[{"VariableDeclarator": {"object": true}}, {"enforceForRenamedProperties": true}]`,
+	},
+	{
+		name:        "upstream valid[10]",
+		source:      `var { bar: foo } = object;`,
+		optionsJson: `[{"object": true}, {"enforceForRenamedProperties": true}]`,
+	},
+	{
+		name:        "upstream valid[11]",
+		source:      `var { [bar]: foo } = object;`,
+		optionsJson: `[{"VariableDeclarator": {"object": true}}, {"enforceForRenamedProperties": true}]`,
+	},
+	{
+		name:        "upstream valid[12]",
+		source:      `var { [bar]: foo } = object;`,
+		optionsJson: `[{"object": true}, {"enforceForRenamedProperties": true}]`,
+	},
+	{
+		name:        "upstream valid[13]",
+		source:      `var foo = array[0];`,
+		optionsJson: `[{"VariableDeclarator": {"array": false}}]`,
+	},
 	{name: "upstream valid[14]", source: `var foo = array[0];`, optionsJson: `[{"array": false}]`},
-	{name: "upstream valid[15]", source: `var foo = object.foo;`, optionsJson: `[{"VariableDeclarator": {"object": false}}]`},
-	{name: "upstream valid[16]", source: `var foo = object['foo'];`, optionsJson: `[{"VariableDeclarator": {"object": false}}]`},
+	{
+		name:        "upstream valid[15]",
+		source:      `var foo = object.foo;`,
+		optionsJson: `[{"VariableDeclarator": {"object": false}}]`,
+	},
+	{
+		name:        "upstream valid[16]",
+		source:      `var foo = object['foo'];`,
+		optionsJson: `[{"VariableDeclarator": {"object": false}}]`,
+	},
 	{name: "upstream valid[17]", source: `({ foo } = object);`, optionsJson: ""},
-	{name: "upstream valid[18]", source: `var foo = array[0];`, optionsJson: `[{"VariableDeclarator": {"array": false}}, {"enforceForRenamedProperties": true}]`},
-	{name: "upstream valid[19]", source: `var foo = array[0];`, optionsJson: `[{"array": false}, {"enforceForRenamedProperties": true}]`},
+	{
+		name:        "upstream valid[18]",
+		source:      `var foo = array[0];`,
+		optionsJson: `[{"VariableDeclarator": {"array": false}}, {"enforceForRenamedProperties": true}]`,
+	},
+	{
+		name:        "upstream valid[19]",
+		source:      `var foo = array[0];`,
+		optionsJson: `[{"array": false}, {"enforceForRenamedProperties": true}]`,
+	},
 	{name: "upstream valid[20]", source: `[foo] = array;`, optionsJson: ""},
 	{name: "upstream valid[21]", source: `foo += array[0]`, optionsJson: ""},
 	{name: "upstream valid[22]", source: `foo &&= array[0]`, optionsJson: ""},
 	{name: "upstream valid[23]", source: `foo += bar.foo`, optionsJson: ""},
 	{name: "upstream valid[24]", source: `foo ||= bar.foo`, optionsJson: ""},
 	{name: "upstream valid[25]", source: `foo ??= bar['foo']`, optionsJson: ""},
-	{name: "upstream valid[26]", source: `foo = object.foo;`, optionsJson: `[{"AssignmentExpression": {"object": false}}, {"enforceForRenamedProperties": true}]`},
-	{name: "upstream valid[27]", source: `foo = object.foo;`, optionsJson: `[{"AssignmentExpression": {"object": false}}, {"enforceForRenamedProperties": false}]`},
-	{name: "upstream valid[28]", source: `foo = array[0];`, optionsJson: `[{"AssignmentExpression": {"array": false}}, {"enforceForRenamedProperties": true}]`},
-	{name: "upstream valid[29]", source: `foo = array[0];`, optionsJson: `[{"AssignmentExpression": {"array": false}}, {"enforceForRenamedProperties": false}]`},
-	{name: "upstream valid[30]", source: `foo = array[0];`, optionsJson: `[{"VariableDeclarator": {"array": true}, "AssignmentExpression": {"array": false}}, {"enforceForRenamedProperties": false}]`},
-	{name: "upstream valid[31]", source: `var foo = array[0];`, optionsJson: `[{"VariableDeclarator": {"array": false}, "AssignmentExpression": {"array": true}}, {"enforceForRenamedProperties": false}]`},
-	{name: "upstream valid[32]", source: `foo = object.foo;`, optionsJson: `[{"VariableDeclarator": {"object": true}, "AssignmentExpression": {"object": false}}]`},
-	{name: "upstream valid[33]", source: `var foo = object.foo;`, optionsJson: `[{"VariableDeclarator": {"object": false}, "AssignmentExpression": {"object": true}}]`},
-	{name: "upstream valid[34]", source: `class Foo extends Bar { static foo() {var foo = super.foo} }`, optionsJson: ""},
+	{
+		name:        "upstream valid[26]",
+		source:      `foo = object.foo;`,
+		optionsJson: `[{"AssignmentExpression": {"object": false}}, {"enforceForRenamedProperties": true}]`,
+	},
+	{
+		name:        "upstream valid[27]",
+		source:      `foo = object.foo;`,
+		optionsJson: `[{"AssignmentExpression": {"object": false}}, {"enforceForRenamedProperties": false}]`,
+	},
+	{
+		name:        "upstream valid[28]",
+		source:      `foo = array[0];`,
+		optionsJson: `[{"AssignmentExpression": {"array": false}}, {"enforceForRenamedProperties": true}]`,
+	},
+	{
+		name:        "upstream valid[29]",
+		source:      `foo = array[0];`,
+		optionsJson: `[{"AssignmentExpression": {"array": false}}, {"enforceForRenamedProperties": false}]`,
+	},
+	{
+		name:        "upstream valid[30]",
+		source:      `foo = array[0];`,
+		optionsJson: `[{"VariableDeclarator": {"array": true}, "AssignmentExpression": {"array": false}}, {"enforceForRenamedProperties": false}]`,
+	},
+	{
+		name:        "upstream valid[31]",
+		source:      `var foo = array[0];`,
+		optionsJson: `[{"VariableDeclarator": {"array": false}, "AssignmentExpression": {"array": true}}, {"enforceForRenamedProperties": false}]`,
+	},
+	{
+		name:        "upstream valid[32]",
+		source:      `foo = object.foo;`,
+		optionsJson: `[{"VariableDeclarator": {"object": true}, "AssignmentExpression": {"object": false}}]`,
+	},
+	{
+		name:        "upstream valid[33]",
+		source:      `var foo = object.foo;`,
+		optionsJson: `[{"VariableDeclarator": {"object": false}, "AssignmentExpression": {"object": true}}]`,
+	},
+	{
+		name:        "upstream valid[34]",
+		source:      `class Foo extends Bar { static foo() {var foo = super.foo} }`,
+		optionsJson: "",
+	},
 	{name: "upstream valid[35]", source: `foo = bar[foo];`, optionsJson: ""},
 	{name: "upstream valid[36]", source: `var foo = bar[foo];`, optionsJson: ""},
 	{name: "upstream valid[37]", source: `var {foo: {bar}} = object;`, optionsJson: `[{"object": true}]`},
@@ -116,13 +208,41 @@ var preferDestructuringCleanCases = []preferDestructuringCase{
 	{name: "upstream valid[41]", source: `class C { #x; foo() { const x = this.#x; } }`, optionsJson: ""},
 	{name: "upstream valid[42]", source: `class C { #x; foo() { x = this.#x; } }`, optionsJson: ""},
 	{name: "upstream valid[43]", source: `class C { #x; foo(a) { x = a.#x; } }`, optionsJson: ""},
-	{name: "upstream valid[44]", source: `class C { #x; foo() { const x = this.#x; } }`, optionsJson: `[{"array": true, "object": true}, {"enforceForRenamedProperties": true}]`},
-	{name: "upstream valid[45]", source: `class C { #x; foo() { const y = this.#x; } }`, optionsJson: `[{"array": true, "object": true}, {"enforceForRenamedProperties": true}]`},
-	{name: "upstream valid[46]", source: `class C { #x; foo() { x = this.#x; } }`, optionsJson: `[{"array": true, "object": true}, {"enforceForRenamedProperties": true}]`},
-	{name: "upstream valid[47]", source: `class C { #x; foo() { y = this.#x; } }`, optionsJson: `[{"array": true, "object": true}, {"enforceForRenamedProperties": true}]`},
-	{name: "upstream valid[48]", source: `class C { #x; foo(a) { x = a.#x; } }`, optionsJson: `[{"array": true, "object": true}, {"enforceForRenamedProperties": true}]`},
-	{name: "upstream valid[49]", source: `class C { #x; foo(a) { y = a.#x; } }`, optionsJson: `[{"array": true, "object": true}, {"enforceForRenamedProperties": true}]`},
-	{name: "upstream valid[50]", source: `class C { #x; foo() { x = this.a.#x; } }`, optionsJson: `[{"array": true, "object": true}, {"enforceForRenamedProperties": true}]`},
+	{
+		name:        "upstream valid[44]",
+		source:      `class C { #x; foo() { const x = this.#x; } }`,
+		optionsJson: `[{"array": true, "object": true}, {"enforceForRenamedProperties": true}]`,
+	},
+	{
+		name:        "upstream valid[45]",
+		source:      `class C { #x; foo() { const y = this.#x; } }`,
+		optionsJson: `[{"array": true, "object": true}, {"enforceForRenamedProperties": true}]`,
+	},
+	{
+		name:        "upstream valid[46]",
+		source:      `class C { #x; foo() { x = this.#x; } }`,
+		optionsJson: `[{"array": true, "object": true}, {"enforceForRenamedProperties": true}]`,
+	},
+	{
+		name:        "upstream valid[47]",
+		source:      `class C { #x; foo() { y = this.#x; } }`,
+		optionsJson: `[{"array": true, "object": true}, {"enforceForRenamedProperties": true}]`,
+	},
+	{
+		name:        "upstream valid[48]",
+		source:      `class C { #x; foo(a) { x = a.#x; } }`,
+		optionsJson: `[{"array": true, "object": true}, {"enforceForRenamedProperties": true}]`,
+	},
+	{
+		name:        "upstream valid[49]",
+		source:      `class C { #x; foo(a) { y = a.#x; } }`,
+		optionsJson: `[{"array": true, "object": true}, {"enforceForRenamedProperties": true}]`,
+	},
+	{
+		name:        "upstream valid[50]",
+		source:      `class C { #x; foo() { x = this.a.#x; } }`,
+		optionsJson: `[{"array": true, "object": true}, {"enforceForRenamedProperties": true}]`,
+	},
 	{name: "upstream valid[51]", source: `using foo = array[0];`, optionsJson: ""},
 	{name: "upstream valid[52]", source: `using foo = object.foo;`, optionsJson: ""},
 	{name: "upstream valid[53]", source: `await using foo = array[0];`, optionsJson: ""},
@@ -740,7 +860,9 @@ func TestPreferDestructuringDecoderReadsBothSchemaElements(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, decodePreferDestructuringOptionsError := DecodePreferDestructuringOptions(json.RawMessage(testCase.raw))
+			decoded, decodePreferDestructuringOptionsError := DecodePreferDestructuringOptions(
+				json.RawMessage(testCase.raw),
+			)
 			if testCase.wantErr {
 				if decodePreferDestructuringOptionsError == nil {
 					test.Fatalf("expected the decoder to refuse %s, got %#v", testCase.raw, decoded)

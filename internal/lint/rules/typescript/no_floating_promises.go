@@ -341,7 +341,10 @@ var NoFloatingPromises = rule.Rule{
 			parameter *ast.Symbol,
 			node *ast.Node,
 		) bool {
-			t := checker.Checker_getApparentType(ruleContext.TypeChecker, ruleContext.TypeChecker.GetTypeOfSymbolAtLocation(parameter, node))
+			t := checker.Checker_getApparentType(
+				ruleContext.TypeChecker,
+				ruleContext.TypeChecker.GetTypeOfSymbolAtLocation(parameter, node),
+			)
 
 			for part := range type_checking.UnionTypePartsSeq(t) {
 				if len(type_checking.GetCallSignatures(ruleContext.TypeChecker, part)) != 0 {
@@ -394,7 +397,9 @@ var NoFloatingPromises = rule.Rule{
 					thenType,
 					func(signature *checker.Signature) bool {
 						parameters := checker.Signature_parameters(signature)
-						return len(parameters) >= 2 && isFunctionParam(parameters[0], node) && isFunctionParam(parameters[1], node)
+						return len(parameters) >= 2 &&
+							isFunctionParam(parameters[0], node) &&
+							isFunctionParam(parameters[1], node)
 					}) {
 					return true
 				}
@@ -415,7 +420,10 @@ var NoFloatingPromises = rule.Rule{
 				}
 
 				if checker.IsTupleType(apparent) {
-					for _, tupleElementType := range checker.Checker_getTypeArguments(ruleContext.TypeChecker, apparent) {
+					for _, tupleElementType := range checker.Checker_getTypeArguments(
+						ruleContext.TypeChecker,
+						apparent,
+					) {
 						if isPromiseLike(node, tupleElementType) {
 							return true
 						}
@@ -451,7 +459,10 @@ var NoFloatingPromises = rule.Rule{
 		}
 
 		isValidRejectionHandler := func(rejectionHandler *ast.Node) bool {
-			return len(type_checking.GetCallSignatures(ruleContext.TypeChecker, ruleContext.TypeChecker.GetTypeAtLocation(rejectionHandler))) > 0
+			return len(type_checking.GetCallSignatures(
+				ruleContext.TypeChecker,
+				ruleContext.TypeChecker.GetTypeAtLocation(rejectionHandler),
+			)) > 0
 		}
 
 		var isUnhandledPromise func(
@@ -756,7 +767,9 @@ func DecodeNoFloatingPromisesOptions(raw []byte) (any, error) {
 		IgnoreVoid:     wire.IgnoreVoid,
 	}
 	options.AllowForKnownSafeCalls, options.AllowForKnownSafeCallsInline = specifiersFrom(wire.AllowForKnownSafeCalls)
-	options.AllowForKnownSafePromises, options.AllowForKnownSafePromisesInline = specifiersFrom(wire.AllowForKnownSafePromises)
+	options.AllowForKnownSafePromises, options.AllowForKnownSafePromisesInline = specifiersFrom(
+		wire.AllowForKnownSafePromises,
+	)
 
 	return options, nil
 }

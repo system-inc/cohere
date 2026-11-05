@@ -35,7 +35,8 @@ func TestNoConsoleStaysSilent(test *testing.T) {
 		sourceText string
 	}{
 		{
-			// The receiver of the outer access is window.console rather than the identifier console, so it is silent. Upstream reads a name rather than resolving a binding.
+			// The receiver of the outer access is window.console rather than the identifier console, so it is silent.
+			// Upstream reads a name rather than resolving a binding.
 			sourceText: "window.console.log(\"x\");",
 		},
 		{
@@ -55,14 +56,18 @@ func TestNoConsoleStaysSilent(test *testing.T) {
 			sourceText: "const c = console;",
 		},
 		{
-			// Destructuring is not a member access, so it is silent. That is a real hole in the rule and it is upstreams, reproduced rather than closed.
+			// Destructuring is not a member access, so it is silent. That is a real hole in the rule and it is
+			// upstreams, reproduced rather than closed.
 			sourceText: "const { log } = console;",
 		},
 	}
 	for index, testCase := range cases {
 		test.Run(consistencyNoConsoleCaseName(index), func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.Run(test, ConsistencyNoConsole, consistencyNoConsoleFile, testCase.sourceText))
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.Run(test, ConsistencyNoConsole, consistencyNoConsoleFile, testCase.sourceText),
+			)
 		})
 	}
 }
@@ -84,130 +89,195 @@ func TestNoConsoleFires(test *testing.T) {
 			// The ordinary case.
 			sourceText: "console.log(\"x\");",
 			wantFindings: []consistencyNoConsoleFinding{
-				{wantSpan: "console.log", wantMessage: "Do not call 'console.log'. Reach the tier that owns this failure and call '.log.error(identifier, data, error)' or '.log.warning(...)' for a row, or '.log.debug(message)' for a line that never becomes one."},
+				{
+					wantSpan:    "console.log",
+					wantMessage: "Do not call 'console.log'. Reach the tier that owns this failure and call '.log.error(identifier, data, error)' or '.log.warning(...)' for a row, or '.log.debug(message)' for a line that never becomes one.",
+				},
 			},
 		},
 		{
 			// Every method reports, not just log.
 			sourceText: "console.error(\"x\");",
 			wantFindings: []consistencyNoConsoleFinding{
-				{wantSpan: "console.error", wantMessage: "Do not call 'console.error'. Reach the tier that owns this failure and call '.log.error(identifier, data, error)' or '.log.warning(...)' for a row, or '.log.debug(message)' for a line that never becomes one."},
+				{
+					wantSpan:    "console.error",
+					wantMessage: "Do not call 'console.error'. Reach the tier that owns this failure and call '.log.error(identifier, data, error)' or '.log.warning(...)' for a row, or '.log.debug(message)' for a line that never becomes one.",
+				},
 			},
 		},
 		{
 			sourceText: "console.warn(\"x\");",
 			wantFindings: []consistencyNoConsoleFinding{
-				{wantSpan: "console.warn", wantMessage: "Do not call 'console.warn'. Reach the tier that owns this failure and call '.log.error(identifier, data, error)' or '.log.warning(...)' for a row, or '.log.debug(message)' for a line that never becomes one."},
+				{
+					wantSpan:    "console.warn",
+					wantMessage: "Do not call 'console.warn'. Reach the tier that owns this failure and call '.log.error(identifier, data, error)' or '.log.warning(...)' for a row, or '.log.debug(message)' for a line that never becomes one.",
+				},
 			},
 		},
 		{
 			sourceText: "console.debug(\"x\");",
 			wantFindings: []consistencyNoConsoleFinding{
-				{wantSpan: "console.debug", wantMessage: "Do not call 'console.debug'. Reach the tier that owns this failure and call '.log.error(identifier, data, error)' or '.log.warning(...)' for a row, or '.log.debug(message)' for a line that never becomes one."},
+				{
+					wantSpan:    "console.debug",
+					wantMessage: "Do not call 'console.debug'. Reach the tier that owns this failure and call '.log.error(identifier, data, error)' or '.log.warning(...)' for a row, or '.log.debug(message)' for a line that never becomes one.",
+				},
 			},
 		},
 		{
 			sourceText: "console.table(rows);",
 			wantFindings: []consistencyNoConsoleFinding{
-				{wantSpan: "console.table", wantMessage: "Do not call 'console.table'. Reach the tier that owns this failure and call '.log.error(identifier, data, error)' or '.log.warning(...)' for a row, or '.log.debug(message)' for a line that never becomes one."},
+				{
+					wantSpan:    "console.table",
+					wantMessage: "Do not call 'console.table'. Reach the tier that owns this failure and call '.log.error(identifier, data, error)' or '.log.warning(...)' for a row, or '.log.debug(message)' for a line that never becomes one.",
+				},
 			},
 		},
 		{
 			sourceText: "console.trace();",
 			wantFindings: []consistencyNoConsoleFinding{
-				{wantSpan: "console.trace", wantMessage: "Do not call 'console.trace'. Reach the tier that owns this failure and call '.log.error(identifier, data, error)' or '.log.warning(...)' for a row, or '.log.debug(message)' for a line that never becomes one."},
+				{
+					wantSpan:    "console.trace",
+					wantMessage: "Do not call 'console.trace'. Reach the tier that owns this failure and call '.log.error(identifier, data, error)' or '.log.warning(...)' for a row, or '.log.debug(message)' for a line that never becomes one.",
+				},
 			},
 		},
 		{
-			// An alias. This is why the anchor is a member access rather than a call: a call-shaped check misses this while reporting itself clean.
+			// An alias. This is why the anchor is a member access rather than a call: a call-shaped check misses this
+			// while reporting itself clean.
 			sourceText: "const log = console.log;",
 			wantFindings: []consistencyNoConsoleFinding{
-				{wantSpan: "console.log", wantMessage: "Do not call 'console.log'. Reach the tier that owns this failure and call '.log.error(identifier, data, error)' or '.log.warning(...)' for a row, or '.log.debug(message)' for a line that never becomes one."},
+				{
+					wantSpan:    "console.log",
+					wantMessage: "Do not call 'console.log'. Reach the tier that owns this failure and call '.log.error(identifier, data, error)' or '.log.warning(...)' for a row, or '.log.debug(message)' for a line that never becomes one.",
+				},
 			},
 		},
 		{
 			// The same escape as a callback argument.
 			sourceText: "foo(console.error);",
 			wantFindings: []consistencyNoConsoleFinding{
-				{wantSpan: "console.error", wantMessage: "Do not call 'console.error'. Reach the tier that owns this failure and call '.log.error(identifier, data, error)' or '.log.warning(...)' for a row, or '.log.debug(message)' for a line that never becomes one."},
+				{
+					wantSpan:    "console.error",
+					wantMessage: "Do not call 'console.error'. Reach the tier that owns this failure and call '.log.error(identifier, data, error)' or '.log.warning(...)' for a row, or '.log.debug(message)' for a line that never becomes one.",
+				},
 			},
 		},
 		{
 			// And exported, where it would outlive the file.
 			sourceText: "export const w = console.warn;",
 			wantFindings: []consistencyNoConsoleFinding{
-				{wantSpan: "console.warn", wantMessage: "Do not call 'console.warn'. Reach the tier that owns this failure and call '.log.error(identifier, data, error)' or '.log.warning(...)' for a row, or '.log.debug(message)' for a line that never becomes one."},
+				{
+					wantSpan:    "console.warn",
+					wantMessage: "Do not call 'console.warn'. Reach the tier that owns this failure and call '.log.error(identifier, data, error)' or '.log.warning(...)' for a row, or '.log.debug(message)' for a line that never becomes one.",
+				},
 			},
 		},
 		{
 			// A computed key. The message renders the fallback word log rather than the key.
 			sourceText: "console[\"log\"](\"x\");",
 			wantFindings: []consistencyNoConsoleFinding{
-				{wantSpan: "console[\"log\"]", wantMessage: "Do not call 'console.log'. Reach the tier that owns this failure and call '.log.error(identifier, data, error)' or '.log.warning(...)' for a row, or '.log.debug(message)' for a line that never becomes one."},
+				{
+					wantSpan:    "console[\"log\"]",
+					wantMessage: "Do not call 'console.log'. Reach the tier that owns this failure and call '.log.error(identifier, data, error)' or '.log.warning(...)' for a row, or '.log.debug(message)' for a line that never becomes one.",
+				},
 			},
 		},
 		{
-			// The fallback again, and this is the row that shows it: upstream renders console.log here even though the key is error, because its ternary only reads an Identifier property.
+			// The fallback again, and this is the row that shows it: upstream renders console.log here even though the
+			// key is error, because its ternary only reads an Identifier property.
 			sourceText: "console[\"error\"](\"x\");",
 			wantFindings: []consistencyNoConsoleFinding{
-				{wantSpan: "console[\"error\"]", wantMessage: "Do not call 'console.log'. Reach the tier that owns this failure and call '.log.error(identifier, data, error)' or '.log.warning(...)' for a row, or '.log.debug(message)' for a line that never becomes one."},
+				{
+					wantSpan:    "console[\"error\"]",
+					wantMessage: "Do not call 'console.log'. Reach the tier that owns this failure and call '.log.error(identifier, data, error)' or '.log.warning(...)' for a row, or '.log.debug(message)' for a line that never becomes one.",
+				},
 			},
 		},
 		{
 			// A non-literal computed key, same fallback.
 			sourceText: "console[key](\"x\");",
 			wantFindings: []consistencyNoConsoleFinding{
-				{wantSpan: "console[key]", wantMessage: "Do not call 'console.key'. Reach the tier that owns this failure and call '.log.error(identifier, data, error)' or '.log.warning(...)' for a row, or '.log.debug(message)' for a line that never becomes one."},
+				{
+					wantSpan:    "console[key]",
+					wantMessage: "Do not call 'console.key'. Reach the tier that owns this failure and call '.log.error(identifier, data, error)' or '.log.warning(...)' for a row, or '.log.debug(message)' for a line that never becomes one.",
+				},
 			},
 		},
 		{
 			// Two findings in one statement pair.
 			sourceText: "console.log(\"a\"); console.warn(\"b\");",
 			wantFindings: []consistencyNoConsoleFinding{
-				{wantSpan: "console.log", wantMessage: "Do not call 'console.log'. Reach the tier that owns this failure and call '.log.error(identifier, data, error)' or '.log.warning(...)' for a row, or '.log.debug(message)' for a line that never becomes one."},
-				{wantSpan: "console.warn", wantMessage: "Do not call 'console.warn'. Reach the tier that owns this failure and call '.log.error(identifier, data, error)' or '.log.warning(...)' for a row, or '.log.debug(message)' for a line that never becomes one."},
+				{
+					wantSpan:    "console.log",
+					wantMessage: "Do not call 'console.log'. Reach the tier that owns this failure and call '.log.error(identifier, data, error)' or '.log.warning(...)' for a row, or '.log.debug(message)' for a line that never becomes one.",
+				},
+				{
+					wantSpan:    "console.warn",
+					wantMessage: "Do not call 'console.warn'. Reach the tier that owns this failure and call '.log.error(identifier, data, error)' or '.log.warning(...)' for a row, or '.log.debug(message)' for a line that never becomes one.",
+				},
 			},
 		},
 		{
 			// Inside a class method.
 			sourceText: "class A { m() { console.log(\"x\"); } }",
 			wantFindings: []consistencyNoConsoleFinding{
-				{wantSpan: "console.log", wantMessage: "Do not call 'console.log'. Reach the tier that owns this failure and call '.log.error(identifier, data, error)' or '.log.warning(...)' for a row, or '.log.debug(message)' for a line that never becomes one."},
+				{
+					wantSpan:    "console.log",
+					wantMessage: "Do not call 'console.log'. Reach the tier that owns this failure and call '.log.error(identifier, data, error)' or '.log.warning(...)' for a row, or '.log.debug(message)' for a line that never becomes one.",
+				},
 			},
 		},
 		{
 			// Inside a branch without a block.
 			sourceText: "if(x) console.log(\"x\");",
 			wantFindings: []consistencyNoConsoleFinding{
-				{wantSpan: "console.log", wantMessage: "Do not call 'console.log'. Reach the tier that owns this failure and call '.log.error(identifier, data, error)' or '.log.warning(...)' for a row, or '.log.debug(message)' for a line that never becomes one."},
+				{
+					wantSpan:    "console.log",
+					wantMessage: "Do not call 'console.log'. Reach the tier that owns this failure and call '.log.error(identifier, data, error)' or '.log.warning(...)' for a row, or '.log.debug(message)' for a line that never becomes one.",
+				},
 			},
 		},
 		{
 			// An optional chain still reports.
 			sourceText: "console?.log(\"x\");",
 			wantFindings: []consistencyNoConsoleFinding{
-				{wantSpan: "console?.log", wantMessage: "Do not call 'console.log'. Reach the tier that owns this failure and call '.log.error(identifier, data, error)' or '.log.warning(...)' for a row, or '.log.debug(message)' for a line that never becomes one."},
+				{
+					wantSpan:    "console?.log",
+					wantMessage: "Do not call 'console.log'. Reach the tier that owns this failure and call '.log.error(identifier, data, error)' or '.log.warning(...)' for a row, or '.log.debug(message)' for a line that never becomes one.",
+				},
 			},
 		},
 		{
 			// An optional call over a plain access reports, and the span is the access.
 			sourceText: "console.log?.(\"x\");",
 			wantFindings: []consistencyNoConsoleFinding{
-				{wantSpan: "console.log", wantMessage: "Do not call 'console.log'. Reach the tier that owns this failure and call '.log.error(identifier, data, error)' or '.log.warning(...)' for a row, or '.log.debug(message)' for a line that never becomes one."},
+				{
+					wantSpan:    "console.log",
+					wantMessage: "Do not call 'console.log'. Reach the tier that owns this failure and call '.log.error(identifier, data, error)' or '.log.warning(...)' for a row, or '.log.debug(message)' for a line that never becomes one.",
+				},
 			},
 		},
 		{
-			// A parenthesized receiver. estree folds the parenthesis so upstream sees the identifier and reports; our parser keeps the node, so the rule unwraps it. This was the one disagreement in twenty five probed inputs before the unwrap was added.
+			// A parenthesized receiver. estree folds the parenthesis so upstream sees the identifier and reports; our
+			// parser keeps the node, so the rule unwraps it. This was the one disagreement in twenty five probed inputs
+			// before the unwrap was added.
 			sourceText: "(console).log(\"x\");",
 			wantFindings: []consistencyNoConsoleFinding{
-				{wantSpan: "(console).log", wantMessage: "Do not call 'console.log'. Reach the tier that owns this failure and call '.log.error(identifier, data, error)' or '.log.warning(...)' for a row, or '.log.debug(message)' for a line that never becomes one."},
+				{
+					wantSpan:    "(console).log",
+					wantMessage: "Do not call 'console.log'. Reach the tier that owns this failure and call '.log.error(identifier, data, error)' or '.log.warning(...)' for a row, or '.log.debug(message)' for a line that never becomes one.",
+				},
 			},
 		},
 		{
-			// Nested access reports once, on the inner console.a, because that is the only access whose receiver is the identifier.
+			// Nested access reports once, on the inner console.a, because that is the only access whose receiver is the
+			// identifier.
 			sourceText: "console.a.b(\"x\");",
 			wantFindings: []consistencyNoConsoleFinding{
-				{wantSpan: "console.a", wantMessage: "Do not call 'console.a'. Reach the tier that owns this failure and call '.log.error(identifier, data, error)' or '.log.warning(...)' for a row, or '.log.debug(message)' for a line that never becomes one."},
+				{
+					wantSpan:    "console.a",
+					wantMessage: "Do not call 'console.a'. Reach the tier that owns this failure and call '.log.error(identifier, data, error)' or '.log.warning(...)' for a row, or '.log.debug(message)' for a line that never becomes one.",
+				},
 			},
 		},
 	}
@@ -229,7 +299,12 @@ func TestNoConsoleFires(test *testing.T) {
 					test.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
 				}
 				if diagnostic.Message.Description != want.wantMessage {
-					test.Fatalf("finding %d message: expected %q, got %q", position, want.wantMessage, diagnostic.Message.Description)
+					test.Fatalf(
+						"finding %d message: expected %q, got %q",
+						position,
+						want.wantMessage,
+						diagnostic.Message.Description,
+					)
 				}
 
 				// No repair. Upstream ships none and says why: replacing a console call means
@@ -273,8 +348,11 @@ func TestNoConsoleReportsAnyBindingNamedConsole(test *testing.T) {
 	for index, sourceText := range reporting {
 		test.Run("reports"+strconv.Itoa(index), func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectFindings(test, rule_testing.Run(test, ConsistencyNoConsole, consistencyNoConsoleFile, sourceText),
-				"consistencyNoConsole")
+			rule_testing.ExpectFindings(
+				test,
+				rule_testing.Run(test, ConsistencyNoConsole, consistencyNoConsoleFile, sourceText),
+				"consistencyNoConsole",
+			)
 		})
 	}
 
@@ -288,7 +366,10 @@ func TestNoConsoleReportsAnyBindingNamedConsole(test *testing.T) {
 	for index, sourceText := range clean {
 		test.Run("clean"+strconv.Itoa(index), func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.Run(test, ConsistencyNoConsole, consistencyNoConsoleFile, sourceText))
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.Run(test, ConsistencyNoConsole, consistencyNoConsoleFile, sourceText),
+			)
 		})
 	}
 }

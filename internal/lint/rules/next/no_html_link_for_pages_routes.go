@@ -59,7 +59,11 @@ var noHtmlLinkForPagesRouteModels struct {
 
 // noHtmlLinkForPagesRouteModelFor returns the route model for one root and one setting of the option,
 // building it on the first ask in this program.
-func noHtmlLinkForPagesRouteModelFor(program rule.Program, root string, settings NoHtmlLinkForPagesOptions) *noHtmlLinkForPagesRouteModel {
+func noHtmlLinkForPagesRouteModelFor(
+	program rule.Program,
+	root string,
+	settings NoHtmlLinkForPagesOptions,
+) *noHtmlLinkForPagesRouteModel {
 	key := root + "\x00" + noHtmlLinkForPagesSettingsKey(settings)
 
 	noHtmlLinkForPagesRouteModels.Lock()
@@ -119,7 +123,11 @@ func noHtmlLinkForPagesSettingsKey(settings NoHtmlLinkForPagesOptions) string {
 // One reading differs, on input upstream crashes on. Upstream asks `fs.existsSync`, which is true for
 // a file as well as a directory, and then `readdirSync` throws `ENOTDIR` and the rule fails to load. A
 // file named `pages` is not a pages directory, so here it is simply not found.
-func buildNoHtmlLinkForPagesRouteModel(fileSystem vfs.FS, root string, settings NoHtmlLinkForPagesOptions) *noHtmlLinkForPagesRouteModel {
+func buildNoHtmlLinkForPagesRouteModel(
+	fileSystem vfs.FS,
+	root string,
+	settings NoHtmlLinkForPagesOptions,
+) *noHtmlLinkForPagesRouteModel {
 	pagesDirectories := settings.PagesDirectories
 	if !settings.Configured {
 		pagesDirectories = []string{filepath.Join(root, "pages"), filepath.Join(root, "src", "pages")}
@@ -297,7 +305,10 @@ func compileRouteSources(sources []string) []*esregexp.RegExp {
 			continue
 		}
 		seen[source] = true
-		compiled, compileError := esregexp.Compile(dynamicSegments.ReplaceAllLiteralString(source, dynamicSegmentPattern), "")
+		compiled, compileError := esregexp.Compile(
+			dynamicSegments.ReplaceAllLiteralString(source, dynamicSegmentPattern),
+			"",
+		)
 		if compileError != nil {
 			continue
 		}

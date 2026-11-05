@@ -19,7 +19,9 @@ func publicThemeSystem(test *testing.T) *LoadedDesignSystem {
 	if err != nil {
 		test.Fatalf("resolving the public theme: %v", err)
 	}
-	system, err := LoadDesignSystem(LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: vendored.TailwindPackageRoot()})
+	system, err := LoadDesignSystem(
+		LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: vendored.TailwindPackageRoot()},
+	)
 	if err != nil {
 		test.Fatalf("loading the public theme: %v", err)
 	}
@@ -35,8 +37,13 @@ func TestARootDeclaredBothWaysKeepsBothKindsOnThePublicTheme(test *testing.T) {
 		staticForm := system.HasUtility(root, UtilityKindStatic)
 		functionalForm := system.HasUtility(root, UtilityKindFunctional)
 		if !staticForm || !functionalForm {
-			test.Errorf("`@utility %s` and `@utility %s-*` are both declared and the system reports static=%v functional=%v",
-				root, root, staticForm, functionalForm)
+			test.Errorf(
+				"`@utility %s` and `@utility %s-*` are both declared and the system reports static=%v functional=%v",
+				root,
+				root,
+				staticForm,
+				functionalForm,
+			)
 		}
 	}
 }

@@ -171,7 +171,10 @@ func TestCompareManualMemoDependenciesGlobalRoots(test *testing.T) {
 	if got := CompareManualMemoDependencies(globalRoot("Math"), globalRoot("Math")); got != CompareDependencyOk {
 		test.Errorf("two globals of the same name returned %v, want ok", got)
 	}
-	if got := CompareManualMemoDependencies(globalRoot("Math"), globalRoot("Date")); got != CompareDependencyRootDifference {
+	if got := CompareManualMemoDependencies(
+		globalRoot("Math"),
+		globalRoot("Date"),
+	); got != CompareDependencyRootDifference {
 		test.Errorf("two globals of different names returned %v, want a root difference", got)
 	}
 	if got := CompareManualMemoDependencies(globalRoot("Math"), localRoot); got != CompareDependencyRootDifference {

@@ -1,7 +1,7 @@
 // The instruction set.
 //
-// 43 variants, matching upstream's count and names. See high_level_intermediate_representation.go's package comment for why fidelity
-// to upstream is the priority here and where it is deliberately broken.
+// 43 variants, matching upstream's count and names. See high_level_intermediate_representation.go's package comment for
+// why fidelity to upstream is the priority here and where it is deliberately broken.
 //
 // # Why an interface rather than a tagged struct
 //

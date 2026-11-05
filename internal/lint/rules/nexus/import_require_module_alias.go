@@ -51,7 +51,10 @@ var defaultModuleAliases = map[string]ModuleAlias{
 
 // importRequireModuleAliasRequireAliasNameText is the rule's `requireAliasName` message,
 // whose wording lives in `policy/messages/import-require-module-alias.json`.
-var importRequireModuleAliasRequireAliasNameText = policy.MessageOf("nexus/import-require-module-alias", "requireAliasName")
+var importRequireModuleAliasRequireAliasNameText = policy.MessageOf(
+	"nexus/import-require-module-alias",
+	"requireAliasName",
+)
 
 func messageRequireAliasName(source string, expected string, actual string) rule.Message {
 	return rule.Message{
@@ -66,7 +69,10 @@ func messageRequireAliasName(source string, expected string, actual string) rule
 
 // importRequireModuleAliasRequireDefaultStyleText is the rule's `requireDefaultStyle` message,
 // whose wording lives in `policy/messages/import-require-module-alias.json`.
-var importRequireModuleAliasRequireDefaultStyleText = policy.MessageOf("nexus/import-require-module-alias", "requireDefaultStyle")
+var importRequireModuleAliasRequireDefaultStyleText = policy.MessageOf(
+	"nexus/import-require-module-alias",
+	"requireDefaultStyle",
+)
 
 func messageRequireDefaultStyle(source string, expected string) rule.Message {
 	return rule.Message{
@@ -80,7 +86,10 @@ func messageRequireDefaultStyle(source string, expected string) rule.Message {
 
 // importRequireModuleAliasRequireNamespaceStyleText is the rule's `requireNamespaceStyle` message,
 // whose wording lives in `policy/messages/import-require-module-alias.json`.
-var importRequireModuleAliasRequireNamespaceStyleText = policy.MessageOf("nexus/import-require-module-alias", "requireNamespaceStyle")
+var importRequireModuleAliasRequireNamespaceStyleText = policy.MessageOf(
+	"nexus/import-require-module-alias",
+	"requireNamespaceStyle",
+)
 
 func messageRequireNamespaceStyle(source string, expected string) rule.Message {
 	return rule.Message{

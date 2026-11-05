@@ -40,40 +40,114 @@ func TestUseUnknownInCatchCallbackVariableStaysSilent(test *testing.T) {
 		sourceText string
 	}{
 		{"upstream valid 0", "\nPromise.resolve().catch((err: unknown) => {\n  throw err;\n});\n    "},
-		{"upstream valid 1", "\nlet x = Math.random() ? 'ca' + 'tch' : 'catch';\nPromise.resolve()[x]((err: Error) => {});\n    "},
-		{"upstream valid 2", "\nPromise.resolve().then(\n  () => {},\n  (err: unknown) => {\n    throw err;\n  },\n);\n    "},
+		{
+			"upstream valid 1",
+			"\nlet x = Math.random() ? 'ca' + 'tch' : 'catch';\nPromise.resolve()[x]((err: Error) => {});\n    ",
+		},
+		{
+			"upstream valid 2",
+			"\nPromise.resolve().then(\n  () => {},\n  (err: unknown) => {\n    throw err;\n  },\n);\n    ",
+		},
 		{"upstream valid 3", "\nPromise.resolve().catch(() => {\n  throw new Error();\n});\n    "},
 		{"upstream valid 4", "\nPromise.reject(new Error()).catch(\"not this rule's problem\");\n    "},
-		{"upstream valid 5", "\ndeclare const crappyHandler: (() => void) | 2;\nPromise.reject(new Error()).catch(crappyHandler);\n    "},
+		{
+			"upstream valid 5",
+			"\ndeclare const crappyHandler: (() => void) | 2;\nPromise.reject(new Error()).catch(crappyHandler);\n    ",
+		},
 		{"upstream valid 6", "\nPromise.resolve().catch((...args: [unknown]) => {\n  throw args[0];\n});\n    "},
-		{"upstream valid 7", "\nPromise.resolve().catch((...args: [a: unknown]) => {\n  const err = args[0];\n});\n    "},
-		{"upstream valid 8", "\nPromise.resolve().catch((...args: readonly unknown[]) => {\n  throw args[0];\n});\n    "},
-		{"upstream valid 9", "\ndeclare const notAPromise: { catch: (f: Function) => void };\nnotAPromise.catch((...args: [a: string, string]) => {\n  throw args[0];\n});\n    "},
-		{"upstream valid 10", "\ndeclare const catchArgs: [(x: unknown) => void];\nPromise.reject(new Error()).catch(...catchArgs);\n    "},
-		{"upstream valid 11", "\ndeclare const catchArgs: [\n  string | (() => never),\n  (shouldntFlag: string) => void,\n  number,\n];\nPromise.reject(new Error()).catch(...catchArgs);\n    "},
-		{"upstream valid 12", "\ndeclare const catchArgs: ['not callable'];\nPromise.reject(new Error()).catch(...catchArgs);\n    "},
-		{"upstream valid 13", "\ndeclare const emptySpread: [];\nPromise.reject(new Error()).catch(...emptySpread);\n    "},
-		{"upstream valid 14", "\nPromise.resolve().catch(\n  (\n    ...err: [unknown, string | ((number | unknown) & { b: () => void }), string]\n  ) => {\n    throw err;\n  },\n);\n    "},
-		{"upstream valid 15", "\ndeclare const notAMemberExpression: (...args: any[]) => {};\nnotAMemberExpression(\n  'This helps get 100% code cov',\n  \"but doesn't test anything useful related to the rule.\",\n);\n    "},
+		{
+			"upstream valid 7",
+			"\nPromise.resolve().catch((...args: [a: unknown]) => {\n  const err = args[0];\n});\n    ",
+		},
+		{
+			"upstream valid 8",
+			"\nPromise.resolve().catch((...args: readonly unknown[]) => {\n  throw args[0];\n});\n    ",
+		},
+		{
+			"upstream valid 9",
+			"\ndeclare const notAPromise: { catch: (f: Function) => void };\nnotAPromise.catch((...args: [a: string, string]) => {\n  throw args[0];\n});\n    ",
+		},
+		{
+			"upstream valid 10",
+			"\ndeclare const catchArgs: [(x: unknown) => void];\nPromise.reject(new Error()).catch(...catchArgs);\n    ",
+		},
+		{
+			"upstream valid 11",
+			"\ndeclare const catchArgs: [\n  string | (() => never),\n  (shouldntFlag: string) => void,\n  number,\n];\nPromise.reject(new Error()).catch(...catchArgs);\n    ",
+		},
+		{
+			"upstream valid 12",
+			"\ndeclare const catchArgs: ['not callable'];\nPromise.reject(new Error()).catch(...catchArgs);\n    ",
+		},
+		{
+			"upstream valid 13",
+			"\ndeclare const emptySpread: [];\nPromise.reject(new Error()).catch(...emptySpread);\n    ",
+		},
+		{
+			"upstream valid 14",
+			"\nPromise.resolve().catch(\n  (\n    ...err: [unknown, string | ((number | unknown) & { b: () => void }), string]\n  ) => {\n    throw err;\n  },\n);\n    ",
+		},
+		{
+			"upstream valid 15",
+			"\ndeclare const notAMemberExpression: (...args: any[]) => {};\nnotAMemberExpression(\n  'This helps get 100% code cov',\n  \"but doesn't test anything useful related to the rule.\",\n);\n    ",
+		},
 		{"upstream valid 16", "\nPromise.resolve().catch((...[args]: [unknown]) => {\n  console.log(args);\n});\n    "},
-		{"upstream valid 17", "\nPromise.resolve().catch((...{ find }: [unknown]) => {\n  console.log(find);\n});\n    "},
+		{
+			"upstream valid 17",
+			"\nPromise.resolve().catch((...{ find }: [unknown]) => {\n  console.log(find);\n});\n    ",
+		},
 		{"upstream valid 18", "Promise.resolve.then();"},
 		{"upstream valid 19", "Promise.resolve().then(() => {});"},
-		{"upstream valid 20", "\ndeclare const singleTupleArg: [() => void];\nPromise.resolve().then(...singleTupleArg, (error: unknown) => {});\n    "},
-		{"upstream valid 21", "\ndeclare const arrayArg: (() => void)[];\nPromise.resolve().then(...arrayArg, error => {});\n    "},
-		{"upstream valid 22", "\ndeclare let iPromiseImAPromise: Promise<any>;\ndeclare const catchArgs: [(x: any) => void];\niPromiseImAPromise.catch(...catchArgs);\n    "},
-		{"upstream valid 23", "\ndeclare const catchArgs: [\n  string | (() => never) | ((x: string) => void),\n  number,\n];\nPromise.reject(new Error()).catch(...catchArgs);\n    "},
-		{"upstream valid 24", "\ndeclare const you: [];\ndeclare const cannot: [];\ndeclare const fool: [];\ndeclare const me: [(x: Error) => void] | undefined;\nPromise.resolve(undefined).catch(...you, ...cannot, ...fool, ...me!);\n    "},
-		{"upstream valid 25", "\ndeclare const really: undefined[];\ndeclare const dumb: [];\ndeclare const code: (x: Error) => void;\nPromise.resolve(undefined).catch(...really, ...dumb, code);\n    "},
-		{"upstream valid 26", "\ndeclare const x: ((x: any) => string)[];\nPromise.resolve('string promise').catch(...x);\n    "},
+		{
+			"upstream valid 20",
+			"\ndeclare const singleTupleArg: [() => void];\nPromise.resolve().then(...singleTupleArg, (error: unknown) => {});\n    ",
+		},
+		{
+			"upstream valid 21",
+			"\ndeclare const arrayArg: (() => void)[];\nPromise.resolve().then(...arrayArg, error => {});\n    ",
+		},
+		{
+			"upstream valid 22",
+			"\ndeclare let iPromiseImAPromise: Promise<any>;\ndeclare const catchArgs: [(x: any) => void];\niPromiseImAPromise.catch(...catchArgs);\n    ",
+		},
+		{
+			"upstream valid 23",
+			"\ndeclare const catchArgs: [\n  string | (() => never) | ((x: string) => void),\n  number,\n];\nPromise.reject(new Error()).catch(...catchArgs);\n    ",
+		},
+		{
+			"upstream valid 24",
+			"\ndeclare const you: [];\ndeclare const cannot: [];\ndeclare const fool: [];\ndeclare const me: [(x: Error) => void] | undefined;\nPromise.resolve(undefined).catch(...you, ...cannot, ...fool, ...me!);\n    ",
+		},
+		{
+			"upstream valid 25",
+			"\ndeclare const really: undefined[];\ndeclare const dumb: [];\ndeclare const code: (x: Error) => void;\nPromise.resolve(undefined).catch(...really, ...dumb, code);\n    ",
+		},
+		{
+			"upstream valid 26",
+			"\ndeclare const x: ((x: any) => string)[];\nPromise.resolve('string promise').catch(...x);\n    ",
+		},
 		{"upstream valid 27", "\ndeclare const x: any;\nPromise.resolve().catch(...x);\n    "},
-		{"upstream valid 28", "\ndeclare const thenArgs: [() => {}, (err: any) => {}];\nPromise.resolve().then(...thenArgs);\n    "},
-		{"upstream valid 29", "\ndeclare const yoloHandler: (x: any) => void;\nPromise.reject(new Error('I will reject!')).catch(yoloHandler);\n    "},
-		{"upstream valid 30", "\ntype InvalidHandler = (arg: any) => void;\nPromise.resolve().catch(<InvalidHandler>(\n  function (err /* awkward spot for comment */) {\n    throw err;\n  }\n));\n    "}}
+		{
+			"upstream valid 28",
+			"\ndeclare const thenArgs: [() => {}, (err: any) => {}];\nPromise.resolve().then(...thenArgs);\n    ",
+		},
+		{
+			"upstream valid 29",
+			"\ndeclare const yoloHandler: (x: any) => void;\nPromise.reject(new Error('I will reject!')).catch(yoloHandler);\n    ",
+		},
+		{
+			"upstream valid 30",
+			"\ntype InvalidHandler = (arg: any) => void;\nPromise.resolve().catch(<InvalidHandler>(\n  function (err /* awkward spot for comment */) {\n    throw err;\n  }\n));\n    ",
+		}}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTyped(test, UseUnknownInCatchCallbackVariable, useUnknownInCatchCallbackVariableFile, testCase.sourceText)
+			result := rule_testing.RunTyped(
+				test,
+				UseUnknownInCatchCallbackVariable,
+				useUnknownInCatchCallbackVariableFile,
+				testCase.sourceText,
+			)
 			rule_testing.ExpectClean(test, result)
 		})
 	}
@@ -93,35 +167,128 @@ func TestUseUnknownInCatchCallbackVariableFires(test *testing.T) {
 		sourceText string
 		wantIds    []string
 	}{
-		{"upstream invalid 0", "\nPromise.resolve().catch((err: Error) => {\n  throw err;\n});\n      ", []string{"useUnknown"}},
-		{"upstream invalid 2", "\nPromise.resolve().catch((e, ...rest: []) => {\n  throw err;\n});\n      ", []string{"useUnknown"}},
-		{"upstream invalid 3", "\nPromise.resolve().catch(\n  (err: string | ((number | unknown) & { b: () => void })) => {\n    throw err;\n  },\n);\n      ", []string{"useUnknown"}},
-		{"upstream invalid 4", "\nPromise.resolve().catch(\n  (\n    ...err: [\n      unknown[],\n      string | ((number | unknown) & { b: () => void }),\n      string,\n    ]\n  ) => {\n    throw err;\n  },\n);\n      ", []string{"useUnknown"}},
-		{"upstream invalid 5", "\nPromise.resolve().catch(function (err: string) {\n  throw err;\n});\n      ", []string{"useUnknown"}},
-		{"upstream invalid 6", "\nPromise.resolve().catch(function (err /* awkward spot for comment */) {\n  throw err;\n});\n      ", []string{"useUnknown"}},
-		{"upstream invalid 7", "\nPromise.resolve().catch(function namedCallback(err: string) {\n  throw err;\n});\n      ", []string{"useUnknown"}},
+		{
+			"upstream invalid 0",
+			"\nPromise.resolve().catch((err: Error) => {\n  throw err;\n});\n      ",
+			[]string{"useUnknown"},
+		},
+		{
+			"upstream invalid 2",
+			"\nPromise.resolve().catch((e, ...rest: []) => {\n  throw err;\n});\n      ",
+			[]string{"useUnknown"},
+		},
+		{
+			"upstream invalid 3",
+			"\nPromise.resolve().catch(\n  (err: string | ((number | unknown) & { b: () => void })) => {\n    throw err;\n  },\n);\n      ",
+			[]string{"useUnknown"},
+		},
+		{
+			"upstream invalid 4",
+			"\nPromise.resolve().catch(\n  (\n    ...err: [\n      unknown[],\n      string | ((number | unknown) & { b: () => void }),\n      string,\n    ]\n  ) => {\n    throw err;\n  },\n);\n      ",
+			[]string{"useUnknown"},
+		},
+		{
+			"upstream invalid 5",
+			"\nPromise.resolve().catch(function (err: string) {\n  throw err;\n});\n      ",
+			[]string{"useUnknown"},
+		},
+		{
+			"upstream invalid 6",
+			"\nPromise.resolve().catch(function (err /* awkward spot for comment */) {\n  throw err;\n});\n      ",
+			[]string{"useUnknown"},
+		},
+		{
+			"upstream invalid 7",
+			"\nPromise.resolve().catch(function namedCallback(err: string) {\n  throw err;\n});\n      ",
+			[]string{"useUnknown"},
+		},
 		{"upstream invalid 8", "\nPromise.resolve().catch(err => {\n  throw err;\n});\n      ", []string{"useUnknown"}},
-		{"upstream invalid 9", "\nPromise.resolve().then(\n  () => {},\n  error => {},\n);\n      ", []string{"useUnknown"}},
-		{"upstream invalid 10", "\nPromise.resolve().catch((err?) => {\n  throw err;\n});\n      ", []string{"useUnknown"}},
-		{"upstream invalid 11", "\nPromise.resolve().catch((err?: string) => {\n  throw err;\n});\n      ", []string{"useUnknown"}},
-		{"upstream invalid 12", "\nPromise.resolve().catch(err/* with comment */=> {\n  throw err;\n});\n      ", []string{"useUnknown"}},
-		{"upstream invalid 13", "\nPromise.resolve().catch((err = 2) => {\n  throw err;\n});\n      ", []string{"useUnknown"}},
-		{"upstream invalid 14", "\nPromise.resolve().catch((err: any /* comment 1 */ = /* comment 2 */ 2) => {\n  throw err;\n});\n      ", []string{"useUnknown"}},
-		{"upstream invalid 15", "\nPromise.resolve().catch((...args) => {\n  throw args[0];\n});\n      ", []string{"useUnknown"}},
-		{"upstream invalid 16", "\nPromise.reject(new Error('I will reject!')).catch(([err]: [unknown]) => {\n  console.log(err);\n});\n      ", []string{"useUnknownArrayDestructuringPattern"}},
-		{"upstream invalid 17", "\nPromise.resolve(' a string ').catch(\n  (a: any, b: () => any, c: (x: string & number) => void) => {},\n);\n      ", []string{"useUnknown"}},
-		{"upstream invalid 18", "\nPromise.resolve('object destructuring').catch(({}) => {});\n      ", []string{"useUnknownObjectDestructuringPattern"}},
-		{"upstream invalid 19", "\nPromise.resolve('object destructuring').catch(function ({ gotcha }) {\n  return null;\n});\n      ", []string{"useUnknownObjectDestructuringPattern"}},
+		{
+			"upstream invalid 9",
+			"\nPromise.resolve().then(\n  () => {},\n  error => {},\n);\n      ",
+			[]string{"useUnknown"},
+		},
+		{
+			"upstream invalid 10",
+			"\nPromise.resolve().catch((err?) => {\n  throw err;\n});\n      ",
+			[]string{"useUnknown"},
+		},
+		{
+			"upstream invalid 11",
+			"\nPromise.resolve().catch((err?: string) => {\n  throw err;\n});\n      ",
+			[]string{"useUnknown"},
+		},
+		{
+			"upstream invalid 12",
+			"\nPromise.resolve().catch(err/* with comment */=> {\n  throw err;\n});\n      ",
+			[]string{"useUnknown"},
+		},
+		{
+			"upstream invalid 13",
+			"\nPromise.resolve().catch((err = 2) => {\n  throw err;\n});\n      ",
+			[]string{"useUnknown"},
+		},
+		{
+			"upstream invalid 14",
+			"\nPromise.resolve().catch((err: any /* comment 1 */ = /* comment 2 */ 2) => {\n  throw err;\n});\n      ",
+			[]string{"useUnknown"},
+		},
+		{
+			"upstream invalid 15",
+			"\nPromise.resolve().catch((...args) => {\n  throw args[0];\n});\n      ",
+			[]string{"useUnknown"},
+		},
+		{
+			"upstream invalid 16",
+			"\nPromise.reject(new Error('I will reject!')).catch(([err]: [unknown]) => {\n  console.log(err);\n});\n      ",
+			[]string{"useUnknownArrayDestructuringPattern"},
+		},
+		{
+			"upstream invalid 17",
+			"\nPromise.resolve(' a string ').catch(\n  (a: any, b: () => any, c: (x: string & number) => void) => {},\n);\n      ",
+			[]string{"useUnknown"},
+		},
+		{
+			"upstream invalid 18",
+			"\nPromise.resolve('object destructuring').catch(({}) => {});\n      ",
+			[]string{"useUnknownObjectDestructuringPattern"},
+		},
+		{
+			"upstream invalid 19",
+			"\nPromise.resolve('object destructuring').catch(function ({ gotcha }) {\n  return null;\n});\n      ",
+			[]string{"useUnknownObjectDestructuringPattern"},
+		},
 		{"upstream invalid 20", "\nPromise.resolve()['catch']((x: any) => 'return');\n      ", []string{"useUnknown"}},
 		{"upstream invalid 21", "\nPromise.reject().catch((...x: any) => {});\n      ", []string{"useUnknown"}},
-		{"upstream invalid 22", "\nPromise.resolve().catch((...[args]: [string]) => {\n  console.log(args);\n});\n      ", []string{"useUnknown"}},
-		{"upstream invalid 23", "\nPromise.resolve().catch((...{ find }: [string]) => {\n  console.log(find);\n});\n      ", []string{"useUnknown"}},
-		{"upstream invalid 24", "\ndeclare const condition: boolean;\nPromise.resolve('foo').then(() => {}, condition ? err => {} : err => {});\n      ", []string{"useUnknown", "useUnknown"}},
-		{"upstream invalid 25", "\ndeclare const condition: boolean;\ndeclare const maybeNullishHandler: null | ((err: any) => void);\nPromise.resolve('foo').catch(\n  condition\n    ? ((err => {}, err => {}, maybeNullishHandler) ?? (err => {}))\n    : (condition && (err => {})) || (err => {}),\n);\n      ", []string{"useUnknown", "useUnknown", "useUnknown"}}}
+		{
+			"upstream invalid 22",
+			"\nPromise.resolve().catch((...[args]: [string]) => {\n  console.log(args);\n});\n      ",
+			[]string{"useUnknown"},
+		},
+		{
+			"upstream invalid 23",
+			"\nPromise.resolve().catch((...{ find }: [string]) => {\n  console.log(find);\n});\n      ",
+			[]string{"useUnknown"},
+		},
+		{
+			"upstream invalid 24",
+			"\ndeclare const condition: boolean;\nPromise.resolve('foo').then(() => {}, condition ? err => {} : err => {});\n      ",
+			[]string{"useUnknown", "useUnknown"},
+		},
+		{
+			"upstream invalid 25",
+			"\ndeclare const condition: boolean;\ndeclare const maybeNullishHandler: null | ((err: any) => void);\nPromise.resolve('foo').catch(\n  condition\n    ? ((err => {}, err => {}, maybeNullishHandler) ?? (err => {}))\n    : (condition && (err => {})) || (err => {}),\n);\n      ",
+			[]string{"useUnknown", "useUnknown", "useUnknown"},
+		}}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTyped(test, UseUnknownInCatchCallbackVariable, useUnknownInCatchCallbackVariableFile, testCase.sourceText)
+			result := rule_testing.RunTyped(
+				test,
+				UseUnknownInCatchCallbackVariable,
+				useUnknownInCatchCallbackVariableFile,
+				testCase.sourceText,
+			)
 			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
@@ -147,35 +314,165 @@ func TestUseUnknownInCatchCallbackVariableSuggestions(test *testing.T) {
 		wantId     string
 		wantOutput string
 	}{
-		{"upstream invalid 0", "\nPromise.resolve().catch((err: Error) => {\n  throw err;\n});\n      ", "wrongTypeAnnotationSuggestion", "\nPromise.resolve().catch((err: unknown) => {\n  throw err;\n});\n      "},
-		{"upstream invalid 2", "\nPromise.resolve().catch((e, ...rest: []) => {\n  throw err;\n});\n      ", "addUnknownTypeAnnotationSuggestion", "\nPromise.resolve().catch((e: unknown, ...rest: []) => {\n  throw err;\n});\n      "},
-		{"upstream invalid 3", "\nPromise.resolve().catch(\n  (err: string | ((number | unknown) & { b: () => void })) => {\n    throw err;\n  },\n);\n      ", "wrongTypeAnnotationSuggestion", "\nPromise.resolve().catch(\n  (err: unknown) => {\n    throw err;\n  },\n);\n      "},
-		{"upstream invalid 4", "\nPromise.resolve().catch(\n  (\n    ...err: [\n      unknown[],\n      string | ((number | unknown) & { b: () => void }),\n      string,\n    ]\n  ) => {\n    throw err;\n  },\n);\n      ", "wrongRestTypeAnnotationSuggestion", "\nPromise.resolve().catch(\n  (\n    ...err: [unknown]\n  ) => {\n    throw err;\n  },\n);\n      "},
-		{"upstream invalid 5", "\nPromise.resolve().catch(function (err: string) {\n  throw err;\n});\n      ", "wrongTypeAnnotationSuggestion", "\nPromise.resolve().catch(function (err: unknown) {\n  throw err;\n});\n      "},
-		{"upstream invalid 6", "\nPromise.resolve().catch(function (err /* awkward spot for comment */) {\n  throw err;\n});\n      ", "addUnknownTypeAnnotationSuggestion", "\nPromise.resolve().catch(function (err: unknown /* awkward spot for comment */) {\n  throw err;\n});\n      "},
-		{"upstream invalid 7", "\nPromise.resolve().catch(function namedCallback(err: string) {\n  throw err;\n});\n      ", "wrongTypeAnnotationSuggestion", "\nPromise.resolve().catch(function namedCallback(err: unknown) {\n  throw err;\n});\n      "},
-		{"upstream invalid 8", "\nPromise.resolve().catch(err => {\n  throw err;\n});\n      ", "addUnknownTypeAnnotationSuggestion", "\nPromise.resolve().catch((err: unknown) => {\n  throw err;\n});\n      "},
-		{"upstream invalid 9", "\nPromise.resolve().then(\n  () => {},\n  error => {},\n);\n      ", "addUnknownTypeAnnotationSuggestion", "\nPromise.resolve().then(\n  () => {},\n  (error: unknown) => {},\n);\n      "},
-		{"upstream invalid 10", "\nPromise.resolve().catch((err?) => {\n  throw err;\n});\n      ", "addUnknownTypeAnnotationSuggestion", "\nPromise.resolve().catch((err?: unknown) => {\n  throw err;\n});\n      "},
-		{"upstream invalid 11", "\nPromise.resolve().catch((err?: string) => {\n  throw err;\n});\n      ", "wrongTypeAnnotationSuggestion", "\nPromise.resolve().catch((err?: unknown) => {\n  throw err;\n});\n      "},
-		{"upstream invalid 12", "\nPromise.resolve().catch(err/* with comment */=> {\n  throw err;\n});\n      ", "addUnknownTypeAnnotationSuggestion", "\nPromise.resolve().catch((err: unknown)/* with comment */=> {\n  throw err;\n});\n      "},
-		{"upstream invalid 13", "\nPromise.resolve().catch((err = 2) => {\n  throw err;\n});\n      ", "addUnknownTypeAnnotationSuggestion", "\nPromise.resolve().catch((err: unknown = 2) => {\n  throw err;\n});\n      "},
-		{"upstream invalid 14", "\nPromise.resolve().catch((err: any /* comment 1 */ = /* comment 2 */ 2) => {\n  throw err;\n});\n      ", "wrongTypeAnnotationSuggestion", "\nPromise.resolve().catch((err: unknown /* comment 1 */ = /* comment 2 */ 2) => {\n  throw err;\n});\n      "},
-		{"upstream invalid 15", "\nPromise.resolve().catch((...args) => {\n  throw args[0];\n});\n      ", "addUnknownRestTypeAnnotationSuggestion", "\nPromise.resolve().catch((...args: [unknown]) => {\n  throw args[0];\n});\n      "},
-		{"upstream invalid 17", "\nPromise.resolve(' a string ').catch(\n  (a: any, b: () => any, c: (x: string & number) => void) => {},\n);\n      ", "wrongTypeAnnotationSuggestion", "\nPromise.resolve(' a string ').catch(\n  (a: unknown, b: () => any, c: (x: string & number) => void) => {},\n);\n      "},
-		{"upstream invalid 20", "\nPromise.resolve()['catch']((x: any) => 'return');\n      ", "wrongTypeAnnotationSuggestion", "\nPromise.resolve()['catch']((x: unknown) => 'return');\n      "},
-		{"upstream invalid 21", "\nPromise.reject().catch((...x: any) => {});\n      ", "wrongRestTypeAnnotationSuggestion", "\nPromise.reject().catch((...x: [unknown]) => {});\n      "},
-		{"upstream invalid 22", "\nPromise.resolve().catch((...[args]: [string]) => {\n  console.log(args);\n});\n      ", "wrongRestTypeAnnotationSuggestion", "\nPromise.resolve().catch((...[args]: [unknown]) => {\n  console.log(args);\n});\n      "},
-		{"upstream invalid 23", "\nPromise.resolve().catch((...{ find }: [string]) => {\n  console.log(find);\n});\n      ", "wrongRestTypeAnnotationSuggestion", "\nPromise.resolve().catch((...{ find }: [unknown]) => {\n  console.log(find);\n});\n      "},
-		{"upstream invalid 24", "\ndeclare const condition: boolean;\nPromise.resolve('foo').then(() => {}, condition ? err => {} : err => {});\n      ", "addUnknownTypeAnnotationSuggestion", "\ndeclare const condition: boolean;\nPromise.resolve('foo').then(() => {}, condition ? (err: unknown) => {} : err => {});\n      "},
-		{"upstream invalid 24", "\ndeclare const condition: boolean;\nPromise.resolve('foo').then(() => {}, condition ? err => {} : err => {});\n      ", "addUnknownTypeAnnotationSuggestion", "\ndeclare const condition: boolean;\nPromise.resolve('foo').then(() => {}, condition ? err => {} : (err: unknown) => {});\n      "},
-		{"upstream invalid 25", "\ndeclare const condition: boolean;\ndeclare const maybeNullishHandler: null | ((err: any) => void);\nPromise.resolve('foo').catch(\n  condition\n    ? ((err => {}, err => {}, maybeNullishHandler) ?? (err => {}))\n    : (condition && (err => {})) || (err => {}),\n);\n      ", "addUnknownTypeAnnotationSuggestion", "\ndeclare const condition: boolean;\ndeclare const maybeNullishHandler: null | ((err: any) => void);\nPromise.resolve('foo').catch(\n  condition\n    ? ((err => {}, err => {}, maybeNullishHandler) ?? ((err: unknown) => {}))\n    : (condition && (err => {})) || (err => {}),\n);\n      "},
-		{"upstream invalid 25", "\ndeclare const condition: boolean;\ndeclare const maybeNullishHandler: null | ((err: any) => void);\nPromise.resolve('foo').catch(\n  condition\n    ? ((err => {}, err => {}, maybeNullishHandler) ?? (err => {}))\n    : (condition && (err => {})) || (err => {}),\n);\n      ", "addUnknownTypeAnnotationSuggestion", "\ndeclare const condition: boolean;\ndeclare const maybeNullishHandler: null | ((err: any) => void);\nPromise.resolve('foo').catch(\n  condition\n    ? ((err => {}, err => {}, maybeNullishHandler) ?? (err => {}))\n    : (condition && ((err: unknown) => {})) || (err => {}),\n);\n      "},
-		{"upstream invalid 25", "\ndeclare const condition: boolean;\ndeclare const maybeNullishHandler: null | ((err: any) => void);\nPromise.resolve('foo').catch(\n  condition\n    ? ((err => {}, err => {}, maybeNullishHandler) ?? (err => {}))\n    : (condition && (err => {})) || (err => {}),\n);\n      ", "addUnknownTypeAnnotationSuggestion", "\ndeclare const condition: boolean;\ndeclare const maybeNullishHandler: null | ((err: any) => void);\nPromise.resolve('foo').catch(\n  condition\n    ? ((err => {}, err => {}, maybeNullishHandler) ?? (err => {}))\n    : (condition && (err => {})) || ((err: unknown) => {}),\n);\n      "}}
+		{
+			"upstream invalid 0",
+			"\nPromise.resolve().catch((err: Error) => {\n  throw err;\n});\n      ",
+			"wrongTypeAnnotationSuggestion",
+			"\nPromise.resolve().catch((err: unknown) => {\n  throw err;\n});\n      ",
+		},
+		{
+			"upstream invalid 2",
+			"\nPromise.resolve().catch((e, ...rest: []) => {\n  throw err;\n});\n      ",
+			"addUnknownTypeAnnotationSuggestion",
+			"\nPromise.resolve().catch((e: unknown, ...rest: []) => {\n  throw err;\n});\n      ",
+		},
+		{
+			"upstream invalid 3",
+			"\nPromise.resolve().catch(\n  (err: string | ((number | unknown) & { b: () => void })) => {\n    throw err;\n  },\n);\n      ",
+			"wrongTypeAnnotationSuggestion",
+			"\nPromise.resolve().catch(\n  (err: unknown) => {\n    throw err;\n  },\n);\n      ",
+		},
+		{
+			"upstream invalid 4",
+			"\nPromise.resolve().catch(\n  (\n    ...err: [\n      unknown[],\n      string | ((number | unknown) & { b: () => void }),\n      string,\n    ]\n  ) => {\n    throw err;\n  },\n);\n      ",
+			"wrongRestTypeAnnotationSuggestion",
+			"\nPromise.resolve().catch(\n  (\n    ...err: [unknown]\n  ) => {\n    throw err;\n  },\n);\n      ",
+		},
+		{
+			"upstream invalid 5",
+			"\nPromise.resolve().catch(function (err: string) {\n  throw err;\n});\n      ",
+			"wrongTypeAnnotationSuggestion",
+			"\nPromise.resolve().catch(function (err: unknown) {\n  throw err;\n});\n      ",
+		},
+		{
+			"upstream invalid 6",
+			"\nPromise.resolve().catch(function (err /* awkward spot for comment */) {\n  throw err;\n});\n      ",
+			"addUnknownTypeAnnotationSuggestion",
+			"\nPromise.resolve().catch(function (err: unknown /* awkward spot for comment */) {\n  throw err;\n});\n      ",
+		},
+		{
+			"upstream invalid 7",
+			"\nPromise.resolve().catch(function namedCallback(err: string) {\n  throw err;\n});\n      ",
+			"wrongTypeAnnotationSuggestion",
+			"\nPromise.resolve().catch(function namedCallback(err: unknown) {\n  throw err;\n});\n      ",
+		},
+		{
+			"upstream invalid 8",
+			"\nPromise.resolve().catch(err => {\n  throw err;\n});\n      ",
+			"addUnknownTypeAnnotationSuggestion",
+			"\nPromise.resolve().catch((err: unknown) => {\n  throw err;\n});\n      ",
+		},
+		{
+			"upstream invalid 9",
+			"\nPromise.resolve().then(\n  () => {},\n  error => {},\n);\n      ",
+			"addUnknownTypeAnnotationSuggestion",
+			"\nPromise.resolve().then(\n  () => {},\n  (error: unknown) => {},\n);\n      ",
+		},
+		{
+			"upstream invalid 10",
+			"\nPromise.resolve().catch((err?) => {\n  throw err;\n});\n      ",
+			"addUnknownTypeAnnotationSuggestion",
+			"\nPromise.resolve().catch((err?: unknown) => {\n  throw err;\n});\n      ",
+		},
+		{
+			"upstream invalid 11",
+			"\nPromise.resolve().catch((err?: string) => {\n  throw err;\n});\n      ",
+			"wrongTypeAnnotationSuggestion",
+			"\nPromise.resolve().catch((err?: unknown) => {\n  throw err;\n});\n      ",
+		},
+		{
+			"upstream invalid 12",
+			"\nPromise.resolve().catch(err/* with comment */=> {\n  throw err;\n});\n      ",
+			"addUnknownTypeAnnotationSuggestion",
+			"\nPromise.resolve().catch((err: unknown)/* with comment */=> {\n  throw err;\n});\n      ",
+		},
+		{
+			"upstream invalid 13",
+			"\nPromise.resolve().catch((err = 2) => {\n  throw err;\n});\n      ",
+			"addUnknownTypeAnnotationSuggestion",
+			"\nPromise.resolve().catch((err: unknown = 2) => {\n  throw err;\n});\n      ",
+		},
+		{
+			"upstream invalid 14",
+			"\nPromise.resolve().catch((err: any /* comment 1 */ = /* comment 2 */ 2) => {\n  throw err;\n});\n      ",
+			"wrongTypeAnnotationSuggestion",
+			"\nPromise.resolve().catch((err: unknown /* comment 1 */ = /* comment 2 */ 2) => {\n  throw err;\n});\n      ",
+		},
+		{
+			"upstream invalid 15",
+			"\nPromise.resolve().catch((...args) => {\n  throw args[0];\n});\n      ",
+			"addUnknownRestTypeAnnotationSuggestion",
+			"\nPromise.resolve().catch((...args: [unknown]) => {\n  throw args[0];\n});\n      ",
+		},
+		{
+			"upstream invalid 17",
+			"\nPromise.resolve(' a string ').catch(\n  (a: any, b: () => any, c: (x: string & number) => void) => {},\n);\n      ",
+			"wrongTypeAnnotationSuggestion",
+			"\nPromise.resolve(' a string ').catch(\n  (a: unknown, b: () => any, c: (x: string & number) => void) => {},\n);\n      ",
+		},
+		{
+			"upstream invalid 20",
+			"\nPromise.resolve()['catch']((x: any) => 'return');\n      ",
+			"wrongTypeAnnotationSuggestion",
+			"\nPromise.resolve()['catch']((x: unknown) => 'return');\n      ",
+		},
+		{
+			"upstream invalid 21",
+			"\nPromise.reject().catch((...x: any) => {});\n      ",
+			"wrongRestTypeAnnotationSuggestion",
+			"\nPromise.reject().catch((...x: [unknown]) => {});\n      ",
+		},
+		{
+			"upstream invalid 22",
+			"\nPromise.resolve().catch((...[args]: [string]) => {\n  console.log(args);\n});\n      ",
+			"wrongRestTypeAnnotationSuggestion",
+			"\nPromise.resolve().catch((...[args]: [unknown]) => {\n  console.log(args);\n});\n      ",
+		},
+		{
+			"upstream invalid 23",
+			"\nPromise.resolve().catch((...{ find }: [string]) => {\n  console.log(find);\n});\n      ",
+			"wrongRestTypeAnnotationSuggestion",
+			"\nPromise.resolve().catch((...{ find }: [unknown]) => {\n  console.log(find);\n});\n      ",
+		},
+		{
+			"upstream invalid 24",
+			"\ndeclare const condition: boolean;\nPromise.resolve('foo').then(() => {}, condition ? err => {} : err => {});\n      ",
+			"addUnknownTypeAnnotationSuggestion",
+			"\ndeclare const condition: boolean;\nPromise.resolve('foo').then(() => {}, condition ? (err: unknown) => {} : err => {});\n      ",
+		},
+		{
+			"upstream invalid 24",
+			"\ndeclare const condition: boolean;\nPromise.resolve('foo').then(() => {}, condition ? err => {} : err => {});\n      ",
+			"addUnknownTypeAnnotationSuggestion",
+			"\ndeclare const condition: boolean;\nPromise.resolve('foo').then(() => {}, condition ? err => {} : (err: unknown) => {});\n      ",
+		},
+		{
+			"upstream invalid 25",
+			"\ndeclare const condition: boolean;\ndeclare const maybeNullishHandler: null | ((err: any) => void);\nPromise.resolve('foo').catch(\n  condition\n    ? ((err => {}, err => {}, maybeNullishHandler) ?? (err => {}))\n    : (condition && (err => {})) || (err => {}),\n);\n      ",
+			"addUnknownTypeAnnotationSuggestion",
+			"\ndeclare const condition: boolean;\ndeclare const maybeNullishHandler: null | ((err: any) => void);\nPromise.resolve('foo').catch(\n  condition\n    ? ((err => {}, err => {}, maybeNullishHandler) ?? ((err: unknown) => {}))\n    : (condition && (err => {})) || (err => {}),\n);\n      ",
+		},
+		{
+			"upstream invalid 25",
+			"\ndeclare const condition: boolean;\ndeclare const maybeNullishHandler: null | ((err: any) => void);\nPromise.resolve('foo').catch(\n  condition\n    ? ((err => {}, err => {}, maybeNullishHandler) ?? (err => {}))\n    : (condition && (err => {})) || (err => {}),\n);\n      ",
+			"addUnknownTypeAnnotationSuggestion",
+			"\ndeclare const condition: boolean;\ndeclare const maybeNullishHandler: null | ((err: any) => void);\nPromise.resolve('foo').catch(\n  condition\n    ? ((err => {}, err => {}, maybeNullishHandler) ?? (err => {}))\n    : (condition && ((err: unknown) => {})) || (err => {}),\n);\n      ",
+		},
+		{
+			"upstream invalid 25",
+			"\ndeclare const condition: boolean;\ndeclare const maybeNullishHandler: null | ((err: any) => void);\nPromise.resolve('foo').catch(\n  condition\n    ? ((err => {}, err => {}, maybeNullishHandler) ?? (err => {}))\n    : (condition && (err => {})) || (err => {}),\n);\n      ",
+			"addUnknownTypeAnnotationSuggestion",
+			"\ndeclare const condition: boolean;\ndeclare const maybeNullishHandler: null | ((err: any) => void);\nPromise.resolve('foo').catch(\n  condition\n    ? ((err => {}, err => {}, maybeNullishHandler) ?? (err => {}))\n    : (condition && (err => {})) || ((err: unknown) => {}),\n);\n      ",
+		}}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTyped(test, UseUnknownInCatchCallbackVariable, useUnknownInCatchCallbackVariableFile, testCase.sourceText)
+			result := rule_testing.RunTyped(
+				test,
+				UseUnknownInCatchCallbackVariable,
+				useUnknownInCatchCallbackVariableFile,
+				testCase.sourceText,
+			)
 			if len(result.Diagnostics) == 0 {
 				test.Fatal("want at least one finding, got none")
 			}
@@ -231,7 +528,12 @@ func TestUseUnknownInCatchCallbackVariableComputedKeyDivergence(test *testing.T)
 
 	test.Run("a let-bound key is silent here and reports upstream", func(test *testing.T) {
 		test.Parallel()
-		result := rule_testing.RunTyped(test, UseUnknownInCatchCallbackVariable, useUnknownInCatchCallbackVariableFile, "\nlet method = 'catch';\nPromise.resolve()[method]((error: Error) => {});\n      ")
+		result := rule_testing.RunTyped(
+			test,
+			UseUnknownInCatchCallbackVariable,
+			useUnknownInCatchCallbackVariableFile,
+			"\nlet method = 'catch';\nPromise.resolve()[method]((error: Error) => {});\n      ",
+		)
 		rule_testing.ExpectClean(test, result)
 	})
 
@@ -271,7 +573,12 @@ func TestUseUnknownInCatchCallbackVariableThisParameter(test *testing.T) {
 
 	const source = "interface W {\n  z: number;\n}\ndeclare const p: Promise<void>;\np.catch(function (this: W, err: Error) {});"
 
-	result := rule_testing.RunTyped(test, UseUnknownInCatchCallbackVariable, useUnknownInCatchCallbackVariableFile, source)
+	result := rule_testing.RunTyped(
+		test,
+		UseUnknownInCatchCallbackVariable,
+		useUnknownInCatchCallbackVariableFile,
+		source,
+	)
 	rule_testing.ExpectFindings(test, result, "useUnknown")
 
 	text := strings.TrimSpace(source) + "\n"
@@ -288,14 +595,20 @@ func TestUseUnknownInCatchCallbackVariableThisParameter(test *testing.T) {
 
 	test.Run("a this parameter alone is clean, so this is no checker parameter", func(test *testing.T) {
 		test.Parallel()
-		rule_testing.ExpectClean(test, rule_testing.RunTyped(test, UseUnknownInCatchCallbackVariable, useUnknownInCatchCallbackVariableFile,
-			"interface W {\n  z: number;\n}\ndeclare const p: Promise<void>;\np.catch(function (this: W) {});"))
+		rule_testing.ExpectClean(
+			test,
+			rule_testing.RunTyped(test, UseUnknownInCatchCallbackVariable, useUnknownInCatchCallbackVariableFile,
+				"interface W {\n  z: number;\n}\ndeclare const p: Promise<void>;\np.catch(function (this: W) {});"),
+		)
 	})
 
 	test.Run("an unknown err is clean, so the decision reads err rather than this", func(test *testing.T) {
 		test.Parallel()
-		rule_testing.ExpectClean(test, rule_testing.RunTyped(test, UseUnknownInCatchCallbackVariable, useUnknownInCatchCallbackVariableFile,
-			"interface W {\n  z: number;\n}\ndeclare const p: Promise<void>;\np.catch(function (this: W, err: unknown) {});"))
+		rule_testing.ExpectClean(
+			test,
+			rule_testing.RunTyped(test, UseUnknownInCatchCallbackVariable, useUnknownInCatchCallbackVariableFile,
+				"interface W {\n  z: number;\n}\ndeclare const p: Promise<void>;\np.catch(function (this: W, err: unknown) {});"),
+		)
 	})
 }
 
@@ -310,12 +623,19 @@ func TestUseUnknownInCatchCallbackVariableRequiresTheTypedHarness(test *testing.
 	test.Parallel()
 
 	if !UseUnknownInCatchCallbackVariable.NeedsTypeChecker {
-		test.Fatal("the rule stopped declaring NeedsTypeChecker, so every typed fixture would run against a nil checker")
+		test.Fatal(
+			"the rule stopped declaring NeedsTypeChecker, so every typed fixture would run against a nil checker",
+		)
 	}
 
 	const source = "Promise.resolve().catch((err: Error) => {\n  throw err;\n});"
 
-	typed := rule_testing.RunTyped(test, UseUnknownInCatchCallbackVariable, useUnknownInCatchCallbackVariableFile, source)
+	typed := rule_testing.RunTyped(
+		test,
+		UseUnknownInCatchCallbackVariable,
+		useUnknownInCatchCallbackVariableFile,
+		source,
+	)
 	rule_testing.ExpectFindings(test, typed, "useUnknown")
 
 	untyped := rule_testing.Run(test, UseUnknownInCatchCallbackVariable, useUnknownInCatchCallbackVariableFile, source)
@@ -366,7 +686,12 @@ func TestUseUnknownInCatchCallbackVariableMessages(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTyped(test, UseUnknownInCatchCallbackVariable, useUnknownInCatchCallbackVariableFile, testCase.sourceText)
+			result := rule_testing.RunTyped(
+				test,
+				UseUnknownInCatchCallbackVariable,
+				useUnknownInCatchCallbackVariableFile,
+				testCase.sourceText,
+			)
 			if len(result.Diagnostics) != 1 {
 				test.Fatalf("want one finding, got %d", len(result.Diagnostics))
 			}
@@ -408,13 +733,24 @@ func TestUseUnknownInCatchCallbackVariableParentheses(test *testing.T) {
 		{"a doubly parenthesized argument", "Promise.resolve().catch(((err => {})));"},
 		{"a parenthesized callee", "declare const p: Promise<void>;\n(p.catch)(err => {});"},
 		{"a doubly parenthesized callee", "declare const p: Promise<void>;\n((p.catch))(err => {});"},
-		{"a parenthesized receiver, which the callee skip does not decide", "declare const p: Promise<void>;\n(p).catch(err => {});"},
-		{"a parenthesized branch of a conditional", "declare const c: boolean;\nPromise.resolve().catch(c ? (err => {}) : (err => {}));"},
+		{
+			"a parenthesized receiver, which the callee skip does not decide",
+			"declare const p: Promise<void>;\n(p).catch(err => {});",
+		},
+		{
+			"a parenthesized branch of a conditional",
+			"declare const c: boolean;\nPromise.resolve().catch(c ? (err => {}) : (err => {}));",
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTyped(test, UseUnknownInCatchCallbackVariable, useUnknownInCatchCallbackVariableFile, testCase.sourceText)
+			result := rule_testing.RunTyped(
+				test,
+				UseUnknownInCatchCallbackVariable,
+				useUnknownInCatchCallbackVariableFile,
+				testCase.sourceText,
+			)
 			if len(result.Diagnostics) == 0 {
 				test.Fatal("want a finding: a parenthesis is invisible to upstream and must be here too")
 			}
@@ -487,7 +823,12 @@ func TestUseUnknownInCatchCallbackVariableSurvivesMalformedCalls(test *testing.T
 			// A panic fails the test. The assertion is only that this returns at all: what the rule
 			// concludes about a malformed shape belongs in its own fixture, and asserting it here
 			// would make this guard fail for reasons that are not crashes.
-			rule_testing.RunTyped(test, UseUnknownInCatchCallbackVariable, useUnknownInCatchCallbackVariableFile, source)
+			rule_testing.RunTyped(
+				test,
+				UseUnknownInCatchCallbackVariable,
+				useUnknownInCatchCallbackVariableFile,
+				source,
+			)
 		})
 	}
 }

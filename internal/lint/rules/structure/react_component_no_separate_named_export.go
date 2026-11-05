@@ -12,12 +12,18 @@ import (
 
 // reactComponentNoSeparateNamedExportText is the rule's message, whose wording lives in
 // `policy/messages/react-component-no-separate-named-export.json`.
-var reactComponentNoSeparateNamedExportText = policy.MessageOf("structure/react-component-no-separate-named-export", "noSeparateNamedExport")
+var reactComponentNoSeparateNamedExportText = policy.MessageOf(
+	"structure/react-component-no-separate-named-export",
+	"noSeparateNamedExport",
+)
 
 // messageNoSeparateNamedExport is the finding, rendered when it is reported so the text comes from
 // the current catalog.
 func messageNoSeparateNamedExport() rule.Message {
-	return rule.Message{Id: reactComponentNoSeparateNamedExportText.Id, Description: reactComponentNoSeparateNamedExportText.Render(nil)}
+	return rule.Message{
+		Id:          reactComponentNoSeparateNamedExportText.Id,
+		Description: reactComponentNoSeparateNamedExportText.Render(nil),
+	}
 }
 
 // ReactComponentNoSeparateNamedExport flags a bare export list naming a component the file declares.

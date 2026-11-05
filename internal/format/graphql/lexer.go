@@ -348,7 +348,11 @@ func readNextToken(lexer *lexer, start int) *token {
 				panic(syntaxError(body, position, `Unexpected "..", did you mean "..."?`))
 			} else if isDigit(nextCode) {
 				digits := body[position+1 : readDigits(lexer, position+1, nextCode)]
-				panic(syntaxError(body, position, `Invalid number, expected digit before ".", did you mean "0.`+digits+`"?`))
+				panic(syntaxError(
+					body,
+					position,
+					`Invalid number, expected digit before ".", did you mean "0.`+digits+`"?`,
+				))
 			}
 		case 0x003a: // :
 			return createToken(lexer, tokenKindColon, position, position+1)
@@ -388,7 +392,11 @@ func readNextToken(lexer *lexer, start int) *token {
 		character, _ := codePointAt(body, position)
 		switch {
 		case code == 0x0027:
-			panic(syntaxError(body, position, `Unexpected single quote character ('), did you mean to use a double quote (")?`))
+			panic(syntaxError(
+				body,
+				position,
+				`Unexpected single quote character ('), did you mean to use a double quote (")?`,
+			))
 		case isUnicodeScalarValue(character) || isSupplementaryCodePoint(body, position):
 			panic(syntaxError(body, position, "Unexpected character: "+printCodePointAt(lexer, position)+"."))
 		default:
@@ -472,7 +480,11 @@ func readNumber(lexer *lexer, start int, firstCode int) *token {
 		position++
 		code = charCodeAt(body, position)
 		if isDigit(code) {
-			panic(syntaxError(body, position, "Invalid number, unexpected digit after 0: "+printCodePointAt(lexer, position)+"."))
+			panic(syntaxError(
+				body,
+				position,
+				"Invalid number, unexpected digit after 0: "+printCodePointAt(lexer, position)+".",
+			))
 		}
 	} else {
 		position = readDigits(lexer, position, code)
@@ -506,7 +518,11 @@ func readNumber(lexer *lexer, start int, firstCode int) *token {
 
 	// Numbers cannot be followed by . or NameStart
 	if code == 0x002e || isNameStart(code) {
-		panic(syntaxError(body, position, "Invalid number, expected digit but got: "+printCodePointAt(lexer, position)+"."))
+		panic(syntaxError(
+			body,
+			position,
+			"Invalid number, expected digit but got: "+printCodePointAt(lexer, position)+".",
+		))
 	}
 
 	kind := tokenKindInt
@@ -519,7 +535,11 @@ func readNumber(lexer *lexer, start int, firstCode int) *token {
 // readDigits returns the new position in the source after reading one or more digits.
 func readDigits(lexer *lexer, start int, firstCode int) int {
 	if !isDigit(firstCode) {
-		panic(syntaxError(lexer.body, start, "Invalid number, expected digit but got: "+printCodePointAt(lexer, start)+"."))
+		panic(syntaxError(
+			lexer.body,
+			start,
+			"Invalid number, expected digit but got: "+printCodePointAt(lexer, start)+".",
+		))
 	}
 
 	body := lexer.body
@@ -594,7 +614,9 @@ func readString(lexer *lexer, start int) *token {
 		} else if isSupplementaryCodePoint(body, position) {
 			position += 2
 		} else {
-			panic(syntaxError(body, position, "Invalid character within String: "+printCodePointAt(lexer, position)+"."))
+			panic(
+				syntaxError(body, position, "Invalid character within String: "+printCodePointAt(lexer, position)+"."),
+			)
 		}
 	}
 
@@ -815,7 +837,9 @@ func readBlockString(lexer *lexer, start int) *token {
 		} else if isSupplementaryCodePoint(body, position) {
 			position += 2
 		} else {
-			panic(syntaxError(body, position, "Invalid character within String: "+printCodePointAt(lexer, position)+"."))
+			panic(
+				syntaxError(body, position, "Invalid character within String: "+printCodePointAt(lexer, position)+"."),
+			)
 		}
 	}
 

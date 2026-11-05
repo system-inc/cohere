@@ -10,7 +10,10 @@ import (
 // src/language-markdown/print/heading.js.
 
 func printAtxHeading(path *astPath, options *options, print printing.PrintFunc) doc.Doc {
-	return doc.Concat{doc.Text(strings.Repeat("#", currentNode(path).Depth) + " "), printChildren(path, options, print, nil)}
+	return doc.Concat{
+		doc.Text(strings.Repeat("#", currentNode(path).Depth) + " "),
+		printChildren(path, options, print, nil),
+	}
 }
 
 func printSetextHeading(path *astPath, options *options, print printing.PrintFunc) doc.Doc {

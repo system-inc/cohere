@@ -162,12 +162,24 @@ func TestNoUnusedExpressionsStaysSilent(test *testing.T) {
 		{"an element used as an initialiser", "var partial = <div />"},
 		// The typescript-eslint half.
 		{"an optional call as a statement", "\n                  test.age?.toLocaleString();\n                "},
-		{"a parenthesised optional access used as an initialiser", "\n                  let a = (a?.b).c;\n                "},
-		{"an optional element access used as an initialiser", "\n                  let b = a?.['b'];\n                "},
-		{"a chained optional access used as an initialiser", "\n                  let c = one[2]?.[3][4];\n                "},
+		{
+			"a parenthesised optional access used as an initialiser",
+			"\n                  let a = (a?.b).c;\n                ",
+		},
+		{
+			"an optional element access used as an initialiser",
+			"\n                  let b = a?.['b'];\n                ",
+		},
+		{
+			"a chained optional access used as an initialiser",
+			"\n                  let c = one[2]?.[3][4];\n                ",
+		},
 		{"a chained optional call as a statement", "\n                  one[2]?.[3][4]?.();\n                "},
 		{"an optional element access then an optional call", "\n                  a?.['b']?.c();\n                "},
-		{"a directive at the top of a module block", "\n                  module Foo {\n                    'use strict';\n                  }\n                "},
+		{
+			"a directive at the top of a module block",
+			"\n                  module Foo {\n                    'use strict';\n                  }\n                ",
+		},
 		{
 			"a directive at the top of a namespace",
 			"\n                  namespace Foo {\n                    'use strict';\n\n                    export class Foo {}\n                    export class Bar {}\n                  }\n                ",
@@ -215,18 +227,48 @@ func TestNoUnusedExpressionsUnderOptions(test *testing.T) {
 	}{
 		// allowShortCircuit
 		{"a short circuit onto a call", "a && a()", NoUnusedExpressionsOptions{AllowShortCircuit: true}, 0},
-		{"a short circuit onto an assignment", "a() || (b = c)", NoUnusedExpressionsOptions{AllowShortCircuit: true}, 0},
+		{
+			"a short circuit onto an assignment",
+			"a() || (b = c)",
+			NoUnusedExpressionsOptions{AllowShortCircuit: true},
+			0,
+		},
 		{
 			"a short circuit onto an await",
 			"async function foo() { bar && await baz; }",
 			NoUnusedExpressionsOptions{AllowShortCircuit: true}, 0,
 		},
-		{"a short circuit onto an optional call", "foo && foo?.();", NoUnusedExpressionsOptions{AllowShortCircuit: true}, 0},
-		{"a short circuit onto a dynamic import", "foo && import('./foo');", NoUnusedExpressionsOptions{AllowShortCircuit: true}, 0},
+		{
+			"a short circuit onto an optional call",
+			"foo && foo?.();",
+			NoUnusedExpressionsOptions{AllowShortCircuit: true},
+			0,
+		},
+		{
+			"a short circuit onto a dynamic import",
+			"foo && import('./foo');",
+			NoUnusedExpressionsOptions{AllowShortCircuit: true},
+			0,
+		},
 		{"a short circuit onto an identifier", "a || b", NoUnusedExpressionsOptions{AllowShortCircuit: true}, 1},
-		{"a short circuit onto an identifier, left used", "a() && b", NoUnusedExpressionsOptions{AllowShortCircuit: true}, 1},
-		{"a short circuit onto an optional access", "foo && foo?.bar;", NoUnusedExpressionsOptions{AllowShortCircuit: true}, 1},
-		{"a ternary under the short-circuit option only", "a ? b() : c()", NoUnusedExpressionsOptions{AllowShortCircuit: true}, 1},
+		{
+			"a short circuit onto an identifier, left used",
+			"a() && b",
+			NoUnusedExpressionsOptions{AllowShortCircuit: true},
+			1,
+		},
+		{
+			"a short circuit onto an optional access",
+			"foo && foo?.bar;",
+			NoUnusedExpressionsOptions{AllowShortCircuit: true},
+			1,
+		},
+		{
+			"a ternary under the short-circuit option only",
+			"a ? b() : c()",
+			NoUnusedExpressionsOptions{AllowShortCircuit: true},
+			1,
+		},
 
 		// allowTernary
 		{"a ternary onto two calls", "a ? b() : c()", NoUnusedExpressionsOptions{AllowTernary: true}, 0},
@@ -242,8 +284,18 @@ func TestNoUnusedExpressionsUnderOptions(test *testing.T) {
 		},
 		{"a ternary with a literal alternate", "a ? b : 0", NoUnusedExpressionsOptions{AllowTernary: true}, 1},
 		{"a ternary with an identifier consequent", "a ? b : c()", NoUnusedExpressionsOptions{AllowTernary: true}, 1},
-		{"a ternary onto an optional access", "foo ? foo?.bar : bar.baz;", NoUnusedExpressionsOptions{AllowTernary: true}, 1},
-		{"a short circuit under the ternary option only", "a && b()", NoUnusedExpressionsOptions{AllowTernary: true}, 1},
+		{
+			"a ternary onto an optional access",
+			"foo ? foo?.bar : bar.baz;",
+			NoUnusedExpressionsOptions{AllowTernary: true},
+			1,
+		},
+		{
+			"a short circuit under the ternary option only",
+			"a && b()",
+			NoUnusedExpressionsOptions{AllowTernary: true},
+			1,
+		},
 
 		// both
 		{
@@ -253,19 +305,49 @@ func TestNoUnusedExpressionsUnderOptions(test *testing.T) {
 		},
 
 		// allowTaggedTemplates
-		{"a tagged template", "tag`tagged template literal`", NoUnusedExpressionsOptions{AllowTaggedTemplates: true}, 0},
+		{
+			"a tagged template",
+			"tag`tagged template literal`",
+			NoUnusedExpressionsOptions{AllowTaggedTemplates: true},
+			0,
+		},
 		{
 			"a call is unaffected by the tagged-template option",
 			"shouldNotBeAffectedByAllowTemplateTagsOption()",
 			NoUnusedExpressionsOptions{AllowTaggedTemplates: true}, 0,
 		},
-		{"an untagged template is unaffected", "`untagged template literal`", NoUnusedExpressionsOptions{AllowTaggedTemplates: true}, 1},
-		{"an untagged template with the option off", "`untagged template literal`", NoUnusedExpressionsOptions{AllowTaggedTemplates: false}, 1},
-		{"a tagged template with the option off", "tag`tagged template literal`", NoUnusedExpressionsOptions{AllowTaggedTemplates: false}, 1},
+		{
+			"an untagged template is unaffected",
+			"`untagged template literal`",
+			NoUnusedExpressionsOptions{AllowTaggedTemplates: true},
+			1,
+		},
+		{
+			"an untagged template with the option off",
+			"`untagged template literal`",
+			NoUnusedExpressionsOptions{AllowTaggedTemplates: false},
+			1,
+		},
+		{
+			"a tagged template with the option off",
+			"tag`tagged template literal`",
+			NoUnusedExpressionsOptions{AllowTaggedTemplates: false},
+			1,
+		},
 
 		// enforceForJSX
-		{"an element used as an initialiser is still not a statement", "var partial = <div />", NoUnusedExpressionsOptions{EnforceForJsx: true}, 0},
-		{"a fragment used as an initialiser", "var partial = <></>", NoUnusedExpressionsOptions{EnforceForJsx: true}, 0},
+		{
+			"an element used as an initialiser is still not a statement",
+			"var partial = <div />",
+			NoUnusedExpressionsOptions{EnforceForJsx: true},
+			0,
+		},
+		{
+			"a fragment used as an initialiser",
+			"var partial = <></>",
+			NoUnusedExpressionsOptions{EnforceForJsx: true},
+			0,
+		},
 		{"a self-closing element as a statement", "<div />", NoUnusedExpressionsOptions{EnforceForJsx: true}, 1},
 		{"a fragment as a statement", "<></>", NoUnusedExpressionsOptions{EnforceForJsx: true}, 1},
 
@@ -273,9 +355,24 @@ func TestNoUnusedExpressionsUnderOptions(test *testing.T) {
 		// directive prologue is exempt unconditionally in both upstreams. They are here verbatim
 		// anyway: upstream wrote them, and a port under which they changed verdict would be wrong.
 		{"a directive under the option", `"use strict";`, NoUnusedExpressionsOptions{IgnoreDirectives: true}, 0},
-		{"two directives then a call, under the option", `"directive one"; "directive two"; f();`, NoUnusedExpressionsOptions{IgnoreDirectives: true}, 0},
-		{"a function-body directive under the option", `function foo() {"use strict"; return true; }`, NoUnusedExpressionsOptions{IgnoreDirectives: true}, 0},
-		{"two function-body directives under the option", `function foo() {"directive one"; "directive two"; f(); }`, NoUnusedExpressionsOptions{IgnoreDirectives: true}, 0},
+		{
+			"two directives then a call, under the option",
+			`"directive one"; "directive two"; f();`,
+			NoUnusedExpressionsOptions{IgnoreDirectives: true},
+			0,
+		},
+		{
+			"a function-body directive under the option",
+			`function foo() {"use strict"; return true; }`,
+			NoUnusedExpressionsOptions{IgnoreDirectives: true},
+			0,
+		},
+		{
+			"two function-body directives under the option",
+			`function foo() {"directive one"; "directive two"; f(); }`,
+			NoUnusedExpressionsOptions{IgnoreDirectives: true},
+			0,
+		},
 		{"an identifier is not a directive", "foo;", NoUnusedExpressionsOptions{IgnoreDirectives: true}, 1},
 	}
 

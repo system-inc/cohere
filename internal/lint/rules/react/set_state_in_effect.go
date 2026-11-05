@@ -135,8 +135,8 @@ var messageSetStateInEffect = rule.Message{
 // in the effect does not exempt it.
 //
 // **Both halves are implemented here.** The value-taint half tracks a `refDerivedValues` set through
-// the effect's blocks; the control-dominance half asks `high_level_intermediate_representation.ControlDominators` whether the block
-// holding the setter is control-dependent on a branch whose test is ref-derived.
+// the effect's blocks; the control-dominance half asks `high_level_intermediate_representation.ControlDominators`
+// whether the block holding the setter is control-dependent on a branch whose test is ref-derived.
 //
 // The control half was missing for a while and the file said so, because
 // `internal/utilities/hir/postdominator.go` had the tree and kept it unexported: it exposed
@@ -262,9 +262,12 @@ var SetStateInEffect = rule.Rule{
 				forEachCompiledFunction(node, func(functionNode *ast.Node) {
 					// Manual memoization is erased first, because upstream validates a graph
 					// where `useMemo` and `useCallback` are already gone; see
-					// high_level_intermediate_representation.ForFunctionWithoutManualMemoization for why that is a separate cache
-					// entry rather than a step in the shared one.
-					lowered := high_level_intermediate_representation.ForFunctionWithoutManualMemoization(ruleContext, functionNode)
+					// high_level_intermediate_representation.ForFunctionWithoutManualMemoization for why that is a
+					// separate cache entry rather than a step in the shared one.
+					lowered := high_level_intermediate_representation.ForFunctionWithoutManualMemoization(
+						ruleContext,
+						functionNode,
+					)
 					if lowered == nil {
 						return
 					}
@@ -288,7 +291,10 @@ var SetStateInEffect = rule.Rule{
 // is silent there, measured on `function notAComponent() { const [s, setS] = useState(0);
 // useEffect(() => setS(1)); }`. Gating also makes `hir.MayHoldComponentOrHook` exact for this rule,
 // so a file that cannot hold a component is not lowered at all (#1pmwkmv).
-func analyzeSetStateInEffectSubject(ruleContext rule.Context, function *high_level_intermediate_representation.Function) {
+func analyzeSetStateInEffectSubject(
+	ruleContext rule.Context,
+	function *high_level_intermediate_representation.Function,
+) {
 	if function == nil {
 		return
 	}
@@ -383,7 +389,11 @@ func reportSetStateInEffects(ruleContext rule.Context, function *high_level_inte
 				// callback handed to an effect; when this value is instead called from a later
 				// effect body, that body's own call site supplies the span. See the note on where
 				// findings point in `findSetStateCall`.
-				if callee, found := findSetStateCall(ruleContext, nested, translateAcrossCaptures(value, nested, setStateFunctions)); found {
+				if callee, found := findSetStateCall(
+					ruleContext,
+					nested,
+					translateAcrossCaptures(value, nested, setStateFunctions),
+				); found {
 					setStateFunctions[target] = callee
 				}
 
@@ -637,7 +647,10 @@ func findSetStateCall(
 // the covered set explicitly is deliberate: a silent default that answered "no operands" for an
 // unhandled instruction would drop the exemption and produce a false positive, which is the
 // direction that costs a user rather than the direction that costs a finding.
-func instructionReadsRefDerived(instruction *high_level_intermediate_representation.Instruction, isDerived func(high_level_intermediate_representation.Place) bool) bool {
+func instructionReadsRefDerived(
+	instruction *high_level_intermediate_representation.Instruction,
+	isDerived func(high_level_intermediate_representation.Place) bool,
+) bool {
 	switch value := instruction.Value.(type) {
 	case *high_level_intermediate_representation.LoadLocal:
 		return isDerived(value.Place)
@@ -722,7 +735,10 @@ func translateAcrossCaptures(
 // other, which is a distinction upstream does not draw either.
 //
 // Mutates: refDerived marks every binding the pattern introduces as derived from a ref.
-func markPatternRefDerived(pattern high_level_intermediate_representation.Pattern, referenceDerived map[static_single_assignment.IdentifierId]bool) {
+func markPatternRefDerived(
+	pattern high_level_intermediate_representation.Pattern,
+	referenceDerived map[static_single_assignment.IdentifierId]bool,
+) {
 	switch shape := pattern.(type) {
 	case *high_level_intermediate_representation.PlacePattern:
 		referenceDerived[shape.Place.Identifier] = true
@@ -779,7 +795,9 @@ func markPatternRefDerived(pattern high_level_intermediate_representation.Patter
 // standard, and a reader comparing the two implementations should find the same test in both. Both
 // spread fixtures are also kept, in `TestSetStateInEffectSpreadArgument`, since they assert real
 // upstream behaviour even though they cannot see this particular branch.
-func firstIdentifierArgument(args []high_level_intermediate_representation.Argument) (static_single_assignment.IdentifierId, bool) {
+func firstIdentifierArgument(
+	args []high_level_intermediate_representation.Argument,
+) (static_single_assignment.IdentifierId, bool) {
 	if len(args) == 0 || args[0].Spread {
 		return 0, false
 	}
@@ -855,12 +873,20 @@ const setStateTypeAliasName = "Dispatch"
 const refTypeSymbolName = "RefObject"
 
 // isSetterTyped asks the checker whether a value is a `useState` setter.
-func isSetterTyped(ruleContext rule.Context, function *high_level_intermediate_representation.Function, place high_level_intermediate_representation.Place) bool {
+func isSetterTyped(
+	ruleContext rule.Context,
+	function *high_level_intermediate_representation.Function,
+	place high_level_intermediate_representation.Place,
+) bool {
 	return typeAliasNameOf(ruleContext, function, place) == setStateTypeAliasName
 }
 
 // isRefTyped asks the checker whether a value is a ref object.
-func isRefTyped(ruleContext rule.Context, function *high_level_intermediate_representation.Function, place high_level_intermediate_representation.Place) bool {
+func isRefTyped(
+	ruleContext rule.Context,
+	function *high_level_intermediate_representation.Function,
+	place high_level_intermediate_representation.Place,
+) bool {
 	node := setStateInEffectIdentifierNodeOf(function, place.Identifier)
 	if node == nil || ruleContext.TypeChecker == nil {
 		return false
@@ -874,7 +900,11 @@ func isRefTyped(ruleContext rule.Context, function *high_level_intermediate_repr
 }
 
 // typeAliasNameOf returns the name of the type alias on a value, or the empty string.
-func typeAliasNameOf(ruleContext rule.Context, function *high_level_intermediate_representation.Function, place high_level_intermediate_representation.Place) string {
+func typeAliasNameOf(
+	ruleContext rule.Context,
+	function *high_level_intermediate_representation.Function,
+	place high_level_intermediate_representation.Place,
+) string {
 	node := setStateInEffectIdentifierNodeOf(function, place.Identifier)
 	if node == nil || ruleContext.TypeChecker == nil {
 		return ""
@@ -900,7 +930,11 @@ func typeAliasNameOf(ruleContext rule.Context, function *high_level_intermediate
 // `import {useEffect as useFx}` report and `import {somethingElse as useEffect}` stay silent, which
 // is upstream's `binding.imported` rule. It is also what makes `React.useEffect` need no separate
 // member-expression case: the property access resolves to the same declaration.
-func effectHookKind(ruleContext rule.Context, function *high_level_intermediate_representation.Function, callee high_level_intermediate_representation.Place) effectHookKindOf {
+func effectHookKind(
+	ruleContext rule.Context,
+	function *high_level_intermediate_representation.Function,
+	callee high_level_intermediate_representation.Place,
+) effectHookKindOf {
 	node := setStateInEffectIdentifierNodeOf(function, callee.Identifier)
 	if node == nil || ruleContext.TypeChecker == nil {
 		return effectHookNone
@@ -961,7 +995,10 @@ func effectHookKind(ruleContext rule.Context, function *high_level_intermediate_
 //
 // The index is bounds-checked rather than trusted: `Functions` is populated by lowering, and a
 // malformed or partially lowered function is exactly the input a linter is handed.
-func setStateInEffectNestedFunction(function *high_level_intermediate_representation.Function, value *high_level_intermediate_representation.FunctionExpression) *high_level_intermediate_representation.Function {
+func setStateInEffectNestedFunction(
+	function *high_level_intermediate_representation.Function,
+	value *high_level_intermediate_representation.FunctionExpression,
+) *high_level_intermediate_representation.Function {
 	if function == nil || value == nil || int(value.Function) >= len(function.Functions) {
 		return nil
 	}
@@ -972,7 +1009,10 @@ func setStateInEffectNestedFunction(function *high_level_intermediate_representa
 //
 // This is the seam `Identifier.Node` documents itself as existing for: the node goes to the checker
 // rather than to a local inference pass, which is why this rule needs no type inference.
-func setStateInEffectIdentifierNodeOf(function *high_level_intermediate_representation.Function, id static_single_assignment.IdentifierId) *ast.Node {
+func setStateInEffectIdentifierNodeOf(
+	function *high_level_intermediate_representation.Function,
+	id static_single_assignment.IdentifierId,
+) *ast.Node {
 	if function == nil || int(id) >= len(function.Identifiers) {
 		return nil
 	}
@@ -990,7 +1030,11 @@ func setStateInEffectIdentifierNodeOf(function *high_level_intermediate_represen
 // Our Diagnostic has one Range, so the primary is kept where upstream puts it and the containing
 // effect is not named. That is a deliberate shape difference rather than dropped information: the
 // setter is the line a reader has to change.
-func reportSetter(ruleContext rule.Context, function *high_level_intermediate_representation.Function, setter high_level_intermediate_representation.Place) {
+func reportSetter(
+	ruleContext rule.Context,
+	function *high_level_intermediate_representation.Function,
+	setter high_level_intermediate_representation.Place,
+) {
 	// `Place.Range` rather than `Identifier.Node`, and the distinction is the whole correctness of
 	// this function.
 	//

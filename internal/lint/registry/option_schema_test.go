@@ -18,22 +18,56 @@ func TestTheConfigLayerRefusesWhatUpstreamsSchemaRefuses(test *testing.T) {
 		// An enum value with its case flipped fell back to the default.
 		{"@typescript-eslint/method-signature-style", `["error", "Method"]`, `["error", "method"]`, "element 1"},
 		// A specifier missing `from` decoded and was then dropped from allow.
-		{"@typescript-eslint/no-deprecated", `["error", {"allow": [{"name": "x"}]}]`, `["error", {"allow": [{"from": "file", "name": "x"}]}]`, "element 1 at allow[0]"},
+		{
+			"@typescript-eslint/no-deprecated",
+			`["error", {"allow": [{"name": "x"}]}]`,
+			`["error", {"allow": [{"from": "file", "name": "x"}]}]`,
+			"element 1 at allow[0]",
+		},
 		// A negative maximum loaded as -1.
 		{"complexity", `["error", -1]`, `["error", 0]`, "element 1"},
 		// A duplicate stayed a duplicate.
-		{"no-unreachable-loop", `["error", {"ignore": ["WhileStatement", "WhileStatement"]}]`, `["error", {"ignore": ["WhileStatement"]}]`, "element 1 at ignore"},
+		{
+			"no-unreachable-loop",
+			`["error", {"ignore": ["WhileStatement", "WhileStatement"]}]`,
+			`["error", {"ignore": ["WhileStatement"]}]`,
+			"element 1 at ignore",
+		},
 		// An empty list where upstream says minItems 1.
-		{"no-warning-comments", `["error", {"decoration": []}]`, `["error", {"decoration": ["*"]}]`, "element 1 at decoration"},
+		{
+			"no-warning-comments",
+			`["error", {"decoration": []}]`,
+			`["error", {"decoration": ["*"]}]`,
+			"element 1 at decoration",
+		},
 	} {
-		_, optionsThroughTheConfigurationLayerError := optionsThroughTheConfigLayer(test, testCase.rule, testCase.refused)
+		_, optionsThroughTheConfigurationLayerError := optionsThroughTheConfigLayer(
+			test,
+			testCase.rule,
+			testCase.refused,
+		)
 		if optionsThroughTheConfigurationLayerError == nil {
 			test.Errorf("%s %s loaded, and ESLint refuses it", testCase.rule, testCase.refused)
-		} else if !strings.Contains(optionsThroughTheConfigurationLayerError.Error(), testCase.mustName) || !strings.Contains(optionsThroughTheConfigurationLayerError.Error(), "upstream's schema") {
-			test.Errorf("%s: the refusal does not name %q and upstream's schema: %v", testCase.rule, testCase.mustName, optionsThroughTheConfigurationLayerError)
+		} else if !strings.Contains(optionsThroughTheConfigurationLayerError.Error(), testCase.mustName) ||
+			!strings.Contains(optionsThroughTheConfigurationLayerError.Error(), "upstream's schema") {
+			test.Errorf(
+				"%s: the refusal does not name %q and upstream's schema: %v",
+				testCase.rule,
+				testCase.mustName,
+				optionsThroughTheConfigurationLayerError,
+			)
 		}
-		if _, optionsThroughTheConfigurationLayerError := optionsThroughTheConfigLayer(test, testCase.rule, testCase.accepted); optionsThroughTheConfigurationLayerError != nil {
-			test.Errorf("%s refused %s, which ESLint accepts: %v", testCase.rule, testCase.accepted, optionsThroughTheConfigurationLayerError)
+		if _, optionsThroughTheConfigurationLayerError := optionsThroughTheConfigLayer(
+			test,
+			testCase.rule,
+			testCase.accepted,
+		); optionsThroughTheConfigurationLayerError != nil {
+			test.Errorf(
+				"%s refused %s, which ESLint accepts: %v",
+				testCase.rule,
+				testCase.accepted,
+				optionsThroughTheConfigurationLayerError,
+			)
 		}
 	}
 }

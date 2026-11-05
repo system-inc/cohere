@@ -42,7 +42,13 @@ func TestNoCondAssignFiresUnderExceptParens(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, NoCondAssign, condAssignFile, testCase.sourceText, exceptParensOptions)
+			result := rule_testing.RunWithOptions(
+				test,
+				NoCondAssign,
+				condAssignFile,
+				testCase.sourceText,
+				exceptParensOptions,
+			)
 			rule_testing.ExpectFindings(test, result, "condAssign")
 		})
 	}
@@ -85,7 +91,13 @@ func TestNoCondAssignFiresUnderAlways(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, NoCondAssign, condAssignFile, testCase.sourceText, alwaysOptions)
+			result := rule_testing.RunWithOptions(
+				test,
+				NoCondAssign,
+				condAssignFile,
+				testCase.sourceText,
+				alwaysOptions,
+			)
 			rule_testing.ExpectFindings(test, result, "condAssign")
 		})
 	}
@@ -104,8 +116,16 @@ func TestNoCondAssignStaysSilent(test *testing.T) {
 		{"comparison under always", "var x = 0; if (x == 0) { var b = 1; }", alwaysOptions},
 		{"assignment in a loop body", "var x = 5; while (x < 5) { x = x + 1; }", exceptParensOptions},
 		// The idiom the default mode exists to permit: parentheses say the assignment was meant.
-		{"parenthesized assignment compared", "if ((someNode = someNode.parentNode) !== null) { }", exceptParensOptions},
-		{"parenthesized assignment compared, explicit mode", "if ((someNode = someNode.parentNode) !== null) { }", exceptParensOptions},
+		{
+			"parenthesized assignment compared",
+			"if ((someNode = someNode.parentNode) !== null) { }",
+			exceptParensOptions,
+		},
+		{
+			"parenthesized assignment compared, explicit mode",
+			"if ((someNode = someNode.parentNode) !== null) { }",
+			exceptParensOptions,
+		},
 		{"parenthesized if test", "if ((a = b));", exceptParensOptions},
 		{"parenthesized while test", "while ((a = b));", exceptParensOptions},
 		{"parenthesized do while test", "do {} while ((a = b));", exceptParensOptions},
@@ -113,17 +133,37 @@ func TestNoCondAssignStaysSilent(test *testing.T) {
 		{"for with no test", "for (;;) {}", exceptParensOptions},
 		{"nested parenthesized in if", "if (someNode || (someNode = parentNode)) { }", exceptParensOptions},
 		{"nested parenthesized in while", "while (someNode || (someNode = parentNode)) { }", exceptParensOptions},
-		{"nested parenthesized in do while", "do { } while (someNode || (someNode = parentNode));", exceptParensOptions},
+		{
+			"nested parenthesized in do while",
+			"do { } while (someNode || (someNode = parentNode));",
+			exceptParensOptions,
+		},
 		{"nested parenthesized in for", "for (;someNode || (someNode = parentNode););", exceptParensOptions},
 		// A function boundary stops the ancestor walk. The assignment is inside a body that merely
 		// happens to sit in a test position, and it runs when the function is called rather than
 		// when the condition is evaluated.
-		{"assignment inside an invoked function expression", "if ((function(node) { return node = parentNode; })(someNode)) { }", exceptParensOptions},
-		{"assignment inside an invoked function expression, always", "if ((function(node) { return node = parentNode; })(someNode)) { }", alwaysOptions},
+		{
+			"assignment inside an invoked function expression",
+			"if ((function(node) { return node = parentNode; })(someNode)) { }",
+			exceptParensOptions,
+		},
+		{
+			"assignment inside an invoked function expression, always",
+			"if ((function(node) { return node = parentNode; })(someNode)) { }",
+			alwaysOptions,
+		},
 		{"assignment inside an invoked arrow", "if ((node => node = parentNode)(someNode)) { }", exceptParensOptions},
 		{"assignment inside an invoked arrow, always", "if ((node => node = parentNode)(someNode)) { }", alwaysOptions},
-		{"assignment inside a function expression", "if (function(node) { return node = parentNode; }) { }", exceptParensOptions},
-		{"assignment inside a function expression, always", "if (function(node) { return node = parentNode; }) { }", alwaysOptions},
+		{
+			"assignment inside a function expression",
+			"if (function(node) { return node = parentNode; }) { }",
+			exceptParensOptions,
+		},
+		{
+			"assignment inside a function expression, always",
+			"if (function(node) { return node = parentNode; }) { }",
+			alwaysOptions,
+		},
 		{"plain assignment statement", "x = 0;", alwaysOptions},
 		{"comparison in a ternary test", "var x; var b = (x === 0) ? 1 : 0;", exceptParensOptions},
 		// A case label is not a conditional test position, even though a switch is a conditional.
@@ -138,14 +178,26 @@ func TestNoCondAssignStaysSilent(test *testing.T) {
 		{"assignment in a do body", "do { (obj.key=false) } while (obj.key)", alwaysOptions},
 		// oxc issue 6656: an unbraced statement body. Without a BlockStatement to stop the walk,
 		// a containment check that was merely "is there a conditional ancestor" reports these.
-		{"unbraced if and else bodies", "if (['a', 'b', 'c', 'd'].includes(value)) newValue = value;\nelse newValue = 'default';", alwaysOptions},
+		{
+			"unbraced if and else bodies",
+			"if (['a', 'b', 'c', 'd'].includes(value)) newValue = value;\nelse newValue = 'default';",
+			alwaysOptions,
+		},
 		{"unbraced while body", "while(true) newValue = value;", alwaysOptions},
 		{"unbraced for body", "for(;;) newValue = value;", alwaysOptions},
-		{"ternary in a for test under the default", "for (; (typeof l === 'undefined' ? (l = 0) : l); i++) { }", exceptParensOptions},
+		{
+			"ternary in a for test under the default",
+			"for (; (typeof l === 'undefined' ? (l = 0) : l); i++) { }",
+			exceptParensOptions,
+		},
 		// The for initializer and updater are not the test.
 		{"for initializer and body", "for (x = 0;x<10;x++) { x = 0 }", exceptParensOptions},
 		{"for updater", "for (x = 0;x<10;(x = x + 1)) { x = 0 }", exceptParensOptions},
-		{"for updater compound", "const nums = [1,2,3]; for(let i = 0; i < nums.length; i += 1) { dosomething(); }", exceptParensOptions},
+		{
+			"for updater compound",
+			"const nums = [1,2,3]; for(let i = 0; i < nums.length; i += 1) { dosomething(); }",
+			exceptParensOptions,
+		},
 		{"for updater compound, always", "for (let i = 0; i < nums.length; i += 1) { dosomething();}", alwaysOptions},
 		// The assignment is in a ternary branch, not its test.
 		{"assignment in a ternary branch", "let a = 1; a = a ? (a += 5) : 1;", alwaysOptions},
@@ -154,7 +206,13 @@ func TestNoCondAssignStaysSilent(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, NoCondAssign, condAssignFile, testCase.sourceText, testCase.options)
+			result := rule_testing.RunWithOptions(
+				test,
+				NoCondAssign,
+				condAssignFile,
+				testCase.sourceText,
+				testCase.options,
+			)
 			rule_testing.ExpectClean(test, result)
 		})
 	}
@@ -181,7 +239,13 @@ func TestNoCondAssignBeyondTheUpstreamCorpus(test *testing.T) {
 		test.Parallel()
 		// A typo in the config must not silently escalate to the strict mode. It relaxes to the
 		// documented default instead, which is the same direction the decoder fails in.
-		result := rule_testing.RunWithOptions(test, NoCondAssign, condAssignFile, "if ((a = b));", NoCondAssignOptions("alwyas"))
+		result := rule_testing.RunWithOptions(
+			test,
+			NoCondAssign,
+			condAssignFile,
+			"if ((a = b));",
+			NoCondAssignOptions("alwyas"),
+		)
 		rule_testing.ExpectClean(test, result)
 	})
 
@@ -220,7 +284,11 @@ func TestNoCondAssignBeyondTheUpstreamCorpus(test *testing.T) {
 		rule_testing.ExpectFindings(test, result, "condAssign")
 		reported := result.Diagnostics[0].Range.Pos()
 		if want := 14; reported != want {
-			test.Fatalf("the finding starts at offset %d, wanted %d (the test's operator, not the initializer's)", reported, want)
+			test.Fatalf(
+				"the finding starts at offset %d, wanted %d (the test's operator, not the initializer's)",
+				reported,
+				want,
+			)
 		}
 	})
 
@@ -315,7 +383,13 @@ func TestNoCondAssignReportsTheOperator(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, NoCondAssign, condAssignFile, testCase.sourceText, testCase.options)
+			result := rule_testing.RunWithOptions(
+				test,
+				NoCondAssign,
+				condAssignFile,
+				testCase.sourceText,
+				testCase.options,
+			)
 			if len(result.Diagnostics) != 1 {
 				test.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 			}

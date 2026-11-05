@@ -10,12 +10,18 @@ import (
 
 // reactComponentRequireNamedExportText is the rule's message, whose wording lives in
 // `policy/messages/react-component-require-named-export.json`.
-var reactComponentRequireNamedExportText = policy.MessageOf("structure/react-component-require-named-export", "componentRequiresNamedExport")
+var reactComponentRequireNamedExportText = policy.MessageOf(
+	"structure/react-component-require-named-export",
+	"componentRequiresNamedExport",
+)
 
 // messageComponentRequiresNamedExport is the finding, rendered when it is reported so the text
 // comes from the current catalog.
 func messageComponentRequiresNamedExport() rule.Message {
-	return rule.Message{Id: reactComponentRequireNamedExportText.Id, Description: reactComponentRequireNamedExportText.Render(nil)}
+	return rule.Message{
+		Id:          reactComponentRequireNamedExportText.Id,
+		Description: reactComponentRequireNamedExportText.Render(nil),
+	}
 }
 
 // ReactComponentRequireNamedExport flags a component file with no named export.

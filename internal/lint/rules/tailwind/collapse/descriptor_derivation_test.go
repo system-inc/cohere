@@ -94,7 +94,12 @@ func TestDescriptorRowsAgreeWithTheEmitters(test *testing.T) {
 		totalAgreed += counts[kind].agreed
 		test.Logf("%-12s %3d compared, %3d agreed", kind, counts[kind].compared, counts[kind].agreed)
 	}
-	test.Logf("descriptor cells: %d compared, %d agreed, %d disagreed", totalCompared, totalAgreed, totalCompared-totalAgreed)
+	test.Logf(
+		"descriptor cells: %d compared, %d agreed, %d disagreed",
+		totalCompared,
+		totalAgreed,
+		totalCompared-totalAgreed,
+	)
 
 	for _, disagreement := range disagreements {
 		if descriptorCellsTheEmittersCannotReach[strings.SplitN(disagreement, ":", 2)[0]] {
@@ -220,7 +225,9 @@ func TestNoClassReachesTheTextDropCell(test *testing.T) {
 
 		keys := system.Theme().KeysInNamespaces([]string{"--drop"})
 		if len(keys) == 0 {
-			test.Fatal("this theme declares no --drop keys, and every theme over the framework's does, so nothing reached the cell and the test proves nothing")
+			test.Fatal(
+				"this theme declares no --drop keys, and every theme over the framework's does, so nothing reached the cell and the test proves nothing",
+			)
 		}
 
 		var reachedText int
@@ -231,7 +238,10 @@ func TestNoClassReachesTheTextDropCell(test *testing.T) {
 			}
 			if parsed[0].Root == "text" {
 				reachedText++
-				test.Errorf("text-%s parses as root `text`, so it reaches the text/--drop cell the exemption calls dead", key)
+				test.Errorf(
+					"text-%s parses as root `text`, so it reaches the text/--drop cell the exemption calls dead",
+					key,
+				)
 			}
 		}
 
@@ -279,7 +289,12 @@ func TestModifierAxesAgreeWithTheEmitters(test *testing.T) {
 			{name: "Themed", readings: descriptor.Themed, hasModifier: rootConsultsTheThemeForItsModifier[root]},
 		} {
 			for dataType, want := range axisCase.readings.ByType {
-				branch := UtilityBranch{HasValue: true, IsArbitrary: true, DataType: dataType, HasModifier: axisCase.hasModifier}
+				branch := UtilityBranch{
+					HasValue:    true,
+					IsArbitrary: true,
+					DataType:    dataType,
+					HasModifier: axisCase.hasModifier,
+				}
 				branch.ResolvedAsColor = dataType == DataTypeColor
 				nodes := EmitGapRoot(root, branch)
 				if len(nodes) == 0 {
@@ -325,7 +340,12 @@ func TestModifierAxesAgreeWithTheEmitters(test *testing.T) {
 		totalAgreed += counts[name].agreed
 		test.Logf("%-8s %3d compared, %3d agreed", name, counts[name].compared, counts[name].agreed)
 	}
-	test.Logf("modifier-axis cells: %d compared, %d agreed, %d disagreed", totalCompared, totalAgreed, totalCompared-totalAgreed)
+	test.Logf(
+		"modifier-axis cells: %d compared, %d agreed, %d disagreed",
+		totalCompared,
+		totalAgreed,
+		totalCompared-totalAgreed,
+	)
 
 	// The same dead cell the unmodified measurement exempts, on both modifier axes. `text/--drop` is
 	// a `text-shadow` reading filed under root `text`, and no class reaches it on any axis.
@@ -380,25 +400,34 @@ func TestThemedModifierRootsAreTheOnesThatDiffer(test *testing.T) {
 		// called it unchanged and the entry stale.
 		differs := false
 		for namespace, themed := range descriptor.Themed.ByNamespace {
-			if unmodified, has := descriptor.Absent.ByNamespace[namespace]; has && fmt.Sprint(themed) != fmt.Sprint(unmodified) {
+			if unmodified, has := descriptor.Absent.ByNamespace[namespace]; has &&
+				fmt.Sprint(themed) != fmt.Sprint(unmodified) {
 				differs = true
 			}
 		}
 		for dataType, themed := range descriptor.Themed.ByType {
-			if unmodified, has := descriptor.Absent.ByType[dataType]; has && fmt.Sprint(themed) != fmt.Sprint(unmodified) {
+			if unmodified, has := descriptor.Absent.ByType[dataType]; has &&
+				fmt.Sprint(themed) != fmt.Sprint(unmodified) {
 				differs = true
 			}
 		}
 
 		if differs && !rootConsultsTheThemeForItsModifier[root] {
-			test.Errorf("%s reads differently on the Themed axis and is not in the set, so its cells are compared on the unmodified arm", root)
+			test.Errorf(
+				"%s reads differently on the Themed axis and is not in the set, so its cells are compared on the unmodified arm",
+				root,
+			)
 		}
 		if !differs && rootConsultsTheThemeForItsModifier[root] {
 			test.Errorf("%s is in the set and reads the same on both axes, so the entry is stale", root)
 		}
 	}
 
-	test.Logf("gap roots with a Themed axis: %d checked, %d in the set", checked, len(rootConsultsTheThemeForItsModifier))
+	test.Logf(
+		"gap roots with a Themed axis: %d checked, %d in the set",
+		checked,
+		len(rootConsultsTheThemeForItsModifier),
+	)
 
 	if checked == 0 {
 		test.Fatal("no root carried a Themed axis, so this test measured nothing")

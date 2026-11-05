@@ -24,7 +24,28 @@ import (
  * pure ASCII, so it never reached any of this.
  */
 
-var textAlphabet = []string{" ", "\t", "\n", "\r", "\r\n", " ", " ", " ", "　", "\ufeff", "a", "中", "😀", "/", "*", ",", ";", "//", "/*", "*/"}
+var textAlphabet = []string{
+	" ",
+	"\t",
+	"\n",
+	"\r",
+	"\r\n",
+	" ",
+	" ",
+	" ",
+	"　",
+	"\ufeff",
+	"a",
+	"中",
+	"😀",
+	"/",
+	"*",
+	",",
+	";",
+	"//",
+	"/*",
+	"*/",
+}
 
 // byteToUnit and unitToByte convert between offsets at rune boundaries. -1, -2 and len map to themselves.
 func offsetMaps(text string) (byteToUnit map[int]int, unitToByte map[int]int) {
@@ -151,22 +172,34 @@ func TestTextAgreesWithUpstream(test *testing.T) {
 			return -100
 		}
 		got := textAnswers{
-			SkipWhitespaceForward: SkipWhitespace(text, start, false), SkipWhitespaceBackward: SkipWhitespace(text, start, true),
-			SkipSpacesForward: SkipSpaces(text, start, false), SkipSpacesBackward: SkipSpaces(text, start, true),
-			SkipToLineEnd: SkipToLineEnd(text, start, false), SkipEverythingButNewLine: SkipEverythingButNewLine(text, start, false),
-			SkipNewlineForward: SkipNewline(text, start, false), SkipNewlineBackward: SkipNewline(text, start, true),
-			HasNewlineForward: HasNewline(text, start, false), HasNewlineBackward: HasNewline(text, start, true),
-			IsPreviousLineEmpty: IsPreviousLineEmpty(text, start),
-			SkipInlineComment:   SkipInlineComment(text, start), SkipTrailingComment: SkipTrailingComment(text, start),
+			SkipWhitespaceForward:    SkipWhitespace(text, start, false),
+			SkipWhitespaceBackward:   SkipWhitespace(text, start, true),
+			SkipSpacesForward:        SkipSpaces(text, start, false),
+			SkipSpacesBackward:       SkipSpaces(text, start, true),
+			SkipToLineEnd:            SkipToLineEnd(text, start, false),
+			SkipEverythingButNewLine: SkipEverythingButNewLine(text, start, false),
+			SkipNewlineForward:       SkipNewline(text, start, false),
+			SkipNewlineBackward:      SkipNewline(text, start, true),
+			HasNewlineForward:        HasNewline(text, start, false),
+			HasNewlineBackward:       HasNewline(text, start, true),
+			IsPreviousLineEmpty:      IsPreviousLineEmpty(text, start),
+			SkipInlineComment:        SkipInlineComment(text, start),
+			SkipTrailingComment:      SkipTrailingComment(text, start),
 		}
 		expected := textAnswers{
-			SkipWhitespaceForward: mapped(want.SkipWhitespaceForward), SkipWhitespaceBackward: mapped(want.SkipWhitespaceBackward),
-			SkipSpacesForward: mapped(want.SkipSpacesForward), SkipSpacesBackward: mapped(want.SkipSpacesBackward),
-			SkipToLineEnd: mapped(want.SkipToLineEnd), SkipEverythingButNewLine: mapped(want.SkipEverythingButNewLine),
-			SkipNewlineForward: mapped(want.SkipNewlineForward), SkipNewlineBackward: mapped(want.SkipNewlineBackward),
-			HasNewlineForward: want.HasNewlineForward, HasNewlineBackward: want.HasNewlineBackward,
-			IsPreviousLineEmpty: want.IsPreviousLineEmpty,
-			SkipInlineComment:   mapped(want.SkipInlineComment), SkipTrailingComment: mapped(want.SkipTrailingComment),
+			SkipWhitespaceForward:    mapped(want.SkipWhitespaceForward),
+			SkipWhitespaceBackward:   mapped(want.SkipWhitespaceBackward),
+			SkipSpacesForward:        mapped(want.SkipSpacesForward),
+			SkipSpacesBackward:       mapped(want.SkipSpacesBackward),
+			SkipToLineEnd:            mapped(want.SkipToLineEnd),
+			SkipEverythingButNewLine: mapped(want.SkipEverythingButNewLine),
+			SkipNewlineForward:       mapped(want.SkipNewlineForward),
+			SkipNewlineBackward:      mapped(want.SkipNewlineBackward),
+			HasNewlineForward:        want.HasNewlineForward,
+			HasNewlineBackward:       want.HasNewlineBackward,
+			IsPreviousLineEmpty:      want.IsPreviousLineEmpty,
+			SkipInlineComment:        mapped(want.SkipInlineComment),
+			SkipTrailingComment:      mapped(want.SkipTrailingComment),
 		}
 		if got != expected {
 			mismatches++
@@ -175,9 +208,19 @@ func TestTextAgreesWithUpstream(test *testing.T) {
 			}
 		}
 	}
-	test.Logf("%d cases, %d with non-ASCII, %d answers upstream lands mid surrogate pair (held to the containing rune's start), %d mismatches", len(cases), nonASCII, unmapped, mismatches)
+	test.Logf(
+		"%d cases, %d with non-ASCII, %d answers upstream lands mid surrogate pair (held to the containing rune's start), %d mismatches",
+		len(cases),
+		nonASCII,
+		unmapped,
+		mismatches,
+	)
 	if nonASCII < len(cases)/2 {
-		test.Errorf("only %d of %d cases contain non-ASCII text, which is the population this test exists for", nonASCII, len(cases))
+		test.Errorf(
+			"only %d of %d cases contain non-ASCII text, which is the population this test exists for",
+			nonASCII,
+			len(cases),
+		)
 	}
 }
 

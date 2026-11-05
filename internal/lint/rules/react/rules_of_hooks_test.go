@@ -554,7 +554,10 @@ func TestRulesOfHooksStaysSilent(test *testing.T) {
 		{name: "upstream054", source: `const MyComponent = makeComponent(() => { useHook(); });`},
 		{name: "upstream055", source: `const MyComponent2 = makeComponent(function () { useHook(); });`},
 		{name: "upstream056", source: `const MyComponent4 = makeComponent(function InnerComponent() { useHook(); });`},
-		{name: "upstream057", source: `const Foo = hoc((props) => { if (props.cond) { const [_a, _b] = useState(false); } });`},
+		{
+			name:   "upstream057",
+			source: `const Foo = hoc((props) => { if (props.cond) { const [_a, _b] = useState(false); } });`,
+		},
 		{name: "upstream058", source: `
         async (_, use) => {
           await use();
@@ -1170,9 +1173,21 @@ func TestRulesOfHooksFires(test *testing.T) {
                     }
                 }
         `, ids: []string{"rulesOfHooksClassComponent"}},
-		{name: "upstream124", source: `(class {useHook = () => { useState(); }});`, ids: []string{"rulesOfHooksClassComponent"}},
-		{name: "upstream125", source: `(class {useHook() { useState(); }});`, ids: []string{"rulesOfHooksClassComponent"}},
-		{name: "upstream126", source: `(class {h = () => { useState(); }});`, ids: []string{"rulesOfHooksClassComponent"}},
+		{
+			name:   "upstream124",
+			source: `(class {useHook = () => { useState(); }});`,
+			ids:    []string{"rulesOfHooksClassComponent"},
+		},
+		{
+			name:   "upstream125",
+			source: `(class {useHook() { useState(); }});`,
+			ids:    []string{"rulesOfHooksClassComponent"},
+		},
+		{
+			name:   "upstream126",
+			source: `(class {h = () => { useState(); }});`,
+			ids:    []string{"rulesOfHooksClassComponent"},
+		},
 		{name: "upstream127", source: `(class {i() { useState(); }});`, ids: []string{"rulesOfHooksClassComponent"}},
 		{name: "upstream128", source: `
                 async function AsyncComponent() {
@@ -1258,7 +1273,11 @@ func TestRulesOfHooksFires(test *testing.T) {
                 });
             }
         `, ids: []string{"rulesOfHooksCallback"}},
-		{name: "upstream142", source: `const MyComponent3 = makeComponent(function foo () { useHook(); });`, ids: []string{"rulesOfHooksNotComponent"}},
+		{
+			name:   "upstream142",
+			source: `const MyComponent3 = makeComponent(function foo () { useHook(); });`,
+			ids:    []string{"rulesOfHooksNotComponent"},
+		},
 		{name: "upstream143", source: `
             function Component() {
                 return <Foo>{() => { useState(); }}</Foo>;
@@ -1279,7 +1298,11 @@ func TestRulesOfHooksFires(test *testing.T) {
                 return <Foo render={props => { useCallback(() => {}, []); }} />;
             }
         `, ids: []string{"rulesOfHooksCallback"}},
-		{name: "upstream147", source: `const Foo3 = hoc(function NamedComp(props) { if (props.cond) { const [_a, _b] = useState(false); } });`, ids: []string{"rulesOfHooksConditional"}},
+		{
+			name:   "upstream147",
+			source: `const Foo3 = hoc(function NamedComp(props) { if (props.cond) { const [_a, _b] = useState(false); } });`,
+			ids:    []string{"rulesOfHooksConditional"},
+		},
 		{name: "upstream150", source: `
             function MyComponent({ theme }) {
                 return <Child onClick={useEffectEvent(() => {
@@ -1403,22 +1426,72 @@ func TestRulesOfHooksMessages(test *testing.T) {
 		actualId   string
 		actualText string
 	}{
-		{"rulesOfHooksConditional", "This Hook is not called on every render path", messageRulesOfHooksConditional.Id, messageRulesOfHooksConditional.Description},
-		{"rulesOfHooksLoop", "This Hook can run more than once in a single render", messageRulesOfHooksLoop.Id, messageRulesOfHooksLoop.Description},
-		{"rulesOfHooksTopLevel", "A Hook called at module scope", messageRulesOfHooksTopLevel.Id, messageRulesOfHooksTopLevel.Description},
-		{"rulesOfHooksClassComponent", "A class component does not render through the Hook dispatcher", messageRulesOfHooksClassComponent.Id, messageRulesOfHooksClassComponent.Description},
-		{"rulesOfHooksCallback", "This Hook is called inside a callback rather than during render", messageRulesOfHooksCallback.Id, messageRulesOfHooksCallback.Description},
-		{"rulesOfHooksNotComponent", "This Hook is called from a plain function", messageRulesOfHooksNotComponent.Id, messageRulesOfHooksNotComponent.Description},
-		{"rulesOfHooksAsync", "An async function body resumes after its awaits", messageRulesOfHooksAsync.Id, messageRulesOfHooksAsync.Description},
-		{"rulesOfHooksTryCatchUse", "`use` suspends by throwing a promise", messageRulesOfHooksTryCatchUse.Id, messageRulesOfHooksTryCatchUse.Description},
-		{"rulesOfHooksEffectEventEscape", "`useEffectEvent` returns a function", messageRulesOfHooksEffectEventEscape.Id, messageRulesOfHooksEffectEventEscape.Description},
+		{
+			"rulesOfHooksConditional",
+			"This Hook is not called on every render path",
+			messageRulesOfHooksConditional.Id,
+			messageRulesOfHooksConditional.Description,
+		},
+		{
+			"rulesOfHooksLoop",
+			"This Hook can run more than once in a single render",
+			messageRulesOfHooksLoop.Id,
+			messageRulesOfHooksLoop.Description,
+		},
+		{
+			"rulesOfHooksTopLevel",
+			"A Hook called at module scope",
+			messageRulesOfHooksTopLevel.Id,
+			messageRulesOfHooksTopLevel.Description,
+		},
+		{
+			"rulesOfHooksClassComponent",
+			"A class component does not render through the Hook dispatcher",
+			messageRulesOfHooksClassComponent.Id,
+			messageRulesOfHooksClassComponent.Description,
+		},
+		{
+			"rulesOfHooksCallback",
+			"This Hook is called inside a callback rather than during render",
+			messageRulesOfHooksCallback.Id,
+			messageRulesOfHooksCallback.Description,
+		},
+		{
+			"rulesOfHooksNotComponent",
+			"This Hook is called from a plain function",
+			messageRulesOfHooksNotComponent.Id,
+			messageRulesOfHooksNotComponent.Description,
+		},
+		{
+			"rulesOfHooksAsync",
+			"An async function body resumes after its awaits",
+			messageRulesOfHooksAsync.Id,
+			messageRulesOfHooksAsync.Description,
+		},
+		{
+			"rulesOfHooksTryCatchUse",
+			"`use` suspends by throwing a promise",
+			messageRulesOfHooksTryCatchUse.Id,
+			messageRulesOfHooksTryCatchUse.Description,
+		},
+		{
+			"rulesOfHooksEffectEventEscape",
+			"`useEffectEvent` returns a function",
+			messageRulesOfHooksEffectEventEscape.Id,
+			messageRulesOfHooksEffectEventEscape.Description,
+		},
 	}
 	for _, pair := range pairs {
 		if pair.actualId != pair.id {
 			test.Errorf("expected id %q, got %q", pair.id, pair.actualId)
 		}
 		if !strings.HasPrefix(pair.actualText, pair.startsWith) {
-			test.Errorf("expected the description for %q to start with %q, got %q", pair.id, pair.startsWith, pair.actualText)
+			test.Errorf(
+				"expected the description for %q to start with %q, got %q",
+				pair.id,
+				pair.startsWith,
+				pair.actualText,
+			)
 		}
 	}
 }

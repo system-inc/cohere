@@ -35,16 +35,48 @@ func TestJsxNoUndefFires(test *testing.T) {
 		findings   []string
 	}{
 		{"an undeclared uppercase component", "var React; React.render(<App />);", []string{"jsxIdentifierNotDefined"}},
-		{"an undeclared uppercase member object", "var React; React.render(<Appp.Foo />);", []string{"jsxIdentifierNotDefined"}},
-		{"an undeclared lowercase member object", "var React; React.render(<appp.Foo />);", []string{"jsxIdentifierNotDefined"}},
-		{"an undeclared lowercase member object, two levels deep", "var React; React.render(<appp.foo.Bar />);", []string{"jsxIdentifierNotDefined"}},
-		{"another undeclared uppercase component", "var React; React.render(<Foo />);", []string{"jsxIdentifierNotDefined"}},
-		{"an undeclared name mentioned as a bare expression too", "var React; Unknown; React.render(<Unknown />)", []string{"jsxIdentifierNotDefined"}},
-		{"a binding declared only inside a nested block", "var React; { const App = null; }; React.render(<App />);", []string{"jsxIdentifierNotDefined"}},
-		{"an enum member that is not a value binding", "var React; enum A { App }; React.render(<App />);", []string{"jsxIdentifierNotDefined"}},
+		{
+			"an undeclared uppercase member object",
+			"var React; React.render(<Appp.Foo />);",
+			[]string{"jsxIdentifierNotDefined"},
+		},
+		{
+			"an undeclared lowercase member object",
+			"var React; React.render(<appp.Foo />);",
+			[]string{"jsxIdentifierNotDefined"},
+		},
+		{
+			"an undeclared lowercase member object, two levels deep",
+			"var React; React.render(<appp.foo.Bar />);",
+			[]string{"jsxIdentifierNotDefined"},
+		},
+		{
+			"another undeclared uppercase component",
+			"var React; React.render(<Foo />);",
+			[]string{"jsxIdentifierNotDefined"},
+		},
+		{
+			"an undeclared name mentioned as a bare expression too",
+			"var React; Unknown; React.render(<Unknown />)",
+			[]string{"jsxIdentifierNotDefined"},
+		},
+		{
+			"a binding declared only inside a nested block",
+			"var React; { const App = null; }; React.render(<App />);",
+			[]string{"jsxIdentifierNotDefined"},
+		},
+		{
+			"an enum member that is not a value binding",
+			"var React; enum A { App }; React.render(<App />);",
+			[]string{"jsxIdentifierNotDefined"},
+		},
 		// Upstream block 2, the fail half. The pass half of this pair sets `globals: {A: "readonly"}`
 		// and has no expressible form here.
-		{"an undeclared member object with no surrounding code", "let x = <A.B />;", []string{"jsxIdentifierNotDefined"}},
+		{
+			"an undeclared member object with no surrounding code",
+			"let x = <A.B />;",
+			[]string{"jsxIdentifierNotDefined"},
+		},
 
 		// Cases below are ours, not upstream's, and each covers a distinction our tree makes that
 		// oxc's corpus never exercises.
@@ -52,31 +84,63 @@ func TestJsxNoUndefFires(test *testing.T) {
 		// The intrinsic split is a parser variant upstream and a text predicate here, so the three
 		// shapes that a reading of "lowercase means intrinsic" gets wrong need their own cases.
 		// Measured against the release oxlint binary before being written: all three report there.
-		{"an underscore-led name, which upstream treats as a reference", "var React; React.render(<_foo />);", []string{"jsxIdentifierNotDefined"}},
-		{"a dollar-led name, which upstream treats as a reference", "var React; React.render(<$foo />);", []string{"jsxIdentifierNotDefined"}},
-		{"a non-ASCII name, always a reference whatever its case", "var React; React.render(<אב />);", []string{"jsxIdentifierNotDefined"}},
+		{
+			"an underscore-led name, which upstream treats as a reference",
+			"var React; React.render(<_foo />);",
+			[]string{"jsxIdentifierNotDefined"},
+		},
+		{
+			"a dollar-led name, which upstream treats as a reference",
+			"var React; React.render(<$foo />);",
+			[]string{"jsxIdentifierNotDefined"},
+		},
+		{
+			"a non-ASCII name, always a reference whatever its case",
+			"var React; React.render(<אב />);",
+			[]string{"jsxIdentifierNotDefined"},
+		},
 
 		// The member walk has to reach the leftmost object rather than the immediate one. A single
 		// step would read `A.B` as the object of `A.B.C.D` and resolve nothing either way, so this
 		// case only distinguishes the two once the object is declared, which the pass twin covers.
-		{"a four-deep member expression reports on its leftmost object", "var React; React.render(<A.B.C.D />);", []string{"jsxIdentifierNotDefined"}},
+		{
+			"a four-deep member expression reports on its leftmost object",
+			"var React; React.render(<A.B.C.D />);",
+			[]string{"jsxIdentifierNotDefined"},
+		},
 
 		// A lowercase member object is a reference, so the case predicate must not be applied to
 		// it. Applying it there would silence this and two upstream fail cases at once.
-		{"a lowercase leftmost object with an undeclared name", "var React; React.render(<zzz.Bar />);", []string{"jsxIdentifierNotDefined"}},
+		{
+			"a lowercase leftmost object with an undeclared name",
+			"var React; React.render(<zzz.Bar />);",
+			[]string{"jsxIdentifierNotDefined"},
+		},
 
 		// A type-only binding is not a value binding, so both of these report. Written the other way
 		// round first, on the belief that anything the checker can name is enough, and the fixture
 		// failed against the rule. The release oxlint binary settled it: both report there too, so
 		// the rule was right and the guess was wrong. Kept as two cases because a later narrowing of
 		// the resolution call to value symbols would pass the interface case and fail the alias one.
-		{"a component bound only by an interface declaration", "interface App {}; var React; React.render(<App />);", []string{"jsxIdentifierNotDefined"}},
-		{"a component bound only by a type alias", "type App = any; var React; React.render(<App />);", []string{"jsxIdentifierNotDefined"}},
+		{
+			"a component bound only by an interface declaration",
+			"interface App {}; var React; React.render(<App />);",
+			[]string{"jsxIdentifierNotDefined"},
+		},
+		{
+			"a component bound only by a type alias",
+			"type App = any; var React; React.render(<App />);",
+			[]string{"jsxIdentifierNotDefined"},
+		},
 
 		// A JSX element written in its non-self-closing form parses as KindJsxOpeningElement rather
 		// than KindJsxSelfClosingElement, and a rule listening to only one of the two is silent on
 		// the other. Upstream's corpus is entirely self-closing, so nothing in it covers this.
-		{"an undeclared component written with a closing tag", "var React; React.render(<App></App>);", []string{"jsxIdentifierNotDefined"}},
+		{
+			"an undeclared component written with a closing tag",
+			"var React; React.render(<App></App>);",
+			[]string{"jsxIdentifierNotDefined"},
+		},
 	}
 
 	for _, testCase := range cases {
@@ -101,12 +165,24 @@ func TestJsxNoUndefStaysSilent(test *testing.T) {
 		{"a lowercase member object that is declared", "var React, app; React.render(<app.Foo />);"},
 		{"a lowercase member object declared, two levels deep", "var React, app; React.render(<app.foo.Bar />);"},
 		{"a namespaced name", "var React; React.render(<Apppp:Foo />);"},
-		{"a this-rooted member expression inside a class", "\n        var React;\n        class Hello extends React.Component {\n          render() {\n            return <this.props.tag />\n          }\n        }\n        "},
-		{"a component imported by default import", "\n        import Text from \"cool-module\";\n        const TextWrapper = function (props) {\n          return (\n            <Text />\n          );\n        };\n        "},
-		{"a var declared before an enum of the same member name", "var App; var React; enum A { App };  React.render(<App />);"},
+		{
+			"a this-rooted member expression inside a class",
+			"\n        var React;\n        class Hello extends React.Component {\n          render() {\n            return <this.props.tag />\n          }\n        }\n        ",
+		},
+		{
+			"a component imported by default import",
+			"\n        import Text from \"cool-module\";\n        const TextWrapper = function (props) {\n          return (\n            <Text />\n          );\n        };\n        ",
+		},
+		{
+			"a var declared before an enum of the same member name",
+			"var App; var React; enum A { App };  React.render(<App />);",
+		},
 		{"an enum before a var of the same name", "var React; enum A { App }; var App; React.render(<App />);"},
 		{"an import-equals require binding", "var React; import App = require('./app'); React.render(<App />);"},
-		{"an import-equals alias of an imported namespace member", "\n        var React;\n        import { Foo } from './foo';\n        import App = Foo.App;\n        React.render(<App />);\n        "},
+		{
+			"an import-equals alias of an imported namespace member",
+			"\n        var React;\n        import { Foo } from './foo';\n        import App = Foo.App;\n        React.render(<App />);\n        ",
+		},
 		// Cases below are ours. Each is a shape our tree produces that upstream's corpus does not
 		// reach, and every one was checked against the release oxlint binary first.
 
@@ -133,7 +209,10 @@ func TestJsxNoUndefStaysSilent(test *testing.T) {
 
 		// An ambient declaration is the shape our tree has where upstream has its `globals` option,
 		// and it is what makes the block-2 pass case inexpressible rather than simply missing.
-		{"a component declared in an ambient declare statement", "declare var A: any; var React; React.render(<A.B />);"},
+		{
+			"a component declared in an ambient declare statement",
+			"declare var A: any; var React; React.render(<A.B />);",
+		},
 
 		// A function declaration is the ordinary component spelling and appears nowhere in
 		// upstream's corpus, which declares everything with `var`.

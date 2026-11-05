@@ -99,8 +99,8 @@ const useMemoOverlappingScopes = "// @validatePreserveExistingMemoizationGuarant
 // reports it at 7:26, on the memo callback.
 const mixedOptionalNonOptionalPropertyChain = "// @enablePreserveExistingMemoizationGuarantees @validatePreserveExistingMemoizationGuarantees @enableOptionalDependencies\n\nimport {useMemo} from 'react';\nimport {identity, ValidateMemoization} from 'shared-runtime';\n\nfunction Component({x}) {\n  const object = useMemo(() => {\n    return identity({\n      callback: () => {\n        // This is a bug in our dependency inference: we stop capturing dependencies\n        // after x.a.b?.c. But what this dependency is telling us is that if `x.a.b`\n        // was non-nullish, then we can access `.c.d?.e`. Thus we should take the\n        // full property chain, exactly as-is with optionals/non-optionals, as a\n        // dependency\n        return identity(x.a.b?.c.d?.e);\n      },\n    });\n  }, [x.a.b?.c.d?.e]);\n  const result = useMemo(() => {\n    return [object.callback()];\n  }, [object]);\n  return <Inner x={x} result={result} />;\n}\n\nfunction Inner({x, result}) {\n  'use no memo';\n  return <ValidateMemoization inputs={[x.y.z]} output={result} />;\n}\n\nexport const FIXTURE_ENTRYPOINT = {\n  fn: Component,\n  params: [{x: {y: {z: 42}}}],\n  sequentialRenders: [\n    {x: {y: {z: 42}}},\n    {x: {y: {z: 42}}},\n    {x: {y: {z: 3.14}}},\n    {x: {y: {z: 42}}},\n    {x: {y: {z: 3.14}}},\n    {x: {y: {z: 42}}},\n  ],\n};\n"
 
-// preserveManualMemoizationClean1 is `preserve-memo-validation/preserve-use-callback-stable-built-ins.ts`, which upstream compiles
-// without reporting this rule.
+// preserveManualMemoizationClean1 is `preserve-memo-validation/preserve-use-callback-stable-built-ins.ts`, which
+// upstream compiles without reporting this rule.
 const preserveManualMemoizationClean1 = `// @validatePreserveExistingMemoizationGuarantees
 import {
   useCallback,
@@ -136,8 +136,8 @@ export const FIXTURE_ENTRYPOINT = {
 };
 `
 
-// preserveManualMemoizationClean2 is `preserve-memo-validation/preserve-use-memo-ref-missing-ok.ts`, which upstream compiles
-// without reporting this rule.
+// preserveManualMemoizationClean2 is `preserve-memo-validation/preserve-use-memo-ref-missing-ok.ts`, which upstream
+// compiles without reporting this rule.
 const preserveManualMemoizationClean2 = `// @validatePreserveExistingMemoizationGuarantees
 import {useCallback, useRef} from 'react';
 
@@ -157,8 +157,8 @@ export const FIXTURE_ENTRYPOINT = {
 };
 `
 
-// preserveManualMemoizationClean3 is `preserve-memo-validation/preserve-use-memo-transition.ts`, which upstream compiles
-// without reporting this rule.
+// preserveManualMemoizationClean3 is `preserve-memo-validation/preserve-use-memo-transition.ts`, which upstream
+// compiles without reporting this rule.
 const preserveManualMemoizationClean3 = `// @validatePreserveExistingMemoizationGuarantees
 import {useCallback, useTransition} from 'react';
 
@@ -197,8 +197,8 @@ export const FIXTURE_ENTRYPOINT = {
 };
 `
 
-// preserveManualMemoizationClean5 is `preserve-memo-validation/maybe-invalid-useMemo-no-memoblock-sideeffect.ts`, which upstream compiles
-// without reporting this rule.
+// preserveManualMemoizationClean5 is `preserve-memo-validation/maybe-invalid-useMemo-no-memoblock-sideeffect.ts`, which
+// upstream compiles without reporting this rule.
 const preserveManualMemoizationClean5 = `// @validatePreserveExistingMemoizationGuarantees
 
 import {useMemo} from 'react';

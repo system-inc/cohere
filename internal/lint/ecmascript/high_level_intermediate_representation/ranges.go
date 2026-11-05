@@ -182,7 +182,11 @@ func newRangeGraph(function *Function, effects *AliasingEffects) rangeGraph {
 	return rangeGraph{effects: effects, refs: refDerivedValues(function)}
 }
 
-func (rangeGraph) InstructionOrder(function *Function, block *BasicBlock, index int) (static_single_assignment.EvaluationOrder, bool) {
+func (rangeGraph) InstructionOrder(
+	function *Function,
+	block *BasicBlock,
+	index int,
+) (static_single_assignment.EvaluationOrder, bool) {
 	instruction := function.Instructions[block.Instructions[index]]
 	if instruction == nil {
 		return 0, false
@@ -214,7 +218,11 @@ func (rangeGraph) ReturnValue(block *BasicBlock) (Place, bool) {
 	return returnTerminal.Value, true
 }
 
-func (rangeGraph) StoredContextValue(function *Function, block *BasicBlock, index int) (static_single_assignment.IdentifierId, bool) {
+func (rangeGraph) StoredContextValue(
+	function *Function,
+	block *BasicBlock,
+	index int,
+) (static_single_assignment.IdentifierId, bool) {
 	store, ok := function.Instructions[block.Instructions[index]].Value.(*StoreContext)
 	if !ok {
 		return 0, false
@@ -225,8 +233,13 @@ func (rangeGraph) StoredContextValue(function *Function, block *BasicBlock, inde
 // Closure is React's rule for a FunctionExpression: created Frozen when every capture is immutable,
 // none is derived from a useRef result, and the closure's body only reads them
 // (hasReadOnlyClosureEffectsForCaptures).
-func (graph rangeGraph) Closure(function *Function, block *BasicBlock, index int, into static_single_assignment.IdentifierId,
-	kinds map[static_single_assignment.IdentifierId]mutation_aliasing.EffectValueKind) ([]Place, bool) {
+func (graph rangeGraph) Closure(
+	function *Function,
+	block *BasicBlock,
+	index int,
+	into static_single_assignment.IdentifierId,
+	kinds map[static_single_assignment.IdentifierId]mutation_aliasing.EffectValueKind,
+) ([]Place, bool) {
 	instruction := function.Instructions[block.Instructions[index]]
 	expression, ok := instruction.Value.(*FunctionExpression)
 	if !ok || into != instruction.LValue.Identifier {

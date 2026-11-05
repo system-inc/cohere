@@ -93,7 +93,9 @@ func TestParseCombinatorAndSpaces(test *testing.T) {
 		test.Errorf("leading space %q", spacesOf(nodes[0])["before"])
 	}
 	combinator := nodes[1]
-	if combinator.String("value") != ">" || spacesOf(combinator)["before"] != "  " || spacesOf(combinator)["after"] != "\t" {
+	if combinator.String("value") != ">" ||
+		spacesOf(combinator)["before"] != "  " ||
+		spacesOf(combinator)["after"] != "\t" {
 		test.Errorf("combinator %q spaces %v", combinator.String("value"), spacesOf(combinator))
 	}
 	if spacesOf(nodes[2])["after"] != " " {
@@ -194,7 +196,33 @@ func TestParseRefusals(test *testing.T) {
 func TestParseNeverPanics(test *testing.T) {
 	test.Parallel()
 	random := rand.New(rand.NewPCG(5, 7))
-	pieces := []string{"a", ".", "#", ":", "(", ")", "[", "]", "=", "|", "*", "&", ",", " ", ">", "\\", "'", "\"", "/*", "*/", "@", ";", "i", "\xf0\x9f\x98\x80", "#{"}
+	pieces := []string{
+		"a",
+		".",
+		"#",
+		":",
+		"(",
+		")",
+		"[",
+		"]",
+		"=",
+		"|",
+		"*",
+		"&",
+		",",
+		" ",
+		">",
+		"\\",
+		"'",
+		"\"",
+		"/*",
+		"*/",
+		"@",
+		";",
+		"i",
+		"\xf0\x9f\x98\x80",
+		"#{",
+	}
 	for range 20000 {
 		var text strings.Builder
 		for range 1 + random.IntN(8) {

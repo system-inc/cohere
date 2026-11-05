@@ -92,7 +92,16 @@ func TestShoutingMaskGatesActuallySkip(test *testing.T) {
 	}
 
 	// And they must admit the real cases, or the rule goes quiet for them.
-	for _, admitted := range []string{"$ ls", "git commit", "pnpm install", "curl x", "s c", "ahra os", "sqlite3 db", "npm run"} {
+	for _, admitted := range []string{
+		"$ ls",
+		"git commit",
+		"pnpm install",
+		"curl x",
+		"s c",
+		"ahra os",
+		"sqlite3 db",
+		"npm run",
+	} {
 		if !containsAnyCommandStarter(admitted) {
 			test.Fatalf("command gate rejects %q, which the pattern matches", admitted)
 		}

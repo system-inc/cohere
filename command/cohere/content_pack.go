@@ -65,7 +65,10 @@ func saveContentPack() {
 	activeContentPack = nil
 	directory := cacheDirectory(activeContentPackRoot)
 	if _, _, damaged := pack.Counts(); damaged > 0 {
-		cacheNote(directory, fmt.Sprintf("%d files in the content pack failed their checksum or bounds and were read from disk; the pack is rewritten without them", damaged))
+		cacheNote(directory, fmt.Sprintf(
+			"%d files in the content pack failed their checksum or bounds and were read from disk; the pack is rewritten without them",
+			damaged,
+		))
 	}
 	release := holdTableLock(directory)
 	saveError := pack.Save()

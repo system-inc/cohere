@@ -59,7 +59,13 @@ var programReadNames = map[ProgramRead]string{
 // String lists the reads a declaration holds, for refusals and tests.
 func (reads ProgramRead) String() string {
 	names := []string{}
-	for _, read := range []ProgramRead{ReadsCompilerOptions, ReadsDefaultLibrary, ReadsModuleResolution, ReadsOtherFiles, ReadsDesignSystem} {
+	for _, read := range []ProgramRead{
+		ReadsCompilerOptions,
+		ReadsDefaultLibrary,
+		ReadsModuleResolution,
+		ReadsOtherFiles,
+		ReadsDesignSystem,
+	} {
 		if reads&read != 0 {
 			names = append(names, programReadNames[read])
 		}
@@ -179,8 +185,11 @@ func (view *programView) live(method string) {
 	if view.ended {
 		// Invariant: a rule keeps what a Program answered, never the Program, so no call reaches a view
 		// after its file ends; one that does is a rule bug, made loud here rather than read from a freed file.
-		panic(fmt.Sprintf("rule %s called Program.%s after the file it was given ended; a Program is good for its file only, so keep what it answered rather than the Program",
-			view.ruleName, method))
+		panic(fmt.Sprintf(
+			"rule %s called Program.%s after the file it was given ended; a Program is good for its file only, so keep what it answered rather than the Program",
+			view.ruleName,
+			method,
+		))
 	}
 }
 
@@ -190,8 +199,13 @@ func (view *programView) require(read ProgramRead, method string) {
 	if view.reads&read == 0 {
 		// Invariant: every rule declares the Program reads it makes, which is what keys its cached findings;
 		// an undeclared read would replay a stale verdict, so it stops the rule here instead.
-		panic(fmt.Sprintf("rule %s called Program.%s, which is %s, and declares ProgramReads %s; declare the read so the findings cache does not replay a stale verdict",
-			view.ruleName, method, programReadNames[read], view.reads))
+		panic(fmt.Sprintf(
+			"rule %s called Program.%s, which is %s, and declares ProgramReads %s; declare the read so the findings cache does not replay a stale verdict",
+			view.ruleName,
+			method,
+			programReadNames[read],
+			view.reads,
+		))
 	}
 }
 

@@ -35,27 +35,98 @@ func TestNoReturnAssignFires(test *testing.T) {
 		wantIds    []string
 	}{
 		{"bare assignment returned", "function x() { return result = a * b; };", nil, []string{"returnAssignment"}},
-		{"parenthesized operands are not a parenthesized assignment", "function x() { return (result) = (a * b); };", nil, []string{"returnAssignment"}},
-		{"bare assignment returned, explicit except-parens", "function x() { return result = a * b; };", exceptParensReturnOptions, []string{"returnAssignment"}},
-		{"parenthesized operands, explicit except-parens", "function x() { return (result) = (a * b); };", exceptParensReturnOptions, []string{"returnAssignment"}},
-		{"bare assignment returned from an arrow block body", "() => { return result = a * b; }", nil, []string{"returnAssignment"}},
+		{
+			"parenthesized operands are not a parenthesized assignment",
+			"function x() { return (result) = (a * b); };",
+			nil,
+			[]string{"returnAssignment"},
+		},
+		{
+			"bare assignment returned, explicit except-parens",
+			"function x() { return result = a * b; };",
+			exceptParensReturnOptions,
+			[]string{"returnAssignment"},
+		},
+		{
+			"parenthesized operands, explicit except-parens",
+			"function x() { return (result) = (a * b); };",
+			exceptParensReturnOptions,
+			[]string{"returnAssignment"},
+		},
+		{
+			"bare assignment returned from an arrow block body",
+			"() => { return result = a * b; }",
+			nil,
+			[]string{"returnAssignment"},
+		},
 		{"bare assignment as an arrow body", "() => result = a * b", nil, []string{"arrowAssignment"}},
-		{"bare assignment returned, always", "function x() { return result = a * b; };", alwaysReturnOptions, []string{"returnAssignment"}},
-		{"parenthesized assignment returned, always", "function x() { return (result = a * b); };", alwaysReturnOptions, []string{"returnAssignment"}},
-		{"assignment nested in a logical expression, always", "function x() { return result || (result = a * b); };", alwaysReturnOptions, []string{"returnAssignment"}},
-		{"bare assignment returned across lines", "function foo(){\n                return a = b\n            }", nil, []string{"returnAssignment"}},
-		{"assignment of a logical expression returned", "function doSomething() {\n                return foo = bar && foo > 0;\n            }", nil, []string{"returnAssignment"}},
-		{"assignment of a function expression returned", "function doSomething() {\n                return foo = function(){\n                    return (bar = bar1)\n                }\n            }", nil, []string{"returnAssignment"}},
-		{"assignment of an arrow returned", "function doSomething() {\n                return foo = () => a\n            }", nil, []string{"returnAssignment"}},
-		{"arrow body assigning an arrow", "function doSomething() {\n                return () => a = () => b\n            }", nil, []string{"arrowAssignment"}},
-		{"assignment returned from a nested function expression", "function foo(a){\n                return function bar(b){\n                    return a = b\n                }\n            }", nil, []string{"returnAssignment"}},
+		{
+			"bare assignment returned, always",
+			"function x() { return result = a * b; };",
+			alwaysReturnOptions,
+			[]string{"returnAssignment"},
+		},
+		{
+			"parenthesized assignment returned, always",
+			"function x() { return (result = a * b); };",
+			alwaysReturnOptions,
+			[]string{"returnAssignment"},
+		},
+		{
+			"assignment nested in a logical expression, always",
+			"function x() { return result || (result = a * b); };",
+			alwaysReturnOptions,
+			[]string{"returnAssignment"},
+		},
+		{
+			"bare assignment returned across lines",
+			"function foo(){\n                return a = b\n            }",
+			nil,
+			[]string{"returnAssignment"},
+		},
+		{
+			"assignment of a logical expression returned",
+			"function doSomething() {\n                return foo = bar && foo > 0;\n            }",
+			nil,
+			[]string{"returnAssignment"},
+		},
+		{
+			"assignment of a function expression returned",
+			"function doSomething() {\n                return foo = function(){\n                    return (bar = bar1)\n                }\n            }",
+			nil,
+			[]string{"returnAssignment"},
+		},
+		{
+			"assignment of an arrow returned",
+			"function doSomething() {\n                return foo = () => a\n            }",
+			nil,
+			[]string{"returnAssignment"},
+		},
+		{
+			"arrow body assigning an arrow",
+			"function doSomething() {\n                return () => a = () => b\n            }",
+			nil,
+			[]string{"arrowAssignment"},
+		},
+		{
+			"assignment returned from a nested function expression",
+			"function foo(a){\n                return function bar(b){\n                    return a = b\n                }\n            }",
+			nil,
+			[]string{"returnAssignment"},
+		},
 		{"curried arrow body assigning", "const foo = (a) => (b) => a = b", nil, []string{"arrowAssignment"}},
 	}
 
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, NoReturnAssign, returnAssignFile, testCase.sourceText, testCase.options)
+			result := rule_testing.RunWithOptions(
+				test,
+				NoReturnAssign,
+				returnAssignFile,
+				testCase.sourceText,
+				testCase.options,
+			)
 			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
@@ -78,22 +149,52 @@ func TestNoReturnAssignStaysSilent(test *testing.T) {
 		{"plain assignment statement", "var result = a * b;", nil},
 		{"return of a variable", "function x() { var result = a * b; return result; }", nil},
 		{"parenthesized assignment returned", "function x() { return (result = a * b); }", nil},
-		{"return of a variable, explicit except-parens", "function x() { var result = a * b; return result; }", exceptParensReturnOptions},
-		{"parenthesized assignment returned, explicit except-parens", "function x() { return (result = a * b); }", exceptParensReturnOptions},
+		{
+			"return of a variable, explicit except-parens",
+			"function x() { var result = a * b; return result; }",
+			exceptParensReturnOptions,
+		},
+		{
+			"parenthesized assignment returned, explicit except-parens",
+			"function x() { return (result = a * b); }",
+			exceptParensReturnOptions,
+		},
 		{"return of a variable, always", "function x() { var result = a * b; return result; }", alwaysReturnOptions},
-		{"assignment inside a returned function expression, always", "function x() { return function y() { result = a * b }; }", alwaysReturnOptions},
-		{"parenthesized assignment in an arrow block body", "() => { return (result = a * b); }", exceptParensReturnOptions},
+		{
+			"assignment inside a returned function expression, always",
+			"function x() { return function y() { result = a * b }; }",
+			alwaysReturnOptions,
+		},
+		{
+			"parenthesized assignment in an arrow block body",
+			"() => { return (result = a * b); }",
+			exceptParensReturnOptions,
+		},
 		{"parenthesized assignment as an arrow body", "() => (result = a * b)", exceptParensReturnOptions},
 		{"parenthesized assignment inside a sequence arrow body", "const foo = (a,b,c) => ((a = b), c)", nil},
-		{"parenthesized assignment returned across lines", "function foo(){\n            return (a = b)\n        }", nil},
-		{"parenthesized assignment in a nested function expression", "function bar(){\n            return function foo(){\n                return (a = b) && c\n            }\n        }", nil},
+		{
+			"parenthesized assignment returned across lines",
+			"function foo(){\n            return (a = b)\n        }",
+			nil,
+		},
+		{
+			"parenthesized assignment in a nested function expression",
+			"function bar(){\n            return function foo(){\n                return (a = b) && c\n            }\n        }",
+			nil,
+		},
 		{"parenthesized assignment as a curried arrow body", "const foo = (a) => (b) => (a = b)", nil},
 	}
 
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, NoReturnAssign, returnAssignFile, testCase.sourceText, testCase.options)
+			result := rule_testing.RunWithOptions(
+				test,
+				NoReturnAssign,
+				returnAssignFile,
+				testCase.sourceText,
+				testCase.options,
+			)
 			rule_testing.ExpectClean(test, result)
 		})
 	}
@@ -175,7 +276,13 @@ func TestNoReturnAssignReportsTheEnclosingNode(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, NoReturnAssign, returnAssignFile, testCase.sourceText, testCase.options)
+			result := rule_testing.RunWithOptions(
+				test,
+				NoReturnAssign,
+				returnAssignFile,
+				testCase.sourceText,
+				testCase.options,
+			)
 			if len(result.Diagnostics) != 1 {
 				test.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 			}

@@ -740,7 +740,11 @@ func firstNonEmptyWarning(recommendation recommendations) (rule.Message, int) {
 // `scope.references` from `eslint-scope`; this walks the callback's own subtree and resolves each
 // identifier through the checker, which answers the same question; see the rule's doc comment for
 // the measurement that established the two classifications agree.
-func gatherDependencies(ruleContext rule.Context, callback *ast.Node, componentScope *ast.Node) map[string]*dependencyRead {
+func gatherDependencies(
+	ruleContext rule.Context,
+	callback *ast.Node,
+	componentScope *ast.Node,
+) map[string]*dependencyRead {
 	reads := map[string]*dependencyRead{}
 
 	var walk func(node *ast.Node)
@@ -1617,7 +1621,14 @@ func reportEveryRenderConstructions(ruleContext rule.Context, run exhaustiveDeps
 			continue
 		}
 		run.report(ruleContext, declaration, messageExhaustiveDepsConstruction,
-			wrapConstructionInUseCallback(ruleContext, declaration, symbol, componentScope, callback, dependencyArrayNode)...)
+			wrapConstructionInUseCallback(
+				ruleContext,
+				declaration,
+				symbol,
+				componentScope,
+				callback,
+				dependencyArrayNode,
+			)...)
 	}
 }
 
@@ -1667,8 +1678,10 @@ func isUsedOutsideOfHook(ruleContext rule.Context, symbol *ast.Symbol, declarati
 		if node.Kind == ast.KindIdentifier && node != declaration.Name() && !isNonDependencyIdentifier(node) &&
 			resolveIdentifier(ruleContext, node) == symbol {
 			parent := node.Parent
-			written := parent != nil && parent.Kind == ast.KindBinaryExpression &&
-				parent.AsBinaryExpression().Left == node && ast.IsAssignmentOperator(parent.AsBinaryExpression().OperatorToken.Kind)
+			written := parent != nil &&
+				parent.Kind == ast.KindBinaryExpression &&
+				parent.AsBinaryExpression().Left == node &&
+				ast.IsAssignmentOperator(parent.AsBinaryExpression().OperatorToken.Kind)
 			if written || (!nodeContains(callback, node) && !nodeContains(dependencyArrayNode, node)) {
 				used = true
 				return

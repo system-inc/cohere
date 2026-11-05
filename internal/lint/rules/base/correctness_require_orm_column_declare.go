@@ -8,7 +8,10 @@ import (
 
 // correctnessRequireOrmColumnDeclareText is the rule's message, whose wording lives in
 // `policy/messages/correctness-require-orm-column-declare.json`.
-var correctnessRequireOrmColumnDeclareText = policy.MessageOf("base/correctness-require-orm-column-declare", "missingDeclare")
+var correctnessRequireOrmColumnDeclareText = policy.MessageOf(
+	"base/correctness-require-orm-column-declare",
+	"missingDeclare",
+)
 
 // declareRequiringColumnDecorators is the source rule's set of the same name.
 //

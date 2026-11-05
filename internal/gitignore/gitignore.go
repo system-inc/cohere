@@ -213,7 +213,12 @@ func (matcher *Matcher) Enter(relativeDirectory string) (*Matcher, error) {
 		if entered.excludedBy != nil {
 			continue
 		}
-		if decided := entered.decide(child, path.Base(child), true, len(entered.files)); decided != nil && !decided.negated {
+		if decided := entered.decide(
+			child,
+			path.Base(child),
+			true,
+			len(entered.files),
+		); decided != nil && !decided.negated {
 			entered.excludedBy = decided
 			continue
 		}
@@ -289,7 +294,12 @@ func CompilePatterns(lines []string, name string) (*Patterns, error) {
 	patterns := &Patterns{}
 	for index, line := range lines {
 		if strings.ContainsAny(line, "\n\x00") {
-			return nil, fmt.Errorf("gitignore: %s entry %d, %q, holds a newline or a NUL byte, which no ignore-file line can", name, index+1, line)
+			return nil, fmt.Errorf(
+				"gitignore: %s entry %d, %q, holds a newline or a NUL byte, which no ignore-file line can",
+				name,
+				index+1,
+				line,
+			)
 		}
 		line = strings.TrimSuffix(line, "\r")
 		if line == "" || line[0] == '#' {
@@ -374,7 +384,10 @@ func readIgnoreFile(filePath string, follow bool) ([]byte, error) {
 	}
 	if info.Mode()&fs.ModeSymlink != 0 {
 		if !follow {
-			return nil, fmt.Errorf("gitignore: %s is a symbolic link, which git does not follow inside a working tree, so its patterns would not apply; replace it with the file it points to", filePath)
+			return nil, fmt.Errorf(
+				"gitignore: %s is a symbolic link, which git does not follow inside a working tree, so its patterns would not apply; replace it with the file it points to",
+				filePath,
+			)
 		}
 		if info, err = os.Stat(filePath); errors.Is(err, fs.ErrNotExist) {
 			return nil, nil
@@ -386,7 +399,10 @@ func readIgnoreFile(filePath string, follow bool) ([]byte, error) {
 		return nil, fmt.Errorf("gitignore: %s is not a regular file, so it cannot be read as an ignore file", filePath)
 	}
 	if info.Size() > maximumFileSize {
-		return nil, fmt.Errorf("gitignore: %s is larger than 100 MiB, which git skips with a warning, leaving its patterns unapplied; cohere refuses it rather than skip it", filePath)
+		return nil, fmt.Errorf(
+			"gitignore: %s is larger than 100 MiB, which git skips with a warning, leaving its patterns unapplied; cohere refuses it rather than skip it",
+			filePath,
+		)
 	}
 	contents, err := os.ReadFile(filePath)
 	if err != nil {

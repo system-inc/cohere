@@ -28,7 +28,12 @@ func TestCanonicalizeCalcExpressions(test *testing.T) {
 		test.Run(testCase.input, func(test *testing.T) {
 			test.Parallel()
 			if actual := canonicalizeCalcExpressions(testCase.input); actual != testCase.expected {
-				test.Errorf("canonicalizeCalcExpressions(%q) = %q, upstream gives %q", testCase.input, actual, testCase.expected)
+				test.Errorf(
+					"canonicalizeCalcExpressions(%q) = %q, upstream gives %q",
+					testCase.input,
+					actual,
+					testCase.expected,
+				)
 			}
 		})
 	}
@@ -62,7 +67,14 @@ func TestCanonicalizeCalcLocaleCompare(test *testing.T) {
 	} {
 		order, collated := javaScriptLocaleCompare(testCase.left, testCase.right)
 		if !collated || order != testCase.expected {
-			test.Errorf("javaScriptLocaleCompare(%q, %q) = %d, %v, Node gives %d", testCase.left, testCase.right, order, collated, testCase.expected)
+			test.Errorf(
+				"javaScriptLocaleCompare(%q, %q) = %d, %v, Node gives %d",
+				testCase.left,
+				testCase.right,
+				order,
+				collated,
+				testCase.expected,
+			)
 		}
 	}
 

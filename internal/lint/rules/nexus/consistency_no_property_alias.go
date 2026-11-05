@@ -163,14 +163,17 @@ var ConsistencyNoPropertyAlias = rule.Rule{
 					if chainReadsAGetter(ruleContext, initializer) {
 						return
 					}
-					if isReadInsideANestedFunction(ruleContext, enclosing, localName, name) && chainIsNarrowed(ruleContext, initializer) {
+					if isReadInsideANestedFunction(ruleContext, enclosing, localName, name) &&
+						chainIsNarrowed(ruleContext, initializer) {
 						return
 					}
 					if isNarrowedWhereAClosureReadsIt(ruleContext, enclosing, localName, name) {
 						return
 					}
 					if declaration.Type != nil &&
-						ruleContext.TypeChecker.GetTypeFromTypeNode(declaration.Type) != ruleContext.TypeChecker.GetTypeAtLocation(initializer) {
+						ruleContext.TypeChecker.GetTypeFromTypeNode(
+							declaration.Type,
+						) != ruleContext.TypeChecker.GetTypeAtLocation(initializer) {
 						return
 					}
 				}
@@ -179,8 +182,10 @@ var ConsistencyNoPropertyAlias = rule.Rule{
 				objectText := ruleContext.SourceFile.Text()[sourceText.Pos():sourceText.End()]
 
 				ruleContext.ReportNode(node, rule.Message{
-					Id:          consistencyNoPropertyAliasText.Id,
-					Description: consistencyNoPropertyAliasText.Render(map[string]string{"name": localName, "object": objectText}),
+					Id: consistencyNoPropertyAliasText.Id,
+					Description: consistencyNoPropertyAliasText.Render(
+						map[string]string{"name": localName, "object": objectText},
+					),
 				})
 			},
 		}
@@ -252,7 +257,12 @@ func chainContainsCall(expression *ast.Node) bool {
 // The whole function is searched rather than the statements near the declaration, because the array
 // that justifies the alias is usually several lines below it. The declaration's own name node is
 // excluded, since the binding is not a read of itself.
-func isReadInsideHookDependencyArray(ruleContext rule.Context, enclosing *ast.Node, localName string, declarationName *ast.Node) bool {
+func isReadInsideHookDependencyArray(
+	ruleContext rule.Context,
+	enclosing *ast.Node,
+	localName string,
+	declarationName *ast.Node,
+) bool {
 	found := false
 
 	var walk func(node *ast.Node) bool
@@ -315,7 +325,12 @@ func arrayMentions(ruleContext rule.Context, array *ast.Node, localName string, 
 
 // isWrittenAfterItsDeclaration reports whether anything in the enclosing function writes the local's
 // name again: an assignment, a compound assignment, an update, or a destructuring target.
-func isWrittenAfterItsDeclaration(ruleContext rule.Context, enclosing *ast.Node, localName string, declarationName *ast.Node) bool {
+func isWrittenAfterItsDeclaration(
+	ruleContext rule.Context,
+	enclosing *ast.Node,
+	localName string,
+	declarationName *ast.Node,
+) bool {
 	written := false
 	var walk func(node *ast.Node) bool
 	walk = func(node *ast.Node) bool {
@@ -340,7 +355,14 @@ func isWrittenAfterItsDeclaration(ruleContext rule.Context, enclosing *ast.Node,
 // `const value = state.inner.value`, a write to `state.inner.value`, to `state.inner` or to `state`
 // each changes what a reach at the read would see. A write is an assignment of any operator, an
 // update, or a `delete`.
-func isSnapshotTakenBeforeItsSourceIsWritten(ruleContext rule.Context, enclosing *ast.Node, declaration *ast.Node, localName string, declarationName *ast.Node, initializer *ast.Node) bool {
+func isSnapshotTakenBeforeItsSourceIsWritten(
+	ruleContext rule.Context,
+	enclosing *ast.Node,
+	declaration *ast.Node,
+	localName string,
+	declarationName *ast.Node,
+	initializer *ast.Node,
+) bool {
 	lastRead := -1
 	var findLastRead func(node *ast.Node) bool
 	findLastRead = func(node *ast.Node) bool {
@@ -518,7 +540,12 @@ func chainIsNarrowed(ruleContext rule.Context, initializer *ast.Node) bool {
 
 // isReadInsideANestedFunction reports whether the local is read inside a function within the one
 // that declares it.
-func isReadInsideANestedFunction(ruleContext rule.Context, enclosing *ast.Node, localName string, declarationName *ast.Node) bool {
+func isReadInsideANestedFunction(
+	ruleContext rule.Context,
+	enclosing *ast.Node,
+	localName string,
+	declarationName *ast.Node,
+) bool {
 	found := false
 	var walk func(node *ast.Node) bool
 	walk = func(node *ast.Node) bool {
@@ -569,7 +596,12 @@ func referencesTheLocal(ruleContext rule.Context, node *ast.Node, localName stri
 // isNarrowedWhereAClosureReadsIt reports whether the local is read inside a nested function at a type
 // other than its declared one, which is a narrowing of the local the closure keeps and a reach of the
 // property path inside that closure would lose.
-func isNarrowedWhereAClosureReadsIt(ruleContext rule.Context, enclosing *ast.Node, localName string, declarationName *ast.Node) bool {
+func isNarrowedWhereAClosureReadsIt(
+	ruleContext rule.Context,
+	enclosing *ast.Node,
+	localName string,
+	declarationName *ast.Node,
+) bool {
 	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(declarationName)
 	if symbol == nil {
 		return false
@@ -581,8 +613,10 @@ func isNarrowedWhereAClosureReadsIt(ruleContext rule.Context, enclosing *ast.Nod
 		if node == nil || found {
 			return false
 		}
-		if referencesTheLocal(ruleContext, node, localName, declarationName) && !reference.WritesToBinding(node) &&
-			scope.EnclosingFunctionLike(node) != enclosing && ruleContext.TypeChecker.GetTypeAtLocation(node) != declared {
+		if referencesTheLocal(ruleContext, node, localName, declarationName) &&
+			!reference.WritesToBinding(node) &&
+			scope.EnclosingFunctionLike(node) != enclosing &&
+			ruleContext.TypeChecker.GetTypeAtLocation(node) != declared {
 			found = true
 			return true
 		}

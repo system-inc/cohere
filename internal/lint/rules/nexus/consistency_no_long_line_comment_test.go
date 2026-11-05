@@ -117,7 +117,10 @@ func TestConsistencyNoLongLineCommentStaysSilent(test *testing.T) {
 // to skip these files.
 func TestConsistencyNoLongLineCommentHoldsGeneratedFilesToTheRule(test *testing.T) {
 	test.Parallel()
-	for _, fileName := range []string{"/repository/source/generated/Thing.ts", "/repository/source/Thing.generated.ts"} {
+	for _, fileName := range []string{
+		"/repository/source/generated/Thing.ts",
+		"/repository/source/Thing.generated.ts",
+	} {
 		result := rule_testing.Run(test, ConsistencyNoLongLineComment, fileName, lineCommentRun(9))
 		rule_testing.ExpectFindings(test, result, "longLineComment")
 	}

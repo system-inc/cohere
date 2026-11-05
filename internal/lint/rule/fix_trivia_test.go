@@ -183,7 +183,10 @@ func TestReportNodeAnchorsOnTheTokenNotItsComment(test *testing.T) {
 
 	line := 1 + strings.Count(source[:reported.Range.Pos()], "\n")
 	if line != 4 {
-		test.Fatalf("the finding anchored on line %d, want 4 (the binding). Anchoring earlier puts it on or above the suppression comment, where no -next-line directive can reach it", line)
+		test.Fatalf(
+			"the finding anchored on line %d, want 4 (the binding). Anchoring earlier puts it on or above the suppression comment, where no -next-line directive can reach it",
+			line,
+		)
 	}
 }
 

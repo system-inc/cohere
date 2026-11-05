@@ -93,12 +93,23 @@ func TestTheParallelFormatPassMatchesTheSerialOne(test *testing.T) {
 		serial, serialDisk := run(test, 0, write)
 		parallel, parallelDisk := run(test, 8, write)
 		if serial != parallel {
-			test.Errorf("write=%v: the parallel pass reported differently:\n--- serial\n%s\n--- parallel\n%s", write, serial, parallel)
+			test.Errorf(
+				"write=%v: the parallel pass reported differently:\n--- serial\n%s\n--- parallel\n%s",
+				write,
+				serial,
+				parallel,
+			)
 		}
 		if !reflect.DeepEqual(serialDisk, parallelDisk) {
 			for name := range serialDisk {
 				if serialDisk[name] != parallelDisk[name] {
-					test.Errorf("write=%v: %s differs on disk:\n--- serial\n%s--- parallel\n%s", write, name, serialDisk[name], parallelDisk[name])
+					test.Errorf(
+						"write=%v: %s differs on disk:\n--- serial\n%s--- parallel\n%s",
+						write,
+						name,
+						serialDisk[name],
+						parallelDisk[name],
+					)
 				}
 			}
 		}
@@ -133,7 +144,11 @@ func TestFormatInParallelLeavesTheRulesToTheSerialPath(test *testing.T) {
 		mutex.Unlock()
 		switch fileName {
 		case "/b.ts":
-			return edit.FileResult{}, fmt.Errorf("collecting fixes for %s after formatting: %w", fileName, errRelintRefused)
+			return edit.FileResult{}, fmt.Errorf(
+				"collecting fixes for %s after formatting: %w",
+				fileName,
+				errRelintRefused,
+			)
 		case "/c.ts":
 			return edit.FileResult{FileName: fileName}, failure
 		}
@@ -144,7 +159,11 @@ func TestFormatInParallelLeavesTheRulesToTheSerialPath(test *testing.T) {
 		test.Error("a file with proposals was attempted off the serial path")
 	}
 	if attempts[0].done || attempts[1].done {
-		test.Errorf("a file with proposals or one that asked for its rules was marked done: %+v %+v", attempts[0], attempts[1])
+		test.Errorf(
+			"a file with proposals or one that asked for its rules was marked done: %+v %+v",
+			attempts[0],
+			attempts[1],
+		)
 	}
 	if !attempts[2].done || !errors.Is(attempts[2].err, failure) {
 		test.Errorf("a failure was not kept for the serial loop to report: %+v", attempts[2])
@@ -166,9 +185,11 @@ func TestASpeculativeFormatResultStandsOnlyForTheWalksBytes(test *testing.T) {
 		done := make(chan struct{})
 		close(done)
 		return &formatSpeculation{
-			done:     done,
-			attempts: map[string]formatAttempt{fileName: {result: edit.FileResult{FileName: fileName, Text: read}, done: true}},
-			read:     map[string]string{fileName: read},
+			done: done,
+			attempts: map[string]formatAttempt{
+				fileName: {result: edit.FileResult{FileName: fileName, Text: read}, done: true},
+			},
+			read: map[string]string{fileName: read},
 		}
 	}
 

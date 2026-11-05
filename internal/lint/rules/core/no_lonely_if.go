@@ -263,7 +263,9 @@ func noLonelyIfFixWouldChangeMeaning(ruleContext rule.Context, node *ast.Node, b
 		return false
 	}
 
-	lastToken := text.TrimWhitespace(sourceText[rule.TokenRange(ruleContext.SourceFile, consequent).Pos():consequent.End()])
+	lastToken := text.TrimWhitespace(
+		sourceText[rule.TokenRange(ruleContext.SourceFile, consequent).Pos():consequent.End()],
+	)
 	if strings.HasSuffix(lastToken, ";") {
 		return false
 	}

@@ -109,9 +109,21 @@ func TestNoImplicitGlobalsFiresOnGlobalDeclarations(test *testing.T) {
 		{"const a = 1; const b = 2;", true, []string{"globalLexicalBinding", "globalLexicalBinding"}},
 		{"const a = 1, b = 2;", true, []string{"globalLexicalBinding", "globalLexicalBinding"}},
 		{"let a, b = 1;", true, []string{"globalLexicalBinding", "globalLexicalBinding"}},
-		{"const a = 1; let b; class C {}", true, []string{"globalLexicalBinding", "globalLexicalBinding", "globalLexicalBinding"}},
-		{"const [a, b, ...c] = [];", true, []string{"globalLexicalBinding", "globalLexicalBinding", "globalLexicalBinding"}},
-		{"let { a, foo: b, bar: { c } } = {};", true, []string{"globalLexicalBinding", "globalLexicalBinding", "globalLexicalBinding"}},
+		{
+			"const a = 1; let b; class C {}",
+			true,
+			[]string{"globalLexicalBinding", "globalLexicalBinding", "globalLexicalBinding"},
+		},
+		{
+			"const [a, b, ...c] = [];",
+			true,
+			[]string{"globalLexicalBinding", "globalLexicalBinding", "globalLexicalBinding"},
+		},
+		{
+			"let { a, foo: b, bar: { c } } = {};",
+			true,
+			[]string{"globalLexicalBinding", "globalLexicalBinding", "globalLexicalBinding"},
+		},
 	}
 
 	for _, testCase := range cases {
@@ -305,7 +317,12 @@ func TestNoImplicitGlobalsDeclinesReadonlyGlobals(test *testing.T) {
 	}{
 		{"Array = 1", []string{"assignmentToReadonlyGlobal"}, nil, true},
 		{"var Array = 1", []string{"redeclarationOfReadonlyGlobal"}, []string{"globalNonLexicalBinding"}, false},
-		{"var Array = 1; Array = 2;", []string{"redeclarationOfReadonlyGlobal"}, []string{"globalNonLexicalBinding"}, false},
+		{
+			"var Array = 1; Array = 2;",
+			[]string{"redeclarationOfReadonlyGlobal"},
+			[]string{"globalNonLexicalBinding"},
+			false,
+		},
 	}
 
 	for _, testCase := range cases {
@@ -342,16 +359,38 @@ func TestNoImplicitGlobalsReadsWhatTheFileIs(test *testing.T) {
 
 	run := map[string]func(test *testing.T, sourceText string) rule_testing.Result{
 		"the untyped harness": func(test *testing.T, sourceText string) rule_testing.Result {
-			return rule_testing.RunWithOptions(test, NoImplicitGlobals, implicitGlobalsFile, sourceText, implicitGlobalsOptions(test, true))
+			return rule_testing.RunWithOptions(
+				test,
+				NoImplicitGlobals,
+				implicitGlobalsFile,
+				sourceText,
+				implicitGlobalsOptions(test, true),
+			)
 		},
 		"a module": func(test *testing.T, sourceText string) rule_testing.Result {
-			return rule_testing.RunTypedWithOptions(test, NoImplicitGlobals, implicitGlobalsFile, sourceText, implicitGlobalsOptions(test, true))
+			return rule_testing.RunTypedWithOptions(
+				test,
+				NoImplicitGlobals,
+				implicitGlobalsFile,
+				sourceText,
+				implicitGlobalsOptions(test, true),
+			)
 		},
 		"a TypeScript script under alwaysStrict": func(test *testing.T, sourceText string) rule_testing.Result {
-			return runImplicitGlobalsAsAScript(test, implicitGlobalsFile, sourceText, implicitGlobalsOptions(test, true))
+			return runImplicitGlobalsAsAScript(
+				test,
+				implicitGlobalsFile,
+				sourceText,
+				implicitGlobalsOptions(test, true),
+			)
 		},
 		"a sloppy JavaScript script": func(test *testing.T, sourceText string) rule_testing.Result {
-			return runImplicitGlobalsAsAScript(test, implicitGlobalsScript, sourceText, implicitGlobalsOptions(test, true))
+			return runImplicitGlobalsAsAScript(
+				test,
+				implicitGlobalsScript,
+				sourceText,
+				implicitGlobalsOptions(test, true),
+			)
 		},
 	}
 	cases := []struct {
@@ -457,7 +496,9 @@ func TestDecodeNoImplicitGlobalsOptions(test *testing.T) {
 
 	test.Run("an explicit true turns it on", func(test *testing.T) {
 		test.Parallel()
-		decoded, decodeNoImplicitGlobalsOptionsError := DecodeNoImplicitGlobalsOptions(json.RawMessage(`{"lexicalBindings":true}`))
+		decoded, decodeNoImplicitGlobalsOptionsError := DecodeNoImplicitGlobalsOptions(
+			json.RawMessage(`{"lexicalBindings":true}`),
+		)
 		if decodeNoImplicitGlobalsOptionsError != nil {
 			test.Fatalf("the decoder refused an explicit true: %v", decodeNoImplicitGlobalsOptionsError)
 		}

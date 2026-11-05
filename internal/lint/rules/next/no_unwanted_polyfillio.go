@@ -228,7 +228,8 @@ var NoUnwantedPolyfillio = rule.Rule{
 			// The compromised domains, checked before anything else and reported on their own. The
 			// feature list is never consulted on these, which is why the arm returns rather than
 			// falling through.
-			if strings.HasPrefix(source, "https://cdn.polyfill.io/v2/") || strings.HasPrefix(source, "https://polyfill.io/v3/") {
+			if strings.HasPrefix(source, "https://cdn.polyfill.io/v2/") ||
+				strings.HasPrefix(source, "https://polyfill.io/v3/") {
 				ruleContext.ReportNode(sourceNode, messageNoUnwantedPolyfillioSecurity)
 				return
 			}

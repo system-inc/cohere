@@ -24,47 +24,51 @@ func flattenHooksIn(test *testing.T, source string) hookFlattening {
 	test.Helper()
 	var result hookFlattening
 	visited := 0
-	probe := rule.Rule{Name: "hook-flatten", NeedsTypeChecker: true, Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
-			forEachFunctionLike(node, func(node *ast.Node) {
-				function := Lower(node, ruleContext.TypeChecker)
-				if function == nil {
-					return
-				}
-				Construct(function)
-				OutlineFunctions(function)
-				InferReactive(function, ruleContext.TypeChecker)
-				DropManualMemoization(function)
-				if InlineImmediatelyInvokedFunctionExpressionsIncludingMemoCallbacks(function) > 0 {
-					MergeConsecutiveBlocks(function)
-				}
-				EliminateDeadCode(function)
-				ranges := InferMutableRanges(function)
-				disjoint := FindDisjointMutableValuesWithRanges(function, ranges)
-				scopes := AssignReactiveScopesWithSets(function, ranges, disjoint)
-				aligned, merged := AlignThenMergeReactiveScopes(function, scopes)
-				BuildReactiveScopeTerminals(function, scopes, MergedScopeIdentity{Aligned: aligned, Merged: merged})
-				FlattenReactiveLoops(function)
-				labelsBefore := 0
-				for _, block := range function.Blocks {
-					if _, isLabel := block.Terminal.(*Label); isLabel {
-						labelsBefore++
+	probe := rule.Rule{
+		Name:             "hook-flatten",
+		NeedsTypeChecker: true,
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+			return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
+				forEachFunctionLike(node, func(node *ast.Node) {
+					function := Lower(node, ruleContext.TypeChecker)
+					if function == nil {
+						return
 					}
-				}
-				result.pruned = len(FlattenScopesWithHooksOrUse(function))
-				for _, block := range function.Blocks {
-					switch block.Terminal.(type) {
-					case *Label:
-						result.labels++
-					case *Scope:
-						result.scopesLeft++
+					Construct(function)
+					OutlineFunctions(function)
+					InferReactive(function, ruleContext.TypeChecker)
+					DropManualMemoization(function)
+					if InlineImmediatelyInvokedFunctionExpressionsIncludingMemoCallbacks(function) > 0 {
+						MergeConsecutiveBlocks(function)
 					}
-				}
-				result.labels -= labelsBefore
-				visited++
-			})
-		}}
-	}}
+					EliminateDeadCode(function)
+					ranges := InferMutableRanges(function)
+					disjoint := FindDisjointMutableValuesWithRanges(function, ranges)
+					scopes := AssignReactiveScopesWithSets(function, ranges, disjoint)
+					aligned, merged := AlignThenMergeReactiveScopes(function, scopes)
+					BuildReactiveScopeTerminals(function, scopes, MergedScopeIdentity{Aligned: aligned, Merged: merged})
+					FlattenReactiveLoops(function)
+					labelsBefore := 0
+					for _, block := range function.Blocks {
+						if _, isLabel := block.Terminal.(*Label); isLabel {
+							labelsBefore++
+						}
+					}
+					result.pruned = len(FlattenScopesWithHooksOrUse(function))
+					for _, block := range function.Blocks {
+						switch block.Terminal.(type) {
+						case *Label:
+							result.labels++
+						case *Scope:
+							result.scopesLeft++
+						}
+					}
+					result.labels -= labelsBefore
+					visited++
+				})
+			}}
+		},
+	}
 	rule_testing.RunTypedFiles(test, probe, map[string]string{
 		"/react.d.ts": reactiveDeclarations + `
 declare module 'react' {

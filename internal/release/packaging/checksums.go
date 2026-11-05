@@ -43,7 +43,11 @@ func Checksums(outputDirectory string, packageDirectoryNames []string) ([]byte, 
 			if !entry.Type().IsRegular() {
 				// A directory or a link in bin/ is nothing the build writes, and hashing what a link points
 				// at would vouch for a file outside the package.
-				return nil, fmt.Errorf("%s holds %s, which is not a regular file, so its checksum would not describe what installs", binDirectory, entry.Name())
+				return nil, fmt.Errorf(
+					"%s holds %s, which is not a regular file, so its checksum would not describe what installs",
+					binDirectory,
+					entry.Name(),
+				)
 			}
 			digest, sha256FileError := sha256File(filepath.Join(binDirectory, entry.Name()))
 			if sha256FileError != nil {

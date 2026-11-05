@@ -7,7 +7,11 @@ import (
 
 // attention is micromark-core-commonmark/lib/attention.js: sequences of `*` or `_` that resolveAll pairs
 // into emphasis and strong.
-var attention = &Construct{Name: "attention", ResolveAll: &Resolver{Resolve: resolveAllAttention}, Tokenize: tokenizeAttention}
+var attention = &Construct{
+	Name:       "attention",
+	ResolveAll: &Resolver{Resolve: resolveAllAttention},
+	Tokenize:   tokenizeAttention,
+}
 
 // typeAttentionSequence is upstream's `attentionSequence`, missing from the generated symbols. It never
 // survives resolveAll: an unpaired sequence becomes `data`.
@@ -48,7 +52,9 @@ func resolveAllAttention(events []Event, context *TokenizeContext) []Event {
 					// and the close size *is not* a multiple of three,
 					// but the sum of the opening and closing size *is* multiple of three,
 					// then don’t match.
-					if (events[open].Token.close || events[index].Token.open) && closeSize%3 != 0 && (openSize+closeSize)%3 == 0 {
+					if (events[open].Token.close || events[index].Token.open) &&
+						closeSize%3 != 0 &&
+						(openSize+closeSize)%3 == 0 {
 						continue
 					}
 
@@ -99,7 +105,10 @@ func resolveAllAttention(events []Event, context *TokenizeContext) []Event {
 					// Always populated by defaults.
 
 					// Between. Upstream's `events.slice` is a copy, and the inner resolvers splice it in place.
-					nextEvents = pushEvents(nextEvents, resolveAll(context.Parser.Constructs.InsideSpan, slices.Clone(events[open+1:index]), context))
+					nextEvents = pushEvents(
+						nextEvents,
+						resolveAll(context.Parser.Constructs.InsideSpan, slices.Clone(events[open+1:index]), context),
+					)
 
 					// Closing.
 					nextEvents = pushEvents(nextEvents, []Event{
@@ -192,7 +201,9 @@ func tokenizeAttention(self *Self, effects *Effects, ok State, nok State) State 
 		// Upstream's `||` and `&&` over the 0, 1 or 2 of classifyCharacter, read as booleans. Upstream
 		// names these open and close; opens and closes keep Go's builtin close unshadowed.
 		opens := after == 0 || (after == attentionSideAfter && before != 0) || slices.Contains(attentionMarkers, code)
-		closes := before == 0 || (before == attentionSideAfter && after != 0) || slices.Contains(attentionMarkers, previous)
+		closes := before == 0 ||
+			(before == attentionSideAfter && after != 0) ||
+			slices.Contains(attentionMarkers, previous)
 
 		if marker == CodeAsterisk {
 			token.open = opens

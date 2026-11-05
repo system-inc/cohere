@@ -148,7 +148,10 @@ func TestPreferConstStaysSilent(test *testing.T) {
 		// Writes from a nested function, which may run any number of times.
 		{"a write from a function declaration", "let a; function foo() { if (a) {} a = bar(); }"},
 		{"a logical write from a function", "let a; function foo() { a = a || bar(); baz(a); }"},
-		{"a deferred write from a function", "let id;\nfunction foo() {\n  if (typeof id !== 'undefined') {\n    return;\n  }\n  id = setInterval(() => {}, 250);\n}\nfoo();\n"},
+		{
+			"a deferred write from a function",
+			"let id;\nfunction foo() {\n  if (typeof id !== 'undefined') {\n    return;\n  }\n  id = setInterval(() => {}, 250);\n}\nfoo();\n",
+		},
 		{"a write into a static block from outside", "let a; class C { static { a = 1; } }"},
 
 		// Two writes, where neither can be the initializer.
@@ -156,7 +159,10 @@ func TestPreferConstStaysSilent(test *testing.T) {
 		{"an initializer and two writes", "class C { static { let a; a = 1; a = 2; } }"},
 		{"a conditional write in a static block", "class C { static { let a; if (foo) { a = 1; } } }"},
 		{"an unbraced conditional write in a static block", "class C { static { let a; if (foo) a = 1; } }"},
-		{"a conditional destructuring write in a static block", "class C { static { let a, b; if (foo) { ({ a, b } = foo); } } }"},
+		{
+			"a conditional destructuring write in a static block",
+			"class C { static { let a, b; if (foo) { ({ a, b } = foo); } } }",
+		},
 		{"an unbraced conditional destructuring write", "class C { static { let a, b; if (foo) ({ a, b } = foo); } }"},
 
 		// Function shapes that are not conversions.
@@ -167,7 +173,10 @@ func TestPreferConstStaysSilent(test *testing.T) {
 		{"a const inside a function", "(function() { const x = 0; })();"},
 		{"a parameter default", "(function(x = 0) { })();"},
 		{"a write in a nested block then read, inside a function", "(function() { let x; { x = 0; foo(x); } })();"},
-		{"a write inside a loop inside a function", "(function() { let x; for (const a of [1,2,3]) { x = foo(); bar(x); } })();"},
+		{
+			"a write inside a loop inside a function",
+			"(function() { let x; for (const a of [1,2,3]) { x = foo(); bar(x); } })();",
+		},
 
 		// A classic for head with a written counter.
 		{"a for head whose counter is updated", "for (let i = 0, end = 10; i < end; ++i) {}"},
@@ -200,10 +209,22 @@ func TestPreferConstStaysSilent(test *testing.T) {
 		{"two hole bindings written later", "const x = [1,2,3]; let y, z; [y,,z] = x; y = 0; z = 0;"},
 
 		// Block 5: shapes upstream added as regressions.
-		{"a write in a logical expression the return depends on", "function example() {\n  let value;\n  return someCheck() && (value = getValue());\n}\n"},
-		{"a write inside an array literal argument", "let t;\nconst r = await Promise.race([ a(), (t = b()) ]);\nt.cancel();\n"},
-		{"a write in a for condition with no initializer", "for (let match; (match = REGEX.exec(line)); ) {\n  handle(match);\n}"},
-		{"the same with a type annotation", "for (let match: string[]; (match = REGEX.exec(line)); ) {\n  handle(match);\n}"},
+		{
+			"a write in a logical expression the return depends on",
+			"function example() {\n  let value;\n  return someCheck() && (value = getValue());\n}\n",
+		},
+		{
+			"a write inside an array literal argument",
+			"let t;\nconst r = await Promise.race([ a(), (t = b()) ]);\nt.cancel();\n",
+		},
+		{
+			"a write in a for condition with no initializer",
+			"for (let match; (match = REGEX.exec(line)); ) {\n  handle(match);\n}",
+		},
+		{
+			"the same with a type annotation",
+			"for (let match: string[]; (match = REGEX.exec(line)); ) {\n  handle(match);\n}",
+		},
 
 		// Ours, not upstream's. Each covers a write category the task named and the imported corpus
 		// does not separate, because upstream's semantic layer classifies them all as is_write()
@@ -411,12 +432,24 @@ func TestPreferConstIgnoreReadBeforeAssignOption(test *testing.T) {
 		{"a read from a function declared earlier",
 			"function square(n) { x * x }\nlet x = 5;\nconsole.log(square(4));", 1},
 		{"a read from an arrow assigned earlier", "const fn = () => x;\nlet x = 5;", 1},
-		{"a read from an inner function", "function outer() {\n  function inner() { return x; }\n  let x = 5;\n  return inner();\n}", 1},
+		{
+			"a read from an inner function",
+			"function outer() {\n  function inner() { return x; }\n  let x = 5;\n  return inner();\n}",
+			1,
+		},
 		{"a read from a class method", "class C {\n  method() { return x; }\n}\nlet x = 5;", 1},
 		{"a read from an async function", "async function fetchData() { return x; }\nlet x = 5;", 1},
 		{"a read from a generator", "function* gen() { yield x; }\nlet x = 5;", 1},
-		{"a read from the first of two functions", "function reader() { return x; }\nfunction setup() { console.log('setup'); }\nlet x = 5;", 1},
-		{"a read from an arrow inside a static block", "class C {\n  static {\n    const fn = () => a;\n    let a = 1;\n  }\n}", 1},
+		{
+			"a read from the first of two functions",
+			"function reader() { return x; }\nfunction setup() { console.log('setup'); }\nlet x = 5;",
+			1,
+		},
+		{
+			"a read from an arrow inside a static block",
+			"class C {\n  static {\n    const fn = () => a;\n    let a = 1;\n  }\n}",
+			1,
+		},
 	}
 
 	for _, testCase := range bothWays {
@@ -626,7 +659,12 @@ func TestPreferConstReportsAtTheWrite(test *testing.T) {
 		{"the write in a switch case", "switch (a) { case 0: let x; x = 0; }", PreferConstOptions{}, []int{28}},
 		{"the write in a static block", "class C { static { let a; a = 1; } }", PreferConstOptions{}, []int{26}},
 		{"the declaration, when a read comes first", "let x; foo(x); x = 0;", PreferConstOptions{}, []int{4}},
-		{"the declaration, when a closure reads first", "let x; function f() { x; } x = 0;", PreferConstOptions{}, []int{4}},
+		{
+			"the declaration, when a closure reads first",
+			"let x; function f() { x; } x = 0;",
+			PreferConstOptions{},
+			[]int{4},
+		},
 		{"the write, after a read the write follows", "let x; x = 0; foo(x);", PreferConstOptions{}, []int{7}},
 		// A departure: ESLint leaves this, since a namespace body is not a block it knows, and reports
 		// the initialized `let` in the same place. The write converts here as in any block.
@@ -635,7 +673,12 @@ func TestPreferConstReportsAtTheWrite(test *testing.T) {
 		// The declaration's own name is not a read. Counting it silenced every uninitialized binding
 		// under the option, and ESLint reports this one.
 		{"the write, under ignoreReadBeforeAssign", "let x; x = 0;", ignoring, []int{7}},
-		{"the write in a function, under ignoreReadBeforeAssign", "(function() { let x; x = 1; })();", ignoring, []int{21}},
+		{
+			"the write in a function, under ignoreReadBeforeAssign",
+			"(function() { let x; x = 1; })();",
+			ignoring,
+			[]int{21},
+		},
 	}
 
 	for _, testCase := range cases {
@@ -686,7 +729,12 @@ func TestPreferConstReportsADestructuringWrite(test *testing.T) {
 		{"two lets in one pattern", "let a, b; ({a, b} = obj);", PreferConstOptions{}, []int{12, 15}},
 		{"two let statements in one pattern", "let a; let b; [a, b] = xs;", PreferConstOptions{}, []int{15, 18}},
 		{"a nested pattern", "let a, b; [a, [b]] = xs;", PreferConstOptions{}, []int{11, 15}},
-		{"a pattern holding an undeclared name", "let predicate; [, {foo:returnType, predicate}] = foo();", PreferConstOptions{}, []int{35}},
+		{
+			"a pattern holding an undeclared name",
+			"let predicate; [, {foo:returnType, predicate}] = foo();",
+			PreferConstOptions{},
+			[]int{35},
+		},
 		{"a pattern inside a for-of body", "for (const b of c) { let a; ({a} = b); }", PreferConstOptions{}, []int{30}},
 
 		// The rest shapes, which are writes the shelf's accessor once missed. Without an initializer

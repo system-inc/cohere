@@ -80,7 +80,10 @@ func runsAfterItsTargetExists(identifier *ast.Node, declaration *ast.Node) bool 
 			return false
 		}
 		call := ancestor.Parent
-		if call == nil || call.Kind != ast.KindCallExpression || call.Parent == nil || call.Parent.Kind != ast.KindDecorator {
+		if call == nil ||
+			call.Kind != ast.KindCallExpression ||
+			call.Parent == nil ||
+			call.Parent.Kind != ast.KindDecorator {
 			return false
 		}
 		for _, argument := range call.AsCallExpression().Arguments.Nodes {
@@ -154,9 +157,14 @@ func (cycles *useBeforeDefineCycles) graph(block *ast.Node) map[*ast.Node]map[*a
 		var visit func(*ast.Node)
 		visit = func(current *ast.Node) {
 			if current.Kind == ast.KindIdentifier && !isDeclaringName(current) {
-				declarations := rule.DeclarationsIn(cycles.ctx.SourceFile, useBeforeDefineResolveBinding(cycles.ctx, current))
+				declarations := rule.DeclarationsIn(
+					cycles.ctx.SourceFile,
+					useBeforeDefineResolveBinding(cycles.ctx, current),
+				)
 				if declaration := useBeforeDefineBindingDeclaration(declarations); declaration != nil {
-					if target := useBeforeDefineStatementOf(declaration); target != nil && target.Parent == block && target != statement {
+					if target := useBeforeDefineStatementOf(
+						declaration,
+					); target != nil && target.Parent == block && target != statement {
 						if graph[statement] == nil {
 							graph[statement] = map[*ast.Node]bool{}
 						}

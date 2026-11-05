@@ -375,7 +375,10 @@ func markPrivateKeywordAccess(
 		return
 	}
 	for _, candidate := range candidates {
-		if !candidate.isHashPrivate && !candidate.used && rule.HasDeclaration(symbol, candidate.declaration) && privateKeywordAccessIsRead(access, candidate.isAccessor) {
+		if !candidate.isHashPrivate &&
+			!candidate.used &&
+			rule.HasDeclaration(symbol, candidate.declaration) &&
+			privateKeywordAccessIsRead(access, candidate.isAccessor) {
 			candidate.used = true
 		}
 	}

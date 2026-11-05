@@ -55,7 +55,10 @@ func TestARuleCrashFailsTheRunAndNamesItselfAsCohere(test *testing.T) {
 	}
 	const planted = "cohere-test/panics-on-marked-file"
 
-	beside := project(`"`+planted+`":"error","no-empty":"error"`, "export function check(flag: boolean): void {\n\tif (flag) {}\n}\n")
+	beside := project(
+		`"`+planted+`":"error","no-empty":"error"`,
+		"export function check(flag: boolean): void {\n\tif (flag) {}\n}\n",
+	)
 	output, code := run(beside)
 	if code != 1 {
 		test.Errorf("exit %d with a crash beside findings, want 1:\n%s", code, output)
@@ -63,14 +66,22 @@ func TestARuleCrashFailsTheRunAndNamesItselfAsCohere(test *testing.T) {
 	// The crashed file's empty block is a line lower, under the marker comment.
 	for _, location := range []string{"crashes.ts:3:12", "survives.ts:2:12"} {
 		if !strings.Contains(output, location+" error no-empty") {
-			test.Errorf("the rule beside the crash did not report at %s, so the crash cost more than its own verdict:\n%s", location, output)
+			test.Errorf(
+				"the rule beside the crash did not report at %s, so the crash cost more than its own verdict:\n%s",
+				location,
+				output,
+			)
 		}
 	}
 
 	alone := project(`"`+planted+`":"error"`, "export function check(flag: boolean): boolean {\n\treturn !flag;\n}\n")
 	output, code = run(alone)
 	if code != 1 {
-		test.Errorf("exit %d from a run whose only problem is a crash, want 1, since a missing verdict is not a pass:\n%s", code, output)
+		test.Errorf(
+			"exit %d from a run whose only problem is a crash, want 1, since a missing verdict is not a pass:\n%s",
+			code,
+			output,
+		)
 	}
 	lines := strings.Split(strings.TrimRight(output, "\n"), "\n")
 	crashLines := []string{}
@@ -82,14 +93,21 @@ func TestARuleCrashFailsTheRunAndNamesItselfAsCohere(test *testing.T) {
 	if len(crashLines) != 1 {
 		test.Fatalf("the default view printed %d crash lines for one crash, want 1:\n%s", len(crashLines), output)
 	}
-	for _, want := range []string{filepath.Join(alone, "crashes.ts"), "This is a bug in cohere, not in your code", reportBugsAt,
-		"Unhandled case in Node.Text"} {
+	for _, want := range []string{
+		filepath.Join(alone, "crashes.ts"),
+		"This is a bug in cohere, not in your code",
+		reportBugsAt,
+		"Unhandled case in Node.Text",
+	} {
 		if !strings.Contains(crashLines[0], want) {
 			test.Errorf("the crash line lacks %q:\n%s", want, crashLines[0])
 		}
 	}
 	if footer := lines[len(lines)-1]; !strings.HasPrefix(footer, "✗ ☠️ ") || !strings.Contains(footer, "1 rule crash") {
-		test.Errorf("the footer of a run that lost a verdict to a crash is %q, want a failing verdict that names the crash", footer)
+		test.Errorf(
+			"the footer of a run that lost a verdict to a crash is %q, want a failing verdict that names the crash",
+			footer,
+		)
 	}
 
 	output, code = run(alone, "--json")
@@ -115,13 +133,19 @@ func TestARuleCrashFailsTheRunAndNamesItselfAsCohere(test *testing.T) {
 		switch record.Kind {
 		case "crash":
 			crashes++
-			if record.Rule != planted || filepath.Base(record.Path) != "crashes.ts" || !strings.Contains(record.Cause, "Unhandled case") {
+			if record.Rule != planted ||
+				filepath.Base(record.Path) != "crashes.ts" ||
+				!strings.Contains(record.Cause, "Unhandled case") {
 				test.Errorf("the crash record names %s on %s with cause %q", record.Rule, record.Path, record.Cause)
 			}
 		case "summary":
 			summaries++
 			if record.Verdict != "fail" || record.Gaps.RuleCrashes != 1 {
-				test.Errorf("the summary says %s with %d rule crashes, want fail and 1", record.Verdict, record.Gaps.RuleCrashes)
+				test.Errorf(
+					"the summary says %s with %d rule crashes, want fail and 1",
+					record.Verdict,
+					record.Gaps.RuleCrashes,
+				)
 			}
 		}
 	}

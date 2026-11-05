@@ -13,7 +13,10 @@ import (
 func localizationNoUntranslatedValueFingerprintOf(test *testing.T, files map[string]string) [sha256.Size]byte {
 	test.Helper()
 	graph, _ := buildTranslations(test, files)
-	return LocalizationNoUntranslatedValue.ProgramFingerprint(rule.ViewProgram(graph.Program, nil, LocalizationNoUntranslatedValue), nil)
+	return LocalizationNoUntranslatedValue.ProgramFingerprint(
+		rule.ViewProgram(graph.Program, nil, LocalizationNoUntranslatedValue),
+		nil,
+	)
 }
 
 // The fingerprint is every English table a locale file could read (#31ffaaa), proven both ways: a table's
@@ -46,14 +49,30 @@ func TestLocalizationNoUntranslatedValueFingerprintsExactlyTheEnglishTables(test
 	original := localizationNoUntranslatedValueFingerprintOf(test, edited(nil))
 
 	moves := map[string]map[string]string{
-		"an English value edited":                edited(map[string]string{english: "export default {\n    Greeting: 'Hi there',\n};\n"}),
-		"a comment in en.ts":                     edited(map[string]string{english: "// The English set.\n" + englishTranslations}),
-		"en.ts deleted":                          edited(nil, english),
-		"en.a added beside en.ts":                edited(map[string]string{"source/translations/en.a": englishTranslations}),
-		"en.ts renamed to en.a":                  edited(map[string]string{"source/translations/en.a": englishTranslations}, english),
-		"a set gaining its first en.ts":          edited(map[string]string{"source/admin/translations/en.ts": englishTranslations}),
-		"an en.ts in an _translations set":       edited(map[string]string{"source/billing/_translations/en.ts": englishTranslations}),
-		"en.ts moved to another translation set": edited(map[string]string{"source/admin/translations/en.ts": englishTranslations}, english),
+		"an English value edited": edited(
+			map[string]string{english: "export default {\n    Greeting: 'Hi there',\n};\n"},
+		),
+		"a comment in en.ts": edited(
+			map[string]string{english: "// The English set.\n" + englishTranslations},
+		),
+		"en.ts deleted": edited(nil, english),
+		"en.a added beside en.ts": edited(
+			map[string]string{"source/translations/en.a": englishTranslations},
+		),
+		"en.ts renamed to en.a": edited(
+			map[string]string{"source/translations/en.a": englishTranslations},
+			english,
+		),
+		"a set gaining its first en.ts": edited(
+			map[string]string{"source/admin/translations/en.ts": englishTranslations},
+		),
+		"an en.ts in an _translations set": edited(
+			map[string]string{"source/billing/_translations/en.ts": englishTranslations},
+		),
+		"en.ts moved to another translation set": edited(
+			map[string]string{"source/admin/translations/en.ts": englishTranslations},
+			english,
+		),
 	}
 	for name, files := range moves {
 		if localizationNoUntranslatedValueFingerprintOf(test, files) == original {
@@ -62,12 +81,22 @@ func TestLocalizationNoUntranslatedValueFingerprintsExactlyTheEnglishTables(test
 	}
 
 	holds := map[string]map[string]string{
-		"nothing changed, built elsewhere":     edited(nil),
-		"a locale file edited":                 edited(map[string]string{"source/translations/es.ts": "export default {\n    Greeting: 'Hello there',\n};\n"}),
-		"a locale file added to a set":         edited(map[string]string{"source/translations/fr.ts": "export default {\n    Greeting: 'Bonjour',\n};\n"}),
-		"an unrelated file edited":             edited(map[string]string{"source/lib/util.ts": "export const util = 2;\n"}),
-		"an en.ts outside any translation set": edited(map[string]string{"source/en.ts": "export default { Greeting: 'Hi' };\n"}),
-		"an en.ts in a translations-archive":   edited(map[string]string{"source/translations-archive/en.ts": englishTranslations}),
+		"nothing changed, built elsewhere": edited(nil),
+		"a locale file edited": edited(
+			map[string]string{"source/translations/es.ts": "export default {\n    Greeting: 'Hello there',\n};\n"},
+		),
+		"a locale file added to a set": edited(
+			map[string]string{"source/translations/fr.ts": "export default {\n    Greeting: 'Bonjour',\n};\n"},
+		),
+		"an unrelated file edited": edited(
+			map[string]string{"source/lib/util.ts": "export const util = 2;\n"},
+		),
+		"an en.ts outside any translation set": edited(
+			map[string]string{"source/en.ts": "export default { Greeting: 'Hi' };\n"},
+		),
+		"an en.ts in a translations-archive": edited(
+			map[string]string{"source/translations-archive/en.ts": englishTranslations},
+		),
 	}
 	for name, files := range holds {
 		if localizationNoUntranslatedValueFingerprintOf(test, files) != original {

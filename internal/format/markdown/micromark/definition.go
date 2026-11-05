@@ -57,11 +57,19 @@ func tokenizeDefinition(self *Self, effects *Effects, ok State, nok State) State
 
 	// Before destination.
 	destinationBefore = func(code Code) State {
-		return factoryDestination(effects, destinationAfter,
+		return factoryDestination(
+			effects,
+			destinationAfter,
 			// Note: we don’t need to reset the way `markdown-rs` does.
-			nok, TypeDefinitionDestination, TypeDefinitionDestinationLiteral, TypeDefinitionDestinationLiteralMarker, TypeDefinitionDestinationRaw, TypeDefinitionDestinationString,
+			nok,
+			TypeDefinitionDestination,
+			TypeDefinitionDestinationLiteral,
+			TypeDefinitionDestinationLiteralMarker,
+			TypeDefinitionDestinationRaw,
+			TypeDefinitionDestinationString,
 			// Upstream passes no max: no limit.
-			0)(code)
+			0,
+		)(code)
 	}
 
 	// After destination.
@@ -112,7 +120,14 @@ func tokenizeDefinitionTitleBefore(self *Self, effects *Effects, ok State, nok S
 
 	// At title.
 	beforeMarker = func(code Code) State {
-		return factoryTitle(effects, titleAfter, nok, TypeDefinitionTitle, TypeDefinitionTitleMarker, TypeDefinitionTitleString)(code)
+		return factoryTitle(
+			effects,
+			titleAfter,
+			nok,
+			TypeDefinitionTitle,
+			TypeDefinitionTitleMarker,
+			TypeDefinitionTitleString,
+		)(code)
 	}
 
 	// After title.

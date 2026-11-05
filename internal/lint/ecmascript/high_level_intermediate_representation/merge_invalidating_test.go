@@ -78,7 +78,9 @@ func TestFindLastUsageRecordsTheHighestOrder(test *testing.T) {
 func TestLastUsedAtReportsMissesRatherThanZero(test *testing.T) {
 	test.Parallel()
 
-	usage := &LastUsage{byDeclaration: map[static_single_assignment.DeclarationId]static_single_assignment.EvaluationOrder{7: 0}}
+	usage := &LastUsage{
+		byDeclaration: map[static_single_assignment.DeclarationId]static_single_assignment.EvaluationOrder{7: 0},
+	}
 
 	if order, found := usage.LastUsedAt(7); !found || order != 0 {
 		test.Errorf("a declaration recorded at order zero answered (%d, %t), want (0, true)", order, found)
@@ -101,7 +103,11 @@ func TestLastUsedAtReportsMissesRatherThanZero(test *testing.T) {
 func TestAreEqualDependenciesIsSetEquality(test *testing.T) {
 	test.Parallel()
 
-	plain := func(identifier static_single_assignment.IdentifierId, property string, optional bool) ReactiveScopeDependency {
+	plain := func(
+		identifier static_single_assignment.IdentifierId,
+		property string,
+		optional bool,
+	) ReactiveScopeDependency {
 		return ReactiveScopeDependency{
 			Identifier: identifier,
 			Path:       []DependencyPathEntry{{Property: property, Optional: optional}},
@@ -172,10 +178,12 @@ func TestAreEqualDependenciesIsSetEquality(test *testing.T) {
 func TestAreLValuesLastUsedByScopeDeclinesOnMissingInformation(test *testing.T) {
 	test.Parallel()
 
-	usage := &LastUsage{byDeclaration: map[static_single_assignment.DeclarationId]static_single_assignment.EvaluationOrder{
-		1: 5,
-		2: 12,
-	}}
+	usage := &LastUsage{
+		byDeclaration: map[static_single_assignment.DeclarationId]static_single_assignment.EvaluationOrder{
+			1: 5,
+			2: 12,
+		},
+	}
 
 	if !AreLValuesLastUsedByScope(10, []static_single_assignment.DeclarationId{1}, usage) {
 		test.Error("a declaration last used at 5 before a scope ending at 10 should be mergeable")
@@ -217,7 +225,11 @@ func TestFindLastUsageCorpus(test *testing.T) {
 	highestPerDeclaration := map[static_single_assignment.DeclarationId]static_single_assignment.EvaluationOrder{}
 	recordedTable := map[static_single_assignment.DeclarationId]static_single_assignment.EvaluationOrder{}
 
-	forEachCorpusFunction(test, 200, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(test, 200, func(
+		function *Function,
+		ranges *mutation_aliasing.MutableRanges,
+		scopes *ReactiveScopes,
+	) {
 		aligned, merged := AlignThenMergeReactiveScopes(function, scopes)
 		BuildReactiveScopeTerminals(function, scopes, MergedScopeIdentity{Aligned: aligned, Merged: merged})
 
@@ -510,7 +522,10 @@ func TestCanMergeScopesGuardsAreIndependentlyLoadBearing(test *testing.T) {
 //
 // The identifier is found rather than assumed: a hardcoded id would silently stop being an array
 // the day lowering changes, and the test would keep passing while asserting nothing.
-func withInvalidatingScopes(test *testing.T, visit func(*Function, *shimchecker.Checker, static_single_assignment.IdentifierId)) {
+func withInvalidatingScopes(
+	test *testing.T,
+	visit func(*Function, *shimchecker.Checker, static_single_assignment.IdentifierId),
+) {
 	test.Helper()
 
 	ran := false

@@ -16,13 +16,35 @@ func TestNoTypePredicateFiresOnEveryWrittenPredicate(test *testing.T) {
 		span   string
 	}{
 		// adamic's refusal 4, tsc 6.0.3 accepts it and Node fails
-		"a lying guard":       {pets + `function isCat(pet: Pet): pet is Extract<Pet, { kind: 'Cat' }> { return pet.kind === 'Dog'; }`, "pet is Extract<Pet, { kind: 'Cat' }>"},
-		"an assertion":        {pets + `function assertCat(pet: Pet): asserts pet is Extract<Pet, { kind: 'Cat' }> { if (pet.kind !== 'Cat') { throw new Error('dog'); } }`, "asserts pet is Extract<Pet, { kind: 'Cat' }>"},
-		"a bare assertion":    {`function assertPresent(value: unknown): asserts value { if (value === undefined) { throw new Error('missing'); } }`, "asserts value"},
-		"a this predicate":    {`class Tree { readonly leaf = true; isLeaf(): this is { readonly leaf: true } { return this.leaf; } }`, "this is { readonly leaf: true }"},
-		"a declared function": {pets + `declare function isDog(pet: Pet): pet is Extract<Pet, { kind: 'Dog' }>;`, "pet is Extract<Pet, { kind: 'Dog' }>"},
-		"a function type":     {pets + `type Guard = (pet: Pet) => pet is Extract<Pet, { kind: 'Dog' }>;`, "pet is Extract<Pet, { kind: 'Dog' }>"},
-		"an arrow":            {pets + `const isDog = (pet: Pet): pet is Extract<Pet, { kind: 'Dog' }> => pet.kind === 'Dog';`, "pet is Extract<Pet, { kind: 'Dog' }>"},
+		"a lying guard": {
+			pets + `function isCat(pet: Pet): pet is Extract<Pet, { kind: 'Cat' }> { return pet.kind === 'Dog'; }`,
+			"pet is Extract<Pet, { kind: 'Cat' }>",
+		},
+		"an assertion": {
+			pets +
+				`function assertCat(pet: Pet): asserts pet is Extract<Pet, { kind: 'Cat' }> { if (pet.kind !== 'Cat') { throw new Error('dog'); } }`,
+			"asserts pet is Extract<Pet, { kind: 'Cat' }>",
+		},
+		"a bare assertion": {
+			`function assertPresent(value: unknown): asserts value { if (value === undefined) { throw new Error('missing'); } }`,
+			"asserts value",
+		},
+		"a this predicate": {
+			`class Tree { readonly leaf = true; isLeaf(): this is { readonly leaf: true } { return this.leaf; } }`,
+			"this is { readonly leaf: true }",
+		},
+		"a declared function": {
+			pets + `declare function isDog(pet: Pet): pet is Extract<Pet, { kind: 'Dog' }>;`,
+			"pet is Extract<Pet, { kind: 'Dog' }>",
+		},
+		"a function type": {
+			pets + `type Guard = (pet: Pet) => pet is Extract<Pet, { kind: 'Dog' }>;`,
+			"pet is Extract<Pet, { kind: 'Dog' }>",
+		},
+		"an arrow": {
+			pets + `const isDog = (pet: Pet): pet is Extract<Pet, { kind: 'Dog' }> => pet.kind === 'Dog';`,
+			"pet is Extract<Pet, { kind: 'Dog' }>",
+		},
 	} {
 		test.Run(name, func(test *testing.T) {
 			test.Parallel()

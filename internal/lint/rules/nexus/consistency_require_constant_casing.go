@@ -26,17 +26,34 @@ type ConsistencyRequireConstantCasingOptions struct {
 // The reasoning behind each message is the part that ports. A rule that says only what is wrong gets
 // disabled the first time it is inconvenient; one that says why gets fixed.
 var (
-	constantCasingRequirePascalCaseExportedText = policy.MessageOf("nexus/consistency-require-constant-casing", "requirePascalCaseExported")
-	constantCasingDropUnimportedExportText      = policy.MessageOf("nexus/consistency-require-constant-casing", "dropUnimportedExport")
-	constantCasingRequireCamelCaseLocalText     = policy.MessageOf("nexus/consistency-require-constant-casing", "requireCamelCaseLocal")
-	constantCasingRequireCamelCaseFunctionText  = policy.MessageOf("nexus/consistency-require-constant-casing", "requireCamelCaseFunction")
-	constantCasingRequireCamelCaseInstanceText  = policy.MessageOf("nexus/consistency-require-constant-casing", "requireCamelCaseInstance")
+	constantCasingRequirePascalCaseExportedText = policy.MessageOf(
+		"nexus/consistency-require-constant-casing",
+		"requirePascalCaseExported",
+	)
+	constantCasingDropUnimportedExportText = policy.MessageOf(
+		"nexus/consistency-require-constant-casing",
+		"dropUnimportedExport",
+	)
+	constantCasingRequireCamelCaseLocalText = policy.MessageOf(
+		"nexus/consistency-require-constant-casing",
+		"requireCamelCaseLocal",
+	)
+	constantCasingRequireCamelCaseFunctionText = policy.MessageOf(
+		"nexus/consistency-require-constant-casing",
+		"requireCamelCaseFunction",
+	)
+	constantCasingRequireCamelCaseInstanceText = policy.MessageOf(
+		"nexus/consistency-require-constant-casing",
+		"requireCamelCaseInstance",
+	)
 )
 
 func messageRequirePascalCaseExported(name string, suggestion string) rule.Message {
 	return rule.Message{
-		Id:          constantCasingRequirePascalCaseExportedText.Id,
-		Description: constantCasingRequirePascalCaseExportedText.Render(map[string]string{"name": name, "suggestion": suggestion}),
+		Id: constantCasingRequirePascalCaseExportedText.Id,
+		Description: constantCasingRequirePascalCaseExportedText.Render(
+			map[string]string{"name": name, "suggestion": suggestion},
+		),
 	}
 }
 
@@ -50,29 +67,37 @@ func messageRequirePascalCaseExported(name string, suggestion string) rule.Messa
 // imported from another repository this run cannot see.
 func messageDropUnimportedExport(name string, suggestion string) rule.Message {
 	return rule.Message{
-		Id:          constantCasingDropUnimportedExportText.Id,
-		Description: constantCasingDropUnimportedExportText.Render(map[string]string{"name": name, "suggestion": suggestion}),
+		Id: constantCasingDropUnimportedExportText.Id,
+		Description: constantCasingDropUnimportedExportText.Render(
+			map[string]string{"name": name, "suggestion": suggestion},
+		),
 	}
 }
 
 func messageRequireCamelCaseLocal(name string, suggestion string) rule.Message {
 	return rule.Message{
-		Id:          constantCasingRequireCamelCaseLocalText.Id,
-		Description: constantCasingRequireCamelCaseLocalText.Render(map[string]string{"name": name, "suggestion": suggestion}),
+		Id: constantCasingRequireCamelCaseLocalText.Id,
+		Description: constantCasingRequireCamelCaseLocalText.Render(
+			map[string]string{"name": name, "suggestion": suggestion},
+		),
 	}
 }
 
 func messageRequireCamelCaseFunction(name string, suggestion string) rule.Message {
 	return rule.Message{
-		Id:          constantCasingRequireCamelCaseFunctionText.Id,
-		Description: constantCasingRequireCamelCaseFunctionText.Render(map[string]string{"name": name, "suggestion": suggestion}),
+		Id: constantCasingRequireCamelCaseFunctionText.Id,
+		Description: constantCasingRequireCamelCaseFunctionText.Render(
+			map[string]string{"name": name, "suggestion": suggestion},
+		),
 	}
 }
 
 func messageRequireCamelCaseInstance(name string, suggestion string) rule.Message {
 	return rule.Message{
-		Id:          constantCasingRequireCamelCaseInstanceText.Id,
-		Description: constantCasingRequireCamelCaseInstanceText.Render(map[string]string{"name": name, "suggestion": suggestion}),
+		Id: constantCasingRequireCamelCaseInstanceText.Id,
+		Description: constantCasingRequireCamelCaseInstanceText.Render(
+			map[string]string{"name": name, "suggestion": suggestion},
+		),
 	}
 }
 
@@ -214,7 +239,8 @@ var ConsistencyRequireConstantCasing = rule.Rule{
 				// `POST`, or dropping the export from a `metadata` nothing imports. Checked before
 				// the clauses rather than beside the consumer's list, because that list is optional
 				// and this floor is not.
-				if exported && nextjs.IsRouteContractExport(imports.NormalizedFileName(ruleContext.SourceFile), declaredName) {
+				if exported &&
+					nextjs.IsRouteContractExport(imports.NormalizedFileName(ruleContext.SourceFile), declaredName) {
 					return
 				}
 
@@ -283,7 +309,10 @@ var ConsistencyRequireConstantCasing = rule.Rule{
 						return
 					}
 					if isCamelCase(declaredName) &&
-						importerIndexFor(ruleContext.Program).provablyUnimported(ruleContext.SourceFile, exportedNames...) {
+						importerIndexFor(ruleContext.Program).provablyUnimported(
+							ruleContext.SourceFile,
+							exportedNames...,
+						) {
 						ruleContext.ReportNode(name, messageDropUnimportedExport(
 							declaredName, constantNameToPascalCase(declaredName),
 						))
@@ -580,7 +609,10 @@ func holdsAFunctionType(ruleContext rule.Context, name *ast.Node) bool {
 			return false
 		}
 		for _, signature := range callSignatures {
-			if mayReturnAnElement(ruleContext.TypeChecker, checker.Checker_getReturnTypeOfSignature(ruleContext.TypeChecker, signature)) {
+			if mayReturnAnElement(
+				ruleContext.TypeChecker,
+				checker.Checker_getReturnTypeOfSignature(ruleContext.TypeChecker, signature),
+			) {
 				return false
 			}
 		}
@@ -671,7 +703,9 @@ func constantCasingClassOf(ruleContext rule.Context, name *ast.Node) *ast.Node {
 	}
 	var found *ast.Node
 	ruleContext.SourceFile.AsNode().ForEachChild(func(statement *ast.Node) bool {
-		if statement.Kind == ast.KindClassDeclaration && statement.Name() != nil && statement.Name().Text() == name.Text() {
+		if statement.Kind == ast.KindClassDeclaration &&
+			statement.Name() != nil &&
+			statement.Name().Text() == name.Text() {
 			found = statement
 			return true
 		}

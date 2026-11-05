@@ -226,7 +226,9 @@ func settingsTree(test *testing.T, house string, ignorePatterns string, files ma
 		block = `{"tabWidth": 4, "ignore": ` + house + `}`
 	}
 	files["nexus/NexusCohereSettings.json"] = `{"rules": {}, "format": ` + block + `}`
-	files["CohereSettings.json"] = `{"extends": "./nexus/NexusCohereSettings.json", "rules": {}, "ignorePatterns": ` + ignorePatterns + `}`
+	files["CohereSettings.json"] = `{"extends": "./nexus/NexusCohereSettings.json", "rules": {}, "ignorePatterns": ` +
+		ignorePatterns +
+		`}`
 	return writeTree(test, files)
 }
 
@@ -250,7 +252,12 @@ func TestEnumerateAppliesEveryIgnoreLayer(test *testing.T) {
 		test.Fatalf("enumerate: %v", enumerateError)
 	}
 	if len(enumeration.IgnoredByLayer) != 3 {
-		test.Errorf("layers %v, want exactly .gitignore, %s and %s", enumeration.IgnoredByLayer, HouseIgnoreLayer, IgnorePatternsLayer)
+		test.Errorf(
+			"layers %v, want exactly .gitignore, %s and %s",
+			enumeration.IgnoredByLayer,
+			HouseIgnoreLayer,
+			IgnorePatternsLayer,
+		)
 	}
 	for layer, want := range map[string]int{".gitignore": 1, HouseIgnoreLayer: 1, IgnorePatternsLayer: 1} {
 		if enumeration.IgnoredByLayer[layer] != want {
@@ -277,7 +284,12 @@ func TestALeftoverPrettierignoreIsRefused(test *testing.T) {
 		root func() string
 	}{
 		{"with a settings chain", func() string {
-			return settingsTree(test, `["pnpm-lock.yaml"]`, `[]`, map[string]string{".prettierignore": "archived/\n", "a.ts": "export const a = 1;\n"})
+			return settingsTree(
+				test,
+				`["pnpm-lock.yaml"]`,
+				`[]`,
+				map[string]string{".prettierignore": "archived/\n", "a.ts": "export const a = 1;\n"},
+			)
 		}},
 		{"without settings", func() string {
 			return writeTree(test, map[string]string{".prettierignore": "archived/\n", "a.ts": "export const a = 1;\n"})
@@ -299,7 +311,12 @@ func TestALeftoverPrettierignoreIsRefused(test *testing.T) {
 	}
 
 	// Only the walk root's: one inside the tree is a file like any other, and nothing reads it.
-	root := settingsTree(test, `["pnpm-lock.yaml"]`, `[]`, map[string]string{"fixtures/.prettierignore": "x\n", "a.ts": "export const a = 1;\n"})
+	root := settingsTree(
+		test,
+		`["pnpm-lock.yaml"]`,
+		`[]`,
+		map[string]string{"fixtures/.prettierignore": "x\n", "a.ts": "export const a = 1;\n"},
+	)
 	if _, enumerateError := Enumerate(root, handlesEveryLanguage); enumerateError != nil {
 		test.Errorf("a .prettierignore below the root was refused: %v", enumerateError)
 	}
@@ -311,8 +328,18 @@ func TestALeftoverPrettierignoreIsRefused(test *testing.T) {
 func TestEveryWalkHasAHouseList(test *testing.T) {
 	test.Parallel()
 	for name, root := range map[string]string{
-		"an outsider's block without ignore": settingsTree(test, "", `[]`, map[string]string{".gitignore": "built.ts\n", "a.ts": "export const a = 1;\n", "built.ts": "export const built = 1;\n", "pnpm-lock.yaml": "lockfileVersion: 1\n"}),
-		"no settings at all":                 writeTree(test, map[string]string{".gitignore": "built.ts\n", "a.ts": "export const a = 1;\n", "built.ts": "export const built = 1;\n", "pnpm-lock.yaml": "lockfileVersion: 1\n"}),
+		"an outsider's block without ignore": settingsTree(test, "", `[]`, map[string]string{
+			".gitignore":     "built.ts\n",
+			"a.ts":           "export const a = 1;\n",
+			"built.ts":       "export const built = 1;\n",
+			"pnpm-lock.yaml": "lockfileVersion: 1\n",
+		}),
+		"no settings at all": writeTree(test, map[string]string{
+			".gitignore":     "built.ts\n",
+			"a.ts":           "export const a = 1;\n",
+			"built.ts":       "export const built = 1;\n",
+			"pnpm-lock.yaml": "lockfileVersion: 1\n",
+		}),
 	} {
 		test.Run(name, func(test *testing.T) {
 			test.Parallel()
@@ -321,7 +348,11 @@ func TestEveryWalkHasAHouseList(test *testing.T) {
 				test.Fatal(enumerateError)
 			}
 			if enumeration.IgnoredByLayer[".gitignore"] != 1 || enumeration.IgnoredByLayer[HouseIgnoreLayer] != 1 {
-				test.Fatalf("layers %v, want built.ts by .gitignore and pnpm-lock.yaml by %s", enumeration.IgnoredByLayer, HouseIgnoreLayer)
+				test.Fatalf(
+					"layers %v, want built.ts by .gitignore and pnpm-lock.yaml by %s",
+					enumeration.IgnoredByLayer,
+					HouseIgnoreLayer,
+				)
 			}
 			for _, file := range enumeration.Files {
 				if base := filepath.Base(file); base == "pnpm-lock.yaml" || base == "built.ts" {
@@ -358,7 +389,10 @@ func TestIgnorePatternsReadAsLintReadsThem(test *testing.T) {
 		test.Errorf("offered %v, want source/a.ts and source/odd.code.js/keep.ts", offered)
 	}
 	if enumeration.IgnoredByLayer[IgnorePatternsLayer] != 2 {
-		test.Errorf("ignorePatterns removed %d, want 2 (the generated directory, pruned whole, and the bundle)", enumeration.IgnoredByLayer[IgnorePatternsLayer])
+		test.Errorf(
+			"ignorePatterns removed %d, want 2 (the generated directory, pruned whole, and the bundle)",
+			enumeration.IgnoredByLayer[IgnorePatternsLayer],
+		)
 	}
 }
 
@@ -399,8 +433,14 @@ func TestNestedRepositoryContainingNamesTheOutermostBelowTheRoot(test *testing.T
 		fileName string
 		want     string
 	}{
-		{filepath.Join(root, "libraries", "structure", "libraries", "nexus", "source", "Thing.ts"), filepath.Join("libraries", "structure")},
-		{filepath.Join(root, "libraries", "structure", "source", "Button.tsx"), filepath.Join("libraries", "structure")},
+		{
+			filepath.Join(root, "libraries", "structure", "libraries", "nexus", "source", "Thing.ts"),
+			filepath.Join("libraries", "structure"),
+		},
+		{
+			filepath.Join(root, "libraries", "structure", "source", "Button.tsx"),
+			filepath.Join("libraries", "structure"),
+		},
 		{filepath.Join(root, "source", "Own.ts"), ""},
 		{filepath.Join(root, "Root.ts"), ""},
 		{filepath.Join(filepath.Dir(root), "Elsewhere.ts"), ""},
@@ -473,7 +513,10 @@ func TestNestedRepositoriesAreFoundUnderAPathTheProjectNeverFormats(test *testin
 	}
 	sort.Strings(nested)
 	if strings.Join(nested, ",") != "projects/ignored-repo,projects/listed" {
-		test.Errorf("found %v, want projects/ignored-repo and projects/listed, and nothing below a gitignored plain directory", nested)
+		test.Errorf(
+			"found %v, want projects/ignored-repo and projects/listed, and nothing below a gitignored plain directory",
+			nested,
+		)
 	}
 
 	// The host's own walk still offers nothing under projects/, and finds no repository there either.
@@ -503,7 +546,10 @@ func TestANestedRepositoryDoesNotInheritItsHostsIgnorePatterns(test *testing.T) 
 		test.Fatal(enumerateError)
 	}
 	if len(enumeration.Files) != 1 || filepath.Base(enumeration.Files[0]) != "b.ts" {
-		test.Errorf("offered %v, want b.ts alone: the host's ignorePatterns do not reach in, its house list does", enumeration.Files)
+		test.Errorf(
+			"offered %v, want b.ts alone: the host's ignorePatterns do not reach in, its house list does",
+			enumeration.Files,
+		)
 	}
 	if _, counted := enumeration.IgnoredByLayer[IgnorePatternsLayer]; counted {
 		test.Error("the host's ignorePatterns were read as a layer of the nested repository's walk")
@@ -548,8 +594,14 @@ func TestTheWalkReadsGitsIgnoreRulesAsGitDoes(test *testing.T) {
 	}
 	survivors := survivorsOf(root, enumeration)
 	for name, want := range map[string]bool{
-		"a.ts": true, "keep.gen.ts": true, "sub/y.gen.ts": true,
-		"local.ts": false, "x.gen.ts": false, "sub/scratch.ts": false, "sub/deep/scratch.ts": false, "vendor/lib.ts": false,
+		"a.ts":                true,
+		"keep.gen.ts":         true,
+		"sub/y.gen.ts":        true,
+		"local.ts":            false,
+		"x.gen.ts":            false,
+		"sub/scratch.ts":      false,
+		"sub/deep/scratch.ts": false,
+		"vendor/lib.ts":       false,
 	} {
 		if survivors[name] != want {
 			test.Errorf("%s offered %v, want %v (offered: %v)", name, survivors[name], want, enumeration.Files)
@@ -612,7 +664,13 @@ func TestTheHouseListReadsAsIgnoreFileLines(test *testing.T) {
 		test.Fatalf("enumerate: %v", enumerateError)
 	}
 	survivors := survivorsOf(root, enumeration)
-	for name, want := range map[string]bool{"keep.json": true, "sub/top.ts": true, "a.json": false, "top.ts": false, "sub/b.json": false} {
+	for name, want := range map[string]bool{
+		"keep.json":  true,
+		"sub/top.ts": true,
+		"a.json":     false,
+		"top.ts":     false,
+		"sub/b.json": false,
+	} {
 		if survivors[name] != want {
 			test.Errorf("%s offered %v, want %v (offered: %v)", name, survivors[name], want, enumeration.Files)
 		}
@@ -637,7 +695,10 @@ func TestEnumerateHoldsAdamicFilesBack(test *testing.T) {
 		"nested/deeper.a":   "export const deeper = 1;\n",
 		"nested/Thing.d.ts": "export {};\n",
 	})
-	if symlinkError := os.Symlink(filepath.Join(root, "geometry.a"), filepath.Join(root, "link.a")); symlinkError != nil {
+	if symlinkError := os.Symlink(
+		filepath.Join(root, "geometry.a"),
+		filepath.Join(root, "link.a"),
+	); symlinkError != nil {
 		test.Fatal(symlinkError)
 	}
 
@@ -656,15 +717,29 @@ func TestEnumerateHoldsAdamicFilesBack(test *testing.T) {
 		held = append(held, filepath.ToSlash(relative))
 	}
 	sort.Strings(held)
-	if want := []string{"geometry.a", "lib/libfoo.a", "nested/deeper.a"}; strings.Join(held, " ") != strings.Join(want, " ") {
+	if want := []string{
+		"geometry.a",
+		"lib/libfoo.a",
+		"nested/deeper.a",
+	}; strings.Join(held, " ") != strings.Join(want, " ") {
 		test.Errorf("held back %v, want %v: the ignored and the linked stay out", held, want)
 	}
 	ignored := 0
 	for _, count := range enumeration.IgnoredByLayer {
 		ignored += count
 	}
-	if offered := enumeration.Walked - ignored - enumeration.Unhandled - enumeration.SymbolicLinks; offered != len(enumeration.Files)+len(enumeration.Adamic) {
-		test.Errorf("walked %d less %d ignored, %d unhandled and %d links is %d, but %d files and %d held back",
-			enumeration.Walked, ignored, enumeration.Unhandled, enumeration.SymbolicLinks, offered, len(enumeration.Files), len(enumeration.Adamic))
+	if offered := enumeration.Walked - ignored - enumeration.Unhandled - enumeration.SymbolicLinks; offered != len(
+		enumeration.Files,
+	)+len(enumeration.Adamic) {
+		test.Errorf(
+			"walked %d less %d ignored, %d unhandled and %d links is %d, but %d files and %d held back",
+			enumeration.Walked,
+			ignored,
+			enumeration.Unhandled,
+			enumeration.SymbolicLinks,
+			offered,
+			len(enumeration.Files),
+			len(enumeration.Adamic),
+		)
 	}
 }

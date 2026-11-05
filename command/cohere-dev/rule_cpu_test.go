@@ -55,7 +55,9 @@ exit 0
 		return string(output), outputError
 	}
 	before := fixture.git(fixture.repository, "rev-parse", "main")
-	if output, err := land(); err == nil || !strings.Contains(output, "planted-rule 501ms > 500ms") || strings.Contains(output, "landed ") {
+	if output, err := land(); err == nil ||
+		!strings.Contains(output, "planted-rule 501ms > 500ms") ||
+		strings.Contains(output, "landed ") {
 		test.Fatalf("over-budget land was not refused (%v):\n%s", err, output)
 	}
 	commands, readError := os.ReadFile(log)
@@ -63,8 +65,14 @@ exit 0
 		test.Fatal(readError)
 	}
 	lines := strings.Split(strings.TrimSpace(string(commands)), "\n")
-	if len(lines) != 2 || !strings.HasPrefix(lines[0], "vet ") || !strings.Contains(lines[1], "-count=1 -timeout=30s -run=^TestRegisteredRuleCPUBudget$ -v ./internal/lint/registry") {
-		test.Fatalf("commands before refusal: %q; want vet then uncached bounded CPU check, without ordinary tests", lines)
+	if len(lines) != 2 || !strings.HasPrefix(lines[0], "vet ") || !strings.Contains(
+		lines[1],
+		"-count=1 -timeout=30s -run=^TestRegisteredRuleCPUBudget$ -v ./internal/lint/registry",
+	) {
+		test.Fatalf(
+			"commands before refusal: %q; want vet then uncached bounded CPU check, without ordinary tests",
+			lines,
+		)
 	}
 	if got := fixture.git(fixture.repository, "rev-parse", "main"); got != before {
 		test.Fatalf("refused land moved main: %s -> %s", before, got)
@@ -72,7 +80,9 @@ exit 0
 	if writeError := os.WriteFile(marker, nil, 0o644); writeError != nil {
 		test.Fatal(writeError)
 	}
-	if output, err := land(); err != nil || !strings.Contains(output, "rule CPU budget passed") || !strings.Contains(output, "landed ") {
+	if output, err := land(); err != nil ||
+		!strings.Contains(output, "rule CPU budget passed") ||
+		!strings.Contains(output, "landed ") {
 		test.Fatalf("under-budget land did not land (%v):\n%s", err, output)
 	}
 }

@@ -144,7 +144,10 @@ var valuesFixtures = []valuesFixture{
 	{name: "calc with var fallback", text: "calc(100% - var(--x, 2px))"},
 	{name: "color-mix", text: "color-mix(in oklab, var(--color-red-500) 50%, transparent)"},
 	{name: "nested functions three deep", text: "translate(calc(var(--a) * -1), min(10px, max(1vw, 2em)))"},
-	{name: "function after a function", text: "rgb(0 0 0 / 0.5) linear-gradient(to right, #fff 0%, rgba(0, 0, 0, .5) 100%)"},
+	{
+		name: "function after a function",
+		text: "rgb(0 0 0 / 0.5) linear-gradient(to right, #fff 0%, rgba(0, 0, 0, .5) 100%)",
+	},
 	{name: "parenthesized group", text: "(min-width: 100px) and (max-width: 200px)"},
 	{name: "nested parens in calc", text: "calc((1px + 2px) * (3 - 4))"},
 	{name: "empty function", text: "foo()"},
@@ -389,7 +392,13 @@ func TestParseAgreesWithPostcssValuesParser(test *testing.T) {
 			case oracleRefused && dumpValuesError != nil:
 				var thrown *Error
 				if !asError(dumpValuesError, &thrown) || thrown.Error() != wantError {
-					fail("%s %s: both refuse, with different messages:\n  library %s\n  Go      %v", label, mode.name, wantError, dumpValuesError)
+					fail(
+						"%s %s: both refuse, with different messages:\n  library %s\n  Go      %v",
+						label,
+						mode.name,
+						wantError,
+						dumpValuesError,
+					)
 					continue
 				}
 				refusedByBoth++
@@ -406,13 +415,27 @@ func TestParseAgreesWithPostcssValuesParser(test *testing.T) {
 			}
 		}
 	}
-	test.Logf("%d corpus files: %d values Prettier parses (%d refused in loose mode) and %d extra at-rule params; %d fixtures; %d comparisons (loose and strict): %d identical, %d refused by both with the same message, %d different",
-		corpusFiles, corpusValues, corpusRefused, extraValues, len(valuesFixtures), compared, identical, refusedByBoth, different)
+	test.Logf(
+		"%d corpus files: %d values Prettier parses (%d refused in loose mode) and %d extra at-rule params; %d fixtures; %d comparisons (loose and strict): %d identical, %d refused by both with the same message, %d different",
+		corpusFiles,
+		corpusValues,
+		corpusRefused,
+		extraValues,
+		len(valuesFixtures),
+		compared,
+		identical,
+		refusedByBoth,
+		different,
+	)
 	if corpusValues == 0 {
 		test.Errorf("the corpus yielded no values")
 	}
 	if corpusRefused > corpusValues/10 {
-		test.Errorf("the library refused %d of %d corpus values; the comparison is thinner than it looks", corpusRefused, corpusValues)
+		test.Errorf(
+			"the library refused %d of %d corpus values; the comparison is thinner than it looks",
+			corpusRefused,
+			corpusValues,
+		)
 	}
 }
 
@@ -542,7 +565,14 @@ func firstValuesDifference(want any, got any, path string) string {
 			wantValue, wantPresent := typed[key]
 			gotValue, gotPresent := other[key]
 			if wantPresent != gotPresent {
-				return fmt.Sprintf("%s.%s: present in the library %v, in Go %v (%v)", path, key, wantPresent, gotPresent, typed["type"])
+				return fmt.Sprintf(
+					"%s.%s: present in the library %v, in Go %v (%v)",
+					path,
+					key,
+					wantPresent,
+					gotPresent,
+					typed["type"],
+				)
 			}
 			if difference := firstValuesDifference(wantValue, gotValue, path+"."+key); difference != "" {
 				return difference
@@ -555,7 +585,11 @@ func firstValuesDifference(want any, got any, path string) string {
 			return fmt.Sprintf("%s: want %d elements, got %v", path, len(typed), got)
 		}
 		for index := range typed {
-			if difference := firstValuesDifference(typed[index], other[index], fmt.Sprintf("%s[%d]", path, index)); difference != "" {
+			if difference := firstValuesDifference(
+				typed[index],
+				other[index],
+				fmt.Sprintf("%s[%d]", path, index),
+			); difference != "" {
 				return difference
 			}
 		}

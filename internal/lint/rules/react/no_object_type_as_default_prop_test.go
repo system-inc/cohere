@@ -15,11 +15,23 @@ func TestNoObjectTypeAsDefaultPropStaysSilent(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct{ name, sourceText string }{
-		{"upstream valid 0", "\n      function Foo({\n        bar = emptyFunction,\n      }) {\n        return null;\n      }\n    "},
-		{"upstream valid 1", "\n      function Foo({\n        bar = emptyFunction,\n        ...rest\n      }) {\n        return null;\n      }\n    "},
-		{"upstream valid 2", "\n      function Foo({\n        bar = 1,\n        baz = 'hello',\n      }) {\n        return null;\n      }\n    "},
+		{
+			"upstream valid 0",
+			"\n      function Foo({\n        bar = emptyFunction,\n      }) {\n        return null;\n      }\n    ",
+		},
+		{
+			"upstream valid 1",
+			"\n      function Foo({\n        bar = emptyFunction,\n        ...rest\n      }) {\n        return null;\n      }\n    ",
+		},
+		{
+			"upstream valid 2",
+			"\n      function Foo({\n        bar = 1,\n        baz = 'hello',\n      }) {\n        return null;\n      }\n    ",
+		},
 		{"upstream valid 3", "\n      function Foo(props) {\n        return null;\n      }\n    "},
-		{"upstream valid 4", "\n      function Foo(props) {\n        return null;\n      }\n\n      Foo.defaultProps = {\n        bar: () => {}\n      }\n    "},
+		{
+			"upstream valid 4",
+			"\n      function Foo(props) {\n        return null;\n      }\n\n      Foo.defaultProps = {\n        bar: () => {}\n      }\n    ",
+		},
 		{"upstream valid 5", "\n      const Foo = () => {\n        return null;\n      };\n    "},
 		{"upstream valid 6", "\n      const Foo = ({bar = 1}) => {\n        return null;\n      };\n    "},
 		{"upstream valid 7", "\n      const Foo = ({bar = 1}, context) => {\n        return null;\n      };\n    "},
@@ -28,7 +40,12 @@ func TestNoObjectTypeAsDefaultPropStaysSilent(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTyped(test, NoObjectTypeAsDefaultProp, noObjectTypeAsDefaultPropFile, testCase.sourceText)
+			result := rule_testing.RunTyped(
+				test,
+				NoObjectTypeAsDefaultProp,
+				noObjectTypeAsDefaultPropFile,
+				testCase.sourceText,
+			)
 			rule_testing.ExpectClean(test, result)
 		})
 	}
@@ -46,44 +63,61 @@ func TestNoObjectTypeAsDefaultPropFires(test *testing.T) {
 		name, sourceText string
 		wantMessages     []string
 	}{
-		{"upstream invalid 0", "\n        function Foo({\n          a = {},\n          b = ['one', 'two'],\n          c = /regex/i,\n          d = () => {},\n          e = function() {},\n          f = class {},\n          g = new Thing(),\n          h = <Thing />,\n          i = Symbol('foo')\n        }) {\n          return null;\n        }\n      ", []string{
-			"a has a/an object literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of object literal.",
-			"b has a/an array literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of array literal.",
-			"c has a/an regex literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of regex literal.",
-			"d has a/an arrow function as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of arrow function.",
-			"e has a/an function expression as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of function expression.",
-			"f has a/an class expression as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of class expression.",
-			"g has a/an construction expression as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of construction expression.",
-			"h has a/an JSX element as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of JSX element.",
-			"i has a/an Symbol literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of Symbol literal.",
-		}},
-		{"upstream invalid 1", "\n        const Foo = ({\n          a = {},\n          b = ['one', 'two'],\n          c = /regex/i,\n          d = () => {},\n          e = function() {},\n          f = class {},\n          g = new Thing(),\n          h = <Thing />,\n          i = Symbol('foo')\n        }) => {\n          return null;\n        }\n      ", []string{
-			"a has a/an object literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of object literal.",
-			"b has a/an array literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of array literal.",
-			"c has a/an regex literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of regex literal.",
-			"d has a/an arrow function as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of arrow function.",
-			"e has a/an function expression as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of function expression.",
-			"f has a/an class expression as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of class expression.",
-			"g has a/an construction expression as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of construction expression.",
-			"h has a/an JSX element as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of JSX element.",
-			"i has a/an Symbol literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of Symbol literal.",
-		}},
-		{"upstream invalid 2", "\n        const Foo = ({\n          a = {},\n          b = ['one', 'two'],\n          c = /regex/i,\n          d = () => {},\n          e = function() {},\n          f = class {},\n          g = new Thing(),\n          h = <Thing />,\n          i = Symbol('foo')\n        }, context) => {\n          return null;\n        }\n      ", []string{
-			"a has a/an object literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of object literal.",
-			"b has a/an array literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of array literal.",
-			"c has a/an regex literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of regex literal.",
-			"d has a/an arrow function as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of arrow function.",
-			"e has a/an function expression as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of function expression.",
-			"f has a/an class expression as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of class expression.",
-			"g has a/an construction expression as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of construction expression.",
-			"h has a/an JSX element as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of JSX element.",
-			"i has a/an Symbol literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of Symbol literal.",
-		}},
+		{
+			"upstream invalid 0",
+			"\n        function Foo({\n          a = {},\n          b = ['one', 'two'],\n          c = /regex/i,\n          d = () => {},\n          e = function() {},\n          f = class {},\n          g = new Thing(),\n          h = <Thing />,\n          i = Symbol('foo')\n        }) {\n          return null;\n        }\n      ",
+			[]string{
+				"a has a/an object literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of object literal.",
+				"b has a/an array literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of array literal.",
+				"c has a/an regex literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of regex literal.",
+				"d has a/an arrow function as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of arrow function.",
+				"e has a/an function expression as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of function expression.",
+				"f has a/an class expression as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of class expression.",
+				"g has a/an construction expression as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of construction expression.",
+				"h has a/an JSX element as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of JSX element.",
+				"i has a/an Symbol literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of Symbol literal.",
+			},
+		},
+		{
+			"upstream invalid 1",
+			"\n        const Foo = ({\n          a = {},\n          b = ['one', 'two'],\n          c = /regex/i,\n          d = () => {},\n          e = function() {},\n          f = class {},\n          g = new Thing(),\n          h = <Thing />,\n          i = Symbol('foo')\n        }) => {\n          return null;\n        }\n      ",
+			[]string{
+				"a has a/an object literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of object literal.",
+				"b has a/an array literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of array literal.",
+				"c has a/an regex literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of regex literal.",
+				"d has a/an arrow function as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of arrow function.",
+				"e has a/an function expression as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of function expression.",
+				"f has a/an class expression as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of class expression.",
+				"g has a/an construction expression as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of construction expression.",
+				"h has a/an JSX element as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of JSX element.",
+				"i has a/an Symbol literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of Symbol literal.",
+			},
+		},
+		{
+			"upstream invalid 2",
+			"\n        const Foo = ({\n          a = {},\n          b = ['one', 'two'],\n          c = /regex/i,\n          d = () => {},\n          e = function() {},\n          f = class {},\n          g = new Thing(),\n          h = <Thing />,\n          i = Symbol('foo')\n        }, context) => {\n          return null;\n        }\n      ",
+			[]string{
+				"a has a/an object literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of object literal.",
+				"b has a/an array literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of array literal.",
+				"c has a/an regex literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of regex literal.",
+				"d has a/an arrow function as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of arrow function.",
+				"e has a/an function expression as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of function expression.",
+				"f has a/an class expression as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of class expression.",
+				"g has a/an construction expression as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of construction expression.",
+				"h has a/an JSX element as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of JSX element.",
+				"i has a/an Symbol literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of Symbol literal.",
+			},
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTyped(test, NoObjectTypeAsDefaultProp, noObjectTypeAsDefaultPropFile, testCase.sourceText)
+			result := rule_testing.RunTyped(
+				test,
+				NoObjectTypeAsDefaultProp,
+				noObjectTypeAsDefaultPropFile,
+				testCase.sourceText,
+			)
 			if len(result.Diagnostics) != len(testCase.wantMessages) {
 				test.Fatalf("want %d findings, got %d", len(testCase.wantMessages), len(result.Diagnostics))
 			}
@@ -125,19 +159,43 @@ func TestNoObjectTypeAsDefaultPropMatchesTheInstalledRuleOnInputsTheCorpusDoesNo
 		sourceText   string
 		wantMessages []string
 	}{
-		{"default is a object", "function C({a = {}}) { return <div/>; }", []string{"a has a/an object literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of object literal."}},
-		{"default is a array", "function C({a = []}) { return <div/>; }", []string{"a has a/an array literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of array literal."}},
-		{"default is a arrow", "function C({a = ()=>{}}) { return <div/>; }", []string{"a has a/an arrow function as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of arrow function."}},
-		{"default is a function expression", "function C({a = function(){}}) { return <div/>; }", []string{"a has a/an function expression as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of function expression."}},
-		{"default is a class expression", "function C({a = class {}}) { return <div/>; }", []string{"a has a/an class expression as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of class expression."}},
-		{"default is a new expression", "function C({a = new Foo()}) { return <div/>; }", []string{"a has a/an construction expression as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of construction expression."}},
-		{"default is a jsx element", "function C({a = <div/>}) { return <div/>; }", []string{"a has a/an JSX element as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of JSX element."}},
+		{"default is a object", "function C({a = {}}) { return <div/>; }", []string{
+			"a has a/an object literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of object literal.",
+		}},
+		{"default is a array", "function C({a = []}) { return <div/>; }", []string{
+			"a has a/an array literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of array literal.",
+		}},
+		{"default is a arrow", "function C({a = ()=>{}}) { return <div/>; }", []string{
+			"a has a/an arrow function as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of arrow function.",
+		}},
+		{"default is a function expression", "function C({a = function(){}}) { return <div/>; }", []string{
+			"a has a/an function expression as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of function expression.",
+		}},
+		{"default is a class expression", "function C({a = class {}}) { return <div/>; }", []string{
+			"a has a/an class expression as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of class expression.",
+		}},
+		{"default is a new expression", "function C({a = new Foo()}) { return <div/>; }", []string{
+			"a has a/an construction expression as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of construction expression.",
+		}},
+		{"default is a jsx element", "function C({a = <div/>}) { return <div/>; }", []string{
+			"a has a/an JSX element as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of JSX element.",
+		}},
 		{"default is a jsx fragment", "function C({a = <></>}) { return <div/>; }", []string{}},
-		{"default is a jsx self closing", "function C({a = <Foo/>}) { return <div/>; }", []string{"a has a/an JSX element as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of JSX element."}},
-		{"default is a regex", "function C({a = /x/}) { return <div/>; }", []string{"a has a/an regex literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of regex literal."}},
-		{"default is a regex with flags", "function C({a = /x/gi}) { return <div/>; }", []string{"a has a/an regex literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of regex literal."}},
-		{"default is a Symbol call", "function C({a = Symbol()}) { return <div/>; }", []string{"a has a/an Symbol literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of Symbol literal."}},
-		{"default is a Symbol with argument", "function C({a = Symbol(1)}) { return <div/>; }", []string{"a has a/an Symbol literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of Symbol literal."}},
+		{"default is a jsx self closing", "function C({a = <Foo/>}) { return <div/>; }", []string{
+			"a has a/an JSX element as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of JSX element.",
+		}},
+		{"default is a regex", "function C({a = /x/}) { return <div/>; }", []string{
+			"a has a/an regex literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of regex literal.",
+		}},
+		{"default is a regex with flags", "function C({a = /x/gi}) { return <div/>; }", []string{
+			"a has a/an regex literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of regex literal.",
+		}},
+		{"default is a Symbol call", "function C({a = Symbol()}) { return <div/>; }", []string{
+			"a has a/an Symbol literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of Symbol literal.",
+		}},
+		{"default is a Symbol with argument", "function C({a = Symbol(1)}) { return <div/>; }", []string{
+			"a has a/an Symbol literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of Symbol literal.",
+		}},
 		{"default is a Symbol.for member callee", "function C({a = Symbol.for(1)}) { return <div/>; }", []string{}},
 		{"default is a symbol lowercase", "function C({a = symbol()}) { return <div/>; }", []string{}},
 		{"default is a string", "function C({a = \"s\"}) { return <div/>; }", []string{}},
@@ -150,25 +208,46 @@ func TestNoObjectTypeAsDefaultPropMatchesTheInstalledRuleOnInputsTheCorpusDoesNo
 		{"default is a template literal", "function C({a = `x`}) { return <div/>; }", []string{}},
 		{"default is a tagged template", "function C({a = tag`x`}) { return <div/>; }", []string{}},
 		{"default is a member access", "function C({a = a.b}) { return <div/>; }", []string{}},
-		{"default is a parenthesized object", "function C({a = ({})}) { return <div/>; }", []string{"a has a/an object literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of object literal."}},
-		{"default is a double parenthesized object", "function C({a = (({}))}) { return <div/>; }", []string{"a has a/an object literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of object literal."}},
-		{"default is a parenthesized Symbol call", "function C({a = (Symbol())}) { return <div/>; }", []string{"a has a/an Symbol literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of Symbol literal."}},
+		{"default is a parenthesized object", "function C({a = ({})}) { return <div/>; }", []string{
+			"a has a/an object literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of object literal.",
+		}},
+		{"default is a double parenthesized object", "function C({a = (({}))}) { return <div/>; }", []string{
+			"a has a/an object literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of object literal.",
+		}},
+		{"default is a parenthesized Symbol call", "function C({a = (Symbol())}) { return <div/>; }", []string{
+			"a has a/an Symbol literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of Symbol literal.",
+		}},
 		{"default is a conditional", "function C({a = a?{}:{}}) { return <div/>; }", []string{}},
 		{"default is a negative number", "function C({a = -1}) { return <div/>; }", []string{}},
 		{"default is a void expression", "function C({a = void 0}) { return <div/>; }", []string{}},
-		{"component returning null still counts", "function C({a = {}}) { return null; }", []string{"a has a/an object literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of object literal."}},
+		{"component returning null still counts", "function C({a = {}}) { return null; }", []string{
+			"a has a/an object literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of object literal.",
+		}},
 		{"lowercase name is not a component", "function c({a = {}}) { return <div/>; }", []string{}},
 		{"helper returning a number", "function helper({a = {}}) { return 1; }", []string{}},
-		{"arrow component", "const C = ({a = {}}) => <div/>;", []string{"a has a/an object literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of object literal."}},
+		{"arrow component", "const C = ({a = {}}) => <div/>;", []string{
+			"a has a/an object literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of object literal.",
+		}},
 		{"second parameter destructured", "function C(p, {a = {}}) { return <div/>; }", []string{}},
 		{"nested destructuring does not recurse", "function C({x: {a = {}}}) { return <div/>; }", []string{}},
-		{"explicit key names the key not the binding", "function C({key: local = {}}) { return <div/>; }", []string{"key has a/an object literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of object literal."}},
+		{"explicit key names the key not the binding", "function C({key: local = {}}) { return <div/>; }", []string{
+			"key has a/an object literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of object literal.",
+		}},
 		{"rest element", "function C({...rest}) { return <div/>; }", []string{}},
 		{"no default", "function C({a}) { return <div/>; }", []string{}},
-		{"two offending defaults", "function C({a = {}, b = []}) { return <div/>; }", []string{"a has a/an object literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of object literal.", "b has a/an array literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of array literal."}},
-		{"offending and clean mixed", "function C({a = {}, b = 1}) { return <div/>; }", []string{"a has a/an object literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of object literal."}},
+		{"two offending defaults", "function C({a = {}, b = []}) { return <div/>; }", []string{
+			"a has a/an object literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of object literal.",
+			"b has a/an array literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of array literal.",
+		}},
+		{"offending and clean mixed", "function C({a = {}, b = 1}) { return <div/>; }", []string{
+			"a has a/an object literal as default prop. This could lead to potential infinite render loop in React. Use a variable reference instead of object literal.",
+		}},
 		{"memo wrapped component", "import {memo} from 'react';\nconst C = memo(({a = {}}) => <div/>);", []string{}},
-		{"forwardRef wrapped component", "import {forwardRef} from 'react';\nconst C = forwardRef(({a = {}}, ref) => <div/>);", []string{}},
+		{
+			"forwardRef wrapped component",
+			"import {forwardRef} from 'react';\nconst C = forwardRef(({a = {}}, ref) => <div/>);",
+			[]string{},
+		},
 	}
 
 	for _, testCase := range cases {

@@ -107,7 +107,13 @@ func TestCanonicalizeAgreesWithTailwind(test *testing.T) {
 		}
 		for className, pass := range passByClass {
 			if !seen[className] {
-				test.Errorf("%s lists %s under %s, and %s has no such class", unportedName, className, pass, fixtureName)
+				test.Errorf(
+					"%s lists %s under %s, and %s has no such class",
+					unportedName,
+					className,
+					pass,
+					fixtureName,
+				)
 			}
 		}
 
@@ -118,8 +124,14 @@ func TestCanonicalizeAgreesWithTailwind(test *testing.T) {
 			silentCount += len(classes)
 		}
 		sort.Strings(passes)
-		test.Logf("%s: %d classes, %d rewritten by Tailwind, %d answered alike, %d short of Tailwind by unported passes",
-			fixtureName, len(fixture.Cases), rewrites, agreed, silentCount)
+		test.Logf(
+			"%s: %d classes, %d rewritten by Tailwind, %d answered alike, %d short of Tailwind by unported passes",
+			fixtureName,
+			len(fixture.Cases),
+			rewrites,
+			agreed,
+			silentCount,
+		)
 		for _, pass := range passes {
 			test.Logf("  %s: %d", pass, len(silent[pass]))
 		}

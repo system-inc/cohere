@@ -47,19 +47,29 @@ func TestTheRecordIsTheSameWhateverOrderTheQuestionsCameIn(test *testing.T) {
 	random := rand.New(rand.NewPCG(1, 2))
 	for range 200 {
 		shuffled := append([]question{}, questions...)
-		random.Shuffle(len(shuffled), func(left, right int) { shuffled[left], shuffled[right] = shuffled[right], shuffled[left] })
+		random.Shuffle(
+			len(shuffled),
+			func(left, right int) { shuffled[left], shuffled[right] = shuffled[right], shuffled[left] },
+		)
 		// A loader that resolved from its cache asks only some of the questions: drop the redundant probes at
 		// random, as a build whose loaders raced differently would.
 		recorder := NewInputRecorder()
 		for _, asked := range shuffled {
-			if !asked.depended && asked.present && asked.path != "/project/node_modules/lonely/" && random.IntN(2) == 0 {
+			if !asked.depended &&
+				asked.present &&
+				asked.path != "/project/node_modules/lonely/" &&
+				random.IntN(2) == 0 {
 				continue
 			}
 			recorder.note(asked.path, asked.present, asked.depended)
 		}
 		present, absent, probed := recorder.Inputs()
 		if got := [3][]string{present, absent, probed}; !reflect.DeepEqual(got, want) {
-			test.Fatalf("an order the loaders could have asked in recorded\n  %v\nwhere another recorded\n  %v", got, want)
+			test.Fatalf(
+				"an order the loaders could have asked in recorded\n  %v\nwhere another recorded\n  %v",
+				got,
+				want,
+			)
 		}
 	}
 }

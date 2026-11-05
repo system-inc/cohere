@@ -165,7 +165,12 @@ func resolveProps(tokens []*cst.Token, options resolvePropsOptions) props {
 	}
 	if reqSpace && next != nil && next.Type != "space" && next.Type != "newline" && next.Type != "comma" &&
 		(next.Type != "scalar" || len(next.Source) != 0) {
-		onError(next.Offset, "MISSING_CHAR", "Tags and anchors must be separated from the next token by white space", false)
+		onError(
+			next.Offset,
+			"MISSING_CHAR",
+			"Tags and anchors must be separated from the next token by white space",
+			false,
+		)
 	}
 	if tab != nil && (atNewline && tab.Indent <= options.parentIndent ||
 		next != nil && (next.Type == "block-map" || next.Type == "block-seq")) {

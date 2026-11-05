@@ -134,7 +134,12 @@ func TestNoGlobalContainer(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.Run(test, BoundaryNoGlobalContainer, boundaryNoGlobalContainerFile, testCase.sourceText)
+			result := rule_testing.Run(
+				test,
+				BoundaryNoGlobalContainer,
+				boundaryNoGlobalContainerFile,
+				testCase.sourceText,
+			)
 			// A row expecting nothing goes through ExpectClean rather than through ExpectFindings
 			// with an empty list. The two are the same assertion to a reader and not to the
 			// fixture-pair guard, which reads the call by name: a suite that only ever calls

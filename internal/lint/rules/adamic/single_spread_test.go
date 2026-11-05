@@ -17,9 +17,12 @@ func TestSingleSpreadFiresOnEverySpreadAfterAnything(test *testing.T) {
 		// h06
 		"two spreads": {declarations + `const merged = { ...a, ...b };`, []string{"...b"}},
 		// h07
-		"a field, then a spread":  {declarations + `const merged = { x: 1, ...b };`, []string{"...b"}},
-		"three spreads":           {declarations + `const merged = { ...a, ...b, ...c };`, []string{"...b", "...c"}},
-		"after a spread literal":  {declarations + `const merged = { ...(Math.random() > 0.5 ? { y: 1 } : {}), ...b };`, []string{"...b"}},
+		"a field, then a spread": {declarations + `const merged = { x: 1, ...b };`, []string{"...b"}},
+		"three spreads":          {declarations + `const merged = { ...a, ...b, ...c };`, []string{"...b", "...c"}},
+		"after a spread literal": {
+			declarations + `const merged = { ...(Math.random() > 0.5 ? { y: 1 } : {}), ...b };`,
+			[]string{"...b"},
+		},
 		"a method, then a spread": {declarations + `const merged = { run(): void {}, ...b };`, []string{"...b"}},
 	} {
 		test.Run(name, func(test *testing.T) {

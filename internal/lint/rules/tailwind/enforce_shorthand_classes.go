@@ -65,17 +65,26 @@ var shorthandGroups = [][]shorthandRule{
 		{Longhands: []string{"pt-(.*)", "pb-(.*)"}, Shorthands: []string{"py-$1"}},
 	},
 	{
-		{Longhands: []string{"border-t-(.*)", "border-b-(.*)", "border-l-(.*)", "border-r-(.*)"}, Shorthands: []string{"border-$1"}},
+		{
+			Longhands:  []string{"border-t-(.*)", "border-b-(.*)", "border-l-(.*)", "border-r-(.*)"},
+			Shorthands: []string{"border-$1"},
+		},
 		{Longhands: []string{"border-x-(.*)", "border-y-(.*)"}, Shorthands: []string{"border-$1"}},
 		{Longhands: []string{"border-s-(.*)", "border-e-(.*)"}, Shorthands: []string{"border-x-$1"}},
 		{Longhands: []string{"border-l-(.*)", "border-r-(.*)"}, Shorthands: []string{"border-x-$1"}},
 		{Longhands: []string{"border-t-(.*)", "border-b-(.*)"}, Shorthands: []string{"border-y-$1"}},
 	},
 	{
-		{Longhands: []string{"border-spacing-x-(.*)", "border-spacing-y-(.*)"}, Shorthands: []string{"border-spacing-$1"}},
+		{
+			Longhands:  []string{"border-spacing-x-(.*)", "border-spacing-y-(.*)"},
+			Shorthands: []string{"border-spacing-$1"},
+		},
 	},
 	{
-		{Longhands: []string{"rounded-tl-(.*)", "rounded-tr-(.*)", "rounded-bl-(.*)", "rounded-br-(.*)"}, Shorthands: []string{"rounded-$1"}},
+		{
+			Longhands:  []string{"rounded-tl-(.*)", "rounded-tr-(.*)", "rounded-bl-(.*)", "rounded-br-(.*)"},
+			Shorthands: []string{"rounded-$1"},
+		},
 		{Longhands: []string{"rounded-t-(.*)", "rounded-b-(.*)"}, Shorthands: []string{"rounded-$1"}},
 		{Longhands: []string{"rounded-l-(.*)", "rounded-r-(.*)"}, Shorthands: []string{"rounded-$1"}},
 		{Longhands: []string{"rounded-tl-(.*)", "rounded-tr-(.*)"}, Shorthands: []string{"rounded-t-$1"}},
@@ -84,14 +93,20 @@ var shorthandGroups = [][]shorthandRule{
 		{Longhands: []string{"rounded-tr-(.*)", "rounded-br-(.*)"}, Shorthands: []string{"rounded-r-$1"}},
 	},
 	{
-		{Longhands: []string{"scroll-mt-(.*)", "scroll-mb-(.*)", "scroll-ml-(.*)", "scroll-mr-(.*)"}, Shorthands: []string{"scroll-m-$1"}},
+		{
+			Longhands:  []string{"scroll-mt-(.*)", "scroll-mb-(.*)", "scroll-ml-(.*)", "scroll-mr-(.*)"},
+			Shorthands: []string{"scroll-m-$1"},
+		},
 		{Longhands: []string{"scroll-mx-(.*)", "scroll-my-(.*)"}, Shorthands: []string{"scroll-m-$1"}},
 		{Longhands: []string{"scroll-ms-(.*)", "scroll-me-(.*)"}, Shorthands: []string{"scroll-mx-$1"}},
 		{Longhands: []string{"scroll-ml-(.*)", "scroll-mr-(.*)"}, Shorthands: []string{"scroll-mx-$1"}},
 		{Longhands: []string{"scroll-mt-(.*)", "scroll-mb-(.*)"}, Shorthands: []string{"scroll-my-$1"}},
 	},
 	{
-		{Longhands: []string{"scroll-pt-(.*)", "scroll-pb-(.*)", "scroll-pl-(.*)", "scroll-pr-(.*)"}, Shorthands: []string{"scroll-p-$1"}},
+		{
+			Longhands:  []string{"scroll-pt-(.*)", "scroll-pb-(.*)", "scroll-pl-(.*)", "scroll-pr-(.*)"},
+			Shorthands: []string{"scroll-p-$1"},
+		},
 		{Longhands: []string{"scroll-px-(.*)", "scroll-py-(.*)"}, Shorthands: []string{"scroll-p-$1"}},
 		{Longhands: []string{"scroll-pl-(.*)", "scroll-pr-(.*)"}, Shorthands: []string{"scroll-px-$1"}},
 		{Longhands: []string{"scroll-ps-(.*)", "scroll-pe-(.*)"}, Shorthands: []string{"scroll-px-$1"}},
@@ -120,7 +135,10 @@ var shorthandGroups = [][]shorthandRule{
 		{Longhands: []string{"skew-x-(.*)", "skew-y-(.*)"}, Shorthands: []string{"skew-$1"}},
 	},
 	{
-		{Longhands: []string{"scale-x-(.*)", "scale-y-(.*)", "scale-z-(.*)"}, Shorthands: []string{"scale-$1", "scale-3d"}},
+		{
+			Longhands:  []string{"scale-x-(.*)", "scale-y-(.*)", "scale-z-(.*)"},
+			Shorthands: []string{"scale-$1", "scale-3d"},
+		},
 		{Longhands: []string{"scale-x-(.*)", "scale-y-(.*)"}, Shorthands: []string{"scale-$1"}},
 	},
 	{
@@ -129,7 +147,10 @@ var shorthandGroups = [][]shorthandRule{
 		{Longhands: []string{"self-(.*)", "justify-self-(.*)"}, Shorthands: []string{"place-self-$1"}},
 	},
 	{
-		{Longhands: []string{"overflow-hidden", "text-ellipsis", "whitespace-nowrap"}, Shorthands: []string{"truncate"}},
+		{
+			Longhands:  []string{"overflow-hidden", "text-ellipsis", "whitespace-nowrap"},
+			Shorthands: []string{"truncate"},
+		},
 	},
 }
 
@@ -197,7 +218,10 @@ var EnforceShorthandClasses = rule.Rule{
 		// nil when there is no design system to ask, and classExistsIn answers true for nil.
 		var system *tailwindengine.LoadedDesignSystem
 		if ruleContext.Program != nil {
-			if designSystem := DesignSystemForProgramAt(ruleContext.Program, configured.Location()); designSystem.Err == nil {
+			if designSystem := DesignSystemForProgramAt(
+				ruleContext.Program,
+				configured.Location(),
+			); designSystem.Err == nil {
 				system = designSystem.System
 			}
 		}

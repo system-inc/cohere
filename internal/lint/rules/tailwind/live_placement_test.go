@@ -578,7 +578,10 @@ func TestColorTokensReadAsColorsOnThePublicTheme(test *testing.T) {
 	// The theme's own keys are the ones no framework table could vouch for, so they must be among
 	// those checked, or the test proves only the palette.
 	if checkedTokens < 200 || ownTokens != 2 {
-		test.Fatalf("checked %d colour tokens, %d of them the theme's own; want the framework palette and both --color-weird keys",
-			checkedTokens, ownTokens)
+		test.Fatalf(
+			"checked %d colour tokens, %d of them the theme's own; want the framework palette and both --color-weird keys",
+			checkedTokens,
+			ownTokens,
+		)
 	}
 }

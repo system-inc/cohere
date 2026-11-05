@@ -19,9 +19,18 @@ import (
 // `policy/messages/consistency-require-matching-file-name.json`, with the second rename as the
 // `alternative` phrase.
 var (
-	consistencyRequireMatchingFileNameText            = policy.MessageOf("structure/consistency-require-matching-file-name", "requireMatchingFileName")
-	consistencyRequireMatchingFileNameRenameComponent = consistencyRequireMatchingFileNameText.Option("alternative", "renameComponent")
-	consistencyRequireMatchingFileNameNoAlternative   = consistencyRequireMatchingFileNameText.Option("alternative", "none")
+	consistencyRequireMatchingFileNameText = policy.MessageOf(
+		"structure/consistency-require-matching-file-name",
+		"requireMatchingFileName",
+	)
+	consistencyRequireMatchingFileNameRenameComponent = consistencyRequireMatchingFileNameText.Option(
+		"alternative",
+		"renameComponent",
+	)
+	consistencyRequireMatchingFileNameNoAlternative = consistencyRequireMatchingFileNameText.Option(
+		"alternative",
+		"none",
+	)
 )
 
 func messageRequireMatchingFileName(componentName string, fileName string, fileBaseName string) rule.Message {

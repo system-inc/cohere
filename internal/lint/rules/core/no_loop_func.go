@@ -251,7 +251,13 @@ func checkLoopFunc(
 			// this one.
 			continue
 		}
-		if loopFuncReferenceIsSafe(ruleContext, loopNode, declaration, referencesByDeclaration, skippedImmediatelyInvoked) {
+		if loopFuncReferenceIsSafe(
+			ruleContext,
+			loopNode,
+			declaration,
+			referencesByDeclaration,
+			skippedImmediatelyInvoked,
+		) {
 			continue
 		}
 		name := identifier.Text()

@@ -171,11 +171,15 @@ func splitText(text string, nodes *arena.Arena[Node]) []*Node {
 			// Korean uses space to divide words, but Chinese & Japanese do not. This is why Korean should
 			// be treated like non-CJK.
 			if containsClass(hangulRanges, innerToken) {
-				appendNode(nodes.New(Node{NodeType: "word", Value: innerToken, IsLiteral: true, Kind: kindKLetter, IsCJ: false}))
+				appendNode(nodes.New(
+					Node{NodeType: "word", Value: innerToken, IsLiteral: true, Kind: kindKLetter, IsCJ: false},
+				))
 				continue
 			}
 
-			appendNode(nodes.New(Node{NodeType: "word", Value: innerToken, IsLiteral: true, Kind: kindCJLetter, IsCJ: true}))
+			appendNode(
+				nodes.New(Node{NodeType: "word", Value: innerToken, IsLiteral: true, Kind: kindCJLetter, IsCJ: true}),
+			)
 		}
 	}
 
@@ -319,7 +323,9 @@ func isAutolink(node *Node) bool {
 	return locStart(node) == locStart(child) && locEnd(node) == locEnd(child)
 }
 
-var prettierIgnorePattern = regexp.MustCompile(`(?s)^<!--[` + javaScriptSpace + `]*prettier-ignore(?:-(start|end))?[` + javaScriptSpace + `]*-->$`)
+var prettierIgnorePattern = regexp.MustCompile(
+	`(?s)^<!--[` + javaScriptSpace + `]*prettier-ignore(?:-(start|end))?[` + javaScriptSpace + `]*-->$`,
+)
 
 // isPrettierIgnore returns "", "next", "start" or "end". esComment is MDX's and never occurs here.
 func isPrettierIgnore(node *Node) string {

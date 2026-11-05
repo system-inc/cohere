@@ -26,13 +26,21 @@ func Of(callerPath string) (string, error) {
 		importPath := path.Dir(filepath.ToSlash(callerPath))
 		listed, outputError := exec.Command("go", "list", "-f", "{{.Dir}}", importPath).Output()
 		if outputError != nil {
-			return "", fmt.Errorf("this tool was built with -trimpath, so its source is named by import path %s, and go list could not find it (run it from inside the cohere checkout): %w", importPath, outputError)
+			return "", fmt.Errorf(
+				"this tool was built with -trimpath, so its source is named by import path %s, and go list could not find it (run it from inside the cohere checkout): %w",
+				importPath,
+				outputError,
+			)
 		}
 		// Go whitespace: the directory `go list` printed, which no JavaScript tool reads.
 		directory = strings.TrimSpace(string(listed))
 	}
 	if _, statError := os.Stat(filepath.Join(directory, filepath.Base(callerPath))); statError != nil {
-		return "", fmt.Errorf("this tool's source is not at %s, so its sibling scripts cannot be found there: %w", directory, statError)
+		return "", fmt.Errorf(
+			"this tool's source is not at %s, so its sibling scripts cannot be found there: %w",
+			directory,
+			statError,
+		)
 	}
 	return directory, nil
 }

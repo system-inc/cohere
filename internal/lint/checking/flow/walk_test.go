@@ -18,8 +18,13 @@ func TestPathTextReadsAsTheReaderReachesThePart(test *testing.T) {
 		".onDone(animal)": {{Kind: StepProperty, Name: "onDone"}, {Kind: StepParameter, Name: "animal", Index: 0}},
 		".make()":         {{Kind: StepProperty, Name: "make"}, {Kind: StepReturn, Index: -1}},
 		// A well-known symbol's internal name carries a creation id, which no message may print (#y0ejf6a).
-		"[iterator]().next()": {{Kind: StepProperty, Name: "\xfe@iterator@224"}, {Kind: StepReturn, Index: -1}, {Kind: StepProperty, Name: "next"}, {Kind: StepReturn, Index: -1}},
-		`["content-type"]`:    {{Kind: StepProperty, Name: "content-type"}},
+		"[iterator]().next()": {
+			{Kind: StepProperty, Name: "\xfe@iterator@224"},
+			{Kind: StepReturn, Index: -1},
+			{Kind: StepProperty, Name: "next"},
+			{Kind: StepReturn, Index: -1},
+		},
+		`["content-type"]`: {{Kind: StepProperty, Name: "content-type"}},
 	} {
 		if got := PathText(path); got != want {
 			test.Errorf("%+v reads %q, want %q", path, got, want)

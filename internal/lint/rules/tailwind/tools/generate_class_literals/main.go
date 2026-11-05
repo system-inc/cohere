@@ -34,7 +34,11 @@ import (
 )
 
 func main() {
-	packages := flag.String("packages", "ahra:.", "a directory, or a corpus spelling, where eslint, eslint-plugin-better-tailwindcss and @typescript-eslint/parser resolve")
+	packages := flag.String(
+		"packages",
+		"ahra:.",
+		"a directory, or a corpus spelling, where eslint, eslint-plugin-better-tailwindcss and @typescript-eslint/parser resolve",
+	)
 	check := flag.Bool("check", false, "regenerate and fail if a committed file disagrees")
 	flag.Parse()
 
@@ -105,13 +109,20 @@ func main() {
 		if *check {
 			committed, readError := os.ReadFile(output.path)
 			if readError != nil {
-				// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
+				// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this
+				// lands.
 				fmt.Fprintf(os.Stderr, "read %s: %v\n", output.path, readError)
 				os.Exit(1)
 			}
 			if !bytes.Equal(committed, output.contents) {
-				// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
-				fmt.Fprintf(os.Stderr, "%s is stale: better-tailwindcss %s answers differently. Re-run without -check and read the diff.\n", output.path, extracted.Plugin)
+				// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this
+				// lands.
+				fmt.Fprintf(
+					os.Stderr,
+					"%s is stale: better-tailwindcss %s answers differently. Re-run without -check and read the diff.\n",
+					output.path,
+					extracted.Plugin,
+				)
 				stale = true
 			}
 			continue

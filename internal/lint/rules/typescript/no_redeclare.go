@@ -318,7 +318,10 @@ func reportRedeclarationsIn(ruleContext rule.Context, sourceFile *ast.Node, sett
 		}
 		declarations := survivingDeclarations(groups[key].declarations, settings)
 		message := messageNoRedeclare
-		if checksBuiltins && key.container == sourceFile && len(declarations) > 0 && isBuiltinGlobal(ruleContext.TypeChecker, ruleContext.Program, key.name) {
+		if checksBuiltins &&
+			key.container == sourceFile &&
+			len(declarations) > 0 &&
+			isBuiltinGlobal(ruleContext.TypeChecker, ruleContext.Program, key.name) {
 			// The builtin is the first declaration, so every one in the file redeclares it.
 			message = messageNoRedeclareAsBuiltin
 		} else if len(declarations) < 2 {

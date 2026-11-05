@@ -103,7 +103,12 @@ func (context *context) transformBlockValue(nodeType string, blockValue *compose
 }
 
 // transformAstBlockValue is upstream's transformAstBlockValue.
-func (context *context) transformAstBlockValue(nodeType string, blockValue *compose.Node, sourceToken *cst.Token, properties []*cst.Token) *Node {
+func (context *context) transformAstBlockValue(
+	nodeType string,
+	blockValue *compose.Node,
+	sourceToken *cst.Token,
+	properties []*cst.Token,
+) *Node {
 	var blockScalarHeaderToken *cst.Token
 	var indicatorComment *Node
 	for _, token := range tokens(sourceToken.Props) {
@@ -119,8 +124,15 @@ func (context *context) transformAstBlockValue(nodeType string, blockValue *comp
 		throwError("Expected block scalar header token")
 	}
 	chomping, indent := parseHeader(unitsToString(blockScalarHeaderToken.Source))
-	return context.createBlockValue(nodeType, context.transformRange(blockValue.Range[0], blockValue.Range[1]),
-		context.transformContentProperties(blockValue, properties), chomping, indent, blockValue.Source, indicatorComment)
+	return context.createBlockValue(
+		nodeType,
+		context.transformRange(blockValue.Range[0], blockValue.Range[1]),
+		context.transformContentProperties(blockValue, properties),
+		chomping,
+		indent,
+		blockValue.Source,
+		indicatorComment,
+	)
 }
 
 // headerPattern is /([+-]?)(\d*)([+-]?)$/u. Go's regexp finds the leftmost match and prefers what a
@@ -158,7 +170,11 @@ func parseHeader(header string) (chomping string, indent *int) {
 func (context *context) transformPlain(plain *compose.Node, properties []*cst.Token) *Node {
 	if plain.Range[0] == plain.Range[1] {
 		index := findLastCharIndex(context.text, plain.Range[0]-1, isNotWhitespace) + 1
-		return context.createPlain(context.transformRange(index, index), context.transformContentProperties(plain, properties), "")
+		return context.createPlain(
+			context.transformRange(index, index),
+			context.transformContentProperties(plain, properties),
+			"",
+		)
 	}
 	sourceToken := plain.SrcToken
 	if sourceToken == nil || sourceToken.Type != "scalar" {
@@ -258,7 +274,10 @@ var directiveSeparator = regexp.MustCompile(`[\t ]+`)
 
 // transformDirective is upstream's transformDirective (directive.mjs).
 func (context *context) transformDirective(directive *cst.Token) *Node {
-	parts := directiveSeparator.Split(strings.TrimFunc(unitsToString(directive.Source), ecmascripttext.IsWhitespace), -1)
+	parts := directiveSeparator.Split(
+		strings.TrimFunc(unitsToString(directive.Source), ecmascripttext.IsWhitespace),
+		-1,
+	)
 	// parts.shift().replace(/^%/, "")
 	name := strings.TrimPrefix(parts[0], "%")
 	return context.createDirective(context.transformRange(directive.Offset, directive.Offset+len(directive.Source)),

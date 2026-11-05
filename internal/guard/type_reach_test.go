@@ -120,7 +120,11 @@ var ownFileDeclarationReaders = map[string]bool{
 //   - rule.IsReactPragmaBinding checks the identifier's home and each foreign header against the
 //     exact cut ranges shared with SignatureEntry.Syntax. The scan also requires ctx.SourceFile as
 //     its home argument. Wrong-file, cut-region and cache-invalidation tests hold both boundaries.
-var shapeReaders = map[string]bool{"rule.IsReactPragmaBinding": true, "rule.ExportNameIn": true, "rule.ImportBindingOf": true}
+var shapeReaders = map[string]bool{
+	"rule.IsReactPragmaBinding": true,
+	"rule.ExportNameIn":         true,
+	"rule.ImportBindingOf":      true,
+}
 
 // A shape reader's answer is plain data. A result that could carry a compiler value would let a caller
 // take a node from another file and descend into its body, which is the read the scan exists to see, so
@@ -268,9 +272,17 @@ func isCompilerType(subject types.Type, packageName string, typeName string) boo
 // isDescentAccessor reports the ways a rule reads below a node it was handed: its body, its children, its
 // statements, or its text.
 func isDescentAccessor(name string) bool {
-	return name == "Body" || name == "FunctionBody" || name == "GetFunctionBody" || name == "Statements" ||
-		name == "Children" || name == "IterChildren" || name == "VisitEachChild" || strings.HasPrefix(name, "ForEachChild") ||
-		name == "GetTextOfNode" || name == "GetSourceTextOfNodeFromSourceFile" || name == "GetTextOfNodeFromSourceText"
+	return name == "Body" ||
+		name == "FunctionBody" ||
+		name == "GetFunctionBody" ||
+		name == "Statements" ||
+		name == "Children" ||
+		name == "IterChildren" ||
+		name == "VisitEachChild" ||
+		strings.HasPrefix(name, "ForEachChild") ||
+		name == "GetTextOfNode" ||
+		name == "GetSourceTextOfNodeFromSourceFile" ||
+		name == "GetTextOfNodeFromSourceText"
 }
 
 // isOwnSourceFile reports whether an expression is the rule context's own file, `<context>.SourceFile`,
@@ -342,7 +354,11 @@ func scanTypeReach(test *testing.T, overlay map[string][]byte) typeReachScan {
 	// reaches answers, for one predicate, whether a node or anything it refers to touches a matching
 	// compiler accessor, memoized per object and safe on recursion. matchesSelector, when set, decides a
 	// selector on its own, for a match that depends on the receiver as well as the accessor.
-	reaches := func(matches func(types.Object) bool, matchesSelector func(*ast.SelectorExpr, *types.Selection, *types.Info) bool, matchesCall func(*ast.CallExpr, *types.Info) bool) func(ast.Node, *types.Info) bool {
+	reaches := func(
+		matches func(types.Object) bool,
+		matchesSelector func(*ast.SelectorExpr, *types.Selection, *types.Info) bool,
+		matchesCall func(*ast.CallExpr, *types.Info) bool,
+	) func(ast.Node, *types.Info) bool {
 		memo := map[types.Object]int{} // 1 visiting, 2 no, 3 yes
 		var walk func(ast.Node, *types.Info) bool
 		var follow func(types.Object) bool
@@ -412,7 +428,10 @@ func scanTypeReach(test *testing.T, overlay map[string][]byte) typeReachScan {
 				return false
 			}
 			object := info.Uses[selector.Sel]
-			if object == nil || object.Pkg() == nil || (object.Pkg().Name()+"."+object.Name() != "rule.DeclarationsIn" && object.Pkg().Name()+"."+object.Name() != "rule.IsReactPragmaBinding") {
+			if object == nil ||
+				object.Pkg() == nil ||
+				(object.Pkg().Name()+"."+object.Name() != "rule.DeclarationsIn" &&
+					object.Pkg().Name()+"."+object.Name() != "rule.IsReactPragmaBinding") {
 				return false
 			}
 			return len(call.Args) == 0 || !isOwnSourceFile(call.Args[0], info)
@@ -420,8 +439,11 @@ func scanTypeReach(test *testing.T, overlay map[string][]byte) typeReachScan {
 	reachesDescent := reaches(
 		func(object types.Object) bool { return isDescentAccessor(object.Name()) },
 		func(selector *ast.SelectorExpr, selection *types.Selection, info *types.Info) bool {
-			return selector.Sel.Name == "Text" && compiler(selection.Obj()) && selection.Kind() == types.MethodVal &&
-				strings.Contains(types.TypeString(selection.Recv(), nil), "SourceFile") && !isOwnSourceFile(selector.X, info)
+			return selector.Sel.Name == "Text" &&
+				compiler(selection.Obj()) &&
+				selection.Kind() == types.MethodVal &&
+				strings.Contains(types.TypeString(selection.Recv(), nil), "SourceFile") &&
+				!isOwnSourceFile(selector.X, info)
 		},
 		nil,
 	)
@@ -458,7 +480,10 @@ func scanTypeReach(test *testing.T, overlay map[string][]byte) typeReachScan {
 			scan.reason[name] = filepath.Base(filepath.Dir(entry.path)) + "/" + filepath.Base(entry.path)
 		}
 		if reachesNodeInterface(entry.file, entry.info) {
-			scan.callsNodeInterfaces = append(scan.callsNodeInterfaces, filepath.Base(filepath.Dir(entry.path))+"/"+filepath.Base(entry.path))
+			scan.callsNodeInterfaces = append(
+				scan.callsNodeInterfaces,
+				filepath.Base(filepath.Dir(entry.path))+"/"+filepath.Base(entry.path),
+			)
 		}
 	}
 	sort.Strings(scan.claims)

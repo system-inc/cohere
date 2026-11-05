@@ -461,8 +461,8 @@ func TestNextScriptForGaAnswersFromTheFirstDangerouslySetInnerHtml(test *testing
 	}
 }
 
-// TestNextScriptForGaDecodesEntities reads its attribute as ESLint does, with HTML entities decoded: typescript-estree decodes a
-// JSX attribute string before any rule sees it. Each row's verdict is the installed
+// TestNextScriptForGaDecodesEntities reads its attribute as ESLint does, with HTML entities decoded: typescript-estree
+// decodes a JSX attribute string before any rule sees it. Each row's verdict is the installed
 // @next/eslint-plugin-next 16.3.1's under the typescript-eslint parser (#51y9jh2).
 func TestNextScriptForGaDecodesEntities(test *testing.T) {
 	test.Parallel()
@@ -472,8 +472,16 @@ func TestNextScriptForGaDecodesEntities(test *testing.T) {
 		source string
 		ids    []string
 	}{
-		{`an encoded slash in the analytics src`, `export const A = <script src="https://www.google-analytics.com&#47;analytics.js" />;`, []string{messageNextScriptForGa.Id}},
-		{`an encoded slash in another src`, `export const A = <script src="https://www.example.com&#47;analytics.js" />;`, []string{}},
+		{
+			`an encoded slash in the analytics src`,
+			`export const A = <script src="https://www.google-analytics.com&#47;analytics.js" />;`,
+			[]string{messageNextScriptForGa.Id},
+		},
+		{
+			`an encoded slash in another src`,
+			`export const A = <script src="https://www.example.com&#47;analytics.js" />;`,
+			[]string{},
+		},
 	} {
 		test.Run(row.name, func(test *testing.T) {
 			test.Parallel()

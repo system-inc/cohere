@@ -192,7 +192,12 @@ func TestNoBareThrowRendersAnEditedEntry(test *testing.T) {
 	if err != nil {
 		test.Fatal(err)
 	}
-	edited := strings.Replace(string(original), "which names no declared failure", "which names no failure anyone declared", 1)
+	edited := strings.Replace(
+		string(original),
+		"which names no declared failure",
+		"which names no failure anyone declared",
+		1,
+	)
 	if edited == string(original) {
 		test.Fatal("the anchor is not in the entry, so the edit would not apply")
 	}
@@ -206,7 +211,10 @@ func TestNoBareThrowRendersAnEditedEntry(test *testing.T) {
 	result := rule_testing.Run(test, ConsistencyNoBareThrow, "/repository/source/modules/thing/Service.ts",
 		"export function f(): void { throw new TypeError('x'); }")
 	rule_testing.ExpectFindings(test, result, "bareThrow")
-	if got := result.Diagnostics[0].Message.Description; !strings.Contains(got, "This throws a bare `TypeError`, which names no failure anyone declared.") {
+	if got := result.Diagnostics[0].Message.Description; !strings.Contains(
+		got,
+		"This throws a bare `TypeError`, which names no failure anyone declared.",
+	) {
 		test.Errorf("the finding reads %q, without the edit", got)
 	}
 }

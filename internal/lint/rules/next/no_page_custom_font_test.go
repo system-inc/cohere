@@ -404,8 +404,8 @@ func TestNoPageCustomFontOutsideDefaultExportMessage(test *testing.T) {
 	}
 }
 
-// TestNoPageCustomFontDecodesEntities reads its attribute as ESLint does, with HTML entities decoded: typescript-estree decodes a
-// JSX attribute string before any rule sees it. Each row's verdict is the installed
+// TestNoPageCustomFontDecodesEntities reads its attribute as ESLint does, with HTML entities decoded: typescript-estree
+// decodes a JSX attribute string before any rule sees it. Each row's verdict is the installed
 // @next/eslint-plugin-next 16.3.1's under the typescript-eslint parser (#51y9jh2).
 func TestNoPageCustomFontDecodesEntities(test *testing.T) {
 	test.Parallel()
@@ -415,8 +415,16 @@ func TestNoPageCustomFontDecodesEntities(test *testing.T) {
 		source string
 		ids    []string
 	}{
-		{`an encoded slash in the font href`, "export default function D() {\n  return <div><link href=\"https://fonts.googleapis.com&#47;css2?family=Inter\" rel=\"stylesheet\" /></div>\n}\n", []string{messageNoPageCustomFontNotInDocument.Id}},
-		{`an encoded slash in another href`, "export default function D() {\n  return <div><link href=\"https://example.com&#47;css2?family=Inter\" rel=\"stylesheet\" /></div>\n}\n", []string{}},
+		{
+			`an encoded slash in the font href`,
+			"export default function D() {\n  return <div><link href=\"https://fonts.googleapis.com&#47;css2?family=Inter\" rel=\"stylesheet\" /></div>\n}\n",
+			[]string{messageNoPageCustomFontNotInDocument.Id},
+		},
+		{
+			`an encoded slash in another href`,
+			"export default function D() {\n  return <div><link href=\"https://example.com&#47;css2?family=Inter\" rel=\"stylesheet\" /></div>\n}\n",
+			[]string{},
+		},
 	} {
 		test.Run(row.name, func(test *testing.T) {
 			test.Parallel()

@@ -90,13 +90,23 @@ func eqeqeqFiresCases() []eqeqeqCase {
 		{"a == b", nil, []eqeqeqRepair{eqeqeqRepairSuggestion}, ""},
 		{"a != b", nil, []eqeqeqRepair{eqeqeqRepairSuggestion}, ""},
 		{"typeof a == 'number'", nil, []eqeqeqRepair{eqeqeqRepairFix}, "typeof a === 'number'"},
-		{"typeof a == 'number'", EqeqeqOptions{Mode: EqeqeqAlways}, []eqeqeqRepair{eqeqeqRepairFix}, "typeof a === 'number'"},
+		{
+			"typeof a == 'number'",
+			EqeqeqOptions{Mode: EqeqeqAlways},
+			[]eqeqeqRepair{eqeqeqRepairFix},
+			"typeof a === 'number'",
+		},
 		{"'string' != typeof a", nil, []eqeqeqRepair{eqeqeqRepairFix}, "'string' !== typeof a"},
 		{"true == true", nil, []eqeqeqRepair{eqeqeqRepairFix}, "true === true"},
 		{"2 == 3", nil, []eqeqeqRepair{eqeqeqRepairFix}, "2 === 3"},
 		{"2 == 3", EqeqeqOptions{Mode: EqeqeqAlways}, []eqeqeqRepair{eqeqeqRepairFix}, "2 === 3"},
 		{"'hello' != 'world'", nil, []eqeqeqRepair{eqeqeqRepairFix}, "'hello' !== 'world'"},
-		{"'hello' != 'world'", EqeqeqOptions{Mode: EqeqeqAlways}, []eqeqeqRepair{eqeqeqRepairFix}, "'hello' !== 'world'"},
+		{
+			"'hello' != 'world'",
+			EqeqeqOptions{Mode: EqeqeqAlways},
+			[]eqeqeqRepair{eqeqeqRepairFix},
+			"'hello' !== 'world'",
+		},
 		{"`hello` == `world`", nil, []eqeqeqRepair{eqeqeqRepairFix}, "`hello` === `world`"},
 		{"`hello` != 'world'", nil, []eqeqeqRepair{eqeqeqRepairFix}, "`hello` !== 'world'"},
 		{"a == null", nil, []eqeqeqRepair{eqeqeqRepairSuggestion}, ""},
@@ -106,19 +116,84 @@ func eqeqeqFiresCases() []eqeqeqCase {
 		{"0 != '1'", EqeqeqOptions{Mode: EqeqeqSmart}, []eqeqeqRepair{eqeqeqRepairSuggestion}, ""},
 		{"'wee' == /wee/", EqeqeqOptions{Mode: EqeqeqSmart}, []eqeqeqRepair{eqeqeqRepairSuggestion}, ""},
 		{"`hello${world}` == `hello`", EqeqeqOptions{Mode: EqeqeqSmart}, []eqeqeqRepair{eqeqeqRepairSuggestion}, ""},
-		{"typeof a == 'number'", EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullIgnore}, []eqeqeqRepair{eqeqeqRepairFix}, "typeof a === 'number'"},
-		{"'string' != typeof a", EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullIgnore}, []eqeqeqRepair{eqeqeqRepairFix}, "'string' !== typeof a"},
-		{"'hello' != 'world'", EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullIgnore}, []eqeqeqRepair{eqeqeqRepairFix}, "'hello' !== 'world'"},
-		{"2 == 3", EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullIgnore}, []eqeqeqRepair{eqeqeqRepairFix}, "2 === 3"},
-		{"true == true", EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullIgnore}, []eqeqeqRepair{eqeqeqRepairFix}, "true === true"},
-		{"true == null", EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullAlways}, []eqeqeqRepair{eqeqeqRepairSuggestion}, ""},
-		{"true != null", EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullAlways}, []eqeqeqRepair{eqeqeqRepairSuggestion}, ""},
-		{"null == null", EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullAlways}, []eqeqeqRepair{eqeqeqRepairFix}, "null === null"},
-		{"null != null", EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullAlways}, []eqeqeqRepair{eqeqeqRepairFix}, "null !== null"},
-		{"true === null", EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullNever}, []eqeqeqRepair{eqeqeqRepairSuggestion}, ""},
-		{"true !== null", EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullNever}, []eqeqeqRepair{eqeqeqRepairSuggestion}, ""},
-		{"null === null", EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullNever}, []eqeqeqRepair{eqeqeqRepairFix}, "null == null"},
-		{"null !== null", EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullNever}, []eqeqeqRepair{eqeqeqRepairFix}, "null != null"},
+		{
+			"typeof a == 'number'",
+			EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullIgnore},
+			[]eqeqeqRepair{eqeqeqRepairFix},
+			"typeof a === 'number'",
+		},
+		{
+			"'string' != typeof a",
+			EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullIgnore},
+			[]eqeqeqRepair{eqeqeqRepairFix},
+			"'string' !== typeof a",
+		},
+		{
+			"'hello' != 'world'",
+			EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullIgnore},
+			[]eqeqeqRepair{eqeqeqRepairFix},
+			"'hello' !== 'world'",
+		},
+		{
+			"2 == 3",
+			EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullIgnore},
+			[]eqeqeqRepair{eqeqeqRepairFix},
+			"2 === 3",
+		},
+		{
+			"true == true",
+			EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullIgnore},
+			[]eqeqeqRepair{eqeqeqRepairFix},
+			"true === true",
+		},
+		{
+			"true == null",
+			EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullAlways},
+			[]eqeqeqRepair{eqeqeqRepairSuggestion},
+			"",
+		},
+		{
+			"true != null",
+			EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullAlways},
+			[]eqeqeqRepair{eqeqeqRepairSuggestion},
+			"",
+		},
+		{
+			"null == null",
+			EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullAlways},
+			[]eqeqeqRepair{eqeqeqRepairFix},
+			"null === null",
+		},
+		{
+			"null != null",
+			EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullAlways},
+			[]eqeqeqRepair{eqeqeqRepairFix},
+			"null !== null",
+		},
+		{
+			"true === null",
+			EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullNever},
+			[]eqeqeqRepair{eqeqeqRepairSuggestion},
+			"",
+		},
+		{
+			"true !== null",
+			EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullNever},
+			[]eqeqeqRepair{eqeqeqRepairSuggestion},
+			"",
+		},
+		{
+			"null === null",
+			EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullNever},
+			[]eqeqeqRepair{eqeqeqRepairFix},
+			"null == null",
+		},
+		{
+			"null !== null",
+			EqeqeqOptions{Mode: EqeqeqAlways, Null: EqeqeqNullNever},
+			[]eqeqeqRepair{eqeqeqRepairFix},
+			"null != null",
+		},
 		{"a\n==\nb", nil, []eqeqeqRepair{eqeqeqRepairSuggestion}, ""},
 		{"(a) == b", nil, []eqeqeqRepair{eqeqeqRepairSuggestion}, ""},
 		{"(a) != b", nil, []eqeqeqRepair{eqeqeqRepairSuggestion}, ""},
@@ -485,14 +560,18 @@ func TestDecodeEqeqeqOptions(test *testing.T) {
 
 	test.Run("smart takes no second element, so one is refused rather than discarded", func(test *testing.T) {
 		test.Parallel()
-		if _, decodeEqeqeqOptionsError := DecodeEqeqeqOptions([]byte(`["smart", {"null": "never"}]`)); decodeEqeqeqOptionsError == nil {
+		if _, decodeEqeqeqOptionsError := DecodeEqeqeqOptions(
+			[]byte(`["smart", {"null": "never"}]`),
+		); decodeEqeqeqOptionsError == nil {
 			test.Error("a null policy beside smart decoded, and the rule would never read it")
 		}
 	})
 
 	test.Run("a third element is refused", func(test *testing.T) {
 		test.Parallel()
-		if _, decodeEqeqeqOptionsError := DecodeEqeqeqOptions([]byte(`["always", {"null": "ignore"}, "smart"]`)); decodeEqeqeqOptionsError == nil {
+		if _, decodeEqeqeqOptionsError := DecodeEqeqeqOptions(
+			[]byte(`["always", {"null": "ignore"}, "smart"]`),
+		); decodeEqeqeqOptionsError == nil {
 			test.Error("a third element decoded and would have been dropped")
 		}
 	})
@@ -508,21 +587,27 @@ func TestDecodeEqeqeqOptions(test *testing.T) {
 
 	test.Run("an unknown null policy is rejected", func(test *testing.T) {
 		test.Parallel()
-		if _, decodeEqeqeqOptionsError := DecodeEqeqeqOptions([]byte(`["always", {"null": "sometimes"}]`)); decodeEqeqeqOptionsError == nil {
+		if _, decodeEqeqeqOptionsError := DecodeEqeqeqOptions(
+			[]byte(`["always", {"null": "sometimes"}]`),
+		); decodeEqeqeqOptionsError == nil {
 			test.Error("an unrecognized null policy decoded")
 		}
 	})
 
 	test.Run("an unknown key in the second element is rejected", func(test *testing.T) {
 		test.Parallel()
-		if _, decodeEqeqeqOptionsError := DecodeEqeqeqOptions([]byte(`["always", {"nul": "ignore"}]`)); decodeEqeqeqOptionsError == nil {
+		if _, decodeEqeqeqOptionsError := DecodeEqeqeqOptions(
+			[]byte(`["always", {"nul": "ignore"}]`),
+		); decodeEqeqeqOptionsError == nil {
 			test.Error("a misspelled key decoded, so the null policy it carried would be ignored")
 		}
 	})
 
 	test.Run("the retired object spelling is rejected", func(test *testing.T) {
 		test.Parallel()
-		if _, decodeEqeqeqOptionsError := DecodeEqeqeqOptions([]byte(`{"mode":"Smart","null":"Never"}`)); decodeEqeqeqOptionsError == nil {
+		if _, decodeEqeqeqOptionsError := DecodeEqeqeqOptions(
+			[]byte(`{"mode":"Smart","null":"Never"}`),
+		); decodeEqeqeqOptionsError == nil {
 			test.Error("the pre-list object spelling decoded, which the config layer never delivers")
 		}
 	})

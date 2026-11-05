@@ -177,7 +177,10 @@ func TestPreferForOfFiresOnUpstreamFailCases(test *testing.T) {
 		{
 			sourceText: "\nfor (let shadow = 0; shadow < arr.length; shadow++) {\n  for (let shadow = 0; shadow < arr.length; shadow++) {}\n}\n      ",
 			wantIds:    []string{"preferForOf", "preferForOf"},
-			wantSpans:  []string{"for (let shadow = 0; shadow < arr.length; shadow++) {\n  for (let shadow = 0; shadow < arr.length; shadow++) {}\n}", "for (let shadow = 0; shadow < arr.length; shadow++) {}"},
+			wantSpans: []string{
+				"for (let shadow = 0; shadow < arr.length; shadow++) {\n  for (let shadow = 0; shadow < arr.length; shadow++) {}\n}",
+				"for (let shadow = 0; shadow < arr.length; shadow++) {}",
+			},
 		},
 		{
 			sourceText: "\nfor (let i = 0; i < arr.length; i++) {\n  obj[arr[i]] = 1;\n}\n      ",

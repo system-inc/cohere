@@ -92,7 +92,11 @@ func correctnessRequireChildProcessErrorListenerRun(test *testing.T, sourceText 
 // correctnessRequireChildProcessErrorListenerExpect asserts one finding per wanted span, each on
 // the producing call, in source order. The harness trims the subject file before writing it, so
 // spans are read from the program's own text.
-func correctnessRequireChildProcessErrorListenerExpect(test *testing.T, result rule_testing.Result, wantSpans []string) {
+func correctnessRequireChildProcessErrorListenerExpect(
+	test *testing.T,
+	result rule_testing.Result,
+	wantSpans []string,
+) {
 	test.Helper()
 	wantIds := make([]string, 0, len(wantSpans))
 	for range wantSpans {
@@ -109,7 +113,11 @@ func correctnessRequireChildProcessErrorListenerExpect(test *testing.T, result r
 			test.Fatalf("message is %q", diagnostic.Message.Description)
 		}
 		if len(diagnostic.Fixes) != 0 || len(diagnostic.Suggestions) != 0 {
-			test.Fatalf("expected no fix and no suggestion, got %d and %d", len(diagnostic.Fixes), len(diagnostic.Suggestions))
+			test.Fatalf(
+				"expected no fix and no suggestion, got %d and %d",
+				len(diagnostic.Fixes),
+				len(diagnostic.Suggestions),
+			)
 		}
 	}
 }
@@ -163,8 +171,15 @@ const correctnessRequireChildProcessErrorListenerMonitorsSpan = "NodeChildProces
 func TestCorrectnessRequireChildProcessErrorListenerFiresOnMonitors(test *testing.T) {
 	test.Parallel()
 
-	result := correctnessRequireChildProcessErrorListenerRun(test, correctnessRequireChildProcessErrorListenerMonitors(""))
-	correctnessRequireChildProcessErrorListenerExpect(test, result, []string{correctnessRequireChildProcessErrorListenerMonitorsSpan})
+	result := correctnessRequireChildProcessErrorListenerRun(
+		test,
+		correctnessRequireChildProcessErrorListenerMonitors(""),
+	)
+	correctnessRequireChildProcessErrorListenerExpect(
+		test,
+		result,
+		[]string{correctnessRequireChildProcessErrorListenerMonitorsSpan},
+	)
 }
 
 // The real site, after the fix: a failed spawn ends the stream instead of the daemon.
@@ -210,7 +225,10 @@ func correctnessRequireChildProcessErrorListenerPresence(fix string) string {
 func TestCorrectnessRequireChildProcessErrorListenerFiresOnPresence(test *testing.T) {
 	test.Parallel()
 
-	result := correctnessRequireChildProcessErrorListenerRun(test, correctnessRequireChildProcessErrorListenerPresence(""))
+	result := correctnessRequireChildProcessErrorListenerRun(
+		test,
+		correctnessRequireChildProcessErrorListenerPresence(""),
+	)
 	correctnessRequireChildProcessErrorListenerExpect(test, result, []string{
 		"nodeChildProcess.spawn('node', [path, 'pensieve', '--recent', '25k'], {\n            cwd: path,\n        })",
 	})
@@ -309,7 +327,8 @@ func TestCorrectnessRequireChildProcessErrorListenerFires(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 
-			sourceText := correctnessRequireChildProcessErrorListenerPrelude + correctnessRequireChildProcessErrorListenerSource(testCase.lines...)
+			sourceText := correctnessRequireChildProcessErrorListenerPrelude +
+				correctnessRequireChildProcessErrorListenerSource(testCase.lines...)
 			result := correctnessRequireChildProcessErrorListenerRun(test, sourceText)
 			correctnessRequireChildProcessErrorListenerExpect(test, result, testCase.want)
 		})
@@ -431,7 +450,8 @@ func TestCorrectnessRequireChildProcessErrorListenerStaysSilent(test *testing.T)
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 
-			sourceText := correctnessRequireChildProcessErrorListenerPrelude + correctnessRequireChildProcessErrorListenerSource(testCase.lines...)
+			sourceText := correctnessRequireChildProcessErrorListenerPrelude +
+				correctnessRequireChildProcessErrorListenerSource(testCase.lines...)
 			result := correctnessRequireChildProcessErrorListenerRun(test, sourceText)
 			correctnessRequireChildProcessErrorListenerExpect(test, result, nil)
 		})
@@ -443,6 +463,11 @@ func TestCorrectnessRequireChildProcessErrorListenerDeclinesWithoutAChecker(test
 	test.Parallel()
 
 	sourceText := correctnessRequireChildProcessErrorListenerPrelude + "NodeChildProcess.spawn('afplay', [path]);\n"
-	result := rule_testing.Run(test, CorrectnessRequireChildProcessErrorListener, correctnessRequireChildProcessErrorListenerFile, sourceText)
+	result := rule_testing.Run(
+		test,
+		CorrectnessRequireChildProcessErrorListener,
+		correctnessRequireChildProcessErrorListenerFile,
+		sourceText,
+	)
 	rule_testing.ExpectClean(test, result)
 }

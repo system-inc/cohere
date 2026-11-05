@@ -42,7 +42,10 @@ func TestTheCommittedNoticesAreCurrent(test *testing.T) {
 	}
 	for name, generated := range files {
 		if committed(test, name) != string(generated) {
-			test.Errorf("%s differs from what the generator writes now. Run `go run ./internal/release/tools/notices` from the module root and commit the result", name)
+			test.Errorf(
+				"%s differs from what the generator writes now. Run `go run ./internal/release/tools/notices` from the module root and commit the result",
+				name,
+			)
 		}
 		// The repository stores text as LF, so a CR written here is converted on commit, and the next
 		// clone fails the comparison above on bytes nobody changed. Microsoft's NOTICE.txt is CRLF.
@@ -95,8 +98,14 @@ func TestEverySwiftPackageIsCredited(test *testing.T) {
 	}
 	notices := committed(test, ThirdPartyNoticesFileName)
 	for _, pin := range pins {
-		if !strings.Contains(notices, "\n### "+pin.Identity+"\n") || !strings.Contains(notices, "- Version: "+pin.Version+"\n") {
-			test.Errorf("the Swift engine resolves %s %s, and %s does not credit that version", pin.Identity, pin.Version, ThirdPartyNoticesFileName)
+		if !strings.Contains(notices, "\n### "+pin.Identity+"\n") ||
+			!strings.Contains(notices, "- Version: "+pin.Version+"\n") {
+			test.Errorf(
+				"the Swift engine resolves %s %s, and %s does not credit that version",
+				pin.Identity,
+				pin.Version,
+				ThirdPartyNoticesFileName,
+			)
 		}
 	}
 }
@@ -105,7 +114,11 @@ func TestTheGeneratorRefusesAModuleWithNoRecordedLicense(test *testing.T) {
 	test.Parallel()
 
 	var builder strings.Builder
-	writeModuleError := writeModule(&builder, Module{Path: "example.com/uncredited", Version: "v1.0.0", Directory: test.TempDir()}, "carries")
+	writeModuleError := writeModule(
+		&builder,
+		Module{Path: "example.com/uncredited", Version: "v1.0.0", Directory: test.TempDir()},
+		"carries",
+	)
 	if writeModuleError == nil || !strings.Contains(writeModuleError.Error(), "example.com/uncredited") {
 		test.Fatalf("a module with no recorded license was written rather than refused: %v", writeModuleError)
 	}
@@ -255,18 +268,28 @@ func TestNoGPLFileIsTracked(test *testing.T) {
 	probe := test.TempDir()
 	for _, step := range [][]string{{"init", "--quiet"}, {"add", "COPYING"}} {
 		if step[0] == "add" {
-			if writeError := os.WriteFile(filepath.Join(probe, "COPYING"), []byte("                    "+titles[0]+"\n"), 0o644); writeError != nil {
+			if writeError := os.WriteFile(
+				filepath.Join(probe, "COPYING"),
+				[]byte("                    "+titles[0]+"\n"),
+				0o644,
+			); writeError != nil {
 				test.Fatal(writeError)
 			}
 		}
-		if output, outputError := exec.Command("git", append([]string{"-C", probe}, step...)...).CombinedOutput(); outputError != nil {
+		if output, outputError := exec.Command(
+			"git",
+			append([]string{"-C", probe}, step...)...,
+		).CombinedOutput(); outputError != nil {
 			test.Fatalf("git %v: %v\n%s", step, outputError, output)
 		}
 	}
 	probeCommand := exec.Command("git", arguments...)
 	probeCommand.Dir = probe
 	if found, _ := probeCommand.Output(); strings.TrimSpace(string(found)) != "COPYING" {
-		test.Fatalf("the search found %q in a repository tracking a GPL file, so it can't be trusted to find one", found)
+		test.Fatalf(
+			"the search found %q in a repository tracking a GPL file, so it can't be trusted to find one",
+			found,
+		)
 	}
 }
 

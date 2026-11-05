@@ -20,7 +20,11 @@ func noNonNullAssertedNullishCoalescingCaseName(index int) string {
 //
 // The harness applies fixes and has no suggestion support, and this rule's entire repair surface is
 // a suggestion, so without this the thing it offers would go completely unasserted.
-func applyNoNonNullAssertedNullishCoalescingSuggestion(test *testing.T, source string, suggestion rule.Suggestion) string {
+func applyNoNonNullAssertedNullishCoalescingSuggestion(
+	test *testing.T,
+	source string,
+	suggestion rule.Suggestion,
+) string {
 	test.Helper()
 	fixes := append([]rule.Fix(nil), suggestion.Fixes...)
 	sort.Slice(fixes, func(first, second int) bool { return fixes[first].Range.Pos() > fixes[second].Range.Pos() })
@@ -245,7 +249,8 @@ func TestNoNonNullAssertedNullishCoalescingStaysSilentOnShapesTheCorpusDoesNotWr
 			sourceText: "foo! && bar;",
 		},
 		{
-			// The same write below the node does not count. This is the pair that makes the end-position comparison load-bearing rather than decorative.
+			// The same write below the node does not count. This is the pair that makes the end-position comparison
+			// load-bearing rather than decorative.
 			sourceText: "let x: string;\nx! ?? '';\nfunction g() { x = 'a'; }",
 		},
 		{
@@ -285,15 +290,18 @@ func TestNoNonNullAssertedNullishCoalescingStaysSilentOnShapesTheCorpusDoesNotWr
 			sourceText: "function f() { return x! ?? ''; }\nlet x!: string;",
 		},
 		{
-			// A parameter is not a variable declaration, so neither half of the assignment test fires and the rule stays silent.
+			// A parameter is not a variable declaration, so neither half of the assignment test fires and the rule
+			// stays silent.
 			sourceText: "class K { m(x?: string) { return x! ?? ''; } }",
 		},
 		{
-			// The same shape as a plain function parameter, which is upstream's own example in the comment explaining why the repair is a suggestion.
+			// The same shape as a plain function parameter, which is upstream's own example in the comment explaining
+			// why the repair is a suggestion.
 			sourceText: "function f(x?: string) { return x! ?? ''; }",
 		},
 		{
-			// A shadowing inner binding with no value. Resolving to the outer one would see its initializer and report, so this pins that the symbol comparison picks the right binding.
+			// A shadowing inner binding with no value. Resolving to the outer one would see its initializer and report,
+			// so this pins that the symbol comparison picks the right binding.
 			sourceText: "let x = 1;\n{ let x: string; x! ?? ''; }",
 		},
 		{
@@ -330,7 +338,8 @@ func TestNoNonNullAssertedNullishCoalescingFiresOnShapesTheCorpusDoesNotWrite(te
 		wantSuggestion string
 	}{
 		{
-			// A parenthesized left side. estree has no paren node, so upstream's child selector sees through it and reports. This is the case the rule got wrong from a confident argument before it was measured.
+			// A parenthesized left side. estree has no paren node, so upstream's child selector sees through it and
+			// reports. This is the case the rule got wrong from a confident argument before it was measured.
 			sourceText:     "(foo!) ?? bar;",
 			wantSpan:       "foo!",
 			wantSuggestion: "(foo) ?? bar;\n",
@@ -342,7 +351,8 @@ func TestNoNonNullAssertedNullishCoalescingFiresOnShapesTheCorpusDoesNotWrite(te
 			wantSuggestion: "foo ?? bar ?? baz;\n",
 		},
 		{
-			// A write inside a hoisted function above the node still counts, which is why the search is over the whole file rather than the enclosing scope.
+			// A write inside a hoisted function above the node still counts, which is why the search is over the whole
+			// file rather than the enclosing scope.
 			sourceText:     "let x: string;\nfunction g() { x = 'a'; }\nx! ?? '';",
 			wantSpan:       "x!",
 			wantSuggestion: "let x: string;\nfunction g() { x = 'a'; }\nx ?? '';\n",
@@ -406,7 +416,9 @@ func TestNoNonNullAssertedNullishCoalescingNeedsTheTypedHarness(test *testing.T)
 	test.Parallel()
 
 	if !NoNonNullAssertedNullishCoalescing.NeedsTypeChecker {
-		test.Fatal("the assignment test resolves an identifier to its binding, so the rule must declare NeedsTypeChecker")
+		test.Fatal(
+			"the assignment test resolves an identifier to its binding, so the rule must declare NeedsTypeChecker",
+		)
 	}
 
 	// Handed no checker, the rule must stay silent rather than panic. The non-identifier shapes

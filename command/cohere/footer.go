@@ -165,13 +165,19 @@ func uncheckedMarkers(summary runSummary) []string {
 		markers = append(markers, "⚠ no files to check")
 	}
 	if len(gaps.MissingGenerated) > 0 {
-		markers = append(markers, "⚠ "+counted(len(gaps.MissingGenerated), "generated file missing", "generated files missing"))
+		markers = append(
+			markers,
+			"⚠ "+counted(len(gaps.MissingGenerated), "generated file missing", "generated files missing"),
+		)
 	}
 	if gaps.FixesHeld {
 		markers = append(markers, "⚠ 🪄 fixes held")
 	}
 	if gaps.ProgramFiles > summary.FilesInScope && summary.FilesInScope > 0 {
-		markers = append(markers, fmt.Sprintf("⚠ only %s of %s files", grouped(summary.FilesInScope), grouped(gaps.ProgramFiles)))
+		markers = append(
+			markers,
+			fmt.Sprintf("⚠ only %s of %s files", grouped(summary.FilesInScope), grouped(gaps.ProgramFiles)),
+		)
 	}
 	for _, name := range phaseOrder {
 		for _, record := range summary.Phases {
@@ -196,13 +202,17 @@ func uncheckedMarkers(summary runSummary) []string {
 		markers = append(markers, "⚠ "+counted(gaps.CrashedFiles, "file crashed", "files crashed"))
 	}
 	if gaps.RulesSkippingEverything > 0 {
-		markers = append(markers, "⚠ "+counted(gaps.RulesSkippingEverything, "rule skipped every file", "rules skipped every file"))
+		markers = append(
+			markers,
+			"⚠ "+counted(gaps.RulesSkippingEverything, "rule skipped every file", "rules skipped every file"),
+		)
 	}
 	if gaps.Unread != "" {
 		markers = append(markers, "⚠ "+gaps.Unread)
 	}
 	if gaps.AdamicIgnored > 0 {
-		markers = append(markers, "⚠ "+counted(gaps.AdamicIgnored, ".a file git ignores, not formatted", ".a files git ignores, not formatted"))
+		markers = append(markers, "⚠ "+
+			counted(gaps.AdamicIgnored, ".a file git ignores, not formatted", ".a files git ignores, not formatted"))
 	}
 	if gaps.ModifiedBuild {
 		markers = append(markers, "⚠ built from a modified tree")
@@ -260,8 +270,9 @@ func overallFooter(facts overallFacts, style textStyle) string {
 		line += " • ⚠ " + counted(facts.Unfinished, "project did not finish", "projects did not finish")
 	}
 	if facts.CoverageUnknown > 0 {
-		line += " • ⚠ " + counted(facts.CoverageUnknown, "Swift coverage query failed, so some files may be counted twice",
-			"Swift coverage queries failed, so some files may be counted twice")
+		line += " • ⚠ " +
+			counted(facts.CoverageUnknown, "Swift coverage query failed, so some files may be counted twice",
+				"Swift coverage queries failed, so some files may be counted twice")
 	}
 	return line
 }

@@ -102,7 +102,10 @@ func reasonOf(diagnostics []*ast.Diagnostic) string {
 // Those are all the parser reads besides the module-indicator options, which set a property of the file and
 // no node or diagnostic, so the seed's parse diagnostics are the guard's.
 func seedFor(fileName string, text string, seed *ast.SourceFile) bool {
-	return seed != nil && TypeScriptParsable(fileName) && seed.Text() == text && seed.ScriptKind == guardScriptKind(fileName) &&
+	return seed != nil &&
+		TypeScriptParsable(fileName) &&
+		seed.Text() == text &&
+		seed.ScriptKind == guardScriptKind(fileName) &&
 		tspath.IsDeclarationFileName(seed.FileName().AsString()) == tspath.IsDeclarationFileName(fileName)
 }
 

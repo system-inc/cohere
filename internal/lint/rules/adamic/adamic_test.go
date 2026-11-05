@@ -130,7 +130,10 @@ func adamicPrograms(test *testing.T) map[string]string {
 	}
 	// Eleven files: ten programs, the seventh in two modules.
 	if len(programs) != 11 {
-		test.Fatalf("read %d program files, want 11, so the clean corpus is not the one Adamic must compile", len(programs))
+		test.Fatalf(
+			"read %d program files, want 11, so the clean corpus is not the one Adamic must compile",
+			len(programs),
+		)
 	}
 	return programs
 }

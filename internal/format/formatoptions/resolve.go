@@ -168,8 +168,10 @@ func (resolver *Resolver) resolveHere(directory string) resolved {
 		return resolved{err: prettierConfigurationInError}
 	}
 	if found {
-		return resolved{err: fmt.Errorf("%s: %w; delete it, since cohere reads format options only from a \"format\" block in %s",
-			leftover, ErrPrettierConfigRemains, SettingsFileName)}
+		return resolved{
+			err: fmt.Errorf("%s: %w; delete it, since cohere reads format options only from a \"format\" block in %s",
+				leftover, ErrPrettierConfigRemains, SettingsFileName),
+		}
 	}
 
 	path := filepath.Join(directory, SettingsFileName)
@@ -264,8 +266,8 @@ func isNexusTier(source string) bool {
 // resolveChain reads the format block path's `extends` chain says to format with.
 //
 // In our tiers (configuration.InOurTiers, shared with the lint loader so a project cannot be strict for
-// one reader and free for the other) it is the Nexus tier's and only the Nexus tier's: formatting is unified (Kirk's ruling,
-// 2026-10-03), so a `format` key anywhere else in the chain is refused, naming the file, rather than
+// one reader and free for the other) it is the Nexus tier's and only the Nexus tier's: formatting is unified (Kirk's
+// ruling, 2026-10-03), so a `format` key anywhere else in the chain is refused, naming the file, rather than
 // merged over it, and a Nexus tier without the block is refused rather than formatted with anything.
 //
 // Outside them (Kirk, 2026-10-04, #bfxz13m), the project goes its own way: the most derived file of
@@ -301,7 +303,11 @@ func resolveChain(path string) (Resolution, error) {
 		for index, source := range sources {
 			if !isNexusTier(source) {
 				if blocks[index] != nil {
-					return Resolution{}, fmt.Errorf("%s has a \"format\" block; formatting is unified in our tiers, and only the Nexus tier (%s) holds the format block, so remove it here", source, NexusTierSetName)
+					return Resolution{}, fmt.Errorf(
+						"%s has a \"format\" block; formatting is unified in our tiers, and only the Nexus tier (%s) holds the format block, so remove it here",
+						source,
+						NexusTierSetName,
+					)
 				}
 				continue
 			}
@@ -311,10 +317,18 @@ func resolveChain(path string) (Resolution, error) {
 			}
 		}
 		if nexusTier == "" {
-			return Resolution{}, fmt.Errorf("%s does not extend the Nexus tier (%s), which holds the format block, so it does not say how to format", path, NexusTierSetName)
+			return Resolution{}, fmt.Errorf(
+				"%s does not extend the Nexus tier (%s), which holds the format block, so it does not say how to format",
+				path,
+				NexusTierSetName,
+			)
 		}
 		if block == nil {
-			return Resolution{}, fmt.Errorf("%s, the Nexus tier %s extends, has no \"format\" block, so the chain does not say how to format", nexusTier, path)
+			return Resolution{}, fmt.Errorf(
+				"%s, the Nexus tier %s extends, has no \"format\" block, so the chain does not say how to format",
+				nexusTier,
+				path,
+			)
 		}
 		resolution, err = blockResolution(nexusTier, block)
 		if err != nil {
@@ -364,7 +378,10 @@ func houseResolution() (Resolution, error) {
 	}
 	block, present := settings["format"]
 	if !present {
-		return Resolution{}, fmt.Errorf("%s carries no \"format\" block, so cohere has no house format", NexusTierSetName)
+		return Resolution{}, fmt.Errorf(
+			"%s carries no \"format\" block, so cohere has no house format",
+			NexusTierSetName,
+		)
 	}
 	resolution, err := blockResolution(NexusTierSetName, block)
 	if err != nil {
@@ -390,7 +407,11 @@ func blockResolution(source string, block json.RawMessage) (Resolution, error) {
 	}
 	if raw, present := keys["ignore"]; present {
 		if decodeError := json.Unmarshal(raw, &resolution.HouseIgnore); decodeError != nil {
-			return Resolution{}, fmt.Errorf("%s: the format block's \"ignore\" is not a list of patterns: %w", source, decodeError)
+			return Resolution{}, fmt.Errorf(
+				"%s: the format block's \"ignore\" is not a list of patterns: %w",
+				source,
+				decodeError,
+			)
 		}
 		resolution.HouseIgnoreDeclared = true
 	}
@@ -442,11 +463,26 @@ var BlockKeys = []BlockKey{
 	{Name: "useTabs", Type: "boolean", Option: func(options *Options) any { return &options.UseTabs }},
 	{Name: "semi", Type: "boolean", Option: func(options *Options) any { return &options.Semi }},
 	{Name: "singleQuote", Type: "boolean", Option: func(options *Options) any { return &options.SingleQuote }},
-	{Name: "trailingComma", Type: "string", Enum: []string{"all", "es5", "none"}, Option: func(options *Options) any { return &options.TrailingComma }},
+	{
+		Name:   "trailingComma",
+		Type:   "string",
+		Enum:   []string{"all", "es5", "none"},
+		Option: func(options *Options) any { return &options.TrailingComma },
+	},
 	{Name: "bracketSpacing", Type: "boolean", Option: func(options *Options) any { return &options.BracketSpacing }},
 	{Name: "bracketSameLine", Type: "boolean", Option: func(options *Options) any { return &options.BracketSameLine }},
-	{Name: "arrowParens", Type: "string", Enum: []string{"always", "avoid"}, Option: func(options *Options) any { return &options.ArrowParens }},
-	{Name: "endOfLine", Type: "string", Enum: []string{"lf"}, Option: func(options *Options) any { return &options.EndOfLine }},
+	{
+		Name:   "arrowParens",
+		Type:   "string",
+		Enum:   []string{"always", "avoid"},
+		Option: func(options *Options) any { return &options.ArrowParens },
+	},
+	{
+		Name:   "endOfLine",
+		Type:   "string",
+		Enum:   []string{"lf"},
+		Option: func(options *Options) any { return &options.EndOfLine },
+	},
 	{Name: "ignore", Type: "array"},
 }
 
@@ -485,7 +521,11 @@ func applyFormatBlock(path string, raw json.RawMessage, over Options) (Options, 
 			continue
 		}
 		if !known {
-			return Options{}, fmt.Errorf("%s: format option %q is not one cohere applies; add it to Options rather than formatting without it", path, key)
+			return Options{}, fmt.Errorf(
+				"%s: format option %q is not one cohere applies; add it to Options rather than formatting without it",
+				path,
+				key,
+			)
 		}
 		if decodeError := json.Unmarshal(value, blockKey.Option(options)); decodeError != nil {
 			return Options{}, fmt.Errorf("%s: format option %q: %w", path, key, decodeError)

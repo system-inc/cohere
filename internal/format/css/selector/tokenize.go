@@ -163,7 +163,10 @@ func tokenize(css []uint16) []*token {
 				}
 			}
 
-			tokens = append(tokens, &token{"space", slice(css, position, next), []int{line, position - offset, position}})
+			tokens = append(
+				tokens,
+				&token{"space", slice(css, position, next), []int{line, position - offset, position}},
+			)
 			position = next - 1
 
 		case plus, gt, tilde, pipe:
@@ -175,7 +178,10 @@ func tokenize(css []uint16) []*token {
 					break
 				}
 			}
-			tokens = append(tokens, &token{"combinator", slice(css, position, next), []int{line, position - offset, position}})
+			tokens = append(
+				tokens,
+				&token{"combinator", slice(css, position, next), []int{line, position - offset, position}},
+			)
 			position = next - 1
 
 		case asterisk:
@@ -228,7 +234,11 @@ func tokenize(css []uint16) []*token {
 				}
 			}
 
-			tokens = append(tokens, &token{"string", slice(css, position, next+1), []int{line, position - offset, line, next - offset, position}})
+			tokens = append(tokens, &token{
+				"string",
+				slice(css, position, next+1),
+				[]int{line, position - offset, line, next - offset, position},
+			})
 			position = next
 
 		case at:
@@ -245,7 +255,11 @@ func tokenize(css []uint16) []*token {
 			} else {
 				next = lastIndex - 2
 			}
-			tokens = append(tokens, &token{"at-word", slice(css, position, next+1), []int{line, position - offset, line, next - offset, position}})
+			tokens = append(tokens, &token{
+				"at-word",
+				slice(css, position, next+1),
+				[]int{line, position - offset, line, next - offset, position},
+			})
 			position = next
 
 		case backslash:
@@ -256,10 +270,20 @@ func tokenize(css []uint16) []*token {
 				escape = !escape
 			}
 			code = charCodeAt(css, next+1)
-			if escape && code != slash && code != space && code != newline && code != tab && code != cr && code != feed {
+			if escape &&
+				code != slash &&
+				code != space &&
+				code != newline &&
+				code != tab &&
+				code != cr &&
+				code != feed {
 				next += 1
 			}
-			tokens = append(tokens, &token{"word", slice(css, position, next+1), []int{line, position - offset, line, next - offset, position}})
+			tokens = append(tokens, &token{
+				"word",
+				slice(css, position, next+1),
+				[]int{line, position - offset, line, next - offset, position},
+			})
 			position = next
 
 		default:
@@ -289,7 +313,10 @@ func tokenize(css []uint16) []*token {
 					nextOffset = offset
 				}
 
-				tokens = append(tokens, &token{"comment", content, []int{line, position - offset, nextLine, next - nextOffset, position}})
+				tokens = append(
+					tokens,
+					&token{"comment", content, []int{line, position - offset, nextLine, next - nextOffset, position}},
+				)
 
 				offset = nextOffset
 				line = nextLine
@@ -309,7 +336,11 @@ func tokenize(css []uint16) []*token {
 					next = lastIndex - 2
 				}
 
-				tokens = append(tokens, &token{"word", slice(css, position, next+1), []int{line, position - offset, line, next - offset, position}})
+				tokens = append(tokens, &token{
+					"word",
+					slice(css, position, next+1),
+					[]int{line, position - offset, line, next - offset, position},
+				})
 				position = next
 			}
 		}

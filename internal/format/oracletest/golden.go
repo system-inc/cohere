@@ -101,7 +101,12 @@ func read(path string, digest string) (map[string]Answer, error) {
 		return nil, fmt.Errorf("%s is not a golden: %v", path, decodeError)
 	}
 	if contents.Digest != digest {
-		return nil, fmt.Errorf("%s was recorded from Prettier bundles %s, and this build embeds %s", path, contents.Digest, digest)
+		return nil, fmt.Errorf(
+			"%s was recorded from Prettier bundles %s, and this build embeds %s",
+			path,
+			contents.Digest,
+			digest,
+		)
 	}
 	return contents.Answers, nil
 }
@@ -165,8 +170,11 @@ func (golden *Golden) Answer(key string, compute func() (string, error)) (string
 	answer, recorded := golden.answers[key]
 	golden.mutex.Unlock()
 	if !recorded {
-		golden.t.Errorf("an oracle answer %s never recorded was asked for, so the fixtures changed: record them again with %s=1",
-			golden.path, UpdateVariable)
+		golden.t.Errorf(
+			"an oracle answer %s never recorded was asked for, so the fixtures changed: record them again with %s=1",
+			golden.path,
+			UpdateVariable,
+		)
 		return "", ErrNotRecorded
 	}
 	if answer.Error != "" {
@@ -192,7 +200,12 @@ type Engine struct {
 
 // Format is the answer prettier.Engine.Format gives for fileName and text under the engine's options.
 func (engine *Engine) Format(fileName string, text string) (string, error) {
-	return engine.golden.Answer(Key("engine", fmt.Sprintf("%+v", engine.options), fileName, text), func() (string, error) {
+	return engine.golden.Answer(Key(
+		"engine",
+		fmt.Sprintf("%+v", engine.options),
+		fileName,
+		text,
+	), func() (string, error) {
 		engine.once.Do(func() { engine.engine, engine.err = prettier.New(engine.options) })
 		if engine.err != nil {
 			return "", engine.err

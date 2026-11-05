@@ -39,19 +39,71 @@ func TestJsxNoConstructedContextValuesFires(test *testing.T) {
 		sourceText string
 		wantIds    []string
 	}{
-		{"invalid 0 an object held in a const", `function Component() { const foo = {}; return (<Context.Provider value={foo}></Context.Provider>) }`, []string{"withIdentifierMsg"}},
-		{"invalid 1 an array held in a const", `function Component() { const foo = []; return (<Context.Provider value={foo}></Context.Provider>) }`, []string{"withIdentifierMsg"}},
-		{"invalid 2 an arrow held in a const", `function Component() { const foo = () => {}; return (<Context.Provider value={foo}></Context.Provider>)}`, []string{"withIdentifierMsgFunc"}},
-		{"invalid 3 a named function expression held in a const", `function Component() { const foo = function bar(){}; return (<Context.Provider value={foo}></Context.Provider>)}`, []string{"withIdentifierMsgFunc"}},
-		{"invalid 4 a class expression held in a const", `function Component() { const foo = class SomeClass{}; return (<Context.Provider value={foo}></Context.Provider>)}`, []string{"withIdentifierMsg"}},
-		{"invalid 5 a new expression held in a const", `function Component() { const foo = new SomeClass(); return (<Context.Provider value={foo}></Context.Provider>)}`, []string{"withIdentifierMsg"}},
-		{"invalid 6 a function declaration", `function Component() { function foo() {}; return (<Context.Provider value={foo}></Context.Provider>)}`, []string{"withIdentifierMsgFunc"}},
-		{"invalid 7 a conditional whose consequent constructs", `function Component() { const foo = true ? {} : "fine"; return (<Context.Provider value={foo}></Context.Provider>)}`, []string{"withIdentifierMsg"}},
-		{"invalid 8 a logical or whose right side constructs", `function Component() { const foo = bar || {}; return (<Context.Provider value={foo}></Context.Provider>)}`, []string{"withIdentifierMsg"}},
-		{"invalid 9 a logical and whose right side constructs", `function Component() { const foo = bar && {}; return (<Context.Provider value={foo}></Context.Provider>)}`, []string{"withIdentifierMsg"}},
-		{"invalid 10 a nested conditional", `function Component() { const foo = bar ? baz ? {} : null : null; return (<Context.Provider value={foo}></Context.Provider>)}`, []string{"withIdentifierMsg"}},
-		{"invalid 11 an object held in a let", `function Component() { let foo = {}; return (<Context.Provider value={foo}></Context.Provider>) }`, []string{"withIdentifierMsg"}},
-		{"invalid 12 an object held in a var", `function Component() { var foo = {}; return (<Context.Provider value={foo}></Context.Provider>)}`, []string{"withIdentifierMsg"}},
+		{
+			"invalid 0 an object held in a const",
+			`function Component() { const foo = {}; return (<Context.Provider value={foo}></Context.Provider>) }`,
+			[]string{"withIdentifierMsg"},
+		},
+		{
+			"invalid 1 an array held in a const",
+			`function Component() { const foo = []; return (<Context.Provider value={foo}></Context.Provider>) }`,
+			[]string{"withIdentifierMsg"},
+		},
+		{
+			"invalid 2 an arrow held in a const",
+			`function Component() { const foo = () => {}; return (<Context.Provider value={foo}></Context.Provider>)}`,
+			[]string{"withIdentifierMsgFunc"},
+		},
+		{
+			"invalid 3 a named function expression held in a const",
+			`function Component() { const foo = function bar(){}; return (<Context.Provider value={foo}></Context.Provider>)}`,
+			[]string{"withIdentifierMsgFunc"},
+		},
+		{
+			"invalid 4 a class expression held in a const",
+			`function Component() { const foo = class SomeClass{}; return (<Context.Provider value={foo}></Context.Provider>)}`,
+			[]string{"withIdentifierMsg"},
+		},
+		{
+			"invalid 5 a new expression held in a const",
+			`function Component() { const foo = new SomeClass(); return (<Context.Provider value={foo}></Context.Provider>)}`,
+			[]string{"withIdentifierMsg"},
+		},
+		{
+			"invalid 6 a function declaration",
+			`function Component() { function foo() {}; return (<Context.Provider value={foo}></Context.Provider>)}`,
+			[]string{"withIdentifierMsgFunc"},
+		},
+		{
+			"invalid 7 a conditional whose consequent constructs",
+			`function Component() { const foo = true ? {} : "fine"; return (<Context.Provider value={foo}></Context.Provider>)}`,
+			[]string{"withIdentifierMsg"},
+		},
+		{
+			"invalid 8 a logical or whose right side constructs",
+			`function Component() { const foo = bar || {}; return (<Context.Provider value={foo}></Context.Provider>)}`,
+			[]string{"withIdentifierMsg"},
+		},
+		{
+			"invalid 9 a logical and whose right side constructs",
+			`function Component() { const foo = bar && {}; return (<Context.Provider value={foo}></Context.Provider>)}`,
+			[]string{"withIdentifierMsg"},
+		},
+		{
+			"invalid 10 a nested conditional",
+			`function Component() { const foo = bar ? baz ? {} : null : null; return (<Context.Provider value={foo}></Context.Provider>)}`,
+			[]string{"withIdentifierMsg"},
+		},
+		{
+			"invalid 11 an object held in a let",
+			`function Component() { let foo = {}; return (<Context.Provider value={foo}></Context.Provider>) }`,
+			[]string{"withIdentifierMsg"},
+		},
+		{
+			"invalid 12 an object held in a var",
+			`function Component() { var foo = {}; return (<Context.Provider value={foo}></Context.Provider>)}`,
+			[]string{"withIdentifierMsg"},
+		},
 		{"invalid 13 a let that is reassigned to a number", `
         function Component() {
           let a = {};
@@ -72,9 +124,21 @@ func TestJsxNoConstructedContextValuesFires(test *testing.T) {
           return (<Context.Provider value={bar}></Context.Provider>);
         }
       `, []string{"withIdentifierMsg"}},
-		{"invalid 16 an object written inline", `function Component() { return (<Context.Provider value={{foo: "bar"}}></Context.Provider>);}`, []string{"defaultMsg"}},
-		{"invalid 17 a jsx element held in a const", `function Component() { const Wrapper = (<SomeComp />); return (<Context.Provider value={Wrapper}></Context.Provider>);}`, []string{"withIdentifierMsg"}},
-		{"invalid 18 a regular expression held in a const", `function Component() { const someRegex = /HelloWorld/; return (<Context.Provider value={someRegex}></Context.Provider>);}`, []string{"withIdentifierMsg"}},
+		{
+			"invalid 16 an object written inline",
+			`function Component() { return (<Context.Provider value={{foo: "bar"}}></Context.Provider>);}`,
+			[]string{"defaultMsg"},
+		},
+		{
+			"invalid 17 a jsx element held in a const",
+			`function Component() { const Wrapper = (<SomeComp />); return (<Context.Provider value={Wrapper}></Context.Provider>);}`,
+			[]string{"withIdentifierMsg"},
+		},
+		{
+			"invalid 18 a regular expression held in a const",
+			`function Component() { const someRegex = /HelloWorld/; return (<Context.Provider value={someRegex}></Context.Provider>);}`,
+			[]string{"withIdentifierMsg"},
+		},
 		{"invalid 19 a chained assignment to an arrow", `
         function Component() {
           let foo = null;
@@ -125,8 +189,14 @@ func TestJsxNoConstructedContextValuesStaysSilent(test *testing.T) {
 	}{
 		{"valid 0 a props identifier", `const Component = () => <Context.Provider value={props}></Context.Provider>`},
 		{"valid 1 a number literal", `const Component = () => <Context.Provider value={100}></Context.Provider>`},
-		{"valid 2 a string attribute", `const Component = () => <Context.Provider value="Some string"></Context.Provider>`},
-		{"valid 3 a memoized object", `function Component() { const foo = useMemo(() => { return {} }, []); return (<Context.Provider value={foo}></Context.Provider>)}`},
+		{
+			"valid 2 a string attribute",
+			`const Component = () => <Context.Provider value="Some string"></Context.Provider>`,
+		},
+		{
+			"valid 3 a memoized object",
+			`function Component() { const foo = useMemo(() => { return {} }, []); return (<Context.Provider value={foo}></Context.Provider>)}`,
+		},
 		{"valid 4 a destructured prop", `
         function Component({oneProp, twoProp, redProp, blueProp,}) {
           return (
@@ -503,7 +573,11 @@ func TestJsxNoConstructedContextValuesIdentifierFollowing(test *testing.T) {
 		{"a const holding an arrow", "const v = () => {};", []string{"withIdentifierMsgFunc"}},
 		{"a const aliasing another const", "const inner = {a: 1}; const v = inner;", []string{"withIdentifierMsg"}},
 		{"a const with no initializer", "let v;", nil},
-		{"a member access off a constructed object", "const o = {a: {b: 1}}; const v = o.a;", []string{"withIdentifierMsg"}},
+		{
+			"a member access off a constructed object",
+			"const o = {a: {b: 1}}; const v = o.a;",
+			[]string{"withIdentifierMsg"},
+		},
 	}
 
 	for _, testCase := range cases {
@@ -555,7 +629,11 @@ func TestJsxNoConstructedContextValuesEnclosingComponent(test *testing.T) {
 		sourceText string
 		wantIds    []string
 	}{
-		{"a capitalized function declaration", "function Component() { return " + provider + "; }\n", []string{"defaultMsg"}},
+		{
+			"a capitalized function declaration",
+			"function Component() { return " + provider + "; }\n",
+			[]string{"defaultMsg"},
+		},
 		{"a lowercase function declaration", "function component() { return " + provider + "; }\n", nil},
 
 		// The walk stops at the first function, so an inner lowercase helper hides a provider that
@@ -886,7 +964,11 @@ func TestJsxNoConstructedContextValuesTakesTheLastDeclaration(test *testing.T) {
 
 		// The kind is read off the last declaration too, not just whether one exists.
 		{"an object then an arrow", "  var v = {a: 1};\n  var v = () => {};", []string{"withIdentifierMsgFunc"}},
-		{"an object then a function declaration", "  var v = {a: 1};\n  function v() {}", []string{"withIdentifierMsgFunc"}},
+		{
+			"an object then a function declaration",
+			"  var v = {a: 1};\n  function v() {}",
+			[]string{"withIdentifierMsgFunc"},
+		},
 
 		// A measured divergence, and it is in the checker rather than in the index.
 		//
@@ -902,7 +984,11 @@ func TestJsxNoConstructedContextValuesTakesTheLastDeclaration(test *testing.T) {
 		// around: reaching for the function's own symbol to recover the var would diverge on the
 		// far more common single-declaration case, and this shape requires redeclaring a name as
 		// both a var and a function in one scope.
-		{"a function declaration then an object", "  function v() {}\n  var v = {a: 1};", []string{"withIdentifierMsgFunc"}},
+		{
+			"a function declaration then an object",
+			"  function v() {}\n  var v = {a: 1};",
+			[]string{"withIdentifierMsgFunc"},
+		},
 	}
 
 	for _, testCase := range cases {

@@ -53,7 +53,10 @@ func TestFunctionalResolutionRejectsWhatTheEngineRejects(test *testing.T) {
 	fixture := loadFunctionalFixture(test, "functional_fixtures.json")
 
 	if fixture.RejectedCount < 4 {
-		test.Fatalf("the fixture carries %d rejected probes; expected at least 4, so the branches that must produce nothing are under-exercised", fixture.RejectedCount)
+		test.Fatalf(
+			"the fixture carries %d rejected probes; expected at least 4, so the branches that must produce nothing are under-exercised",
+			fixture.RejectedCount,
+		)
 	}
 
 	// Each rejected probe is reproduced as the candidate shape the parser produces for it, so the
@@ -73,17 +76,29 @@ func TestFunctionalResolutionRejectsWhatTheEngineRejects(test *testing.T) {
 		rejections++
 		build, known := byClassName[probe.ClassName]
 		if !known {
-			test.Errorf("%s (%s) is rejected by the engine and this test has no case for it, so the rejection is unchecked", probe.ClassName, probe.Branch)
+			test.Errorf(
+				"%s (%s) is rejected by the engine and this test has no case for it, so the rejection is unchecked",
+				probe.ClassName,
+				probe.Branch,
+			)
 			continue
 		}
 		covered++
 		candidate, description, negative := build()
 		if _, produced := ResolveFunctionalUtilityValue(&candidate, description, NewTheme(), negative); produced {
-			test.Errorf("%s (%s): the engine compiles it to no CSS and the pipeline resolved it to a value", probe.ClassName, probe.Branch)
+			test.Errorf(
+				"%s (%s): the engine compiles it to no CSS and the pipeline resolved it to a value",
+				probe.ClassName,
+				probe.Branch,
+			)
 		}
 	}
 	if covered != rejections {
-		test.Errorf("covered %d of %d rejections; an unchecked rejection is a branch this file claims to test and does not", covered, rejections)
+		test.Errorf(
+			"covered %d of %d rejections; an unchecked rejection is a branch this file claims to test and does not",
+			covered,
+			rejections,
+		)
 	}
 	test.Logf("checked %d rejections of %d probes", rejections, fixture.ProbeCount)
 }
@@ -273,7 +288,9 @@ func TestFunctionalResolutionThemeBeforeStaticValues(test *testing.T) {
 		test.Fatal("a name in both the theme and staticValues produced nothing")
 	}
 	if resolved.IsStaticValue {
-		test.Error("resolution ended at staticValues for a name the theme declares; the theme is branch 3 and staticValues is branch 5")
+		test.Error(
+			"resolution ended at staticValues for a name the theme declares; the theme is branch 3 and staticValues is branch 5",
+		)
 	}
 	if resolved.Value != "var(--width-full)" {
 		test.Errorf("resolved to %q, expected the theme's own var() reference", resolved.Value)

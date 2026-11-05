@@ -25,22 +25,52 @@ func TestRelatedGetterSetterPairsStaysSilent(test *testing.T) {
 		name       string
 		sourceText string
 	}{
-		{"string getter and string setter", "\ninterface Example {\n  get value(): string;\n  set value(newValue: string);\n}\n    "},
-		{"optional getter with a zero parameter setter", "\ninterface Example {\n  get value(): string | undefined;\n  set value();\n}\n    "},
-		{"optional getter with a two parameter setter", "\ninterface Example {\n  get value(): string | undefined;\n  set value(newValue: string, invalid: string);\n}\n    "},
-		{"string getter and an optional setter", "\ninterface Example {\n  get value(): string;\n  set value(newValue: string | undefined);\n}\n    "},
+		{
+			"string getter and string setter",
+			"\ninterface Example {\n  get value(): string;\n  set value(newValue: string);\n}\n    ",
+		},
+		{
+			"optional getter with a zero parameter setter",
+			"\ninterface Example {\n  get value(): string | undefined;\n  set value();\n}\n    ",
+		},
+		{
+			"optional getter with a two parameter setter",
+			"\ninterface Example {\n  get value(): string | undefined;\n  set value(newValue: string, invalid: string);\n}\n    ",
+		},
+		{
+			"string getter and an optional setter",
+			"\ninterface Example {\n  get value(): string;\n  set value(newValue: string | undefined);\n}\n    ",
+		},
 		{"a getter with no setter", "\ninterface Example {\n  get value(): number;\n}\n    "},
-		{"a getter and a zero parameter setter", "\ninterface Example {\n  get value(): number;\n  set value();\n}\n    "},
+		{
+			"a getter and a zero parameter setter",
+			"\ninterface Example {\n  get value(): number;\n  set value();\n}\n    ",
+		},
 		{"a setter with no getter", "\ninterface Example {\n  set value(newValue: string);\n}\n    "},
 		{"a zero parameter setter alone", "\ninterface Example {\n  set value();\n}\n    "},
 		{"a type literal getter with no return annotation", "\ntype Example = {\n  get value();\n};\n    "},
 		{"a type literal setter with no getter", "\ntype Example = {\n  set value();\n};\n    "},
-		{"a class getter with no return annotation", "\nclass Example {\n  get value() {\n    return '';\n  }\n}\n    "},
-		{"a class getter with no annotation and an empty setter", "\nclass Example {\n  get value() {\n    return '';\n  }\n  set value() {}\n}\n    "},
-		{"a class getter with no annotation and an untyped setter parameter", "\nclass Example {\n  get value() {\n    return '';\n  }\n  set value(param) {}\n}\n    "},
-		{"a class getter with no annotation and a number setter", "\nclass Example {\n  get value() {\n    return '';\n  }\n  set value(param: number) {}\n}\n    "},
+		{
+			"a class getter with no return annotation",
+			"\nclass Example {\n  get value() {\n    return '';\n  }\n}\n    ",
+		},
+		{
+			"a class getter with no annotation and an empty setter",
+			"\nclass Example {\n  get value() {\n    return '';\n  }\n  set value() {}\n}\n    ",
+		},
+		{
+			"a class getter with no annotation and an untyped setter parameter",
+			"\nclass Example {\n  get value() {\n    return '';\n  }\n  set value(param) {}\n}\n    ",
+		},
+		{
+			"a class getter with no annotation and a number setter",
+			"\nclass Example {\n  get value() {\n    return '';\n  }\n  set value(param: number) {}\n}\n    ",
+		},
 		{"a class setter with no getter", "\nclass Example {\n  set value() {}\n}\n    "},
-		{"a type literal number pair that matches", "\ntype Example = {\n  get value(): number;\n  set value(newValue: number);\n};\n    "},
+		{
+			"a type literal number pair that matches",
+			"\ntype Example = {\n  get value(): number;\n  set value(newValue: number);\n};\n    ",
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -64,13 +94,34 @@ func TestRelatedGetterSetterPairsFires(test *testing.T) {
 		name       string
 		sourceText string
 	}{
-		{"an optional getter against a required setter", "\ninterface Example {\n  get value(): string | undefined;\n  set value(newValue: string);\n}\n      "},
-		{"a number getter against a string setter", "\ninterface Example {\n  get value(): number;\n  set value(newValue: string);\n}\n      "},
-		{"a type literal number getter against a string setter", "\ntype Example = {\n  get value(): number;\n  set value(newValue: string);\n};\n      "},
-		{"a class boolean getter against a string setter", "\nclass Example {\n  get value(): boolean {\n    return true;\n  }\n  set value(newValue: string) {}\n}\n      "},
-		{"a declared class against an inline object type", "\ntype GetType = { a: string; b: string };\n\ndeclare class Foo {\n  get a(): GetType;\n\n  set a(x: { c: string });\n}\n      "},
-		{"a declared class beside an unused alias", "\ntype GetType = { a: string; b: string };\n\ntype SetTypeUnused = { c: string };\n\ndeclare class Foo {\n  get a(): GetType;\n\n  set a(x: { c: string });\n}\n      "},
-		{"a declared class against a named alias", "\ntype GetType = { a: string; b: string };\n\ntype SetType = { c: string };\n\ndeclare class Foo {\n  get a(): GetType;\n\n  set a(x: SetType);\n}\n      "},
+		{
+			"an optional getter against a required setter",
+			"\ninterface Example {\n  get value(): string | undefined;\n  set value(newValue: string);\n}\n      ",
+		},
+		{
+			"a number getter against a string setter",
+			"\ninterface Example {\n  get value(): number;\n  set value(newValue: string);\n}\n      ",
+		},
+		{
+			"a type literal number getter against a string setter",
+			"\ntype Example = {\n  get value(): number;\n  set value(newValue: string);\n};\n      ",
+		},
+		{
+			"a class boolean getter against a string setter",
+			"\nclass Example {\n  get value(): boolean {\n    return true;\n  }\n  set value(newValue: string) {}\n}\n      ",
+		},
+		{
+			"a declared class against an inline object type",
+			"\ntype GetType = { a: string; b: string };\n\ndeclare class Foo {\n  get a(): GetType;\n\n  set a(x: { c: string });\n}\n      ",
+		},
+		{
+			"a declared class beside an unused alias",
+			"\ntype GetType = { a: string; b: string };\n\ntype SetTypeUnused = { c: string };\n\ndeclare class Foo {\n  get a(): GetType;\n\n  set a(x: { c: string });\n}\n      ",
+		},
+		{
+			"a declared class against a named alias",
+			"\ntype GetType = { a: string; b: string };\n\ntype SetType = { c: string };\n\ndeclare class Foo {\n  get a(): GetType;\n\n  set a(x: SetType);\n}\n      ",
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -103,13 +154,41 @@ func TestRelatedGetterSetterPairsSpans(test *testing.T) {
 		sourceText string
 		want       string
 	}{
-		{"an optional getter against a required setter", "\ninterface Example {\n  get value(): string | undefined;\n  set value(newValue: string);\n}\n      ", "string | undefined"},
-		{"a number getter against a string setter", "\ninterface Example {\n  get value(): number;\n  set value(newValue: string);\n}\n      ", "number"},
-		{"a type literal number getter against a string setter", "\ntype Example = {\n  get value(): number;\n  set value(newValue: string);\n};\n      ", "number"},
-		{"a class boolean getter against a string setter", "\nclass Example {\n  get value(): boolean {\n    return true;\n  }\n  set value(newValue: string) {}\n}\n      ", "boolean"},
-		{"a declared class against an inline object type", "\ntype GetType = { a: string; b: string };\n\ndeclare class Foo {\n  get a(): GetType;\n\n  set a(x: { c: string });\n}\n      ", "GetType"},
-		{"a declared class beside an unused alias", "\ntype GetType = { a: string; b: string };\n\ntype SetTypeUnused = { c: string };\n\ndeclare class Foo {\n  get a(): GetType;\n\n  set a(x: { c: string });\n}\n      ", "GetType"},
-		{"a declared class against a named alias", "\ntype GetType = { a: string; b: string };\n\ntype SetType = { c: string };\n\ndeclare class Foo {\n  get a(): GetType;\n\n  set a(x: SetType);\n}\n      ", "GetType"},
+		{
+			"an optional getter against a required setter",
+			"\ninterface Example {\n  get value(): string | undefined;\n  set value(newValue: string);\n}\n      ",
+			"string | undefined",
+		},
+		{
+			"a number getter against a string setter",
+			"\ninterface Example {\n  get value(): number;\n  set value(newValue: string);\n}\n      ",
+			"number",
+		},
+		{
+			"a type literal number getter against a string setter",
+			"\ntype Example = {\n  get value(): number;\n  set value(newValue: string);\n};\n      ",
+			"number",
+		},
+		{
+			"a class boolean getter against a string setter",
+			"\nclass Example {\n  get value(): boolean {\n    return true;\n  }\n  set value(newValue: string) {}\n}\n      ",
+			"boolean",
+		},
+		{
+			"a declared class against an inline object type",
+			"\ntype GetType = { a: string; b: string };\n\ndeclare class Foo {\n  get a(): GetType;\n\n  set a(x: { c: string });\n}\n      ",
+			"GetType",
+		},
+		{
+			"a declared class beside an unused alias",
+			"\ntype GetType = { a: string; b: string };\n\ntype SetTypeUnused = { c: string };\n\ndeclare class Foo {\n  get a(): GetType;\n\n  set a(x: { c: string });\n}\n      ",
+			"GetType",
+		},
+		{
+			"a declared class against a named alias",
+			"\ntype GetType = { a: string; b: string };\n\ntype SetType = { c: string };\n\ndeclare class Foo {\n  get a(): GetType;\n\n  set a(x: SetType);\n}\n      ",
+			"GetType",
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -149,9 +228,15 @@ func TestRelatedGetterSetterPairsFiresOnMeasuredShapes(test *testing.T) {
 		name       string
 		sourceText string
 	}{
-		{"a static getter pairs with an instance setter", "class C {\n  static get value(): number { return 1; }\n  set value(v: string) {}\n}"},
+		{
+			"a static getter pairs with an instance setter",
+			"class C {\n  static get value(): number { return 1; }\n  set value(v: string) {}\n}",
+		},
 		{"a private pair", "class C {\n  get #value(): number { return 1; }\n  set #value(v: string) {}\n}"},
-		{"a computed identifier key pairs with itself", "declare const k: string;\nclass C {\n  get [k](): number { return 1; }\n  set [k](v: string) {}\n}"},
+		{
+			"a computed identifier key pairs with itself",
+			"declare const k: string;\nclass C {\n  get [k](): number { return 1; }\n  set [k](v: string) {}\n}",
+		},
 		// The two that pin that a computed key is keyed by what is inside the brackets rather than
 		// by the bracketed source text. Both are needed and neither is redundant with the case
 		// above: a rule keying `[k]` by its whole text still pairs `[k]` with `[k]`, so that case
@@ -168,18 +253,48 @@ func TestRelatedGetterSetterPairsFiresOnMeasuredShapes(test *testing.T) {
 		// load-bearing rather than tidy. A mutant using the untrimmed position goes silent here.
 		{"a symbol key pairs across a line break",
 			"class C {\n  get [Symbol.iterator](): number { return 1; }\n  set [\n    Symbol.iterator](v: string) {}\n}"},
-		{"a quoted key pairs with a bare identifier of the same spelling", "class C {\n  get 'value'(): number { return 1; }\n  set value(v: string) {}\n}"},
-		{"a numeric key pairs with a quoted one of the same value", "class C {\n  get 12(): number { return 1; }\n  set '12'(v: string) {}\n}"},
-		{"a second setter replaces the first", "class C {\n  get value(): number { return 1; }\n  set value(v: number) {}\n  set value(v: string) {}\n}"},
-		{"a second getter replaces the first", "class C {\n  get value(): string { return \"\"; }\n  get value(): number { return 1; }\n  set value(v: string) {}\n}"},
+		{
+			"a quoted key pairs with a bare identifier of the same spelling",
+			"class C {\n  get 'value'(): number { return 1; }\n  set value(v: string) {}\n}",
+		},
+		{
+			"a numeric key pairs with a quoted one of the same value",
+			"class C {\n  get 12(): number { return 1; }\n  set '12'(v: string) {}\n}",
+		},
+		{
+			"a second setter replaces the first",
+			"class C {\n  get value(): number { return 1; }\n  set value(v: number) {}\n  set value(v: string) {}\n}",
+		},
+		{
+			"a second getter replaces the first",
+			"class C {\n  get value(): string { return \"\"; }\n  get value(): number { return 1; }\n  set value(v: string) {}\n}",
+		},
 		{"a setter written before its getter", "interface I {\n  set value(v: string);\n  get value(): number;\n}"},
-		{"a declare class reports where an abstract class does not", "declare class C {\n  get value(): number;\n  set value(v: string);\n}"},
-		{"a class expression body", "const C = class {\n  get value(): number { return 1; }\n  set value(v: string) {}\n};"},
-		{"a rest parameter counts as one parameter", "class C {\n  get value(): number { return 1; }\n  set value(...v: string[]) {}\n}"},
-		{"an optional parameter is still one parameter", "class C {\n  get value(): number { return 1; }\n  set value(v?: string) {}\n}"},
+		{
+			"a declare class reports where an abstract class does not",
+			"declare class C {\n  get value(): number;\n  set value(v: string);\n}",
+		},
+		{
+			"a class expression body",
+			"const C = class {\n  get value(): number { return 1; }\n  set value(v: string) {}\n};",
+		},
+		{
+			"a rest parameter counts as one parameter",
+			"class C {\n  get value(): number { return 1; }\n  set value(...v: string[]) {}\n}",
+		},
+		{
+			"an optional parameter is still one parameter",
+			"class C {\n  get value(): number { return 1; }\n  set value(v?: string) {}\n}",
+		},
 		{"a never setter with a string getter", "interface I {\n  get value(): string;\n  set value(v: never);\n}"},
-		{"a type literal nested inside an interface", "interface I {\n  p: {\n    get value(): number;\n    set value(v: string);\n  };\n}"},
-		{"a type literal in a function parameter position", "function f(x: { get value(): number; set value(v: string) }) {}"},
+		{
+			"a type literal nested inside an interface",
+			"interface I {\n  p: {\n    get value(): number;\n    set value(v: string);\n  };\n}",
+		},
+		{
+			"a type literal in a function parameter position",
+			"function f(x: { get value(): number; set value(v: string) }) {}",
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -210,21 +325,60 @@ func TestRelatedGetterSetterPairsStaysSilentOnMeasuredShapes(test *testing.T) {
 		name       string
 		sourceText string
 	}{
-		{"an object literal is not one of the three containers", "const o = {\n  get value(): number { return 1; },\n  set value(v: string) {},\n};"},
-		{"both accessors abstract", "abstract class C {\n  abstract get value(): number;\n  abstract set value(v: string);\n}"},
-		{"an abstract getter with a concrete setter", "abstract class C {\n  abstract get value(): number;\n  set value(v: string) {}\n}"},
-		{"a concrete getter with an abstract setter", "abstract class C {\n  get value(): number { return 1; }\n  abstract set value(v: string);\n}"},
-		{"a nested class does not see the outer names", "class Outer {\n  get value(): number { return 1; }\n  m() {\n    class Inner {\n      set value(v: string) {}\n    }\n    return Inner;\n  }\n}"},
-		{"a private getter does not pair with a public setter", "class C {\n  get #value(): number { return 1; }\n  set value(v: string) {}\n}"},
-		{"a this parameter pushes the setter to two parameters", "class C {\n  get value(): number { return 1; }\n  set value(this: C, v: string) {}\n}"},
-		{"a never getter is assignable to everything", "interface I {\n  get value(): never;\n  set value(v: string);\n}"},
+		{
+			"an object literal is not one of the three containers",
+			"const o = {\n  get value(): number { return 1; },\n  set value(v: string) {},\n};",
+		},
+		{
+			"both accessors abstract",
+			"abstract class C {\n  abstract get value(): number;\n  abstract set value(v: string);\n}",
+		},
+		{
+			"an abstract getter with a concrete setter",
+			"abstract class C {\n  abstract get value(): number;\n  set value(v: string) {}\n}",
+		},
+		{
+			"a concrete getter with an abstract setter",
+			"abstract class C {\n  get value(): number { return 1; }\n  abstract set value(v: string);\n}",
+		},
+		{
+			"a nested class does not see the outer names",
+			"class Outer {\n  get value(): number { return 1; }\n  m() {\n    class Inner {\n      set value(v: string) {}\n    }\n    return Inner;\n  }\n}",
+		},
+		{
+			"a private getter does not pair with a public setter",
+			"class C {\n  get #value(): number { return 1; }\n  set value(v: string) {}\n}",
+		},
+		{
+			"a this parameter pushes the setter to two parameters",
+			"class C {\n  get value(): number { return 1; }\n  set value(this: C, v: string) {}\n}",
+		},
+		{
+			"a never getter is assignable to everything",
+			"interface I {\n  get value(): never;\n  set value(v: string);\n}",
+		},
 		{"an any getter", "class C {\n  get value(): any { return 1; }\n  set value(v: string) {}\n}"},
 		{"an any setter parameter", "class C {\n  get value(): number { return 1; }\n  set value(v: any) {}\n}"},
-		{"an untyped setter parameter is an implicit any", "class C {\n  get value(): number { return 1; }\n  set value(v) {}\n}"},
-		{"computed keys with different source text do not pair", "declare const k: \"x\";\nclass C {\n  get [k](): number { return 1; }\n  set [\"x\"](v: string) {}\n}"},
-		{"two interface declarations merging do not share a container", "interface I { get value(): number; }\ninterface I { set value(v: string); }"},
-		{"a second getter replaces a mismatching first", "class C {\n  get value(): number { return 1; }\n  get value(): string { return \"\"; }\n  set value(v: string) {}\n}"},
-		{"a second setter replaces a mismatching first", "class C {\n  get value(): number { return 1; }\n  set value(v: string) {}\n  set value(v: number) {}\n}"},
+		{
+			"an untyped setter parameter is an implicit any",
+			"class C {\n  get value(): number { return 1; }\n  set value(v) {}\n}",
+		},
+		{
+			"computed keys with different source text do not pair",
+			"declare const k: \"x\";\nclass C {\n  get [k](): number { return 1; }\n  set [\"x\"](v: string) {}\n}",
+		},
+		{
+			"two interface declarations merging do not share a container",
+			"interface I { get value(): number; }\ninterface I { set value(v: string); }",
+		},
+		{
+			"a second getter replaces a mismatching first",
+			"class C {\n  get value(): number { return 1; }\n  get value(): string { return \"\"; }\n  set value(v: string) {}\n}",
+		},
+		{
+			"a second setter replaces a mismatching first",
+			"class C {\n  get value(): number { return 1; }\n  set value(v: string) {}\n  set value(v: number) {}\n}",
+		},
 		// The getter's return-annotation filter is crash protection on this input, and it is the
 		// only input in this file that reaches that. Every other unannotated getter is silent for a
 		// reason that has nothing to do with the filter: TypeScript infers an unannotated getter's
@@ -270,9 +424,21 @@ func TestRelatedGetterSetterPairsSpansOnMeasuredShapes(test *testing.T) {
 		sourceText string
 		want       string
 	}{
-		{"a parenthesized return type reports the inner type", "interface I {\n  get value(): (string);\n  set value(v: number);\n}", "string"},
-		{"a multi-line object return type spans all of it", "interface I {\n  get value(): {\n    a: string;\n  };\n  set value(v: number);\n}", "{\n    a: string;\n  }"},
-		{"a symbol-keyed pair reports the getter's type", "class C {\n  get [Symbol.iterator](): number { return 1; }\n  set [Symbol.iterator](v: string) {}\n}", "number"},
+		{
+			"a parenthesized return type reports the inner type",
+			"interface I {\n  get value(): (string);\n  set value(v: number);\n}",
+			"string",
+		},
+		{
+			"a multi-line object return type spans all of it",
+			"interface I {\n  get value(): {\n    a: string;\n  };\n  set value(v: number);\n}",
+			"{\n    a: string;\n  }",
+		},
+		{
+			"a symbol-keyed pair reports the getter's type",
+			"class C {\n  get [Symbol.iterator](): number { return 1; }\n  set [Symbol.iterator](v: string) {}\n}",
+			"number",
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -309,8 +475,16 @@ func TestRelatedGetterSetterPairsReportsInSourceOrder(test *testing.T) {
 		sourceText string
 		want       []string
 	}{
-		{"two mismatching pairs in one container report in source order", "class C {\n  get a(): number { return 1; }\n  set a(v: string) {}\n  get b(): boolean { return true; }\n  set b(v: string) {}\n}", []string{"number", "boolean"}},
-		{"an outer and an inner class each report their own", "class Outer {\n  get a(): number { return 1; }\n  set a(v: string) {}\n  m() {\n    class Inner {\n      get b(): boolean { return true; }\n      set b(v: string) {}\n    }\n    return Inner;\n  }\n}", []string{"number", "boolean"}},
+		{
+			"two mismatching pairs in one container report in source order",
+			"class C {\n  get a(): number { return 1; }\n  set a(v: string) {}\n  get b(): boolean { return true; }\n  set b(v: string) {}\n}",
+			[]string{"number", "boolean"},
+		},
+		{
+			"an outer and an inner class each report their own",
+			"class Outer {\n  get a(): number { return 1; }\n  set a(v: string) {}\n  m() {\n    class Inner {\n      get b(): boolean { return true; }\n      set b(v: string) {}\n    }\n    return Inner;\n  }\n}",
+			[]string{"number", "boolean"},
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {

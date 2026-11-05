@@ -53,7 +53,11 @@ func TestNoUnusedLabelsFires(test *testing.T) {
 		{"five nested labels, all unused", "A: B: C: D: E: 'foo'", 5},
 		{"a label on a bare number", "A: 42", 1},
 		{"an inner label inside a function while the outer is used", "A: { function f() { B: { } } break A; }", 1},
-		{"a label reused inside an arrow, neither jumped to", "label: while (true) { (() => { label: while (false) {} })(); }", 2},
+		{
+			"a label reused inside an arrow, neither jumped to",
+			"label: while (true) { (() => { label: while (false) {} })(); }",
+			2,
+		},
 	}
 
 	for _, testCase := range cases {
@@ -93,17 +97,32 @@ func TestNoUnusedLabelsStaysSilent(test *testing.T) {
 		{"a label broken to from inside an if", "A: if (a) { foo(); if (b) break A; bar(); }"},
 		{"a loop label broken to by name", "A: for (var i = 0; i < 10; ++i) { foo(); if (a) break A; bar(); }"},
 		{"a loop label continued to by name", "A: for (var i = 0; i < 10; ++i) { foo(); if (a) continue A; bar(); }"},
-		{"three labels each used by a differently named jump", "A: { B: break B; C: for (var i = 0; i < 10; ++i) { foo(); if (a) break A; if (c) continue C; bar(); } }"},
-		{"a label used despite a variable shadowing its name", "A: { var A = 0; console.log(A); break A; console.log(A); }"},
-		{"a label reused inside a function, both used", "label: while (true) { f = function() { label: while (true) { break label; } }; break label; }"},
-		{"a label inside a nested function, both used", "outer: { function f() { inner: { break inner; } } break outer; }"},
+		{
+			"three labels each used by a differently named jump",
+			"A: { B: break B; C: for (var i = 0; i < 10; ++i) { foo(); if (a) break A; if (c) continue C; bar(); } }",
+		},
+		{
+			"a label used despite a variable shadowing its name",
+			"A: { var A = 0; console.log(A); break A; console.log(A); }",
+		},
+		{
+			"a label reused inside a function, both used",
+			"label: while (true) { f = function() { label: while (true) { break label; } }; break label; }",
+		},
+		{
+			"a label inside a nested function, both used",
+			"outer: { function f() { inner: { break inner; } } break outer; }",
+		},
 		{"a label inside an arrow, both used", "A: { const f = () => { B: { break B; } }; break A; }"},
 	}
 
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.Run(test, NoUnusedLabels, unusedLabelsFile, testCase.sourceText))
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.Run(test, NoUnusedLabels, unusedLabelsFile, testCase.sourceText),
+			)
 		})
 	}
 }

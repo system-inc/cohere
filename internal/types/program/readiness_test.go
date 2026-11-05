@@ -31,7 +31,9 @@ func TestReadinessCountsEverySetRuleAndReportsOnlyTheChainsOwn(test *testing.T) 
 		"a.ts":                "// cohere-disable-next-line test-set-enabled -- suppressed, still counted\nexport const first = 1;\nexport const second = 2;\n",
 		"b.ts":                "export const third = 3;\n",
 	})
-	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory, SingleThreaded: true})
+	graph, err := program.Build(
+		program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory, SingleThreaded: true},
+	)
 	if err != nil {
 		test.Fatalf("building: %v", err)
 	}
@@ -76,7 +78,10 @@ func TestReadinessCountsEverySetRuleAndReportsOnlyTheChainsOwn(test *testing.T) 
 	for _, diagnostic := range result.Diagnostics {
 		reported[diagnostic.RuleName]++
 		if diagnostic.RuleName == "test-set-off" {
-			test.Errorf("a measure-only rule reported %q, which a reader would see and a fix phase could apply", diagnostic.Message.Id)
+			test.Errorf(
+				"a measure-only rule reported %q, which a reader would see and a fix phase could apply",
+				diagnostic.Message.Id,
+			)
 		}
 	}
 	// a.ts's first constant is suppressed for test-set-enabled, so the chain sees one of a.ts's two and b.ts's one.
@@ -89,8 +94,16 @@ func TestReadinessCountsEverySetRuleAndReportsOnlyTheChainsOwn(test *testing.T) 
 		records[filepath.Base(fileName)] = record
 	}
 	want := map[string]*program.AdamicRecord{
-		"a.ts": {Counts: []program.AdamicCount{{Rule: "test-set-enabled", Findings: 2}, {Rule: "test-set-off", Findings: 2}, {Rule: "test-set-skips", Findings: 0}}},
-		"b.ts": {Counts: []program.AdamicCount{{Rule: "test-set-enabled", Findings: 1}, {Rule: "test-set-off", Findings: 1}, {Rule: "test-set-skips", Findings: 0}},
+		"a.ts": {Counts: []program.AdamicCount{
+			{Rule: "test-set-enabled", Findings: 2},
+			{Rule: "test-set-off", Findings: 2},
+			{Rule: "test-set-skips", Findings: 0},
+		}},
+		"b.ts": {Counts: []program.AdamicCount{
+			{Rule: "test-set-enabled", Findings: 1},
+			{Rule: "test-set-off", Findings: 1},
+			{Rule: "test-set-skips", Findings: 0},
+		},
 			Skipped: []string{"test-set-skips"}},
 	}
 	if !reflect.DeepEqual(records, want) {
@@ -123,7 +136,9 @@ func TestReadinessOffMeasuresNothing(test *testing.T) {
 		"CohereSettings.json": `{"rules": {"test-set-off": "off", "test-other": "error"}}`,
 		"a.ts":                "export const first = 1;\n",
 	})
-	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory, SingleThreaded: true})
+	graph, err := program.Build(
+		program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory, SingleThreaded: true},
+	)
 	if err != nil {
 		test.Fatalf("building: %v", err)
 	}
@@ -133,8 +148,16 @@ func TestReadinessOffMeasuresNothing(test *testing.T) {
 	}
 	ran := false
 	rules := []rule.Rule{
-		{Name: "test-other", Run: func(ruleContext rule.Context, options any) rule.Listeners { return nil }, NoListener: rule.NoListenerAnswersInRun},
-		{Name: "test-set-off", Run: func(ruleContext rule.Context, options any) rule.Listeners { ran = true; return nil }, NoListener: rule.NoListenerAnswersInRun},
+		{
+			Name:       "test-other",
+			Run:        func(ruleContext rule.Context, options any) rule.Listeners { return nil },
+			NoListener: rule.NoListenerAnswersInRun,
+		},
+		{
+			Name:       "test-set-off",
+			Run:        func(ruleContext rule.Context, options any) rule.Listeners { ran = true; return nil },
+			NoListener: rule.NoListenerAnswersInRun,
+		},
 	}
 	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), rules)
 	if err != nil {
@@ -155,7 +178,9 @@ func TestReadinessRunsATierEnabledSetRuleOncePerFile(test *testing.T) {
 		"a.ts":                "export const first = 1;\n",
 		"b.ts":                "export const second = 2;\n",
 	})
-	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory, SingleThreaded: true})
+	graph, err := program.Build(
+		program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory, SingleThreaded: true},
+	)
 	if err != nil {
 		test.Fatalf("building: %v", err)
 	}
@@ -183,8 +208,15 @@ func TestReadinessRunsATierEnabledSetRuleOncePerFile(test *testing.T) {
 		test.Errorf("reported %d findings, want each file's one", len(result.Diagnostics))
 	}
 	for fileName, record := range result.Adamic {
-		if want := []program.AdamicCount{{Rule: "test-set-enabled", Findings: 1}}; !reflect.DeepEqual(record.Counts, want) {
-			test.Errorf("%s counts %v, want %v: the one run's finding, counted", filepath.Base(fileName), record.Counts, want)
+		if want := []program.AdamicCount{
+			{Rule: "test-set-enabled", Findings: 1},
+		}; !reflect.DeepEqual(record.Counts, want) {
+			test.Errorf(
+				"%s counts %v, want %v: the one run's finding, counted",
+				filepath.Base(fileName),
+				record.Counts,
+				want,
+			)
 		}
 	}
 }
@@ -200,11 +232,13 @@ func TestAWarmReplayRunsNoRuleForReadiness(test *testing.T) {
 	test.Parallel()
 	typeAware := typeAwareRule(test)
 	root := writeProject(test, map[string]string{
-		"tsconfig.json":       minimalConfig,
-		"CohereSettings.json": `{"rules": {"test-set-enabled": "error", "test-set-off": "off", "` + typeAware.Name + `": "off"}}`,
-		"a.ts":                "export const first = 1;\nexport const negated = -first;\n",
-		"b.ts":                "export const second = 2;\n",
-		"c.ts":                "// cohere-disable-next-line test-set-enabled -- the directive file\nexport const third = 3;\n",
+		"tsconfig.json": minimalConfig,
+		"CohereSettings.json": `{"rules": {"test-set-enabled": "error", "test-set-off": "off", "` +
+			typeAware.Name +
+			`": "off"}}`,
+		"a.ts": "export const first = 1;\nexport const negated = -first;\n",
+		"b.ts": "export const second = 2;\n",
+		"c.ts": "// cohere-disable-next-line test-set-enabled -- the directive file\nexport const third = 3;\n",
 	})
 
 	var runs atomic.Int32
@@ -278,7 +312,10 @@ func TestAWarmReplayRunsNoRuleForReadiness(test *testing.T) {
 		test.Errorf("the warm walk ran rules %d times; readiness rides the findings cache and should run none", got)
 	}
 	if warm.FilesReplayed != 3 {
-		test.Errorf("the warm walk replayed %d of 3 files; every file's record should serve a run that measures", warm.FilesReplayed)
+		test.Errorf(
+			"the warm walk replayed %d of 3 files; every file's record should serve a run that measures",
+			warm.FilesReplayed,
+		)
 	}
 	if warm.Coverage.Suppressed != cold.Coverage.Suppressed || cold.Coverage.Suppressed == 0 {
 		test.Errorf("c.ts's directive withheld %d findings warm and %d cold; it should withhold one either way",

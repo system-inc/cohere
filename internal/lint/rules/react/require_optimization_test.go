@@ -43,14 +43,54 @@ func TestRequireOptimizationFires(test *testing.T) {
 		rawOptions string
 		wantIds    []string
 	}{
-		{"upstream invalid-0", "\n        import React from \"react\";\n        class YourComponent extends React.Component {}\n      ", "", []string{"noShouldComponentUpdate"}},
-		{"upstream invalid-1", "\n        import React from \"react\";\n        class YourComponent extends React.Component {\n          handleClick() {}\n          render() {\n            return <div onClick={this.handleClick}>123</div>\n          }\n        }\n      ", "", []string{"noShouldComponentUpdate"}},
-		{"upstream invalid-2", "\n        import React from \"react\";\n        class YourComponent extends React.Component {\n          handleClick = () => {}\n          render() {\n            return <div onClick={this.handleClick}>123</div>\n          }\n        }\n      ", "", []string{"noShouldComponentUpdate"}},
-		{"upstream invalid-3", "\n        import React, {Component} from \"react\";\n        class YourComponent extends Component {}\n      ", "", []string{"noShouldComponentUpdate"}},
-		{"upstream invalid-4", "\n        import React from \"react\";\n        createReactClass({})\n      ", "", []string{"noShouldComponentUpdate"}},
-		{"upstream invalid-5", "\n        import React from \"react\";\n        createReactClass({\n          mixins: [RandomMixin]\n        })\n      ", "", []string{"noShouldComponentUpdate"}},
-		{"upstream invalid-6", "\n        @reactMixin.decorate(SomeOtherMixin)\n        class DecoratedComponent extends Component {}\n      ", "", []string{"noShouldComponentUpdate"}},
-		{"upstream invalid-7", "\n        @bar\n        @pure\n        @foo\n        class DecoratedComponent extends Component {}\n      ", "{\"allowDecorators\":[\"renderPure\",\"pureRender\"]}", []string{"noShouldComponentUpdate"}},
+		{
+			"upstream invalid-0",
+			"\n        import React from \"react\";\n        class YourComponent extends React.Component {}\n      ",
+			"",
+			[]string{"noShouldComponentUpdate"},
+		},
+		{
+			"upstream invalid-1",
+			"\n        import React from \"react\";\n        class YourComponent extends React.Component {\n          handleClick() {}\n          render() {\n            return <div onClick={this.handleClick}>123</div>\n          }\n        }\n      ",
+			"",
+			[]string{"noShouldComponentUpdate"},
+		},
+		{
+			"upstream invalid-2",
+			"\n        import React from \"react\";\n        class YourComponent extends React.Component {\n          handleClick = () => {}\n          render() {\n            return <div onClick={this.handleClick}>123</div>\n          }\n        }\n      ",
+			"",
+			[]string{"noShouldComponentUpdate"},
+		},
+		{
+			"upstream invalid-3",
+			"\n        import React, {Component} from \"react\";\n        class YourComponent extends Component {}\n      ",
+			"",
+			[]string{"noShouldComponentUpdate"},
+		},
+		{
+			"upstream invalid-4",
+			"\n        import React from \"react\";\n        createReactClass({})\n      ",
+			"",
+			[]string{"noShouldComponentUpdate"},
+		},
+		{
+			"upstream invalid-5",
+			"\n        import React from \"react\";\n        createReactClass({\n          mixins: [RandomMixin]\n        })\n      ",
+			"",
+			[]string{"noShouldComponentUpdate"},
+		},
+		{
+			"upstream invalid-6",
+			"\n        @reactMixin.decorate(SomeOtherMixin)\n        class DecoratedComponent extends Component {}\n      ",
+			"",
+			[]string{"noShouldComponentUpdate"},
+		},
+		{
+			"upstream invalid-7",
+			"\n        @bar\n        @pure\n        @foo\n        class DecoratedComponent extends Component {}\n      ",
+			"{\"allowDecorators\":[\"renderPure\",\"pureRender\"]}",
+			[]string{"noShouldComponentUpdate"},
+		},
 	}
 
 	for _, testCase := range cases {
@@ -77,20 +117,72 @@ func TestRequireOptimizationStaysSilent(test *testing.T) {
 		rawOptions string
 	}{
 		{"upstream valid-0", "\n        class A {}\n      ", ""},
-		{"upstream valid-1", "\n        import React from \"react\";\n        class YourComponent extends React.Component {\n          shouldComponentUpdate () {}\n        }\n      ", ""},
-		{"upstream valid-2", "\n        import React, {Component} from \"react\";\n        class YourComponent extends Component {\n          shouldComponentUpdate () {}\n        }\n      ", ""},
-		{"upstream valid-3", "\n        import React, {Component} from \"react\";\n        @reactMixin.decorate(PureRenderMixin)\n        class YourComponent extends Component {\n          componentDidMount () {}\n          render() {}\n        }\n      ", ""},
-		{"upstream valid-4", "\n        import React from \"react\";\n        createReactClass({\n          shouldComponentUpdate: function () {}\n        })\n      ", ""},
-		{"upstream valid-5", "\n        import React from \"react\";\n        createReactClass({\n          mixins: [PureRenderMixin]\n        })\n      ", ""},
-		{"upstream valid-6", "\n        @reactMixin.decorate(PureRenderMixin)\n        class DecoratedComponent extends Component {}\n      ", ""},
-		{"upstream valid-7", "\n        const FunctionalComponent = function (props) {\n          return <div />;\n        }\n      ", ""},
-		{"upstream valid-8", "\n        function FunctionalComponent(props) {\n          return <div />;\n        }\n      ", ""},
-		{"upstream valid-9", "\n        const FunctionalComponent = (props) => {\n          return <div />;\n        }\n      ", ""},
-		{"upstream valid-10", "\n        @bar\n        @pureRender\n        @foo\n        class DecoratedComponent extends Component {}\n      ", "{\"allowDecorators\":[\"renderPure\",\"pureRender\"]}"},
-		{"upstream valid-11", "\n        import React from \"react\";\n        class YourComponent extends React.PureComponent {}\n      ", "{\"allowDecorators\":[\"renderPure\",\"pureRender\"]}"},
-		{"upstream valid-12", "\n        import React, {PureComponent} from \"react\";\n        class YourComponent extends PureComponent {}\n      ", "{\"allowDecorators\":[\"renderPure\",\"pureRender\"]}"},
+		{
+			"upstream valid-1",
+			"\n        import React from \"react\";\n        class YourComponent extends React.Component {\n          shouldComponentUpdate () {}\n        }\n      ",
+			"",
+		},
+		{
+			"upstream valid-2",
+			"\n        import React, {Component} from \"react\";\n        class YourComponent extends Component {\n          shouldComponentUpdate () {}\n        }\n      ",
+			"",
+		},
+		{
+			"upstream valid-3",
+			"\n        import React, {Component} from \"react\";\n        @reactMixin.decorate(PureRenderMixin)\n        class YourComponent extends Component {\n          componentDidMount () {}\n          render() {}\n        }\n      ",
+			"",
+		},
+		{
+			"upstream valid-4",
+			"\n        import React from \"react\";\n        createReactClass({\n          shouldComponentUpdate: function () {}\n        })\n      ",
+			"",
+		},
+		{
+			"upstream valid-5",
+			"\n        import React from \"react\";\n        createReactClass({\n          mixins: [PureRenderMixin]\n        })\n      ",
+			"",
+		},
+		{
+			"upstream valid-6",
+			"\n        @reactMixin.decorate(PureRenderMixin)\n        class DecoratedComponent extends Component {}\n      ",
+			"",
+		},
+		{
+			"upstream valid-7",
+			"\n        const FunctionalComponent = function (props) {\n          return <div />;\n        }\n      ",
+			"",
+		},
+		{
+			"upstream valid-8",
+			"\n        function FunctionalComponent(props) {\n          return <div />;\n        }\n      ",
+			"",
+		},
+		{
+			"upstream valid-9",
+			"\n        const FunctionalComponent = (props) => {\n          return <div />;\n        }\n      ",
+			"",
+		},
+		{
+			"upstream valid-10",
+			"\n        @bar\n        @pureRender\n        @foo\n        class DecoratedComponent extends Component {}\n      ",
+			"{\"allowDecorators\":[\"renderPure\",\"pureRender\"]}",
+		},
+		{
+			"upstream valid-11",
+			"\n        import React from \"react\";\n        class YourComponent extends React.PureComponent {}\n      ",
+			"{\"allowDecorators\":[\"renderPure\",\"pureRender\"]}",
+		},
+		{
+			"upstream valid-12",
+			"\n        import React, {PureComponent} from \"react\";\n        class YourComponent extends PureComponent {}\n      ",
+			"{\"allowDecorators\":[\"renderPure\",\"pureRender\"]}",
+		},
 		{"upstream valid-13", "\n        const obj = { prop: [,,,,,] }\n      ", ""},
-		{"upstream valid-14", "\n        import React from \"react\";\n        class YourComponent extends React.Component {\n          handleClick = () => {}\n          shouldComponentUpdate(){\n            return true;\n          }\n          render() {\n            return <div onClick={this.handleClick}>123</div>\n          }\n        }\n      ", ""},
+		{
+			"upstream valid-14",
+			"\n        import React from \"react\";\n        class YourComponent extends React.Component {\n          handleClick = () => {}\n          shouldComponentUpdate(){\n            return true;\n          }\n          render() {\n            return <div onClick={this.handleClick}>123</div>\n          }\n        }\n      ",
+			"",
+		},
 	}
 
 	for _, testCase := range cases {
@@ -136,25 +228,65 @@ func TestRequireOptimizationObjectArmReproducesUpstreamsAccident(test *testing.T
 		sourceText string
 		wantIds    []string
 	}{
-		{"an empty object reports", "declare function createReactClass(spec: any): any;\ncreateReactClass({});\n", []string{"noShouldComponentUpdate"}},
-		{"a non-function value does not exempt", "declare function createReactClass(spec: any): any;\ncreateReactClass({ foo: 1 });\n", []string{"noShouldComponentUpdate"}},
-		{"an unrelated mixin does not exempt", "declare function createReactClass(spec: any): any;\ndeclare const RandomMixin: any;\ncreateReactClass({ mixins: [RandomMixin] });\n", []string{"noShouldComponentUpdate"}},
-		{"ANY function expression exempts", "declare function createReactClass(spec: any): any;\ncreateReactClass({ foo: function () { return 1; } });\n", nil},
-		{"ANY arrow exempts", "declare function createReactClass(spec: any): any;\ncreateReactClass({ foo: () => 1 });\n", nil},
-		{"ANY method shorthand exempts", "declare function createReactClass(spec: any): any;\ncreateReactClass({ foo() { return 1; } });\n", nil},
-		{"the mixin arm exempts", "declare function createReactClass(spec: any): any;\ndeclare const PureRenderMixin: any;\ncreateReactClass({ mixins: [PureRenderMixin] });\n", nil},
-		{"a shouldComponentUpdate property exempts", "declare function createReactClass(spec: any): any;\ncreateReactClass({ shouldComponentUpdate: 1 });\n", nil},
+		{
+			"an empty object reports",
+			"declare function createReactClass(spec: any): any;\ncreateReactClass({});\n",
+			[]string{"noShouldComponentUpdate"},
+		},
+		{
+			"a non-function value does not exempt",
+			"declare function createReactClass(spec: any): any;\ncreateReactClass({ foo: 1 });\n",
+			[]string{"noShouldComponentUpdate"},
+		},
+		{
+			"an unrelated mixin does not exempt",
+			"declare function createReactClass(spec: any): any;\ndeclare const RandomMixin: any;\ncreateReactClass({ mixins: [RandomMixin] });\n",
+			[]string{"noShouldComponentUpdate"},
+		},
+		{
+			"ANY function expression exempts",
+			"declare function createReactClass(spec: any): any;\ncreateReactClass({ foo: function () { return 1; } });\n",
+			nil,
+		},
+		{
+			"ANY arrow exempts",
+			"declare function createReactClass(spec: any): any;\ncreateReactClass({ foo: () => 1 });\n",
+			nil,
+		},
+		{
+			"ANY method shorthand exempts",
+			"declare function createReactClass(spec: any): any;\ncreateReactClass({ foo() { return 1; } });\n",
+			nil,
+		},
+		{
+			"the mixin arm exempts",
+			"declare function createReactClass(spec: any): any;\ndeclare const PureRenderMixin: any;\ncreateReactClass({ mixins: [PureRenderMixin] });\n",
+			nil,
+		},
+		{
+			"a shouldComponentUpdate property exempts",
+			"declare function createReactClass(spec: any): any;\ncreateReactClass({ shouldComponentUpdate: 1 });\n",
+			nil,
+		},
 		// A bare object with no `createReactClass` around it is not a component at all, so the
 		// object arm never sees it. Upstream reaches the object through its component registry;
 		// this port reaches it through the call, and this row pins that the two agree.
 		{"a bare object literal is not a component", "const x = {};\n", nil},
-		{"a bare object with a function is not a component either", "const x = { foo: function () { return 1; } };\n", nil},
+		{
+			"a bare object with a function is not a component either",
+			"const x = { foo: function () { return 1; } };\n",
+			nil,
+		},
 	}
 
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectFindings(test, runRequireOptimization(test, testCase.sourceText, ""), testCase.wantIds...)
+			rule_testing.ExpectFindings(
+				test,
+				runRequireOptimization(test, testCase.sourceText, ""),
+				testCase.wantIds...,
+			)
 		})
 	}
 }
@@ -237,7 +369,11 @@ func TestRequireOptimizationMatchesUpstreamOnShapesTheCorpusOmits(test *testing.
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectFindings(test, runRequireOptimization(test, testCase.sourceText, ""), testCase.wantIds...)
+			rule_testing.ExpectFindings(
+				test,
+				runRequireOptimization(test, testCase.sourceText, ""),
+				testCase.wantIds...,
+			)
 		})
 	}
 }
@@ -258,20 +394,64 @@ func TestRequireOptimizationDecoratorArms(test *testing.T) {
 		rawOptions string
 		wantIds    []string
 	}{
-		{"the built-in decoration exempts", preamble + "@reactMixin.decorate(PureRenderMixin)\nclass C extends Component {}\n", "", nil},
-		{"a different mixin argument reports", preamble + "@reactMixin.decorate(SomeOtherMixin)\nclass C extends Component {}\n", "", []string{"noShouldComponentUpdate"}},
-		{"a different object reports", preamble + "@other.decorate(PureRenderMixin)\nclass C extends Component {}\n", "", []string{"noShouldComponentUpdate"}},
-		{"a different property reports", preamble + "@reactMixin.other(PureRenderMixin)\nclass C extends Component {}\n", "", []string{"noShouldComponentUpdate"}},
-		{"a listed bare decorator exempts", preamble + "@pure\nclass C extends Component {}\n", `{"allowDecorators":["pure"]}`, nil},
-		{"a listed decorator CALLED does not exempt", preamble + "@pure()\nclass C extends Component {}\n", `{"allowDecorators":["pure"]}`, []string{"noShouldComponentUpdate"}},
-		{"an unlisted bare decorator reports", preamble + "@bar\nclass C extends Component {}\n", `{"allowDecorators":["pure"]}`, []string{"noShouldComponentUpdate"}},
-		{"a bare decorator with no option list reports", preamble + "@pure\nclass C extends Component {}\n", "", []string{"noShouldComponentUpdate"}},
+		{
+			"the built-in decoration exempts",
+			preamble + "@reactMixin.decorate(PureRenderMixin)\nclass C extends Component {}\n",
+			"",
+			nil,
+		},
+		{
+			"a different mixin argument reports",
+			preamble + "@reactMixin.decorate(SomeOtherMixin)\nclass C extends Component {}\n",
+			"",
+			[]string{"noShouldComponentUpdate"},
+		},
+		{
+			"a different object reports",
+			preamble + "@other.decorate(PureRenderMixin)\nclass C extends Component {}\n",
+			"",
+			[]string{"noShouldComponentUpdate"},
+		},
+		{
+			"a different property reports",
+			preamble + "@reactMixin.other(PureRenderMixin)\nclass C extends Component {}\n",
+			"",
+			[]string{"noShouldComponentUpdate"},
+		},
+		{
+			"a listed bare decorator exempts",
+			preamble + "@pure\nclass C extends Component {}\n",
+			`{"allowDecorators":["pure"]}`,
+			nil,
+		},
+		{
+			"a listed decorator CALLED does not exempt",
+			preamble + "@pure()\nclass C extends Component {}\n",
+			`{"allowDecorators":["pure"]}`,
+			[]string{"noShouldComponentUpdate"},
+		},
+		{
+			"an unlisted bare decorator reports",
+			preamble + "@bar\nclass C extends Component {}\n",
+			`{"allowDecorators":["pure"]}`,
+			[]string{"noShouldComponentUpdate"},
+		},
+		{
+			"a bare decorator with no option list reports",
+			preamble + "@pure\nclass C extends Component {}\n",
+			"",
+			[]string{"noShouldComponentUpdate"},
+		},
 	}
 
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectFindings(test, runRequireOptimization(test, testCase.sourceText, testCase.rawOptions), testCase.wantIds...)
+			rule_testing.ExpectFindings(
+				test,
+				runRequireOptimization(test, testCase.sourceText, testCase.rawOptions),
+				testCase.wantIds...,
+			)
 		})
 	}
 }
@@ -449,10 +629,14 @@ func TestRequireOptimizationDecodesItsOptions(test *testing.T) {
 func TestRequireOptimizationRejectsMalformedOptions(test *testing.T) {
 	test.Parallel()
 
-	if _, decodeRequireOptimizationOptionsError := DecodeRequireOptimizationOptions([]byte(`{"allowDecorators":`)); decodeRequireOptimizationOptionsError == nil {
+	if _, decodeRequireOptimizationOptionsError := DecodeRequireOptimizationOptions(
+		[]byte(`{"allowDecorators":`),
+	); decodeRequireOptimizationOptionsError == nil {
 		test.Fatal("truncated JSON decoded without error")
 	}
-	if _, decodeRequireOptimizationOptionsError := DecodeRequireOptimizationOptions([]byte(`"error"`)); decodeRequireOptimizationOptionsError == nil {
+	if _, decodeRequireOptimizationOptionsError := DecodeRequireOptimizationOptions(
+		[]byte(`"error"`),
+	); decodeRequireOptimizationOptionsError == nil {
 		test.Fatal("a string decoded into the options struct without error")
 	}
 }
@@ -576,9 +760,18 @@ func TestRequireOptimizationObjectArmReportsWithoutAFunction(test *testing.T) {
 		name       string
 		sourceText string
 	}{
-		{"a spread-only object", "declare function createReactClass(spec: any): any;\ndeclare const spread: any;\ncreateReactClass({ ...spread });\n"},
-		{"a mixins value that is not an array", "declare function createReactClass(spec: any): any;\ncreateReactClass({ mixins: 1 });\n"},
-		{"an empty mixins array", "declare function createReactClass(spec: any): any;\ncreateReactClass({ mixins: [] });\n"},
+		{
+			"a spread-only object",
+			"declare function createReactClass(spec: any): any;\ndeclare const spread: any;\ncreateReactClass({ ...spread });\n",
+		},
+		{
+			"a mixins value that is not an array",
+			"declare function createReactClass(spec: any): any;\ncreateReactClass({ mixins: 1 });\n",
+		},
+		{
+			"an empty mixins array",
+			"declare function createReactClass(spec: any): any;\ncreateReactClass({ mixins: [] });\n",
+		},
 	}
 
 	for _, testCase := range cases {
@@ -605,20 +798,40 @@ func TestRequireOptimizationCreateReactClassSpellings(test *testing.T) {
 		sourceText string
 		wantIds    []string
 	}{
-		{"createReactClass reports", "declare function createReactClass(spec: any): any;\ncreateReactClass({});\n", []string{"noShouldComponentUpdate"}},
+		{
+			"createReactClass reports",
+			"declare function createReactClass(spec: any): any;\ncreateReactClass({});\n",
+			[]string{"noShouldComponentUpdate"},
+		},
 		{"a bare createClass declines", "declare function createClass(spec: any): any;\ncreateClass({});\n", nil},
 		{"React.createClass declines", "declare const React: any;\nReact.createClass({});\n", nil},
 		{"a foreign namespace declines", "declare const Foo: any;\nFoo.createClass({});\n", nil},
 		{"React.createReactClass declines", "declare const React: any;\nReact.createReactClass({});\n", nil},
-		{"an unrelated call declines", "declare function notCreateReactClass(spec: any): any;\nnotCreateReactClass({});\n", nil},
-		{"a call whose name merely contains it declines", "declare function myCreateReactClass(spec: any): any;\nmyCreateReactClass({});\n", nil},
-		{"an ordinary call with an object argument declines", "declare function doThing(spec: any): any;\ndoThing({ a: 1 });\n", nil},
+		{
+			"an unrelated call declines",
+			"declare function notCreateReactClass(spec: any): any;\nnotCreateReactClass({});\n",
+			nil,
+		},
+		{
+			"a call whose name merely contains it declines",
+			"declare function myCreateReactClass(spec: any): any;\nmyCreateReactClass({});\n",
+			nil,
+		},
+		{
+			"an ordinary call with an object argument declines",
+			"declare function doThing(spec: any): any;\ndoThing({ a: 1 });\n",
+			nil,
+		},
 	}
 
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectFindings(test, runRequireOptimization(test, testCase.sourceText, ""), testCase.wantIds...)
+			rule_testing.ExpectFindings(
+				test,
+				runRequireOptimization(test, testCase.sourceText, ""),
+				testCase.wantIds...,
+			)
 		})
 	}
 }

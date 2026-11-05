@@ -131,7 +131,13 @@ func TestImportRequirePathAliasDerivesNothingUnlessAsked(test *testing.T) {
 	fixture := structureFixture("import { Helper } from '../../../libraries/structure/source/Helper';\n")
 
 	rule_testing.ExpectFindings(test,
-		rule_testing.RunTypedFilesWithOptionsFor(test, ImportRequirePathAlias, fixture, derivedImporter, derivedOptions()),
+		rule_testing.RunTypedFilesWithOptionsFor(
+			test,
+			ImportRequirePathAlias,
+			fixture,
+			derivedImporter,
+			derivedOptions(),
+		),
 		"useAlias")
 
 	rule_testing.ExpectClean(test,

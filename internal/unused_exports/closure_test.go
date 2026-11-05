@@ -215,7 +215,9 @@ func TestReExportIsAPassThrough(test *testing.T) {
 		}
 	}
 	if !found {
-		test.Fatalf("BarrelOnlyThing was spared, so a re-export now counts as a use and every unimported barrel is a root")
+		test.Fatalf(
+			"BarrelOnlyThing was spared, so a re-export now counts as a use and every unimported barrel is a root",
+		)
 	}
 
 	// The barrel itself contributes no exports, which is the gap this documents rather than fixes.

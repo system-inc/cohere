@@ -63,7 +63,15 @@ func (context *context) createAnchor(position *position, value string) *Node {
 
 // createBlockValue is upstream's createBlockValue, with createBlockFolded's and createBlockLiteral's
 // type, which they set over the spread blockValue.
-func (context *context) createBlockValue(nodeType string, position *position, content content, chomping string, indent *int, value string, indicatorComment *Node) *Node {
+func (context *context) createBlockValue(
+	nodeType string,
+	position *position,
+	content content,
+	chomping string,
+	indent *int,
+	value string,
+	indicatorComment *Node,
+) *Node {
 	node := context.newNode(nodeType, position)
 	node.LeadingComments = []*Node{}
 	node.withContent(content)
@@ -91,7 +99,14 @@ func (context *context) createDirective(position *position, name string, paramet
 }
 
 // createDocument is upstream's createDocument.
-func (context *context) createDocument(position *position, directivesEndMarker bool, documentEndMarker bool, head *Node, body *Node, trailingComment *Node) *Node {
+func (context *context) createDocument(
+	position *position,
+	directivesEndMarker bool,
+	documentEndMarker bool,
+	head *Node,
+	body *Node,
+	trailingComment *Node,
+) *Node {
 	node := context.newNode("document", position)
 	node.TrailingComment = trailingComment
 	node.DirectivesEndMarker = directivesEndMarker
@@ -109,7 +124,12 @@ func (context *context) createDocumentBody(position *position, content *Node, en
 }
 
 // createDocumentHead is upstream's createDocumentHead.
-func (context *context) createDocumentHead(position *position, children []*Node, endComments []*Node, trailingComment *Node) *Node {
+func (context *context) createDocumentHead(
+	position *position,
+	children []*Node,
+	endComments []*Node,
+	trailingComment *Node,
+) *Node {
 	node := context.newNode("documentHead", position)
 	node.EndComments = endComments
 	node.TrailingComment = trailingComment
@@ -119,7 +139,12 @@ func (context *context) createDocumentHead(position *position, children []*Node,
 
 // createFlowCollection is upstream's createFlowCollection, with createFlowMapping's and
 // createFlowSequence's type.
-func (context *context) createFlowCollection(nodeType string, position *position, content content, children []*Node) *Node {
+func (context *context) createFlowCollection(
+	nodeType string,
+	position *position,
+	content content,
+	children []*Node,
+) *Node {
 	node := context.newNode(nodeType, position)
 	node.LeadingComments = []*Node{}
 	node.EndComments = []*Node{}

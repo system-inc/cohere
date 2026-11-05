@@ -90,12 +90,20 @@ var noUnderscoreDangleCleanCases = []noUnderscoreDangleCase{
 	{name: "upstream valid[21]", source: `foo._bar;`, optionsJson: `{"allow": ["_bar"]}`},
 	{name: "upstream valid[22]", source: `function _foo() {}`, optionsJson: `{"allow": ["_foo"]}`},
 	{name: "upstream valid[23]", source: `this._bar;`, optionsJson: `{"allowAfterThis": true}`},
-	{name: "upstream valid[24]", source: `class foo { constructor() { super._bar; } }`, optionsJson: `{"allowAfterSuper": true}`},
+	{
+		name:        "upstream valid[24]",
+		source:      `class foo { constructor() { super._bar; } }`,
+		optionsJson: `{"allowAfterSuper": true}`,
+	},
 	{name: "upstream valid[25]", source: `class foo { _onClick() { } }`, optionsJson: ""},
 	{name: "upstream valid[26]", source: `class foo { onClick_() { } }`, optionsJson: ""},
 	{name: "upstream valid[27]", source: `const o = { _onClick() { } }`, optionsJson: ""},
 	{name: "upstream valid[28]", source: `const o = { onClick_() { } }`, optionsJson: ""},
-	{name: "upstream valid[29]", source: `const o = { _onClick() { } }`, optionsJson: `{"allow": ["_onClick"], "enforceInMethodNames": true}`},
+	{
+		name:        "upstream valid[29]",
+		source:      `const o = { _onClick() { } }`,
+		optionsJson: `{"allow": ["_onClick"], "enforceInMethodNames": true}`,
+	},
 	{name: "upstream valid[30]", source: `const o = { _foo: 'bar' }`, optionsJson: ""},
 	{name: "upstream valid[31]", source: `const o = { foo_: 'bar' }`, optionsJson: ""},
 	{name: "upstream valid[32]", source: `this.constructor._bar`, optionsJson: `{"allowAfterThisConstructor": true}`},
@@ -103,30 +111,74 @@ var noUnderscoreDangleCleanCases = []noUnderscoreDangleCase{
 	{name: "upstream valid[34]", source: `const foo = (bar) => {}`, optionsJson: ""},
 	{name: "upstream valid[35]", source: `function foo(_bar) {}`, optionsJson: `{"allowFunctionParams": true}`},
 	{name: "upstream valid[36]", source: `function foo( _bar = 0) {}`, optionsJson: `{"allowFunctionParams": true}`},
-	{name: "upstream valid[37]", source: `const foo = { onClick(_bar) { } }`, optionsJson: `{"allowFunctionParams": true}`},
+	{
+		name:        "upstream valid[37]",
+		source:      `const foo = { onClick(_bar) { } }`,
+		optionsJson: `{"allowFunctionParams": true}`,
+	},
 	{name: "upstream valid[38]", source: `const foo = (_bar) => {}`, optionsJson: `{"allowFunctionParams": true}`},
 	{name: "upstream valid[39]", source: `function foo(bar) {}`, optionsJson: `{"allowFunctionParams": false}`},
-	{name: "upstream valid[40]", source: `const foo = { onClick(bar) { } }`, optionsJson: `{"allowFunctionParams": false}`},
+	{
+		name:        "upstream valid[40]",
+		source:      `const foo = { onClick(bar) { } }`,
+		optionsJson: `{"allowFunctionParams": false}`,
+	},
 	{name: "upstream valid[41]", source: `const foo = (bar) => {}`, optionsJson: `{"allowFunctionParams": false}`},
-	{name: "upstream valid[42]", source: `function foo(_bar) {}`, optionsJson: `{"allowFunctionParams": false, "allow": ["_bar"]}`},
-	{name: "upstream valid[43]", source: `const foo = { onClick(_bar) { } }`, optionsJson: `{"allowFunctionParams": false, "allow": ["_bar"]}`},
-	{name: "upstream valid[44]", source: `const foo = (_bar) => {}`, optionsJson: `{"allowFunctionParams": false, "allow": ["_bar"]}`},
+	{
+		name:        "upstream valid[42]",
+		source:      `function foo(_bar) {}`,
+		optionsJson: `{"allowFunctionParams": false, "allow": ["_bar"]}`,
+	},
+	{
+		name:        "upstream valid[43]",
+		source:      `const foo = { onClick(_bar) { } }`,
+		optionsJson: `{"allowFunctionParams": false, "allow": ["_bar"]}`,
+	},
+	{
+		name:        "upstream valid[44]",
+		source:      `const foo = (_bar) => {}`,
+		optionsJson: `{"allowFunctionParams": false, "allow": ["_bar"]}`,
+	},
 	{name: "upstream valid[45]", source: `function foo([_bar]) {}`, optionsJson: `{"allowFunctionParams": false}`},
 	{name: "upstream valid[46]", source: `function foo([_bar] = []) {}`, optionsJson: `{"allowFunctionParams": false}`},
 	{name: "upstream valid[47]", source: `function foo( { _bar }) {}`, optionsJson: `{"allowFunctionParams": false}`},
-	{name: "upstream valid[48]", source: `function foo( { _bar = 0 } = {}) {}`, optionsJson: `{"allowFunctionParams": false}`},
+	{
+		name:        "upstream valid[48]",
+		source:      `function foo( { _bar = 0 } = {}) {}`,
+		optionsJson: `{"allowFunctionParams": false}`,
+	},
 	{name: "upstream valid[49]", source: `function foo(...[_bar]) {}`, optionsJson: `{"allowFunctionParams": false}`},
 	{name: "upstream valid[50]", source: `const [_foo] = arr`, optionsJson: ""},
 	{name: "upstream valid[51]", source: `const [_foo] = arr`, optionsJson: `{}`},
 	{name: "upstream valid[52]", source: `const [_foo] = arr`, optionsJson: `{"allowInArrayDestructuring": true}`},
-	{name: "upstream valid[53]", source: `const [foo, ...rest] = [1, 2, 3]`, optionsJson: `{"allowInArrayDestructuring": false}`},
-	{name: "upstream valid[54]", source: `const [foo, _bar] = [1, 2, 3]`, optionsJson: `{"allowInArrayDestructuring": false, "allow": ["_bar"]}`},
+	{
+		name:        "upstream valid[53]",
+		source:      `const [foo, ...rest] = [1, 2, 3]`,
+		optionsJson: `{"allowInArrayDestructuring": false}`,
+	},
+	{
+		name:        "upstream valid[54]",
+		source:      `const [foo, _bar] = [1, 2, 3]`,
+		optionsJson: `{"allowInArrayDestructuring": false, "allow": ["_bar"]}`,
+	},
 	{name: "upstream valid[55]", source: `const { _foo } = obj`, optionsJson: ""},
 	{name: "upstream valid[56]", source: `const { _foo } = obj`, optionsJson: `{}`},
 	{name: "upstream valid[57]", source: `const { _foo } = obj`, optionsJson: `{"allowInObjectDestructuring": true}`},
-	{name: "upstream valid[58]", source: `const { foo, bar: _bar } = { foo: 1, bar: 2 }`, optionsJson: `{"allowInObjectDestructuring": false, "allow": ["_bar"]}`},
-	{name: "upstream valid[59]", source: `const { foo, _bar } = { foo: 1, _bar: 2 }`, optionsJson: `{"allowInObjectDestructuring": false, "allow": ["_bar"]}`},
-	{name: "upstream valid[60]", source: `const { foo, _bar: bar } = { foo: 1, _bar: 2 }`, optionsJson: `{"allowInObjectDestructuring": false}`},
+	{
+		name:        "upstream valid[58]",
+		source:      `const { foo, bar: _bar } = { foo: 1, bar: 2 }`,
+		optionsJson: `{"allowInObjectDestructuring": false, "allow": ["_bar"]}`,
+	},
+	{
+		name:        "upstream valid[59]",
+		source:      `const { foo, _bar } = { foo: 1, _bar: 2 }`,
+		optionsJson: `{"allowInObjectDestructuring": false, "allow": ["_bar"]}`,
+	},
+	{
+		name:        "upstream valid[60]",
+		source:      `const { foo, _bar: bar } = { foo: 1, _bar: 2 }`,
+		optionsJson: `{"allowInObjectDestructuring": false}`,
+	},
 	{name: "upstream valid[61]", source: `class foo { _field; }`, optionsJson: ""},
 	{name: "upstream valid[62]", source: `class foo { _field; }`, optionsJson: `{"enforceInClassFields": false}`},
 	{name: "upstream valid[63]", source: `class foo { #_field; }`, optionsJson: ""},
@@ -641,7 +693,9 @@ func TestNoUnderscoreDangleDecoderAcceptsTheShapesTheConfigLayerDelivers(test *t
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, decodeNoUnderscoreDangleOptionsError := DecodeNoUnderscoreDangleOptions(json.RawMessage(testCase.raw))
+			decoded, decodeNoUnderscoreDangleOptionsError := DecodeNoUnderscoreDangleOptions(
+				json.RawMessage(testCase.raw),
+			)
 			if testCase.wantErr {
 				if decodeNoUnderscoreDangleOptionsError == nil {
 					test.Fatalf("expected the decoder to refuse %s, got %#v", testCase.raw, decoded)

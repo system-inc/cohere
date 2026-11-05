@@ -16,7 +16,11 @@ func graduationProject(test *testing.T, names ...string) (*Graph, []*ast.SourceF
 	test.Helper()
 	root := test.TempDir()
 	configuration := `{"compilerOptions": {"target": "ES2022", "module": "esnext", "moduleResolution": "bundler", "strict": true, "noEmit": true}}`
-	if writeError := os.WriteFile(filepath.Join(root, "tsconfig.json"), []byte(configuration), 0o644); writeError != nil {
+	if writeError := os.WriteFile(
+		filepath.Join(root, "tsconfig.json"),
+		[]byte(configuration),
+		0o644,
+	); writeError != nil {
 		test.Fatal(writeError)
 	}
 	for _, name := range names {
@@ -51,13 +55,21 @@ func TestGraduationGivesEachContentKeyedShapeTheSignatureAnEmitComputes(test *te
 	shapes, _ := graph.Signatures(backgroundContext, nil)
 	for _, sourceFile := range sources {
 		if entry := shapes[sourceFile.FileName().AsString()]; entry.Signature != entry.Version {
-			test.Fatalf("%s already has a real signature before graduating, so this proves nothing", sourceFile.FileName())
+			test.Fatalf(
+				"%s already has a real signature before graduating, so this proves nothing",
+				sourceFile.FileName(),
+			)
 		}
 	}
 
 	graduated, abandoned := graph.GraduateSignatures(shapes, time.Now().Add(time.Minute), 0)
 	if graduated != len(sources) || abandoned != "" {
-		test.Fatalf("graduated %d of %d, abandoned %q; want every one and none abandoned", graduated, len(sources), abandoned)
+		test.Fatalf(
+			"graduated %d of %d, abandoned %q; want every one and none abandoned",
+			graduated,
+			len(sources),
+			abandoned,
+		)
 	}
 	emitted, _ := graph.Signatures(backgroundContext, RecordedRealSignatures(graph))
 	for _, sourceFile := range sources {
@@ -117,7 +129,11 @@ func TestGraduationStopsAtItsDeadlineAndNeverRetriesTheFileItAbandoned(test *tes
 			test.Errorf("the abandoned %s was emitted again with its bytes unchanged", planted)
 		}
 	}
-	if graduated, abandoned := graph.GraduateSignatures(shapes, time.Now().Add(time.Minute), 0); graduated != 1 || abandoned != "" {
+	if graduated, abandoned := graph.GraduateSignatures(
+		shapes,
+		time.Now().Add(time.Minute),
+		0,
+	); graduated != 1 || abandoned != "" {
 		test.Errorf("the next run graduated %d and abandoned %q; want the one file left and none", graduated, abandoned)
 	}
 
@@ -158,7 +174,11 @@ func TestGraduationLeavesAFileTheDeadlineCaughtEarlyForTheNextRun(test *testing.
 	}
 	graduated, abandoned := graph.GraduateSignatures(shapes, time.Now().Add(200*time.Millisecond), time.Hour)
 	if graduated != 1 || abandoned != "" {
-		test.Fatalf("graduated %d and abandoned %q; want 1 and none, since the caught emit ran for less than abandonAfter", graduated, abandoned)
+		test.Fatalf(
+			"graduated %d and abandoned %q; want 1 and none, since the caught emit ran for less than abandonAfter",
+			graduated,
+			abandoned,
+		)
 	}
 	if entry := shapes[caught.AsString()]; entry.Abandoned || entry.Signature != entry.Version {
 		test.Errorf("the file caught early was not left as it was for the next run: %+v", entry)

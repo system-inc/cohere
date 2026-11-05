@@ -174,8 +174,10 @@ var NoUnnecessaryBooleanLiteralCompare = rule.Rule{
 				// Upstream reports at line zero, column zero, which is a location rather than a
 				// node. The file's first token is the nearest thing this tree has to that and it
 				// puts the finding where a reader will look.
-				ruleContext.ReportRange(ruleContext.SourceFile.AsNode().Loc.WithEnd(ruleContext.SourceFile.AsNode().Loc.Pos()),
-					messageNoUnnecessaryBooleanLiteralCompareNoStrictNullCheck())
+				ruleContext.ReportRange(
+					ruleContext.SourceFile.AsNode().Loc.WithEnd(ruleContext.SourceFile.AsNode().Loc.Pos()),
+					messageNoUnnecessaryBooleanLiteralCompareNoStrictNullCheck(),
+				)
 			},
 			ast.KindBinaryExpression: func(node *ast.Node) {
 				if ruleContext.TypeChecker == nil {

@@ -72,46 +72,97 @@ func TestInitDeclarationsStaysSilentOnUpstreamPassCases(test *testing.T) {
 		{sourceText: "\nfor (var foo of []) {\n}\n      ", options: ""},
 		{sourceText: "let a = true;", options: "[\"always\"]"},
 		{sourceText: "const a = {};", options: "[\"always\"]"},
-		{sourceText: "\nfunction foo() {\n  let a = 1,\n    b = false;\n  if (a) {\n    let c = 3,\n      d = null;\n  }\n}\n      ", options: "[\"always\"]"},
-		{sourceText: "\nfunction foo() {\n  const a = 1,\n    b = true;\n  if (a) {\n    const c = 3,\n      d = null;\n  }\n}\n      ", options: "[\"always\"]"},
-		{sourceText: "\nfunction foo() {\n  let a = 1;\n  const b = false;\n  var c = true;\n}\n      ", options: "[\"always\"]"},
+		{
+			sourceText: "\nfunction foo() {\n  let a = 1,\n    b = false;\n  if (a) {\n    let c = 3,\n      d = null;\n  }\n}\n      ",
+			options:    "[\"always\"]",
+		},
+		{
+			sourceText: "\nfunction foo() {\n  const a = 1,\n    b = true;\n  if (a) {\n    const c = 3,\n      d = null;\n  }\n}\n      ",
+			options:    "[\"always\"]",
+		},
+		{
+			sourceText: "\nfunction foo() {\n  let a = 1;\n  const b = false;\n  var c = true;\n}\n      ",
+			options:    "[\"always\"]",
+		},
 		{sourceText: "var foo;", options: "[\"never\"]"},
 		{sourceText: "var foo, bar, baz;", options: "[\"never\"]"},
 		{sourceText: "\nfunction foo() {\n  var foo;\n  var bar;\n}\n      ", options: "[\"never\"]"},
 		{sourceText: "let a;", options: "[\"never\"]"},
 		{sourceText: "const a = 1;", options: "[\"never\"]"},
-		{sourceText: "\nfunction foo() {\n  let a, b;\n  if (a) {\n    let c, d;\n  }\n}\n      ", options: "[\"never\"]"},
-		{sourceText: "\nfunction foo() {\n  const a = 1,\n    b = true;\n  if (a) {\n    const c = 3,\n      d = null;\n  }\n}\n      ", options: "[\"never\"]"},
+		{
+			sourceText: "\nfunction foo() {\n  let a, b;\n  if (a) {\n    let c, d;\n  }\n}\n      ",
+			options:    "[\"never\"]",
+		},
+		{
+			sourceText: "\nfunction foo() {\n  const a = 1,\n    b = true;\n  if (a) {\n    const c = 3,\n      d = null;\n  }\n}\n      ",
+			options:    "[\"never\"]",
+		},
 		{sourceText: "\nfunction foo() {\n  let a;\n  const b = false;\n  var c;\n}\n      ", options: "[\"never\"]"},
 		{sourceText: "for (var i = 0; i < 1; i++) {}", options: "[\"never\", {\"ignoreForLoopInit\": true}]"},
 		{sourceText: "\nfor (var foo in []) {\n}\n      ", options: "[\"never\", {\"ignoreForLoopInit\": true}]"},
 		{sourceText: "\nfor (var foo of []) {\n}\n      ", options: "[\"never\", {\"ignoreForLoopInit\": true}]"},
-		{sourceText: "\nfunction foo() {\n  var bar = 1;\n  let baz = 2;\n  const qux = 3;\n}\n      ", options: "[\"always\"]"},
+		{
+			sourceText: "\nfunction foo() {\n  var bar = 1;\n  let baz = 2;\n  const qux = 3;\n}\n      ",
+			options:    "[\"always\"]",
+		},
 		{sourceText: "declare const foo: number;", options: "[\"always\"]"},
 		{sourceText: "declare const foo: number;", options: "[\"never\"]"},
-		{sourceText: "\ndeclare namespace myLib {\n  let numberOfGreetings: number;\n}\n      ", options: "[\"always\"]"},
-		{sourceText: "\ndeclare namespace myLib {\n  let numberOfGreetings: number;\n}\n      ", options: "[\"never\"]"},
-		{sourceText: "\ninterface GreetingSettings {\n  greeting: string;\n  duration?: number;\n  color?: string;\n}\n      ", options: ""},
-		{sourceText: "\ninterface GreetingSettings {\n  greeting: string;\n  duration?: number;\n  color?: string;\n}\n      ", options: "[\"never\"]"},
+		{
+			sourceText: "\ndeclare namespace myLib {\n  let numberOfGreetings: number;\n}\n      ",
+			options:    "[\"always\"]",
+		},
+		{
+			sourceText: "\ndeclare namespace myLib {\n  let numberOfGreetings: number;\n}\n      ",
+			options:    "[\"never\"]",
+		},
+		{
+			sourceText: "\ninterface GreetingSettings {\n  greeting: string;\n  duration?: number;\n  color?: string;\n}\n      ",
+			options:    "",
+		},
+		{
+			sourceText: "\ninterface GreetingSettings {\n  greeting: string;\n  duration?: number;\n  color?: string;\n}\n      ",
+			options:    "[\"never\"]",
+		},
 		{sourceText: "type GreetingLike = string | (() => string) | Greeter;", options: ""},
 		{sourceText: "type GreetingLike = string | (() => string) | Greeter;", options: "[\"never\"]"},
 		{sourceText: "\nfunction foo() {\n  var bar: string;\n}\n      ", options: "[\"never\"]"},
 		{sourceText: "var bar: string;", options: "[\"never\"]"},
-		{sourceText: "\nvar bar: string = function (): string {\n  return 'string';\n};\n      ", options: "[\"always\"]"},
-		{sourceText: "\nvar bar: string = function (arg1: string): string {\n  return 'string';\n};\n      ", options: "[\"always\"]"},
+		{
+			sourceText: "\nvar bar: string = function (): string {\n  return 'string';\n};\n      ",
+			options:    "[\"always\"]",
+		},
+		{
+			sourceText: "\nvar bar: string = function (arg1: string): string {\n  return 'string';\n};\n      ",
+			options:    "[\"always\"]",
+		},
 		{sourceText: "function foo(arg1: string = 'string'): void {}", options: "[\"never\"]"},
 		{sourceText: "const foo: string = 'hello';", options: "[\"never\"]"},
-		{sourceText: "\nconst class1 = class NAME {\n  constructor() {\n    var name1: string = 'hello';\n  }\n};\n      ", options: ""},
+		{
+			sourceText: "\nconst class1 = class NAME {\n  constructor() {\n    var name1: string = 'hello';\n  }\n};\n      ",
+			options:    "",
+		},
 		{sourceText: "\nconst class1 = class NAME {\n  static pi: number = 3.14;\n};\n      ", options: ""},
 		{sourceText: "\nconst class1 = class NAME {\n  static pi: number = 3.14;\n};\n      ", options: "[\"never\"]"},
-		{sourceText: "\ninterface IEmployee {\n  empCode: number;\n  empName: string;\n  getSalary: (number) => number; // arrow function\n  getManagerName(number): string;\n}\n      ", options: ""},
-		{sourceText: "\ninterface IEmployee {\n  empCode: number;\n  empName: string;\n  getSalary: (number) => number; // arrow function\n  getManagerName(number): string;\n}\n      ", options: "[\"never\"]"},
+		{
+			sourceText: "\ninterface IEmployee {\n  empCode: number;\n  empName: string;\n  getSalary: (number) => number; // arrow function\n  getManagerName(number): string;\n}\n      ",
+			options:    "",
+		},
+		{
+			sourceText: "\ninterface IEmployee {\n  empCode: number;\n  empName: string;\n  getSalary: (number) => number; // arrow function\n  getManagerName(number): string;\n}\n      ",
+			options:    "[\"never\"]",
+		},
 		{sourceText: "const foo: number = 'asd';", options: "[\"always\"]"},
 		{sourceText: "const foo: number;", options: "[\"never\"]"},
 		{sourceText: "\nnamespace myLib {\n  let numberOfGreetings: number;\n}\n      ", options: "[\"never\"]"},
 		{sourceText: "\nnamespace myLib {\n  let numberOfGreetings: number = 2;\n}\n      ", options: "[\"always\"]"},
-		{sourceText: "\ndeclare namespace myLib1 {\n  const foo: number;\n  namespace myLib2 {\n    let bar: string;\n    namespace myLib3 {\n      let baz: object;\n    }\n  }\n}\n      ", options: "[\"always\"]"},
-		{sourceText: "\ndeclare namespace myLib1 {\n  const foo: number;\n  namespace myLib2 {\n    let bar: string;\n    namespace myLib3 {\n      let baz: object;\n    }\n  }\n}\n      ", options: "[\"never\"]"},
+		{
+			sourceText: "\ndeclare namespace myLib1 {\n  const foo: number;\n  namespace myLib2 {\n    let bar: string;\n    namespace myLib3 {\n      let baz: object;\n    }\n  }\n}\n      ",
+			options:    "[\"always\"]",
+		},
+		{
+			sourceText: "\ndeclare namespace myLib1 {\n  const foo: number;\n  namespace myLib2 {\n    let bar: string;\n    namespace myLib3 {\n      let baz: object;\n    }\n  }\n}\n      ",
+			options:    "[\"never\"]",
+		},
 	}
 	for index, testCase := range cases {
 		test.Run(initDeclarationsCaseName(index), func(test *testing.T) {
@@ -157,11 +208,14 @@ func TestInitDeclarationsFiresOnUpstreamFailCases(test *testing.T) {
 			wantMessages: []string{"Variable 'foo' should be initialized on declaration."},
 		},
 		{
-			sourceText:   "\nvar foo,\n  bar = false,\n  baz;\n      ",
-			options:      "[\"always\"]",
-			wantIds:      []string{"initialized", "initialized"},
-			wantSpans:    []string{"foo", "baz"},
-			wantMessages: []string{"Variable 'foo' should be initialized on declaration.", "Variable 'baz' should be initialized on declaration."},
+			sourceText: "\nvar foo,\n  bar = false,\n  baz;\n      ",
+			options:    "[\"always\"]",
+			wantIds:    []string{"initialized", "initialized"},
+			wantSpans:  []string{"foo", "baz"},
+			wantMessages: []string{
+				"Variable 'foo' should be initialized on declaration.",
+				"Variable 'baz' should be initialized on declaration.",
+			},
 		},
 		{
 			sourceText:   "\nfunction foo() {\n  var foo = 0;\n  var bar;\n}\n      ",
@@ -192,11 +246,14 @@ func TestInitDeclarationsFiresOnUpstreamFailCases(test *testing.T) {
 			wantMessages: []string{"Variable 'b' should be initialized on declaration."},
 		},
 		{
-			sourceText:   "\nfunction foo() {\n  let a;\n  const b = false;\n  var c;\n}\n      ",
-			options:      "[\"always\"]",
-			wantIds:      []string{"initialized", "initialized"},
-			wantSpans:    []string{"a", "c"},
-			wantMessages: []string{"Variable 'a' should be initialized on declaration.", "Variable 'c' should be initialized on declaration."},
+			sourceText: "\nfunction foo() {\n  let a;\n  const b = false;\n  var c;\n}\n      ",
+			options:    "[\"always\"]",
+			wantIds:    []string{"initialized", "initialized"},
+			wantSpans:  []string{"a", "c"},
+			wantMessages: []string{
+				"Variable 'a' should be initialized on declaration.",
+				"Variable 'c' should be initialized on declaration.",
+			},
 		},
 		{
 			sourceText:   "var foo = (bar = 2);",
@@ -213,11 +270,14 @@ func TestInitDeclarationsFiresOnUpstreamFailCases(test *testing.T) {
 			wantMessages: []string{"Variable 'foo' should not be initialized on declaration."},
 		},
 		{
-			sourceText:   "\nvar foo,\n  bar = 5,\n  baz = 3;\n      ",
-			options:      "[\"never\"]",
-			wantIds:      []string{"notInitialized", "notInitialized"},
-			wantSpans:    []string{"bar = 5", "baz = 3"},
-			wantMessages: []string{"Variable 'bar' should not be initialized on declaration.", "Variable 'baz' should not be initialized on declaration."},
+			sourceText: "\nvar foo,\n  bar = 5,\n  baz = 3;\n      ",
+			options:    "[\"never\"]",
+			wantIds:    []string{"notInitialized", "notInitialized"},
+			wantSpans:  []string{"bar = 5", "baz = 3"},
+			wantMessages: []string{
+				"Variable 'bar' should not be initialized on declaration.",
+				"Variable 'baz' should not be initialized on declaration.",
+			},
 		},
 		{
 			sourceText:   "\nfunction foo() {\n  var foo;\n  var bar = foo;\n}\n      ",
@@ -318,11 +378,15 @@ func TestInitDeclarationsFiresOnUpstreamFailCases(test *testing.T) {
 			wantMessages: []string{"Variable 'numberOfGreetings' should not be initialized on declaration."},
 		},
 		{
-			sourceText:   "\nnamespace myLib1 {\n  const foo: number;\n  namespace myLib2 {\n    let bar: string;\n    namespace myLib3 {\n      let baz: object;\n    }\n  }\n}\n      ",
-			options:      "[\"always\"]",
-			wantIds:      []string{"initialized", "initialized", "initialized"},
-			wantSpans:    []string{"foo", "bar", "baz"},
-			wantMessages: []string{"Variable 'foo' should be initialized on declaration.", "Variable 'bar' should be initialized on declaration.", "Variable 'baz' should be initialized on declaration."},
+			sourceText: "\nnamespace myLib1 {\n  const foo: number;\n  namespace myLib2 {\n    let bar: string;\n    namespace myLib3 {\n      let baz: object;\n    }\n  }\n}\n      ",
+			options:    "[\"always\"]",
+			wantIds:    []string{"initialized", "initialized", "initialized"},
+			wantSpans:  []string{"foo", "bar", "baz"},
+			wantMessages: []string{
+				"Variable 'foo' should be initialized on declaration.",
+				"Variable 'bar' should be initialized on declaration.",
+				"Variable 'baz' should be initialized on declaration.",
+			},
 		},
 	}
 	for index, testCase := range cases {
@@ -579,7 +643,9 @@ func TestInitDeclarationsDecoderRefusesWhatUpstreamRefuses(test *testing.T) {
 		`"never"`,
 		`{"mode": "never", "ignoreForLoopInit": true}`,
 	} {
-		if decoded, decodeInitDeclarationsOptionsError := DecodeInitDeclarationsOptions(json.RawMessage(raw)); decodeInitDeclarationsOptionsError == nil {
+		if decoded, decodeInitDeclarationsOptionsError := DecodeInitDeclarationsOptions(
+			json.RawMessage(raw),
+		); decodeInitDeclarationsOptionsError == nil {
 			test.Errorf("%s decoded to %+v; it must be refused", raw, decoded)
 		}
 	}

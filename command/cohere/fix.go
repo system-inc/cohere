@@ -176,7 +176,10 @@ func applyProposedFixes(
 		}
 		// A warning-only directive repair is available to --fix, but must not turn --no-fix red.
 		if !write && diagnostic.RuleName == configuration.UnusedDisable &&
-			unusedDisableSeverity(graph.LintConfig, diagnostic.SourceFile.FileName().AsString()) == configuration.SeverityWarn {
+			unusedDisableSeverity(
+				graph.LintConfig,
+				diagnostic.SourceFile.FileName().AsString(),
+			) == configuration.SeverityWarn {
 			continue
 		}
 		// In the form the format scope holds, since both halves of the union below are keyed by it. The
@@ -367,7 +370,12 @@ func applyProposedFixes(
 // streams, which only the main goroutine writes: it is the real stderr, unbuffered, and a write to it that
 // fails is reported to package streams, which counts it in the exit code. The caller shows streams.Errors
 // first, so the notice cannot arrive ahead of what was said before it.
-func watchedFile(out io.Writer, after time.Duration, fileName string, process func() (edit.FileResult, error)) (edit.FileResult, error) {
+func watchedFile(
+	out io.Writer,
+	after time.Duration,
+	fileName string,
+	process func() (edit.FileResult, error),
+) (edit.FileResult, error) {
 	notice := time.AfterFunc(after, func() {
 		_, writeError := fmt.Fprintf(out, "cohere: %s is still being fixed and formatted after %s, which no file "+
 			"should take. This is likely a bug in cohere, not in your code: please report it at %s with the output "+
@@ -470,7 +478,15 @@ func printWouldChange(out *bufio.Writer, changed []edit.ChangedFile, lineEndings
 			message += crlfReason
 		}
 		printFinding(out,
-			runFinding{Path: file.FileName, Line: 1, Column: 1, Severity: "error", Rule: "fix", MessageID: "would-change", Message: message},
+			runFinding{
+				Path:      file.FileName,
+				Line:      1,
+				Column:    1,
+				Severity:  "error",
+				Rule:      "fix",
+				MessageID: "would-change",
+				Message:   message,
+			},
 			fmt.Sprintf("%s:1:1 - %s [fix/would-change]\n", file.FileName, message))
 	}
 }
@@ -689,7 +705,8 @@ func proposalsForText(
 		walkNode(sourceFile.AsNode(), listeners)
 	}
 
-	if len(directives.Directives()) > 0 && unusedDisableSeverity(graph.LintConfig, fileName) != configuration.SeverityOff {
+	if len(directives.Directives()) > 0 &&
+		unusedDisableSeverity(graph.LintConfig, fileName) != configuration.SeverityOff {
 		ran := make([]string, 0, len(applicable))
 		for _, subject := range applicable {
 			ran = append(ran, subject.Name)
@@ -753,14 +770,29 @@ type formatSpeculation struct {
 // programs is where the program arrives once it is built, or nil. Every other file goes first, so the program
 // has the time to be built while they are formatted, and a TypeScript file reached before then is parsed, as
 // before: nothing waits for the program.
-func speculateFormat(candidates []string, transform edit.Transform, maximumPasses int, programs *programOffer) *formatSpeculation {
+func speculateFormat(
+	candidates []string,
+	transform edit.Transform,
+	maximumPasses int,
+	programs *programOffer,
+) *formatSpeculation {
 	return speculateFormatOn(candidates, transform, maximumPasses, speculationWorkers(), programs)
 }
 
 // speculateFormatOn is speculateFormat on a given number of workers.
-func speculateFormatOn(candidates []string, transform edit.Transform, maximumPasses int, workers int, programs *programOffer) *formatSpeculation {
-	speculation := &formatSpeculation{done: make(chan struct{}), attempts: map[string]formatAttempt{}, read: map[string]string{},
-		stopped: make(chan struct{})}
+func speculateFormatOn(
+	candidates []string,
+	transform edit.Transform,
+	maximumPasses int,
+	workers int,
+	programs *programOffer,
+) *formatSpeculation {
+	speculation := &formatSpeculation{
+		done:     make(chan struct{}),
+		attempts: map[string]formatAttempt{},
+		read:     map[string]string{},
+		stopped:  make(chan struct{}),
+	}
 	speculation.limit.Store(int32(workers))
 	if transform == nil || len(candidates) == 0 || workers == 0 {
 		close(speculation.done)
@@ -808,9 +840,22 @@ func speculateFormatOn(candidates []string, transform edit.Transform, maximumPas
 				var result edit.FileResult
 				var err error
 				if tree := programs.unchangedTreeOf(fileName); tree != nil {
-					result, err = edit.CheckTextSeeded(fileName, tree.Text(), tree, unproposed, transform, maximumPasses)
+					result, err = edit.CheckTextSeeded(
+						fileName,
+						tree.Text(),
+						tree,
+						unproposed,
+						transform,
+						maximumPasses,
+					)
 				} else {
-					result, err = edit.CheckFileSeeded(fileName, programs.boundTreeOf(fileName), unproposed, transform, maximumPasses)
+					result, err = edit.CheckFileSeeded(
+						fileName,
+						programs.boundTreeOf(fileName),
+						unproposed,
+						transform,
+						maximumPasses,
+					)
 				}
 				// Only an unchanged result is final this early. A changed one is left to the path after the
 				// walk, which writes it, or re-lints it where its type has rules: a markdown, css or json file
@@ -851,10 +896,11 @@ func (programs *programOffer) offer(graph *program.Graph) {
 }
 
 // unchangedTreeOf is boundTreeOf's tree when the program's copy of the file is the file's bytes, by the stat it
-// was read under and a file that starts with no byte order mark (Graph.ReadUnchanged): the speculation then formats the tree's own text and reads nothing (#q6dey77). Rereading every file to
-// compare it with the tree was 51 MB on a cold ahra run. A file changed on disk since the program read it has
-// another stat, so it is read as before, its bytes differ from the program's, and keepable discards the
-// attempt: an edit made after the walk read the file is still noticed.
+// was read under and a file that starts with no byte order mark (Graph.ReadUnchanged): the speculation then formats the
+// tree's own text and reads nothing (#q6dey77). Rereading every file to compare it with the tree was 51 MB on a cold
+// ahra run. A file changed on disk since the program read it has another stat, so it is read as before, its bytes
+// differ from the program's, and keepable discards the attempt: an edit made after the walk read the file is still
+// noticed.
 func (programs *programOffer) unchangedTreeOf(fileName string) *ast.SourceFile {
 	tree := programs.boundTreeOf(fileName)
 	if tree == nil || !programs.graph.Load().ReadUnchanged(fileName, tree.Text()) {
@@ -921,7 +967,10 @@ func (speculation *formatSpeculation) wait() {
 // whose bytes, where the walk read the file, are the bytes the attempt read. A result whose file has a
 // proposal describes text the fixes will replace, and one read from other bytes than the walk's would pair
 // the walk's findings with formatting of a different file.
-func (speculation *formatSpeculation) keepable(byFileName map[string][]edit.Proposal, graph *program.Graph) map[string]formatAttempt {
+func (speculation *formatSpeculation) keepable(
+	byFileName map[string][]edit.Proposal,
+	graph *program.Graph,
+) map[string]formatAttempt {
 	speculation.wait()
 	kept := make(map[string]formatAttempt, len(speculation.attempts))
 	for fileName, attempt := range speculation.attempts {
@@ -929,7 +978,9 @@ func (speculation *formatSpeculation) keepable(byFileName map[string][]edit.Prop
 			continue
 		}
 		if attempt.err == nil && graph != nil && graph.Program != nil {
-			if sourceFile := graph.Program.GetSourceFile(tspath.RootedFilePath(fileName)); sourceFile != nil && sourceFile.Text() != speculation.read[fileName] {
+			if sourceFile := graph.Program.GetSourceFile(
+				tspath.RootedFilePath(fileName),
+			); sourceFile != nil && sourceFile.Text() != speculation.read[fileName] {
 				continue
 			}
 		}

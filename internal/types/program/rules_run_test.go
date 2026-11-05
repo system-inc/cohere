@@ -41,7 +41,10 @@ func TestRulesRunCountsOnlyTheRulesOfferedAFile(test *testing.T) {
 			}}
 		}}
 	}
-	declines := rule.Rule{Name: "test-declines", Run: func(ruleContext rule.Context, options any) rule.Listeners { return nil }}
+	declines := rule.Rule{
+		Name: "test-declines",
+		Run:  func(ruleContext rule.Context, options any) rule.Listeners { return nil },
+	}
 	rules := []rule.Rule{listens("test-listens"), declines, listens("test-off"), listens("test-only-in-special"),
 		listens("test-nobody-configured")}
 
@@ -50,7 +53,10 @@ func TestRulesRunCountsOnlyTheRulesOfferedAFile(test *testing.T) {
 		test.Fatalf("walking: %v", err)
 	}
 	if result.Coverage.RulesRun != 3 {
-		test.Errorf("RulesRun is %d of the %d rules handed in, want 3: test-listens, test-declines and test-only-in-special",
-			result.Coverage.RulesRun, len(rules))
+		test.Errorf(
+			"RulesRun is %d of the %d rules handed in, want 3: test-listens, test-declines and test-only-in-special",
+			result.Coverage.RulesRun,
+			len(rules),
+		)
 	}
 }

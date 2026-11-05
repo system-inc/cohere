@@ -14,7 +14,11 @@ func TestOfAnImportDeclaration(test *testing.T) {
 	test.Parallel()
 
 	text := "/* lead */ import { a, /* gap */ b } from 'm';\nconst c = 1;\n"
-	sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/file.ts", PathKey: "/file.ts"}, text, core.ScriptKindTS)
+	sourceFile := parser.ParseSourceFile(
+		ast.SourceFileParseOptions{FileName: "/file.ts", PathKey: "/file.ts"},
+		text,
+		core.ScriptKindTS,
+	)
 	statement := sourceFile.Statements.Nodes[0]
 	list := Of(sourceFile, statement)
 
@@ -34,7 +38,9 @@ func TestOfAnImportDeclaration(test *testing.T) {
 	}
 
 	bStart := len("/* lead */ import { a, /* gap */ ")
-	if comma, found := list.Before(bStart); !found || comma.Kind != ast.KindCommaToken || text[comma.Start:comma.End] != "," {
+	if comma, found := list.Before(
+		bStart,
+	); !found || comma.Kind != ast.KindCommaToken || text[comma.Start:comma.End] != "," {
 		test.Errorf("before b: %+v, %v, want the comma", comma, found)
 	}
 	if brace, found := list.After(bStart + 1); !found || brace.Kind != ast.KindCloseBraceToken {
@@ -43,7 +49,11 @@ func TestOfAnImportDeclaration(test *testing.T) {
 	if _, found := list.FirstBetween(0, bStart, ast.KindCloseBraceToken); found {
 		test.Error("found a closing brace before b, where there is none")
 	}
-	if brace, found := list.FirstBetween(0, len(text), ast.KindCloseBraceToken); !found || text[brace.Start:brace.End] != "}" {
+	if brace, found := list.FirstBetween(
+		0,
+		len(text),
+		ast.KindCloseBraceToken,
+	); !found || text[brace.Start:brace.End] != "}" {
 		test.Errorf("first closing brace: %+v, %v", brace, found)
 	}
 }

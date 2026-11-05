@@ -387,8 +387,11 @@ func TestNoRegexSpacesShapesOurCorpusDoesNotCover(test *testing.T) {
 
 	test.Run("a parenthesized callee is still the RegExp constructor", func(test *testing.T) {
 		test.Parallel()
-		rule_testing.ExpectFindings(test,
-			rule_testing.Run(test, NoRegexSpaces, regexSpacesFile, "var foo = new (RegExp)('bar  baz');"), "multipleSpaces")
+		rule_testing.ExpectFindings(
+			test,
+			rule_testing.Run(test, NoRegexSpaces, regexSpacesFile, "var foo = new (RegExp)('bar  baz');"),
+			"multipleSpaces",
+		)
 	})
 
 	silent := []struct {

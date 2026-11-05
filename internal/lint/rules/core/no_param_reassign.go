@@ -278,7 +278,11 @@ func isOwnParameterBinding(identifier *ast.Node, anchors map[*ast.Node]string) b
 // asked through the plain one answers with the property's symbol, which reads exactly like a
 // correctly declined shadow. That case is in upstream's corpus as a failing one, so the wrong
 // accessor loses a finding silently.
-func anchoredParameterName(ruleContext rule.Context, identifier *ast.Node, anchors map[*ast.Node]string) (string, bool) {
+func anchoredParameterName(
+	ruleContext rule.Context,
+	identifier *ast.Node,
+	anchors map[*ast.Node]string,
+) (string, bool) {
 	// A cheap pre-filter before a checker call, since this runs on every identifier in every
 	// function body. Symbol identity already implies the text matches, so this decides nothing.
 	matchesAnyName := false
@@ -294,7 +298,9 @@ func anchoredParameterName(ruleContext rule.Context, identifier *ast.Node, ancho
 
 	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(identifier)
 	if identifier.Parent != nil && identifier.Parent.Kind == ast.KindShorthandPropertyAssignment {
-		if valueSymbol := ruleContext.TypeChecker.GetShorthandAssignmentValueSymbol(identifier.Parent); valueSymbol != nil {
+		if valueSymbol := ruleContext.TypeChecker.GetShorthandAssignmentValueSymbol(
+			identifier.Parent,
+		); valueSymbol != nil {
 			symbol = valueSymbol
 		}
 	}

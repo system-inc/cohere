@@ -161,7 +161,10 @@ func PlanPrune(paths Paths, keep []string, currentCompiler string, now time.Time
 			plan.Remove = append(plan.Remove, PrunedFile{Name: candidate.name, Bytes: candidate.bytes})
 		}
 	}
-	sort.Slice(plan.Remove, func(first int, second int) bool { return plan.Remove[first].Name < plan.Remove[second].Name })
+	sort.Slice(
+		plan.Remove,
+		func(first int, second int) bool { return plan.Remove[first].Name < plan.Remove[second].Name },
+	)
 	sort.Strings(plan.Unrecognised)
 
 	// Without the current compiler named, nothing says which extraction a build is reading, so none is
@@ -198,7 +201,10 @@ func planStaleDirectories(parent string, current string, now time.Time) ([]Prune
 		if infoError != nil || now.Sub(information.ModTime()) < pruneInFlightWindow {
 			continue
 		}
-		stale = append(stale, PrunedFile{Name: entry.Name(), Bytes: directoryBytes(filepath.Join(parent, entry.Name()))})
+		stale = append(
+			stale,
+			PrunedFile{Name: entry.Name(), Bytes: directoryBytes(filepath.Join(parent, entry.Name()))},
+		)
 	}
 	return stale, nil
 }
@@ -228,7 +234,10 @@ func ApplyPrune(paths Paths, plan PrunePlan) ([]PrunedFile, error) {
 	removed := []PrunedFile{}
 	for _, file := range plan.Remove {
 		if file.Name == "" || file.Name != filepath.Base(file.Name) {
-			return removed, fmt.Errorf("refusing to remove %q from the binary cache: it is not a plain file name", file.Name)
+			return removed, fmt.Errorf(
+				"refusing to remove %q from the binary cache: it is not a plain file name",
+				file.Name,
+			)
 		}
 		removeError := os.Remove(filepath.Join(paths.BinaryDirectory(), file.Name))
 		if errors.Is(removeError, os.ErrNotExist) {
@@ -251,8 +260,15 @@ func ApplyPrune(paths Paths, plan PrunePlan) ([]PrunedFile, error) {
 		{paths.SnapshotDirectory(), plan.StaleSnapshots},
 	} {
 		for _, directory := range group.list {
-			if directory.Name == "" || directory.Name == "." || directory.Name == ".." || directory.Name != filepath.Base(directory.Name) {
-				return removed, fmt.Errorf("refusing to remove %q from %s: it is not a plain directory name", directory.Name, group.parent)
+			if directory.Name == "" ||
+				directory.Name == "." ||
+				directory.Name == ".." ||
+				directory.Name != filepath.Base(directory.Name) {
+				return removed, fmt.Errorf(
+					"refusing to remove %q from %s: it is not a plain directory name",
+					directory.Name,
+					group.parent,
+				)
 			}
 			path := filepath.Join(group.parent, directory.Name)
 			information, statError := os.Lstat(path)
@@ -267,7 +283,10 @@ func ApplyPrune(paths Paths, plan PrunePlan) ([]PrunedFile, error) {
 			if removeError := os.RemoveAll(path); removeError != nil {
 				return removed, fmt.Errorf("removing %s: %w", path, removeError)
 			}
-			removed = append(removed, PrunedFile{Name: filepath.Join(filepath.Base(group.parent), directory.Name), Bytes: directory.Bytes})
+			removed = append(
+				removed,
+				PrunedFile{Name: filepath.Join(filepath.Base(group.parent), directory.Name), Bytes: directory.Bytes},
+			)
 		}
 	}
 	return removed, nil
@@ -286,7 +305,14 @@ func RecordPrune(paths Paths, plan PrunePlan, removed []PrunedFile, now time.Tim
 		bytes += file.Bytes
 	}
 	var entry strings.Builder
-	fmt.Fprintf(&entry, "%s examined %d, removed %d (%d bytes)\n", now.Format(time.RFC3339), plan.Examined, len(removed), bytes)
+	fmt.Fprintf(
+		&entry,
+		"%s examined %d, removed %d (%d bytes)\n",
+		now.Format(time.RFC3339),
+		plan.Examined,
+		len(removed),
+		bytes,
+	)
 	for _, file := range removed {
 		fmt.Fprintf(&entry, "  removed %s (%d bytes)\n", file.Name, file.Bytes)
 	}

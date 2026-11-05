@@ -70,7 +70,12 @@ func (exports *Exports) importer(fileSet *token.FileSet) types.Importer {
 	return importer.ForCompiler(fileSet, "gc", func(path string) (io.ReadCloser, error) {
 		file := exports.files[path]
 		if file == "" {
-			return nil, fmt.Errorf("the %s product (%s) holds no export data for %s", exports.name, exports.key[:12], path)
+			return nil, fmt.Errorf(
+				"the %s product (%s) holds no export data for %s",
+				exports.name,
+				exports.key[:12],
+				path,
+			)
 		}
 		return os.Open(file)
 	})
@@ -106,7 +111,12 @@ func (product Product) state() (*productState, error) {
 	}
 	for _, listedPackage := range listed.packages {
 		if listedPackage.Error != nil {
-			return nil, fmt.Errorf("listing the %s product's packages: %s: %s", product.Name, listedPackage.ImportPath, listedPackage.Error.Err)
+			return nil, fmt.Errorf(
+				"listing the %s product's packages: %s: %s",
+				product.Name,
+				listedPackage.ImportPath,
+				listedPackage.Error.Err,
+			)
 		}
 	}
 	environment, err := goEnvironmentValues(product.Directory, product.Environment)
@@ -128,7 +138,13 @@ func (product Product) state() (*productState, error) {
 // productKey is the product's key and its description, one line per keyed fact, from a listing: a pure
 // function of what go list and go env said, and of the repository's files, so the same tree keys the same
 // wherever it sits.
-func productKey(product Product, root string, environment map[string]string, listed *listing, exported map[string]bool) (string, string, error) {
+func productKey(
+	product Product,
+	root string,
+	environment map[string]string,
+	listed *listing,
+	exported map[string]bool,
+) (string, string, error) {
 	hash := sha256.New()
 	field := func(writer io.Writer, kind, value string) {
 		// Ignored: every writer handed here is a sha256 hash, whose Write never returns an error.
@@ -137,7 +153,13 @@ func productKey(product Product, root string, environment map[string]string, lis
 	lines := []string{
 		"name go types " + product.Name,
 		"patterns " + strings.Join(product.Patterns, " "),
-		fmt.Sprintf("go %s %s/%s GOEXPERIMENT=%s", environment["GOVERSION"], environment["GOOS"], environment["GOARCH"], environment["GOEXPERIMENT"]),
+		fmt.Sprintf(
+			"go %s %s/%s GOEXPERIMENT=%s",
+			environment["GOVERSION"],
+			environment["GOOS"],
+			environment["GOARCH"],
+			environment["GOEXPERIMENT"],
+		),
 	}
 	field(hash, "format", productFormat)
 	field(hash, "name", product.Name)
@@ -152,8 +174,15 @@ func productKey(product Product, root string, environment map[string]string, lis
 	sort.Strings(paths)
 	relative := func(path string) (string, error) {
 		within, relativePathError := filepath.Rel(root, path)
-		if relativePathError != nil || within == ".." || strings.HasPrefix(within, ".."+string(filepath.Separator)) || filepath.IsAbs(within) {
-			return "", fmt.Errorf("%s is outside the repository at %s, so nothing can key it the same on another machine", path, root)
+		if relativePathError != nil ||
+			within == ".." ||
+			strings.HasPrefix(within, ".."+string(filepath.Separator)) ||
+			filepath.IsAbs(within) {
+			return "", fmt.Errorf(
+				"%s is outside the repository at %s, so nothing can key it the same on another machine",
+				path,
+				root,
+			)
 		}
 		return filepath.ToSlash(within), nil
 	}
@@ -169,12 +198,19 @@ func productKey(product Product, root string, environment map[string]string, lis
 		listedPackage := listed.byPath[path]
 		packageHash := sha256.New()
 		field(packageHash, "package", path)
-		field(packageHash, "files", strings.Join(append(append([]string{}, listedPackage.GoFiles...), listedPackage.CgoFiles...), " "))
+		field(
+			packageHash,
+			"files",
+			strings.Join(append(append([]string{}, listedPackage.GoFiles...), listedPackage.CgoFiles...), " "),
+		)
 		origin := "standard"
 		if !listedPackage.Standard && path != "unsafe" {
 			module := listedPackage.Module
 			if module == nil {
-				return "", "", fmt.Errorf("%s is in no module and not in the standard library, so it cannot be keyed", path)
+				return "", "", fmt.Errorf(
+					"%s is in no module and not in the standard library, so it cannot be keyed",
+					path,
+				)
 			}
 			modulePath, version, directory := module.Path, module.Version, module.Dir
 			if module.Replace != nil {
@@ -247,11 +283,19 @@ func (product Product) Find() (*Exports, error) {
 		// The description's first lines say what was keyed; one line per package follows, which otherKeys
 		// compares against any product of this name the cache does hold.
 		lines := strings.SplitAfterN(state.description, "\n", 4)
-		return nil, fmt.Errorf("the %s product %s is not in %s: it is the export data of the %d packages outside the module "+
-			"that %s import, and a test that reads it never builds it, since building compiles. %s builds it: on Workshop "+
-			"before the tests run, and locally as the first test of a plain `go test` of its package.%s\nIt keyed:\n%s",
-			product.Name, state.key[:12], state.cache, len(state.exported), strings.Join(product.Patterns, " "), product.Test,
-			otherKeys(product, state), strings.Join(lines[:min(3, len(lines))], ""))
+		return nil, fmt.Errorf(
+			"the %s product %s is not in %s: it is the export data of the %d packages outside the module "+
+				"that %s import, and a test that reads it never builds it, since building compiles. %s builds it: on Workshop "+
+				"before the tests run, and locally as the first test of a plain `go test` of its package.%s\nIt keyed:\n%s",
+			product.Name,
+			state.key[:12],
+			state.cache,
+			len(state.exported),
+			strings.Join(product.Patterns, " "),
+			product.Test,
+			otherKeys(product, state),
+			strings.Join(lines[:min(3, len(lines))], ""),
+		)
 	}
 	if err != nil {
 		return nil, err
@@ -293,7 +337,10 @@ func otherKeys(product Product, state *productState) string {
 				break
 			}
 		}
-		found = append(found, fmt.Sprintf("\nThe cache holds it under %s instead, which keyed %s.", key[:min(12, len(key))], difference))
+		found = append(
+			found,
+			fmt.Sprintf("\nThe cache holds it under %s instead, which keyed %s.", key[:min(12, len(key))], difference),
+		)
 	}
 	return strings.Join(found, "")
 }
@@ -313,13 +360,25 @@ func open(product Product, state *productState) (*Exports, error) {
 	for path, file := range read.Packages {
 		absolute := filepath.Join(directory, filepath.FromSlash(file))
 		if _, statError := os.Stat(absolute); statError != nil {
-			return nil, fmt.Errorf("the %s product %s names %s for %s, and it is not there: the product is incomplete: %w", product.Name, state.key[:12], file, path, statError)
+			return nil, fmt.Errorf(
+				"the %s product %s names %s for %s, and it is not there: the product is incomplete: %w",
+				product.Name,
+				state.key[:12],
+				file,
+				path,
+				statError,
+			)
 		}
 		exports.files[path] = absolute
 	}
 	for path := range state.exported {
 		if path != "unsafe" && exports.files[path] == "" {
-			return nil, fmt.Errorf("the %s product %s holds no export data for %s, which its key covers: the product is incomplete", product.Name, state.key[:12], path)
+			return nil, fmt.Errorf(
+				"the %s product %s holds no export data for %s, which its key covers: the product is incomplete",
+				product.Name,
+				state.key[:12],
+				path,
+			)
 		}
 	}
 	return exports, nil
@@ -351,7 +410,11 @@ func (product Product) Build() (*Exports, error) {
 	if compileError := product.compile(state, scratch); compileError != nil {
 		return nil, compileError
 	}
-	if writeError := os.WriteFile(filepath.Join(state.cache, state.key+".inputs"), []byte(state.description), 0o644); writeError != nil {
+	if writeError := os.WriteFile(
+		filepath.Join(state.cache, state.key+".inputs"),
+		[]byte(state.description),
+		0o644,
+	); writeError != nil {
 		return nil, writeError
 	}
 	destination := filepath.Join(state.cache, state.key)
@@ -405,7 +468,11 @@ func (product Product) compile(state *productState, directory string) error {
 	sort.Strings(patterns)
 	// -trimpath, so the export data's positions name no checkout path and the product's bytes are the same
 	// from any checkout.
-	output, err := goCommand(product.Directory, product.Environment, append([]string{"list", "-export", "-trimpath", "-deps", "-json=ImportPath,Export,Error"}, patterns...)...)
+	output, err := goCommand(
+		product.Directory,
+		product.Environment,
+		append([]string{"list", "-export", "-trimpath", "-deps", "-json=ImportPath,Export,Error"}, patterns...)...,
+	)
 	if err != nil {
 		return fmt.Errorf("building the %s product: %w", product.Name, err)
 	}
@@ -426,7 +493,11 @@ func (product Product) compile(state *productState, directory string) error {
 			return fmt.Errorf("building the %s product: %s: %s", product.Name, listed.ImportPath, listed.Error.Err)
 		}
 		if !state.exported[listed.ImportPath] {
-			return fmt.Errorf("building the %s product, go list reached %s, which the key does not cover", product.Name, listed.ImportPath)
+			return fmt.Errorf(
+				"building the %s product, go list reached %s, which the key does not cover",
+				product.Name,
+				listed.ImportPath,
+			)
 		}
 		exportFiles[listed.ImportPath] = listed.Export
 	}
@@ -450,10 +521,20 @@ func (product Product) compile(state *productState, directory string) error {
 			return err
 		}
 		if content, err = exportDataOnly(content); err != nil {
-			return fmt.Errorf("building the %s product, %s's export file %s: %w", product.Name, path, exportFiles[path], err)
+			return fmt.Errorf(
+				"building the %s product, %s's export file %s: %w",
+				product.Name,
+				path,
+				exportFiles[path],
+				err,
+			)
 		}
 		name := fmt.Sprintf("exports/%04d.a", index)
-		if writeError := os.WriteFile(filepath.Join(directory, filepath.FromSlash(name)), content, 0o644); writeError != nil {
+		if writeError := os.WriteFile(
+			filepath.Join(directory, filepath.FromSlash(name)),
+			content,
+			0o644,
+		); writeError != nil {
 			return writeError
 		}
 		written.Packages[path] = name
@@ -478,7 +559,10 @@ func exportDataOnly(archive []byte) ([]byte, error) {
 	for offset+headerSize <= len(archive) {
 		header := archive[offset : offset+headerSize]
 		var size int
-		if _, scanError := fmt.Sscan(string(bytes.TrimSpace(header[48:58])), &size); scanError != nil || size < 0 || offset+headerSize+size > len(archive) {
+		if _, scanError := fmt.Sscan(
+			string(bytes.TrimSpace(header[48:58])),
+			&size,
+		); scanError != nil || size < 0 || offset+headerSize+size > len(archive) {
 			return nil, fmt.Errorf("its member at %d has a malformed size", offset)
 		}
 		if string(bytes.TrimSpace(header[:16])) == "__.PKGDEF" {
@@ -510,5 +594,12 @@ func record(product Product, key, outcome string, started time.Time) {
 	// and the build it counts succeeded either way.
 	defer file.Close()
 	// Ignored: a census line that does not land is lost the same best-effort way the open above loses one.
-	fmt.Fprintf(file, "build %s %s %s %.2f\n", strings.ReplaceAll("go types "+product.Name, " ", "_"), key[:12], outcome, time.Since(started).Seconds())
+	fmt.Fprintf(
+		file,
+		"build %s %s %s %.2f\n",
+		strings.ReplaceAll("go types "+product.Name, " ", "_"),
+		key[:12],
+		outcome,
+		time.Since(started).Seconds(),
+	)
 }

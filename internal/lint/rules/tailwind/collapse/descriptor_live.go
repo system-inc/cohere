@@ -123,8 +123,8 @@ func NewTable(system *LoadedDesignSystem) *Table {
 // addThemeNamespaces fills Namespaces and KeysByNamespace from the repository's own theme.
 //
 // This is the per-repository half of the table and the reason no table can be committed. It mirrors
-// `internal/lint/rules/tailwind/tools/generate_descriptor_table/context.mjs`, which asks the engine the same question the
-// same way, because the two must agree: the readings in the base table were measured under the
+// `internal/lint/rules/tailwind/tools/generate_descriptor_table/context.mjs`, which asks the engine the same question
+// the same way, because the two must agree: the readings in the base table were measured under the
 // namespace set that function produces, and a namespace set derived differently would make the table
 // answer a different question than the lookup asks.
 func (table *Table) addThemeNamespaces(theme *Theme) {

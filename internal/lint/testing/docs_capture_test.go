@@ -20,8 +20,11 @@ var captureProbe = rule.Rule{
 	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindDebuggerStatement: func(node *ast.Node) {
-				ruleContext.ReportNodeWithFixes(node, rule.Message{Id: "debugger", Description: "A debugger statement."},
-					rule.Fix{Range: rule.TokenRange(ruleContext.SourceFile, node)})
+				ruleContext.ReportNodeWithFixes(
+					node,
+					rule.Message{Id: "debugger", Description: "A debugger statement."},
+					rule.Fix{Range: rule.TokenRange(ruleContext.SourceFile, node)},
+				)
 			},
 		}
 	},
@@ -111,7 +114,15 @@ func TestDocsCaptureRecordsOnlyAssertedCases(test *testing.T) {
 		}
 		// The statement opens line 2 at its third byte, and its range ends after the semicolon, so the end
 		// column is the twelfth: one past the last byte, as a range end is.
-		want := capture.Finding{Line: 2, Column: 3, EndLine: 2, EndColumn: 12, MessageId: "debugger", Message: "A debugger statement.", Fix: true}
+		want := capture.Finding{
+			Line:      2,
+			Column:    3,
+			EndLine:   2,
+			EndColumn: 12,
+			MessageId: "debugger",
+			Message:   "A debugger statement.",
+			Fix:       true,
+		}
 		if len(record.Findings) != 1 || record.Findings[0] != want {
 			test.Errorf("findings %+v, want [%+v]", record.Findings, want)
 		}

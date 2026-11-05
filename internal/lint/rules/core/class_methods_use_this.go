@@ -111,7 +111,9 @@ var ClassMethodsUseThis = rule.Rule{
 	Name: "class-methods-use-this",
 	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		resolved := DefaultClassMethodsUseThisOptions()
-		if given, isClassMethodsUseThisOptions := rule.OptionsAs[ClassMethodsUseThisOptions](options); isClassMethodsUseThisOptions {
+		if given, isClassMethodsUseThisOptions := rule.OptionsAs[ClassMethodsUseThisOptions](
+			options,
+		); isClassMethodsUseThisOptions {
 			resolved = given
 		}
 		enforceForClassFields := true

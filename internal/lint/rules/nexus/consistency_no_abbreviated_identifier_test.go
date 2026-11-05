@@ -122,7 +122,11 @@ func TestConsistencyNoAbbreviatedIdentifierFires(test *testing.T) {
 		{"destructured binding", "const { props } = source;\n", []string{"abbreviatedIdentifier"}},
 
 		// Every reference reports, not just the declaration.
-		{"declaration and reference", "const idx = 0;\nuse(idx);\n", []string{"abbreviatedIdentifier", "abbreviatedIdentifier"}},
+		{
+			"declaration and reference",
+			"const idx = 0;\nuse(idx);\n",
+			[]string{"abbreviatedIdentifier", "abbreviatedIdentifier"},
+		},
 
 		// `Msg` continues in lowercase, so it is not the millisecond unit. It is still the `msg`
 		// prefix, which is a different branch with a different message.
@@ -132,11 +136,23 @@ func TestConsistencyNoAbbreviatedIdentifierFires(test *testing.T) {
 		// use. Once the file binds one, the rest-only exemption is off for the whole file, since
 		// without scope analysis a use cannot be traced to its binding (#e000k8d): the rest's own
 		// declaration stays exempt and its use reports.
-		{"a plain args parameter", "function run(args: string[]) {\n    use(args);\n}\n", []string{"abbreviatedIdentifier", "abbreviatedIdentifier"}},
-		{"a catch binding named args", "try {\n    run();\n} catch (args) {\n    use(args);\n}\n", []string{"abbreviatedIdentifier", "abbreviatedIdentifier"}},
+		{
+			"a plain args parameter",
+			"function run(args: string[]) {\n    use(args);\n}\n",
+			[]string{"abbreviatedIdentifier", "abbreviatedIdentifier"},
+		},
+		{
+			"a catch binding named args",
+			"try {\n    run();\n} catch (args) {\n    use(args);\n}\n",
+			[]string{"abbreviatedIdentifier", "abbreviatedIdentifier"},
+		},
 		// A file that binds no `args` at all has no rest to agree with, so a free reference reports.
 		{"an args the file never binds", "use(args);\n", []string{"abbreviatedIdentifier"}},
-		{"a rest beside a plain args", "function run(...args: string[]) {\n    use(args);\n}\nfunction other(args: string[]) {\n    return args;\n}\n", []string{"abbreviatedIdentifier", "abbreviatedIdentifier", "abbreviatedIdentifier"}},
+		{
+			"a rest beside a plain args",
+			"function run(...args: string[]) {\n    use(args);\n}\nfunction other(args: string[]) {\n    return args;\n}\n",
+			[]string{"abbreviatedIdentifier", "abbreviatedIdentifier", "abbreviatedIdentifier"},
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -164,8 +180,14 @@ func TestConsistencyNoAbbreviatedIdentifierStaysSilent(test *testing.T) {
 		{"current and previous", "const current = 1;\nconst previous = 2;\n"},
 		{"options and percent", "const options = 1;\nconst percent = 2;\n"},
 		{"index and character", "const index = 0;\nconst character = 'a';\n"},
-		{"value, array, object, number", "const value = 1;\nconst array = [];\nconst object = {};\nconst number = 1;\n"},
-		{"response, error, request, message", "const response = 1;\nconst error = 2;\nconst request = 3;\nconst message = 4;\n"},
+		{
+			"value, array, object, number",
+			"const value = 1;\nconst array = [];\nconst object = {};\nconst number = 1;\n",
+		},
+		{
+			"response, error, request, message",
+			"const response = 1;\nconst error = 2;\nconst request = 3;\nconst message = 4;\n",
+		},
 		{"minimum and maximum", "const minimum = 1;\nconst maximum = 2;\n"},
 		{"reference and string", "const reference = 1;\nconst string = 'a';\n"},
 		{"spelled suffixes", "const rowProperty = 1;\nconst inputValue = 2;\nconst pageNumber = 3;\n"},
@@ -223,7 +245,10 @@ func TestConsistencyNoAbbreviatedIdentifierStaysSilent(test *testing.T) {
 		{"a use of a rest parameter", "function run(...args: string[]) {\n    use(args);\n}\n"},
 		{"a spread of a rest parameter", "function forward(...args: unknown[]) {\n    return target(...args);\n}\n"},
 		{"a use of a destructured rest", "const [first, ...args] = source;\nuse(first, args);\n"},
-		{"two rests in one file", "function run(...args: string[]) {\n    use(args);\n}\nconst other = (...args: number[]) => args.length;\n"},
+		{
+			"two rests in one file",
+			"function run(...args: string[]) {\n    use(args);\n}\nconst other = (...args: number[]) => args.length;\n",
+		},
 
 		// A destructured ref forwarded to React retains its binding exemption.
 		{"a destructured ref forwarded onward", "export const Thing = ({ ref }) => <Child ref={ref} />;\n"},
@@ -494,12 +519,20 @@ func TestConsistencyNoAbbreviatedIdentifierReportsAtTheIdentifier(test *testing.
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.Run(test, ConsistencyNoAbbreviatedIdentifier, "/repository/source/Thing.ts", testCase.sourceText)
+			result := rule_testing.Run(
+				test,
+				ConsistencyNoAbbreviatedIdentifier,
+				"/repository/source/Thing.ts",
+				testCase.sourceText,
+			)
 			if len(result.Diagnostics) == 0 {
 				test.Fatalf("expected a finding, got none")
 			}
 
-			line, column := scanner.GetECMALineAndByteOffsetOfPosition(result.SourceFile, result.Diagnostics[0].Range.Pos())
+			line, column := scanner.GetECMALineAndByteOffsetOfPosition(
+				result.SourceFile,
+				result.Diagnostics[0].Range.Pos(),
+			)
 			if line+1 != testCase.wantLine || column+1 != testCase.wantColumn {
 				test.Fatalf("expected the finding at %d:%d, got %d:%d",
 					testCase.wantLine, testCase.wantColumn, line+1, column+1)
@@ -588,29 +621,59 @@ func TestConsistencyNoAbbreviatedIdentifierSkipsNamesTheCodeOnlyReads(test *test
 
 	silent := []struct{ name, sourceText string }{
 		// ModuleTestDiscovery.ts: tsconfig-paths' loadConfig, read in a type query and a call.
-		{"a reference to an imported name", "import { loadConfig } from 'tsconfig-paths';\nlet configuration: ReturnType<typeof loadConfig> | undefined;\nconfiguration = loadConfig('.');\nexport { configuration };\n"},
+		{
+			"a reference to an imported name",
+			"import { loadConfig } from 'tsconfig-paths';\nlet configuration: ReturnType<typeof loadConfig> | undefined;\nconfiguration = loadConfig('.');\nexport { configuration };\n",
+		},
 		// OrmSchemaBuilderDrizzleMySql.ts: drizzle's char, called.
-		{"a call of an imported function", "import { char } from 'drizzle-orm/mysql-core';\nexport const column = char('name', { length: 36 });\n"},
-		{"a reference to a default import", "import loadConfig from 'config-loader';\nexport const configuration = loadConfig();\n"},
+		{
+			"a call of an imported function",
+			"import { char } from 'drizzle-orm/mysql-core';\nexport const column = char('name', { length: 36 });\n",
+		},
+		{
+			"a reference to a default import",
+			"import loadConfig from 'config-loader';\nexport const configuration = loadConfig();\n",
+		},
 		// MappedJoins.test.ts: drizzle's params key, renamed on destructure.
-		{"a destructuring key renamed away", "declare const query: { toSQL(): Record<string, unknown> };\nconst { sql: statement, params: parameters } = query.toSQL();\nexport { statement, parameters };\n"},
+		{
+			"a destructuring key renamed away",
+			"declare const query: { toSQL(): Record<string, unknown> };\nconst { sql: statement, params: parameters } = query.toSQL();\nexport { statement, parameters };\n",
+		},
 		// FileStorageVideoDerivativeService.ts: an external maxBitrate key, renamed on destructure.
-		{"an external key renamed away", "declare const entry: Record<string, unknown>;\nconst { maxBitrate: maximumBitrate } = entry;\nexport { maximumBitrate };\n"},
+		{
+			"an external key renamed away",
+			"declare const entry: Record<string, unknown>;\nconst { maxBitrate: maximumBitrate } = entry;\nexport { maximumBitrate };\n",
+		},
 	}
 	for _, testCase := range silent {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.Run(test, ConsistencyNoAbbreviatedIdentifier, abbreviatedFile, testCase.sourceText))
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.Run(test, ConsistencyNoAbbreviatedIdentifier, abbreviatedFile, testCase.sourceText),
+			)
 		})
 	}
 
 	fires := []struct{ name, sourceText, id string }{
 		// A shorthand destructure declares the abbreviated name in this file.
-		{"a shorthand destructure", "declare const query: { params: unknown[] };\nconst { params } = query;\nexport { params };\n", "abbreviatedIdentifier"},
+		{
+			"a shorthand destructure",
+			"declare const query: { params: unknown[] };\nconst { params } = query;\nexport { params };\n",
+			"abbreviatedIdentifier",
+		},
 		// The local half of a rename is this file's name.
-		{"a rename onto an abbreviation", "declare const entry: { maximumBitrate: number };\nconst { maximumBitrate: maxBitrate } = entry;\nexport { maxBitrate };\n", "abbreviatedIdentifier"},
+		{
+			"a rename onto an abbreviation",
+			"declare const entry: { maximumBitrate: number };\nconst { maximumBitrate: maxBitrate } = entry;\nexport { maxBitrate };\n",
+			"abbreviatedIdentifier",
+		},
 		// A file that shadows an import declares that name too, so it is judged rather than guessed.
-		{"a local that shadows an import", "import { char } from 'drizzle-orm/mysql-core';\nexport function build() {\n    const char = 1;\n    return char;\n}\nexport { char as column };\n", "abbreviatedIdentifier"},
+		{
+			"a local that shadows an import",
+			"import { char } from 'drizzle-orm/mysql-core';\nexport function build() {\n    const char = 1;\n    return char;\n}\nexport { char as column };\n",
+			"abbreviatedIdentifier",
+		},
 	}
 	for _, testCase := range fires {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -645,18 +708,48 @@ func TestConsistencyNoAbbreviatedIdentifierLeavesNextRouteContractsAlone(test *t
 		wantIds    []string
 	}{
 		{"maxDuration in a route", routeFile, "export const maxDuration = 60;", nil},
-		{"maxDuration outside a route", abbreviatedFile, "export const maxDuration = 60;", []string{"abbreviatedIdentifier"}},
-		{"generateStaticParams in a page", pageFile, "export async function generateStaticParams() { return []; }", nil},
-		{"generateStaticParams outside a route", abbreviatedFile, "export async function generateStaticParams() { return []; }", []string{"abbreviatedSuffix"}},
+		{
+			"maxDuration outside a route",
+			abbreviatedFile,
+			"export const maxDuration = 60;",
+			[]string{"abbreviatedIdentifier"},
+		},
+		{
+			"generateStaticParams in a page",
+			pageFile,
+			"export async function generateStaticParams() { return []; }",
+			nil,
+		},
+		{
+			"generateStaticParams outside a route",
+			abbreviatedFile,
+			"export async function generateStaticParams() { return []; }",
+			[]string{"abbreviatedSuffix"},
+		},
 		{"dynamicParams in a page", pageFile, "export const dynamicParams = false;", nil},
 		{"config in a page", pageFile, "export const config = {};", nil},
-		{"a reference to the export is the export", pageFile, "export const maxDuration = 60;\nconsole.log(maxDuration);", nil},
+		{
+			"a reference to the export is the export",
+			pageFile,
+			"export const maxDuration = 60;\nconsole.log(maxDuration);",
+			nil,
+		},
 		// A nested binding sharing the spelling is a different variable, judged on its merits. Its
 		// declaration reports and its reference does not: references are exempt by spelling, since
 		// telling a shadow from the export needs scope resolution this rule does not do. One finding,
 		// on the declaration, is enough for the author to rename both.
-		{"a nested config shadows the contract", pageFile, "export function load() {\n    const config = 1;\n    return config;\n}", []string{"abbreviatedIdentifier"}},
-		{"a parameter named for the contract", pageFile, "export function load(maxDuration: number) {\n    return 1;\n}", []string{"abbreviatedIdentifier"}},
+		{
+			"a nested config shadows the contract",
+			pageFile,
+			"export function load() {\n    const config = 1;\n    return config;\n}",
+			[]string{"abbreviatedIdentifier"},
+		},
+		{
+			"a parameter named for the contract",
+			pageFile,
+			"export function load(maxDuration: number) {\n    return 1;\n}",
+			[]string{"abbreviatedIdentifier"},
+		},
 		// Contracts differ by file: a page has no http methods and a route has no metadata, and
 		// `params` is no contract export anywhere, so it keeps its own options-driven handling.
 		{"a page is not a route handler", routeFile, "export const generateViewport = () => ({});", nil},
@@ -689,7 +782,11 @@ func TestConsistencyNoAbbreviatedIdentifierOwnedProperties(test *testing.T) {
 		name, source string
 		want         int
 	}{
-		{"own ref property", `interface Session { ref: unknown; params: unknown; config: unknown; args: unknown; maxDuration: number } function forward(...args: unknown[]) {}`, 5},
+		{
+			"own ref property",
+			`interface Session { ref: unknown; params: unknown; config: unknown; args: unknown; maxDuration: number } function forward(...args: unknown[]) {}`,
+			5,
+		},
 		{"own queryFn property", `const session = { queryFn: () => 500 };`, 1},
 		{"interface property", `interface Session { durationMs: number }`, 1},
 		{"type property", `type Session = { durationMs: number }`, 1},
@@ -704,25 +801,81 @@ func TestConsistencyNoAbbreviatedIdentifierOwnedProperties(test *testing.T) {
 		{"string literal key", `const session = { "durationMs": 500 };`, 1},
 		{"index signature", `const session: { [key: string]: number } = { durationMs: 500 };`, 1},
 		{"Record", `const session: Record<string, number> = { durationMs: 500 };`, 1},
-		{"generic schema", `declare const Schema: { object<T>(shape: T): T }; const session = Schema.object({ durationMs: 500 });`, 1},
-		{"schema index", `declare const Schema: { object(shape: Record<string, unknown>): unknown }; const session = Schema.object({ durationMs: 500 });`, 1},
-		{"own interface contextual key", `interface Session { durationMs: number } const session: Session = { durationMs: 500 };`, 1},
-		{"own type contextual key", `type Session = { durationMs: number }; const session: Session = { durationMs: 500 };`, 1},
-		{"own satisfies key", `interface Session { durationMs: number } const session = { durationMs: 500 } satisfies Session;`, 1},
-		{"dependency contextual key", `import { Options } from 'wire'; const session: Options = { durationMs: 500 };`, 0},
+		{
+			"generic schema",
+			`declare const Schema: { object<T>(shape: T): T }; const session = Schema.object({ durationMs: 500 });`,
+			1,
+		},
+		{
+			"schema index",
+			`declare const Schema: { object(shape: Record<string, unknown>): unknown }; const session = Schema.object({ durationMs: 500 });`,
+			1,
+		},
+		{
+			"own interface contextual key",
+			`interface Session { durationMs: number } const session: Session = { durationMs: 500 };`,
+			1,
+		},
+		{
+			"own type contextual key",
+			`type Session = { durationMs: number }; const session: Session = { durationMs: 500 };`,
+			1,
+		},
+		{
+			"own satisfies key",
+			`interface Session { durationMs: number } const session = { durationMs: 500 } satisfies Session;`,
+			1,
+		},
+		{
+			"dependency contextual key",
+			`import { Options } from 'wire'; const session: Options = { durationMs: 500 };`,
+			0,
+		},
 		{"dependency argument", `import { accept } from 'wire'; accept({ durationMs: 500 });`, 0},
 		{"dependency string key", `import { Options } from 'wire'; const session: Options = { "durationMs": 500 };`, 0},
-		{"dependency method", `import { Worker } from 'wire'; const session: Worker = { durationMs() { return 500 } };`, 0},
+		{
+			"dependency method",
+			`import { Worker } from 'wire'; const session: Worker = { durationMs() { return 500 } };`,
+			0,
+		},
 		{"dependency override", `import { Base } from 'wire'; class Session extends Base { durationMs = 500 }`, 0},
-		{"dependency implementation", `import { Worker } from 'wire'; class Session implements Worker { durationMs() { return 500 } }`, 0},
-		{"transitive dependency override", `import { Base } from 'wire'; class Middle extends Base {} class Session extends Middle { durationMs = 500 }`, 0},
-		{"redeclared dependency override", `import { Base } from 'wire'; class Middle extends Base { durationMs = 100 } class Session extends Middle { durationMs = 500 }`, 0},
-		{"static does not implement instance contract", `import { Options } from 'wire'; class Session implements Options { durationMs = 100; static durationMs = 500 }`, 1},
-		{"generic constraint", `function define<T extends { durationMs: number }>(shape: T): T { return shape } const session = define({ durationMs: 500 });`, 1},
-		{"own inferred contextual key", `const defaults = { durationMs: 100 }; const session: typeof defaults = { durationMs: 500 };`, 1},
+		{
+			"dependency implementation",
+			`import { Worker } from 'wire'; class Session implements Worker { durationMs() { return 500 } }`,
+			0,
+		},
+		{
+			"transitive dependency override",
+			`import { Base } from 'wire'; class Middle extends Base {} class Session extends Middle { durationMs = 500 }`,
+			0,
+		},
+		{
+			"redeclared dependency override",
+			`import { Base } from 'wire'; class Middle extends Base { durationMs = 100 } class Session extends Middle { durationMs = 500 }`,
+			0,
+		},
+		{
+			"static does not implement instance contract",
+			`import { Options } from 'wire'; class Session implements Options { durationMs = 100; static durationMs = 500 }`,
+			1,
+		},
+		{
+			"generic constraint",
+			`function define<T extends { durationMs: number }>(shape: T): T { return shape } const session = define({ durationMs: 500 });`,
+			1,
+		},
+		{
+			"own inferred contextual key",
+			`const defaults = { durationMs: 100 }; const session: typeof defaults = { durationMs: 500 };`,
+			1,
+		},
 
 		{"own override", `class Base { durationMs = 1 } class Session extends Base { durationMs = 500 }`, 2},
-		{"own implementation", `interface Worker { durationMs(): number } class Session implements Worker { durationMs() { return 500 } }`, 2},
+		{
+			"own implementation",
+			`interface Worker { durationMs(): number } class Session implements Worker { durationMs() { return 500 } }`,
+			2,
+		},
 		{"module augmentation", `import 'wire'; declare module 'wire' { interface Options { durationMs: number } }`, 0},
 		{"global augmentation", `export {}; declare global { interface Window { durationMs: number } }`, 0},
 		{"merged foreign interface", `interface Host { durationMs: number }`, 0},
@@ -732,29 +885,77 @@ func TestConsistencyNoAbbreviatedIdentifierOwnedProperties(test *testing.T) {
 		{"destructured key", `import { external } from 'wire'; const { durationMs: elapsed } = external;`, 0},
 		{"import name", `import { durationMs } from 'wire';`, 0},
 		{"JSX attribute", `declare const Widget: any; const element = <Widget durationMs={500} />;`, 0},
-		{"dependency source", `import { Options } from 'source-wire'; const session: Options = { durationMs: 500 };`, 0},
-		{"own imported declaration key", `import { Options } from './options'; const session: Options = { durationMs: 500 };`, 0},
+		{
+			"dependency source",
+			`import { Options } from 'source-wire'; const session: Options = { durationMs: 500 };`,
+			0,
+		},
+		{
+			"own imported declaration key",
+			`import { Options } from './options'; const session: Options = { durationMs: 500 };`,
+			0,
+		},
 		{"local library declaration", `const session: Host = { durationMs: 500 };`, 0},
-		{"platform property", `class Session implements Pick<Math, 'max'> { max(...values: number[]) { return 500 } }`, 0},
-		{"union contextual key", `import { Options } from 'wire'; const session: Options | { value: number } = { durationMs: 500 };`, 0},
-		{"intersection contextual key", `import { Options } from 'wire'; const session: Options & { value: number } = { durationMs: 500, value: 1 };`, 0},
-		{"nested contextual key", `import { Options } from 'wire'; const session: { timer: Options } = { timer: { durationMs: 500 } };`, 0},
-		{"contextual return", `import { Options } from 'wire'; function create(): Options { return { durationMs: 500 }; }`, 0},
-		{"contextual assignment", `import { Options } from 'wire'; let session: Options; session = { durationMs: 500 };`, 0},
+		{
+			"platform property",
+			`class Session implements Pick<Math, 'max'> { max(...values: number[]) { return 500 } }`,
+			0,
+		},
+		{
+			"union contextual key",
+			`import { Options } from 'wire'; const session: Options | { value: number } = { durationMs: 500 };`,
+			0,
+		},
+		{
+			"intersection contextual key",
+			`import { Options } from 'wire'; const session: Options & { value: number } = { durationMs: 500, value: 1 };`,
+			0,
+		},
+		{
+			"nested contextual key",
+			`import { Options } from 'wire'; const session: { timer: Options } = { timer: { durationMs: 500 } };`,
+			0,
+		},
+		{
+			"contextual return",
+			`import { Options } from 'wire'; function create(): Options { return { durationMs: 500 }; }`,
+			0,
+		},
+		{
+			"contextual assignment",
+			`import { Options } from 'wire'; let session: Options; session = { durationMs: 500 };`,
+			0,
+		},
 		{"finite Record", `const session: Record<'durationMs', number> = { durationMs: 500 };`, 1},
 		{"class expression", `const Session = class { durationMs = 500 };`, 1},
-		{"dependency accessor", `import { Options } from 'wire'; class Session implements Options { get durationMs() { return 500 } }`, 0},
-		{"dependency static override", `import { StaticBase } from 'wire'; class Session extends StaticBase { static durationMs = 500 }`, 0},
+		{
+			"dependency accessor",
+			`import { Options } from 'wire'; class Session implements Options { get durationMs() { return 500 } }`,
+			0,
+		},
+		{
+			"dependency static override",
+			`import { StaticBase } from 'wire'; class Session extends StaticBase { static durationMs = 500 }`,
+			0,
+		},
 		{"own string class key", `class Session { "durationMs" = 500 }`, 1},
 		{"own imported spelling", `import { durationMs } from 'wire'; interface Session { durationMs: number }`, 1},
 
-		{"computed dependency declaration", `import { ComputedOptions } from 'wire'; const session: ComputedOptions = { durationMs: 500 };`, 0},
+		{
+			"computed dependency declaration",
+			`import { ComputedOptions } from 'wire'; const session: ComputedOptions = { durationMs: 500 };`,
+			0,
+		},
 		{"computed interface key", `interface Session { ['durationMs']: number }`, 1},
 		{"computed class key", `class Session { ['durationMs'] = 500 }`, 1},
 		{"computed literal key", `const session = { ['durationMs']: 500 };`, 1},
 		{"private class key", `class Session { #durationMs = 500; #idx = 0 }`, 2},
 
-		{"full names", `interface Session { durationInMilliseconds: number } class Timer { durationInMilliseconds = 500 } const session = { durationInMilliseconds: 500 };`, 0},
+		{
+			"full names",
+			`interface Session { durationInMilliseconds: number } class Timer { durationInMilliseconds = 500 } const session = { durationInMilliseconds: 500 };`,
+			0,
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -763,29 +964,54 @@ func TestConsistencyNoAbbreviatedIdentifierOwnedProperties(test *testing.T) {
 			if testCase.name == "own ref property" {
 				fileName = "app/page.tsx"
 			}
-			result := rule_testing.RunTypedFilesWithSetupAndOptions(test, ConsistencyNoAbbreviatedIdentifier, map[string]string{
-				fileName:                            testCase.source,
-				"tsconfig.json":                     `{ "compilerOptions": { "strict": true, "target": "ES2022", "lib": ["ES2022"], "types": [] }, "include": ["**/*.ts", "**/*.tsx"] }`,
-				"node_modules/wire/index.d.ts":      `export interface ComputedOptions { ['durationMs']: number } export interface Options { durationMs: number } export interface Worker { durationMs(): number } export class StaticBase { static durationMs: number } export class Base { durationMs: number } export const external: Options; export const durationMs: number; export function accept(options: Options): void;`,
-				"node_modules/source-wire/index.ts": `export interface Options { durationMs: number }`,
-				"options.ts":                        `export interface Options { durationMs: number }`,
-				"host.d.ts":                         `interface Host { durationMs: number }`,
-			}, fileName, ConsistencyNoAbbreviatedIdentifierOptions{
-				FrameworkParameterFilePatterns: []string{"app/page.tsx"},
-				FrameworkConstantFilePatterns:  []string{"app/page.tsx"},
-			}, func(string) {
-				// The fixture's files are all in the map, so the directory needs nothing more.
-			})
+			result := rule_testing.RunTypedFilesWithSetupAndOptions(
+				test,
+				ConsistencyNoAbbreviatedIdentifier,
+				map[string]string{
+					fileName:                            testCase.source,
+					"tsconfig.json":                     `{ "compilerOptions": { "strict": true, "target": "ES2022", "lib": ["ES2022"], "types": [] }, "include": ["**/*.ts", "**/*.tsx"] }`,
+					"node_modules/wire/index.d.ts":      `export interface ComputedOptions { ['durationMs']: number } export interface Options { durationMs: number } export interface Worker { durationMs(): number } export class StaticBase { static durationMs: number } export class Base { durationMs: number } export const external: Options; export const durationMs: number; export function accept(options: Options): void;`,
+					"node_modules/source-wire/index.ts": `export interface Options { durationMs: number }`,
+					"options.ts":                        `export interface Options { durationMs: number }`,
+					"host.d.ts":                         `interface Host { durationMs: number }`,
+				},
+				fileName,
+				ConsistencyNoAbbreviatedIdentifierOptions{
+					FrameworkParameterFilePatterns: []string{"app/page.tsx"},
+					FrameworkConstantFilePatterns:  []string{"app/page.tsx"},
+				},
+				func(string) {
+					// The fixture's files are all in the map, so the directory needs nothing more.
+				},
+			)
 			if len(result.Diagnostics) != testCase.want {
-				test.Fatalf("expected %d findings, got %d: %v", testCase.want, len(result.Diagnostics), result.MessageIds())
+				test.Fatalf(
+					"expected %d findings, got %d: %v",
+					testCase.want,
+					len(result.Diagnostics),
+					result.MessageIds(),
+				)
 			}
 			for _, diagnostic := range result.Diagnostics {
 				text := result.SourceFile.Text()[diagnostic.Range.Pos():diagnostic.Range.End()]
-				if text != "durationMs" && text != `"durationMs"` && text != "ref" && text != "queryFn" && text != "'durationMs'" && text != "#durationMs" && text != "#idx" && text != "params" && text != "config" && text != "args" && text != "maxDuration" {
+				if text != "durationMs" &&
+					text != `"durationMs"` &&
+					text != "ref" &&
+					text != "queryFn" &&
+					text != "'durationMs'" &&
+					text != "#durationMs" &&
+					text != "#idx" &&
+					text != "params" &&
+					text != "config" &&
+					text != "args" &&
+					text != "maxDuration" {
 					test.Errorf("finding at %q instead of the property declaration", text)
 				}
 			}
-			if strings.HasPrefix(testCase.name, "own ") && strings.Contains(testCase.name, "key") && strings.Contains(testCase.source, "const session") && len(result.Diagnostics) == 1 {
+			if strings.HasPrefix(testCase.name, "own ") &&
+				strings.Contains(testCase.name, "key") &&
+				strings.Contains(testCase.source, "const session") &&
+				len(result.Diagnostics) == 1 {
 				if result.Diagnostics[0].Range.Pos() >= strings.Index(result.SourceFile.Text(), "const session") {
 					test.Fatal("reported at literal instead of declaration")
 				}
@@ -798,7 +1024,8 @@ func TestConsistencyNoAbbreviatedIdentifierOwnedProperties(test *testing.T) {
 // inheritance and CSSProperties -> csstype.Properties inheritance, including the relevant fields.
 func abbreviatedReactDependencyFiles(source string) map[string]string {
 	return map[string]string{
-		"subject.tsx": "import * as React from 'react';\ninterface SVGSVGElement {}\ndeclare const condition: boolean;\ndeclare const previous: { height?: number } | undefined;\n" + source,
+		"subject.tsx": "import * as React from 'react';\ninterface SVGSVGElement {}\ndeclare const condition: boolean;\ndeclare const previous: { height?: number } | undefined;\n" +
+			source,
 		"node_modules/react/index.d.ts": `
 			import * as CSS from 'csstype';
 			export interface RefObject<T> { current: T }
@@ -839,30 +1066,100 @@ func TestConsistencyNoAbbreviatedIdentifierCombinedDependencyProperties(test *te
 	}{
 		{"intersection", `type Properties = React.SVGProps<SVGSVGElement> & { ref?: React.Ref<SVGSVGElement> };`, 0},
 		{"union", `type Properties = React.SVGProps<SVGSVGElement> | { ref?: React.Ref<SVGSVGElement> };`, 0},
-		{"reversed intersection", `type Properties = { ref?: React.Ref<SVGSVGElement> } & React.SVGProps<SVGSVGElement>;`, 0},
-		{"parenthesized", `type Properties = ((React.SVGProps<SVGSVGElement>) & (({ ref?: React.Ref<SVGSVGElement> })));`, 0},
-		{"nested union constituent", `type Alternatives = React.SVGProps<SVGSVGElement> | { title: string }; type Properties = Alternatives & { ref?: React.Ref<SVGSVGElement> };`, 0},
-		{"nested intersection constituent", `type Alternatives = React.SVGProps<SVGSVGElement> & { title: string }; type Properties = Alternatives | { ref?: React.Ref<SVGSVGElement> };`, 0},
+		{
+			"reversed intersection",
+			`type Properties = { ref?: React.Ref<SVGSVGElement> } & React.SVGProps<SVGSVGElement>;`,
+			0,
+		},
+		{
+			"parenthesized",
+			`type Properties = ((React.SVGProps<SVGSVGElement>) & (({ ref?: React.Ref<SVGSVGElement> })));`,
+			0,
+		},
+		{
+			"nested union constituent",
+			`type Alternatives = React.SVGProps<SVGSVGElement> | { title: string }; type Properties = Alternatives & { ref?: React.Ref<SVGSVGElement> };`,
+			0,
+		},
+		{
+			"nested intersection constituent",
+			`type Alternatives = React.SVGProps<SVGSVGElement> & { title: string }; type Properties = Alternatives | { ref?: React.Ref<SVGSVGElement> };`,
+			0,
+		},
 		{"quoted member", `type Properties = React.SVGProps<SVGSVGElement> & { 'ref'?: React.Ref<SVGSVGElement> };`, 0},
-		{"computed member", `type Properties = React.SVGProps<SVGSVGElement> & { ['ref']?: React.Ref<SVGSVGElement> };`, 0},
+		{
+			"computed member",
+			`type Properties = React.SVGProps<SVGSVGElement> & { ['ref']?: React.Ref<SVGSVGElement> };`,
+			0,
+		},
 		{"method member", `type Properties = React.SVGProps<SVGSVGElement> & { ref?(): void };`, 0},
-		{"only our intersection constituent declares it", `type Properties = React.SVGProps<SVGSVGElement> & { durationMs?: number };`, 1},
-		{"only our union constituent declares it", `type Properties = React.SVGProps<SVGSVGElement> | { durationMs?: number };`, 1},
-		{"both constituents ours", `type Attributes = { ref?: React.Ref<SVGSVGElement> }; type Properties = Attributes & { ref?: React.Ref<SVGSVGElement> };`, 2},
-		{"own union", `type Attributes = { ref?: React.Ref<SVGSVGElement> }; type Properties = Attributes | { ref?: React.Ref<SVGSVGElement> };`, 2},
-		{"nested property is a separate shape", `type Properties = React.SVGProps<SVGSVGElement> & { nested: { ref?: React.Ref<SVGSVGElement> } };`, 1},
-		{"referenced declaration stays ours", `type Attributes = { ref?: React.Ref<SVGSVGElement> }; type Properties = React.SVGProps<SVGSVGElement> & Attributes;`, 1},
-		{"mapped existing dependency property", `type Properties = Pick<React.SVGProps<SVGSVGElement>, 'ref'> & { ref?: React.Ref<SVGSVGElement> };`, 0},
-		{"mapped generic declares no named property", `type Properties = Record<'ref', unknown> & { ref?: React.Ref<SVGSVGElement> };`, 1},
-		{"index signature declares no named property", `type Properties = Record<string, unknown> & { ref?: React.Ref<SVGSVGElement> };`, 1},
-		{"page properties unchanged", `type PageProperties = { params: Promise<{ slug: string }>; searchParams: Promise<Record<string, string>> };`, 2},
+		{
+			"only our intersection constituent declares it",
+			`type Properties = React.SVGProps<SVGSVGElement> & { durationMs?: number };`,
+			1,
+		},
+		{
+			"only our union constituent declares it",
+			`type Properties = React.SVGProps<SVGSVGElement> | { durationMs?: number };`,
+			1,
+		},
+		{
+			"both constituents ours",
+			`type Attributes = { ref?: React.Ref<SVGSVGElement> }; type Properties = Attributes & { ref?: React.Ref<SVGSVGElement> };`,
+			2,
+		},
+		{
+			"own union",
+			`type Attributes = { ref?: React.Ref<SVGSVGElement> }; type Properties = Attributes | { ref?: React.Ref<SVGSVGElement> };`,
+			2,
+		},
+		{
+			"nested property is a separate shape",
+			`type Properties = React.SVGProps<SVGSVGElement> & { nested: { ref?: React.Ref<SVGSVGElement> } };`,
+			1,
+		},
+		{
+			"referenced declaration stays ours",
+			`type Attributes = { ref?: React.Ref<SVGSVGElement> }; type Properties = React.SVGProps<SVGSVGElement> & Attributes;`,
+			1,
+		},
+		{
+			"mapped existing dependency property",
+			`type Properties = Pick<React.SVGProps<SVGSVGElement>, 'ref'> & { ref?: React.Ref<SVGSVGElement> };`,
+			0,
+		},
+		{
+			"mapped generic declares no named property",
+			`type Properties = Record<'ref', unknown> & { ref?: React.Ref<SVGSVGElement> };`,
+			1,
+		},
+		{
+			"index signature declares no named property",
+			`type Properties = Record<string, unknown> & { ref?: React.Ref<SVGSVGElement> };`,
+			1,
+		},
+		{
+			"page properties unchanged",
+			`type PageProperties = { params: Promise<{ slug: string }>; searchParams: Promise<Record<string, string>> };`,
+			2,
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedFiles(test, ConsistencyNoAbbreviatedIdentifier, abbreviatedReactDependencyFiles(testCase.source), "subject.tsx")
+			result := rule_testing.RunTypedFiles(
+				test,
+				ConsistencyNoAbbreviatedIdentifier,
+				abbreviatedReactDependencyFiles(testCase.source),
+				"subject.tsx",
+			)
 			if len(result.Diagnostics) != testCase.want {
-				test.Fatalf("expected %d findings, got %d: %v", testCase.want, len(result.Diagnostics), result.MessageIds())
+				test.Fatalf(
+					"expected %d findings, got %d: %v",
+					testCase.want,
+					len(result.Diagnostics),
+					result.MessageIds(),
+				)
 			}
 		})
 	}
@@ -893,15 +1190,31 @@ func TestConsistencyNoAbbreviatedIdentifierSpreadDependencyProperties(test *test
 				want         int
 			}{
 				{"dependency context", "const style: React.CSSProperties = { ...(" + expression.source + ") };", 0},
-				{"JSX style context", "declare function Icon(properties: React.SVGProps<SVGSVGElement>): any; const icon = <Icon style={{ ...(" + expression.source + ") }} />;", 0},
+				{
+					"JSX style context",
+					"declare function Icon(properties: React.SVGProps<SVGSVGElement>): any; const icon = <Icon style={{ ...(" +
+						expression.source +
+						") }} />;",
+					0,
+				},
 				{"own shape", "const style = { ...(" + expression.source + ") };", 1},
 			}
 			for _, testCase := range cases {
 				test.Run(testCase.name, func(test *testing.T) {
 					test.Parallel()
-					result := rule_testing.RunTypedFiles(test, ConsistencyNoAbbreviatedIdentifier, abbreviatedReactDependencyFiles(testCase.source), "subject.tsx")
+					result := rule_testing.RunTypedFiles(
+						test,
+						ConsistencyNoAbbreviatedIdentifier,
+						abbreviatedReactDependencyFiles(testCase.source),
+						"subject.tsx",
+					)
 					if len(result.Diagnostics) != testCase.want {
-						test.Fatalf("expected %d findings, got %d: %v", testCase.want, len(result.Diagnostics), result.MessageIds())
+						test.Fatalf(
+							"expected %d findings, got %d: %v",
+							testCase.want,
+							len(result.Diagnostics),
+							result.MessageIds(),
+						)
 					}
 				})
 			}
@@ -910,8 +1223,14 @@ func TestConsistencyNoAbbreviatedIdentifierSpreadDependencyProperties(test *test
 	boundaries := []struct{ name, source string }{
 		{"condition is not a value", `const style: React.CSSProperties = { ...({ maxWidth: 'x' } ? {} : {}) };`},
 		{"and left is not a value", `const style: React.CSSProperties = { ...({ maxWidth: 'x' } && {}) };`},
-		{"nested property is a separate shape", `const style: React.CSSProperties = { ...({ nested: { maxWidth: 'x' } }) };`},
-		{"no matching contextual property", `const properties: React.SVGProps<SVGSVGElement> = { ...(condition && { maxWidth: 'x' }) };`},
+		{
+			"nested property is a separate shape",
+			`const style: React.CSSProperties = { ...({ nested: { maxWidth: 'x' } }) };`,
+		},
+		{
+			"no matching contextual property",
+			`const properties: React.SVGProps<SVGSVGElement> = { ...(condition && { maxWidth: 'x' }) };`,
+		},
 		{"index signature", `const configuration: Record<string, unknown> = { ...(condition && { maxWidth: 'x' }) };`},
 		{"untyped Jest configuration unchanged", `export default { maxWorkers: 4 };`},
 		{"untyped ESLint configuration unchanged", `export default { maxWarnings: 1 };`},
@@ -919,7 +1238,12 @@ func TestConsistencyNoAbbreviatedIdentifierSpreadDependencyProperties(test *test
 	for _, testCase := range boundaries {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedFiles(test, ConsistencyNoAbbreviatedIdentifier, abbreviatedReactDependencyFiles(testCase.source), "subject.tsx")
+			result := rule_testing.RunTypedFiles(
+				test,
+				ConsistencyNoAbbreviatedIdentifier,
+				abbreviatedReactDependencyFiles(testCase.source),
+				"subject.tsx",
+			)
 			rule_testing.ExpectFindings(test, result, "abbreviatedIdentifier")
 		})
 	}
@@ -936,10 +1260,26 @@ func TestConsistencyNoAbbreviatedIdentifierUnresolvedTypeOwnership(test *testing
 		{name: "unresolved contextual contract", source: "const page: PageProps = { durationMs: 500 };"},
 		{name: "unresolved inherited contract", source: "class Session implements PageProps { durationMs = 500 }"},
 		{name: "unresolved combined contract", source: "type Session = PageProps & { durationMs: number };"},
-		{name: "own declaration", source: "interface PageProps { durationMs: number } declare const page: PageProps;", want: 2},
-		{name: "dependency declaration", source: "declare const page: PageProps;", dependency: "interface PageProps { durationMs: number }"},
-		{name: "own contextual declaration", source: "interface PageProps { durationMs: number } const page: PageProps = { durationMs: 500 };", want: 2},
-		{name: "dependency contextual declaration", source: "const page: PageProps = { durationMs: 500 };", dependency: "interface PageProps { durationMs: number }"},
+		{
+			name:   "own declaration",
+			source: "interface PageProps { durationMs: number } declare const page: PageProps;",
+			want:   2,
+		},
+		{
+			name:       "dependency declaration",
+			source:     "declare const page: PageProps;",
+			dependency: "interface PageProps { durationMs: number }",
+		},
+		{
+			name:   "own contextual declaration",
+			source: "interface PageProps { durationMs: number } const page: PageProps = { durationMs: 500 };",
+			want:   2,
+		},
+		{
+			name:       "dependency contextual declaration",
+			source:     "const page: PageProps = { durationMs: 500 };",
+			dependency: "interface PageProps { durationMs: number }",
+		},
 	}
 	for _, tc := range cases {
 		test.Run(tc.name, func(test *testing.T) {

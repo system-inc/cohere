@@ -120,7 +120,10 @@ func TestImportNoForbiddenSourceExemptsOnlyTheSanctionedWrapper(test *testing.T)
 	for _, wrapper := range wrappers {
 		test.Run(wrapper.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.Run(test, ImportNoForbiddenSource, wrapper.fileName, wrapper.sourceText))
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.Run(test, ImportNoForbiddenSource, wrapper.fileName, wrapper.sourceText),
+			)
 		})
 	}
 
@@ -131,10 +134,20 @@ func TestImportNoForbiddenSourceExemptsOnlyTheSanctionedWrapper(test *testing.T)
 		wantId     string
 		wantFix    string
 	}{
-		{"a dialog beside the Image wrapper", "/repository/libraries/structure/source/components/images/dialogs/ImageDialog.tsx",
-			"import Image from 'next/image';\n", "forbiddenImageImport", "'@structure/source/components/images/Image'"},
-		{"a component beside the Link wrapper", "/repository/libraries/structure/source/components/navigation/NavigationMenu.tsx",
-			"import Link from 'next/link';\n", "forbiddenLinkImport", "'@structure/source/components/navigation/Link'"},
+		{
+			"a dialog beside the Image wrapper",
+			"/repository/libraries/structure/source/components/images/dialogs/ImageDialog.tsx",
+			"import Image from 'next/image';\n",
+			"forbiddenImageImport",
+			"'@structure/source/components/images/Image'",
+		},
+		{
+			"a component beside the Link wrapper",
+			"/repository/libraries/structure/source/components/navigation/NavigationMenu.tsx",
+			"import Link from 'next/link';\n",
+			"forbiddenLinkImport",
+			"'@structure/source/components/navigation/Link'",
+		},
 		{"framer-motion has no wrapper to exempt", "/repository/libraries/structure/source/router/hooks/useRouter.ts",
 			"import { motion } from 'framer-motion';\n", "forbiddenMotionImport", "'motion/react'"},
 	}

@@ -348,7 +348,10 @@ func (report *pipelineReport) Write(out *bufio.Writer) {
 			}
 			switch record.Outcome {
 			case outcomeRan:
-				parts = append(parts, fmt.Sprintf("%s ran in %s%s", record.Name, round(record.Elapsed), narrowedNote(record)))
+				parts = append(
+					parts,
+					fmt.Sprintf("%s ran in %s%s", record.Name, round(record.Elapsed), narrowedNote(record)),
+				)
 			case outcomeSkipped:
 				parts = append(parts, fmt.Sprintf("%s skipped (%s)", record.Name, record.Detail))
 			case outcomeNotReached:
@@ -399,7 +402,10 @@ func (report *pipelineReport) Write(out *bufio.Writer) {
 		fmt.Fprintf(out, "  %s\n", report.rootNote)
 	}
 	if report.cacheOff {
-		fmt.Fprintln(out, "  cache: off, by --no-cache: nothing was read from or written to this project's cache table or its incremental build info")
+		fmt.Fprintln(
+			out,
+			"  cache: off, by --no-cache: nothing was read from or written to this project's cache table or its incremental build info",
+		)
 	}
 	// Said, because keying a shape on content is a choice with a cost: an edit to one of these files re-runs
 	// its importers' shape-keyed rules. The alternative, a declaration emit up front, has no ceiling (#5txm9gg).
@@ -408,8 +414,12 @@ func (report *pipelineReport) Write(out *bufio.Writer) {
 		if report.contentKeyedShapes == 1 {
 			subject = "file's shape is"
 		}
-		fmt.Fprintf(out, "  cache: %d %s keyed on content, with no recorded declaration signature (computing one up front has no ceiling), so an edit to one re-runs its importers' shape-keyed rules\n",
-			report.contentKeyedShapes, subject)
+		fmt.Fprintf(
+			out,
+			"  cache: %d %s keyed on content, with no recorded declaration signature (computing one up front has no ceiling), so an edit to one re-runs its importers' shape-keyed rules\n",
+			report.contentKeyedShapes,
+			subject,
+		)
 	}
 
 	// File scope is its own dimension and the phase lines cannot express it. A run narrowed to one

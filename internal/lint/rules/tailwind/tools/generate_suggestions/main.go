@@ -84,8 +84,14 @@ func main() {
 	if decodeError := json.Unmarshal(raw, &file); decodeError != nil {
 		fail("parse %s: %v", *input, decodeError)
 	}
-	if len(file.Functional) == 0 || len(file.Statics) == 0 || len(file.DefaultSpacingSuggestions) == 0 || len(file.SuggestedFractions) == 0 {
-		fail("%s is missing recipes, statics, the spacing scale or the fractions, so it is not a whole extraction", *input)
+	if len(file.Functional) == 0 ||
+		len(file.Statics) == 0 ||
+		len(file.DefaultSpacingSuggestions) == 0 ||
+		len(file.SuggestedFractions) == 0 {
+		fail(
+			"%s is missing recipes, statics, the spacing scale or the fractions, so it is not a whole extraction",
+			*input,
+		)
 	}
 
 	source, err := render(file)
@@ -109,7 +115,12 @@ func main() {
 		fail("write %s: %v", *output, writeError)
 	}
 	// Ignored: what it reports is already written, and a summary that cannot reach the terminal changes none of it.
-	fmt.Fprintf(os.Stderr, "generate_suggestions: %d functional roots, %d statics\n", len(file.Functional), len(file.Statics))
+	fmt.Fprintf(
+		os.Stderr,
+		"generate_suggestions: %d functional roots, %d statics\n",
+		len(file.Functional),
+		len(file.Statics),
+	)
 }
 
 func render(file suggestionsFile) ([]byte, error) {

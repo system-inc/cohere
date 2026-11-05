@@ -13,11 +13,11 @@
 // # Why this does not consume control_flow_graph's dominators
 //
 // Braun needs no dominance frontier at all, which is why this does not consume
-// `internal/lint/ecmascript/control_flow_graph`'s dominator tree. `AnalyzeDominators` is generic over `control_flow_graph.Graph[E]` and `control_flow_graph.Block[E]`, which are
-// that package's own types; this graph is `Function` and `BasicBlock`. There is no conversion, and
-// writing one would mean materialising a second graph purely to compute a frontier this algorithm
-// does not use. Dominance is still what CORRECTNESS is stated against - see `VerifySSA` - but it is
-// computed there, over this graph, for checking rather than for construction.
+// `internal/lint/ecmascript/control_flow_graph`'s dominator tree. `AnalyzeDominators` is generic over
+// `control_flow_graph.Graph[E]` and `control_flow_graph.Block[E]`, which are that package's own types; this graph is
+// `Function` and `BasicBlock`. There is no conversion, and writing one would mean materialising a second graph purely
+// to compute a frontier this algorithm does not use. Dominance is still what CORRECTNESS is stated against - see
+// `VerifySSA` - but it is computed there, over this graph, for checking rather than for construction.
 //
 // Stated plainly for the next pass built on this IR, because it is easy to plan around the wrong
 // answer: NOTHING in `internal/lint/ecmascript/control_flow_graph` applies to this graph without a conversion that

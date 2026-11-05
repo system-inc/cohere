@@ -39,12 +39,37 @@ func TestNoThisAliasFires(test *testing.T) {
 		expected      []string
 	}{
 		{"an identifier alias with no configuration", "const self = this;", "{}", []string{"thisAssignment"}},
-		{"an object pattern with destructuring disallowed", "const { props, state } = this;", `{"allowDestructuring": false}`, []string{"thisDestructure"}},
-		{"an array pattern with destructuring disallowed", "const [ props, state ] = this;", `{"allowDestructuring": false}`, []string{"thisDestructure"}},
-		{"an assignment to an existing binding", "let foo; \nconst other =3;\n\n\n\nfoo = this", "{}", []string{"thisAssignment"}},
+		{
+			"an object pattern with destructuring disallowed",
+			"const { props, state } = this;",
+			`{"allowDestructuring": false}`,
+			[]string{"thisDestructure"},
+		},
+		{
+			"an array pattern with destructuring disallowed",
+			"const [ props, state ] = this;",
+			`{"allowDestructuring": false}`,
+			[]string{"thisDestructure"},
+		},
+		{
+			"an assignment to an existing binding",
+			"let foo; \nconst other =3;\n\n\n\nfoo = this",
+			"{}",
+			[]string{"thisAssignment"},
+		},
 		{"an assignment through a type assertion", "let foo; (foo as any) = this", "{}", []string{"thisAssignment"}},
-		{"an alias inside a function", "function testFunction() {\n            let inFunction = this;\n          }", "{}", []string{"thisAssignment"}},
-		{"an alias inside an arrow function", "const testLambda = () => {\n            const inLambda = this;\n          };", "{}", []string{"thisAssignment"}},
+		{
+			"an alias inside a function",
+			"function testFunction() {\n            let inFunction = this;\n          }",
+			"{}",
+			[]string{"thisAssignment"},
+		},
+		{
+			"an alias inside an arrow function",
+			"const testLambda = () => {\n            const inLambda = this;\n          };",
+			"{}",
+			[]string{"thisAssignment"},
+		},
 		// The corpus's one multi-finding input, and the only place the two messages appear
 		// together. Two identifier aliases in the constructor, one in the method, then four
 		// destructuring patterns, in source order.
@@ -57,8 +82,18 @@ func TestNoThisAliasFires(test *testing.T) {
 				"thisDestructure", "thisDestructure", "thisDestructure", "thisDestructure",
 			},
 		},
-		{"an allow list naming a different name", "const self = this;", `{"allowedNames": ["bar"]}`, []string{"thisAssignment"}},
-		{"the typo'd allow list naming a different name", "const self = this;", `{"allowNames": ["bar"]}`, []string{"thisAssignment"}},
+		{
+			"an allow list naming a different name",
+			"const self = this;",
+			`{"allowedNames": ["bar"]}`,
+			[]string{"thisAssignment"},
+		},
+		{
+			"the typo'd allow list naming a different name",
+			"const self = this;",
+			`{"allowNames": ["bar"]}`,
+			[]string{"thisAssignment"},
+		},
 
 		// Cases upstream does not write, each measured on the release binary before being recorded.
 		//
@@ -76,11 +111,26 @@ func TestNoThisAliasFires(test *testing.T) {
 		{"an assignment through a non-null assertion", "let foo; (foo!) = this", "{}", []string{"thisAssignment"}},
 		// The destructuring assignment targets, which parse as literals rather than as patterns and
 		// are therefore the arm most likely to be missed. Upstream reports both under the flag.
-		{"an array destructuring assignment", "let foo; [foo] = this", `{"allowDestructuring": false}`, []string{"thisDestructure"}},
-		{"an object destructuring assignment", "let foo; ({foo} = this)", `{"allowDestructuring": false}`, []string{"thisDestructure"}},
+		{
+			"an array destructuring assignment",
+			"let foo; [foo] = this",
+			`{"allowDestructuring": false}`,
+			[]string{"thisDestructure"},
+		},
+		{
+			"an object destructuring assignment",
+			"let foo; ({foo} = this)",
+			`{"allowDestructuring": false}`,
+			[]string{"thisDestructure"},
+		},
 		// A declaration with two declarators produces two findings, which is the fixture that would
 		// catch a listener anchored on the declaration list rather than on each declarator.
-		{"two declarators in one declaration", "var b = this, c = this;", "{}", []string{"thisAssignment", "thisAssignment"}},
+		{
+			"two declarators in one declaration",
+			"var b = this, c = this;",
+			"{}",
+			[]string{"thisAssignment", "thisAssignment"},
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -102,7 +152,11 @@ func TestNoThisAliasStaysSilent(test *testing.T) {
 		sourceText    string
 		configuration string
 	}{
-		{"an object pattern with destructuring allowed", "const { props, state } = this;", `{"allowDestructuring": true}`},
+		{
+			"an object pattern with destructuring allowed",
+			"const { props, state } = this;",
+			`{"allowDestructuring": true}`,
+		},
 		{"a single-member object pattern", "const { length } = this;", `{"allowDestructuring": true}`},
 		{"a two-member object pattern", "const { length, toString } = this;", `{"allowDestructuring": true}`},
 		{"a single-element array pattern", "const [foo] = this;", `{"allowDestructuring": true}`},
@@ -271,7 +325,12 @@ func TestNoThisAliasDecodeMapsUpstreamSpellings(test *testing.T) {
 		// Upstream refuses both keys at once as a configuration error. There is no error channel
 		// for that here, so the correctly-spelled key wins, which is recorded rather than left to
 		// be discovered.
-		{"both spellings at once prefers the correct one", `{"allowedNames": ["a"], "allowNames": ["b"]}`, false, []string{"a"}},
+		{
+			"both spellings at once prefers the correct one",
+			`{"allowedNames": ["a"], "allowNames": ["b"]}`,
+			false,
+			[]string{"a"},
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {

@@ -36,10 +36,22 @@ func TestVoidDomElementsNoChildrenFires(test *testing.T) {
 		{"a br with the danger prop", "<br dangerouslySetInnerHTML={{ __html: 'Foo' }} />;"},
 		{"createElement for a br with a third argument", "React.createElement('br', {}, 'Foo');"},
 		{"createElement for a br with a children prop", "React.createElement('br', { children: 'Foo' });"},
-		{"createElement for a br with the danger prop", "React.createElement('br', { dangerouslySetInnerHTML: { __html: 'Foo' } });"},
-		{"a bare createElement for an img with a third argument", "\n                import React, {createElement} from 'react';\n                createElement('img', {}, 'Foo');\n            "},
-		{"a bare createElement for an img with a children prop", "\n                import React, {createElement} from 'react';\n                createElement('img', { children: 'Foo' });\n            "},
-		{"a bare createElement for an img with the danger prop", "\n                import React, {createElement} from 'react';\n                createElement('img', { dangerouslySetInnerHTML: { __html: 'Foo' } });\n            "},
+		{
+			"createElement for a br with the danger prop",
+			"React.createElement('br', { dangerouslySetInnerHTML: { __html: 'Foo' } });",
+		},
+		{
+			"a bare createElement for an img with a third argument",
+			"\n                import React, {createElement} from 'react';\n                createElement('img', {}, 'Foo');\n            ",
+		},
+		{
+			"a bare createElement for an img with a children prop",
+			"\n                import React, {createElement} from 'react';\n                createElement('img', { children: 'Foo' });\n            ",
+		},
+		{
+			"a bare createElement for an img with the danger prop",
+			"\n                import React, {createElement} from 'react';\n                createElement('img', { dangerouslySetInnerHTML: { __html: 'Foo' } });\n            ",
+		},
 	}
 
 	for _, testCase := range cases {
@@ -69,13 +81,28 @@ func TestVoidDomElementsNoChildrenStaysSilent(test *testing.T) {
 		{"a div with the danger prop", "<div dangerouslySetInnerHTML={{ __html: 'Foo' }} />;"},
 		{"createElement for a div with a third argument", "React.createElement('div', {}, 'Foo');"},
 		{"createElement for a div with a children prop", "React.createElement('div', { children: 'Foo' });"},
-		{"createElement for a div with the danger prop", "React.createElement('div', { dangerouslySetInnerHTML: { __html: 'Foo' } });"},
+		{
+			"createElement for a div with the danger prop",
+			"React.createElement('div', { dangerouslySetInnerHTML: { __html: 'Foo' } });",
+		},
 		{"createElement for an img with no props", "React.createElement('img');"},
 		{"createElement with no arguments at all", "React.createElement();"},
-		{"createElement for an img whose props are a variable", "\n                const props = {};\n                React.createElement('img', props);\n            "},
-		{"a bare createElement for a div", "\n                import React, {createElement} from 'react';\n                createElement('div');\n            "},
-		{"a bare createElement for an img", "\n                import React, {createElement} from 'react';\n                createElement('img');\n            "},
-		{"a class component rendering a div", "\n                import React, {createElement, PureComponent} from 'react';\n                class Button extends PureComponent {\n                    handleClick(ev) {\n                        ev.preventDefault();\n                    }\n                    render() {\n                        return <div onClick={this.handleClick}>Hello</div>;\n                    }\n                }\n            "},
+		{
+			"createElement for an img whose props are a variable",
+			"\n                const props = {};\n                React.createElement('img', props);\n            ",
+		},
+		{
+			"a bare createElement for a div",
+			"\n                import React, {createElement} from 'react';\n                createElement('div');\n            ",
+		},
+		{
+			"a bare createElement for an img",
+			"\n                import React, {createElement} from 'react';\n                createElement('img');\n            ",
+		},
+		{
+			"a class component rendering a div",
+			"\n                import React, {createElement, PureComponent} from 'react';\n                class Button extends PureComponent {\n                    handleClick(ev) {\n                        ev.preventDefault();\n                    }\n                    render() {\n                        return <div onClick={this.handleClick}>Hello</div>;\n                    }\n                }\n            ",
+		},
 	}
 
 	for _, testCase := range cases {
@@ -143,8 +170,16 @@ func TestVoidDomElementsNoChildrenNamesTheElementInTheMessage(test *testing.T) {
 		wantMessage string
 	}{
 		{"a JSX element", "<br>Foo</br>;", "Void DOM element <br /> cannot receive children."},
-		{"a longer element name", "<menuitem>Foo</menuitem>;", "Void DOM element <menuitem /> cannot receive children."},
-		{"a createElement call names the literal's value, without quotes", "React.createElement('img', {}, 'Foo');", "Void DOM element <img /> cannot receive children."},
+		{
+			"a longer element name",
+			"<menuitem>Foo</menuitem>;",
+			"Void DOM element <menuitem /> cannot receive children.",
+		},
+		{
+			"a createElement call names the literal's value, without quotes",
+			"React.createElement('img', {}, 'Foo');",
+			"Void DOM element <img /> cannot receive children.",
+		},
 	}
 
 	for _, testCase := range cases {
@@ -395,7 +430,12 @@ func TestVoidDomElementsNoChildrenAcceptsEveryCalleeSpellingUpstreamDoes(test *t
 	// call sharing the property name. Upstream excludes it by name in both member arms.
 	test.Run("document.createElement is excluded by name", func(test *testing.T) {
 		test.Parallel()
-		result := rule_testing.Run(test, VoidDomElementsNoChildren, voidDomElementsFile, "document.createElement('br', {}, 'Foo');")
+		result := rule_testing.Run(
+			test,
+			VoidDomElementsNoChildren,
+			voidDomElementsFile,
+			"document.createElement('br', {}, 'Foo');",
+		)
 		rule_testing.ExpectClean(test, result)
 	})
 }
@@ -465,7 +505,10 @@ func TestVoidDomElementsNoChildrenCountsArgumentsBeforeReadingThem(test *testing
 		{"a props argument that is not an object", "React.createElement('br', 'notanobject', 'Foo');"},
 		{"a first argument that is not a string literal", "React.createElement(Component, {}, 'Foo');"},
 		{"a template literal element name", "React.createElement(`br`, {}, 'Foo');"},
-		{"a props variable rather than a literal", "const props = {children: 'Foo'}; React.createElement('br', props);"},
+		{
+			"a props variable rather than a literal",
+			"const props = {children: 'Foo'}; React.createElement('br', props);",
+		},
 	}
 
 	for _, testCase := range cases {

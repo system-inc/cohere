@@ -218,7 +218,10 @@ func TestJsxNoCommentTextnodesStaysSilent(test *testing.T) {
         <Foo title={'foo' /* valid */}/>
       `},
 		{"valid 14 entity-escaped line comment in a pre", `<pre>&#x2F;&#x2F; TODO: Write perfect code</pre>`},
-		{"valid 15 entity-escaped block comment in a pre", `<pre>&#x2F;&#42; TODO: Write perfect code &#42;&#x2F;</pre>`},
+		{
+			"valid 15 entity-escaped block comment in a pre",
+			`<pre>&#x2F;&#42; TODO: Write perfect code &#42;&#x2F;</pre>`,
+		},
 		{"valid 16 entity-escaped slashes inside a span", `
         <div>
           <span className="pl-c"><span className="pl-c">&#47;&#47;</span> ...</span><br />
@@ -278,7 +281,11 @@ func TestJsxNoCommentTextnodesLineAnchoring(test *testing.T) {
 		{"a comment at the node start", "const a = <div>// invalid</div>;\n", []string{"putCommentInBraces"}},
 
 		// The `m` flag: the comment is on the third line of one text node.
-		{"a comment on a later line", "const a = <div>\n  hello\n  // invalid\n</div>;\n", []string{"putCommentInBraces"}},
+		{
+			"a comment on a later line",
+			"const a = <div>\n  hello\n  // invalid\n</div>;\n",
+			[]string{"putCommentInBraces"},
+		},
 
 		// `\s*` allows leading whitespace, so indentation does not hide it.
 		{"an indented comment", "const a = <div>\n      // invalid\n</div>;\n", []string{"putCommentInBraces"}},

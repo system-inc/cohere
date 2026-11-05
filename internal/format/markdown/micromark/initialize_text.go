@@ -80,7 +80,9 @@ func initializeTextFactory(field string) *InitialConstruct {
 }
 
 // createTextResolver merges adjacent data events, then runs the extra resolver.
-func createTextResolver(extraResolver func(events []Event, context *TokenizeContext) []Event) func(events []Event, context *TokenizeContext) []Event {
+func createTextResolver(
+	extraResolver func(events []Event, context *TokenizeContext) []Event,
+) func(events []Event, context *TokenizeContext) []Event {
 	return func(events []Event, context *TokenizeContext) []Event {
 		index := -1
 		enter := -1

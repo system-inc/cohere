@@ -137,7 +137,10 @@ func TestReactImportNoDestructuringStaysSilent(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.Run(test, ImportRequireReactNamespace, reactImportFile, testCase.sourceText))
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.Run(test, ImportRequireReactNamespace, reactImportFile, testCase.sourceText),
+			)
 		})
 	}
 }

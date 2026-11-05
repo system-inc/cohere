@@ -31,7 +31,10 @@ var noUnusedVarsOptionsCorpusDivergences = map[int]struct {
 	// value, so the checker resolves the read to nothing and this rule, which counts reads by symbol,
 	// never sees it. Upstream's scope analysis counts the reference anyway. The gap is in read detection,
 	// on code the compiler rejects, and predates these options.
-	25: {"a value read of an uninstantiated namespace (TS2708) resolves to no symbol", []noUnusedVarsOptionsCorpusFinding{}},
+	25: {
+		"a value read of an uninstantiated namespace (TS2708) resolves to no symbol",
+		[]noUnusedVarsOptionsCorpusFinding{},
+	},
 }
 
 func TestNoUnusedVarsOptionsUpstreamCorpus(test *testing.T) {
@@ -63,9 +66,15 @@ func TestNoUnusedVarsOptionsUpstreamCorpus(test *testing.T) {
 			if decodeNoUnusedVariablesOptionsError != nil {
 				test.Fatalf("decoding %q: %v", row.options, decodeNoUnusedVariablesOptionsError)
 			}
-			result := rule_testing.RunTypedFilesWithSetupAndOptions(test, NoUnusedVars, map[string]string{"file.ts": row.source}, "file.ts", options,
+			result := rule_testing.RunTypedFilesWithSetupAndOptions(test, NoUnusedVars, map[string]string{
+				"file.ts": row.source,
+			}, "file.ts", options,
 				func(directory string) {
-					if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(noUnusedVarsOptionsCorpusTsconfig), 0o644); writeError != nil {
+					if writeError := os.WriteFile(
+						filepath.Join(directory, "tsconfig.json"),
+						[]byte(noUnusedVarsOptionsCorpusTsconfig),
+						0o644,
+					); writeError != nil {
 						test.Fatal(writeError)
 					}
 				})
@@ -112,10 +121,30 @@ func TestNoUnusedVarsUsedIgnoredMessageNamesItsPattern(test *testing.T) {
 		options string
 		want    string
 	}{
-		{"variable", "const _a = 1;\nconsole.log(_a);\nexport {};", `{"reportUsedIgnorePattern": true, "varsIgnorePattern": "^_"}`, "'_a' matches varsIgnorePattern ^_, which marks a variable"},
-		{"argument", "export function f(_a: number) {\n  return _a;\n}", `{"reportUsedIgnorePattern": true, "argsIgnorePattern": "^_"}`, "'_a' matches argsIgnorePattern ^_, which marks an argument"},
-		{"caught error", "try {\n} catch (_e) {\n  console.log(_e);\n}\nexport {};", `{"reportUsedIgnorePattern": true, "caughtErrorsIgnorePattern": "^_"}`, "'_e' matches caughtErrorsIgnorePattern ^_, which marks a caught error"},
-		{"array element", "const [_a] = [1];\nconsole.log(_a);\nexport {};", `{"reportUsedIgnorePattern": true, "destructuredArrayIgnorePattern": "^_"}`, "'_a' matches destructuredArrayIgnorePattern ^_, which marks an element of array destructuring"},
+		{
+			"variable",
+			"const _a = 1;\nconsole.log(_a);\nexport {};",
+			`{"reportUsedIgnorePattern": true, "varsIgnorePattern": "^_"}`,
+			"'_a' matches varsIgnorePattern ^_, which marks a variable",
+		},
+		{
+			"argument",
+			"export function f(_a: number) {\n  return _a;\n}",
+			`{"reportUsedIgnorePattern": true, "argsIgnorePattern": "^_"}`,
+			"'_a' matches argsIgnorePattern ^_, which marks an argument",
+		},
+		{
+			"caught error",
+			"try {\n} catch (_e) {\n  console.log(_e);\n}\nexport {};",
+			`{"reportUsedIgnorePattern": true, "caughtErrorsIgnorePattern": "^_"}`,
+			"'_e' matches caughtErrorsIgnorePattern ^_, which marks a caught error",
+		},
+		{
+			"array element",
+			"const [_a] = [1];\nconsole.log(_a);\nexport {};",
+			`{"reportUsedIgnorePattern": true, "destructuredArrayIgnorePattern": "^_"}`,
+			"'_a' matches destructuredArrayIgnorePattern ^_, which marks an element of array destructuring",
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -124,7 +153,13 @@ func TestNoUnusedVarsUsedIgnoredMessageNamesItsPattern(test *testing.T) {
 			if decodeNoUnusedVariablesOptionsError != nil {
 				test.Fatal(decodeNoUnusedVariablesOptionsError)
 			}
-			result := rule_testing.RunTypedWithOptions(test, NoUnusedVars, "/repository/source/Case.ts", testCase.source, options)
+			result := rule_testing.RunTypedWithOptions(
+				test,
+				NoUnusedVars,
+				"/repository/source/Case.ts",
+				testCase.source,
+				options,
+			)
 			if len(result.Diagnostics) != 1 || result.Diagnostics[0].Message.Id != "usedIgnoredVar" {
 				test.Fatalf("got %+v, want one usedIgnoredVar", result.Diagnostics)
 			}

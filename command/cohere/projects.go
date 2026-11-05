@@ -62,7 +62,12 @@ func discoveryApplies(given map[string]bool, arguments []string) bool {
 //
 // lintConfigFileName is the lint config the command line named, absolute, or empty: every project's run
 // gets it, since a path typed here would resolve against each project's directory there.
-func checkDiscoveredProjects(location projectLocation, locateError error, workingDirectory string, lintConfigFileName string) (int, bool, error) {
+func checkDiscoveredProjects(
+	location projectLocation,
+	locateError error,
+	workingDirectory string,
+	lintConfigFileName string,
+) (int, bool, error) {
 	root := discoveryRoot(location, locateError, workingDirectory)
 	patterns, err := rootIgnorePatterns(root)
 	if err != nil {
@@ -150,7 +155,10 @@ func (found discovery) notes() []string {
 		lines = append(lines, fmt.Sprintf("%s not checked: the root's ignorePatterns match it", marker))
 	}
 	for _, label := range found.Ownership.Solutions {
-		lines = append(lines, fmt.Sprintf("%s not run: a solution tsconfig, which includes no file and references the projects checked instead", label))
+		lines = append(lines, fmt.Sprintf(
+			"%s not run: a solution tsconfig, which includes no file and references the projects checked instead",
+			label,
+		))
 	}
 	for _, label := range found.Ownership.Yielding {
 		lines = append(lines, fmt.Sprintf("%s not run: every file it includes belongs to a nearer tsconfig", label))
@@ -165,18 +173,28 @@ func (found discovery) notes() []string {
 	}
 	for _, covered := range found.SwiftCoverage.Covered {
 		if covered.Vendored {
-			lines = append(lines, fmt.Sprintf("%s not run: vendored in %s, whose run lists it as not checked", covered.Label, covered.CoveredBy))
+			lines = append(lines, fmt.Sprintf(
+				"%s not run: vendored in %s, whose run lists it as not checked",
+				covered.Label,
+				covered.CoveredBy,
+			))
 			continue
 		}
 		lines = append(lines, fmt.Sprintf("%s not run: checked as part of %s", covered.Label, covered.CoveredBy))
 	}
 	for _, failed := range found.SwiftCoverage.FailedQueries {
-		lines = append(lines, fmt.Sprintf("%s: the Swift coverage query failed, so every package it might check runs as its own project too: %s",
-			failed.Label, failed.Reason))
+		lines = append(lines, fmt.Sprintf(
+			"%s: the Swift coverage query failed, so every package it might check runs as its own project too: %s",
+			failed.Label,
+			failed.Reason,
+		))
 	}
 	// Last, since only these are sorted: a map has no order of its own.
 	for label := range found.Ownership.SharedDirectory {
-		lines = append(lines, fmt.Sprintf("%s ran with the cache off: another tsconfig's run keeps its cache in the same directory", label))
+		lines = append(lines, fmt.Sprintf(
+			"%s ran with the cache off: another tsconfig's run keeps its cache in the same directory",
+			label,
+		))
 	}
 	sort.Strings(lines[len(lines)-len(found.Ownership.SharedDirectory):])
 	return lines
@@ -240,7 +258,11 @@ func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
 		label := projectLabel(project)
 		yieldFile, writeProjectYieldError := writeProjectYield(found.Ownership.Yields[label], yieldDirectory)
 		if writeProjectYieldError != nil {
-			runs[index] = projectRun{project: project, exitCode: 1, err: fmt.Errorf("writing what it yields: %w", writeProjectYieldError)}
+			runs[index] = projectRun{
+				project:  project,
+				exitCode: 1,
+				err:      fmt.Errorf("writing what it yields: %w", writeProjectYieldError),
+			}
 			continue
 		}
 		projectArguments := arguments
@@ -309,7 +331,14 @@ func runProjects(found discovery, arguments []string, out *bufio.Writer) int {
 		if checked.exitCode != 0 {
 			verdict = fmt.Sprintf("failed, exit %d", checked.exitCode)
 		}
-		fmt.Fprintf(account, "  %s (%s): %s in %s\n", projectLabel(checked.project), checked.project.Engine, verdict, round(checked.elapsed))
+		fmt.Fprintf(
+			account,
+			"  %s (%s): %s in %s\n",
+			projectLabel(checked.project),
+			checked.project.Engine,
+			verdict,
+			round(checked.elapsed),
+		)
 	}
 	for _, note := range found.notes() {
 		fmt.Fprintf(account, "  %s\n", note)
@@ -340,7 +369,10 @@ func overallFactsOf(runs []projectRun, total time.Duration) overallFacts {
 		case checked.err != nil:
 			facts.Unfinished++
 		case checked.exitCode != 0:
-			facts.Failed = append(facts.Failed, fmt.Sprintf("%s (exit %d)", projectLabel(checked.project), checked.exitCode))
+			facts.Failed = append(
+				facts.Failed,
+				fmt.Sprintf("%s (exit %d)", projectLabel(checked.project), checked.exitCode),
+			)
 		}
 	}
 	return facts
@@ -470,18 +502,31 @@ func summaryLine(found discovery, runs []projectRun) string {
 	}
 	var notRunParts []string
 	if len(found.Ownership.Solutions) > 0 || len(found.Ownership.Yielding) > 0 {
-		notRunParts = append(notRunParts, fmt.Sprintf("%d solution tsconfigs, %d whose every file a nearer tsconfig owns",
-			len(found.Ownership.Solutions), len(found.Ownership.Yielding)))
+		notRunParts = append(
+			notRunParts,
+			fmt.Sprintf("%d solution tsconfigs, %d whose every file a nearer tsconfig owns",
+				len(found.Ownership.Solutions), len(found.Ownership.Yielding)),
+		)
 	}
 	if len(found.SwiftCoverage.Covered) > 0 {
-		notRunParts = append(notRunParts, fmt.Sprintf("%d Swift packages another package's run covers", len(found.SwiftCoverage.Covered)))
+		notRunParts = append(
+			notRunParts,
+			fmt.Sprintf("%d Swift packages another package's run covers", len(found.SwiftCoverage.Covered)),
+		)
 	}
 	notRun := ""
 	if len(notRunParts) > 0 {
 		notRun = "; not run: " + strings.Join(notRunParts, ", ")
 	}
-	return fmt.Sprintf("projects: %d checked (%s), %s%s; not searched for projects: %d directories .gitignore ignores, "+
-		"%d dependency, build, cache or fixture directories, %d nested repositories",
-		checkedCount, strings.Join(engines, ", "), verdict, notRun, found.Ignored, found.NeverDescended,
-		len(found.NestedRepositories)+found.Submodules)
+	return fmt.Sprintf(
+		"projects: %d checked (%s), %s%s; not searched for projects: %d directories .gitignore ignores, "+
+			"%d dependency, build, cache or fixture directories, %d nested repositories",
+		checkedCount,
+		strings.Join(engines, ", "),
+		verdict,
+		notRun,
+		found.Ignored,
+		found.NeverDescended,
+		len(found.NestedRepositories)+found.Submodules,
+	)
 }

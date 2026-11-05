@@ -45,8 +45,8 @@ const unknownFixtureStylesheetPath = "app/_theme/styles/theme.css"
 // declares and no framework contains must read as known, and the shipped table could only answer
 // that for the repository it was generated from.
 //
-// The names come from `internal/lint/rules/tailwind/tools/generate_descriptor_base/testdata/independent_theme.css`, which
-// exists so a framework fact can be told from a repository fact. `synthetic-static` and
+// The names come from `internal/lint/rules/tailwind/tools/generate_descriptor_base/testdata/independent_theme.css`,
+// which exists so a framework fact can be told from a repository fact. `synthetic-static` and
 // `synthetic-fn-*` appear in no framework table and in neither corpus repository, so a rule that
 // calls them known has consulted this stylesheet rather than a table.
 const unknownFixtureStylesheet = `@import "tailwindcss";
@@ -563,7 +563,10 @@ func TestRepositoryNamesAreNoLongerVouchedForByTheFramework(test *testing.T) {
 				"the leak", name)
 		}
 	}
-	test.Logf("checked %d repository-declared utilities: known on ahra, unknown on an independent system", len(declaredByAhra))
+	test.Logf(
+		"checked %d repository-declared utilities: known on ahra, unknown on an independent system",
+		len(declaredByAhra),
+	)
 }
 
 // TestUnknownClassFixturesActuallyRan is what stops this file from going green on nothing.
@@ -702,8 +705,11 @@ func TestRepositoryUtilityRootsAreNeverReported(test *testing.T) {
 		}
 		checked++
 		if !classExistsIn(className, system) {
-			test.Errorf("%s reads as the repository root %q and is reported, which is a false positive on a declared utility",
-				className, candidates[0].Root)
+			test.Errorf(
+				"%s reads as the repository root %q and is reported, which is a false positive on a declared utility",
+				className,
+				candidates[0].Root,
+			)
 		}
 	}
 

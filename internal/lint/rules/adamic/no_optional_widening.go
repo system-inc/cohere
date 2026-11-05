@@ -63,7 +63,8 @@ var NoOptionalWidening = rule.Rule{
 			if flow.IsClassInstance(pair.Target) {
 				return false, false
 			}
-			if pair.Target.Flags()&checker.TypeFlagsObject == 0 || pair.Source.Flags()&(checker.TypeFlagsUnion|checker.TypeFlagsAny) != 0 {
+			if pair.Target.Flags()&checker.TypeFlagsObject == 0 ||
+				pair.Source.Flags()&(checker.TypeFlagsUnion|checker.TypeFlagsAny) != 0 {
 				return false, true
 			}
 			// A tuple's optional element is a position its fixed length rules out: tsc refuses `[number]`
@@ -106,11 +107,14 @@ var NoOptionalWidening = rule.Rule{
 			ruleContext.ReportNode(site.Node, rule.Message{
 				Id: "optionalWidening",
 				Description: noOptionalWideningText.Render(map[string]string{
-					"slot":         slotText(ruleContext.SourceFile, site.Node, found.Path),
-					"source":       type_checking.StableTypeText(typeChecker, found.Source),
-					"target":       type_checking.StableTypeText(typeChecker, found.Target),
-					"property":     type_checking.StablePropertyName(missing.Name),
-					"propertyType": type_checking.StableTypeText(typeChecker, checker.Checker_getTypeOfSymbol(typeChecker, missing)),
+					"slot":     slotText(ruleContext.SourceFile, site.Node, found.Path),
+					"source":   type_checking.StableTypeText(typeChecker, found.Source),
+					"target":   type_checking.StableTypeText(typeChecker, found.Target),
+					"property": type_checking.StablePropertyName(missing.Name),
+					"propertyType": type_checking.StableTypeText(
+						typeChecker,
+						checker.Checker_getTypeOfSymbol(typeChecker, missing),
+					),
 				}),
 			})
 		})

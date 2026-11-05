@@ -151,7 +151,13 @@ func showDoc(document Doc) string {
 	case *Fill:
 		return "fill[" + list(typed.Parts) + "]"
 	case *IfBreak:
-		return "ifBreak(" + idName(typed.GroupID) + "," + showDoc(typed.BreakContents) + "," + showDoc(typed.FlatContents) + ")"
+		return "ifBreak(" +
+			idName(typed.GroupID) +
+			"," +
+			showDoc(typed.BreakContents) +
+			"," +
+			showDoc(typed.FlatContents) +
+			")"
 	case *Indent:
 		return "indent(" + showDoc(typed.Contents) + ")"
 	case *Align:
@@ -168,7 +174,13 @@ func showDoc(document Doc) string {
 		}
 		return "align(" + n + "," + showDoc(typed.Contents) + ")"
 	case *IndentIfBreak:
-		return "indentIfBreak(" + idName(typed.GroupID) + "," + fmt.Sprint(typed.Negate) + "," + showDoc(typed.Contents) + ")"
+		return "indentIfBreak(" +
+			idName(typed.GroupID) +
+			"," +
+			fmt.Sprint(typed.Negate) +
+			"," +
+			showDoc(typed.Contents) +
+			")"
 	case *LineSuffix:
 		return "lineSuffix(" + showDoc(typed.Contents) + ")"
 	case lineSuffixBoundaryDoc:

@@ -50,9 +50,21 @@ func TestEmptyTextAndNumericSeparatorsMatchTheFork(test *testing.T) {
 		case oracleErr != nil && nativeErr != nil:
 			refusedByBoth++
 		case oracleErr != nil:
-			test.Errorf("%s %q: the fork refuses it (%v) and Formatter printed %q", each.fileName, each.text, oracleErr, actual)
+			test.Errorf(
+				"%s %q: the fork refuses it (%v) and Formatter printed %q",
+				each.fileName,
+				each.text,
+				oracleErr,
+				actual,
+			)
 		case nativeErr != nil:
-			test.Errorf("%s %q: the fork prints %q and Formatter refused: %v", each.fileName, each.text, expected, nativeErr)
+			test.Errorf(
+				"%s %q: the fork prints %q and Formatter refused: %v",
+				each.fileName,
+				each.text,
+				expected,
+				nativeErr,
+			)
 		default:
 			compared++
 			if actual != expected {

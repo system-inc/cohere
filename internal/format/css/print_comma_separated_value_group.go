@@ -87,7 +87,8 @@ func printCommaSeparatedValueGroup(path *astPath, options *printerOptions, print
 			continue
 		}
 
-		// Ignore Tailwind `@utility` directive ( https://tailwindcss.com/docs/adding-custom-styles#functional-utilities )
+		// Ignore Tailwind `@utility` directive ( https://tailwindcss.com/docs/adding-custom-styles#functional-utilities
+		// )
 		if insideAtRuleNode(path, "utility") &&
 			iNode.Type() == "value-word" &&
 			iNextNode != nil &&

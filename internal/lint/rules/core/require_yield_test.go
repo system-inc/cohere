@@ -32,8 +32,11 @@ func TestRequireYieldFires(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectFindings(test, rule_testing.Run(test, RequireYield, requireYieldFile, testCase.sourceText),
-				"missingYield")
+			rule_testing.ExpectFindings(
+				test,
+				rule_testing.Run(test, RequireYield, requireYieldFile, testCase.sourceText),
+				"missingYield",
+			)
 		})
 	}
 }
@@ -46,11 +49,17 @@ func TestRequireYieldStaysSilent(test *testing.T) {
 		sourceText string
 	}{
 		{"a yield", "export function* generate() {\n    yield 1;\n}\n"},
-		{"a delegating yield", "declare function other(): Generator<number>;\nexport function* generate() {\n    yield* other();\n}\n"},
+		{
+			"a delegating yield",
+			"declare function other(): Generator<number>;\nexport function* generate() {\n    yield* other();\n}\n",
+		},
 		{"a yield with no argument", "export function* generate() {\n    yield;\n}\n"},
 		// The yield is this function's even though it sits several statements deep, so the walk
 		// has to descend through blocks while stopping at function boundaries.
-		{"a yield inside a nested block", "export function* generate(flag: boolean) {\n    if(flag) {\n        for(let index = 0; index < 3; index++) {\n            yield index;\n        }\n    }\n}\n"},
+		{
+			"a yield inside a nested block",
+			"export function* generate(flag: boolean) {\n    if(flag) {\n        for(let index = 0; index < 3; index++) {\n            yield index;\n        }\n    }\n}\n",
+		},
 		{"a yield in a class method", "export class Thing {\n    *generate() {\n        yield 1;\n    }\n}\n"},
 		// A plain function is not a generator, so its lack of yield means nothing. This is the
 		// boundary: the asterisk is the whole trigger.
@@ -66,7 +75,10 @@ func TestRequireYieldStaysSilent(test *testing.T) {
 		{"an empty generator method", "export class Thing {\n    *generate() {}\n}\n"},
 		// An overload signature and an ambient declaration have no body to search, so there is
 		// nothing to judge and reading a nil body must not report.
-		{"an ambient generator declaration", "declare function generate(): Generator<number>;\nexport const Use = generate;\n"},
+		{
+			"an ambient generator declaration",
+			"declare function generate(): Generator<number>;\nexport const Use = generate;\n",
+		},
 		{"no functions at all", "export const Value = 1;\n"},
 	}
 	for _, testCase := range cases {

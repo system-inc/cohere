@@ -255,7 +255,10 @@ func (builder *builder) lowerCallExpression(node *ast.Node) Place {
 
 	calleePlace := builder.lowerExpressionToPlace(callee)
 	args := builder.lowerArguments(expression.Arguments)
-	return builder.emit(&CallExpression{Callee: calleePlace, Args: args, Optional: optional, CalleeOrigin: origin}, node)
+	return builder.emit(
+		&CallExpression{Callee: calleePlace, Args: args, Optional: optional, CalleeOrigin: origin},
+		node,
+	)
 }
 
 func (builder *builder) lowerNewExpression(node *ast.Node) Place {

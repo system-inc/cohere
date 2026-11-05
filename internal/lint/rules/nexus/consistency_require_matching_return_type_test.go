@@ -426,10 +426,19 @@ var consistencyRequireMatchingReturnTypeSilentCases = []struct {
 	}},
 }
 
-func consistencyRequireMatchingReturnTypeAssertCase(test *testing.T, subject consistencyRequireMatchingReturnTypeCase, id string) {
+func consistencyRequireMatchingReturnTypeAssertCase(
+	test *testing.T,
+	subject consistencyRequireMatchingReturnTypeCase,
+	id string,
+) {
 	test.Helper()
 	source := consistencyRequireMatchingReturnTypeSource(subject.lines...)
-	result := rule_testing.RunTyped(test, ConsistencyRequireMatchingReturnType, consistencyRequireMatchingReturnTypeFile, source)
+	result := rule_testing.RunTyped(
+		test,
+		ConsistencyRequireMatchingReturnType,
+		consistencyRequireMatchingReturnTypeFile,
+		source,
+	)
 	want := make([]string, len(subject.reported))
 	for index := range want {
 		want[index] = id
@@ -465,7 +474,11 @@ func consistencyRequireMatchingReturnTypeAssertCase(test *testing.T, subject con
 	if changed != 1 {
 		test.Fatalf("the case names no line holding %q to fix", subject.reported[0])
 	}
-	rule_testing.ExpectFixedSource(test, result, strings.TrimSpace(consistencyRequireMatchingReturnTypeSource(fixedLines...))+"\n")
+	rule_testing.ExpectFixedSource(
+		test,
+		result,
+		strings.TrimSpace(consistencyRequireMatchingReturnTypeSource(fixedLines...))+"\n",
+	)
 }
 
 func TestConsistencyRequireReturnMatchingTypeFiresOnBareReturnInValueFunction(test *testing.T) {
@@ -483,7 +496,11 @@ func TestConsistencyRequireReturnMatchingTypeFiresOnUndefinedReturnInVoidFunctio
 	for _, subject := range consistencyRequireMatchingReturnTypeUndefinedCases {
 		test.Run(subject.name, func(test *testing.T) {
 			test.Parallel()
-			consistencyRequireMatchingReturnTypeAssertCase(test, subject, consistencyRequireMatchingReturnTypeUndefinedId)
+			consistencyRequireMatchingReturnTypeAssertCase(
+				test,
+				subject,
+				consistencyRequireMatchingReturnTypeUndefinedId,
+			)
 		})
 	}
 }
@@ -494,7 +511,12 @@ func TestConsistencyRequireReturnMatchingTypeStaysSilent(test *testing.T) {
 		test.Run(subject.name, func(test *testing.T) {
 			test.Parallel()
 			source := consistencyRequireMatchingReturnTypeSource(subject.lines...)
-			result := rule_testing.RunTyped(test, ConsistencyRequireMatchingReturnType, consistencyRequireMatchingReturnTypeFile, source)
+			result := rule_testing.RunTyped(
+				test,
+				ConsistencyRequireMatchingReturnType,
+				consistencyRequireMatchingReturnTypeFile,
+				source,
+			)
 			rule_testing.ExpectClean(test, result)
 		})
 	}
@@ -531,8 +553,12 @@ func TestConsistencyRequireReturnMatchingTypeMessages(test *testing.T) {
 	for _, subject := range cases {
 		test.Run(subject.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTyped(test, ConsistencyRequireMatchingReturnType, consistencyRequireMatchingReturnTypeFile,
-				consistencyRequireMatchingReturnTypeSource(subject.lines...))
+			result := rule_testing.RunTyped(
+				test,
+				ConsistencyRequireMatchingReturnType,
+				consistencyRequireMatchingReturnTypeFile,
+				consistencyRequireMatchingReturnTypeSource(subject.lines...),
+			)
 			if len(result.Diagnostics) != 1 {
 				test.Fatalf("want one finding, got %d", len(result.Diagnostics))
 			}

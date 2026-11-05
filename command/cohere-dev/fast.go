@@ -116,8 +116,12 @@ func fastTest(base []string, arguments []string) int {
 	skippedPackages := map[string]bool{}
 	for _, entry := range landingGateOnly {
 		if !packages[entry.pattern] {
-			fmt.Fprintf(streams.Errors, "cohere-dev: the fast tier's landing-gate list names %s, which is not a package of this "+
-				"module; fix landingGateOnly in command/cohere-dev/fast.go\n", entry.pattern)
+			fmt.Fprintf(
+				streams.Errors,
+				"cohere-dev: the fast tier's landing-gate list names %s, which is not a package of this "+
+					"module; fix landingGateOnly in command/cohere-dev/fast.go\n",
+				entry.pattern,
+			)
 			return 2
 		}
 		if entry.skippedBy == "" {
@@ -163,7 +167,10 @@ func fastTest(base []string, arguments []string) int {
 		fmt.Fprintf(streams.Errors, "  %s (%.1fs alone): %s\n", what, entry.wallSeconds, entry.reason)
 	}
 	printUncovered(streams.Errors, uncovered)
-	fmt.Fprintln(streams.Errors, "fast tier: not the landing gate. Run cohere-dev test ./... through the lock before landing on main.")
+	fmt.Fprintln(
+		streams.Errors,
+		"fast tier: not the landing gate. Run cohere-dev test ./... through the lock before landing on main.",
+	)
 	return code
 }
 
@@ -186,7 +193,11 @@ func modulePackagesIn(root string, environment []string) (map[string]bool, error
 	output, outputError := command.Output()
 	if outputError != nil {
 		if exited, ok := outputError.(*exec.ExitError); ok && len(exited.Stderr) > 0 {
-			return nil, fmt.Errorf("listing the module's packages: %w\n%s", outputError, strings.TrimSpace(string(exited.Stderr)))
+			return nil, fmt.Errorf(
+				"listing the module's packages: %w\n%s",
+				outputError,
+				strings.TrimSpace(string(exited.Stderr)),
+			)
 		}
 		return nil, fmt.Errorf("listing the module's packages: %w", outputError)
 	}

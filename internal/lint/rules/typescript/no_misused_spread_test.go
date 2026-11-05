@@ -44,44 +44,177 @@ func TestNoMisusedSpreadStaysSilent(test *testing.T) {
 		{"upstream valid 3", "file.ts", "\ndeclare const data: unknown;\nconst a = [...data];\n    ", nil},
 		{"upstream valid 4", "file.ts", "\nconst a = [1, 2, 3];\nconst b = [...a];\n    ", nil},
 		{"upstream valid 5", "file.ts", "\nconst a = [1, 2, 3] as const;\nconst b = [...a];\n    ", nil},
-		{"upstream valid 6", "file.ts", "\ndeclare function getArray(): number[];\nconst a = [...getArray()];\n    ", nil},
-		{"upstream valid 7", "file.ts", "\ndeclare function getTuple(): readonly number[];\nconst a = [...getTuple()];\n    ", nil},
-		{"upstream valid 8", "file.ts", "\nconst iterator = {\n  *[Symbol.iterator]() {\n    yield 1;\n    yield 2;\n    yield 3;\n  },\n};\n\nconst a = [...iterator];\n    ", nil},
-		{"upstream valid 9", "file.ts", "\ndeclare const data: Iterable<number> | number[];\n\nconst a = [...data];\n    ", nil},
-		{"upstream valid 10", "file.ts", "\ndeclare const data: Iterable<number> & number[];\n\nconst a = [...data];\n    ", nil},
-		{"upstream valid 11", "file.ts", "\ndeclare function getIterable(): Iterable<number>;\n\nconst a = [...getIterable()];\n    ", nil},
+		{
+			"upstream valid 6",
+			"file.ts",
+			"\ndeclare function getArray(): number[];\nconst a = [...getArray()];\n    ",
+			nil,
+		},
+		{
+			"upstream valid 7",
+			"file.ts",
+			"\ndeclare function getTuple(): readonly number[];\nconst a = [...getTuple()];\n    ",
+			nil,
+		},
+		{
+			"upstream valid 8",
+			"file.ts",
+			"\nconst iterator = {\n  *[Symbol.iterator]() {\n    yield 1;\n    yield 2;\n    yield 3;\n  },\n};\n\nconst a = [...iterator];\n    ",
+			nil,
+		},
+		{
+			"upstream valid 9",
+			"file.ts",
+			"\ndeclare const data: Iterable<number> | number[];\n\nconst a = [...data];\n    ",
+			nil,
+		},
+		{
+			"upstream valid 10",
+			"file.ts",
+			"\ndeclare const data: Iterable<number> & number[];\n\nconst a = [...data];\n    ",
+			nil,
+		},
+		{
+			"upstream valid 11",
+			"file.ts",
+			"\ndeclare function getIterable(): Iterable<number>;\n\nconst a = [...getIterable()];\n    ",
+			nil,
+		},
 		{"upstream valid 12", "file.ts", "\ndeclare const data: Uint8Array;\n\nconst a = [...data];\n    ", nil},
 		{"upstream valid 13", "file.ts", "\ndeclare const data: TypedArray;\n\nconst a = [...data];\n    ", nil},
 		{"upstream valid 14", "file.ts", "const o = { ...{ a: 1, b: 2 } };", nil},
 		{"upstream valid 15", "file.ts", "const o = { ...({ a: 1, b: 2 } as const) };", nil},
 		{"upstream valid 16", "file.ts", "\ndeclare const obj: any;\n\nconst o = { ...obj };\n    ", nil},
-		{"upstream valid 17", "file.ts", "\ndeclare const obj: { a: number; b: number } | any;\n\nconst o = { ...obj };\n    ", nil},
-		{"upstream valid 18", "file.ts", "\ndeclare const obj: { a: number; b: number } & any;\n\nconst o = { ...obj };\n    ", nil},
+		{
+			"upstream valid 17",
+			"file.ts",
+			"\ndeclare const obj: { a: number; b: number } | any;\n\nconst o = { ...obj };\n    ",
+			nil,
+		},
+		{
+			"upstream valid 18",
+			"file.ts",
+			"\ndeclare const obj: { a: number; b: number } & any;\n\nconst o = { ...obj };\n    ",
+			nil,
+		},
 		{"upstream valid 19", "file.ts", "\nconst obj = { a: 1, b: 2 };\nconst o = { ...obj };\n    ", nil},
-		{"upstream valid 20", "file.ts", "\ndeclare const obj: { a: number; b: number };\nconst o = { ...obj };\n    ", nil},
-		{"upstream valid 21", "file.ts", "\ndeclare function getObject(): { a: number; b: number };\nconst o = { ...getObject() };\n    ", nil},
+		{
+			"upstream valid 20",
+			"file.ts",
+			"\ndeclare const obj: { a: number; b: number };\nconst o = { ...obj };\n    ",
+			nil,
+		},
+		{
+			"upstream valid 21",
+			"file.ts",
+			"\ndeclare function getObject(): { a: number; b: number };\nconst o = { ...getObject() };\n    ",
+			nil,
+		},
 		{"upstream valid 22", "file.ts", "\nfunction f() {}\n\nf.prop = 1;\n\nconst o = { ...f };\n    ", nil},
 		{"upstream valid 23", "file.ts", "\nconst f = () => {};\n\nf.prop = 1;\n\nconst o = { ...f };\n    ", nil},
-		{"upstream valid 24", "file.ts", "\nfunction* generator() {}\n\ngenerator.prop = 1;\n\nconst o = { ...generator };\n    ", nil},
-		{"upstream valid 25", "file.ts", "\ndeclare const promiseLike: PromiseLike<number>;\n\nconst o = { ...promiseLike };\n    ", nil},
+		{
+			"upstream valid 24",
+			"file.ts",
+			"\nfunction* generator() {}\n\ngenerator.prop = 1;\n\nconst o = { ...generator };\n    ",
+			nil,
+		},
+		{
+			"upstream valid 25",
+			"file.ts",
+			"\ndeclare const promiseLike: PromiseLike<number>;\n\nconst o = { ...promiseLike };\n    ",
+			nil,
+		},
 		{"upstream valid 26", "file.tsx", "\nconst obj = { a: 1, b: 2 };\nconst o = <div {...x} />;\n      ", nil},
-		{"upstream valid 27", "file.tsx", "\ndeclare const obj: { a: number; b: number } | any;\nconst o = <div {...x} />;\n      ", nil},
-		{"upstream valid 28", "file.ts", "\nconst promise = new Promise(() => {});\nconst o = { ...promise };\n      ", NoMisusedSpreadOptions{AllowInline: []string{"Promise"}}},
+		{
+			"upstream valid 27",
+			"file.tsx",
+			"\ndeclare const obj: { a: number; b: number } | any;\nconst o = <div {...x} />;\n      ",
+			nil,
+		},
+		{
+			"upstream valid 28",
+			"file.ts",
+			"\nconst promise = new Promise(() => {});\nconst o = { ...promise };\n      ",
+			NoMisusedSpreadOptions{AllowInline: []string{"Promise"}},
+		},
 		{"upstream valid 29", "file.ts", "\ninterface A {}\n\ndeclare const a: A;\n\nconst o = { ...a };\n    ", nil},
 		{"upstream valid 30", "file.ts", "\nconst o = { ...'test' };\n    ", nil},
-		{"upstream valid 31", "file.ts", "\nconst str: string = 'test';\nconst a = [...str];\n      ", NoMisusedSpreadOptions{AllowInline: []string{"string"}}},
-		{"upstream valid 32", "file.ts", "\nfunction f() {}\n\nconst a = { ...f };\n      ", NoMisusedSpreadOptions{AllowInline: []string{"f"}}},
-		{"upstream valid 33", "file.ts", "\ndeclare const iterator: Iterable<string>;\n\nconst a = { ...iterator };\n      ", NoMisusedSpreadOptions{Allow: []type_checking.TypeOrValueSpecifier{{From: type_checking.TypeOrValueSpecifierFromLib, Name: []string{"Iterable"}}}}},
-		{"upstream valid 34", "file.ts", "\ntype BrandedString = string & { __brand: 'safe' };\n\ndeclare const brandedString: BrandedString;\n\nconst spreadBrandedString = [...brandedString];\n      ", NoMisusedSpreadOptions{Allow: []type_checking.TypeOrValueSpecifier{{From: type_checking.TypeOrValueSpecifierFromFile, Name: []string{"BrandedString"}}}}},
-		{"upstream valid 35", "file.ts", "\ntype CustomIterable = {\n  [Symbol.iterator]: () => Generator<string>;\n};\n\ndeclare const iterator: CustomIterable;\n\nconst a = { ...iterator };\n      ", NoMisusedSpreadOptions{AllowInline: []string{"CustomIterable"}}},
-		{"upstream valid 36", "file.ts", "\ntype CustomIterable = {\n  [Symbol.iterator]: () => string;\n};\n\ndeclare const iterator: CustomIterable;\n\nconst a = { ...iterator };\n      ", NoMisusedSpreadOptions{Allow: []type_checking.TypeOrValueSpecifier{{From: type_checking.TypeOrValueSpecifierFromFile, Name: []string{"CustomIterable"}}}}},
-		{"upstream valid 37", "file.ts", "\ndeclare module 'module' {\n  export type CustomIterable = {\n    [Symbol.iterator]: () => string;\n  };\n}\n\nimport { CustomIterable } from 'module';\n\ndeclare const iterator: CustomIterable;\n\nconst a = { ...iterator };\n      ", NoMisusedSpreadOptions{Allow: []type_checking.TypeOrValueSpecifier{{From: type_checking.TypeOrValueSpecifierFromPackage, Name: []string{"CustomIterable"}, Package: "module"}}}},
-		{"upstream valid 38", "file.ts", "\nclass A {\n  a = 1;\n}\n\nconst a = new A();\n\nconst o = { ...a };\n      ", NoMisusedSpreadOptions{AllowInline: []string{"A"}}},
-		{"upstream valid 39", "file.ts", "\nconst a = {\n  ...class A {\n    static value = 1;\n  },\n};\n      ", NoMisusedSpreadOptions{AllowInline: []string{"A"}}}}
+		{
+			"upstream valid 31",
+			"file.ts",
+			"\nconst str: string = 'test';\nconst a = [...str];\n      ",
+			NoMisusedSpreadOptions{AllowInline: []string{"string"}},
+		},
+		{
+			"upstream valid 32",
+			"file.ts",
+			"\nfunction f() {}\n\nconst a = { ...f };\n      ",
+			NoMisusedSpreadOptions{AllowInline: []string{"f"}},
+		},
+		{
+			"upstream valid 33",
+			"file.ts",
+			"\ndeclare const iterator: Iterable<string>;\n\nconst a = { ...iterator };\n      ",
+			NoMisusedSpreadOptions{
+				Allow: []type_checking.TypeOrValueSpecifier{
+					{From: type_checking.TypeOrValueSpecifierFromLib, Name: []string{"Iterable"}},
+				},
+			},
+		},
+		{
+			"upstream valid 34",
+			"file.ts",
+			"\ntype BrandedString = string & { __brand: 'safe' };\n\ndeclare const brandedString: BrandedString;\n\nconst spreadBrandedString = [...brandedString];\n      ",
+			NoMisusedSpreadOptions{Allow: []type_checking.TypeOrValueSpecifier{
+				{From: type_checking.TypeOrValueSpecifierFromFile, Name: []string{"BrandedString"}},
+			}},
+		},
+		{
+			"upstream valid 35",
+			"file.ts",
+			"\ntype CustomIterable = {\n  [Symbol.iterator]: () => Generator<string>;\n};\n\ndeclare const iterator: CustomIterable;\n\nconst a = { ...iterator };\n      ",
+			NoMisusedSpreadOptions{AllowInline: []string{"CustomIterable"}},
+		},
+		{
+			"upstream valid 36",
+			"file.ts",
+			"\ntype CustomIterable = {\n  [Symbol.iterator]: () => string;\n};\n\ndeclare const iterator: CustomIterable;\n\nconst a = { ...iterator };\n      ",
+			NoMisusedSpreadOptions{Allow: []type_checking.TypeOrValueSpecifier{
+				{From: type_checking.TypeOrValueSpecifierFromFile, Name: []string{"CustomIterable"}},
+			}},
+		},
+		{
+			"upstream valid 37",
+			"file.ts",
+			"\ndeclare module 'module' {\n  export type CustomIterable = {\n    [Symbol.iterator]: () => string;\n  };\n}\n\nimport { CustomIterable } from 'module';\n\ndeclare const iterator: CustomIterable;\n\nconst a = { ...iterator };\n      ",
+			NoMisusedSpreadOptions{Allow: []type_checking.TypeOrValueSpecifier{{
+				From:    type_checking.TypeOrValueSpecifierFromPackage,
+				Name:    []string{"CustomIterable"},
+				Package: "module",
+			}}},
+		},
+		{
+			"upstream valid 38",
+			"file.ts",
+			"\nclass A {\n  a = 1;\n}\n\nconst a = new A();\n\nconst o = { ...a };\n      ",
+			NoMisusedSpreadOptions{AllowInline: []string{"A"}},
+		},
+		{
+			"upstream valid 39",
+			"file.ts",
+			"\nconst a = {\n  ...class A {\n    static value = 1;\n  },\n};\n      ",
+			NoMisusedSpreadOptions{AllowInline: []string{"A"}},
+		}}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(test, NoMisusedSpread, testCase.fileName, testCase.sourceText, testCase.options)
+			result := rule_testing.RunTypedWithOptions(
+				test,
+				NoMisusedSpread,
+				testCase.fileName,
+				testCase.sourceText,
+				testCase.options,
+			)
 			rule_testing.ExpectClean(test, result)
 		})
 	}
@@ -109,76 +242,478 @@ func TestNoMisusedSpreadFires(test *testing.T) {
 		wantIds    []string
 	}{
 		{"upstream invalid 14", "file.ts", "const o = { ...[1, 2, 3] };", nil, []string{"noArraySpreadInObject"}},
-		{"upstream invalid 15", "file.ts", "\nconst arr = [1, 2, 3];\nconst o = { ...arr };\n      ", nil, []string{"noArraySpreadInObject"}},
-		{"upstream invalid 16", "file.ts", "\nconst arr = [1, 2, 3] as const;\nconst o = { ...arr };\n      ", nil, []string{"noArraySpreadInObject"}},
-		{"upstream invalid 17", "file.ts", "\ndeclare const arr: number[];\nconst o = { ...arr };\n      ", nil, []string{"noArraySpreadInObject"}},
-		{"upstream invalid 18", "file.ts", "\ndeclare const arr: readonly number[];\nconst o = { ...arr };\n      ", nil, []string{"noArraySpreadInObject"}},
-		{"upstream invalid 19", "file.ts", "\ndeclare const arr: number[] | string[];\nconst o = { ...arr };\n      ", nil, []string{"noArraySpreadInObject"}},
-		{"upstream invalid 20", "file.ts", "\ndeclare const arr: number[] & string[];\nconst o = { ...arr };\n      ", nil, []string{"noArraySpreadInObject"}},
-		{"upstream invalid 21", "file.ts", "\ndeclare function getArray(): number[];\nconst o = { ...getArray() };\n      ", nil, []string{"noArraySpreadInObject"}},
-		{"upstream invalid 22", "file.ts", "\ndeclare function getArray(): readonly number[];\nconst o = { ...getArray() };\n      ", nil, []string{"noArraySpreadInObject"}},
-		{"upstream invalid 23", "file.ts", "const o = { ...new Set([1, 2, 3]) };", nil, []string{"noIterableSpreadInObject"}},
-		{"upstream invalid 24", "file.ts", "\nconst set = new Set([1, 2, 3]);\nconst o = { ...set };\n      ", nil, []string{"noIterableSpreadInObject"}},
-		{"upstream invalid 25", "file.ts", "\ndeclare const set: Set<number>;\nconst o = { ...set };\n      ", nil, []string{"noIterableSpreadInObject"}},
-		{"upstream invalid 26", "file.ts", "\ndeclare const set: WeakSet<object>;\nconst o = { ...set };\n      ", nil, []string{"noClassInstanceSpreadInObject"}},
-		{"upstream invalid 27", "file.ts", "\ndeclare const set: ReadonlySet<number>;\nconst o = { ...set };\n      ", nil, []string{"noIterableSpreadInObject"}},
-		{"upstream invalid 28", "file.ts", "\ndeclare const set: Set<number> | { a: number };\nconst o = { ...set };\n      ", nil, []string{"noIterableSpreadInObject"}},
-		{"upstream invalid 29", "file.ts", "\ndeclare function getSet(): Set<number>;\nconst o = { ...getSet() };\n      ", nil, []string{"noIterableSpreadInObject"}},
-		{"upstream invalid 30", "file.ts", "\nconst o = {\n  ...new Map([\n    ['test-1', 1],\n    ['test-2', 2],\n  ]),\n};\n      ", nil, []string{"noMapSpreadInObject"}},
-		{"upstream invalid 31", "file.ts", "\nconst map = new Map([\n  ['test-1', 1],\n  ['test-2', 2],\n]);\n\nconst o = { ...map };\n      ", nil, []string{"noMapSpreadInObject"}},
-		{"upstream invalid 32", "file.ts", "\ndeclare const map: Map<string, number>;\nconst o = { ...map };\n      ", nil, []string{"noMapSpreadInObject"}},
-		{"upstream invalid 33", "file.ts", "\n        declare const map: Map<string, number>;\n        const o = { ...(map) };\n      ", nil, []string{"noMapSpreadInObject"}},
-		{"upstream invalid 34", "file.ts", "\ndeclare const map: Map<string, number>;\nconst o = { ...(map, map) };\n      ", nil, []string{"noMapSpreadInObject"}},
-		{"upstream invalid 35", "file.ts", "\ndeclare const map: Map<string, number>;\nconst others = { a: 1 };\nconst o = { ...map, ...others };\n      ", nil, []string{"noMapSpreadInObject"}},
-		{"upstream invalid 36", "file.ts", "\ndeclare const map: Map<string, number>;\nconst o = { other: 1, ...map };\n      ", nil, []string{"noMapSpreadInObject"}},
-		{"upstream invalid 37", "file.ts", "\ndeclare const map: ReadonlyMap<string, number>;\nconst o = { ...map };\n      ", nil, []string{"noMapSpreadInObject"}},
-		{"upstream invalid 38", "file.ts", "\ndeclare const map: WeakMap<{ a: number }, string>;\nconst o = { ...map };\n      ", nil, []string{"noMapSpreadInObject"}},
-		{"upstream invalid 39", "file.ts", "\ndeclare const map: Map<string, number> | { a: number };\nconst o = { ...map };\n      ", nil, []string{"noMapSpreadInObject"}},
-		{"upstream invalid 40", "file.ts", "\ndeclare function getMap(): Map<string, number>;\nconst o = { ...getMap() };\n      ", nil, []string{"noMapSpreadInObject"}},
-		{"upstream invalid 41", "file.ts", "\ndeclare const a: Map<boolean, string> & Set<number>;\nconst o = { ...a };\n      ", nil, []string{"noMapSpreadInObject"}},
-		{"upstream invalid 42", "file.ts", "\nconst ref = new WeakRef({ a: 1 });\nconst o = { ...ref };\n      ", nil, []string{"noClassInstanceSpreadInObject"}},
-		{"upstream invalid 43", "file.ts", "\nconst promise = new Promise(() => {});\nconst o = { ...promise };\n      ", nil, []string{"noPromiseSpreadInObject"}},
-		{"upstream invalid 44", "file.ts", "\ndeclare const promise: Promise<{ a: 1 }>;\nasync function foo() {\n  return { ...(promise || {}) };\n}\n      ", nil, []string{"noPromiseSpreadInObject"}},
-		{"upstream invalid 45", "file.ts", "\ndeclare const promise: Promise<any>;\nasync function foo() {\n  return { ...(Math.random() < 0.5 ? promise : {}) };\n}\n      ", nil, []string{"noPromiseSpreadInObject"}},
-		{"upstream invalid 46", "file.ts", "\nfunction withPromise<P extends Promise<void>>(promise: P) {\n  return { ...promise };\n}\n      ", nil, []string{"noPromiseSpreadInObject"}},
-		{"upstream invalid 47", "file.ts", "\ndeclare const maybePromise: Promise<number> | { a: number };\nconst o = { ...maybePromise };\n      ", nil, []string{"noPromiseSpreadInObject"}},
-		{"upstream invalid 48", "file.ts", "\ndeclare const promise: Promise<number> & { a: number };\nconst o = { ...promise };\n      ", nil, []string{"noPromiseSpreadInObject"}},
-		{"upstream invalid 49", "file.ts", "\ndeclare function getPromise(): Promise<number>;\nconst o = { ...getPromise() };\n      ", nil, []string{"noPromiseSpreadInObject"}},
-		{"upstream invalid 50", "file.ts", "\ndeclare function getPromise<T extends Promise<number>>(arg: T): T;\nconst o = { ...getPromise() };\n      ", nil, []string{"noPromiseSpreadInObject"}},
-		{"upstream invalid 51", "file.ts", "\nfunction f() {}\n\nconst o = { ...f };\n      ", nil, []string{"noFunctionSpreadInObject"}},
-		{"upstream invalid 52", "file.ts", "\ninterface FunctionWithProps {\n  (): string;\n  prop: boolean;\n}\n\ntype FunctionWithoutProps = () => string;\n\ndeclare const obj: FunctionWithProps | FunctionWithoutProps | object;\n\nconst o = { ...obj };\n      ", nil, []string{"noFunctionSpreadInObject"}},
-		{"upstream invalid 53", "file.ts", "\nconst f = () => {};\n\nconst o = { ...f };\n      ", nil, []string{"noFunctionSpreadInObject"}},
-		{"upstream invalid 54", "file.ts", "\ndeclare function f(): void;\n\nconst o = { ...f };\n      ", nil, []string{"noFunctionSpreadInObject"}},
-		{"upstream invalid 55", "file.ts", "\ndeclare function getFunction(): () => void;\n\nconst o = { ...getFunction() };\n      ", nil, []string{"noFunctionSpreadInObject"}},
-		{"upstream invalid 56", "file.ts", "\ndeclare const f: () => void;\n\nconst o = { ...f };\n      ", nil, []string{"noFunctionSpreadInObject"}},
-		{"upstream invalid 57", "file.ts", "\ndeclare const f: () => void | { a: number };\n\nconst o = { ...f };\n      ", nil, []string{"noFunctionSpreadInObject"}},
-		{"upstream invalid 58", "file.ts", "\nfunction* generator() {}\n\nconst o = { ...generator };\n      ", nil, []string{"noFunctionSpreadInObject"}},
-		{"upstream invalid 59", "file.ts", "\nconst iterator = {\n  *[Symbol.iterator]() {\n    yield 'test';\n  },\n};\n\nconst o = { ...iterator };\n      ", nil, []string{"noIterableSpreadInObject"}},
-		{"upstream invalid 60", "file.ts", "\ntype CustomIterable = {\n  [Symbol.iterator]: () => Generator<string>;\n};\n\nconst iterator: CustomIterable = {\n  *[Symbol.iterator]() {\n    yield 'test';\n  },\n};\n\nconst a = { ...iterator };\n      ", NoMisusedSpreadOptions{AllowInline: []string{"AnotherIterable"}}, []string{"noIterableSpreadInObject"}},
-		{"upstream invalid 62", "file.ts", "\ndeclare const iterator: Iterable<string>;\n\nconst o = { ...iterator };\n      ", nil, []string{"noIterableSpreadInObject"}},
-		{"upstream invalid 63", "file.ts", "\ndeclare const iterator: Iterable<string> | { a: number };\n\nconst o = { ...iterator };\n      ", nil, []string{"noIterableSpreadInObject"}},
-		{"upstream invalid 64", "file.ts", "\ndeclare function getIterable(): Iterable<string>;\n\nconst o = { ...getIterable() };\n      ", nil, []string{"noIterableSpreadInObject"}},
-		{"upstream invalid 65", "file.ts", "\nclass A {\n  [Symbol.iterator]() {\n    return {\n      next() {\n        return { done: true, value: undefined };\n      },\n    };\n  }\n}\n\nconst a = { ...new A() };\n      ", nil, []string{"noIterableSpreadInObject"}},
-		{"upstream invalid 66", "file.ts", "\nconst o = { ...new Date() };\n      ", nil, []string{"noClassInstanceSpreadInObject"}},
-		{"upstream invalid 67", "file.ts", "\ndeclare class HTMLElementLike {}\ndeclare const element: HTMLElementLike;\nconst o = { ...element };\n      ", nil, []string{"noClassInstanceSpreadInObject"}},
-		{"upstream invalid 68", "file.ts", "\ndeclare const regex: RegExp;\nconst o = { ...regex };\n      ", nil, []string{"noClassInstanceSpreadInObject"}},
-		{"upstream invalid 77", "file.ts", "\nclass A {}\n\nconst o = { ...A };\n      ", nil, []string{"noClassDeclarationSpreadInObject"}},
-		{"upstream invalid 78", "file.ts", "\nconst A = class {};\n\nconst o = { ...A };\n      ", nil, []string{"noClassDeclarationSpreadInObject"}},
-		{"upstream invalid 79", "file.ts", "\nclass Declaration {\n  declaration?: boolean;\n}\nconst Expression = class {\n  expression?: boolean;\n};\n\ndeclare const either: typeof Declaration | typeof Expression;\n\nconst o = { ...either };\n      ", nil, []string{"noClassDeclarationSpreadInObject"}},
-		{"upstream invalid 80", "file.ts", "\nconst A = Set<number>;\n\nconst o = { ...A };\n      ", nil, []string{"noClassDeclarationSpreadInObject"}},
-		{"upstream invalid 81", "file.ts", "\nconst a = {\n  ...class A {\n    static value = 1;\n    nonStatic = 2;\n  },\n};\n      ", nil, []string{"noClassDeclarationSpreadInObject"}},
-		{"upstream invalid 82", "file.ts", "\n        const a = { ...(class A { static value = 1 }) }\n      ", nil, []string{"noClassDeclarationSpreadInObject"}},
-		{"upstream invalid 84", "file.tsx", "\nconst o = <div {...[1, 2, 3]} />;\n      ", nil, []string{"noArraySpreadInObject"}},
-		{"upstream invalid 85", "file.tsx", "\nclass A {}\n\nconst o = <div {...A} />;\n      ", nil, []string{"noClassDeclarationSpreadInObject"}},
-		{"upstream invalid 86", "file.tsx", "\nconst o = <div {...new Date()} />;\n      ", nil, []string{"noClassInstanceSpreadInObject"}},
-		{"upstream invalid 87", "file.tsx", "\nfunction f() {}\n\nconst o = <div {...f} />;\n      ", nil, []string{"noFunctionSpreadInObject"}},
-		{"upstream invalid 88", "file.tsx", "\nconst o = <div {...new Set([1, 2, 3])} />;\n      ", nil, []string{"noIterableSpreadInObject"}},
-		{"upstream invalid 89", "file.tsx", "\ndeclare const map: Map<string, number>;\n\nconst o = <div {...map} />;\n      ", nil, []string{"noMapSpreadInObject"}},
-		{"upstream invalid 90", "file.tsx", "\nconst promise = new Promise(() => {});\n\nconst o = <div {...promise} />;\n      ", nil, []string{"noPromiseSpreadInObject"}}}
+		{
+			"upstream invalid 15",
+			"file.ts",
+			"\nconst arr = [1, 2, 3];\nconst o = { ...arr };\n      ",
+			nil,
+			[]string{"noArraySpreadInObject"},
+		},
+		{
+			"upstream invalid 16",
+			"file.ts",
+			"\nconst arr = [1, 2, 3] as const;\nconst o = { ...arr };\n      ",
+			nil,
+			[]string{"noArraySpreadInObject"},
+		},
+		{
+			"upstream invalid 17",
+			"file.ts",
+			"\ndeclare const arr: number[];\nconst o = { ...arr };\n      ",
+			nil,
+			[]string{"noArraySpreadInObject"},
+		},
+		{
+			"upstream invalid 18",
+			"file.ts",
+			"\ndeclare const arr: readonly number[];\nconst o = { ...arr };\n      ",
+			nil,
+			[]string{"noArraySpreadInObject"},
+		},
+		{
+			"upstream invalid 19",
+			"file.ts",
+			"\ndeclare const arr: number[] | string[];\nconst o = { ...arr };\n      ",
+			nil,
+			[]string{"noArraySpreadInObject"},
+		},
+		{
+			"upstream invalid 20",
+			"file.ts",
+			"\ndeclare const arr: number[] & string[];\nconst o = { ...arr };\n      ",
+			nil,
+			[]string{"noArraySpreadInObject"},
+		},
+		{
+			"upstream invalid 21",
+			"file.ts",
+			"\ndeclare function getArray(): number[];\nconst o = { ...getArray() };\n      ",
+			nil,
+			[]string{"noArraySpreadInObject"},
+		},
+		{
+			"upstream invalid 22",
+			"file.ts",
+			"\ndeclare function getArray(): readonly number[];\nconst o = { ...getArray() };\n      ",
+			nil,
+			[]string{"noArraySpreadInObject"},
+		},
+		{
+			"upstream invalid 23",
+			"file.ts",
+			"const o = { ...new Set([1, 2, 3]) };",
+			nil,
+			[]string{"noIterableSpreadInObject"},
+		},
+		{
+			"upstream invalid 24",
+			"file.ts",
+			"\nconst set = new Set([1, 2, 3]);\nconst o = { ...set };\n      ",
+			nil,
+			[]string{"noIterableSpreadInObject"},
+		},
+		{
+			"upstream invalid 25",
+			"file.ts",
+			"\ndeclare const set: Set<number>;\nconst o = { ...set };\n      ",
+			nil,
+			[]string{"noIterableSpreadInObject"},
+		},
+		{
+			"upstream invalid 26",
+			"file.ts",
+			"\ndeclare const set: WeakSet<object>;\nconst o = { ...set };\n      ",
+			nil,
+			[]string{"noClassInstanceSpreadInObject"},
+		},
+		{
+			"upstream invalid 27",
+			"file.ts",
+			"\ndeclare const set: ReadonlySet<number>;\nconst o = { ...set };\n      ",
+			nil,
+			[]string{"noIterableSpreadInObject"},
+		},
+		{
+			"upstream invalid 28",
+			"file.ts",
+			"\ndeclare const set: Set<number> | { a: number };\nconst o = { ...set };\n      ",
+			nil,
+			[]string{"noIterableSpreadInObject"},
+		},
+		{
+			"upstream invalid 29",
+			"file.ts",
+			"\ndeclare function getSet(): Set<number>;\nconst o = { ...getSet() };\n      ",
+			nil,
+			[]string{"noIterableSpreadInObject"},
+		},
+		{
+			"upstream invalid 30",
+			"file.ts",
+			"\nconst o = {\n  ...new Map([\n    ['test-1', 1],\n    ['test-2', 2],\n  ]),\n};\n      ",
+			nil,
+			[]string{"noMapSpreadInObject"},
+		},
+		{
+			"upstream invalid 31",
+			"file.ts",
+			"\nconst map = new Map([\n  ['test-1', 1],\n  ['test-2', 2],\n]);\n\nconst o = { ...map };\n      ",
+			nil,
+			[]string{"noMapSpreadInObject"},
+		},
+		{
+			"upstream invalid 32",
+			"file.ts",
+			"\ndeclare const map: Map<string, number>;\nconst o = { ...map };\n      ",
+			nil,
+			[]string{"noMapSpreadInObject"},
+		},
+		{
+			"upstream invalid 33",
+			"file.ts",
+			"\n        declare const map: Map<string, number>;\n        const o = { ...(map) };\n      ",
+			nil,
+			[]string{"noMapSpreadInObject"},
+		},
+		{
+			"upstream invalid 34",
+			"file.ts",
+			"\ndeclare const map: Map<string, number>;\nconst o = { ...(map, map) };\n      ",
+			nil,
+			[]string{"noMapSpreadInObject"},
+		},
+		{
+			"upstream invalid 35",
+			"file.ts",
+			"\ndeclare const map: Map<string, number>;\nconst others = { a: 1 };\nconst o = { ...map, ...others };\n      ",
+			nil,
+			[]string{"noMapSpreadInObject"},
+		},
+		{
+			"upstream invalid 36",
+			"file.ts",
+			"\ndeclare const map: Map<string, number>;\nconst o = { other: 1, ...map };\n      ",
+			nil,
+			[]string{"noMapSpreadInObject"},
+		},
+		{
+			"upstream invalid 37",
+			"file.ts",
+			"\ndeclare const map: ReadonlyMap<string, number>;\nconst o = { ...map };\n      ",
+			nil,
+			[]string{"noMapSpreadInObject"},
+		},
+		{
+			"upstream invalid 38",
+			"file.ts",
+			"\ndeclare const map: WeakMap<{ a: number }, string>;\nconst o = { ...map };\n      ",
+			nil,
+			[]string{"noMapSpreadInObject"},
+		},
+		{
+			"upstream invalid 39",
+			"file.ts",
+			"\ndeclare const map: Map<string, number> | { a: number };\nconst o = { ...map };\n      ",
+			nil,
+			[]string{"noMapSpreadInObject"},
+		},
+		{
+			"upstream invalid 40",
+			"file.ts",
+			"\ndeclare function getMap(): Map<string, number>;\nconst o = { ...getMap() };\n      ",
+			nil,
+			[]string{"noMapSpreadInObject"},
+		},
+		{
+			"upstream invalid 41",
+			"file.ts",
+			"\ndeclare const a: Map<boolean, string> & Set<number>;\nconst o = { ...a };\n      ",
+			nil,
+			[]string{"noMapSpreadInObject"},
+		},
+		{
+			"upstream invalid 42",
+			"file.ts",
+			"\nconst ref = new WeakRef({ a: 1 });\nconst o = { ...ref };\n      ",
+			nil,
+			[]string{"noClassInstanceSpreadInObject"},
+		},
+		{
+			"upstream invalid 43",
+			"file.ts",
+			"\nconst promise = new Promise(() => {});\nconst o = { ...promise };\n      ",
+			nil,
+			[]string{"noPromiseSpreadInObject"},
+		},
+		{
+			"upstream invalid 44",
+			"file.ts",
+			"\ndeclare const promise: Promise<{ a: 1 }>;\nasync function foo() {\n  return { ...(promise || {}) };\n}\n      ",
+			nil,
+			[]string{"noPromiseSpreadInObject"},
+		},
+		{
+			"upstream invalid 45",
+			"file.ts",
+			"\ndeclare const promise: Promise<any>;\nasync function foo() {\n  return { ...(Math.random() < 0.5 ? promise : {}) };\n}\n      ",
+			nil,
+			[]string{"noPromiseSpreadInObject"},
+		},
+		{
+			"upstream invalid 46",
+			"file.ts",
+			"\nfunction withPromise<P extends Promise<void>>(promise: P) {\n  return { ...promise };\n}\n      ",
+			nil,
+			[]string{"noPromiseSpreadInObject"},
+		},
+		{
+			"upstream invalid 47",
+			"file.ts",
+			"\ndeclare const maybePromise: Promise<number> | { a: number };\nconst o = { ...maybePromise };\n      ",
+			nil,
+			[]string{"noPromiseSpreadInObject"},
+		},
+		{
+			"upstream invalid 48",
+			"file.ts",
+			"\ndeclare const promise: Promise<number> & { a: number };\nconst o = { ...promise };\n      ",
+			nil,
+			[]string{"noPromiseSpreadInObject"},
+		},
+		{
+			"upstream invalid 49",
+			"file.ts",
+			"\ndeclare function getPromise(): Promise<number>;\nconst o = { ...getPromise() };\n      ",
+			nil,
+			[]string{"noPromiseSpreadInObject"},
+		},
+		{
+			"upstream invalid 50",
+			"file.ts",
+			"\ndeclare function getPromise<T extends Promise<number>>(arg: T): T;\nconst o = { ...getPromise() };\n      ",
+			nil,
+			[]string{"noPromiseSpreadInObject"},
+		},
+		{
+			"upstream invalid 51",
+			"file.ts",
+			"\nfunction f() {}\n\nconst o = { ...f };\n      ",
+			nil,
+			[]string{"noFunctionSpreadInObject"},
+		},
+		{
+			"upstream invalid 52",
+			"file.ts",
+			"\ninterface FunctionWithProps {\n  (): string;\n  prop: boolean;\n}\n\ntype FunctionWithoutProps = () => string;\n\ndeclare const obj: FunctionWithProps | FunctionWithoutProps | object;\n\nconst o = { ...obj };\n      ",
+			nil,
+			[]string{"noFunctionSpreadInObject"},
+		},
+		{
+			"upstream invalid 53",
+			"file.ts",
+			"\nconst f = () => {};\n\nconst o = { ...f };\n      ",
+			nil,
+			[]string{"noFunctionSpreadInObject"},
+		},
+		{
+			"upstream invalid 54",
+			"file.ts",
+			"\ndeclare function f(): void;\n\nconst o = { ...f };\n      ",
+			nil,
+			[]string{"noFunctionSpreadInObject"},
+		},
+		{
+			"upstream invalid 55",
+			"file.ts",
+			"\ndeclare function getFunction(): () => void;\n\nconst o = { ...getFunction() };\n      ",
+			nil,
+			[]string{"noFunctionSpreadInObject"},
+		},
+		{
+			"upstream invalid 56",
+			"file.ts",
+			"\ndeclare const f: () => void;\n\nconst o = { ...f };\n      ",
+			nil,
+			[]string{"noFunctionSpreadInObject"},
+		},
+		{
+			"upstream invalid 57",
+			"file.ts",
+			"\ndeclare const f: () => void | { a: number };\n\nconst o = { ...f };\n      ",
+			nil,
+			[]string{"noFunctionSpreadInObject"},
+		},
+		{
+			"upstream invalid 58",
+			"file.ts",
+			"\nfunction* generator() {}\n\nconst o = { ...generator };\n      ",
+			nil,
+			[]string{"noFunctionSpreadInObject"},
+		},
+		{
+			"upstream invalid 59",
+			"file.ts",
+			"\nconst iterator = {\n  *[Symbol.iterator]() {\n    yield 'test';\n  },\n};\n\nconst o = { ...iterator };\n      ",
+			nil,
+			[]string{"noIterableSpreadInObject"},
+		},
+		{
+			"upstream invalid 60",
+			"file.ts",
+			"\ntype CustomIterable = {\n  [Symbol.iterator]: () => Generator<string>;\n};\n\nconst iterator: CustomIterable = {\n  *[Symbol.iterator]() {\n    yield 'test';\n  },\n};\n\nconst a = { ...iterator };\n      ",
+			NoMisusedSpreadOptions{AllowInline: []string{"AnotherIterable"}},
+			[]string{"noIterableSpreadInObject"},
+		},
+		{
+			"upstream invalid 62",
+			"file.ts",
+			"\ndeclare const iterator: Iterable<string>;\n\nconst o = { ...iterator };\n      ",
+			nil,
+			[]string{"noIterableSpreadInObject"},
+		},
+		{
+			"upstream invalid 63",
+			"file.ts",
+			"\ndeclare const iterator: Iterable<string> | { a: number };\n\nconst o = { ...iterator };\n      ",
+			nil,
+			[]string{"noIterableSpreadInObject"},
+		},
+		{
+			"upstream invalid 64",
+			"file.ts",
+			"\ndeclare function getIterable(): Iterable<string>;\n\nconst o = { ...getIterable() };\n      ",
+			nil,
+			[]string{"noIterableSpreadInObject"},
+		},
+		{
+			"upstream invalid 65",
+			"file.ts",
+			"\nclass A {\n  [Symbol.iterator]() {\n    return {\n      next() {\n        return { done: true, value: undefined };\n      },\n    };\n  }\n}\n\nconst a = { ...new A() };\n      ",
+			nil,
+			[]string{"noIterableSpreadInObject"},
+		},
+		{
+			"upstream invalid 66",
+			"file.ts",
+			"\nconst o = { ...new Date() };\n      ",
+			nil,
+			[]string{"noClassInstanceSpreadInObject"},
+		},
+		{
+			"upstream invalid 67",
+			"file.ts",
+			"\ndeclare class HTMLElementLike {}\ndeclare const element: HTMLElementLike;\nconst o = { ...element };\n      ",
+			nil,
+			[]string{"noClassInstanceSpreadInObject"},
+		},
+		{
+			"upstream invalid 68",
+			"file.ts",
+			"\ndeclare const regex: RegExp;\nconst o = { ...regex };\n      ",
+			nil,
+			[]string{"noClassInstanceSpreadInObject"},
+		},
+		{
+			"upstream invalid 77",
+			"file.ts",
+			"\nclass A {}\n\nconst o = { ...A };\n      ",
+			nil,
+			[]string{"noClassDeclarationSpreadInObject"},
+		},
+		{
+			"upstream invalid 78",
+			"file.ts",
+			"\nconst A = class {};\n\nconst o = { ...A };\n      ",
+			nil,
+			[]string{"noClassDeclarationSpreadInObject"},
+		},
+		{
+			"upstream invalid 79",
+			"file.ts",
+			"\nclass Declaration {\n  declaration?: boolean;\n}\nconst Expression = class {\n  expression?: boolean;\n};\n\ndeclare const either: typeof Declaration | typeof Expression;\n\nconst o = { ...either };\n      ",
+			nil,
+			[]string{"noClassDeclarationSpreadInObject"},
+		},
+		{
+			"upstream invalid 80",
+			"file.ts",
+			"\nconst A = Set<number>;\n\nconst o = { ...A };\n      ",
+			nil,
+			[]string{"noClassDeclarationSpreadInObject"},
+		},
+		{
+			"upstream invalid 81",
+			"file.ts",
+			"\nconst a = {\n  ...class A {\n    static value = 1;\n    nonStatic = 2;\n  },\n};\n      ",
+			nil,
+			[]string{"noClassDeclarationSpreadInObject"},
+		},
+		{
+			"upstream invalid 82",
+			"file.ts",
+			"\n        const a = { ...(class A { static value = 1 }) }\n      ",
+			nil,
+			[]string{"noClassDeclarationSpreadInObject"},
+		},
+		{
+			"upstream invalid 84",
+			"file.tsx",
+			"\nconst o = <div {...[1, 2, 3]} />;\n      ",
+			nil,
+			[]string{"noArraySpreadInObject"},
+		},
+		{
+			"upstream invalid 85",
+			"file.tsx",
+			"\nclass A {}\n\nconst o = <div {...A} />;\n      ",
+			nil,
+			[]string{"noClassDeclarationSpreadInObject"},
+		},
+		{
+			"upstream invalid 86",
+			"file.tsx",
+			"\nconst o = <div {...new Date()} />;\n      ",
+			nil,
+			[]string{"noClassInstanceSpreadInObject"},
+		},
+		{
+			"upstream invalid 87",
+			"file.tsx",
+			"\nfunction f() {}\n\nconst o = <div {...f} />;\n      ",
+			nil,
+			[]string{"noFunctionSpreadInObject"},
+		},
+		{
+			"upstream invalid 88",
+			"file.tsx",
+			"\nconst o = <div {...new Set([1, 2, 3])} />;\n      ",
+			nil,
+			[]string{"noIterableSpreadInObject"},
+		},
+		{
+			"upstream invalid 89",
+			"file.tsx",
+			"\ndeclare const map: Map<string, number>;\n\nconst o = <div {...map} />;\n      ",
+			nil,
+			[]string{"noMapSpreadInObject"},
+		},
+		{
+			"upstream invalid 90",
+			"file.tsx",
+			"\nconst promise = new Promise(() => {});\n\nconst o = <div {...promise} />;\n      ",
+			nil,
+			[]string{"noPromiseSpreadInObject"},
+		}}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(test, NoMisusedSpread, testCase.fileName, testCase.sourceText, testCase.options)
+			result := rule_testing.RunTypedWithOptions(
+				test,
+				NoMisusedSpread,
+				testCase.fileName,
+				testCase.sourceText,
+				testCase.options,
+			)
 			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
@@ -207,29 +742,68 @@ func TestNoMisusedSpreadLeavesStringSpreadAlone(test *testing.T) {
 		sourceText string
 	}{
 		{"upstream invalid 0", "const a = [...'test'];"},
-		{"upstream invalid 1", "\nfunction withText<Text extends string>(text: Text) {\n  return [...text];\n}\n      "},
+		{
+			"upstream invalid 1",
+			"\nfunction withText<Text extends string>(text: Text) {\n  return [...text];\n}\n      ",
+		},
 		{"upstream invalid 2", "\nconst test = 'hello';\nconst a = [...test];\n      "},
 		{"upstream invalid 3", "\nconst test = `he${'ll'}o`;\nconst a = [...test];\n      "},
 		{"upstream invalid 4", "\ndeclare const test: string;\nconst a = [...test];\n      "},
 		{"upstream invalid 5", "\ndeclare const test: string | number[];\nconst a = [...test];\n      "},
 		{"upstream invalid 6", "\ndeclare const test: string & { __brand: 'test' };\nconst a = [...test];\n      "},
-		{"upstream invalid 7", "\ndeclare const test: number | (boolean | (string & { __brand: true }));\nconst a = [...test];\n      "},
+		{
+			"upstream invalid 7",
+			"\ndeclare const test: number | (boolean | (string & { __brand: true }));\nconst a = [...test];\n      ",
+		},
 		{"upstream invalid 8", "\ndeclare function getString(): string;\nconst a = [...getString()];\n      "},
-		{"upstream invalid 9", "\ndeclare function textIdentity(...args: string[]);\n\ndeclare const text: string;\n\ntextIdentity(...text);\n      "},
-		{"upstream invalid 10", "\ndeclare function textIdentity(...args: string[]);\n\ndeclare const text: string;\n\ntextIdentity(...text, 'and', ...text);\n      "},
-		{"upstream invalid 11", "\ndeclare function textIdentity(...args: string[]);\n\nfunction withText<Text extends string>(text: Text) {\n  textIdentity(...text);\n}\n      "},
-		{"upstream invalid 12", "\ndeclare function getString<T extends string>(): T;\nconst a = [...getString()];\n      "},
-		{"upstream invalid 13", "\ndeclare function getString(): string & { __brand: 'test' };\nconst a = [...getString()];\n      "},
-		{"ahra Countries.ts:13, ISO letters to regional indicators", "export function getCountryEmojiByCountryCode(countryCode: string): string {\n    return [...countryCode.toUpperCase()]\n        .map(function(character) {\n            return String.fromCodePoint(0x1f1e6 + character.charCodeAt(0) - 0x41);\n        })\n        .join('');\n}\n"},
-		{"ahra PngTextMetadata.ts:64, a Latin-1 filter by code point", "function toLatin1Safe(value: string): string {\n    return [...value].filter((character) => character.charCodeAt(0) <= 0xff).join('');\n}\n"},
-		{"ahra PensieveDailies.ts:288, quote marks scanned by code point", "declare const quoteMarkCharacters: Set<string>;\nfunction leadingQuoteCount(anchor: string): number {\n    const characters = [...anchor.trim()];\n    let count = 0;\n    while(count < characters.length && quoteMarkCharacters.has(characters[count]!)) count++;\n    return count;\n}\n"},
-		{"ahra PensieveDailies.ts:326, ignored characters filtered by code point", "declare const anchorIgnoredCharacters: Set<string>;\ndeclare function normalizeMomentText(text: string): string;\nfunction normalize(text: string): string {\n    return normalizeMomentText([...text].filter((character) => !anchorIgnoredCharacters.has(character)).join(''));\n}\n"},
-		{"a string spread into a constructor", "class C {\n  constructor(...a: string[]) {}\n}\ndeclare const s: string;\nconst x = new C(...s);"},
+		{
+			"upstream invalid 9",
+			"\ndeclare function textIdentity(...args: string[]);\n\ndeclare const text: string;\n\ntextIdentity(...text);\n      ",
+		},
+		{
+			"upstream invalid 10",
+			"\ndeclare function textIdentity(...args: string[]);\n\ndeclare const text: string;\n\ntextIdentity(...text, 'and', ...text);\n      ",
+		},
+		{
+			"upstream invalid 11",
+			"\ndeclare function textIdentity(...args: string[]);\n\nfunction withText<Text extends string>(text: Text) {\n  textIdentity(...text);\n}\n      ",
+		},
+		{
+			"upstream invalid 12",
+			"\ndeclare function getString<T extends string>(): T;\nconst a = [...getString()];\n      ",
+		},
+		{
+			"upstream invalid 13",
+			"\ndeclare function getString(): string & { __brand: 'test' };\nconst a = [...getString()];\n      ",
+		},
+		{
+			"ahra Countries.ts:13, ISO letters to regional indicators",
+			"export function getCountryEmojiByCountryCode(countryCode: string): string {\n    return [...countryCode.toUpperCase()]\n        .map(function(character) {\n            return String.fromCodePoint(0x1f1e6 + character.charCodeAt(0) - 0x41);\n        })\n        .join('');\n}\n",
+		},
+		{
+			"ahra PngTextMetadata.ts:64, a Latin-1 filter by code point",
+			"function toLatin1Safe(value: string): string {\n    return [...value].filter((character) => character.charCodeAt(0) <= 0xff).join('');\n}\n",
+		},
+		{
+			"ahra PensieveDailies.ts:288, quote marks scanned by code point",
+			"declare const quoteMarkCharacters: Set<string>;\nfunction leadingQuoteCount(anchor: string): number {\n    const characters = [...anchor.trim()];\n    let count = 0;\n    while(count < characters.length && quoteMarkCharacters.has(characters[count]!)) count++;\n    return count;\n}\n",
+		},
+		{
+			"ahra PensieveDailies.ts:326, ignored characters filtered by code point",
+			"declare const anchorIgnoredCharacters: Set<string>;\ndeclare function normalizeMomentText(text: string): string;\nfunction normalize(text: string): string {\n    return normalizeMomentText([...text].filter((character) => !anchorIgnoredCharacters.has(character)).join(''));\n}\n",
+		},
+		{
+			"a string spread into a constructor",
+			"class C {\n  constructor(...a: string[]) {}\n}\ndeclare const s: string;\nconst x = new C(...s);",
+		},
 	}
 	for _, testCase := range silent {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoMisusedSpread, noMisusedSpreadFile, testCase.sourceText, nil))
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.RunTypedWithOptions(test, NoMisusedSpread, noMisusedSpreadFile, testCase.sourceText, nil),
+			)
 		})
 	}
 
@@ -263,31 +837,184 @@ func TestNoMisusedSpreadSuggestions(test *testing.T) {
 		wantId     string
 		wantOutput string
 	}{
-		{"upstream invalid 30", "file.ts", "\nconst o = {\n  ...new Map([\n    ['test-1', 1],\n    ['test-2', 2],\n  ]),\n};\n      ", nil, "replaceMapSpreadInObject", "\nconst o = Object.fromEntries(new Map([\n    ['test-1', 1],\n    ['test-2', 2],\n  ]));\n      "},
-		{"upstream invalid 31", "file.ts", "\nconst map = new Map([\n  ['test-1', 1],\n  ['test-2', 2],\n]);\n\nconst o = { ...map };\n      ", nil, "replaceMapSpreadInObject", "\nconst map = new Map([\n  ['test-1', 1],\n  ['test-2', 2],\n]);\n\nconst o = Object.fromEntries(map);\n      "},
-		{"upstream invalid 32", "file.ts", "\ndeclare const map: Map<string, number>;\nconst o = { ...map };\n      ", nil, "replaceMapSpreadInObject", "\ndeclare const map: Map<string, number>;\nconst o = Object.fromEntries(map);\n      "},
-		{"upstream invalid 33", "file.ts", "\n        declare const map: Map<string, number>;\n        const o = { ...(map) };\n      ", nil, "replaceMapSpreadInObject", "\n        declare const map: Map<string, number>;\n        const o = Object.fromEntries(map);\n      "},
-		{"upstream invalid 34", "file.ts", "\ndeclare const map: Map<string, number>;\nconst o = { ...(map, map) };\n      ", nil, "replaceMapSpreadInObject", "\ndeclare const map: Map<string, number>;\nconst o = Object.fromEntries((map, map));\n      "},
-		{"upstream invalid 35", "file.ts", "\ndeclare const map: Map<string, number>;\nconst others = { a: 1 };\nconst o = { ...map, ...others };\n      ", nil, "replaceMapSpreadInObject", "\ndeclare const map: Map<string, number>;\nconst others = { a: 1 };\nconst o = { ...Object.fromEntries(map), ...others };\n      "},
-		{"upstream invalid 36", "file.ts", "\ndeclare const map: Map<string, number>;\nconst o = { other: 1, ...map };\n      ", nil, "replaceMapSpreadInObject", "\ndeclare const map: Map<string, number>;\nconst o = { other: 1, ...Object.fromEntries(map) };\n      "},
-		{"upstream invalid 37", "file.ts", "\ndeclare const map: ReadonlyMap<string, number>;\nconst o = { ...map };\n      ", nil, "replaceMapSpreadInObject", "\ndeclare const map: ReadonlyMap<string, number>;\nconst o = Object.fromEntries(map);\n      "},
-		{"upstream invalid 38", "file.ts", "\ndeclare const map: WeakMap<{ a: number }, string>;\nconst o = { ...map };\n      ", nil, "replaceMapSpreadInObject", "\ndeclare const map: WeakMap<{ a: number }, string>;\nconst o = Object.fromEntries(map);\n      "},
-		{"upstream invalid 40", "file.ts", "\ndeclare function getMap(): Map<string, number>;\nconst o = { ...getMap() };\n      ", nil, "replaceMapSpreadInObject", "\ndeclare function getMap(): Map<string, number>;\nconst o = Object.fromEntries(getMap());\n      "},
-		{"upstream invalid 41", "file.ts", "\ndeclare const a: Map<boolean, string> & Set<number>;\nconst o = { ...a };\n      ", nil, "replaceMapSpreadInObject", "\ndeclare const a: Map<boolean, string> & Set<number>;\nconst o = Object.fromEntries(a);\n      "},
-		{"upstream invalid 43", "file.ts", "\nconst promise = new Promise(() => {});\nconst o = { ...promise };\n      ", nil, "addAwait", "\nconst promise = new Promise(() => {});\nconst o = { ...await promise };\n      "},
-		{"upstream invalid 44", "file.ts", "\ndeclare const promise: Promise<{ a: 1 }>;\nasync function foo() {\n  return { ...(promise || {}) };\n}\n      ", nil, "addAwait", "\ndeclare const promise: Promise<{ a: 1 }>;\nasync function foo() {\n  return { ...(await (promise || {})) };\n}\n      "},
-		{"upstream invalid 45", "file.ts", "\ndeclare const promise: Promise<any>;\nasync function foo() {\n  return { ...(Math.random() < 0.5 ? promise : {}) };\n}\n      ", nil, "addAwait", "\ndeclare const promise: Promise<any>;\nasync function foo() {\n  return { ...(await (Math.random() < 0.5 ? promise : {})) };\n}\n      "},
-		{"upstream invalid 46", "file.ts", "\nfunction withPromise<P extends Promise<void>>(promise: P) {\n  return { ...promise };\n}\n      ", nil, "addAwait", "\nfunction withPromise<P extends Promise<void>>(promise: P) {\n  return { ...await promise };\n}\n      "},
-		{"upstream invalid 47", "file.ts", "\ndeclare const maybePromise: Promise<number> | { a: number };\nconst o = { ...maybePromise };\n      ", nil, "addAwait", "\ndeclare const maybePromise: Promise<number> | { a: number };\nconst o = { ...await maybePromise };\n      "},
-		{"upstream invalid 48", "file.ts", "\ndeclare const promise: Promise<number> & { a: number };\nconst o = { ...promise };\n      ", nil, "addAwait", "\ndeclare const promise: Promise<number> & { a: number };\nconst o = { ...await promise };\n      "},
-		{"upstream invalid 49", "file.ts", "\ndeclare function getPromise(): Promise<number>;\nconst o = { ...getPromise() };\n      ", nil, "addAwait", "\ndeclare function getPromise(): Promise<number>;\nconst o = { ...await getPromise() };\n      "},
-		{"upstream invalid 50", "file.ts", "\ndeclare function getPromise<T extends Promise<number>>(arg: T): T;\nconst o = { ...getPromise() };\n      ", nil, "addAwait", "\ndeclare function getPromise<T extends Promise<number>>(arg: T): T;\nconst o = { ...await getPromise() };\n      "},
-		{"upstream invalid 89", "file.tsx", "\ndeclare const map: Map<string, number>;\n\nconst o = <div {...map} />;\n      ", nil, "replaceMapSpreadInObject", "\ndeclare const map: Map<string, number>;\n\nconst o = <div {...Object.fromEntries(map)} />;\n      "},
-		{"upstream invalid 90", "file.tsx", "\nconst promise = new Promise(() => {});\n\nconst o = <div {...promise} />;\n      ", nil, "addAwait", "\nconst promise = new Promise(() => {});\n\nconst o = <div {...await promise} />;\n      "}}
+		{
+			"upstream invalid 30",
+			"file.ts",
+			"\nconst o = {\n  ...new Map([\n    ['test-1', 1],\n    ['test-2', 2],\n  ]),\n};\n      ",
+			nil,
+			"replaceMapSpreadInObject",
+			"\nconst o = Object.fromEntries(new Map([\n    ['test-1', 1],\n    ['test-2', 2],\n  ]));\n      ",
+		},
+		{
+			"upstream invalid 31",
+			"file.ts",
+			"\nconst map = new Map([\n  ['test-1', 1],\n  ['test-2', 2],\n]);\n\nconst o = { ...map };\n      ",
+			nil,
+			"replaceMapSpreadInObject",
+			"\nconst map = new Map([\n  ['test-1', 1],\n  ['test-2', 2],\n]);\n\nconst o = Object.fromEntries(map);\n      ",
+		},
+		{
+			"upstream invalid 32",
+			"file.ts",
+			"\ndeclare const map: Map<string, number>;\nconst o = { ...map };\n      ",
+			nil,
+			"replaceMapSpreadInObject",
+			"\ndeclare const map: Map<string, number>;\nconst o = Object.fromEntries(map);\n      ",
+		},
+		{
+			"upstream invalid 33",
+			"file.ts",
+			"\n        declare const map: Map<string, number>;\n        const o = { ...(map) };\n      ",
+			nil,
+			"replaceMapSpreadInObject",
+			"\n        declare const map: Map<string, number>;\n        const o = Object.fromEntries(map);\n      ",
+		},
+		{
+			"upstream invalid 34",
+			"file.ts",
+			"\ndeclare const map: Map<string, number>;\nconst o = { ...(map, map) };\n      ",
+			nil,
+			"replaceMapSpreadInObject",
+			"\ndeclare const map: Map<string, number>;\nconst o = Object.fromEntries((map, map));\n      ",
+		},
+		{
+			"upstream invalid 35",
+			"file.ts",
+			"\ndeclare const map: Map<string, number>;\nconst others = { a: 1 };\nconst o = { ...map, ...others };\n      ",
+			nil,
+			"replaceMapSpreadInObject",
+			"\ndeclare const map: Map<string, number>;\nconst others = { a: 1 };\nconst o = { ...Object.fromEntries(map), ...others };\n      ",
+		},
+		{
+			"upstream invalid 36",
+			"file.ts",
+			"\ndeclare const map: Map<string, number>;\nconst o = { other: 1, ...map };\n      ",
+			nil,
+			"replaceMapSpreadInObject",
+			"\ndeclare const map: Map<string, number>;\nconst o = { other: 1, ...Object.fromEntries(map) };\n      ",
+		},
+		{
+			"upstream invalid 37",
+			"file.ts",
+			"\ndeclare const map: ReadonlyMap<string, number>;\nconst o = { ...map };\n      ",
+			nil,
+			"replaceMapSpreadInObject",
+			"\ndeclare const map: ReadonlyMap<string, number>;\nconst o = Object.fromEntries(map);\n      ",
+		},
+		{
+			"upstream invalid 38",
+			"file.ts",
+			"\ndeclare const map: WeakMap<{ a: number }, string>;\nconst o = { ...map };\n      ",
+			nil,
+			"replaceMapSpreadInObject",
+			"\ndeclare const map: WeakMap<{ a: number }, string>;\nconst o = Object.fromEntries(map);\n      ",
+		},
+		{
+			"upstream invalid 40",
+			"file.ts",
+			"\ndeclare function getMap(): Map<string, number>;\nconst o = { ...getMap() };\n      ",
+			nil,
+			"replaceMapSpreadInObject",
+			"\ndeclare function getMap(): Map<string, number>;\nconst o = Object.fromEntries(getMap());\n      ",
+		},
+		{
+			"upstream invalid 41",
+			"file.ts",
+			"\ndeclare const a: Map<boolean, string> & Set<number>;\nconst o = { ...a };\n      ",
+			nil,
+			"replaceMapSpreadInObject",
+			"\ndeclare const a: Map<boolean, string> & Set<number>;\nconst o = Object.fromEntries(a);\n      ",
+		},
+		{
+			"upstream invalid 43",
+			"file.ts",
+			"\nconst promise = new Promise(() => {});\nconst o = { ...promise };\n      ",
+			nil,
+			"addAwait",
+			"\nconst promise = new Promise(() => {});\nconst o = { ...await promise };\n      ",
+		},
+		{
+			"upstream invalid 44",
+			"file.ts",
+			"\ndeclare const promise: Promise<{ a: 1 }>;\nasync function foo() {\n  return { ...(promise || {}) };\n}\n      ",
+			nil,
+			"addAwait",
+			"\ndeclare const promise: Promise<{ a: 1 }>;\nasync function foo() {\n  return { ...(await (promise || {})) };\n}\n      ",
+		},
+		{
+			"upstream invalid 45",
+			"file.ts",
+			"\ndeclare const promise: Promise<any>;\nasync function foo() {\n  return { ...(Math.random() < 0.5 ? promise : {}) };\n}\n      ",
+			nil,
+			"addAwait",
+			"\ndeclare const promise: Promise<any>;\nasync function foo() {\n  return { ...(await (Math.random() < 0.5 ? promise : {})) };\n}\n      ",
+		},
+		{
+			"upstream invalid 46",
+			"file.ts",
+			"\nfunction withPromise<P extends Promise<void>>(promise: P) {\n  return { ...promise };\n}\n      ",
+			nil,
+			"addAwait",
+			"\nfunction withPromise<P extends Promise<void>>(promise: P) {\n  return { ...await promise };\n}\n      ",
+		},
+		{
+			"upstream invalid 47",
+			"file.ts",
+			"\ndeclare const maybePromise: Promise<number> | { a: number };\nconst o = { ...maybePromise };\n      ",
+			nil,
+			"addAwait",
+			"\ndeclare const maybePromise: Promise<number> | { a: number };\nconst o = { ...await maybePromise };\n      ",
+		},
+		{
+			"upstream invalid 48",
+			"file.ts",
+			"\ndeclare const promise: Promise<number> & { a: number };\nconst o = { ...promise };\n      ",
+			nil,
+			"addAwait",
+			"\ndeclare const promise: Promise<number> & { a: number };\nconst o = { ...await promise };\n      ",
+		},
+		{
+			"upstream invalid 49",
+			"file.ts",
+			"\ndeclare function getPromise(): Promise<number>;\nconst o = { ...getPromise() };\n      ",
+			nil,
+			"addAwait",
+			"\ndeclare function getPromise(): Promise<number>;\nconst o = { ...await getPromise() };\n      ",
+		},
+		{
+			"upstream invalid 50",
+			"file.ts",
+			"\ndeclare function getPromise<T extends Promise<number>>(arg: T): T;\nconst o = { ...getPromise() };\n      ",
+			nil,
+			"addAwait",
+			"\ndeclare function getPromise<T extends Promise<number>>(arg: T): T;\nconst o = { ...await getPromise() };\n      ",
+		},
+		{
+			"upstream invalid 89",
+			"file.tsx",
+			"\ndeclare const map: Map<string, number>;\n\nconst o = <div {...map} />;\n      ",
+			nil,
+			"replaceMapSpreadInObject",
+			"\ndeclare const map: Map<string, number>;\n\nconst o = <div {...Object.fromEntries(map)} />;\n      ",
+		},
+		{
+			"upstream invalid 90",
+			"file.tsx",
+			"\nconst promise = new Promise(() => {});\n\nconst o = <div {...promise} />;\n      ",
+			nil,
+			"addAwait",
+			"\nconst promise = new Promise(() => {});\n\nconst o = <div {...await promise} />;\n      ",
+		}}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(test, NoMisusedSpread, testCase.fileName, testCase.sourceText, testCase.options)
+			result := rule_testing.RunTypedWithOptions(
+				test,
+				NoMisusedSpread,
+				testCase.fileName,
+				testCase.sourceText,
+				testCase.options,
+			)
 			if len(result.Diagnostics) == 0 {
 				test.Fatal("want at least one finding, got none")
 			}
@@ -335,22 +1062,68 @@ func TestNoMisusedSpreadSpans(test *testing.T) {
 	}{
 		{"upstream invalid 14", "file.ts", "const o = { ...[1, 2, 3] };", []string{"...[1, 2, 3]"}},
 		{"upstream invalid 23", "file.ts", "const o = { ...new Set([1, 2, 3]) };", []string{"...new Set([1, 2, 3])"}},
-		{"upstream invalid 26", "file.ts", "\ndeclare const set: WeakSet<object>;\nconst o = { ...set };\n      ", []string{"...set"}},
-		{"upstream invalid 30", "file.ts", "\nconst o = {\n  ...new Map([\n    ['test-1', 1],\n    ['test-2', 2],\n  ]),\n};\n      ", []string{"...new Map([\n    ['test-1', 1],\n    ['test-2', 2],\n  ])"}},
-		{"upstream invalid 43", "file.ts", "\nconst promise = new Promise(() => {});\nconst o = { ...promise };\n      ", []string{"...promise"}},
+		{
+			"upstream invalid 26",
+			"file.ts",
+			"\ndeclare const set: WeakSet<object>;\nconst o = { ...set };\n      ",
+			[]string{"...set"},
+		},
+		{
+			"upstream invalid 30",
+			"file.ts",
+			"\nconst o = {\n  ...new Map([\n    ['test-1', 1],\n    ['test-2', 2],\n  ]),\n};\n      ",
+			[]string{"...new Map([\n    ['test-1', 1],\n    ['test-2', 2],\n  ])"},
+		},
+		{
+			"upstream invalid 43",
+			"file.ts",
+			"\nconst promise = new Promise(() => {});\nconst o = { ...promise };\n      ",
+			[]string{"...promise"},
+		},
 		{"upstream invalid 51", "file.ts", "\nfunction f() {}\n\nconst o = { ...f };\n      ", []string{"...f"}},
 		{"upstream invalid 77", "file.ts", "\nclass A {}\n\nconst o = { ...A };\n      ", []string{"...A"}},
 		{"upstream invalid 84", "file.tsx", "\nconst o = <div {...[1, 2, 3]} />;\n      ", []string{"{...[1, 2, 3]}"}},
 		{"upstream invalid 85", "file.tsx", "\nclass A {}\n\nconst o = <div {...A} />;\n      ", []string{"{...A}"}},
-		{"upstream invalid 86", "file.tsx", "\nconst o = <div {...new Date()} />;\n      ", []string{"{...new Date()}"}},
-		{"upstream invalid 87", "file.tsx", "\nfunction f() {}\n\nconst o = <div {...f} />;\n      ", []string{"{...f}"}},
-		{"upstream invalid 88", "file.tsx", "\nconst o = <div {...new Set([1, 2, 3])} />;\n      ", []string{"{...new Set([1, 2, 3])}"}},
-		{"upstream invalid 89", "file.tsx", "\ndeclare const map: Map<string, number>;\n\nconst o = <div {...map} />;\n      ", []string{"{...map}"}},
-		{"upstream invalid 90", "file.tsx", "\nconst promise = new Promise(() => {});\n\nconst o = <div {...promise} />;\n      ", []string{"{...promise}"}}}
+		{
+			"upstream invalid 86",
+			"file.tsx",
+			"\nconst o = <div {...new Date()} />;\n      ",
+			[]string{"{...new Date()}"},
+		},
+		{
+			"upstream invalid 87",
+			"file.tsx",
+			"\nfunction f() {}\n\nconst o = <div {...f} />;\n      ",
+			[]string{"{...f}"},
+		},
+		{
+			"upstream invalid 88",
+			"file.tsx",
+			"\nconst o = <div {...new Set([1, 2, 3])} />;\n      ",
+			[]string{"{...new Set([1, 2, 3])}"},
+		},
+		{
+			"upstream invalid 89",
+			"file.tsx",
+			"\ndeclare const map: Map<string, number>;\n\nconst o = <div {...map} />;\n      ",
+			[]string{"{...map}"},
+		},
+		{
+			"upstream invalid 90",
+			"file.tsx",
+			"\nconst promise = new Promise(() => {});\n\nconst o = <div {...promise} />;\n      ",
+			[]string{"{...promise}"},
+		}}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(test, NoMisusedSpread, testCase.fileName, testCase.sourceText, nil)
+			result := rule_testing.RunTypedWithOptions(
+				test,
+				NoMisusedSpread,
+				testCase.fileName,
+				testCase.sourceText,
+				nil,
+			)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
 				test.Fatalf("want %d findings, got %d", len(testCase.wantSpans), len(result.Diagnostics))
 			}
@@ -394,8 +1167,13 @@ func TestNoMisusedSpreadCaseThatCannotBeExpressedHere(test *testing.T) {
 
 	test.Run("the same iterable shape without an ambient module reports", func(test *testing.T) {
 		test.Parallel()
-		result := rule_testing.RunTypedWithOptions(test, NoMisusedSpread, noMisusedSpreadFile,
-			"type CustomIterable = {\n  [Symbol.iterator]: () => string;\n};\ndeclare const iterator: CustomIterable;\nconst a = { ...iterator };", nil)
+		result := rule_testing.RunTypedWithOptions(
+			test,
+			NoMisusedSpread,
+			noMisusedSpreadFile,
+			"type CustomIterable = {\n  [Symbol.iterator]: () => string;\n};\ndeclare const iterator: CustomIterable;\nconst a = { ...iterator };",
+			nil,
+		)
 		rule_testing.ExpectFindings(test, result, "noIterableSpreadInObject")
 	})
 
@@ -462,7 +1240,13 @@ func TestNoMisusedSpreadCascadeOrdering(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(test, NoMisusedSpread, noMisusedSpreadFile, testCase.sourceText, nil)
+			result := rule_testing.RunTypedWithOptions(
+				test,
+				NoMisusedSpread,
+				noMisusedSpreadFile,
+				testCase.sourceText,
+				nil,
+			)
 			rule_testing.ExpectFindings(test, result, testCase.wantId)
 		})
 	}
@@ -474,12 +1258,18 @@ func TestNoMisusedSpreadRequiresTheTypedHarness(test *testing.T) {
 	test.Parallel()
 
 	if !NoMisusedSpread.NeedsTypeChecker {
-		test.Fatal("the rule stopped declaring NeedsTypeChecker, so every typed fixture would run against a nil checker")
+		test.Fatal(
+			"the rule stopped declaring NeedsTypeChecker, so every typed fixture would run against a nil checker",
+		)
 	}
 
 	const source = "const o = { ...[1, 2, 3] };"
 
-	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoMisusedSpread, noMisusedSpreadFile, source), "noArraySpreadInObject")
+	rule_testing.ExpectFindings(
+		test,
+		rule_testing.RunTyped(test, NoMisusedSpread, noMisusedSpreadFile, source),
+		"noArraySpreadInObject",
+	)
 	rule_testing.ExpectClean(test, rule_testing.Run(test, NoMisusedSpread, noMisusedSpreadFile, source))
 }
 
@@ -576,10 +1366,17 @@ func TestNoMisusedSpreadDecoder(test *testing.T) {
 		// the list changing anything (see TestNoMisusedSpreadExemptsAClassWhoseCopyIsComplete).
 		const source = "class A {\n  a = 1;\n  m() {}\n}\nconst a = new A();\nconst o = { ...a };"
 
-		rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, NoMisusedSpread, noMisusedSpreadFile, source,
-			decode(test, `{}`)), "noClassInstanceSpreadInObject")
-		rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoMisusedSpread, noMisusedSpreadFile, source,
-			decode(test, `{"allow": ["A"]}`)))
+		rule_testing.ExpectFindings(
+			test,
+			rule_testing.RunTypedWithOptions(test, NoMisusedSpread, noMisusedSpreadFile, source,
+				decode(test, `{}`)),
+			"noClassInstanceSpreadInObject",
+		)
+		rule_testing.ExpectClean(
+			test,
+			rule_testing.RunTypedWithOptions(test, NoMisusedSpread, noMisusedSpreadFile, source,
+				decode(test, `{"allow": ["A"]}`)),
+		)
 	})
 }
 
@@ -632,7 +1429,13 @@ func TestNoMisusedSpreadMapSuggestionKeepsExistingParentheses(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(test, NoMisusedSpread, noMisusedSpreadFile, testCase.sourceText, nil)
+			result := rule_testing.RunTypedWithOptions(
+				test,
+				NoMisusedSpread,
+				noMisusedSpreadFile,
+				testCase.sourceText,
+				nil,
+			)
 			rule_testing.ExpectFindings(test, result, "noMapSpreadInObject")
 
 			source := strings.TrimSpace(testCase.sourceText) + "\n"
@@ -674,7 +1477,13 @@ func TestNoMisusedSpreadMergedClassDeclarations(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(test, NoMisusedSpread, noMisusedSpreadFile, testCase.sourceText, nil)
+			result := rule_testing.RunTypedWithOptions(
+				test,
+				NoMisusedSpread,
+				noMisusedSpreadFile,
+				testCase.sourceText,
+				nil,
+			)
 			rule_testing.ExpectFindings(test, result, "noClassInstanceSpreadInObject")
 		})
 	}
@@ -696,25 +1505,61 @@ func TestNoMisusedSpreadExemptsAClassWhoseCopyIsComplete(test *testing.T) {
 		name       string
 		sourceText string
 	}{
-		{"upstream invalid 69", "\nclass A {\n  a = 1;\n  public b = 2;\n  private c = 3;\n  protected d = 4;\n  static e = 5;\n}\n\nconst o = { ...new A() };\n      "},
+		{
+			"upstream invalid 69",
+			"\nclass A {\n  a = 1;\n  public b = 2;\n  private c = 3;\n  protected d = 4;\n  static e = 5;\n}\n\nconst o = { ...new A() };\n      ",
+		},
 		{"upstream invalid 70", "\nclass A {\n  a = 1;\n}\n\nconst a = new A();\n\nconst o = { ...a };\n      "},
 		{"upstream invalid 71", "\nclass A {\n  a = 1;\n}\n\ndeclare const a: A;\n\nconst o = { ...a };\n      "},
-		{"upstream invalid 72", "\nclass A {\n  a = 1;\n}\n\ndeclare function getA(): A;\n\nconst o = { ...getA() };\n      "},
-		{"upstream invalid 73", "\nclass A {\n  a = 1;\n}\n\ndeclare function getA<T extends A>(arg: T): T;\n\nconst o = { ...getA() };\n      "},
-		{"upstream invalid 74", "\nclass A {\n  a = 1;\n}\n\nclass B extends A {}\n\nconst o = { ...new B() };\n      "},
-		{"upstream invalid 75", "\nclass A {\n  a = 1;\n}\n\ndeclare const a: A | { b: string };\n\nconst o = { ...a };\n      "},
-		{"upstream invalid 76", "\nclass A {\n  a = 1;\n}\n\ndeclare const a: A & { b: string };\n\nconst o = { ...a };\n      "},
+		{
+			"upstream invalid 72",
+			"\nclass A {\n  a = 1;\n}\n\ndeclare function getA(): A;\n\nconst o = { ...getA() };\n      ",
+		},
+		{
+			"upstream invalid 73",
+			"\nclass A {\n  a = 1;\n}\n\ndeclare function getA<T extends A>(arg: T): T;\n\nconst o = { ...getA() };\n      ",
+		},
+		{
+			"upstream invalid 74",
+			"\nclass A {\n  a = 1;\n}\n\nclass B extends A {}\n\nconst o = { ...new B() };\n      ",
+		},
+		{
+			"upstream invalid 75",
+			"\nclass A {\n  a = 1;\n}\n\ndeclare const a: A | { b: string };\n\nconst o = { ...a };\n      ",
+		},
+		{
+			"upstream invalid 76",
+			"\nclass A {\n  a = 1;\n}\n\ndeclare const a: A & { b: string };\n\nconst o = { ...a };\n      ",
+		},
 		{"upstream invalid 83", "\n        const a = { ...new (class A { static value = 1; })() };\n      "},
-		{"a generic abstract base, as Base's PaginationResult", "abstract class Page<T> {\n  abstract items: T[];\n  total = 0;\n}\nclass Users extends Page<string> {\n  items: string[] = [];\n}\ndeclare const page: Users;\nconst o = { ...page, more: true };"},
-		{"a static method lives on the constructor, which an instance never carried", "class A {\n  a = 1;\n  static make(): A { return new A(); }\n}\nconst o = { ...new A() };"},
-		{"constructor parameter properties are own properties", "class A {\n  constructor(public a: number, readonly b: string) {}\n}\nconst o = { ...new A(1, 'b') };"},
-		{"decorators our own source declares, on the class, a field and a parameter", "function Entity(): ClassDecorator { return () => {}; }\nfunction Field(): PropertyDecorator { return () => {}; }\nfunction Inject(): ParameterDecorator { return () => {}; }\n@Entity()\nclass A {\n  @Field() a = 1;\n  constructor(@Inject() public b: number) {}\n}\ndeclare const a: A;\nconst o = { ...a };"},
-		{"every class in a union is exempt", "class A {\n  a = 1;\n}\nclass B {\n  b = 2;\n}\ndeclare const value: A | B;\nconst o = { ...value };"},
+		{
+			"a generic abstract base, as Base's PaginationResult",
+			"abstract class Page<T> {\n  abstract items: T[];\n  total = 0;\n}\nclass Users extends Page<string> {\n  items: string[] = [];\n}\ndeclare const page: Users;\nconst o = { ...page, more: true };",
+		},
+		{
+			"a static method lives on the constructor, which an instance never carried",
+			"class A {\n  a = 1;\n  static make(): A { return new A(); }\n}\nconst o = { ...new A() };",
+		},
+		{
+			"constructor parameter properties are own properties",
+			"class A {\n  constructor(public a: number, readonly b: string) {}\n}\nconst o = { ...new A(1, 'b') };",
+		},
+		{
+			"decorators our own source declares, on the class, a field and a parameter",
+			"function Entity(): ClassDecorator { return () => {}; }\nfunction Field(): PropertyDecorator { return () => {}; }\nfunction Inject(): ParameterDecorator { return () => {}; }\n@Entity()\nclass A {\n  @Field() a = 1;\n  constructor(@Inject() public b: number) {}\n}\ndeclare const a: A;\nconst o = { ...a };",
+		},
+		{
+			"every class in a union is exempt",
+			"class A {\n  a = 1;\n}\nclass B {\n  b = 2;\n}\ndeclare const value: A | B;\nconst o = { ...value };",
+		},
 	}
 	for _, testCase := range silent {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoMisusedSpread, noMisusedSpreadFile, testCase.sourceText, nil))
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.RunTypedWithOptions(test, NoMisusedSpread, noMisusedSpreadFile, testCase.sourceText, nil),
+			)
 		})
 	}
 
@@ -724,24 +1569,82 @@ func TestNoMisusedSpreadExemptsAClassWhoseCopyIsComplete(test *testing.T) {
 		wantId     string
 	}{
 		{"a method", "class A {\n  a = 1;\n  m() {}\n}\nconst o = { ...new A() };", "noClassInstanceSpreadInObject"},
-		{"a getter", "class A {\n  a = 1;\n  get double() { return this.a * 2; }\n}\nconst o = { ...new A() };", "noClassInstanceSpreadInObject"},
-		{"a setter", "class A {\n  a = 1;\n  set value(next: number) { this.a = next; }\n}\nconst o = { ...new A() };", "noClassInstanceSpreadInObject"},
-		{"an auto-accessor", "class A {\n  accessor a = 1;\n}\nconst o = { ...new A() };", "noClassInstanceSpreadInObject"},
-		{"a #private field, which a spread does not copy", "class A {\n  a = 1;\n  #secret = 2;\n}\nconst o = { ...new A() };", "noClassInstanceSpreadInObject"},
-		{"a method on a base class", "class Base {\n  m() {}\n}\nclass A extends Base {\n  a = 1;\n}\nconst o = { ...new A() };", "noClassInstanceSpreadInObject"},
-		{"a base from a mixin, which has no class declaration to read", "type Constructor = new (...args: any[]) => object;\nfunction Tagged<T extends Constructor>(Base: T) { return class extends Base { tag = 'x'; }; }\nclass Plain {}\nclass A extends Tagged(Plain) {\n  a = 1;\n}\nconst o = { ...new A() };", "noClassInstanceSpreadInObject"},
-		{"an ambient class, whose prototype is not ours to read (upstream invalid 67)", "declare class A {\n  a: number;\n}\ndeclare const a: A;\nconst o = { ...a };", "noClassInstanceSpreadInObject"},
-		{"an interface merged into the class, which may describe methods a mixin installs", "interface A {\n  m(): void;\n}\nclass A {\n  a = 1;\n}\ndeclare const a: A;\nconst o = { ...a };", "noClassInstanceSpreadInObject"},
-		{"an ambient decorator, with no implementation in our source", "declare function observable(target: object, key: string): void;\nclass A {\n  @observable a = 1;\n}\nconst o = { ...new A() };", "noClassInstanceSpreadInObject"},
-		{"an ambient decorator on the class alone", "declare function sealed(target: Function): void;\n@sealed\nclass A {\n  a = 1;\n}\nconst o = { ...new A() };", "noClassInstanceSpreadInObject"},
-		{"an ambient decorator on a constructor parameter alone", "declare function inject(target: object, key: string | symbol | undefined, index: number): void;\nclass A {\n  constructor(@inject public a: number) {}\n}\nconst o = { ...new A(1) };", "noClassInstanceSpreadInObject"},
-		{"one class in a union that is not exempt", "class A {\n  a = 1;\n}\nclass B {\n  b = 2;\n  m() {}\n}\ndeclare const value: A | B;\nconst o = { ...value };", "noClassInstanceSpreadInObject"},
-		{"the class itself still reports as a declaration", "class A {\n  static a = 1;\n}\nconst o = { ...A };", "noClassDeclarationSpreadInObject"},
+		{
+			"a getter",
+			"class A {\n  a = 1;\n  get double() { return this.a * 2; }\n}\nconst o = { ...new A() };",
+			"noClassInstanceSpreadInObject",
+		},
+		{
+			"a setter",
+			"class A {\n  a = 1;\n  set value(next: number) { this.a = next; }\n}\nconst o = { ...new A() };",
+			"noClassInstanceSpreadInObject",
+		},
+		{
+			"an auto-accessor",
+			"class A {\n  accessor a = 1;\n}\nconst o = { ...new A() };",
+			"noClassInstanceSpreadInObject",
+		},
+		{
+			"a #private field, which a spread does not copy",
+			"class A {\n  a = 1;\n  #secret = 2;\n}\nconst o = { ...new A() };",
+			"noClassInstanceSpreadInObject",
+		},
+		{
+			"a method on a base class",
+			"class Base {\n  m() {}\n}\nclass A extends Base {\n  a = 1;\n}\nconst o = { ...new A() };",
+			"noClassInstanceSpreadInObject",
+		},
+		{
+			"a base from a mixin, which has no class declaration to read",
+			"type Constructor = new (...args: any[]) => object;\nfunction Tagged<T extends Constructor>(Base: T) { return class extends Base { tag = 'x'; }; }\nclass Plain {}\nclass A extends Tagged(Plain) {\n  a = 1;\n}\nconst o = { ...new A() };",
+			"noClassInstanceSpreadInObject",
+		},
+		{
+			"an ambient class, whose prototype is not ours to read (upstream invalid 67)",
+			"declare class A {\n  a: number;\n}\ndeclare const a: A;\nconst o = { ...a };",
+			"noClassInstanceSpreadInObject",
+		},
+		{
+			"an interface merged into the class, which may describe methods a mixin installs",
+			"interface A {\n  m(): void;\n}\nclass A {\n  a = 1;\n}\ndeclare const a: A;\nconst o = { ...a };",
+			"noClassInstanceSpreadInObject",
+		},
+		{
+			"an ambient decorator, with no implementation in our source",
+			"declare function observable(target: object, key: string): void;\nclass A {\n  @observable a = 1;\n}\nconst o = { ...new A() };",
+			"noClassInstanceSpreadInObject",
+		},
+		{
+			"an ambient decorator on the class alone",
+			"declare function sealed(target: Function): void;\n@sealed\nclass A {\n  a = 1;\n}\nconst o = { ...new A() };",
+			"noClassInstanceSpreadInObject",
+		},
+		{
+			"an ambient decorator on a constructor parameter alone",
+			"declare function inject(target: object, key: string | symbol | undefined, index: number): void;\nclass A {\n  constructor(@inject public a: number) {}\n}\nconst o = { ...new A(1) };",
+			"noClassInstanceSpreadInObject",
+		},
+		{
+			"one class in a union that is not exempt",
+			"class A {\n  a = 1;\n}\nclass B {\n  b = 2;\n  m() {}\n}\ndeclare const value: A | B;\nconst o = { ...value };",
+			"noClassInstanceSpreadInObject",
+		},
+		{
+			"the class itself still reports as a declaration",
+			"class A {\n  static a = 1;\n}\nconst o = { ...A };",
+			"noClassDeclarationSpreadInObject",
+		},
 	}
 	for _, testCase := range reported {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(test, NoMisusedSpread, noMisusedSpreadFile, testCase.sourceText, nil)
+			result := rule_testing.RunTypedWithOptions(
+				test,
+				NoMisusedSpread,
+				noMisusedSpreadFile,
+				testCase.sourceText,
+				nil,
+			)
 			rule_testing.ExpectFindings(test, result, testCase.wantId)
 		})
 	}
@@ -775,7 +1678,12 @@ func TestNoMisusedSpreadExemptsAClassWhoseCopyIsComplete(test *testing.T) {
 			}
 			result := rule_testing.RunTypedFiles(test, NoMisusedSpread, sources, "Subject.ts")
 			if len(result.Diagnostics) != testCase.findings {
-				test.Errorf("got %d findings, want %d: %+v", len(result.Diagnostics), testCase.findings, result.Diagnostics)
+				test.Errorf(
+					"got %d findings, want %d: %+v",
+					len(result.Diagnostics),
+					testCase.findings,
+					result.Diagnostics,
+				)
 			}
 		})
 	}

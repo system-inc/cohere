@@ -36,19 +36,55 @@ func TestIframeMissingSandboxFires(test *testing.T) {
 	}{
 		{"invalid 0 paired tag with no attributes", `<iframe></iframe>;`, []string{"attributeMissing"}},
 		{"invalid 1 self closing with no attributes", `<iframe/>;`, []string{"attributeMissing"}},
-		{"invalid 2 createElement with no props argument", `React.createElement("iframe");`, []string{"attributeMissing"}},
-		{"invalid 3 createElement with an empty props object", `React.createElement("iframe", {});`, []string{"attributeMissing"}},
-		{"invalid 4 createElement with a null props argument", `React.createElement("iframe", null);`, []string{"attributeMissing"}},
+		{
+			"invalid 2 createElement with no props argument",
+			`React.createElement("iframe");`,
+			[]string{"attributeMissing"},
+		},
+		{
+			"invalid 3 createElement with an empty props object",
+			`React.createElement("iframe", {});`,
+			[]string{"attributeMissing"},
+		},
+		{
+			"invalid 4 createElement with a null props argument",
+			`React.createElement("iframe", null);`,
+			[]string{"attributeMissing"},
+		},
 		{"invalid 5 an unknown token alone", `<iframe sandbox="__unknown__"></iframe>`, []string{"invalidValue"}},
-		{"invalid 6 an unknown token alone through createElement", `React.createElement("iframe", { sandbox: "__unknown__" })`, []string{"invalidValue"}},
-		{"invalid 7 an unknown token after a known one", `<iframe sandbox="allow-popups __unknown__"/>`, []string{"invalidValue"}},
-		{"invalid 8 an unknown token before a known one", `<iframe sandbox="__unknown__ allow-popups"/>`, []string{"invalidValue"}},
+		{
+			"invalid 6 an unknown token alone through createElement",
+			`React.createElement("iframe", { sandbox: "__unknown__" })`,
+			[]string{"invalidValue"},
+		},
+		{
+			"invalid 7 an unknown token after a known one",
+			`<iframe sandbox="allow-popups __unknown__"/>`,
+			[]string{"invalidValue"},
+		},
+		{
+			"invalid 8 an unknown token before a known one",
+			`<iframe sandbox="__unknown__ allow-popups"/>`,
+			[]string{"invalidValue"},
+		},
 		// The one case in the corpus that reports twice, and the one that pins the empty string's
 		// membership in the allowed list: the leading space and the trailing double space split
 		// into three empty tokens, none of which reports, while the two unknown ones do.
-		{"invalid 9 two unknown tokens amid padding", `<iframe sandbox=" allow-forms __unknown__ allow-popups __unknown__  "/>`, []string{"invalidValue", "invalidValue"}},
-		{"invalid 10 scripts before same origin", `<iframe sandbox="allow-scripts allow-same-origin"></iframe>;`, []string{"invalidCombination"}},
-		{"invalid 11 same origin before scripts", `<iframe sandbox="allow-same-origin allow-scripts"/>;`, []string{"invalidCombination"}},
+		{
+			"invalid 9 two unknown tokens amid padding",
+			`<iframe sandbox=" allow-forms __unknown__ allow-popups __unknown__  "/>`,
+			[]string{"invalidValue", "invalidValue"},
+		},
+		{
+			"invalid 10 scripts before same origin",
+			`<iframe sandbox="allow-scripts allow-same-origin"></iframe>;`,
+			[]string{"invalidCombination"},
+		},
+		{
+			"invalid 11 same origin before scripts",
+			`<iframe sandbox="allow-same-origin allow-scripts"/>;`,
+			[]string{"invalidCombination"},
+		},
 	}
 
 	for _, testCase := range cases {
@@ -77,7 +113,10 @@ func TestIframeMissingSandboxStaysSilent(test *testing.T) {
 		{"valid 3 an empty sandbox through createElement", `React.createElement("iframe", { sandbox: "" });`},
 		{"valid 4 a bare sandbox with no initializer", `<iframe src="foo.htm" sandbox></iframe>`},
 		// Truthy and not a string, so validation is skipped and presence alone clears it.
-		{"valid 5 a boolean sandbox through createElement", `React.createElement("iframe", { src: "foo.htm", sandbox: true })`},
+		{
+			"valid 5 a boolean sandbox through createElement",
+			`React.createElement("iframe", { src: "foo.htm", sandbox: true })`,
+		},
 		{"valid 6 the attribute written twice", `<iframe src="foo.htm" sandbox sandbox></iframe>`},
 		{"valid 7 allow forms", `<iframe sandbox="allow-forms"></iframe>`},
 		{"valid 8 allow modals", `<iframe sandbox="allow-modals"></iframe>`},
@@ -89,22 +128,55 @@ func TestIframeMissingSandboxStaysSilent(test *testing.T) {
 		{"valid 14 allow same origin alone", `<iframe sandbox="allow-same-origin"></iframe>`},
 		{"valid 15 allow scripts alone", `<iframe sandbox="allow-scripts"></iframe>`},
 		{"valid 16 allow top navigation", `<iframe sandbox="allow-top-navigation"></iframe>`},
-		{"valid 17 allow top navigation by user activation", `<iframe sandbox="allow-top-navigation-by-user-activation"></iframe>`},
+		{
+			"valid 17 allow top navigation by user activation",
+			`<iframe sandbox="allow-top-navigation-by-user-activation"></iframe>`,
+		},
 		{"valid 18 two known tokens", `<iframe sandbox="allow-forms allow-modals"></iframe>`},
-		{"valid 19 five known tokens including same origin without scripts", `<iframe sandbox="allow-popups allow-popups-to-escape-sandbox allow-pointer-lock allow-same-origin allow-top-navigation"></iframe>`},
+		{
+			"valid 19 five known tokens including same origin without scripts",
+			`<iframe sandbox="allow-popups allow-popups-to-escape-sandbox allow-pointer-lock allow-same-origin allow-top-navigation"></iframe>`,
+		},
 		{"valid 20 allow forms through createElement", `React.createElement("iframe", { sandbox: "allow-forms" })`},
 		{"valid 21 allow modals through createElement", `React.createElement("iframe", { sandbox: "allow-modals" })`},
-		{"valid 22 allow orientation lock through createElement", `React.createElement("iframe", { sandbox: "allow-orientation-lock" })`},
-		{"valid 23 allow pointer lock through createElement", `React.createElement("iframe", { sandbox: "allow-pointer-lock" })`},
+		{
+			"valid 22 allow orientation lock through createElement",
+			`React.createElement("iframe", { sandbox: "allow-orientation-lock" })`,
+		},
+		{
+			"valid 23 allow pointer lock through createElement",
+			`React.createElement("iframe", { sandbox: "allow-pointer-lock" })`,
+		},
 		{"valid 24 allow popups through createElement", `React.createElement("iframe", { sandbox: "allow-popups" })`},
-		{"valid 25 allow popups to escape sandbox through createElement", `React.createElement("iframe", { sandbox: "allow-popups-to-escape-sandbox" })`},
-		{"valid 26 allow presentation through createElement", `React.createElement("iframe", { sandbox: "allow-presentation" })`},
-		{"valid 27 allow same origin through createElement", `React.createElement("iframe", { sandbox: "allow-same-origin" })`},
+		{
+			"valid 25 allow popups to escape sandbox through createElement",
+			`React.createElement("iframe", { sandbox: "allow-popups-to-escape-sandbox" })`,
+		},
+		{
+			"valid 26 allow presentation through createElement",
+			`React.createElement("iframe", { sandbox: "allow-presentation" })`,
+		},
+		{
+			"valid 27 allow same origin through createElement",
+			`React.createElement("iframe", { sandbox: "allow-same-origin" })`,
+		},
 		{"valid 28 allow scripts through createElement", `React.createElement("iframe", { sandbox: "allow-scripts" })`},
-		{"valid 29 allow top navigation through createElement", `React.createElement("iframe", { sandbox: "allow-top-navigation" })`},
-		{"valid 30 allow top navigation by user activation through createElement", `React.createElement("iframe", { sandbox: "allow-top-navigation-by-user-activation" })`},
-		{"valid 31 two known tokens through createElement", `React.createElement("iframe", { sandbox: "allow-forms allow-modals" })`},
-		{"valid 32 five known tokens through createElement", `React.createElement("iframe", { sandbox: "allow-popups allow-popups-to-escape-sandbox allow-pointer-lock allow-same-origin allow-top-navigation" })`},
+		{
+			"valid 29 allow top navigation through createElement",
+			`React.createElement("iframe", { sandbox: "allow-top-navigation" })`,
+		},
+		{
+			"valid 30 allow top navigation by user activation through createElement",
+			`React.createElement("iframe", { sandbox: "allow-top-navigation-by-user-activation" })`,
+		},
+		{
+			"valid 31 two known tokens through createElement",
+			`React.createElement("iframe", { sandbox: "allow-forms allow-modals" })`,
+		},
+		{
+			"valid 32 five known tokens through createElement",
+			`React.createElement("iframe", { sandbox: "allow-popups allow-popups-to-escape-sandbox allow-pointer-lock allow-same-origin allow-top-navigation" })`,
+		},
 	}
 
 	for _, testCase := range cases {
@@ -165,9 +237,21 @@ func TestIframeMissingSandboxAnchorsOnTheOpeningTag(test *testing.T) {
 		// The invalid-value finding is reported on the element rather than on the attribute, which
 		// is upstream's choice: `report(context, ..., { node })` where `node` is the opening
 		// element passed down from the listener, not the attribute the token came from.
-		{"an invalid token points at the element, not the attribute", `<iframe sandbox="__unknown__"/>;`, []string{`<iframe sandbox="__unknown__"/>`}},
-		{"the combination points at the element", `<iframe sandbox="allow-scripts allow-same-origin"/>;`, []string{`<iframe sandbox="allow-scripts allow-same-origin"/>`}},
-		{"createElement points at the whole call", `React.createElement("iframe");`, []string{`React.createElement("iframe")`}},
+		{
+			"an invalid token points at the element, not the attribute",
+			`<iframe sandbox="__unknown__"/>;`,
+			[]string{`<iframe sandbox="__unknown__"/>`},
+		},
+		{
+			"the combination points at the element",
+			`<iframe sandbox="allow-scripts allow-same-origin"/>;`,
+			[]string{`<iframe sandbox="allow-scripts allow-same-origin"/>`},
+		},
+		{
+			"createElement points at the whole call",
+			`React.createElement("iframe");`,
+			[]string{`React.createElement("iframe")`},
+		},
 	}
 
 	for _, testCase := range cases {
@@ -289,10 +373,22 @@ func TestIframeMissingSandboxSplitsOnSpacesOnly(test *testing.T) {
 		sourceText string
 		wantIds    []string
 	}{
-		{"a tab joins two names into one unknown token", "<iframe sandbox=\"allow-forms\tallow-modals\" />;", []string{"invalidValue"}},
-		{"a tab between the dangerous pair hides the pairing", "<iframe sandbox=\"allow-scripts\tallow-same-origin\" />;", []string{"invalidValue"}},
+		{
+			"a tab joins two names into one unknown token",
+			"<iframe sandbox=\"allow-forms\tallow-modals\" />;",
+			[]string{"invalidValue"},
+		},
+		{
+			"a tab between the dangerous pair hides the pairing",
+			"<iframe sandbox=\"allow-scripts\tallow-same-origin\" />;",
+			[]string{"invalidValue"},
+		},
 		{"a leading tab is trimmed off a single token", "<iframe sandbox=\"\tallow-forms\" />;", nil},
-		{"a double space yields an empty token, which is allowed", `<iframe sandbox="allow-forms  allow-modals" />;`, nil},
+		{
+			"a double space yields an empty token, which is allowed",
+			`<iframe sandbox="allow-forms  allow-modals" />;`,
+			nil,
+		},
 	}
 
 	for _, testCase := range cases {
@@ -318,7 +414,10 @@ func TestIframeMissingSandboxSplitsOnSpacesOnly(test *testing.T) {
 	if len(result.Diagnostics) != 1 {
 		test.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
 	}
-	if !strings.HasPrefix(result.Diagnostics[0].Message.Description, "`allow-forms\tallow-modals` is not a sandbox token,") {
+	if !strings.HasPrefix(
+		result.Diagnostics[0].Message.Description,
+		"`allow-forms\tallow-modals` is not a sandbox token,",
+	) {
 		test.Errorf("message does not carry the joined token: %q", result.Diagnostics[0].Message.Description)
 	}
 }
@@ -337,8 +436,16 @@ func TestIframeMissingSandboxReadsOnlyIdentifierKeys(test *testing.T) {
 		sourceText string
 		wantIds    []string
 	}{
-		{"a quoted key does not count", `React.createElement("iframe", {'sandbox': ''});`, []string{"attributeMissing"}},
-		{"a computed key does not count", `React.createElement("iframe", {['sandbox']: ''});`, []string{"attributeMissing"}},
+		{
+			"a quoted key does not count",
+			`React.createElement("iframe", {'sandbox': ''});`,
+			[]string{"attributeMissing"},
+		},
+		{
+			"a computed key does not count",
+			`React.createElement("iframe", {['sandbox']: ''});`,
+			[]string{"attributeMissing"},
+		},
 		{"a shorthand counts and is not validated", `React.createElement("iframe", {sandbox});`, nil},
 		// The three shapes a kind filter would wrongly exclude. In ESTree a getter, a setter and a
 		// shorthand method are all `Property` carrying `key.name`, so upstream finds the attribute
@@ -348,11 +455,19 @@ func TestIframeMissingSandboxReadsOnlyIdentifierKeys(test *testing.T) {
 		{"a getter counts as supplying it", `React.createElement("iframe", { get sandbox() { return ""; } });`, nil},
 		{"a setter counts as supplying it", `React.createElement("iframe", { set sandbox(v) {} });`, nil},
 		{"a method counts as supplying it", `React.createElement("iframe", { sandbox() { return ""; } });`, nil},
-		{"a spread in the props object does not count", `React.createElement("iframe", {...p});`, []string{"attributeMissing"}},
+		{
+			"a spread in the props object does not count",
+			`React.createElement("iframe", {...p});`,
+			[]string{"attributeMissing"},
+		},
 		{"a falsy value is present and skipped", `React.createElement("iframe", {sandbox: null});`, nil},
 		{"a numeric value is present and skipped", `React.createElement("iframe", {sandbox: 5});`, nil},
 		// Only the second argument is read, so a third holding `sandbox` changes nothing.
-		{"the third argument is children", `React.createElement("iframe", {a:1}, {sandbox:''});`, []string{"attributeMissing"}},
+		{
+			"the third argument is children",
+			`React.createElement("iframe", {a:1}, {sandbox:''});`,
+			[]string{"attributeMissing"},
+		},
 		{"a non literal tag declines", `React.createElement(Foo);`, nil},
 		{"a template literal tag declines", "React.createElement(`iframe`);", nil},
 		{"an uppercase tag string declines", `React.createElement("IFRAME");`, nil},
@@ -392,11 +507,31 @@ func TestIframeMissingSandboxMatchesUpstreamCreateElementResolution(test *testin
 		{"document createElement declines", `document.createElement('iframe');`, nil},
 		// The namespaced branch is purely syntactic upstream, so a local `React` that is plainly
 		// not React still reports. Measured.
-		{"a local React binding still reports", "const React = {};\nReact.createElement('iframe');", []string{"attributeMissing"}},
-		{"a destructured react import reports", "import {createElement} from 'react';\ncreateElement('iframe');", []string{"attributeMissing"}},
-		{"a destructured require reports", "const {createElement} = require('react');\ncreateElement('iframe');", []string{"attributeMissing"}},
-		{"an alias off the pragma reports", "import React from 'react';\nconst createElement = React.createElement;\ncreateElement('iframe');", []string{"attributeMissing"}},
-		{"a destructured preact import declines", "import {createElement} from 'preact';\ncreateElement('iframe');", nil},
+		{
+			"a local React binding still reports",
+			"const React = {};\nReact.createElement('iframe');",
+			[]string{"attributeMissing"},
+		},
+		{
+			"a destructured react import reports",
+			"import {createElement} from 'react';\ncreateElement('iframe');",
+			[]string{"attributeMissing"},
+		},
+		{
+			"a destructured require reports",
+			"const {createElement} = require('react');\ncreateElement('iframe');",
+			[]string{"attributeMissing"},
+		},
+		{
+			"an alias off the pragma reports",
+			"import React from 'react';\nconst createElement = React.createElement;\ncreateElement('iframe');",
+			[]string{"attributeMissing"},
+		},
+		{
+			"a destructured preact import declines",
+			"import {createElement} from 'preact';\ncreateElement('iframe');",
+			nil,
+		},
 	}
 
 	for _, testCase := range cases {
@@ -462,29 +597,89 @@ func TestIframeMissingSandboxIsSilentOnThePairOnlyOnACrossOriginFrame(test *test
 		reports    bool
 	}{
 		// Silent: the frame provably loads another origin.
-		{"HomePagePodcastSection.tsx:46, a template whose head fixes the origin", "declare const featuredEpisodeYouTubeVideoId: string;\n<iframe src={`https://www.youtube-nocookie.com/embed/${featuredEpisodeYouTubeVideoId}?rel=0`} " + pair + " />;", false},
-		{"PodcastEpisodePlayer.tsx:71, the same template through a const typed string", "declare const properties: { videoId: string };\nconst embedSource = `https://www.youtube-nocookie.com/embed/${properties.videoId}?rel=0&enablejsapi=1`;\n<iframe src={embedSource} " + pair + " />;", false},
-		{"YouTubeEmbed.tsx:23, a template off a props member", "declare const properties: { videoId: string };\n<iframe src={`https://www.youtube-nocookie.com/embed/${properties.videoId}?rel=0`} " + pair + " />;", false},
+		{
+			"HomePagePodcastSection.tsx:46, a template whose head fixes the origin",
+			"declare const featuredEpisodeYouTubeVideoId: string;\n<iframe src={`https://www.youtube-nocookie.com/embed/${featuredEpisodeYouTubeVideoId}?rel=0`} " +
+				pair +
+				" />;",
+			false,
+		},
+		{
+			"PodcastEpisodePlayer.tsx:71, the same template through a const typed string",
+			"declare const properties: { videoId: string };\nconst embedSource = `https://www.youtube-nocookie.com/embed/${properties.videoId}?rel=0&enablejsapi=1`;\n<iframe src={embedSource} " +
+				pair +
+				" />;",
+			false,
+		},
+		{
+			"YouTubeEmbed.tsx:23, a template off a props member",
+			"declare const properties: { videoId: string };\n<iframe src={`https://www.youtube-nocookie.com/embed/${properties.videoId}?rel=0`} " +
+				pair +
+				" />;",
+			false,
+		},
 		{"an https literal", `<iframe src="https://player.vimeo.com/video/1" ` + pair + ` />;`, false},
 		{"an uppercase scheme", `<iframe src="HTTPS://player.vimeo.com/video/1" ` + pair + ` />;`, false},
 		{"a protocol relative literal", `<iframe src="//player.vimeo.com/video/1" ` + pair + ` />;`, false},
-		{"a protocol relative literal behind leading space", `<iframe src="  //player.vimeo.com/video/1" ` + pair + ` />;`, false},
+		{
+			"a protocol relative literal behind leading space",
+			`<iframe src="  //player.vimeo.com/video/1" ` + pair + ` />;`,
+			false,
+		},
 		{"backslashes read as slashes", `<iframe src="\\player.vimeo.com/video/1" ` + pair + ` />;`, false},
 		{"a data url has an opaque origin", `<iframe src="data:text/html,hello" ` + pair + ` />;`, false},
 		{"a plain string proves nothing", "declare const url: string;\n<iframe src={url} " + pair + " />;", true},
-		{"a template with an empty head proves nothing", "declare const base: string;\n<iframe src={`${base}/embed`} " + pair + " />;", true},
-		{"a lone slash head may become protocol relative", "declare const path: string;\n<iframe src={`/${path}`} " + pair + " />;", true},
-		{"a scheme-shaped head with no delimiter yet", "declare const rest: string;\n<iframe src={`about${rest}`} " + pair + " />;", true},
-		{"a union of cross-origin literals", "declare const url: 'https://a.example/' | 'https://b.example/';\n<iframe src={url} " + pair + " />;", false},
-		{"a cross-origin template literal type", "declare const url: `https://www.youtube-nocookie.com/embed/${string}`;\n<iframe src={url} " + pair + " />;", false},
-		{"a spread after a relative src may replace it", "declare const props: {};\n<iframe src=\"/embed.html\" {...props} " + pair + " />;", true},
+		{
+			"a template with an empty head proves nothing",
+			"declare const base: string;\n<iframe src={`${base}/embed`} " + pair + " />;",
+			true,
+		},
+		{
+			"a lone slash head may become protocol relative",
+			"declare const path: string;\n<iframe src={`/${path}`} " + pair + " />;",
+			true,
+		},
+		{
+			"a scheme-shaped head with no delimiter yet",
+			"declare const rest: string;\n<iframe src={`about${rest}`} " + pair + " />;",
+			true,
+		},
+		{
+			"a union of cross-origin literals",
+			"declare const url: 'https://a.example/' | 'https://b.example/';\n<iframe src={url} " + pair + " />;",
+			false,
+		},
+		{
+			"a cross-origin template literal type",
+			"declare const url: `https://www.youtube-nocookie.com/embed/${string}`;\n<iframe src={url} " +
+				pair +
+				" />;",
+			false,
+		},
+		{
+			"a spread after a relative src may replace it",
+			"declare const props: {};\n<iframe src=\"/embed.html\" {...props} " + pair + " />;",
+			true,
+		},
 		{"a spread with no src may supply one", "declare const props: {};\n<iframe {...props} " + pair + " />;", true},
 		{"a bare src has no readable value", `<iframe src ` + pair + ` />;`, true},
-		{"createElement with an https src", `React.createElement("iframe", { src: "https://player.vimeo.com/video/1", sandbox: "allow-scripts allow-same-origin" });`, false},
+		{
+			"createElement with an https src",
+			`React.createElement("iframe", { src: "https://player.vimeo.com/video/1", sandbox: "allow-scripts allow-same-origin" });`,
+			false,
+		},
 		// The shorthand has to be read as `src`, or the frame looks src-less, which is `about:blank`
 		// and reports.
-		{"createElement with a shorthand typed cross-origin", "declare const src: 'https://a.example/';\nReact.createElement(\"iframe\", { src, sandbox: \"allow-scripts allow-same-origin\" });", false},
-		{"createElement with a spread after src", "declare const props: {};\nReact.createElement(\"iframe\", { src: \"/embed.html\", ...props, sandbox: \"allow-scripts allow-same-origin\" });", true},
+		{
+			"createElement with a shorthand typed cross-origin",
+			"declare const src: 'https://a.example/';\nReact.createElement(\"iframe\", { src, sandbox: \"allow-scripts allow-same-origin\" });",
+			false,
+		},
+		{
+			"createElement with a spread after src",
+			"declare const props: {};\nReact.createElement(\"iframe\", { src: \"/embed.html\", ...props, sandbox: \"allow-scripts allow-same-origin\" });",
+			true,
+		},
 
 		// Reports: the frame shares the page's origin, or nothing proves it does not.
 		{"a relative path", `<iframe src="/embed/player.html" ` + pair + ` />;`, true},
@@ -497,19 +692,73 @@ func TestIframeMissingSandboxIsSilentOnThePairOnlyOnACrossOriginFrame(test *test
 		{"about blank inherits the parent", `<iframe src="about:blank" ` + pair + ` />;`, true},
 		{"about blank in capitals", `<iframe src="ABOUT:blank" ` + pair + ` />;`, true},
 		{"a blob url inherits its creator", `<iframe src="blob:https://phi.health/1" ` + pair + ` />;`, true},
-		{"a template whose head is a relative path", "declare const id: string;\n<iframe src={`/embed/${id}`} " + pair + " />;", true},
-		{"srcDoc wins over a cross-origin src", `<iframe src="https://player.vimeo.com/video/1" srcDoc="<p>hi</p>" ` + pair + ` />;`, true},
-		{"a src after a spread is the one that renders", "declare const props: {};\n<iframe {...props} src=\"/embed.html\" " + pair + " />;", true},
-		{"one same-origin constituent is enough", "declare const url: '/embed.html' | 'https://a.example/';\n<iframe src={url} " + pair + " />;", true},
-		{"a same-origin template literal type", "declare const url: `/embed/${string}`;\n<iframe src={url} " + pair + " />;", true},
-		{"createElement with a relative src", `React.createElement("iframe", { src: "/embed.html", sandbox: "allow-scripts allow-same-origin" });`, true},
-		{"createElement with a quoted src key", `React.createElement("iframe", { 'src': "/embed.html", sandbox: "allow-scripts allow-same-origin" });`, true},
-		{"createElement with a shorthand typed same-origin", "declare const src: '/embed.html';\nReact.createElement(\"iframe\", { src, sandbox: \"allow-scripts allow-same-origin\" });", true},
-		{"createElement with srcDoc", `React.createElement("iframe", { src: "https://a.example/", srcDoc: "<p>hi</p>", sandbox: "allow-scripts allow-same-origin" });`, true},
-		{"an https template whose head stops before the host is complete", "declare const host: string;\n<iframe src={`https://${host}/embed`} " + pair + " />;", true},
-		{"an https template whose head stops inside the host", "declare const domain: string;\n<iframe src={`https://cdn.${domain}/embed`} " + pair + " />;", true},
-		{"a const naming a relative path", "const embedSource = '/embed/player.html';\n<iframe src={embedSource} " + pair + " />;", true},
-		{"a let holding a cross-origin template, which a later write can change", "declare const id: string;\nlet embedSource = `https://www.youtube-nocookie.com/embed/${id}`;\nembedSource = embedSource + '';\n<iframe src={embedSource} " + pair + " />;", true},
+		{
+			"a template whose head is a relative path",
+			"declare const id: string;\n<iframe src={`/embed/${id}`} " + pair + " />;",
+			true,
+		},
+		{
+			"srcDoc wins over a cross-origin src",
+			`<iframe src="https://player.vimeo.com/video/1" srcDoc="<p>hi</p>" ` + pair + ` />;`,
+			true,
+		},
+		{
+			"a src after a spread is the one that renders",
+			"declare const props: {};\n<iframe {...props} src=\"/embed.html\" " + pair + " />;",
+			true,
+		},
+		{
+			"one same-origin constituent is enough",
+			"declare const url: '/embed.html' | 'https://a.example/';\n<iframe src={url} " + pair + " />;",
+			true,
+		},
+		{
+			"a same-origin template literal type",
+			"declare const url: `/embed/${string}`;\n<iframe src={url} " + pair + " />;",
+			true,
+		},
+		{
+			"createElement with a relative src",
+			`React.createElement("iframe", { src: "/embed.html", sandbox: "allow-scripts allow-same-origin" });`,
+			true,
+		},
+		{
+			"createElement with a quoted src key",
+			`React.createElement("iframe", { 'src': "/embed.html", sandbox: "allow-scripts allow-same-origin" });`,
+			true,
+		},
+		{
+			"createElement with a shorthand typed same-origin",
+			"declare const src: '/embed.html';\nReact.createElement(\"iframe\", { src, sandbox: \"allow-scripts allow-same-origin\" });",
+			true,
+		},
+		{
+			"createElement with srcDoc",
+			`React.createElement("iframe", { src: "https://a.example/", srcDoc: "<p>hi</p>", sandbox: "allow-scripts allow-same-origin" });`,
+			true,
+		},
+		{
+			"an https template whose head stops before the host is complete",
+			"declare const host: string;\n<iframe src={`https://${host}/embed`} " + pair + " />;",
+			true,
+		},
+		{
+			"an https template whose head stops inside the host",
+			"declare const domain: string;\n<iframe src={`https://cdn.${domain}/embed`} " + pair + " />;",
+			true,
+		},
+		{
+			"a const naming a relative path",
+			"const embedSource = '/embed/player.html';\n<iframe src={embedSource} " + pair + " />;",
+			true,
+		},
+		{
+			"a let holding a cross-origin template, which a later write can change",
+			"declare const id: string;\nlet embedSource = `https://www.youtube-nocookie.com/embed/${id}`;\nembedSource = embedSource + '';\n<iframe src={embedSource} " +
+				pair +
+				" />;",
+			true,
+		},
 	}
 
 	for _, testCase := range cases {

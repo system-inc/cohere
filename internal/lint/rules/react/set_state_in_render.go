@@ -113,9 +113,9 @@ var setStateInUseMemoMessage = rule.Message{
 //	for (const p of props) { setState(true); }                    setState inside: CLEAN
 //
 // and an early return before the call makes it clean while leaving the syntax around the call
-// unchanged. `high_level_intermediate_representation.UnconditionalBlocks` is the port of upstream's `computeUnconditionalBlocks`; its
-// file explains why forward dominance, which this tree already had in two places, answers the wrong
-// question and would have reported the early-return case.
+// unchanged. `high_level_intermediate_representation.UnconditionalBlocks` is the port of upstream's
+// `computeUnconditionalBlocks`; its file explains why forward dominance, which this tree already had in two places,
+// answers the wrong question and would have reported the early-return case.
 //
 // This is therefore the opposite conclusion to `error-boundaries`, which read the same graph
 // machinery and used none of it. That rule's question was "is B written inside A", which is about
@@ -306,7 +306,13 @@ func reportSetStateInRender(
 				// The nested function names its captures with its own identifier ids, so the set
 				// built in this function's namespace means nothing inside it. Translate across the
 				// boundary rather than passing the map down; see setterCapturesOf.
-				nestedSetters, capturesOne := setterCapturesOf(ruleContext, function, value, nested, unconditionalSetStateFunctions)
+				nestedSetters, capturesOne := setterCapturesOf(
+					ruleContext,
+					function,
+					value,
+					nested,
+					unconditionalSetStateFunctions,
+				)
 
 				// A `useMemo` callback is analysed whatever it captures, and this is not an
 				// optimization waiver. Upstream inlines that callback into the render graph before
@@ -378,7 +384,10 @@ func reportSetStateInRender(
 //
 // The index is bounds-checked rather than trusted: `Functions` is populated by lowering and a
 // malformed or partially lowered function is exactly the input a linter is handed.
-func nestedFunction(function *high_level_intermediate_representation.Function, value *high_level_intermediate_representation.FunctionExpression) *high_level_intermediate_representation.Function {
+func nestedFunction(
+	function *high_level_intermediate_representation.Function,
+	value *high_level_intermediate_representation.FunctionExpression,
+) *high_level_intermediate_representation.Function {
 	if value == nil || int(value.Function) >= len(function.Functions) {
 		return nil
 	}
@@ -454,7 +463,11 @@ func setterCapturesOf(
 // `ActionDispatch`, which `useReducer` produces, is deliberately not accepted. Upstream gives it a
 // different built-in shape and its own diagnostics, and a dispatch called during render is not the
 // same defect.
-func isStateSetter(ruleContext rule.Context, function *high_level_intermediate_representation.Function, id static_single_assignment.IdentifierId) bool {
+func isStateSetter(
+	ruleContext rule.Context,
+	function *high_level_intermediate_representation.Function,
+	id static_single_assignment.IdentifierId,
+) bool {
 	if ruleContext.TypeChecker == nil {
 		return false
 	}
@@ -478,7 +491,10 @@ func isStateSetter(ruleContext rule.Context, function *high_level_intermediate_r
 //
 // This is the seam `Identifier.Node` documents itself as existing for: the node goes to the checker
 // rather than to a local inference pass.
-func identifierNodeOf(function *high_level_intermediate_representation.Function, id static_single_assignment.IdentifierId) *ast.Node {
+func identifierNodeOf(
+	function *high_level_intermediate_representation.Function,
+	id static_single_assignment.IdentifierId,
+) *ast.Node {
 	if function == nil || int(id) >= len(function.Identifiers) {
 		return nil
 	}
@@ -495,7 +511,12 @@ func identifierNodeOf(function *high_level_intermediate_representation.Function,
 // golden for `setX(1)` underlines four characters and the one for `aliased(2)` underlines seven.
 // Reporting through `ctx.ReportNode` routes via `rule.TokenRange`, which trims leading trivia at
 // the harness.
-func reportSetterCall(ruleContext rule.Context, function *high_level_intermediate_representation.Function, id static_single_assignment.IdentifierId, message rule.Message) {
+func reportSetterCall(
+	ruleContext rule.Context,
+	function *high_level_intermediate_representation.Function,
+	id static_single_assignment.IdentifierId,
+	message rule.Message,
+) {
 	if node := identifierNodeOf(function, id); node != nil {
 		ruleContext.ReportNode(node, message)
 		return

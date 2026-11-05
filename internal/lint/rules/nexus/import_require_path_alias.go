@@ -129,7 +129,9 @@ func decodeImportRequirePathAliasOptions(raw []byte, base rule.OptionsBase) (any
 func pathsNest(first string, second string) bool {
 	nests := func(outer string, inner string) bool {
 		relative, relativePathError := filepath.Rel(outer, inner)
-		return relativePathError == nil && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator))
+		return relativePathError == nil &&
+			relative != ".." &&
+			!strings.HasPrefix(relative, ".."+string(filepath.Separator))
 	}
 	if nests(first, second) || nests(second, first) {
 		return true
@@ -159,7 +161,10 @@ func messageUseAlias(importPath string, levels int, suggestion string) rule.Mess
 
 // importRequirePathAliasUseAliasInStrictRootText is the rule's `useAliasInStrictRoot` message,
 // whose wording lives in `policy/messages/import-require-path-alias.json`.
-var importRequirePathAliasUseAliasInStrictRootText = policy.MessageOf("nexus/import-require-path-alias", "useAliasInStrictRoot")
+var importRequirePathAliasUseAliasInStrictRootText = policy.MessageOf(
+	"nexus/import-require-path-alias",
+	"useAliasInStrictRoot",
+)
 
 func messageUseAliasInStrictRoot(importPath string, root string, suggestion string) rule.Message {
 	return rule.Message{
@@ -218,7 +223,11 @@ var ImportRequirePathAlias = rule.Rule{
 		configured := append([]PathAlias{}, settings.Aliases...)
 		if settings.AliasesFromTsconfigPaths && ruleContext.Program != nil {
 			configured = append(configured,
-				aliasesFromCompilerPaths(ruleContext.Program.Options(), ruleContext.Program.GetCurrentDirectory(), repositoryRoot)...)
+				aliasesFromCompilerPaths(
+					ruleContext.Program.Options(),
+					ruleContext.Program.GetCurrentDirectory(),
+					repositoryRoot,
+				)...)
 		}
 		if len(configured) == 0 {
 			// Nothing to suggest, so nothing to report.
@@ -336,7 +345,11 @@ var ImportRequirePathAlias = rule.Rule{
 // reads them. Structure writes its aliases in a config two directories down that every project
 // extends, so resolving against the project's own tsconfig instead would put every alias two levels
 // above the repository.
-func aliasesFromCompilerPaths(options *core.CompilerOptions, currentDirectory string, repositoryRoot string) []PathAlias {
+func aliasesFromCompilerPaths(
+	options *core.CompilerOptions,
+	currentDirectory string,
+	repositoryRoot string,
+) []PathAlias {
 	if options == nil || options.Paths.Size() == 0 {
 		return nil
 	}

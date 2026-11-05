@@ -16,10 +16,22 @@ const correctnessNoCallerDataMutationId = "callerDataMutation"
 
 // The rule's messages, whose wording lives in `policy/messages/correctness-no-caller-data-mutation.json`.
 var (
-	correctnessNoCallerDataMutationText             = policy.MessageOf("nexus/correctness-no-caller-data-mutation", correctnessNoCallerDataMutationId)
-	correctnessNoCallerDataMutationBareProcessState = policy.MessageOf("nexus/correctness-no-caller-data-mutation", "processStateWithoutReason")
-	correctnessNoCallerDataMutationBareMutates      = policy.MessageOf("nexus/correctness-no-caller-data-mutation", "mutatesWithoutReason")
-	correctnessNoCallerDataMutationUnknownMutates   = policy.MessageOf("nexus/correctness-no-caller-data-mutation", "mutatesUnknownParameter")
+	correctnessNoCallerDataMutationText = policy.MessageOf(
+		"nexus/correctness-no-caller-data-mutation",
+		correctnessNoCallerDataMutationId,
+	)
+	correctnessNoCallerDataMutationBareProcessState = policy.MessageOf(
+		"nexus/correctness-no-caller-data-mutation",
+		"processStateWithoutReason",
+	)
+	correctnessNoCallerDataMutationBareMutates = policy.MessageOf(
+		"nexus/correctness-no-caller-data-mutation",
+		"mutatesWithoutReason",
+	)
+	correctnessNoCallerDataMutationUnknownMutates = policy.MessageOf(
+		"nexus/correctness-no-caller-data-mutation",
+		"mutatesUnknownParameter",
+	)
 )
 
 // correctnessNoCallerDataMutationProcessStateTag declares a type as state the process shares.
@@ -181,7 +193,11 @@ var CorrectnessNoCallerDataMutation = rule.Rule{
 			}
 		}
 		reportMutatesTags := func(node *ast.Node) {
-			for _, tag := range correctnessNoCallerDataMutationTagsOf(ruleContext.SourceFile, node, correctnessNoCallerDataMutationMutatesTag) {
+			for _, tag := range correctnessNoCallerDataMutationTagsOf(
+				ruleContext.SourceFile,
+				node,
+				correctnessNoCallerDataMutationMutatesTag,
+			) {
 				parameter, reason := correctnessNoCallerDataMutationMutatesTagParts(ruleContext.SourceFile, tag)
 				message := correctnessNoCallerDataMutationBareMutates
 				switch {
@@ -277,7 +293,10 @@ func correctnessNoCallerDataMutationCheckTarget(ruleContext rule.Context, target
 		ruleContext.Note(tagged)
 		return
 	}
-	if contract, isOutParameter := correctnessNoCallerDataMutationOutParameterOf(ruleContext, parameter); isOutParameter {
+	if contract, isOutParameter := correctnessNoCallerDataMutationOutParameterOf(
+		ruleContext,
+		parameter,
+	); isOutParameter {
 		ruleContext.Note(contract)
 		return
 	}
@@ -311,7 +330,10 @@ func correctnessNoCallerDataMutationCheckCall(ruleContext rule.Context, call *as
 		ruleContext.Note(tagged)
 		return
 	}
-	if contract, isOutParameter := correctnessNoCallerDataMutationOutParameterOf(ruleContext, parameter); isOutParameter {
+	if contract, isOutParameter := correctnessNoCallerDataMutationOutParameterOf(
+		ruleContext,
+		parameter,
+	); isOutParameter {
 		ruleContext.Note(contract)
 		return
 	}
@@ -329,7 +351,12 @@ func correctnessNoCallerDataMutationParameterReached(ruleContext rule.Context, e
 //
 // Mutates: seen the recursion marks each expression on the way down and unmarks it on the way back, so one set
 // bounds a whole walk's cycles
-func correctnessNoCallerDataMutationOrigin(ruleContext rule.Context, expression *ast.Node, depth int, seen map[*ast.Node]bool) *ast.Symbol {
+func correctnessNoCallerDataMutationOrigin(
+	ruleContext rule.Context,
+	expression *ast.Node,
+	depth int,
+	seen map[*ast.Node]bool,
+) *ast.Symbol {
 	if expression == nil || seen[expression] {
 		return nil
 	}
@@ -351,7 +378,11 @@ func correctnessNoCallerDataMutationOrigin(ruleContext rule.Context, expression 
 	case ast.KindElementAccessExpression:
 		access := unwrapped.AsElementAccessExpression()
 		if index, ok := correctnessNoCallerDataMutationLiteralIndex(access.ArgumentExpression); ok && index >= 0 {
-			if element := correctnessNoCallerDataMutationKnownElement(ruleContext, access.Expression, index); element != nil {
+			if element := correctnessNoCallerDataMutationKnownElement(
+				ruleContext,
+				access.Expression,
+				index,
+			); element != nil {
 				return next(element, depth)
 			}
 		}
@@ -383,7 +414,11 @@ func correctnessNoCallerDataMutationOrigin(ruleContext rule.Context, expression 
 		case "find", "at", "shift", "pop":
 			if access.Name().Text() == "at" && len(call.Arguments.Nodes) == 1 {
 				if index, ok := correctnessNoCallerDataMutationLiteralIndex(call.Arguments.Nodes[0]); ok {
-					if element := correctnessNoCallerDataMutationKnownElement(ruleContext, access.Expression, index); element != nil {
+					if element := correctnessNoCallerDataMutationKnownElement(
+						ruleContext,
+						access.Expression,
+						index,
+					); element != nil {
 						return next(element, depth)
 					}
 				}
@@ -396,7 +431,9 @@ func correctnessNoCallerDataMutationOrigin(ruleContext rule.Context, expression 
 				return next(access.Expression, depth)
 			}
 		case "map":
-			if depth > 0 && len(call.Arguments.Nodes) > 0 && correctnessNoCallerDataMutationIdentityCallback(ruleContext, call.Arguments.Nodes[0]) {
+			if depth > 0 &&
+				len(call.Arguments.Nodes) > 0 &&
+				correctnessNoCallerDataMutationIdentityCallback(ruleContext, call.Arguments.Nodes[0]) {
 				return next(access.Expression, depth)
 			}
 		case "concat":
@@ -409,7 +446,10 @@ func correctnessNoCallerDataMutationOrigin(ruleContext rule.Context, expression 
 			for _, argument := range call.Arguments.Nodes {
 				// concat flattens array arguments one level, but also accepts single elements.
 				argumentDepth := depth - 1
-				if checker.Checker_isArrayOrTupleType(ruleContext.TypeChecker, ruleContext.TypeChecker.GetTypeAtLocation(argument)) {
+				if checker.Checker_isArrayOrTupleType(
+					ruleContext.TypeChecker,
+					ruleContext.TypeChecker.GetTypeAtLocation(argument),
+				) {
 					argumentDepth = depth
 				}
 				if origin := next(argument, argumentDepth); origin != nil {
@@ -439,13 +479,23 @@ func correctnessNoCallerDataMutationOrigin(ruleContext rule.Context, expression 
 				continue
 			}
 			if correctnessNoCallerDataMutationIsReassigned(ruleContext, function, symbol) {
-				return correctnessNoCallerDataMutationRemovalBindingOrigin(ruleContext, function, declaration, symbol, depth, next)
+				return correctnessNoCallerDataMutationRemovalBindingOrigin(
+					ruleContext,
+					function,
+					declaration,
+					symbol,
+					depth,
+					next,
+				)
 			}
 			if initializer := declaration.Initializer(); initializer != nil {
 				return next(initializer, depth)
 			}
 			list := declaration.Parent
-			if list != nil && list.Kind == ast.KindVariableDeclarationList && list.Parent != nil && list.Parent.Kind == ast.KindForOfStatement {
+			if list != nil &&
+				list.Kind == ast.KindVariableDeclarationList &&
+				list.Parent != nil &&
+				list.Parent.Kind == ast.KindForOfStatement {
 				return next(list.Parent.AsForInOrOfStatement().Expression, depth+1)
 			}
 		}
@@ -457,7 +507,13 @@ func correctnessNoCallerDataMutationOrigin(ruleContext rule.Context, expression 
 // holds. Require its initializer (if present) and every binding write to be a default-library
 // shift/pop call with the same caller origin. Any fresh value, arbitrary assignment or update
 // invalidates the binding; this is a narrow identity contract, not general assignment flow analysis.
-func correctnessNoCallerDataMutationRemovalBindingOrigin(ruleContext rule.Context, function, declaration *ast.Node, symbol *ast.Symbol, depth int, originOf func(*ast.Node, int) *ast.Symbol) *ast.Symbol {
+func correctnessNoCallerDataMutationRemovalBindingOrigin(
+	ruleContext rule.Context,
+	function, declaration *ast.Node,
+	symbol *ast.Symbol,
+	depth int,
+	originOf func(*ast.Node, int) *ast.Symbol,
+) *ast.Symbol {
 	var origin *ast.Symbol
 	valid := true
 	accept := func(value *ast.Node) {
@@ -472,7 +528,8 @@ func correctnessNoCallerDataMutationRemovalBindingOrigin(ruleContext rule.Contex
 			return
 		}
 		name := callee.AsPropertyAccessExpression().Name()
-		if (name.Text() != "shift" && name.Text() != "pop") || !correctnessNoCallerDataMutationArrayMethod(ruleContext, name) {
+		if (name.Text() != "shift" && name.Text() != "pop") ||
+			!correctnessNoCallerDataMutationArrayMethod(ruleContext, name) {
 			valid = false
 			return
 		}
@@ -494,7 +551,9 @@ func correctnessNoCallerDataMutationRemovalBindingOrigin(ruleContext rule.Contex
 		if node.Kind == ast.KindIdentifier && node.Text() == symbol.Name && reference.WritesToBinding(node) {
 			resolved := ruleContext.TypeChecker.GetSymbolAtLocation(node)
 			if parent := node.Parent; parent != nil && parent.Kind == ast.KindShorthandPropertyAssignment {
-				if valueSymbol := ruleContext.TypeChecker.GetShorthandAssignmentValueSymbol(parent); valueSymbol != nil {
+				if valueSymbol := ruleContext.TypeChecker.GetShorthandAssignmentValueSymbol(
+					parent,
+				); valueSymbol != nil {
 					resolved = valueSymbol
 				}
 			}
@@ -554,7 +613,11 @@ func correctnessNoCallerDataMutationKnownElement(ruleContext rule.Context, array
 //
 // Mutates: seen the recursion marks each array on the way down and unmarks it on the way back, so one set
 // bounds a whole walk's cycles
-func correctnessNoCallerDataMutationKnownSlots(ruleContext rule.Context, array *ast.Node, seen map[*ast.Node]bool) []*ast.Node {
+func correctnessNoCallerDataMutationKnownSlots(
+	ruleContext rule.Context,
+	array *ast.Node,
+	seen map[*ast.Node]bool,
+) []*ast.Node {
 	unknown := []*ast.Node{nil}
 	if array == nil || seen[array] {
 		return unknown
@@ -567,7 +630,11 @@ func correctnessNoCallerDataMutationKnownSlots(ruleContext rule.Context, array *
 	case ast.KindArrayLiteralExpression:
 		for _, element := range unwrapped.AsArrayLiteralExpression().Elements.Nodes {
 			if element.Kind == ast.KindSpreadElement {
-				slots = append(slots, correctnessNoCallerDataMutationKnownSlots(ruleContext, element.AsSpreadElement().Expression, seen)...)
+				slots = append(slots, correctnessNoCallerDataMutationKnownSlots(
+					ruleContext,
+					element.AsSpreadElement().Expression,
+					seen,
+				)...)
 			} else {
 				slots = append(slots, element)
 			}
@@ -599,7 +666,10 @@ func correctnessNoCallerDataMutationKnownSlots(ruleContext rule.Context, array *
 		}
 		slots = append(slots, correctnessNoCallerDataMutationKnownSlots(ruleContext, access.Expression, seen)...)
 		for _, argument := range call.Arguments.Nodes {
-			if checker.Checker_isArrayOrTupleType(ruleContext.TypeChecker, ruleContext.TypeChecker.GetTypeAtLocation(argument)) {
+			if checker.Checker_isArrayOrTupleType(
+				ruleContext.TypeChecker,
+				ruleContext.TypeChecker.GetTypeAtLocation(argument),
+			) {
 				slots = append(slots, correctnessNoCallerDataMutationKnownSlots(ruleContext, argument, seen)...)
 			} else {
 				slots = append(slots, argument)
@@ -618,7 +688,8 @@ func correctnessNoCallerDataMutationLiteralIndex(expression *ast.Node) (int, boo
 	sign := 1
 	// The literal whose value is the index's magnitude, under its minus sign when there is one.
 	magnitude := unwrapped
-	if unwrapped.Kind == ast.KindPrefixUnaryExpression && unwrapped.AsPrefixUnaryExpression().Operator == ast.KindMinusToken {
+	if unwrapped.Kind == ast.KindPrefixUnaryExpression &&
+		unwrapped.AsPrefixUnaryExpression().Operator == ast.KindMinusToken {
 		sign = -1
 		magnitude = unwrapped.AsPrefixUnaryExpression().Operand
 	}
@@ -674,7 +745,9 @@ func correctnessNoCallerDataMutationIdentityCallback(ruleContext rule.Context, c
 	}
 	body = ast.SkipParentheses(body)
 	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(parameters[0].Name())
-	return body.Kind == ast.KindIdentifier && symbol != nil && ruleContext.TypeChecker.GetSymbolAtLocation(body) == symbol &&
+	return body.Kind == ast.KindIdentifier &&
+		symbol != nil &&
+		ruleContext.TypeChecker.GetSymbolAtLocation(body) == symbol &&
 		!correctnessNoCallerDataMutationIsReassigned(ruleContext, unwrapped, symbol)
 }
 
@@ -715,7 +788,11 @@ func correctnessNoCallerDataMutationIsCallback(function *ast.Node) bool {
 
 // correctnessNoCallerDataMutationIsReassigned says whether any reference to the parameter, in its
 // function's parameter list or body, writes the binding itself.
-func correctnessNoCallerDataMutationIsReassigned(ruleContext rule.Context, function *ast.Node, symbol *ast.Symbol) bool {
+func correctnessNoCallerDataMutationIsReassigned(
+	ruleContext rule.Context,
+	function *ast.Node,
+	symbol *ast.Symbol,
+) bool {
 	name := symbol.Name
 	reassigned := false
 	var visit func(node *ast.Node) bool
@@ -726,7 +803,9 @@ func correctnessNoCallerDataMutationIsReassigned(ruleContext rule.Context, funct
 		if node.Kind == ast.KindIdentifier && node.Text() == name && reference.WritesToBinding(node) {
 			resolved := ruleContext.TypeChecker.GetSymbolAtLocation(node)
 			if parent := node.Parent; parent != nil && parent.Kind == ast.KindShorthandPropertyAssignment {
-				if valueSymbol := ruleContext.TypeChecker.GetShorthandAssignmentValueSymbol(parent); valueSymbol != nil {
+				if valueSymbol := ruleContext.TypeChecker.GetShorthandAssignmentValueSymbol(
+					parent,
+				); valueSymbol != nil {
 					resolved = valueSymbol
 				}
 			}
@@ -936,7 +1015,9 @@ func correctnessNoCallerDataMutationMutatesTagParts(file *ast.SourceFile, tag *a
 // plainly, or -1.
 func correctnessNoCallerDataMutationParameterIndex(function *ast.Node, name string) int {
 	for index, parameter := range function.Parameters() {
-		if declared := parameter.Name(); declared != nil && declared.Kind == ast.KindIdentifier && declared.Text() == name {
+		if declared := parameter.Name(); declared != nil &&
+			declared.Kind == ast.KindIdentifier &&
+			declared.Text() == name {
 			return index
 		}
 	}
@@ -961,9 +1042,16 @@ func correctnessNoCallerDataMutationOutParameterOf(ruleContext rule.Context, par
 			position = index
 		}
 	}
-	for _, contract := range append([]*ast.Node{method}, correctnessNoCallerDataMutationOverriddenMethods(ruleContext, method)...) {
+	for _, contract := range append(
+		[]*ast.Node{method},
+		correctnessNoCallerDataMutationOverriddenMethods(ruleContext, method)...,
+	) {
 		file := ast.GetSourceFileOfNode(contract)
-		for _, tag := range correctnessNoCallerDataMutationTagsOf(file, contract, correctnessNoCallerDataMutationMutatesTag) {
+		for _, tag := range correctnessNoCallerDataMutationTagsOf(
+			file,
+			contract,
+			correctnessNoCallerDataMutationMutatesTag,
+		) {
 			named, reason := correctnessNoCallerDataMutationMutatesTagParts(file, tag)
 			if reason == "" || correctnessNoCallerDataMutationParameterIndex(contract, named) != position {
 				continue
@@ -1001,12 +1089,17 @@ func correctnessNoCallerDataMutationOverriddenMethods(ruleContext rule.Context, 
 		}
 		seen[container] = true
 		var bases []*checker.Type
-		if declared := checker.Checker_getDeclaredTypeOfSymbol(ruleContext.TypeChecker, container.Symbol()); declared != nil &&
+		if declared := checker.Checker_getDeclaredTypeOfSymbol(
+			ruleContext.TypeChecker,
+			container.Symbol(),
+		); declared != nil &&
 			checker.Type_objectFlags(declared)&(checker.ObjectFlagsInterface|checker.ObjectFlagsClass) != 0 {
 			bases = checker.Checker_getBaseTypes(ruleContext.TypeChecker, declared)
 		}
 		for _, implemented := range ast.GetImplementsHeritageClauseElements(container) {
-			if implementedType := ruleContext.TypeChecker.GetTypeAtLocation(implemented.AsNode()); implementedType != nil {
+			if implementedType := ruleContext.TypeChecker.GetTypeAtLocation(
+				implemented.AsNode(),
+			); implementedType != nil {
 				bases = append(bases, implementedType)
 			}
 		}

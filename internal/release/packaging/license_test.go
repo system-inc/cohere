@@ -30,7 +30,12 @@ func TestEveryPackageDeclaresTheDualLicense(test *testing.T) {
 	}
 	for name, manifest := range manifests {
 		if manifest["license"] != expectedLicenseExpression {
-			test.Errorf("%s declares license %v, wanted exactly %q", name, manifest["license"], expectedLicenseExpression)
+			test.Errorf(
+				"%s declares license %v, wanted exactly %q",
+				name,
+				manifest["license"],
+				expectedLicenseExpression,
+			)
 		}
 		// Listed in files, or npm publish drops the texts the license field promises.
 		files, _ := manifest["files"].([]any)
@@ -53,7 +58,11 @@ func TestEveryPackageDeclaresTheDualLicense(test *testing.T) {
 		test.Fatal(decodeError)
 	}
 	if extension.License != expectedLicenseExpression {
-		test.Errorf("the VS Code extension declares license %q, wanted exactly %q", extension.License, expectedLicenseExpression)
+		test.Errorf(
+			"the VS Code extension declares license %q, wanted exactly %q",
+			extension.License,
+			expectedLicenseExpression,
+		)
 	}
 }
 
@@ -62,7 +71,10 @@ func TestPackagesShipBothLicenseTextsAsCommitted(test *testing.T) {
 
 	module := moduleRoot(test)
 	output := test.TempDir()
-	dispatcher, buildDispatcherPackageError := buildDispatcherPackage(Options{ModuleDirectory: module, OutputDirectory: output, Version: "1.0.0"}, placeholderChecksums)
+	dispatcher, buildDispatcherPackageError := buildDispatcherPackage(
+		Options{ModuleDirectory: module, OutputDirectory: output, Version: "1.0.0"},
+		placeholderChecksums,
+	)
 	if buildDispatcherPackageError != nil {
 		test.Fatal(buildDispatcherPackageError)
 	}

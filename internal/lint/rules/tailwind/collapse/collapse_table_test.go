@@ -567,7 +567,10 @@ func TestCollapseFamiliesAreCssShorthandRelationships(test *testing.T) {
 			withProperties, len(CollapseFamilies))
 	}
 	if len(CollapseFamilies) < 40 {
-		test.Fatalf("the table holds %d families; expected around 45, so this assertion measured far less than it appears to", len(CollapseFamilies))
+		test.Fatalf(
+			"the table holds %d families; expected around 45, so this assertion measured far less than it appears to",
+			len(CollapseFamilies),
+		)
 	}
 	test.Logf("all %d collapse families relate the properties their roots declare", withProperties)
 }

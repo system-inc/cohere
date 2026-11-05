@@ -28,50 +28,218 @@ func TestNoInvalidThisFires(test *testing.T) {
 		settings any
 		findings int
 	}{
-		{source: "\ninterface SomeType {\n  prop: string;\n}\nfunction foo() {\n  this.prop;\n}\n      ", settings: nil, findings: 1},
+		{
+			source:   "\ninterface SomeType {\n  prop: string;\n}\nfunction foo() {\n  this.prop;\n}\n      ",
+			settings: nil,
+			findings: 1,
+		},
 		{source: "\nconsole.log(this);\nz(x => console.log(x, this));\n      ", settings: nil, findings: 2},
 		{source: "\nconsole.log(this);\nz(x => console.log(x, this));\n      ", settings: nil, findings: 2},
-		{source: "\n(function () {\n  console.log(this);\n  z(x => console.log(x, this));\n})();\n      ", settings: nil, findings: 2},
-		{source: "\nfunction foo() {\n  console.log(this);\n  z(x => console.log(x, this));\n}\n      ", settings: nil, findings: 2},
-		{source: "\nfunction foo() {\n  console.log(this);\n  z(x => console.log(x, this));\n}\n      ", settings: noInvalidThisSettings{CapIsConstructor: false}, findings: 2},
-		{source: "\nfunction Foo() {\n  console.log(this);\n  z(x => console.log(x, this));\n}\n      ", settings: noInvalidThisSettings{CapIsConstructor: false}, findings: 2},
-		{source: "\nfunction foo() {\n  'use strict';\n  console.log(this);\n  z(x => console.log(x, this));\n}\n      ", settings: nil, findings: 2},
-		{source: "\nfunction Foo() {\n  'use strict';\n  console.log(this);\n  z(x => console.log(x, this));\n}\n      ", settings: noInvalidThisSettings{CapIsConstructor: false}, findings: 2},
-		{source: "\nreturn function () {\n  console.log(this);\n  z(x => console.log(x, this));\n};\n      ", settings: nil, findings: 2},
-		{source: "\nvar foo = function () {\n  console.log(this);\n  z(x => console.log(x, this));\n}.bar(obj);\n      ", settings: nil, findings: 2},
-		{source: "\nvar obj = {\n  foo: function () {\n    function foo() {\n      console.log(this);\n      z(x => console.log(x, this));\n    }\n    foo();\n  },\n};\n      ", settings: nil, findings: 2},
-		{source: "\nvar obj = {\n  foo() {\n    function foo() {\n      console.log(this);\n      z(x => console.log(x, this));\n    }\n    foo();\n  },\n};\n      ", settings: nil, findings: 2},
-		{source: "\nvar obj = {\n  foo: function () {\n    return function () {\n      console.log(this);\n      z(x => console.log(x, this));\n    };\n  },\n};\n      ", settings: nil, findings: 2},
-		{source: "\nvar obj = {\n  foo: function () {\n    'use strict';\n    return function () {\n      console.log(this);\n      z(x => console.log(x, this));\n    };\n  },\n};\n      ", settings: nil, findings: 2},
-		{source: "\nobj.foo = function () {\n  return function () {\n    console.log(this);\n    z(x => console.log(x, this));\n  };\n};\n      ", settings: nil, findings: 2},
-		{source: "\nobj.foo = function () {\n  'use strict';\n  return function () {\n    console.log(this);\n    z(x => console.log(x, this));\n  };\n};\n      ", settings: nil, findings: 2},
-		{source: "\nclass A {\n  foo() {\n    return function () {\n      console.log(this);\n      z(x => console.log(x, this));\n    };\n  }\n}\n      ", settings: nil, findings: 2},
-		{source: "\nclass A {\n  b = new Array(1, 2, function () {\n    console.log(this);\n    z(x => console.log(x, this));\n  });\n}\n      ", settings: nil, findings: 2},
-		{source: "\nclass A {\n  b = () => {\n    function c() {\n      console.log(this);\n      z(x => console.log(x, this));\n    }\n  };\n}\n      ", settings: nil, findings: 2},
-		{source: "\nobj.foo = (function () {\n  return () => {\n    console.log(this);\n    z(x => console.log(x, this));\n  };\n})();\n      ", settings: nil, findings: 2},
-		{source: "\nobj.foo = (() => () => {\n  console.log(this);\n  z(x => console.log(x, this));\n})();\n      ", settings: nil, findings: 2},
-		{source: "\nvar foo = function () {\n  console.log(this);\n  z(x => console.log(x, this));\n}.bind(null);\n      ", settings: nil, findings: 2},
-		{source: "\n(function () {\n  console.log(this);\n  z(x => console.log(x, this));\n}).call(undefined);\n      ", settings: nil, findings: 2},
-		{source: "\n(function () {\n  console.log(this);\n  z(x => console.log(x, this));\n}).apply(void 0);\n      ", settings: nil, findings: 2},
-		{source: "\nArray.from([], function () {\n  console.log(this);\n  z(x => console.log(x, this));\n});\n      ", settings: nil, findings: 2},
-		{source: "\nfoo.every(function () {\n  console.log(this);\n  z(x => console.log(x, this));\n});\n      ", settings: nil, findings: 2},
-		{source: "\nfoo.filter(function () {\n  console.log(this);\n  z(x => console.log(x, this));\n});\n      ", settings: nil, findings: 2},
-		{source: "\nfoo.find(function () {\n  console.log(this);\n  z(x => console.log(x, this));\n});\n      ", settings: nil, findings: 2},
-		{source: "\nfoo.findIndex(function () {\n  console.log(this);\n  z(x => console.log(x, this));\n});\n      ", settings: nil, findings: 2},
-		{source: "\nfoo.forEach(function () {\n  console.log(this);\n  z(x => console.log(x, this));\n});\n      ", settings: nil, findings: 2},
-		{source: "\nfoo.map(function () {\n  console.log(this);\n  z(x => console.log(x, this));\n});\n      ", settings: nil, findings: 2},
-		{source: "\nfoo.some(function () {\n  console.log(this);\n  z(x => console.log(x, this));\n});\n      ", settings: nil, findings: 2},
-		{source: "\nfoo.forEach(function () {\n  console.log(this);\n  z(x => console.log(x, this));\n}, null);\n      ", settings: nil, findings: 2},
-		{source: "\n/** @returns {void} */ function foo() {\n  console.log(this);\n  z(x => console.log(x, this));\n}\n      ", settings: nil, findings: 2},
-		{source: "\n/** @this Obj */ foo(function () {\n  console.log(this);\n  z(x => console.log(x, this));\n});\n      ", settings: nil, findings: 2},
-		{source: "\nvar Ctor = function () {\n  console.log(this);\n  z(x => console.log(x, this));\n};\n      ", settings: noInvalidThisSettings{CapIsConstructor: false}, findings: 2},
-		{source: "\nvar func = function () {\n  console.log(this);\n  z(x => console.log(x, this));\n};\n      ", settings: nil, findings: 2},
-		{source: "\nvar func = function () {\n  console.log(this);\n  z(x => console.log(x, this));\n};\n      ", settings: noInvalidThisSettings{CapIsConstructor: false}, findings: 2},
-		{source: "\nCtor = function () {\n  console.log(this);\n  z(x => console.log(x, this));\n};\n      ", settings: noInvalidThisSettings{CapIsConstructor: false}, findings: 2},
-		{source: "\nfunc = function () {\n  console.log(this);\n  z(x => console.log(x, this));\n};\n      ", settings: nil, findings: 2},
-		{source: "\nfunc = function () {\n  console.log(this);\n  z(x => console.log(x, this));\n};\n      ", settings: noInvalidThisSettings{CapIsConstructor: false}, findings: 2},
-		{source: "\nfunction foo(\n  func = function () {\n    console.log(this);\n    z(x => console.log(x, this));\n  },\n) {}\n      ", settings: nil, findings: 2},
-		{source: "\n[\n  func = function () {\n    console.log(this);\n    z(x => console.log(x, this));\n  },\n] = a;\n      ", settings: nil, findings: 2},
+		{
+			source:   "\n(function () {\n  console.log(this);\n  z(x => console.log(x, this));\n})();\n      ",
+			settings: nil,
+			findings: 2,
+		},
+		{
+			source:   "\nfunction foo() {\n  console.log(this);\n  z(x => console.log(x, this));\n}\n      ",
+			settings: nil,
+			findings: 2,
+		},
+		{
+			source:   "\nfunction foo() {\n  console.log(this);\n  z(x => console.log(x, this));\n}\n      ",
+			settings: noInvalidThisSettings{CapIsConstructor: false},
+			findings: 2,
+		},
+		{
+			source:   "\nfunction Foo() {\n  console.log(this);\n  z(x => console.log(x, this));\n}\n      ",
+			settings: noInvalidThisSettings{CapIsConstructor: false},
+			findings: 2,
+		},
+		{
+			source:   "\nfunction foo() {\n  'use strict';\n  console.log(this);\n  z(x => console.log(x, this));\n}\n      ",
+			settings: nil,
+			findings: 2,
+		},
+		{
+			source:   "\nfunction Foo() {\n  'use strict';\n  console.log(this);\n  z(x => console.log(x, this));\n}\n      ",
+			settings: noInvalidThisSettings{CapIsConstructor: false},
+			findings: 2,
+		},
+		{
+			source:   "\nreturn function () {\n  console.log(this);\n  z(x => console.log(x, this));\n};\n      ",
+			settings: nil,
+			findings: 2,
+		},
+		{
+			source:   "\nvar foo = function () {\n  console.log(this);\n  z(x => console.log(x, this));\n}.bar(obj);\n      ",
+			settings: nil,
+			findings: 2,
+		},
+		{
+			source:   "\nvar obj = {\n  foo: function () {\n    function foo() {\n      console.log(this);\n      z(x => console.log(x, this));\n    }\n    foo();\n  },\n};\n      ",
+			settings: nil,
+			findings: 2,
+		},
+		{
+			source:   "\nvar obj = {\n  foo() {\n    function foo() {\n      console.log(this);\n      z(x => console.log(x, this));\n    }\n    foo();\n  },\n};\n      ",
+			settings: nil,
+			findings: 2,
+		},
+		{
+			source:   "\nvar obj = {\n  foo: function () {\n    return function () {\n      console.log(this);\n      z(x => console.log(x, this));\n    };\n  },\n};\n      ",
+			settings: nil,
+			findings: 2,
+		},
+		{
+			source:   "\nvar obj = {\n  foo: function () {\n    'use strict';\n    return function () {\n      console.log(this);\n      z(x => console.log(x, this));\n    };\n  },\n};\n      ",
+			settings: nil,
+			findings: 2,
+		},
+		{
+			source:   "\nobj.foo = function () {\n  return function () {\n    console.log(this);\n    z(x => console.log(x, this));\n  };\n};\n      ",
+			settings: nil,
+			findings: 2,
+		},
+		{
+			source:   "\nobj.foo = function () {\n  'use strict';\n  return function () {\n    console.log(this);\n    z(x => console.log(x, this));\n  };\n};\n      ",
+			settings: nil,
+			findings: 2,
+		},
+		{
+			source:   "\nclass A {\n  foo() {\n    return function () {\n      console.log(this);\n      z(x => console.log(x, this));\n    };\n  }\n}\n      ",
+			settings: nil,
+			findings: 2,
+		},
+		{
+			source:   "\nclass A {\n  b = new Array(1, 2, function () {\n    console.log(this);\n    z(x => console.log(x, this));\n  });\n}\n      ",
+			settings: nil,
+			findings: 2,
+		},
+		{
+			source:   "\nclass A {\n  b = () => {\n    function c() {\n      console.log(this);\n      z(x => console.log(x, this));\n    }\n  };\n}\n      ",
+			settings: nil,
+			findings: 2,
+		},
+		{
+			source:   "\nobj.foo = (function () {\n  return () => {\n    console.log(this);\n    z(x => console.log(x, this));\n  };\n})();\n      ",
+			settings: nil,
+			findings: 2,
+		},
+		{
+			source:   "\nobj.foo = (() => () => {\n  console.log(this);\n  z(x => console.log(x, this));\n})();\n      ",
+			settings: nil,
+			findings: 2,
+		},
+		{
+			source:   "\nvar foo = function () {\n  console.log(this);\n  z(x => console.log(x, this));\n}.bind(null);\n      ",
+			settings: nil,
+			findings: 2,
+		},
+		{
+			source:   "\n(function () {\n  console.log(this);\n  z(x => console.log(x, this));\n}).call(undefined);\n      ",
+			settings: nil,
+			findings: 2,
+		},
+		{
+			source:   "\n(function () {\n  console.log(this);\n  z(x => console.log(x, this));\n}).apply(void 0);\n      ",
+			settings: nil,
+			findings: 2,
+		},
+		{
+			source:   "\nArray.from([], function () {\n  console.log(this);\n  z(x => console.log(x, this));\n});\n      ",
+			settings: nil,
+			findings: 2,
+		},
+		{
+			source:   "\nfoo.every(function () {\n  console.log(this);\n  z(x => console.log(x, this));\n});\n      ",
+			settings: nil,
+			findings: 2,
+		},
+		{
+			source:   "\nfoo.filter(function () {\n  console.log(this);\n  z(x => console.log(x, this));\n});\n      ",
+			settings: nil,
+			findings: 2,
+		},
+		{
+			source:   "\nfoo.find(function () {\n  console.log(this);\n  z(x => console.log(x, this));\n});\n      ",
+			settings: nil,
+			findings: 2,
+		},
+		{
+			source:   "\nfoo.findIndex(function () {\n  console.log(this);\n  z(x => console.log(x, this));\n});\n      ",
+			settings: nil,
+			findings: 2,
+		},
+		{
+			source:   "\nfoo.forEach(function () {\n  console.log(this);\n  z(x => console.log(x, this));\n});\n      ",
+			settings: nil,
+			findings: 2,
+		},
+		{
+			source:   "\nfoo.map(function () {\n  console.log(this);\n  z(x => console.log(x, this));\n});\n      ",
+			settings: nil,
+			findings: 2,
+		},
+		{
+			source:   "\nfoo.some(function () {\n  console.log(this);\n  z(x => console.log(x, this));\n});\n      ",
+			settings: nil,
+			findings: 2,
+		},
+		{
+			source:   "\nfoo.forEach(function () {\n  console.log(this);\n  z(x => console.log(x, this));\n}, null);\n      ",
+			settings: nil,
+			findings: 2,
+		},
+		{
+			source:   "\n/** @returns {void} */ function foo() {\n  console.log(this);\n  z(x => console.log(x, this));\n}\n      ",
+			settings: nil,
+			findings: 2,
+		},
+		{
+			source:   "\n/** @this Obj */ foo(function () {\n  console.log(this);\n  z(x => console.log(x, this));\n});\n      ",
+			settings: nil,
+			findings: 2,
+		},
+		{
+			source:   "\nvar Ctor = function () {\n  console.log(this);\n  z(x => console.log(x, this));\n};\n      ",
+			settings: noInvalidThisSettings{CapIsConstructor: false},
+			findings: 2,
+		},
+		{
+			source:   "\nvar func = function () {\n  console.log(this);\n  z(x => console.log(x, this));\n};\n      ",
+			settings: nil,
+			findings: 2,
+		},
+		{
+			source:   "\nvar func = function () {\n  console.log(this);\n  z(x => console.log(x, this));\n};\n      ",
+			settings: noInvalidThisSettings{CapIsConstructor: false},
+			findings: 2,
+		},
+		{
+			source:   "\nCtor = function () {\n  console.log(this);\n  z(x => console.log(x, this));\n};\n      ",
+			settings: noInvalidThisSettings{CapIsConstructor: false},
+			findings: 2,
+		},
+		{
+			source:   "\nfunc = function () {\n  console.log(this);\n  z(x => console.log(x, this));\n};\n      ",
+			settings: nil,
+			findings: 2,
+		},
+		{
+			source:   "\nfunc = function () {\n  console.log(this);\n  z(x => console.log(x, this));\n};\n      ",
+			settings: noInvalidThisSettings{CapIsConstructor: false},
+			findings: 2,
+		},
+		{
+			source:   "\nfunction foo(\n  func = function () {\n    console.log(this);\n    z(x => console.log(x, this));\n  },\n) {}\n      ",
+			settings: nil,
+			findings: 2,
+		},
+		{
+			source:   "\n[\n  func = function () {\n    console.log(this);\n    z(x => console.log(x, this));\n  },\n] = a;\n      ",
+			settings: nil,
+			findings: 2,
+		},
 	}
 
 	for index, testCase := range cases {
@@ -96,52 +264,172 @@ func TestNoInvalidThisStaysSilent(test *testing.T) {
 		source   string
 		settings any
 	}{
-		{source: "\ndescribe('foo', () => {\n  it('does something', function (this: Mocha.Context) {\n    this.timeout(100);\n    // done\n  });\n});\n    ", settings: nil},
-		{source: "\ninterface SomeType {\n  prop: string;\n}\nfunction foo(this: SomeType) {\n  this.prop;\n}\n    ", settings: nil},
+		{
+			source:   "\ndescribe('foo', () => {\n  it('does something', function (this: Mocha.Context) {\n    this.timeout(100);\n    // done\n  });\n});\n    ",
+			settings: nil,
+		},
+		{
+			source:   "\ninterface SomeType {\n  prop: string;\n}\nfunction foo(this: SomeType) {\n  this.prop;\n}\n    ",
+			settings: nil,
+		},
 		{source: "\nfunction foo(this: prop) {\n  this.propMethod();\n}\n    ", settings: nil},
 		{source: "\nz(function (x, this: context) {\n  console.log(x, this);\n});\n    ", settings: nil},
-		{source: "\nfunction foo() {\n  /** @this Obj*/ return function bar() {\n    console.log(this);\n    z(x => console.log(x, this));\n  };\n}\n    ", settings: nil},
-		{source: "\nvar Ctor = function () {\n  console.log(this);\n  z(x => console.log(x, this));\n};\n    ", settings: nil},
+		{
+			source:   "\nfunction foo() {\n  /** @this Obj*/ return function bar() {\n    console.log(this);\n    z(x => console.log(x, this));\n  };\n}\n    ",
+			settings: nil,
+		},
+		{
+			source:   "\nvar Ctor = function () {\n  console.log(this);\n  z(x => console.log(x, this));\n};\n    ",
+			settings: nil,
+		},
 		{source: "\nfunction Foo() {\n  console.log(this);\n  z(x => console.log(x, this));\n}\n      ", settings: nil},
-		{source: "\nfunction Foo() {\n  console.log(this);\n  z(x => console.log(x, this));\n}\n      ", settings: DefaultNoInvalidThisSettings()},
-		{source: "\nfunction Foo() {\n  console.log(this);\n  z(x => console.log(x, this));\n}\n      ", settings: noInvalidThisSettings{CapIsConstructor: true}},
-		{source: "\nvar Foo = function Foo() {\n  console.log(this);\n  z(x => console.log(x, this));\n};\n      ", settings: nil},
-		{source: "\nclass A {\n  constructor() {\n    console.log(this);\n    z(x => console.log(x, this));\n  }\n}\n      ", settings: nil},
-		{source: "\nvar obj = {\n  foo: function () {\n    console.log(this);\n    z(x => console.log(x, this));\n  },\n};\n      ", settings: nil},
-		{source: "\nvar obj = {\n  foo() {\n    console.log(this);\n    z(x => console.log(x, this));\n  },\n};\n      ", settings: nil},
-		{source: "\nvar obj = {\n  foo:\n    foo ||\n    function () {\n      console.log(this);\n      z(x => console.log(x, this));\n    },\n};\n      ", settings: nil},
-		{source: "\nvar obj = {\n  foo: hasNative\n    ? foo\n    : function () {\n        console.log(this);\n        z(x => console.log(x, this));\n      },\n};\n      ", settings: nil},
-		{source: "\nvar obj = {\n  foo: (function () {\n    return function () {\n      console.log(this);\n      z(x => console.log(x, this));\n    };\n  })(),\n};\n      ", settings: nil},
-		{source: "\nObject.defineProperty(obj, 'foo', {\n  value: function () {\n    console.log(this);\n    z(x => console.log(x, this));\n  },\n});\n      ", settings: nil},
-		{source: "\nObject.defineProperties(obj, {\n  foo: {\n    value: function () {\n      console.log(this);\n      z(x => console.log(x, this));\n    },\n  },\n});\n      ", settings: nil},
-		{source: "\nobj.foo = function () {\n  console.log(this);\n  z(x => console.log(x, this));\n};\n      ", settings: nil},
-		{source: "\nobj.foo =\n  foo ||\n  function () {\n    console.log(this);\n    z(x => console.log(x, this));\n  };\n      ", settings: nil},
-		{source: "\nobj.foo = foo\n  ? bar\n  : function () {\n      console.log(this);\n      z(x => console.log(x, this));\n    };\n      ", settings: nil},
-		{source: "\nobj.foo = (function () {\n  return function () {\n    console.log(this);\n    z(x => console.log(x, this));\n  };\n})();\n      ", settings: nil},
-		{source: "\nobj.foo = (() =>\n  function () {\n    console.log(this);\n    z(x => console.log(x, this));\n  })();\n      ", settings: nil},
-		{source: "\n(function () {\n  console.log(this);\n  z(x => console.log(x, this));\n}).call(obj);\n    ", settings: nil},
-		{source: "\nvar foo = function () {\n  console.log(this);\n  z(x => console.log(x, this));\n}.bind(obj);\n    ", settings: nil},
-		{source: "\nReflect.apply(\n  function () {\n    console.log(this);\n    z(x => console.log(x, this));\n  },\n  obj,\n  [],\n);\n    ", settings: nil},
-		{source: "\n(function () {\n  console.log(this);\n  z(x => console.log(x, this));\n}).apply(obj);\n    ", settings: nil},
-		{source: "\nclass A {\n  foo() {\n    console.log(this);\n    z(x => console.log(x, this));\n  }\n}\n    ", settings: nil},
+		{
+			source:   "\nfunction Foo() {\n  console.log(this);\n  z(x => console.log(x, this));\n}\n      ",
+			settings: DefaultNoInvalidThisSettings(),
+		},
+		{
+			source:   "\nfunction Foo() {\n  console.log(this);\n  z(x => console.log(x, this));\n}\n      ",
+			settings: noInvalidThisSettings{CapIsConstructor: true},
+		},
+		{
+			source:   "\nvar Foo = function Foo() {\n  console.log(this);\n  z(x => console.log(x, this));\n};\n      ",
+			settings: nil,
+		},
+		{
+			source:   "\nclass A {\n  constructor() {\n    console.log(this);\n    z(x => console.log(x, this));\n  }\n}\n      ",
+			settings: nil,
+		},
+		{
+			source:   "\nvar obj = {\n  foo: function () {\n    console.log(this);\n    z(x => console.log(x, this));\n  },\n};\n      ",
+			settings: nil,
+		},
+		{
+			source:   "\nvar obj = {\n  foo() {\n    console.log(this);\n    z(x => console.log(x, this));\n  },\n};\n      ",
+			settings: nil,
+		},
+		{
+			source:   "\nvar obj = {\n  foo:\n    foo ||\n    function () {\n      console.log(this);\n      z(x => console.log(x, this));\n    },\n};\n      ",
+			settings: nil,
+		},
+		{
+			source:   "\nvar obj = {\n  foo: hasNative\n    ? foo\n    : function () {\n        console.log(this);\n        z(x => console.log(x, this));\n      },\n};\n      ",
+			settings: nil,
+		},
+		{
+			source:   "\nvar obj = {\n  foo: (function () {\n    return function () {\n      console.log(this);\n      z(x => console.log(x, this));\n    };\n  })(),\n};\n      ",
+			settings: nil,
+		},
+		{
+			source:   "\nObject.defineProperty(obj, 'foo', {\n  value: function () {\n    console.log(this);\n    z(x => console.log(x, this));\n  },\n});\n      ",
+			settings: nil,
+		},
+		{
+			source:   "\nObject.defineProperties(obj, {\n  foo: {\n    value: function () {\n      console.log(this);\n      z(x => console.log(x, this));\n    },\n  },\n});\n      ",
+			settings: nil,
+		},
+		{
+			source:   "\nobj.foo = function () {\n  console.log(this);\n  z(x => console.log(x, this));\n};\n      ",
+			settings: nil,
+		},
+		{
+			source:   "\nobj.foo =\n  foo ||\n  function () {\n    console.log(this);\n    z(x => console.log(x, this));\n  };\n      ",
+			settings: nil,
+		},
+		{
+			source:   "\nobj.foo = foo\n  ? bar\n  : function () {\n      console.log(this);\n      z(x => console.log(x, this));\n    };\n      ",
+			settings: nil,
+		},
+		{
+			source:   "\nobj.foo = (function () {\n  return function () {\n    console.log(this);\n    z(x => console.log(x, this));\n  };\n})();\n      ",
+			settings: nil,
+		},
+		{
+			source:   "\nobj.foo = (() =>\n  function () {\n    console.log(this);\n    z(x => console.log(x, this));\n  })();\n      ",
+			settings: nil,
+		},
+		{
+			source:   "\n(function () {\n  console.log(this);\n  z(x => console.log(x, this));\n}).call(obj);\n    ",
+			settings: nil,
+		},
+		{
+			source:   "\nvar foo = function () {\n  console.log(this);\n  z(x => console.log(x, this));\n}.bind(obj);\n    ",
+			settings: nil,
+		},
+		{
+			source:   "\nReflect.apply(\n  function () {\n    console.log(this);\n    z(x => console.log(x, this));\n  },\n  obj,\n  [],\n);\n    ",
+			settings: nil,
+		},
+		{
+			source:   "\n(function () {\n  console.log(this);\n  z(x => console.log(x, this));\n}).apply(obj);\n    ",
+			settings: nil,
+		},
+		{
+			source:   "\nclass A {\n  foo() {\n    console.log(this);\n    z(x => console.log(x, this));\n  }\n}\n    ",
+			settings: nil,
+		},
 		{source: "\nclass A {\n  b = 0;\n  c = this.b;\n}\n    ", settings: nil},
 		{source: "\nclass A {\n  b = new Array(this, 1, 2, 3);\n}\n    ", settings: nil},
 		{source: "\nclass A {\n  b = () => {\n    console.log(this);\n  };\n}\n    ", settings: nil},
-		{source: "\nArray.from(\n  [],\n  function () {\n    console.log(this);\n    z(x => console.log(x, this));\n  },\n  obj,\n);\n    ", settings: nil},
-		{source: "\nfoo.every(function () {\n  console.log(this);\n  z(x => console.log(x, this));\n}, obj);\n    ", settings: nil},
-		{source: "\nfoo.filter(function () {\n  console.log(this);\n  z(x => console.log(x, this));\n}, obj);\n    ", settings: nil},
-		{source: "\nfoo.find(function () {\n  console.log(this);\n  z(x => console.log(x, this));\n}, obj);\n    ", settings: nil},
-		{source: "\nfoo.findIndex(function () {\n  console.log(this);\n  z(x => console.log(x, this));\n}, obj);\n    ", settings: nil},
-		{source: "\nfoo.forEach(function () {\n  console.log(this);\n  z(x => console.log(x, this));\n}, obj);\n    ", settings: nil},
-		{source: "\nfoo.map(function () {\n  console.log(this);\n  z(x => console.log(x, this));\n}, obj);\n    ", settings: nil},
-		{source: "\nfoo.some(function () {\n  console.log(this);\n  z(x => console.log(x, this));\n}, obj);\n    ", settings: nil},
-		{source: "\n/** @this Obj */ function foo() {\n  console.log(this);\n  z(x => console.log(x, this));\n}\n    ", settings: nil},
-		{source: "\nfoo(\n  /* @this Obj */ function () {\n    console.log(this);\n    z(x => console.log(x, this));\n  },\n);\n    ", settings: nil},
-		{source: "\n/**\n * @returns {void}\n * @this Obj\n */\nfunction foo() {\n  console.log(this);\n  z(x => console.log(x, this));\n}\n    ", settings: nil},
-		{source: "\nCtor = function () {\n  console.log(this);\n  z(x => console.log(x, this));\n};\n    ", settings: nil},
-		{source: "\nfunction foo(\n  Ctor = function () {\n    console.log(this);\n    z(x => console.log(x, this));\n  },\n) {}\n    ", settings: nil},
-		{source: "\n[\n  obj.method = function () {\n    console.log(this);\n    z(x => console.log(x, this));\n  },\n] = a;\n    ", settings: nil},
-		{source: "\nclass A {\n  static foo() {\n    console.log(this);\n    z(x => console.log(x, this));\n  }\n}\n    ", settings: nil},
+		{
+			source:   "\nArray.from(\n  [],\n  function () {\n    console.log(this);\n    z(x => console.log(x, this));\n  },\n  obj,\n);\n    ",
+			settings: nil,
+		},
+		{
+			source:   "\nfoo.every(function () {\n  console.log(this);\n  z(x => console.log(x, this));\n}, obj);\n    ",
+			settings: nil,
+		},
+		{
+			source:   "\nfoo.filter(function () {\n  console.log(this);\n  z(x => console.log(x, this));\n}, obj);\n    ",
+			settings: nil,
+		},
+		{
+			source:   "\nfoo.find(function () {\n  console.log(this);\n  z(x => console.log(x, this));\n}, obj);\n    ",
+			settings: nil,
+		},
+		{
+			source:   "\nfoo.findIndex(function () {\n  console.log(this);\n  z(x => console.log(x, this));\n}, obj);\n    ",
+			settings: nil,
+		},
+		{
+			source:   "\nfoo.forEach(function () {\n  console.log(this);\n  z(x => console.log(x, this));\n}, obj);\n    ",
+			settings: nil,
+		},
+		{
+			source:   "\nfoo.map(function () {\n  console.log(this);\n  z(x => console.log(x, this));\n}, obj);\n    ",
+			settings: nil,
+		},
+		{
+			source:   "\nfoo.some(function () {\n  console.log(this);\n  z(x => console.log(x, this));\n}, obj);\n    ",
+			settings: nil,
+		},
+		{
+			source:   "\n/** @this Obj */ function foo() {\n  console.log(this);\n  z(x => console.log(x, this));\n}\n    ",
+			settings: nil,
+		},
+		{
+			source:   "\nfoo(\n  /* @this Obj */ function () {\n    console.log(this);\n    z(x => console.log(x, this));\n  },\n);\n    ",
+			settings: nil,
+		},
+		{
+			source:   "\n/**\n * @returns {void}\n * @this Obj\n */\nfunction foo() {\n  console.log(this);\n  z(x => console.log(x, this));\n}\n    ",
+			settings: nil,
+		},
+		{
+			source:   "\nCtor = function () {\n  console.log(this);\n  z(x => console.log(x, this));\n};\n    ",
+			settings: nil,
+		},
+		{
+			source:   "\nfunction foo(\n  Ctor = function () {\n    console.log(this);\n    z(x => console.log(x, this));\n  },\n) {}\n    ",
+			settings: nil,
+		},
+		{
+			source:   "\n[\n  obj.method = function () {\n    console.log(this);\n    z(x => console.log(x, this));\n  },\n] = a;\n    ",
+			settings: nil,
+		},
+		{
+			source:   "\nclass A {\n  static foo() {\n    console.log(this);\n    z(x => console.log(x, this));\n  }\n}\n    ",
+			settings: nil,
+		},
 		{source: "\nclass A {\n  a = 5;\n  b = this.a;\n  accessor c = this.a;\n}\n    ", settings: nil},
 	}
 

@@ -98,7 +98,11 @@ func TestEnforceConsistentVariantOrderReports(test *testing.T) {
 	for _, testCase := range testCases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectFindings(test, runVariantOrderFixture(test, "Component.tsx", testCase.source), "variantOrder")
+			rule_testing.ExpectFindings(
+				test,
+				runVariantOrderFixture(test, "Component.tsx", testCase.source),
+				"variantOrder",
+			)
 		})
 	}
 }

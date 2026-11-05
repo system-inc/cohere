@@ -223,7 +223,9 @@ var RequireArraySortCompare = rule.Rule{
 					return
 				}
 
-				if !isArrayOrUnionOfArrays(type_checking.GetConstrainedTypeAtLocation(ruleContext.TypeChecker, receiver)) {
+				if !isArrayOrUnionOfArrays(
+					type_checking.GetConstrainedTypeAtLocation(ruleContext.TypeChecker, receiver),
+				) {
 					return
 				}
 

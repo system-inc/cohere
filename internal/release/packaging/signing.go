@@ -163,7 +163,14 @@ func Notarize(binaryPath string, signing Signing) error {
 	zipPath := filepath.Join(directory, filepath.Base(binaryPath)+".zip")
 	// ditto rather than zip, as Apple's notarization guide uses: it keeps the signature's extended
 	// attributes, which zip can drop.
-	if output, outputError := exec.Command("ditto", "-c", "-k", "--keepParent", binaryPath, zipPath).CombinedOutput(); outputError != nil {
+	if output, outputError := exec.Command(
+		"ditto",
+		"-c",
+		"-k",
+		"--keepParent",
+		binaryPath,
+		zipPath,
+	).CombinedOutput(); outputError != nil {
 		return fmt.Errorf("archiving %s for the notary service: %w\n%s", binaryPath, outputError, output)
 	}
 

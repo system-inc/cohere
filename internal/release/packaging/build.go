@@ -124,7 +124,11 @@ func Build(options Options) (Result, error) {
 		return Result{}, err
 	}
 
-	if requireAncestorError := requireAncestor(options.ModuleDirectory, MinimumReleaseCommit, minimumReleaseReason); requireAncestorError != nil {
+	if requireAncestorError := requireAncestor(
+		options.ModuleDirectory,
+		MinimumReleaseCommit,
+		minimumReleaseReason,
+	); requireAncestorError != nil {
 		return Result{}, requireAncestorError
 	}
 
@@ -157,7 +161,11 @@ func Build(options Options) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	if writeError := os.WriteFile(filepath.Join(options.OutputDirectory, ChecksumsFileName), checksums, 0o644); writeError != nil {
+	if writeError := os.WriteFile(
+		filepath.Join(options.OutputDirectory, ChecksumsFileName),
+		checksums,
+		0o644,
+	); writeError != nil {
 		return Result{}, fmt.Errorf("writing %s: %w", ChecksumsFileName, writeError)
 	}
 
@@ -173,7 +181,9 @@ func Build(options Options) (Result, error) {
 // releaseVersionPattern is a semantic version: three numbers with no leading zeros, and an
 // optional pre-release such as `-rc.1`. Build metadata (`+...`) is refused, because npm ignores it
 // when comparing versions, so two releases differing only there would collide.
-var releaseVersionPattern = regexp.MustCompile(`^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$`)
+var releaseVersionPattern = regexp.MustCompile(
+	`^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$`,
+)
 
 // requireReleaseVersion refuses a version that is not semver, or that is below 0.1.0.
 //
@@ -267,7 +277,13 @@ func buildPlatformPackage(options Options, target Target, pin compilerPin, goToo
 		if err != nil {
 			return StagedPackage{}, err
 		}
-		if buildSwiftEngineError := buildSwiftEngine(options.ModuleDirectory, options.SwiftScratchDirectory, target, enginePath, engineCommit); buildSwiftEngineError != nil {
+		if buildSwiftEngineError := buildSwiftEngine(
+			options.ModuleDirectory,
+			options.SwiftScratchDirectory,
+			target,
+			enginePath,
+			engineCommit,
+		); buildSwiftEngineError != nil {
 			return StagedPackage{}, buildSwiftEngineError
 		}
 		executables = append(executables, enginePath)
@@ -296,7 +312,11 @@ func buildPlatformPackage(options Options, target Target, pin compilerPin, goToo
 
 	// After signing, so the pair checked is the pair that ships.
 	if ShipsSwiftEngine(target.GoOperatingSystem) {
-		if requireSwiftContractError := requireSwiftContract(binaryPath, enginePath, engineCommit); requireSwiftContractError != nil {
+		if requireSwiftContractError := requireSwiftContract(
+			binaryPath,
+			enginePath,
+			engineCommit,
+		); requireSwiftContractError != nil {
 			return StagedPackage{}, requireSwiftContractError
 		}
 	}
@@ -366,7 +386,10 @@ func buildDispatcherPackage(options Options, checksums []byte) (StagedPackage, e
 		return StagedPackage{}, fmt.Errorf("making the dispatcher launcher executable: %w", changeModeError)
 	}
 
-	if stageSettingsSchemasError := stageSettingsSchemas(options.ModuleDirectory, directory); stageSettingsSchemasError != nil {
+	if stageSettingsSchemasError := stageSettingsSchemas(
+		options.ModuleDirectory,
+		directory,
+	); stageSettingsSchemasError != nil {
 		return StagedPackage{}, stageSettingsSchemasError
 	}
 
@@ -401,8 +424,15 @@ func swiftScratchDirectory(options Options) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if relative, relativePathError := filepath.Rel(output, scratch); relativePathError == nil && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
-		return "", fmt.Errorf("the Swift engine's build directory %s is inside the output %s, which is packed and uploaded whole", scratch, output)
+	if relative, relativePathError := filepath.Rel(
+		output,
+		scratch,
+	); relativePathError == nil && relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf(
+			"the Swift engine's build directory %s is inside the output %s, which is packed and uploaded whole",
+			scratch,
+			output,
+		)
 	}
 	return scratch, nil
 }
@@ -423,7 +453,10 @@ var SettingsSchemaFileNames = []string{"CohereSettings.schema.json", "NexusCoher
 // release: a "$schema" path that resolves to nothing validates nothing, and an editor shows no error for
 // that, so it would read as a settings file with no mistakes in it.
 func stageSettingsSchemas(moduleDirectory string, packageDirectory string) error {
-	if createDirectoryError := os.MkdirAll(filepath.Join(packageDirectory, SchemaDirectoryName), 0o755); createDirectoryError != nil {
+	if createDirectoryError := os.MkdirAll(
+		filepath.Join(packageDirectory, SchemaDirectoryName),
+		0o755,
+	); createDirectoryError != nil {
 		return fmt.Errorf("creating the dispatcher's schema directory: %w", createDirectoryError)
 	}
 	for _, name := range SettingsSchemaFileNames {
@@ -434,9 +467,17 @@ func stageSettingsSchemas(moduleDirectory string, packageDirectory string) error
 		}
 		var schema map[string]any
 		if decodeError := json.Unmarshal(contents, &schema); decodeError != nil || len(schema) == 0 {
-			return fmt.Errorf("%s is not a JSON schema (%v), so the dispatcher would ship a $schema target that validates nothing", source, decodeError)
+			return fmt.Errorf(
+				"%s is not a JSON schema (%v), so the dispatcher would ship a $schema target that validates nothing",
+				source,
+				decodeError,
+			)
 		}
-		if writeError := os.WriteFile(filepath.Join(packageDirectory, SchemaDirectoryName, name), contents, 0o644); writeError != nil {
+		if writeError := os.WriteFile(
+			filepath.Join(packageDirectory, SchemaDirectoryName, name),
+			contents,
+			0o644,
+		); writeError != nil {
 			return fmt.Errorf("staging the settings schema %s: %w", name, writeError)
 		}
 	}
@@ -469,8 +510,8 @@ func compile(options Options, target Target, binaryPath string, pin compilerPin,
 // GoBuildCommand is the `go build` that produces cohere for one target.
 //
 // It is the single definition of how a target is compiled, shared by the release and by
-// TestEveryReleaseTargetCompiles (internal/release/crosscompile), so a flag or an environment variable added here for the release
-// is one the test compiles with too. A test with its own copy would keep passing on the copy after
+// TestEveryReleaseTargetCompiles (internal/release/crosscompile), so a flag or an environment variable added here for
+// the release is one the test compiles with too. A test with its own copy would keep passing on the copy after
 // the release had changed.
 func GoBuildCommand(moduleDirectory string, target Target, linkerFlags string, binaryPath string) *exec.Cmd {
 	arguments := append([]string{"build"}, BuildFlags...)
@@ -513,7 +554,11 @@ func cohereBinary(path string, target Target) (int64, error) {
 	// installs perfectly and does nothing.
 	const implausiblySmall = 1 << 20
 	if information.Size() < implausiblySmall {
-		return 0, fmt.Errorf("the binary at %s is %d bytes, which is far too small to be a real build", path, information.Size())
+		return 0, fmt.Errorf(
+			"the binary at %s is %d bytes, which is far too small to be a real build",
+			path,
+			information.Size(),
+		)
 	}
 
 	if requireExecutableFormatError := requireExecutableFormat(path, target); requireExecutableFormatError != nil {
@@ -634,14 +679,22 @@ func PinnedCompilerCommit(moduleDirectory string, commit string) (string, error)
 	command.Stderr = &standardError
 	output, outputError := command.Output()
 	if outputError != nil {
-		return "", fmt.Errorf("reading the compiler pin from %s: %w: %s", ShortCommit(commit), outputError, strings.TrimSpace(standardError.String()))
+		return "", fmt.Errorf(
+			"reading the compiler pin from %s: %w: %s",
+			ShortCommit(commit),
+			outputError,
+			strings.TrimSpace(standardError.String()),
+		)
 	}
 	// "160000 commit <sha>\tTypeScript" for a submodule. Anything else means the commit does not pin
 	// a compiler at all, and building would pick one up from somewhere unnamed.
 	fields := strings.Fields(string(output))
 	if len(fields) < 3 || fields[0] != "160000" || fields[1] != "commit" {
-		return "", fmt.Errorf("commit %s does not pin the vendored compiler as a submodule at TypeScript (ls-tree printed %q)",
-			ShortCommit(commit), strings.TrimSpace(string(output)))
+		return "", fmt.Errorf(
+			"commit %s does not pin the vendored compiler as a submodule at TypeScript (ls-tree printed %q)",
+			ShortCommit(commit),
+			strings.TrimSpace(string(output)),
+		)
 	}
 	return fields[2], nil
 }
@@ -654,7 +707,10 @@ func PinnedCompilerCommit(moduleDirectory string, commit string) (string, error)
 func checkedOutCompilerCommit(moduleDirectory string) (string, error) {
 	submoduleDirectory := filepath.Join(moduleDirectory, "TypeScript")
 
-	notCheckedOut := fmt.Errorf("the compiler at %s is not checked out. Run `git submodule update --init TypeScript`", submoduleDirectory)
+	notCheckedOut := fmt.Errorf(
+		"the compiler at %s is not checked out. Run `git submodule update --init TypeScript`",
+		submoduleDirectory,
+	)
 	output, err := exec.Command("git", "-C", submoduleDirectory, "rev-parse", "--show-toplevel").Output()
 	if err != nil {
 		return "", notCheckedOut

@@ -35,29 +35,86 @@ func TestNoThisInSfcStaysSilent(test *testing.T) {
 		name       string
 		sourceText string
 	}{
-		{"props destructured from the parameter", "\n                    function Foo(props) {\n                      const { foo } = props;\n                      return <div bar={foo} />;\n                    }\n                  "},
-		{"a destructured parameter", "\n                    function Foo({ foo }) {\n                      return <div bar={foo} />;\n                    }\n                  "},
-		{"a class component method", "\n                    class Foo extends React.Component {\n                      render() {\n                        const { foo } = this.props;\n                        return <div bar={foo} />;\n                      }\n                    }\n                  "},
-		{"an es5 component with an anonymous render", "\n                    const Foo = createReactClass({\n                      render: function() {\n                        return <div>{this.props.foo}</div>;\n                      }\n                    });\n                  "},
-		{"a React.createClass with an anonymous render", "\n                    const Foo = React.createClass({\n                      render: function() {\n                        return <div>{this.props.foo}</div>;\n                      }\n                    });\n                  "},
-		{"a lowercase function assigning to this", "\n                    function foo(bar) {\n                      this.bar = bar;\n                      this.props = 'baz';\n                      this.getFoo = function() {\n                        return this.bar + this.props;\n                      }\n                    }\n                  "},
-		{"a conditional returning jsx", "\n                    function Foo(props) {\n                      return props.foo ? <span>{props.bar}</span> : null;\n                    }\n                  "},
-		{"an early return of jsx", "\n                    function Foo(props) {\n                      if (props.foo) {\n                        return <div>{props.bar}</div>;\n                      }\n                      return null;\n                    }\n                  "},
-		{"a conditional with no jsx", "\n                    function Foo(props) {\n                      if (props.foo) {\n                        something();\n                      }\n                      return null;\n                    }\n                  "},
+		{
+			"props destructured from the parameter",
+			"\n                    function Foo(props) {\n                      const { foo } = props;\n                      return <div bar={foo} />;\n                    }\n                  ",
+		},
+		{
+			"a destructured parameter",
+			"\n                    function Foo({ foo }) {\n                      return <div bar={foo} />;\n                    }\n                  ",
+		},
+		{
+			"a class component method",
+			"\n                    class Foo extends React.Component {\n                      render() {\n                        const { foo } = this.props;\n                        return <div bar={foo} />;\n                      }\n                    }\n                  ",
+		},
+		{
+			"an es5 component with an anonymous render",
+			"\n                    const Foo = createReactClass({\n                      render: function() {\n                        return <div>{this.props.foo}</div>;\n                      }\n                    });\n                  ",
+		},
+		{
+			"a React.createClass with an anonymous render",
+			"\n                    const Foo = React.createClass({\n                      render: function() {\n                        return <div>{this.props.foo}</div>;\n                      }\n                    });\n                  ",
+		},
+		{
+			"a lowercase function assigning to this",
+			"\n                    function foo(bar) {\n                      this.bar = bar;\n                      this.props = 'baz';\n                      this.getFoo = function() {\n                        return this.bar + this.props;\n                      }\n                    }\n                  ",
+		},
+		{
+			"a conditional returning jsx",
+			"\n                    function Foo(props) {\n                      return props.foo ? <span>{props.bar}</span> : null;\n                    }\n                  ",
+		},
+		{
+			"an early return of jsx",
+			"\n                    function Foo(props) {\n                      if (props.foo) {\n                        return <div>{props.bar}</div>;\n                      }\n                      return null;\n                    }\n                  ",
+		},
+		{
+			"a conditional with no jsx",
+			"\n                    function Foo(props) {\n                      if (props.foo) {\n                        something();\n                      }\n                      return null;\n                    }\n                  ",
+		},
 		{"an arrow returning jsx", "const Foo = (props) => <span>{props.foo}</span>"},
 		{"an arrow with a destructured parameter", "const Foo = ({ foo }) => <span>{foo}</span>"},
 		{"an arrow with a conditional", "const Foo = (props) => props.foo ? <span>{props.bar}</span> : null;"},
 		{"an arrow destructuring and conditional", "const Foo = ({ foo, bar }) => foo ? <span>{bar}</span> : null;"},
-		{"an arrow inside a plain class method", "\n                    class Foo {\n                      bar() {\n                        () => {\n                          this.something();\n                          return null;\n                        };\n                      }\n                    }\n                  "},
-		{"a class property arrow", "\n                    class Foo {\n                      bar = () => {\n                        this.something();\n                        return null;\n                      };\n                    }\n                  "},
-		{"a method inside an object returned by a component", "\n                    export const Example = ({ prop }) => {\n                      return {\n                        handleClick: () => {},\n                        renderNode() {\n                          return <div onClick={this.handleClick} />;\n                        },\n                      };\n                    };\n                  "},
-		{"a Meteor validated method", "\n                    export const prepareLogin = new ValidatedMethod({\n                      name: \"user.prepare\",\n                      validate: new SimpleSchema({\n                      }).validator(),\n                      run({ remember }) {\n                          if (Meteor.isServer) {\n                              const connectionId = this.connection.id; // react/no-this-in-sfc\n                              return Methods.prepareLogin(connectionId, remember);\n                          }\n                          return null;\n                      },\n                    });\n                  "},
-		{"a function assigned to an object property", "\n                    obj.notAComponent = function () {\n                      return this.a || null;\n                    };\n                  "},
-		{"a jQuery plugin function", "\n                    $.fn.getValueAsStringWeak = function (): string | null {\n                      const val = this.length === 1 ? this.val() : null;\n\n                      return typeof val === 'string' ? val : null;\n                    };\n                  "},
-		{"this passed to bind inside a component", "\n                    const Foo = ({query}) => {\n                      return <div onClick={reopen.bind(this, query)}>click</div>\n                    }\n                  "},
-		{"a nested function declaration", "\n                    function Foo() {\n                      function callback() {\n                        this.itemRef = null;\n                      }\n                      return <div ref={callback} />;\n                    }\n                  "},
-		{"a static block inside a component", "\n                    function Foo() {\n                      class C {\n                        static {\n                          const callback = () => this.value;\n                        }\n                      }\n                      return <div />;\n                    }\n                  "},
-		{"an accessor initializer inside a component", "\n                    function Foo() {\n                      class C {\n                        accessor handler = () => this.value;\n                      }\n                      return <div />;\n                    }\n                  "},
+		{
+			"an arrow inside a plain class method",
+			"\n                    class Foo {\n                      bar() {\n                        () => {\n                          this.something();\n                          return null;\n                        };\n                      }\n                    }\n                  ",
+		},
+		{
+			"a class property arrow",
+			"\n                    class Foo {\n                      bar = () => {\n                        this.something();\n                        return null;\n                      };\n                    }\n                  ",
+		},
+		{
+			"a method inside an object returned by a component",
+			"\n                    export const Example = ({ prop }) => {\n                      return {\n                        handleClick: () => {},\n                        renderNode() {\n                          return <div onClick={this.handleClick} />;\n                        },\n                      };\n                    };\n                  ",
+		},
+		{
+			"a Meteor validated method",
+			"\n                    export const prepareLogin = new ValidatedMethod({\n                      name: \"user.prepare\",\n                      validate: new SimpleSchema({\n                      }).validator(),\n                      run({ remember }) {\n                          if (Meteor.isServer) {\n                              const connectionId = this.connection.id; // react/no-this-in-sfc\n                              return Methods.prepareLogin(connectionId, remember);\n                          }\n                          return null;\n                      },\n                    });\n                  ",
+		},
+		{
+			"a function assigned to an object property",
+			"\n                    obj.notAComponent = function () {\n                      return this.a || null;\n                    };\n                  ",
+		},
+		{
+			"a jQuery plugin function",
+			"\n                    $.fn.getValueAsStringWeak = function (): string | null {\n                      const val = this.length === 1 ? this.val() : null;\n\n                      return typeof val === 'string' ? val : null;\n                    };\n                  ",
+		},
+		{
+			"this passed to bind inside a component",
+			"\n                    const Foo = ({query}) => {\n                      return <div onClick={reopen.bind(this, query)}>click</div>\n                    }\n                  ",
+		},
+		{
+			"a nested function declaration",
+			"\n                    function Foo() {\n                      function callback() {\n                        this.itemRef = null;\n                      }\n                      return <div ref={callback} />;\n                    }\n                  ",
+		},
+		{
+			"a static block inside a component",
+			"\n                    function Foo() {\n                      class C {\n                        static {\n                          const callback = () => this.value;\n                        }\n                      }\n                      return <div />;\n                    }\n                  ",
+		},
+		{
+			"an accessor initializer inside a component",
+			"\n                    function Foo() {\n                      class C {\n                        accessor handler = () => this.value;\n                      }\n                      return <div />;\n                    }\n                  ",
+		},
 	}
 
 	for _, testCase := range cases {
@@ -76,19 +133,55 @@ func TestNoThisInSfcFires(test *testing.T) {
 		name       string
 		sourceText string
 	}{
-		{"props destructured from this", "\n                    function Foo(props) {\n                      const { foo } = this.props;\n                      return <div>{foo}</div>;\n                    }\n                  "},
-		{"a member read inside jsx", "\n                    function Foo(props) {\n                      return <div>{this.props.foo}</div>;\n                    }\n                  "},
-		{"a state read inside jsx", "\n                    function Foo(props) {\n                      return <div>{this.state.foo}</div>;\n                    }\n                  "},
-		{"state destructured from this", "\n                    function Foo(props) {\n                      const { foo } = this.state;\n                      return <div>{foo}</div>;\n                    }\n                  "},
-		{"a member read in a conditional", "\n                    function Foo(props) {\n                      return props.foo ? <div>{this.props.bar}</div> : null;\n                    }\n                  "},
-		{"a member read after an early return", "\n                    function Foo(props) {\n                      if (props.foo) {\n                        return <div>{this.props.bar}</div>;\n                      }\n                      return null;\n                    }\n                  "},
-		{"a member read in the condition itself", "\n                    function Foo(props) {\n                      if (this.props.foo) {\n                        something();\n                      }\n                      return null;\n                    }\n                  "},
+		{
+			"props destructured from this",
+			"\n                    function Foo(props) {\n                      const { foo } = this.props;\n                      return <div>{foo}</div>;\n                    }\n                  ",
+		},
+		{
+			"a member read inside jsx",
+			"\n                    function Foo(props) {\n                      return <div>{this.props.foo}</div>;\n                    }\n                  ",
+		},
+		{
+			"a state read inside jsx",
+			"\n                    function Foo(props) {\n                      return <div>{this.state.foo}</div>;\n                    }\n                  ",
+		},
+		{
+			"state destructured from this",
+			"\n                    function Foo(props) {\n                      const { foo } = this.state;\n                      return <div>{foo}</div>;\n                    }\n                  ",
+		},
+		{
+			"a member read in a conditional",
+			"\n                    function Foo(props) {\n                      return props.foo ? <div>{this.props.bar}</div> : null;\n                    }\n                  ",
+		},
+		{
+			"a member read after an early return",
+			"\n                    function Foo(props) {\n                      if (props.foo) {\n                        return <div>{this.props.bar}</div>;\n                      }\n                      return null;\n                    }\n                  ",
+		},
+		{
+			"a member read in the condition itself",
+			"\n                    function Foo(props) {\n                      if (this.props.foo) {\n                        something();\n                      }\n                      return null;\n                    }\n                  ",
+		},
 		{"an arrow reading this in jsx", "const Foo = (props) => <span>{this.props.foo}</span>"},
-		{"an arrow reading this in a conditional", "const Foo = (props) => this.props.foo ? <span>{props.bar}</span> : null;"},
-		{"a computed member read", "\n                    function Foo(props) {\n                      return <div>{this[\"props\"].foo}</div>;\n                    }\n                  "},
-		{"a nested function declaration and a direct read", "\n                    function Foo(props) {\n                      function onClick(bar) {\n                        this.props.onClick();\n                      }\n                      return <div onClick={onClick}>{this.props.foo}</div>;\n                    }\n                  "},
-		{"an arrow in an object literal", "\n                    function Foo() {\n                      const handlers = {\n                        click: () => this.props.click(),\n                      };\n                      return <button onClick={handlers.click} />;\n                    }\n                  "},
-		{"an accessor computed key", "\n                    function Foo() {\n                      class C {\n                        accessor [this.props.name] = 0;\n                      }\n                      return <div />;\n                    }\n                  "},
+		{
+			"an arrow reading this in a conditional",
+			"const Foo = (props) => this.props.foo ? <span>{props.bar}</span> : null;",
+		},
+		{
+			"a computed member read",
+			"\n                    function Foo(props) {\n                      return <div>{this[\"props\"].foo}</div>;\n                    }\n                  ",
+		},
+		{
+			"a nested function declaration and a direct read",
+			"\n                    function Foo(props) {\n                      function onClick(bar) {\n                        this.props.onClick();\n                      }\n                      return <div onClick={onClick}>{this.props.foo}</div>;\n                    }\n                  ",
+		},
+		{
+			"an arrow in an object literal",
+			"\n                    function Foo() {\n                      const handlers = {\n                        click: () => this.props.click(),\n                      };\n                      return <button onClick={handlers.click} />;\n                    }\n                  ",
+		},
+		{
+			"an accessor computed key",
+			"\n                    function Foo() {\n                      class C {\n                        accessor [this.props.name] = 0;\n                      }\n                      return <div />;\n                    }\n                  ",
+		},
 	}
 
 	for _, testCase := range cases {
@@ -140,7 +233,10 @@ func TestNoThisInSfcPointsAtTheKeywordAlone(test *testing.T) {
 		{"a dotted read", "function Foo(props) {\n  return <div>{this.props.foo}</div>;\n}\n"},
 		{"a computed read", "function Foo(props) {\n  return <div>{this[\"props\"].foo}</div>;\n}\n"},
 		{"an arrow component", "const Foo = (props) => <span>{this.props.foo}</span>;\n"},
-		{"a read in a condition", "function Foo(props) {\n  if (this.props.foo) {\n    something();\n  }\n  return null;\n}\n"},
+		{
+			"a read in a condition",
+			"function Foo(props) {\n  if (this.props.foo) {\n    something();\n  }\n  return null;\n}\n",
+		},
 	}
 
 	for _, testCase := range cases {
@@ -227,10 +323,26 @@ func TestNoThisInSfcParentheses(test *testing.T) {
 		wantFires  bool
 	}{
 		{"the unparenthesized control", "function Foo(props) {\n  return <div>{this.props.foo}</div>;\n}\n", true},
-		{"parentheses around the member expression", "function Foo(props) {\n  return <div>{(this.props).foo}</div>;\n}\n", true},
-		{"parentheses around the keyword", "function Foo(props) {\n  return <div>{(this).props.foo}</div>;\n}\n", false},
-		{"doubled parentheses around the keyword", "function Foo(props) {\n  return <div>{((this)).props.foo}</div>;\n}\n", false},
-		{"a bare keyword with no member access", "function Foo(props) {\n  const x = this;\n  return <div>{x}</div>;\n}\n", false},
+		{
+			"parentheses around the member expression",
+			"function Foo(props) {\n  return <div>{(this.props).foo}</div>;\n}\n",
+			true,
+		},
+		{
+			"parentheses around the keyword",
+			"function Foo(props) {\n  return <div>{(this).props.foo}</div>;\n}\n",
+			false,
+		},
+		{
+			"doubled parentheses around the keyword",
+			"function Foo(props) {\n  return <div>{((this)).props.foo}</div>;\n}\n",
+			false,
+		},
+		{
+			"a bare keyword with no member access",
+			"function Foo(props) {\n  const x = this;\n  return <div>{x}</div>;\n}\n",
+			false,
+		},
 		{"a call rather than a member access", "function Foo(props) {\n  return <div>{this()}</div>;\n}\n", false},
 	}
 
@@ -263,9 +375,21 @@ func TestNoThisInSfcComponentBoundary(test *testing.T) {
 	}{
 		// The name is read off the function's own identifier, never off the variable it is
 		// assigned to. These three rows are the discriminating ones and they disagree.
-		{"a named function expression keeps its own name", "const Foo = function Bar(props) {\n  return this.props.a;\n};\n", true},
-		{"an anonymous function expression has no name to read", "const Foo = function (props) {\n  return this.props.a;\n};\n", false},
-		{"a lowercase function id beats an uppercase variable", "const Foo = function bar(props) {\n  return this.props.a;\n};\n", false},
+		{
+			"a named function expression keeps its own name",
+			"const Foo = function Bar(props) {\n  return this.props.a;\n};\n",
+			true,
+		},
+		{
+			"an anonymous function expression has no name to read",
+			"const Foo = function (props) {\n  return this.props.a;\n};\n",
+			false,
+		},
+		{
+			"a lowercase function id beats an uppercase variable",
+			"const Foo = function bar(props) {\n  return this.props.a;\n};\n",
+			false,
+		},
 
 		// Returning JSX is irrelevant. Upstream's own corpus has a failing case with no JSX in it.
 		{"a component that returns no jsx at all", "function Foo(props) {\n  return this.props.a;\n}\n", true},
@@ -337,16 +461,48 @@ func TestNoThisInSfcNesting(test *testing.T) {
 		sourceText string
 		wantFires  bool
 	}{
-		{"a nested arrow is not a boundary", "function Foo(p) {\n  const cb = () => this.props.a;\n  return <div />;\n}\n", true},
-		{"a nested function declaration is", "function Foo(p) {\n  function cb() {\n    return this.props.a;\n  }\n  return <div />;\n}\n", false},
-		{"a nested anonymous function expression is", "function Foo(p) {\n  const cb = function () {\n    return this.props.a;\n  };\n  return <div />;\n}\n", false},
-		{"a nested capitalized arrow becomes the component itself", "function Foo(p) {\n  const Cb = () => this.props.a;\n  return <div />;\n}\n", true},
-		{"arrows nest arbitrarily deep", "function Foo(p) {\n  const a = () => () => () => this.props.x;\n  return <div />;\n}\n", true},
+		{
+			"a nested arrow is not a boundary",
+			"function Foo(p) {\n  const cb = () => this.props.a;\n  return <div />;\n}\n",
+			true,
+		},
+		{
+			"a nested function declaration is",
+			"function Foo(p) {\n  function cb() {\n    return this.props.a;\n  }\n  return <div />;\n}\n",
+			false,
+		},
+		{
+			"a nested anonymous function expression is",
+			"function Foo(p) {\n  const cb = function () {\n    return this.props.a;\n  };\n  return <div />;\n}\n",
+			false,
+		},
+		{
+			"a nested capitalized arrow becomes the component itself",
+			"function Foo(p) {\n  const Cb = () => this.props.a;\n  return <div />;\n}\n",
+			true,
+		},
+		{
+			"arrows nest arbitrarily deep",
+			"function Foo(p) {\n  const a = () => () => () => this.props.x;\n  return <div />;\n}\n",
+			true,
+		},
 		{"an object method is a function", "function Foo(p) {\n  return { m() { return this.props.a; } };\n}\n", false},
 		{"an object getter is too", "function Foo(p) {\n  return { get m() { return this.props.a; } };\n}\n", false},
-		{"a class method inside a component", "function Foo(p) {\n  class C { m() { return this.props.a; } }\n  return <div />;\n}\n", false},
-		{"a plain class property initializer", "function Foo(p) {\n  class C { h = () => this.props.a; }\n  return <div />;\n}\n", false},
-		{"a plain class computed key", "function Foo(p) {\n  class C { [this.props.n] = 0; }\n  return <div />;\n}\n", false},
+		{
+			"a class method inside a component",
+			"function Foo(p) {\n  class C { m() { return this.props.a; } }\n  return <div />;\n}\n",
+			false,
+		},
+		{
+			"a plain class property initializer",
+			"function Foo(p) {\n  class C { h = () => this.props.a; }\n  return <div />;\n}\n",
+			false,
+		},
+		{
+			"a plain class computed key",
+			"function Foo(p) {\n  class C { [this.props.n] = 0; }\n  return <div />;\n}\n",
+			false,
+		},
 	}
 
 	for _, testCase := range cases {
@@ -377,15 +533,43 @@ func TestNoThisInSfcClassComponentAncestor(test *testing.T) {
 		sourceText string
 		wantFires  bool
 	}{
-		{"React.Component exempts", "class A extends React.Component {\n  m() { const Foo = (p) => this.props.a; }\n}\n", false},
-		{"React.PureComponent exempts", "class A extends React.PureComponent {\n  m() { const Foo = (p) => this.props.a; }\n}\n", false},
-		{"a bare Component exempts", "class A extends Component {\n  m() { const Foo = (p) => this.props.a; }\n}\n", false},
-		{"a bare PureComponent exempts", "class A extends PureComponent {\n  m() { const Foo = (p) => this.props.a; }\n}\n", false},
-		{"a class expression exempts", "const A = class extends React.Component {\n  m() { const Foo = (p) => this.props.a; }\n};\n", false},
-		{"another namespace does not", "class A extends Foo.Component {\n  m() { const Bar = (p) => this.props.a; }\n}\n", true},
+		{
+			"React.Component exempts",
+			"class A extends React.Component {\n  m() { const Foo = (p) => this.props.a; }\n}\n",
+			false,
+		},
+		{
+			"React.PureComponent exempts",
+			"class A extends React.PureComponent {\n  m() { const Foo = (p) => this.props.a; }\n}\n",
+			false,
+		},
+		{
+			"a bare Component exempts",
+			"class A extends Component {\n  m() { const Foo = (p) => this.props.a; }\n}\n",
+			false,
+		},
+		{
+			"a bare PureComponent exempts",
+			"class A extends PureComponent {\n  m() { const Foo = (p) => this.props.a; }\n}\n",
+			false,
+		},
+		{
+			"a class expression exempts",
+			"const A = class extends React.Component {\n  m() { const Foo = (p) => this.props.a; }\n};\n",
+			false,
+		},
+		{
+			"another namespace does not",
+			"class A extends Foo.Component {\n  m() { const Bar = (p) => this.props.a; }\n}\n",
+			true,
+		},
 		{"an unrelated base does not", "class A extends Base {\n  m() { const Foo = (p) => this.props.a; }\n}\n", true},
 		{"no heritage clause does not", "class A {\n  m() { const Foo = (p) => this.props.a; }\n}\n", true},
-		{"a plain class nested inside a component still exempts", "class Outer extends React.Component {\n  m() { class Inner { n() { const Foo = (p) => this.props.a; } } }\n}\n", false},
+		{
+			"a plain class nested inside a component still exempts",
+			"class Outer extends React.Component {\n  m() { class Inner { n() { const Foo = (p) => this.props.a; } } }\n}\n",
+			false,
+		},
 	}
 
 	for _, testCase := range cases {
@@ -420,10 +604,26 @@ func TestNoThisInSfcEs5FactoryNameIsStrict(test *testing.T) {
 		sourceText string
 		wantFires  bool
 	}{
-		{"createReactClass exempts", "const X = createReactClass({\n  m() { const Foo = (p) => this.props.a; },\n});\n", false},
-		{"React.createReactClass exempts", "const X = React.createReactClass({\n  m() { const Foo = (p) => this.props.a; },\n});\n", false},
-		{"a bare createClass does not", "const X = createClass({\n  m() { const Foo = (p) => this.props.a; },\n});\n", true},
-		{"React.createClass does not", "const X = React.createClass({\n  m() { const Foo = (p) => this.props.a; },\n});\n", true},
+		{
+			"createReactClass exempts",
+			"const X = createReactClass({\n  m() { const Foo = (p) => this.props.a; },\n});\n",
+			false,
+		},
+		{
+			"React.createReactClass exempts",
+			"const X = React.createReactClass({\n  m() { const Foo = (p) => this.props.a; },\n});\n",
+			false,
+		},
+		{
+			"a bare createClass does not",
+			"const X = createClass({\n  m() { const Foo = (p) => this.props.a; },\n});\n",
+			true,
+		},
+		{
+			"React.createClass does not",
+			"const X = React.createClass({\n  m() { const Foo = (p) => this.props.a; },\n});\n",
+			true,
+		},
 	}
 
 	for _, testCase := range cases {
@@ -454,11 +654,31 @@ func TestNoThisInSfcAccessorSplit(test *testing.T) {
 		sourceText string
 		wantFires  bool
 	}{
-		{"an accessor value exempts", "function Foo() {\n  class C { accessor h = () => this.value; }\n  return <div />;\n}\n", false},
-		{"an accessor computed key does not", "function Foo() {\n  class C { accessor [this.props.n] = 0; }\n  return <div />;\n}\n", true},
-		{"a plain property value exempts", "function Foo() {\n  class C { h = () => this.value; }\n  return <div />;\n}\n", false},
-		{"a plain property computed key also exempts", "function Foo() {\n  class C { [this.props.n] = 0; }\n  return <div />;\n}\n", false},
-		{"a static block exempts", "function Foo() {\n  class C { static { const cb = () => this.value; } }\n  return <div />;\n}\n", false},
+		{
+			"an accessor value exempts",
+			"function Foo() {\n  class C { accessor h = () => this.value; }\n  return <div />;\n}\n",
+			false,
+		},
+		{
+			"an accessor computed key does not",
+			"function Foo() {\n  class C { accessor [this.props.n] = 0; }\n  return <div />;\n}\n",
+			true,
+		},
+		{
+			"a plain property value exempts",
+			"function Foo() {\n  class C { h = () => this.value; }\n  return <div />;\n}\n",
+			false,
+		},
+		{
+			"a plain property computed key also exempts",
+			"function Foo() {\n  class C { [this.props.n] = 0; }\n  return <div />;\n}\n",
+			false,
+		},
+		{
+			"a static block exempts",
+			"function Foo() {\n  class C { static { const cb = () => this.value; } }\n  return <div />;\n}\n",
+			false,
+		},
 	}
 
 	for _, testCase := range cases {
@@ -485,7 +705,11 @@ func TestNoThisInSfcReportsUnderAnySuffix(test *testing.T) {
 
 	const sourceText = "function Foo(props) {\n  return this.props.a;\n}\n"
 	rule_testing.ExpectFindings(test, rule_testing.Run(test, NoThisInSfc, thisInSfcFile, sourceText), "noThisInSfc")
-	rule_testing.ExpectFindings(test, rule_testing.Run(test, NoThisInSfc, "/repository/source/Thing.ts", sourceText), "noThisInSfc")
+	rule_testing.ExpectFindings(
+		test,
+		rule_testing.Run(test, NoThisInSfc, "/repository/source/Thing.ts", sourceText),
+		"noThisInSfc",
+	)
 }
 
 // A `this` in the argument of an element access, which the parent-kind check accepts.

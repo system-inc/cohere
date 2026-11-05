@@ -25,7 +25,11 @@ func TestIndexRootsRecordsWhatEachRootsOwnCodeHolds(test *testing.T) {
 		"  static { for (const key in object) {} }\n" +
 		"  method() { if (done) { return; } }\n" +
 		"}\n"
-	source := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: "/test.ts", PathKey: "/test.ts"}, code, core.ScriptKindTS)
+	source := parser.ParseSourceFile(
+		ast.SourceFileParseOptions{FileName: "/test.ts", PathKey: "/test.ts"},
+		code,
+		core.ScriptKindTS,
+	)
 
 	type want struct {
 		kind       ast.Kind

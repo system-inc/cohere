@@ -518,7 +518,11 @@ func preferExponentiationOperatorNeedsTrailingSpace(ruleContext rule.Context, no
 // can continue the previous line under
 // automatic semicolon insertion, turning two statements into one. Upstream only does this when the
 // call starts an expression statement and no space was already added.
-func preferExponentiationOperatorNeedsLeadingSemicolon(ruleContext rule.Context, node *ast.Node, replacement string) bool {
+func preferExponentiationOperatorNeedsLeadingSemicolon(
+	ruleContext rule.Context,
+	node *ast.Node,
+	replacement string,
+) bool {
 	if replacement == "" {
 		return false
 	}

@@ -166,7 +166,10 @@ func utilityBuildEvaluator(test *testing.T, fixture utilityCorpus) *UtilityEvalu
 
 // forEachUtilityOracle runs an evaluator assertion once per copy of the utility oracle, the public
 // theme's and ahra's (#f598zk0), each with the evaluator built from the stylesheet that copy records.
-func forEachUtilityOracle(test *testing.T, run func(test *testing.T, fixtureName string, fixture utilityCorpus, evaluator *UtilityEvaluator)) {
+func forEachUtilityOracle(
+	test *testing.T,
+	run func(test *testing.T, fixtureName string, fixture utilityCorpus, evaluator *UtilityEvaluator),
+) {
 	test.Helper()
 	forEachOracleCopy(test, "utility_fixtures.json", func(test *testing.T, fixtureName string) {
 		fixture := utilityLoadCorpus(test, fixtureName)
@@ -250,7 +253,12 @@ func utilityCandidateFromCase(aCase utilityCase) *ParsedCandidate {
 // while looking identical in a summary that only counted matches.
 func TestUtilityMatchesEngine(test *testing.T) {
 	test.Parallel()
-	forEachUtilityOracle(test, func(test *testing.T, fixtureName string, fixture utilityCorpus, evaluator *UtilityEvaluator) {
+	forEachUtilityOracle(test, func(
+		test *testing.T,
+		fixtureName string,
+		fixture utilityCorpus,
+		evaluator *UtilityEvaluator,
+	) {
 
 		var compared int
 		var agreedCompiling int
@@ -283,7 +291,8 @@ func TestUtilityMatchesEngine(test *testing.T) {
 				if len(disagreements) < 40 {
 					disagreements = append(disagreements, fmt.Sprintf(
 						"%s: evaluator rejected the class, engine read %s",
-						aCase.ClassName, utilityDescribeReading(Reading{Order: aCase.Reading.Order, Count: aCase.Reading.Count}),
+						aCase.ClassName,
+						utilityDescribeReading(Reading{Order: aCase.Reading.Order, Count: aCase.Reading.Count}),
 					))
 				}
 				continue
@@ -303,7 +312,12 @@ func TestUtilityMatchesEngine(test *testing.T) {
 		}
 
 		if len(disagreements) > 0 {
-			test.Errorf("%d of %d classes disagreed with the engine:\n  %s", compared-agreedCompiling-agreedRejecting, compared, strings.Join(disagreements, "\n  "))
+			test.Errorf(
+				"%d of %d classes disagreed with the engine:\n  %s",
+				compared-agreedCompiling-agreedRejecting,
+				compared,
+				strings.Join(disagreements, "\n  "),
+			)
 		}
 
 		// Coverage, printed on success. A suite that compared twelve answers and one that compared
@@ -311,10 +325,16 @@ func TestUtilityMatchesEngine(test *testing.T) {
 		// compiling half is what proves arity is counted right, and the rejecting half is what proves
 		// the post-conditions reject anything at all.
 		if agreedCompiling < 500 {
-			test.Errorf("only %d compiling classes were compared; the fixture is too small to have shown anything about arity", agreedCompiling)
+			test.Errorf(
+				"only %d compiling classes were compared; the fixture is too small to have shown anything about arity",
+				agreedCompiling,
+			)
 		}
 		if agreedRejecting < 500 {
-			test.Errorf("only %d rejected classes were compared; without them the post-conditions have never been shown to reject", agreedRejecting)
+			test.Errorf(
+				"only %d rejected classes were compared; without them the post-conditions have never been shown to reject",
+				agreedRejecting,
+			)
 		}
 
 		test.Logf(
@@ -335,7 +355,12 @@ func TestUtilityMatchesEngine(test *testing.T) {
 // justification changed and that should be read rather than silently passed.
 func TestUtilityReproducesTheKnownExceptions(test *testing.T) {
 	test.Parallel()
-	forEachUtilityOracle(test, func(test *testing.T, fixtureName string, fixture utilityCorpus, evaluator *UtilityEvaluator) {
+	forEachUtilityOracle(test, func(
+		test *testing.T,
+		fixtureName string,
+		fixture utilityCorpus,
+		evaluator *UtilityEvaluator,
+	) {
 
 		// Measured per copy: 18 on ahra in Phase 0, and 5 on the public theme, its five per-declaration
 		// roots each with the `translate-full` key two of their namespaces share.
@@ -360,20 +385,31 @@ func TestUtilityReproducesTheKnownExceptions(test *testing.T) {
 				continue
 			}
 			if !evaluator.Has(aCase.Root) {
-				test.Errorf("%s: root %q is not defined by any @utility block the evaluator holds", exception.ClassName, aCase.Root)
+				test.Errorf(
+					"%s: root %q is not defined by any @utility block the evaluator holds",
+					exception.ClassName,
+					aCase.Root,
+				)
 				continue
 			}
 
 			reading, compiled := evaluator.Reading(utilityCandidateFromCase(aCase))
 			if !compiled {
-				test.Errorf("%s: evaluator rejected the class, engine read %s", exception.ClassName, utilityDescribeReading(Reading{Order: exception.Order, Count: exception.Count}))
+				test.Errorf(
+					"%s: evaluator rejected the class, engine read %s",
+					exception.ClassName,
+					utilityDescribeReading(Reading{Order: exception.Order, Count: exception.Count}),
+				)
 				continue
 			}
 			want := Reading{Order: exception.Order, Count: exception.Count}
 			if !reading.Equal(want) {
 				test.Errorf(
 					"%s: evaluator read %s, engine read %s (the descriptor table predicted %s)",
-					exception.ClassName, utilityDescribeReading(reading), utilityDescribeReading(want), exception.PredictedByDescriptorModel,
+					exception.ClassName,
+					utilityDescribeReading(reading),
+					utilityDescribeReading(want),
+					exception.PredictedByDescriptorModel,
 				)
 				continue
 			}
@@ -392,7 +428,10 @@ func TestUtilityReproducesTheKnownExceptions(test *testing.T) {
 		if reproduced != len(fixture.KnownExceptions) {
 			test.Errorf("reproduced %d of %d known exceptions", reproduced, len(fixture.KnownExceptions))
 		}
-		test.Logf("reproduced all %d registry classes the descriptor model declines, each with a reading the table predicts differently", reproduced)
+		test.Logf(
+			"reproduced all %d registry classes the descriptor model declines, each with a reading the table predicts differently",
+			reproduced,
+		)
 	})
 }
 
@@ -406,10 +445,17 @@ func TestUtilityReproducesTheKnownExceptions(test *testing.T) {
 // empty population, which is the failure mode this whole slice has been bitten by.
 func TestUtilityFindsThePerDeclarationRoots(test *testing.T) {
 	test.Parallel()
-	forEachUtilityOracle(test, func(test *testing.T, fixtureName string, fixture utilityCorpus, evaluator *UtilityEvaluator) {
+	forEachUtilityOracle(test, func(
+		test *testing.T,
+		fixtureName string,
+		fixture utilityCorpus,
+		evaluator *UtilityEvaluator,
+	) {
 
 		if len(fixture.PerDeclarationRoots) == 0 {
-			test.Fatal("the fixture reports no per-declaration roots; this component's whole population is empty and every other test here is passing over nothing")
+			test.Fatal(
+				"the fixture reports no per-declaration roots; this component's whole population is empty and every other test here is passing over nothing",
+			)
 		}
 
 		byClassName := make(map[string]utilityCase, len(fixture.Cases))
@@ -449,7 +495,10 @@ func TestUtilityFindsThePerDeclarationRoots(test *testing.T) {
 			checked++
 		}
 
-		test.Logf("%d roots resolve per declaration, each proven by a value satisfying two paths outcounting one satisfying a single path", checked)
+		test.Logf(
+			"%d roots resolve per declaration, each proven by a value satisfying two paths outcounting one satisfying a single path",
+			checked,
+		)
 	})
 }
 
@@ -466,7 +515,12 @@ func TestUtilityFindsThePerDeclarationRoots(test *testing.T) {
 // drift away from what it is mutating.
 func TestUtilityDropIsNotDefault(test *testing.T) {
 	test.Parallel()
-	forEachUtilityOracle(test, func(test *testing.T, fixtureName string, fixture utilityCorpus, evaluator *UtilityEvaluator) {
+	forEachUtilityOracle(test, func(
+		test *testing.T,
+		fixtureName string,
+		fixture utilityCorpus,
+		evaluator *UtilityEvaluator,
+	) {
 
 		byClassName := make(map[string]utilityCase, len(fixture.Cases))
 		for _, aCase := range fixture.Cases {
@@ -483,7 +537,10 @@ func TestUtilityDropIsNotDefault(test *testing.T) {
 
 			mutated, compiled := evaluator.compileKeepingDroppedDeclarations(utilityCandidateFromCase(aCase))
 			if !compiled {
-				test.Errorf("%s: the mutant did not compile at all, so this class proves nothing about the drop", exception.ClassName)
+				test.Errorf(
+					"%s: the mutant did not compile at all, so this class proves nothing about the drop",
+					exception.ClassName,
+				)
 				continue
 			}
 			mutatedSort := PropertySort(mutated)
@@ -504,7 +561,10 @@ func TestUtilityDropIsNotDefault(test *testing.T) {
 		if caught != checked {
 			test.Errorf("the drop mutation was caught on %d of %d exception classes", caught, checked)
 		}
-		test.Logf("suppressing the resolve-or-drop rule changes the reading on all %d exception classes, so the differential is testing that rule", caught)
+		test.Logf(
+			"suppressing the resolve-or-drop rule changes the reading on all %d exception classes, so the differential is testing that rule",
+			caught,
+		)
 	})
 }
 
@@ -521,7 +581,12 @@ func TestUtilityDropIsNotDefault(test *testing.T) {
 // is a branch this suite has not exercised.
 func TestUtilityRatioSpliceIsLoadBearing(test *testing.T) {
 	test.Parallel()
-	forEachUtilityOracle(test, func(test *testing.T, fixtureName string, fixture utilityCorpus, evaluator *UtilityEvaluator) {
+	forEachUtilityOracle(test, func(
+		test *testing.T,
+		fixtureName string,
+		fixture utilityCorpus,
+		evaluator *UtilityEvaluator,
+	) {
 
 		moved, unaffected := 0, 0
 		for _, aCase := range fixture.Cases {
@@ -551,9 +616,15 @@ func TestUtilityRatioSpliceIsLoadBearing(test *testing.T) {
 		}
 
 		if moved == 0 {
-			test.Error("suppressing the ratio splice changed no reading; either no fraction class in the corpus resolves a non-ratio declaration, or the splice is dead code")
+			test.Error(
+				"suppressing the ratio splice changed no reading; either no fraction class in the corpus resolves a non-ratio declaration, or the splice is dead code",
+			)
 		}
-		test.Logf("suppressing the ratio splice changes %d fraction classes and leaves %d unaffected, which are the ones where no non-ratio declaration resolved", moved, unaffected)
+		test.Logf(
+			"suppressing the ratio splice changes %d fraction classes and leaves %d unaffected, which are the ones where no non-ratio declaration resolved",
+			moved,
+			unaffected,
+		)
 	})
 }
 
@@ -567,7 +638,12 @@ func TestUtilityRatioSpliceIsLoadBearing(test *testing.T) {
 // the Go parser produces is a failure here rather than a surprise in the rule.
 func TestUtilityAgreesThroughTheGoCandidateParser(test *testing.T) {
 	test.Parallel()
-	forEachUtilityOracle(test, func(test *testing.T, fixtureName string, fixture utilityCorpus, evaluator *UtilityEvaluator) {
+	forEachUtilityOracle(test, func(
+		test *testing.T,
+		fixtureName string,
+		fixture utilityCorpus,
+		evaluator *UtilityEvaluator,
+	) {
 
 		designSystem := &utilityTestDesignSystem{evaluator: evaluator}
 
@@ -596,7 +672,11 @@ func TestUtilityAgreesThroughTheGoCandidateParser(test *testing.T) {
 			reading, compiled := evaluator.Reading(&candidate)
 			if aCase.Reading == nil {
 				if compiled && len(disagreements) < 20 {
-					disagreements = append(disagreements, fmt.Sprintf("%s: read %s through the Go parser, engine rejected it", aCase.ClassName, utilityDescribeReading(reading)))
+					disagreements = append(disagreements, fmt.Sprintf(
+						"%s: read %s through the Go parser, engine rejected it",
+						aCase.ClassName,
+						utilityDescribeReading(reading),
+					))
 				}
 				if !compiled {
 					agreed++
@@ -617,12 +697,21 @@ func TestUtilityAgreesThroughTheGoCandidateParser(test *testing.T) {
 		}
 
 		if len(disagreements) > 0 {
-			test.Errorf("%d of %d classes disagreed end to end:\n  %s", compared-agreed, compared, strings.Join(disagreements, "\n  "))
+			test.Errorf(
+				"%d of %d classes disagreed end to end:\n  %s",
+				compared-agreed,
+				compared,
+				strings.Join(disagreements, "\n  "),
+			)
 		}
 		if agreed < 500 {
 			test.Errorf("only %d classes agreed end to end; the chain has not been shown to work at scale", agreed)
 		}
-		test.Logf("%d of %d classes agree end to end, from class string through ParseCandidate to a reading", agreed, compared)
+		test.Logf(
+			"%d of %d classes agree end to end, from class string through ParseCandidate to a reading",
+			agreed,
+			compared,
+		)
 	})
 }
 
@@ -637,7 +726,12 @@ func TestUtilityAgreesThroughTheGoCandidateParser(test *testing.T) {
 // wrong one.
 func TestUtilityDoesNotClaimTheShadowQuirk(test *testing.T) {
 	test.Parallel()
-	forEachUtilityOracle(test, func(test *testing.T, fixtureName string, fixture utilityCorpus, evaluator *UtilityEvaluator) {
+	forEachUtilityOracle(test, func(
+		test *testing.T,
+		fixtureName string,
+		fixture utilityCorpus,
+		evaluator *UtilityEvaluator,
+	) {
 
 		// Measured per copy. Ahra's are the four `[16/9]` probes. The public theme's sweep also carries the
 		// five `max-w-screen-*`, which extract.mjs's own model predicts as nothing and the engine reads as
@@ -645,7 +739,11 @@ func TestUtilityDoesNotClaimTheShadowQuirk(test *testing.T) {
 		// disagreeing, and outside this component like the rest.
 		measured := map[string]int{"utility_fixtures.json": 4, "utility_fixtures_public.json": 9}[fixtureName]
 		if len(fixture.ShadowQuirkProbes) != measured {
-			test.Errorf("fixture holds %d shadow-quirk probes, %d were measured", len(fixture.ShadowQuirkProbes), measured)
+			test.Errorf(
+				"fixture holds %d shadow-quirk probes, %d were measured",
+				len(fixture.ShadowQuirkProbes),
+				measured,
+			)
 		}
 
 		for _, probe := range fixture.ShadowQuirkProbes {
@@ -660,7 +758,10 @@ func TestUtilityDoesNotClaimTheShadowQuirk(test *testing.T) {
 				)
 			}
 		}
-		test.Logf("%d shadow-quirk probes are outside this component: none of their roots is an @utility block", len(fixture.ShadowQuirkProbes))
+		test.Logf(
+			"%d shadow-quirk probes are outside this component: none of their roots is an @utility block",
+			len(fixture.ShadowQuirkProbes),
+		)
 	})
 }
 
@@ -790,7 +891,11 @@ func TestUtilitySyntheticCasesMatchEngine(test *testing.T) {
 				reading, compiled := evaluator.Reading(utilityCandidateFromCase(aCase))
 				if aCase.Reading == nil {
 					if compiled {
-						test.Errorf("%s: evaluator read %s, engine rejected the class", aCase.ClassName, utilityDescribeReading(reading))
+						test.Errorf(
+							"%s: evaluator read %s, engine rejected the class",
+							aCase.ClassName,
+							utilityDescribeReading(reading),
+						)
 						continue
 					}
 					rejecting++
@@ -798,11 +903,20 @@ func TestUtilitySyntheticCasesMatchEngine(test *testing.T) {
 				}
 				want := Reading{Order: aCase.Reading.Order, Count: aCase.Reading.Count}
 				if !compiled {
-					test.Errorf("%s: evaluator rejected the class, engine read %s", aCase.ClassName, utilityDescribeReading(want))
+					test.Errorf(
+						"%s: evaluator rejected the class, engine read %s",
+						aCase.ClassName,
+						utilityDescribeReading(want),
+					)
 					continue
 				}
 				if !reading.Equal(want) {
-					test.Errorf("%s: evaluator read %s, engine read %s", aCase.ClassName, utilityDescribeReading(reading), utilityDescribeReading(want))
+					test.Errorf(
+						"%s: evaluator read %s, engine read %s",
+						aCase.ClassName,
+						utilityDescribeReading(reading),
+						utilityDescribeReading(want),
+					)
 					continue
 				}
 				compiling++
@@ -812,13 +926,23 @@ func TestUtilitySyntheticCasesMatchEngine(test *testing.T) {
 			// was written for: a case where everything compiles has not shown its guard rejects, and
 			// one where nothing does has not shown its resolver resolves.
 			if compiling == 0 && !syntheticCase.RejectionOnly {
-				test.Errorf("%s: no probe compiled, so this case has not shown its resolution branch works", syntheticCase.Name)
+				test.Errorf(
+					"%s: no probe compiled, so this case has not shown its resolution branch works",
+					syntheticCase.Name,
+				)
 			}
 			if compiling > 0 && syntheticCase.RejectionOnly {
-				test.Errorf("%s: the fixture marks this case rejection-only and %d probes compiled", syntheticCase.Name, compiling)
+				test.Errorf(
+					"%s: the fixture marks this case rejection-only and %d probes compiled",
+					syntheticCase.Name,
+					compiling,
+				)
 			}
 			if rejecting == 0 {
-				test.Errorf("%s: no probe was rejected, so this case has not shown its guard rejects anything", syntheticCase.Name)
+				test.Errorf(
+					"%s: no probe was rejected, so this case has not shown its guard rejects anything",
+					syntheticCase.Name,
+				)
 			}
 			totalCompiling += compiling
 			totalRejecting += rejecting

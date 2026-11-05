@@ -68,7 +68,10 @@ func readForTest(test *testing.T, path string) string {
 // assertWroteOnlyNamed checks the control and the boundary together.
 func assertWroteOnlyNamed(test *testing.T, root string, before map[string]string, written string, output string) {
 	test.Helper()
-	if after := readForTest(test, filepath.Join(root, written)); after == before[written] || strings.Contains(after, "debugger") {
+	if after := readForTest(
+		test,
+		filepath.Join(root, written),
+	); after == before[written] || strings.Contains(after, "debugger") {
 		test.Fatalf("the control failed: %s was named and still carries its violation, so the fixer never ran:\n%s\n%s",
 			written, after, output)
 	}
@@ -77,7 +80,13 @@ func assertWroteOnlyNamed(test *testing.T, root string, before map[string]string
 			continue
 		}
 		if after := readForTest(test, filepath.Join(root, name)); after != contents {
-			test.Errorf("%s was not named and was rewritten:\nbefore:\n%s\nafter:\n%s\noutput:\n%s", name, contents, after, output)
+			test.Errorf(
+				"%s was not named and was rewritten:\nbefore:\n%s\nafter:\n%s\noutput:\n%s",
+				name,
+				contents,
+				after,
+				output,
+			)
 		}
 	}
 }
@@ -192,7 +201,11 @@ func TestAFixRunDoesNotWriteIntoANestedRepository(test *testing.T) {
 			}
 			for _, name := range []string{"Producer.ts", "Consumer.ts", "Sibling.ts"} {
 				if strings.Contains(readForTest(test, filepath.Join(root, name)), "debugger") {
-					test.Fatalf("the control failed: the project's own %s kept its violation, so the fixer never ran:\n%s", name, output)
+					test.Fatalf(
+						"the control failed: the project's own %s kept its violation, so the fixer never ran:\n%s",
+						name,
+						output,
+					)
 				}
 			}
 			if after := readForTest(test, filepath.Join(root, "nested", "Inside.ts")); after != nestedViolation {
@@ -250,12 +263,20 @@ func TestAFileTheWalkNeverLintedIsFormattedAndNeverFixed(test *testing.T) {
 	}
 	for _, name := range []string{"Producer.ts", "Consumer.ts", "Sibling.ts"} {
 		if strings.Contains(readForTest(test, filepath.Join(root, name)), "debugger") {
-			test.Fatalf("the control failed: the project's own %s kept its violation, so the fixer never ran:\n%s", name, output)
+			test.Fatalf(
+				"the control failed: the project's own %s kept its violation, so the fixer never ran:\n%s",
+				name,
+				output,
+			)
 		}
 	}
 	bundle := readForTest(test, filepath.Join(root, "bundle.js"))
 	if !strings.Contains(bundle, "var first = 1;") {
-		test.Fatalf("the bundle was not formatted, so the format pass never reached it and the boundary is untested:\n%s\noutput:\n%s", bundle, output)
+		test.Fatalf(
+			"the bundle was not formatted, so the format pass never reached it and the boundary is untested:\n%s\noutput:\n%s",
+			bundle,
+			output,
+		)
 	}
 	if !strings.Contains(bundle, "debugger") {
 		test.Errorf("a file no rule was run over had a rule's fix applied to it:\n%s\noutput:\n%s", bundle, output)

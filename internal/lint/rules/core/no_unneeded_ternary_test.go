@@ -67,30 +67,130 @@ func noUnneededTernaryFiresCases() []noUnneededTernaryCase {
 		{"var a = x != 1 ? false : true;", nil, []string{"unnecessaryConditionalExpression"}, "var a = x == 1;"},
 		{"var a = foo() ? false : true;", nil, []string{"unnecessaryConditionalExpression"}, "var a = !foo();"},
 		{"var a = !foo() ? false : true;", nil, []string{"unnecessaryConditionalExpression"}, "var a = !!foo();"},
-		{"var a = foo + bar ? false : true;", nil, []string{"unnecessaryConditionalExpression"}, "var a = !(foo + bar);"},
-		{"var a = x instanceof foo ? false : true;", nil, []string{"unnecessaryConditionalExpression"}, "var a = !(x instanceof foo);"},
+		{
+			"var a = foo + bar ? false : true;",
+			nil,
+			[]string{"unnecessaryConditionalExpression"},
+			"var a = !(foo + bar);",
+		},
+		{
+			"var a = x instanceof foo ? false : true;",
+			nil,
+			[]string{"unnecessaryConditionalExpression"},
+			"var a = !(x instanceof foo);",
+		},
 		{"var a = foo ? false : false;", nil, []string{"unnecessaryConditionalExpression"}, "var a = false;"},
 		{"var a = foo() ? false : false;", nil, []string{"unnecessaryConditionalExpression"}, ""},
-		{"var a = x instanceof foo ? true : false;", nil, []string{"unnecessaryConditionalExpression"}, "var a = x instanceof foo;"},
+		{
+			"var a = x instanceof foo ? true : false;",
+			nil,
+			[]string{"unnecessaryConditionalExpression"},
+			"var a = x instanceof foo;",
+		},
 		{"var a = !foo ? true : false;", nil, []string{"unnecessaryConditionalExpression"}, "var a = !foo;"},
-		{"\n                var value = 'a'\n                var canSet = true\n                var result = value ? value : canSet ? 'unset' : 'can not set'\n            ", NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)}, []string{"unnecessaryConditionalAssignment"}, "\n                var value = 'a'\n                var canSet = true\n                var result = value || (canSet ? 'unset' : 'can not set')\n            "},
-		{"foo ? foo : (bar ? baz : qux)", NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)}, []string{"unnecessaryConditionalAssignment"}, "foo || (bar ? baz : qux)"},
-		{"function* fn() { foo ? foo : yield bar }", NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)}, []string{"unnecessaryConditionalAssignment"}, "function* fn() { foo || (yield bar) }"},
-		{"var a = foo ? foo : 'No';", NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)}, []string{"unnecessaryConditionalAssignment"}, "var a = foo || 'No';"},
-		{"var a = ((foo)) ? (((((foo))))) : ((((((((((((((bar))))))))))))));", NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)}, []string{"unnecessaryConditionalAssignment"}, "var a = ((foo)) || ((((((((((((((bar))))))))))))));"},
-		{"var a = b ? b : c => c;", NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)}, []string{"unnecessaryConditionalAssignment"}, "var a = b || (c => c);"},
-		{"var a = b ? b : c = 0;", NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)}, []string{"unnecessaryConditionalAssignment"}, "var a = b || (c = 0);"},
-		{"var a = b ? b : (c => c);", NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)}, []string{"unnecessaryConditionalAssignment"}, "var a = b || (c => c);"},
-		{"var a = b ? b : (c = 0);", NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)}, []string{"unnecessaryConditionalAssignment"}, "var a = b || (c = 0);"},
-		{"var a = b ? b : (c) => (c);", NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)}, []string{"unnecessaryConditionalAssignment"}, "var a = b || ((c) => (c));"},
-		{"var a = b ? b : c, d; // this is ((b ? b : c), (d))", NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)}, []string{"unnecessaryConditionalAssignment"}, "var a = b || c, d; // this is ((b ? b : c), (d))"},
-		{"var a = b ? b : (c, d);", NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)}, []string{"unnecessaryConditionalAssignment"}, "var a = b || (c, d);"},
-		{"f(x ? x : 1);", NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)}, []string{"unnecessaryConditionalAssignment"}, "f(x || 1);"},
-		{"x ? x : 1;", NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)}, []string{"unnecessaryConditionalAssignment"}, "x || 1;"},
-		{"var a = foo ? foo : bar;", NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)}, []string{"unnecessaryConditionalAssignment"}, "var a = foo || bar;"},
-		{"var a = foo ? foo : a ?? b;", NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)}, []string{"unnecessaryConditionalAssignment"}, "var a = foo || (a ?? b);"},
+		{
+			"\n                var value = 'a'\n                var canSet = true\n                var result = value ? value : canSet ? 'unset' : 'can not set'\n            ",
+			NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)},
+			[]string{"unnecessaryConditionalAssignment"},
+			"\n                var value = 'a'\n                var canSet = true\n                var result = value || (canSet ? 'unset' : 'can not set')\n            ",
+		},
+		{
+			"foo ? foo : (bar ? baz : qux)",
+			NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)},
+			[]string{"unnecessaryConditionalAssignment"},
+			"foo || (bar ? baz : qux)",
+		},
+		{
+			"function* fn() { foo ? foo : yield bar }",
+			NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)},
+			[]string{"unnecessaryConditionalAssignment"},
+			"function* fn() { foo || (yield bar) }",
+		},
+		{
+			"var a = foo ? foo : 'No';",
+			NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)},
+			[]string{"unnecessaryConditionalAssignment"},
+			"var a = foo || 'No';",
+		},
+		{
+			"var a = ((foo)) ? (((((foo))))) : ((((((((((((((bar))))))))))))));",
+			NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)},
+			[]string{"unnecessaryConditionalAssignment"},
+			"var a = ((foo)) || ((((((((((((((bar))))))))))))));",
+		},
+		{
+			"var a = b ? b : c => c;",
+			NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)},
+			[]string{"unnecessaryConditionalAssignment"},
+			"var a = b || (c => c);",
+		},
+		{
+			"var a = b ? b : c = 0;",
+			NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)},
+			[]string{"unnecessaryConditionalAssignment"},
+			"var a = b || (c = 0);",
+		},
+		{
+			"var a = b ? b : (c => c);",
+			NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)},
+			[]string{"unnecessaryConditionalAssignment"},
+			"var a = b || (c => c);",
+		},
+		{
+			"var a = b ? b : (c = 0);",
+			NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)},
+			[]string{"unnecessaryConditionalAssignment"},
+			"var a = b || (c = 0);",
+		},
+		{
+			"var a = b ? b : (c) => (c);",
+			NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)},
+			[]string{"unnecessaryConditionalAssignment"},
+			"var a = b || ((c) => (c));",
+		},
+		{
+			"var a = b ? b : c, d; // this is ((b ? b : c), (d))",
+			NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)},
+			[]string{"unnecessaryConditionalAssignment"},
+			"var a = b || c, d; // this is ((b ? b : c), (d))",
+		},
+		{
+			"var a = b ? b : (c, d);",
+			NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)},
+			[]string{"unnecessaryConditionalAssignment"},
+			"var a = b || (c, d);",
+		},
+		{
+			"f(x ? x : 1);",
+			NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)},
+			[]string{"unnecessaryConditionalAssignment"},
+			"f(x || 1);",
+		},
+		{
+			"x ? x : 1;",
+			NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)},
+			[]string{"unnecessaryConditionalAssignment"},
+			"x || 1;",
+		},
+		{
+			"var a = foo ? foo : bar;",
+			NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)},
+			[]string{"unnecessaryConditionalAssignment"},
+			"var a = foo || bar;",
+		},
+		{
+			"var a = foo ? foo : a ?? b;",
+			NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)},
+			[]string{"unnecessaryConditionalAssignment"},
+			"var a = foo || (a ?? b);",
+		},
 		{"foo as any ? false : true", nil, []string{"unnecessaryConditionalExpression"}, "!(foo as any)"},
-		{"foo ? foo : bar as any", NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)}, []string{"unnecessaryConditionalAssignment"}, "foo || (bar as any)"},
+		{
+			"foo ? foo : bar as any",
+			NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)},
+			[]string{"unnecessaryConditionalAssignment"},
+			"foo || (bar as any)",
+		},
 	}
 }
 
@@ -109,8 +209,18 @@ func noUnneededTernarySilentCases() []noUnneededTernaryCase {
 		{"f(x ? x : 1);", nil, nil, ""},
 		{"foo ? foo : bar;", nil, nil, ""},
 		{"var a = foo ? 'Yes' : foo;", nil, nil, ""},
-		{"var a = foo ? 'Yes' : foo;", NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)}, nil, ""},
-		{"var a = foo ? bar : foo;", NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)}, nil, ""},
+		{
+			"var a = foo ? 'Yes' : foo;",
+			NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)},
+			nil,
+			"",
+		},
+		{
+			"var a = foo ? bar : foo;",
+			NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)},
+			nil,
+			"",
+		},
 		{"foo ? bar : foo;", NoUnneededTernaryOptions{DefaultAssignment: noUnneededTernaryBoolean(false)}, nil, ""},
 	}
 }
@@ -354,7 +464,9 @@ func TestDecodeNoUnneededTernaryOptions(test *testing.T) {
 
 	test.Run("an explicit false overrides it", func(test *testing.T) {
 		test.Parallel()
-		decoded, decodeNoUnneededTernaryOptionsError := DecodeNoUnneededTernaryOptions([]byte(`{"defaultAssignment":false}`))
+		decoded, decodeNoUnneededTernaryOptionsError := DecodeNoUnneededTernaryOptions(
+			[]byte(`{"defaultAssignment":false}`),
+		)
 		if decodeNoUnneededTernaryOptionsError != nil {
 			test.Fatalf("unexpected error: %v", decodeNoUnneededTernaryOptionsError)
 		}

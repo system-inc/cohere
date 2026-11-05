@@ -70,7 +70,8 @@ var NoSetterReturn = rule.Rule{
 
 	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		isGlobal := func(identifier *ast.Node) bool {
-			return ruleContext.TypeChecker != nil && rule.IsDeclaredOnlyInDeclarationFiles(ruleContext.TypeChecker.GetSymbolAtLocation(identifier))
+			return ruleContext.TypeChecker != nil &&
+				rule.IsDeclaredOnlyInDeclarationFiles(ruleContext.TypeChecker.GetSymbolAtLocation(identifier))
 		}
 		report := func(node *ast.Node) {
 			ruleContext.ReportNode(node, rule.Message{

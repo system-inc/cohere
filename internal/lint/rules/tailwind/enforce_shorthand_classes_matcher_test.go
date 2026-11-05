@@ -174,7 +174,12 @@ func expectShorthandMatchersAgree(test *testing.T, classNames []string) bool {
 		return false
 	}
 	if !reflect.DeepEqual(expected, actual) {
-		test.Fatalf("the matchers disagree on %q:\n  expressions: %+v\n  plain text:  %+v", classNames, expected, actual)
+		test.Fatalf(
+			"the matchers disagree on %q:\n  expressions: %+v\n  plain text:  %+v",
+			classNames,
+			expected,
+			actual,
+		)
 	}
 	return true
 }

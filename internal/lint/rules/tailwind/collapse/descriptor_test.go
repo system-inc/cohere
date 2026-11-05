@@ -119,7 +119,11 @@ func TestDescriptorLookupMatchesEngine(test *testing.T) {
 	table := testTable(test)
 
 	if table.TailwindVersion != fixtures.TailwindVersion {
-		test.Fatalf("table is Tailwind %s and fixtures are Tailwind %s", table.TailwindVersion, fixtures.TailwindVersion)
+		test.Fatalf(
+			"table is Tailwind %s and fixtures are Tailwind %s",
+			table.TailwindVersion,
+			fixtures.TailwindVersion,
+		)
 	}
 
 	agreed, declined, mismatched, withoutReading := 0, 0, 0, 0
@@ -189,9 +193,20 @@ func TestDescriptorLookupMatchesEngine(test *testing.T) {
 		test.Errorf("%d of %d cases disagreed with the engine", mismatched, len(fixtures.Cases))
 	}
 	scored := agreed + mismatched
-	test.Logf("agreed on %d of %d scored cases over %d roots, reduced from %d classes", agreed, scored, fixtures.Counts.Roots, fixtures.Counts.ClassesConsidered)
+	test.Logf(
+		"agreed on %d of %d scored cases over %d roots, reduced from %d classes",
+		agreed,
+		scored,
+		fixtures.Counts.Roots,
+		fixtures.Counts.ClassesConsidered,
+	)
 	test.Logf("  %d cases had no engine reading and were reported rather than scored", withoutReading)
-	test.Logf("  %d lookups declined, of which %d on the %d per-declaration roots", declined, perDeclarationDeclined, countPerDeclaration(table))
+	test.Logf(
+		"  %d lookups declined, of which %d on the %d per-declaration roots",
+		declined,
+		perDeclarationDeclined,
+		countPerDeclaration(table),
+	)
 	test.Logf("  %d arbitrary properties", arbitraryProperties)
 
 	// Volume assertions, in the spirit of the extractor's: a suite that agreed on everything because
@@ -243,7 +258,11 @@ func TestDescriptorLookupCoversEveryRoot(test *testing.T) {
 	if missing > 0 {
 		test.Errorf("%d roots in the corpus have no descriptor", missing)
 	}
-	test.Logf("every one of %d corpus roots has a descriptor, out of %d in the table", len(rootsInCorpus), len(table.Descriptors))
+	test.Logf(
+		"every one of %d corpus roots has a descriptor, out of %d in the table",
+		len(rootsInCorpus),
+		len(table.Descriptors),
+	)
 }
 
 // TestPerDeclarationRootsDecline pins the boundary of the model.
@@ -262,7 +281,11 @@ func TestPerDeclarationRootsDecline(test *testing.T) {
 			continue
 		}
 		perDeclaration++
-		candidate := &ParsedCandidate{Kind: ParsedCandidateKindFunctional, Root: root, Value: &ParsedValue{Kind: ParsedValueKindNamed, Value: "translate-full"}}
+		candidate := &ParsedCandidate{
+			Kind:  ParsedCandidateKindFunctional,
+			Root:  root,
+			Value: &ParsedValue{Kind: ParsedValueKindNamed, Value: "translate-full"},
+		}
 		if _, answered := table.Lookup(candidate); answered {
 			test.Errorf("root %q is per-declaration and the lookup answered anyway", root)
 		}
@@ -302,12 +325,19 @@ func TestTypeListOrderIsCarriedNotSorted(test *testing.T) {
 		test.Fatalf("bg's type list lacks position or length: %v", descriptor.TypeList)
 	}
 	if positionAt > lengthAt {
-		test.Errorf("bg lists length before position (%v); bg-[3px] reads as a length rather than a position", descriptor.TypeList)
+		test.Errorf(
+			"bg lists length before position (%v); bg-[3px] reads as a length rather than a position",
+			descriptor.TypeList,
+		)
 	}
 
 	// The observable consequence, asserted separately so a reordering that somehow kept the indices
 	// still fails on the reading itself.
-	candidate := &ParsedCandidate{Kind: ParsedCandidateKindFunctional, Root: "bg", Value: &ParsedValue{Kind: ParsedValueKindArbitrary, Value: "3px"}}
+	candidate := &ParsedCandidate{
+		Kind:  ParsedCandidateKindFunctional,
+		Root:  "bg",
+		Value: &ParsedValue{Kind: ParsedValueKindArbitrary, Value: "3px"},
+	}
 	got, answered := table.Lookup(candidate)
 	if !answered {
 		test.Fatal("bg-[3px] was declined")
@@ -338,7 +368,11 @@ func TestBareValueResolvesBeforeInference(test *testing.T) {
 		test.Skip("bold does not infer in this design system, so the two orderings are not separable here")
 	}
 
-	candidate := &ParsedCandidate{Kind: ParsedCandidateKindFunctional, Root: "font", Value: &ParsedValue{Kind: ParsedValueKindNamed, Value: "bold"}}
+	candidate := &ParsedCandidate{
+		Kind:  ParsedCandidateKindFunctional,
+		Root:  "font",
+		Value: &ParsedValue{Kind: ParsedValueKindNamed, Value: "bold"},
+	}
 	got, answered := table.Lookup(candidate)
 	if !answered {
 		test.Fatal("font-bold was declined")

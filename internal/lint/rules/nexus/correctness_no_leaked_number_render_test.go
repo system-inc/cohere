@@ -72,7 +72,11 @@ func correctnessNoLeakedNumberRenderExpect(test *testing.T, result rule_testing.
 	for _, diagnostic := range diagnostics {
 		got = append(got, text[diagnostic.Range.Pos():diagnostic.Range.End()])
 		if len(diagnostic.Fixes) != 0 || len(diagnostic.Suggestions) != 0 {
-			test.Fatalf("expected no fix and no suggestion, got %d and %d", len(diagnostic.Fixes), len(diagnostic.Suggestions))
+			test.Fatalf(
+				"expected no fix and no suggestion, got %d and %d",
+				len(diagnostic.Fixes),
+				len(diagnostic.Suggestions),
+			)
 		}
 	}
 	if len(got) != len(want) {
@@ -170,10 +174,16 @@ func TestCorrectnessNoLeakedNumberRenderFiresOnTheRealSites(test *testing.T) {
 		correctnessNoLeakedNumberRenderRun(test, correctnessNoLeakedNumberRenderPagination("properties.itemsTotal")),
 		"properties.itemsTotal")
 	correctnessNoLeakedNumberRenderExpect(test,
-		correctnessNoLeakedNumberRenderRun(test, correctnessNoLeakedNumberRenderCheckboxGrid("properties.maximumSelectionsPerRow")),
+		correctnessNoLeakedNumberRenderRun(
+			test,
+			correctnessNoLeakedNumberRenderCheckboxGrid("properties.maximumSelectionsPerRow"),
+		),
 		"properties.maximumSelectionsPerRow")
 	correctnessNoLeakedNumberRenderExpect(test,
-		correctnessNoLeakedNumberRenderRun(test, correctnessNoLeakedNumberRenderWebSockets("information.statistics.connectedAt")),
+		correctnessNoLeakedNumberRenderRun(
+			test,
+			correctnessNoLeakedNumberRenderWebSockets("information.statistics.connectedAt"),
+		),
 		"information.statistics.connectedAt")
 }
 
@@ -185,7 +195,9 @@ func TestCorrectnessNoLeakedNumberRenderStaysSilentOnTheFixedSites(test *testing
 	rule_testing.ExpectClean(test, correctnessNoLeakedNumberRenderRun(test,
 		correctnessNoLeakedNumberRenderPagination("properties.itemsTotal !== undefined")))
 	rule_testing.ExpectClean(test, correctnessNoLeakedNumberRenderRun(test,
-		correctnessNoLeakedNumberRenderCheckboxGrid("properties.maximumSelectionsPerRow !== undefined && properties.maximumSelectionsPerRow > 0")))
+		correctnessNoLeakedNumberRenderCheckboxGrid(
+			"properties.maximumSelectionsPerRow !== undefined && properties.maximumSelectionsPerRow > 0",
+		)))
 	rule_testing.ExpectClean(test, correctnessNoLeakedNumberRenderRun(test,
 		correctnessNoLeakedNumberRenderWebSockets("information.statistics.connectedAt !== null")))
 }
@@ -199,29 +211,81 @@ func TestCorrectnessNoLeakedNumberRenderFires(test *testing.T) {
 		want  []string
 	}{
 		{"a number", []string{"export const view = <p>{count && <Badge />}</p>;"}, []string{"count"}},
-		{"an optional number", []string{"export const view = <p>{optionalCount && 'some'}</p>;"}, []string{"optionalCount"}},
-		{"a nullable number", []string{"export const view = <p>{nullableCount && <Badge />}</p>;"}, []string{"nullableCount"}},
-		{"a length", []string{"export const view = <ul>{items.length && <li>{items[0]}</li>}</ul>;"}, []string{"items.length"}},
+		{
+			"an optional number",
+			[]string{"export const view = <p>{optionalCount && 'some'}</p>;"},
+			[]string{"optionalCount"},
+		},
+		{
+			"a nullable number",
+			[]string{"export const view = <p>{nullableCount && <Badge />}</p>;"},
+			[]string{"nullableCount"},
+		},
+		{
+			"a length",
+			[]string{"export const view = <ul>{items.length && <li>{items[0]}</li>}</ul>;"},
+			[]string{"items.length"},
+		},
 		{"a bigint", []string{"export const view = <p>{big && <Badge />}</p>;"}, []string{"big"}},
-		{"a literal union that holds zero", []string{"export const view = <p>{zeroOrOne && <Badge />}</p>;"}, []string{"zeroOrOne"}},
-		{"a number or false", []string{"export const view = <p>{countOrFalse && <Badge />}</p>;"}, []string{"countOrFalse"}},
+		{
+			"a literal union that holds zero",
+			[]string{"export const view = <p>{zeroOrOne && <Badge />}</p>;"},
+			[]string{"zeroOrOne"},
+		},
+		{
+			"a number or false",
+			[]string{"export const view = <p>{countOrFalse && <Badge />}</p>;"},
+			[]string{"countOrFalse"},
+		},
 		{"a branded number", []string{"export const view = <p>{width && <Badge />}</p>;"}, []string{"width"}},
-		{"a numeric enum with a zero member", []string{"export const view = <p>{level && <Badge />}</p>;"}, []string{"level"}},
+		{
+			"a numeric enum with a zero member",
+			[]string{"export const view = <p>{level && <Badge />}</p>;"},
+			[]string{"level"},
+		},
 		{"in a fragment", []string{"export const view = <>{count && <Badge />}</>;"}, []string{"count"}},
 		{"in parentheses", []string{"export const view = <p>{(count) && (<Badge />)}</p>;"}, []string{"count"}},
-		{"the second operand of a chain", []string{"export const view = <p>{flag && count && <Badge />}</p>;"}, []string{"count"}},
-		{"both operands of a chain", []string{"export const view = <p>{count && optionalCount && <Badge />}</p>;"}, []string{"count", "optionalCount"}},
-		{"narrowed to a number by the operand before it", []string{"export const view = <p>{optionalCount !== undefined && optionalCount && <Badge />}</p>;"}, []string{"optionalCount"}},
-		{"inside a ternary branch", []string{"export const view = <p>{flag ? count && <Badge /> : null}</p>;"}, []string{"count"}},
+		{
+			"the second operand of a chain",
+			[]string{"export const view = <p>{flag && count && <Badge />}</p>;"},
+			[]string{"count"},
+		},
+		{
+			"both operands of a chain",
+			[]string{"export const view = <p>{count && optionalCount && <Badge />}</p>;"},
+			[]string{"count", "optionalCount"},
+		},
+		{
+			"narrowed to a number by the operand before it",
+			[]string{"export const view = <p>{optionalCount !== undefined && optionalCount && <Badge />}</p>;"},
+			[]string{"optionalCount"},
+		},
+		{
+			"inside a ternary branch",
+			[]string{"export const view = <p>{flag ? count && <Badge /> : null}</p>;"},
+			[]string{"count"},
+		},
 		{"behind an or", []string{"export const view = <p>{label || count && <Badge />}</p>;"}, []string{"count"}},
-		{"the right side of an or in the operand", []string{"export const view = <p>{(flag || count) && <Badge />}</p>;"}, []string{"count"}},
-		{"a ternary as the operand", []string{"export const view = <p>{(flag ? count : false) && <Badge />}</p>;"}, []string{"count"}},
+		{
+			"the right side of an or in the operand",
+			[]string{"export const view = <p>{(flag || count) && <Badge />}</p>;"},
+			[]string{"count"},
+		},
+		{
+			"a ternary as the operand",
+			[]string{"export const view = <p>{(flag ? count : false) && <Badge />}</p>;"},
+			[]string{"count"},
+		},
 		{"a generic constrained to number", []string{
 			"export function View<Total extends number>(properties: { total: Total }) {",
 			"    return <p>{properties.total && <Badge />}</p>;",
 			"}",
 		}, []string{"properties.total"}},
-		{"nested inside an attribute's element", []string{"export const view = <Badge visible={<p>{count && 'some'}</p>} />;"}, []string{"count"}},
+		{
+			"nested inside an attribute's element",
+			[]string{"export const view = <Badge visible={<p>{count && 'some'}</p>} />;"},
+			[]string{"count"},
+		},
 		{"a number known positive only by a guard the type cannot carry", []string{
 			"export function View() {",
 			"    if(count > 0) {",
@@ -255,8 +319,14 @@ func TestCorrectnessNoLeakedNumberRenderStaysSilent(test *testing.T) {
 		{"Boolean()", []string{"export const view = <p>{Boolean(count) && <Badge />}</p>;"}},
 		{"a ternary that renders null", []string{"export const view = <p>{count ? <Badge /> : null}</p>;"}},
 		{"a boolean", []string{"export const view = <p>{flag && <Badge />}</p>;"}},
-		{"a string, whose empty value renders nothing", []string{"export const view = <p>{label && <span>{label}</span>}</p>;"}},
-		{"a string or a number, rendered as text by intent", []string{"export const view = <p>{labelOrCount && <span>{labelOrCount}</span>}</p>;"}},
+		{
+			"a string, whose empty value renders nothing",
+			[]string{"export const view = <p>{label && <span>{label}</span>}</p>;"},
+		},
+		{
+			"a string or a number, rendered as text by intent",
+			[]string{"export const view = <p>{labelOrCount && <span>{labelOrCount}</span>}</p>;"},
+		},
 		{"a ReactNode", []string{"export const view = <p>{children && <div>{children}</div>}</p>;"}},
 		{"a number literal union with no zero", []string{"export const view = <p>{columns && <Badge />}</p>;"}},
 		{"a numeric enum with no zero member", []string{"export const view = <p>{size && <Badge />}</p>;"}},
@@ -271,14 +341,29 @@ func TestCorrectnessNoLeakedNumberRenderStaysSilent(test *testing.T) {
 			"    return <p>{properties.value && <Badge />}</p>;",
 			"}",
 		}},
-		{"a number on the right of the and, rendered on purpose", []string{"export const view = <p>{flag && count}</p>;"}},
-		{"a number on the left of an or, rendered only when truthy", []string{"export const view = <p>{count || 'none'}</p>;"}},
-		{"an and that an or catches, so a zero falls through to the fallback", []string{"export const view = <p>{(count && label) || 'none'}</p>;"}},
-		{"a number on the left of an or in the operand, returned only when truthy", []string{"export const view = <p>{(count || flag) && <Badge />}</p>;"}},
+		{
+			"a number on the right of the and, rendered on purpose",
+			[]string{"export const view = <p>{flag && count}</p>;"},
+		},
+		{
+			"a number on the left of an or, rendered only when truthy",
+			[]string{"export const view = <p>{count || 'none'}</p>;"},
+		},
+		{
+			"an and that an or catches, so a zero falls through to the fallback",
+			[]string{"export const view = <p>{(count && label) || 'none'}</p>;"},
+		},
+		{
+			"a number on the left of an or in the operand, returned only when truthy",
+			[]string{"export const view = <p>{(count || flag) && <Badge />}</p>;"},
+		},
 		{"a ternary's condition", []string{"export const view = <p>{count && flag ? <Badge /> : null}</p>;"}},
 		{"an attribute, not a child", []string{"export const view = <Badge visible={count && true} />;"}},
 		{"an and outside JSX", []string{"export const total = count && 'some';"}},
-		{"a spread child, which spreads rather than renders the value", []string{"export const view = <p>{...(count && items)}</p>;"}},
+		{
+			"a spread child, which spreads rather than renders the value",
+			[]string{"export const view = <p>{...(count && items)}</p>;"},
+		},
 		{"a number rendered whole", []string{"export const view = <p>{count}</p>;"}},
 		{"a template", []string{"export const view = <p>{`${count && 'x'}`}</p>;"}},
 	}
@@ -287,7 +372,10 @@ func TestCorrectnessNoLeakedNumberRenderStaysSilent(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 
-			rule_testing.ExpectClean(test, correctnessNoLeakedNumberRenderRun(test, correctnessNoLeakedNumberRenderSource(testCase.lines...)))
+			rule_testing.ExpectClean(
+				test,
+				correctnessNoLeakedNumberRenderRun(test, correctnessNoLeakedNumberRenderSource(testCase.lines...)),
+			)
 		})
 	}
 }

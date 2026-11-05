@@ -64,7 +64,11 @@ func ParseRunOutput(output []byte) (RunOutput, error) {
 		return RunOutput{}, fmt.Errorf("no --json summary line in the run's output")
 	}
 	if summary.SchemaVersion != outputSchemaVersion {
-		return RunOutput{}, fmt.Errorf("the summary is --json schema %d, and this reader knows %d", summary.SchemaVersion, outputSchemaVersion)
+		return RunOutput{}, fmt.Errorf(
+			"the summary is --json schema %d, and this reader knows %d",
+			summary.SchemaVersion,
+			outputSchemaVersion,
+		)
 	}
 	result := RunOutput{
 		EngineSeconds: summary.Seconds,

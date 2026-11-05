@@ -135,7 +135,10 @@ func TestNoConstantConditionStaysSilent(test *testing.T) {
 
 		// Boolean is the only call anyone can reason about, and only with a constant argument.
 		{"a Boolean call with a variable", "export function run() { if(Boolean(a)) {} }\n"},
-		{"a differently named call", "export function run() { declare function Bool(v: any): boolean; if(Bool(1)) {} }\n"},
+		{
+			"a differently named call",
+			"export function run() { declare function Bool(v: any): boolean; if(Bool(1)) {} }\n",
+		},
 
 		{"a sequence ending in a variable", "export function run() { if((1, a)) {} }\n"},
 		{"a negation of a variable", "export function run() { if(!a) {} }\n"},
@@ -184,7 +187,13 @@ func TestNoConstantConditionCheckLoops(test *testing.T) {
 				{"while (true) {}", testCase.whileTrueFires},
 				{"while (1) {}", testCase.whileOneFires},
 			} {
-				result := rule_testing.RunWithOptions(test, NoConstantCondition, constantConditionFile, loop.sourceText, decoded)
+				result := rule_testing.RunWithOptions(
+					test,
+					NoConstantCondition,
+					constantConditionFile,
+					loop.sourceText,
+					decoded,
+				)
 				if loop.fires {
 					rule_testing.ExpectFindings(test, result, "unexpected")
 				} else {
@@ -194,7 +203,12 @@ func TestNoConstantConditionCheckLoops(test *testing.T) {
 		})
 	}
 
-	for _, raw := range []string{`{"checkLoops": "sometimes"}`, `{"checkLoops": "All"}`, `{"checkLoops": 1}`, `{"checkLoops": null}`} {
+	for _, raw := range []string{
+		`{"checkLoops": "sometimes"}`,
+		`{"checkLoops": "All"}`,
+		`{"checkLoops": 1}`,
+		`{"checkLoops": null}`,
+	} {
 		test.Run(raw+" is refused", func(test *testing.T) {
 			test.Parallel()
 			if _, err := rule.DecodeOptionsInto[NoConstantConditionOptions]()([]byte(raw)); err == nil {

@@ -46,10 +46,15 @@ var NoVoidWidening = rule.Rule{
 			}
 			// Pair the promise's value directly, rather than descending into then's
 			// generic callback signatures. Promise<void> may resolve to the hidden value.
-			if isVoidPromise(pair.Source) && isVoidPromise(pair.Target) && pair.Source.Target() == pair.Target.Target() {
+			if isVoidPromise(pair.Source) &&
+				isVoidPromise(pair.Target) &&
+				pair.Source.Target() == pair.Target.Target() {
 				from := checker.Checker_getTypeArguments(tc, pair.Source)
 				to := checker.Checker_getTypeArguments(tc, pair.Target)
-				return len(from) == 1 && len(to) == 1 && from[0].Flags()&checker.TypeFlagsVoid != 0 && readsVoidValue(tc, to[0]) &&
+				return len(from) == 1 &&
+					len(to) == 1 &&
+					from[0].Flags()&checker.TypeFlagsVoid != 0 &&
+					readsVoidValue(tc, to[0]) &&
 					!proof.promiseOriginEmpty(sourceNode, sourceRoot, pair.Path), false
 			}
 			return false, true
@@ -60,11 +65,14 @@ var NoVoidWidening = rule.Rule{
 			if !wrong {
 				return
 			}
-			ruleContext.ReportNode(site.Node, rule.Message{Id: "voidWidening", Description: voidWideningText.Render(map[string]string{
-				"slot":   slotText(ruleContext.SourceFile, site.Node, found.Path),
-				"source": type_checking.StableTypeText(tc, found.Source),
-				"target": type_checking.StableTypeText(tc, found.Target),
-			})})
+			ruleContext.ReportNode(
+				site.Node,
+				rule.Message{Id: "voidWidening", Description: voidWideningText.Render(map[string]string{
+					"slot":   slotText(ruleContext.SourceFile, site.Node, found.Path),
+					"source": type_checking.StableTypeText(tc, found.Source),
+					"target": type_checking.StableTypeText(tc, found.Target),
+				})},
+			)
 		})
 	},
 }
@@ -83,7 +91,8 @@ func readsVoidValue(tc *checker.Checker, target *checker.Type) bool {
 			return true
 		}
 		if member.Flags()&checker.TypeFlagsObject != 0 &&
-			(len(checker.Checker_getPropertiesOfType(tc, member)) != 0 || len(checker.Checker_getSignaturesOfType(tc, member, checker.SignatureKindCall)) != 0) {
+			(len(checker.Checker_getPropertiesOfType(tc, member)) != 0 ||
+				len(checker.Checker_getSignaturesOfType(tc, member, checker.SignatureKindCall)) != 0) {
 			return true
 		}
 	}
@@ -165,7 +174,9 @@ func (proof *voidBodyProof) expressionEmpty(expression *ast.Node, depth int) boo
 		// Only an inferred const retains its initializer's provenance. An annotation
 		// could already have erased a value, and a mutable binding could be replaced.
 		symbol := proof.checker.GetSymbolAtLocation(unwrapped)
-		if symbol == nil || symbol.ValueDeclaration == nil || symbol.ValueDeclaration.Kind != ast.KindVariableDeclaration {
+		if symbol == nil ||
+			symbol.ValueDeclaration == nil ||
+			symbol.ValueDeclaration.Kind != ast.KindVariableDeclaration {
 			return false
 		}
 		declaration := symbol.ValueDeclaration

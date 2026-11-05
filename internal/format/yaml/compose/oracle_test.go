@@ -154,7 +154,11 @@ func upstreamOutputs(test *testing.T, texts []string) []string {
 	}
 	root := forkRoot(test)
 	script := filepath.Join(test.TempDir(), "oracle.mjs")
-	if writeError := os.WriteFile(script, []byte(strings.ReplaceAll(oracleScript, "FORK", root)), 0o644); writeError != nil {
+	if writeError := os.WriteFile(
+		script,
+		[]byte(strings.ReplaceAll(oracleScript, "FORK", root)),
+		0o644,
+	); writeError != nil {
 		test.Fatal(writeError)
 	}
 	var outputs []string
@@ -605,7 +609,11 @@ func TestYamlTestSuiteMatchesUpstream(test *testing.T) {
 const inputs = [];
 for (const test of suite) for (const testCase of test.cases) if (typeof testCase.yaml === "string") inputs.push(testCase.yaml);
 process.stdout.write(JSON.stringify(inputs));`
-	if writeError := os.WriteFile(script, []byte(strings.ReplaceAll(source, "SUITE", suite)), 0o644); writeError != nil {
+	if writeError := os.WriteFile(
+		script,
+		[]byte(strings.ReplaceAll(source, "SUITE", suite)),
+		0o644,
+	); writeError != nil {
 		test.Fatal(writeError)
 	}
 	output, outputError := exec.Command("node", script).Output()
@@ -662,5 +670,10 @@ func TestCorpusMatchesUpstream(test *testing.T) {
 			}
 		}
 	}
-	test.Logf("%d of %d files match upstream's documents (%d of them with errors)", len(texts)-failures, len(texts), withErrors)
+	test.Logf(
+		"%d of %d files match upstream's documents (%d of them with errors)",
+		len(texts)-failures,
+		len(texts),
+		withErrors,
+	)
 }

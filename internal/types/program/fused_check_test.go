@@ -39,7 +39,11 @@ func TestAFusedCheckReportsWhatTheWholeProgramCheckReports(test *testing.T) {
 
 	fused := buildProgram(test, files)
 	fused.FusedCheck = program.NewFusedCheck()
-	if _, walkError := fused.Walk(context.Background(), fused.ProjectFiles(), []rule.Rule{typeAwareRule(test)}); walkError != nil {
+	if _, walkError := fused.Walk(
+		context.Background(),
+		fused.ProjectFiles(),
+		[]rule.Rule{typeAwareRule(test)},
+	); walkError != nil {
 		test.Fatalf("walk: %v", walkError)
 	}
 	if checked := fused.FusedCheck.Checked(); checked != len(fused.ProjectFiles()) {
@@ -49,7 +53,10 @@ func TestAFusedCheckReportsWhatTheWholeProgramCheckReports(test *testing.T) {
 	actual := fused.FusedCheck.DiagnosticParts(context.Background(), fused)
 
 	if len(expected.Semantic) < 80 {
-		test.Fatalf("the whole check found %d semantic diagnostics, too few for a match to prove anything", len(expected.Semantic))
+		test.Fatalf(
+			"the whole check found %d semantic diagnostics, too few for a match to prove anything",
+			len(expected.Semantic),
+		)
 	}
 	for _, part := range []struct {
 		name             string
@@ -77,7 +84,11 @@ func TestAFusedCheckStopsAtASyntaxErrorAsTheWholeCheckDoes(test *testing.T) {
 	expected := buildProgram(test, files).AllDiagnosticParts(context.Background())
 	fused := buildProgram(test, files)
 	fused.FusedCheck = program.NewFusedCheck()
-	if _, walkError := fused.Walk(context.Background(), fused.ProjectFiles(), []rule.Rule{typeAwareRule(test)}); walkError != nil {
+	if _, walkError := fused.Walk(
+		context.Background(),
+		fused.ProjectFiles(),
+		[]rule.Rule{typeAwareRule(test)},
+	); walkError != nil {
 		test.Fatalf("walk: %v", walkError)
 	}
 	actual := fused.FusedCheck.DiagnosticParts(context.Background(), fused)

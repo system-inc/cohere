@@ -329,7 +329,12 @@ func strictShouldFix(mode StrictMode) bool {
 // enclosing function sets the first and not the second. `inClass`
 // whether we are inside a class body, which is always strict. Both are only consulted under the
 // function form; the other modes report every directive they find wherever it is.
-func (walker strictWalker) walkStatements(statements []*ast.Node, insideAnyFunction bool, parentIsStrict bool, inClass bool) {
+func (walker strictWalker) walkStatements(
+	statements []*ast.Node,
+	insideAnyFunction bool,
+	parentIsStrict bool,
+	inClass bool,
+) {
 	for _, statement := range statements {
 		walker.walkNode(statement, insideAnyFunction, parentIsStrict, inClass)
 	}

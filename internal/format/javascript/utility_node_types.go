@@ -7,7 +7,13 @@ import "strings"
 // against its source even though only the TypeScript and ESTree names occur here.
 
 func isBinaryCastExpression(node Node) bool {
-	return node.Is("TSAsExpression", "TSSatisfiesExpression", "AsExpression", "AsConstExpression", "SatisfiesExpression")
+	return node.Is(
+		"TSAsExpression",
+		"TSSatisfiesExpression",
+		"AsExpression",
+		"AsConstExpression",
+		"SatisfiesExpression",
+	)
 }
 func isSatisfiesExpression(node Node) bool {
 	return node.Is("SatisfiesExpression", "TSSatisfiesExpression")
@@ -200,7 +206,9 @@ func shouldFlatten(parentOperator string, nodeOperator string) bool {
 		parentOperator == "%" && multiplicativeOperators[nodeOperator] {
 		return false
 	}
-	if nodeOperator != parentOperator && multiplicativeOperators[nodeOperator] && multiplicativeOperators[parentOperator] {
+	if nodeOperator != parentOperator &&
+		multiplicativeOperators[nodeOperator] &&
+		multiplicativeOperators[parentOperator] {
 		return false
 	}
 	if bitshiftOperators[parentOperator] && bitshiftOperators[nodeOperator] {

@@ -39,17 +39,27 @@ func TestTheFormatOnlyGateExitsOnFormattingAlone(test *testing.T) {
 	}
 	// A file formatting does change is re-linted on its next pass in a run that fixes. Here nothing may
 	// propose: it is formatted, and its finding is left for the run that fixes.
-	writeTree(test, root, map[string]string{"Reformatted.ts": "export function other(): number {\n  debugger;\n  return   2;\n}\n"})
+	writeTree(
+		test,
+		root,
+		map[string]string{"Reformatted.ts": "export function other(): number {\n  debugger;\n  return   2;\n}\n"},
+	)
 	if output, code := runCohere(test, binary, root, "--format-only", "Reformatted.ts"); code != 0 {
 		test.Fatalf("the writing format-only run exited %d:\n%s", code, output)
 	}
-	if got := readForTest(test, filepath.Join(root, "Reformatted.ts")); got != "export function other(): number {\n  debugger;\n  return 2;\n}\n" {
+	if got := readForTest(
+		test,
+		filepath.Join(root, "Reformatted.ts"),
+	); got != "export function other(): number {\n  debugger;\n  return 2;\n}\n" {
 		test.Fatalf("--format-only did not format the file, or fixed it once formatting changed it:\n%s", got)
 	}
 
 	gate := func(label string, wantExit int, wantLines ...string) {
 		test.Helper()
-		for _, arguments := range [][]string{{"--no-fix", "--format-only"}, {"--no-fix", "--format-only", "--format-all"}} {
+		for _, arguments := range [][]string{
+			{"--no-fix", "--format-only"},
+			{"--no-fix", "--format-only", "--format-all"},
+		} {
 			output, code := runCohere(test, binary, root, arguments...)
 			if code != wantExit {
 				test.Fatalf("%s, %v: exit %d, want %d:\n%s", label, arguments, code, wantExit, output)
@@ -59,7 +69,8 @@ func TestTheFormatOnlyGateExitsOnFormattingAlone(test *testing.T) {
 					test.Fatalf("%s, %v: missing %q:\n%s", label, arguments, line, output)
 				}
 			}
-			if !strings.Contains(output, "fix checked in") || !strings.Contains(output, "(formatting only, no fixes proposed)") ||
+			if !strings.Contains(output, "fix checked in") ||
+				!strings.Contains(output, "(formatting only, no fixes proposed)") ||
 				!strings.Contains(output, "types skipped (not requested) · lint skipped (not requested)") {
 				test.Fatalf("%s, %v: the phase line does not say what ran:\n%s", label, arguments, output)
 			}
@@ -74,12 +85,20 @@ func TestTheFormatOnlyGateExitsOnFormattingAlone(test *testing.T) {
 
 	inner := filepath.Join(root, "library", "Inner.ts")
 	writeTree(test, root, map[string]string{"library/Inner.ts": "export const inner   =   1;\n"})
-	gate("an unformatted file in a nested repository", 1, inner+":1:1 - the formatter would rewrite this file in nested repository library")
+	gate(
+		"an unformatted file in a nested repository",
+		1,
+		inner+":1:1 - the formatter would rewrite this file in nested repository library",
+	)
 	writeTree(test, root, map[string]string{"library/Inner.ts": "export const inner = 1;\n"})
 
 	ugly := filepath.Join(root, "Ugly.ts")
 	writeTree(test, root, map[string]string{"Ugly.ts": "export const ugly   =   1;\n"})
-	gate("an unformatted file in the repository", 1, ugly+":1:1 - --fix would rewrite this file: format [fix/would-change]")
+	gate(
+		"an unformatted file in the repository",
+		1,
+		ugly+":1:1 - --fix would rewrite this file: format [fix/would-change]",
+	)
 	removeForTest(test, ugly)
 
 	broken := filepath.Join(root, "broken.json")
@@ -91,7 +110,10 @@ func TestTheFormatOnlyGateExitsOnFormattingAlone(test *testing.T) {
 	nestedBroken := filepath.Join(root, "library", "broken.json")
 	writeTree(test, root, map[string]string{"library/broken.json": "{ \"a\": \n"})
 	gate("a file the formatter cannot read in a nested repository", 1,
-		nestedBroken+":1:1 - the formatter could not check this file: in nested repository library, "+unparseableSkipReason+" [format/unchecked]")
+		nestedBroken+
+			":1:1 - the formatter could not check this file: in nested repository library, "+
+			unparseableSkipReason+
+			" [format/unchecked]")
 	removeForTest(test, nestedBroken)
 
 	gate("neither", 0, "0 files would change")
@@ -155,22 +177,36 @@ func TestFormatOnlyBuildsNoGraph(test *testing.T) {
 		".gitignore":               ".cache/\n",
 		"Tidy.ts":                  "export const tidy = 1;\n",
 	})
-	if output, code := runCohere(test, binary, root, "--no-fix"); code == 0 || !strings.Contains(output, "Building the type graph") {
+	if output, code := runCohere(
+		test,
+		binary,
+		root,
+		"--no-fix",
+	); code == 0 || !strings.Contains(output, "Building the type graph") {
 		test.Fatalf("the tsconfig built a program, so this test proves nothing, exit %d:\n%s", code, output)
 	}
 
 	output, code := runCohere(test, binary, root, "--no-fix", "--format-only")
-	if code != 0 || !strings.Contains(output, "graph not built: --format-only reads the disk, not the program") ||
-		strings.Contains(output, "graph built in") || !strings.Contains(output, "no graph built (formatting reads none)") {
+	if code != 0 ||
+		!strings.Contains(output, "graph not built: --format-only reads the disk, not the program") ||
+		strings.Contains(output, "graph built in") ||
+		!strings.Contains(output, "no graph built (formatting reads none)") {
 		test.Fatalf("--format-only built the graph or did not say it did not, exit %d:\n%s", code, output)
 	}
 
 	writeTree(test, root, map[string]string{"Ugly.ts": "export const ugly   =   1;\n"})
 	output, code = runCohere(test, binary, root, "--no-fix", "--format-only")
-	if code == 0 || !strings.Contains(output, filepath.Join(root, "Ugly.ts")+":1:1 - --fix would rewrite this file: format") {
+	if code == 0 ||
+		!strings.Contains(output, filepath.Join(root, "Ugly.ts")+":1:1 - --fix would rewrite this file: format") {
 		test.Fatalf("with no graph, an unformatted file was not reported, exit %d:\n%s", code, output)
 	}
-	if output, code = runCohere(test, binary, root, "--format-only", "Ugly.ts"); code != 0 || readForTest(test, filepath.Join(root, "Ugly.ts")) != "export const ugly = 1;\n" {
+	if output, code = runCohere(
+		test,
+		binary,
+		root,
+		"--format-only",
+		"Ugly.ts",
+	); code != 0 || readForTest(test, filepath.Join(root, "Ugly.ts")) != "export const ugly = 1;\n" {
 		test.Fatalf("with no graph, the writing run did not format the named file, exit %d:\n%s", code, output)
 	}
 }

@@ -53,11 +53,19 @@ func speculationFormatsTheProgramsCopyOnlyWhileItIsStillTheFiles(test *testing.T
 	}
 	// Unchanged too, but behind a UTF-8 byte order mark, which the program's copy has dropped (#hkv1hgp).
 	marked := filepath.Join(directory, "Marked.ts")
-	if writeError := os.WriteFile(marked, append([]byte{0xEF, 0xBB, 0xBF}, "export const beta = 1;\n"...), 0o644); writeError != nil {
+	if writeError := os.WriteFile(
+		marked,
+		append([]byte{0xEF, 0xBB, 0xBF}, "export const beta = 1;\n"...),
+		0o644,
+	); writeError != nil {
 		test.Fatal(writeError)
 	}
 	configuration := `{"compilerOptions":{"strict":true,"module":"esnext","target":"esnext","moduleResolution":"bundler"},"include":["**/*.ts"]}`
-	if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration), 0o644); writeError != nil {
+	if writeError := os.WriteFile(
+		filepath.Join(directory, "tsconfig.json"),
+		[]byte(configuration),
+		0o644,
+	); writeError != nil {
 		test.Fatal(writeError)
 	}
 	var pack *program.ContentPack
@@ -72,7 +80,10 @@ func speculationFormatsTheProgramsCopyOnlyWhileItIsStillTheFiles(test *testing.T
 		test.Fatal(err)
 	}
 	// Bound, as the speculation requires of a tree before it takes one.
-	_, release := graph.Program.GetTypeCheckerForFile(test.Context(), graph.Program.GetSourceFile(tspath.RootedFilePath(unchanged)))
+	_, release := graph.Program.GetTypeCheckerForFile(
+		test.Context(),
+		graph.Program.GetSourceFile(tspath.RootedFilePath(unchanged)),
+	)
 	release()
 
 	// The edit lands after the program's read: new bytes, and an mtime a second later, so no clock tick can
@@ -96,8 +107,13 @@ func speculationFormatsTheProgramsCopyOnlyWhileItIsStillTheFiles(test *testing.T
 	speculation.wait()
 
 	for _, fileName := range []string{unchanged, edited, marked} {
-		if sourceFile := graph.Program.GetSourceFile(tspath.RootedFilePath(fileName)); sourceFile == nil || !sourceFile.IsBound() {
-			test.Fatalf("%s is not bound, so the speculation never offered it the program's copy", filepath.Base(fileName))
+		if sourceFile := graph.Program.GetSourceFile(
+			tspath.RootedFilePath(fileName),
+		); sourceFile == nil || !sourceFile.IsBound() {
+			test.Fatalf(
+				"%s is not bound, so the speculation never offered it the program's copy",
+				filepath.Base(fileName),
+			)
 		}
 	}
 	attempt, kept := speculation.attempts[unchanged]
@@ -105,7 +121,9 @@ func speculationFormatsTheProgramsCopyOnlyWhileItIsStillTheFiles(test *testing.T
 		test.Fatalf("the unchanged file was not kept as formatted: kept %v, %+v", kept, attempt)
 	}
 	// Unsafe: each pointer is only compared, to tell one string's memory from another's, never followed.
-	if unsafe.StringData(attempt.result.Text) != unsafe.StringData(graph.Program.GetSourceFile(tspath.RootedFilePath(unchanged)).Text()) {
+	if unsafe.StringData(
+		attempt.result.Text,
+	) != unsafe.StringData(graph.Program.GetSourceFile(tspath.RootedFilePath(unchanged)).Text()) {
 		test.Errorf("the unchanged file's result is not the program's copy, so it was read again")
 	}
 
@@ -113,7 +131,8 @@ func speculationFormatsTheProgramsCopyOnlyWhileItIsStillTheFiles(test *testing.T
 		test.Errorf("the edited file was formatted from %q, not from the bytes now on disk", read)
 	}
 	// The marked file is judged on its bytes on disk, mark and all, never on the program's copy without it.
-	if read, kept := speculation.read[marked]; kept && read == graph.Program.GetSourceFile(tspath.RootedFilePath(marked)).Text() {
+	if read, kept := speculation.read[marked]; kept &&
+		read == graph.Program.GetSourceFile(tspath.RootedFilePath(marked)).Text() {
 		test.Errorf("the marked file was formatted from the program's copy, which is not the file's bytes")
 	}
 

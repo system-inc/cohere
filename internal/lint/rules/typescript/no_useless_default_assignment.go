@@ -154,7 +154,10 @@ var NoUselessDefaultAssignment = rule.Rule{
 		// so through Skip, since a declined file and a clean one otherwise read the same (#pa7k7zv).
 		// See the rule's doc comment for the measurement and the reasoning.
 		if ruleContext.Program != nil &&
-			!type_checking.IsStrictCompilerOptionEnabled(ruleContext.Program.Options(), ruleContext.Program.Options().StrictNullChecks) &&
+			!type_checking.IsStrictCompilerOptionEnabled(
+				ruleContext.Program.Options(),
+				ruleContext.Program.Options().StrictNullChecks,
+			) &&
 			!settings.AllowRuleToRunWithoutStrictNullChecks {
 			ruleContext.Skip("strictNullChecks is off")
 			return nil
@@ -361,7 +364,11 @@ func contextualParameterType(ruleContext rule.Context, node *ast.Node) (*checker
 		return nil, false
 	}
 
-	signatures := checker.Checker_getSignaturesOfType(ruleContext.TypeChecker, contextualType, checker.SignatureKindCall)
+	signatures := checker.Checker_getSignaturesOfType(
+		ruleContext.TypeChecker,
+		contextualType,
+		checker.SignatureKindCall,
+	)
 	if len(signatures) == 0 {
 		return nil, false
 	}

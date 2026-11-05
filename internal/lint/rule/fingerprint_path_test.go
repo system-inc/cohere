@@ -43,7 +43,11 @@ func TestFingerprintPathSlicesWhatTspathWouldJoin(test *testing.T) {
 		{"a cousin", "/repository/app", "/repository/libraries/structure/Index.ts"},
 		{"the filesystem root as the directory", "/", "/repository/Paths.ts"},
 		{"a directory spelled with a trailing separator", "/repository/", "/repository/source/Paths.ts"},
-		{"a mixed-case directory over a canonical, lowercased path", "/Work/Repository", "/work/repository/ahra/Paths.ts"},
+		{
+			"a mixed-case directory over a canonical, lowercased path",
+			"/Work/Repository",
+			"/work/repository/ahra/Paths.ts",
+		},
 		{"a lowercased sibling that extends the directory's name", "/Work/Repo", "/work/repository/Paths.ts"},
 		{"a non-ASCII directory", "/Work/Zo\u00eb", "/work/zo\u00eb/Paths.ts"},
 	}
@@ -51,7 +55,13 @@ func TestFingerprintPathSlicesWhatTspathWouldJoin(test *testing.T) {
 		for _, caseSensitive := range []bool{true, false} {
 			program := directoryProgram{directory: shape.directory, caseSensitive: caseSensitive}
 			if got, want := FingerprintPath(program, shape.path), tspathName(program, shape.path); got != want {
-				test.Errorf("%s (case-sensitive %v): FingerprintPath gave %q, tspath %q", shape.name, caseSensitive, got, want)
+				test.Errorf(
+					"%s (case-sensitive %v): FingerprintPath gave %q, tspath %q",
+					shape.name,
+					caseSensitive,
+					got,
+					want,
+				)
 			}
 		}
 	}
@@ -81,10 +91,23 @@ func TestFingerprintPathSlicesWhatTspathWouldJoin(test *testing.T) {
 			program directoryProgram
 			path    string
 		}{{sensitive, name}, {insensitive, canonical}} {
-			if got, want := FingerprintPath(probe.program, probe.path), tspathName(probe.program, probe.path); got != want {
-				test.Errorf("%s (case-sensitive %v): FingerprintPath gave %q, tspath %q", probe.path, probe.program.caseSensitive, got, want)
+			if got, want := FingerprintPath(
+				probe.program,
+				probe.path,
+			), tspathName(probe.program, probe.path); got != want {
+				test.Errorf(
+					"%s (case-sensitive %v): FingerprintPath gave %q, tspath %q",
+					probe.path,
+					probe.program.caseSensitive,
+					got,
+					want,
+				)
 			}
-			if _, under := fingerprintPathUnder(probe.program.directory, probe.path, probe.program.caseSensitive); under {
+			if _, under := fingerprintPathUnder(
+				probe.program.directory,
+				probe.path,
+				probe.program.caseSensitive,
+			); under {
 				sliced++
 			}
 			compared++

@@ -34,7 +34,11 @@ func TestDesignSystemReadsAreKeptPerProgram(test *testing.T) {
 
 	reads, loaded := DesignSystemReads(first)
 	if !loaded || len(reads) != 1 || reads[0].Path != theme || !reads[0].Present {
-		test.Errorf("the first program's reads after a second program asked: %v, loaded %v; want theme.css present", reads, loaded)
+		test.Errorf(
+			"the first program's reads after a second program asked: %v, loaded %v; want theme.css present",
+			reads,
+			loaded,
+		)
 	}
 	reads, loaded = DesignSystemReads(second)
 	if !loaded || len(reads) != 1 || reads[0].Present {

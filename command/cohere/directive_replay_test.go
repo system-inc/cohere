@@ -15,27 +15,39 @@ import (
 //
 // Use.ts holds a blanket directive over a line where a pure rule (no-debugger) and type-aware rules both report,
 // so one directive silences findings from two classes. Other.ts holds one whose findings all come from type-aware
-// rules, and Dead.ts one naming a rule that finds nothing there, which is dead however that rule's verdict arrived. Value.ts, which both import, then changes twice: to `string | null`, which re-runs the type-aware class
-// while the pure class replays, and to `string | number`, after which Other.ts's directive silences nothing. Every
-// step is held to a run with no cache: the same findings, suppression counts and dead directives, and --explain
-// prints the same accounting. Deleting a directive is noticed.
+// rules, and Dead.ts one naming a rule that finds nothing there, which is dead however that rule's verdict arrived.
+// Value.ts, which both import, then changes twice: to `string | null`, which re-runs the type-aware class while the
+// pure class replays, and to `string | number`, after which Other.ts's directive silences nothing. Every step is held
+// to a run with no cache: the same findings, suppression counts and dead directives, and --explain prints the same
+// accounting. Deleting a directive is noticed.
 func TestADirectiveFileReplaysAndCountsItsDirectivesAsAColdRunDoes(test *testing.T) {
 	test.Parallel()
 	fixture := newRunCacheFixture(test, buildCohere(test))
-	fixture.write("CohereSettings.json", `{"rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off","no-debugger":"error","@typescript-eslint/non-nullable-type-assertion-style":"error"}}`)
+	fixture.write(
+		"CohereSettings.json",
+		`{"rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off","no-debugger":"error","@typescript-eslint/non-nullable-type-assertion-style":"error"}}`,
+	)
 	value := func(union string) {
-		fixture.write("source/Value.ts", "export const value: "+union+" = Math.random() > 0.5 ? 'text' : "+map[string]string{
-			"string | undefined": "undefined", "string | null": "null", "string | number": "1"}[union]+";\n")
+		fixture.write(
+			"source/Value.ts",
+			"export const value: "+union+" = Math.random() > 0.5 ? 'text' : "+map[string]string{
+				"string | undefined": "undefined", "string | null": "null", "string | number": "1"}[union]+";\n",
+		)
 	}
 	value("string | undefined")
 	useWithDirective := "import { value } from './Value';\n// cohere-disable-next-line -- the mixed case\nexport const used = value as string; debugger;\n"
 	fixture.write("source/Use.ts", useWithDirective)
-	fixture.write("source/Other.ts", "import { value } from './Value';\n// cohere-disable-next-line -- only type-aware findings\nexport const other = value as string;\n")
+	fixture.write(
+		"source/Other.ts",
+		"import { value } from './Value';\n// cohere-disable-next-line -- only type-aware findings\nexport const other = value as string;\n",
+	)
 	// A directive naming a rule that ran and found nothing is dead, whether that rule was walked or replayed.
 	fixture.write("source/Dead.ts", "// cohere-disable-next-line no-debugger -- left behind\nexport const dead = 1;\n")
 	fixture.commit("directive files")
 
-	accounting := regexp.MustCompile(`(?m)^(\S+:\d+:\d+ - .*|.*findings suppressed.*|.*silenced nothing.*|.*dead disable comments.*|    \S+:\d+ .*)$`)
+	accounting := regexp.MustCompile(
+		`(?m)^(\S+:\d+:\d+ - .*|.*findings suppressed.*|.*silenced nothing.*|.*dead disable comments.*|    \S+:\d+ .*)$`,
+	)
 	compare := func(step string) string {
 		test.Helper()
 		warm, warmExit := fixture.run(true, "--no-fix")
@@ -45,8 +57,12 @@ func TestADirectiveFileReplaysAndCountsItsDirectivesAsAColdRunDoes(test *testing
 		}
 		got, want := accounting.FindAllString(warm, -1), accounting.FindAllString(cold, -1)
 		if strings.Join(got, "\n") != strings.Join(want, "\n") || warmExit != coldExit {
-			test.Fatalf("%s: the warm run's findings and directive accounting differ from a run with no cache\n--- warm\n%s\n--- cold\n%s",
-				step, strings.Join(got, "\n"), strings.Join(want, "\n"))
+			test.Fatalf(
+				"%s: the warm run's findings and directive accounting differ from a run with no cache\n--- warm\n%s\n--- cold\n%s",
+				step,
+				strings.Join(got, "\n"),
+				strings.Join(want, "\n"),
+			)
 		}
 		return warm
 	}
@@ -58,7 +74,12 @@ func TestADirectiveFileReplaysAndCountsItsDirectivesAsAColdRunDoes(test *testing
 			section = section[:next+1]
 		}
 		if !strings.Contains(section, "withheld by directive") {
-			test.Fatalf("%s: %s's entry records no withheld finding, so its replay below proves nothing:\n%s", step, fileName, section)
+			test.Fatalf(
+				"%s: %s's entry records no withheld finding, so its replay below proves nothing:\n%s",
+				step,
+				fileName,
+				section,
+			)
 		}
 	}
 
@@ -105,7 +126,10 @@ func TestADirectiveFileReplaysAndCountsItsDirectivesAsAColdRunDoes(test *testing
 		var kept []string
 		for _, line := range strings.Split(output[start:], "\n") {
 			trimmed := strings.TrimSpace(line)
-			if strings.HasPrefix(trimmed, "cache:") || strings.HasPrefix(trimmed, "memory:") || strings.HasPrefix(trimmed, "✓") || strings.HasPrefix(trimmed, "✗") {
+			if strings.HasPrefix(trimmed, "cache:") ||
+				strings.HasPrefix(trimmed, "memory:") ||
+				strings.HasPrefix(trimmed, "✓") ||
+				strings.HasPrefix(trimmed, "✗") {
 				continue
 			}
 			kept = append(kept, line)
@@ -114,14 +138,24 @@ func TestADirectiveFileReplaysAndCountsItsDirectivesAsAColdRunDoes(test *testing
 	}
 	explainWarm, explainCold := explanation(true), explanation(false)
 	if explainWarm != explainCold {
-		test.Errorf("--explain's account of Use.ts differs warm and cold\n--- warm\n%s\n--- cold\n%s", explainWarm, explainCold)
+		test.Errorf(
+			"--explain's account of Use.ts differs warm and cold\n--- warm\n%s\n--- cold\n%s",
+			explainWarm,
+			explainCold,
+		)
 	}
 	if !strings.Contains(explainCold, "suppressed") {
-		test.Errorf("--explain names no suppressed finding in Use.ts, so the comparison above is not about directives:\n%s", explainCold)
+		test.Errorf(
+			"--explain names no suppressed finding in Use.ts, so the comparison above is not about directives:\n%s",
+			explainCold,
+		)
 	}
 
 	// Deleting Use.ts's directive is noticed: its findings report.
-	fixture.write("source/Use.ts", strings.Replace(useWithDirective, "// cohere-disable-next-line -- the mixed case\n", "", 1))
+	fixture.write(
+		"source/Use.ts",
+		strings.Replace(useWithDirective, "// cohere-disable-next-line -- the mixed case\n", "", 1),
+	)
 	if undirected := compare("Use.ts's directive deleted"); !strings.Contains(undirected, "no-debugger") {
 		test.Fatalf("with its directive deleted, Use.ts should report no-debugger:\n%s", undirected)
 	}
@@ -136,9 +170,18 @@ func TestADirectiveFileReplaysAndCountsItsDirectivesAsAColdRunDoes(test *testing
 func TestADirectiveFileReplaysWithItsAdamicReadiness(test *testing.T) {
 	test.Parallel()
 	fixture := newRunCacheFixture(test, buildCohere(test))
-	fixture.write("CohereSettings.json", `{"rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off","no-debugger":"error","@typescript-eslint/non-nullable-type-assertion-style":"error"}}`)
-	fixture.write("source/Value.ts", "export const value: string | undefined = Math.random() > 0.5 ? 'text' : undefined;\n")
-	fixture.write("source/Use.ts", "import { value } from './Value';\n// cohere-disable-next-line -- the mixed case\nexport const used = value as string; debugger;\n")
+	fixture.write(
+		"CohereSettings.json",
+		`{"rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off","no-debugger":"error","@typescript-eslint/non-nullable-type-assertion-style":"error"}}`,
+	)
+	fixture.write(
+		"source/Value.ts",
+		"export const value: string | undefined = Math.random() > 0.5 ? 'text' : undefined;\n",
+	)
+	fixture.write(
+		"source/Use.ts",
+		"import { value } from './Value';\n// cohere-disable-next-line -- the mixed case\nexport const used = value as string; debugger;\n",
+	)
 	fixture.write("source/Dead.ts", "// cohere-disable-next-line no-debugger -- left behind\nexport const dead = 1;\n")
 	fixture.commit("directive files")
 
@@ -150,7 +193,10 @@ func TestADirectiveFileReplaysWithItsAdamicReadiness(test *testing.T) {
 			Cached int             `json:"cached"`
 			Adamic json.RawMessage `json:"adamic"`
 		}
-		if decodeError := json.Unmarshal([]byte(lines[len(lines)-1]), &summary); decodeError != nil || len(summary.Adamic) == 0 {
+		if decodeError := json.Unmarshal(
+			[]byte(lines[len(lines)-1]),
+			&summary,
+		); decodeError != nil || len(summary.Adamic) == 0 {
 			test.Fatalf("no readiness in the summary line (%v):\n%s", decodeError, output)
 		}
 		return string(summary.Adamic), fmt.Sprint(summary.Cached)

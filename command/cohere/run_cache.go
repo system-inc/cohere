@@ -318,7 +318,12 @@ func beginRunCache(location projectLocation) *program.InputRecorder {
 	// This invocation's run first and alone: a replay needs nothing else, and the run is a sixth of the
 	// table's bytes where the whole table was all of them (#45ekc65).
 	invocation := program.CacheTableInvocation(os.Args[1:])
-	table, err := program.ReadCacheTable(directory, identity, program.CacheTableSections{Runs: []string{invocation}}, anchor)
+	table, err := program.ReadCacheTable(
+		directory,
+		identity,
+		program.CacheTableSections{Runs: []string{invocation}},
+		anchor,
+	)
 	stored := table.Runs[invocation]
 	// Every input's stat is noted as it is checked, so a run that misses hands them to the content pack rather
 	// than statting each file again (#kdee854). See program.StatSnapshot.
@@ -333,10 +338,15 @@ func beginRunCache(location projectLocation) *program.InputRecorder {
 	release()
 	table.Findings, table.Signatures, table.Types = sections.Findings, sections.Signatures, sections.Types
 	for _, readError := range []error{err, sectionsError} {
-		if errors.Is(readError, program.ErrCacheTableUnreadable) || errors.Is(readError, program.ErrCacheTablePartlyKept) {
+		if errors.Is(readError, program.ErrCacheTableUnreadable) ||
+			errors.Is(readError, program.ErrCacheTablePartlyKept) {
 			// Said once, before the recording starts, so it reaches the terminal and never a replay. A table
 			// thrown away on every run would otherwise look like a cache that is merely cold.
-			fmt.Fprintf(accountOutput(streams.Errors), "note: %v; this run starts cold and writes what it drops anew\n", readError)
+			fmt.Fprintf(
+				accountOutput(streams.Errors),
+				"note: %v; this run starts cold and writes what it drops anew\n",
+				readError,
+			)
 			showWarning()
 		}
 	}
@@ -409,7 +419,12 @@ func startRunCacheClock(location projectLocation, locateError error) {
 func prepareCacheDirectory(root string) {
 	prepareCacheDirectoryOnce.Do(func() {
 		if createDirectoryError := os.MkdirAll(cacheDirectory(root), 0o755); createDirectoryError != nil {
-			fmt.Fprintf(accountOutput(streams.Errors), "note: the cache directory %s could not be created: %v\n", cacheDirectory(root), firstLine(createDirectoryError.Error()))
+			fmt.Fprintf(
+				accountOutput(streams.Errors),
+				"note: the cache directory %s could not be created: %v\n",
+				cacheDirectory(root),
+				firstLine(createDirectoryError.Error()),
+			)
 			showWarning()
 			return
 		}
@@ -418,9 +433,16 @@ func prepareCacheDirectory(root string) {
 		if newGitignoreError != nil {
 			return
 		}
-		if ignored, _, ignoredPathError := matcher.IgnoredPath(".cache/cohere/findings.gob", false); ignoredPathError == nil && !ignored {
-			fmt.Fprintf(accountOutput(streams.Errors), "note: %s does not ignore .cache/, so cohere's cache in %s would be tracked: add the line `.cache/` to it\n",
-				ignoreFile, cacheDirectory(root))
+		if ignored, _, ignoredPathError := matcher.IgnoredPath(
+			".cache/cohere/findings.gob",
+			false,
+		); ignoredPathError == nil && !ignored {
+			fmt.Fprintf(
+				accountOutput(streams.Errors),
+				"note: %s does not ignore .cache/, so cohere's cache in %s would be tracked: add the line `.cache/` to it\n",
+				ignoreFile,
+				cacheDirectory(root),
+			)
 			showWarning()
 		}
 	})
@@ -435,8 +457,12 @@ func readFormatSection(root string) *program.FormatSection {
 	release, _ := holdTableReadLock(cacheDirectory(root), tableWriterWait)
 	// Ignored: a table missing or unreadable holds no format record, which is the nil this answers, and costs the
 	// run a format of files already formatted, never a skip; beginRunCache is where a discarded table is said.
-	table, _ := program.ReadCacheTable(cacheDirectory(root), cacheTableIdentity(), program.CacheTableSections{Formatted: true},
-		program.NewPathAnchor(root))
+	table, _ := program.ReadCacheTable(
+		cacheDirectory(root),
+		cacheTableIdentity(),
+		program.CacheTableSections{Formatted: true},
+		program.NewPathAnchor(root),
+	)
 	release()
 	return table.Formatted
 }
@@ -462,7 +488,12 @@ func writeFormatSection(root string, section *program.FormatSection) error {
 func dumpCacheTable(location projectLocation) error {
 	directory := cacheDirectory(location.Root)
 	release, _ := holdTableReadLock(directory, tableWriterWait)
-	table, readCacheTableError := program.ReadCacheTable(directory, cacheTableIdentity(), program.EveryCacheTableSection, program.NewPathAnchor(location.Root))
+	table, readCacheTableError := program.ReadCacheTable(
+		directory,
+		cacheTableIdentity(),
+		program.EveryCacheTableSection,
+		program.NewPathAnchor(location.Root),
+	)
 	release()
 	if readCacheTableError != nil {
 		if errors.Is(readCacheTableError, os.ErrNotExist) {
@@ -524,7 +555,12 @@ func replayRunCache(stored *program.RunCache, anchor program.PathAnchor) {
 	streams.Errors.Write(spelledOutput(stored.Errors, anchor))
 	streams.Show(streams.Errors)
 	fmt.Fprintf(account, "phases: replayed the run at %s · fix, types and lint did not run\n", recorded)
-	fmt.Fprintf(account, "  this run: %s, after checking %d inputs\n", round(time.Since(processStart)), len(stored.Inputs))
+	fmt.Fprintf(
+		account,
+		"  this run: %s, after checking %d inputs\n",
+		round(time.Since(processStart)),
+		len(stored.Inputs),
+	)
 	fmt.Fprintf(account, "  %s\n", activeMemoryPolicy.line())
 
 	// The footer is this replay's, rendered from the recorded run's summary: its findings and its counts,
@@ -535,11 +571,17 @@ func replayRunCache(stored *program.RunCache, anchor program.PathAnchor) {
 		summary = replayedSummary(summary, time.Since(processStart))
 		switch activeOutput.Mode {
 		case outputVerbose:
-			fmt.Fprintln(streams.Output, footer(summary, activeOutput.Style, footerOptions{Phases: activeOutput.Phases, Verbose: true}))
+			fmt.Fprintln(
+				streams.Output,
+				footer(summary, activeOutput.Style, footerOptions{Phases: activeOutput.Phases, Verbose: true}),
+			)
 		case outputJSON:
 			writeJSONLine(streams.Output, summaryAsJSON(summary))
 		default:
-			fmt.Fprintln(streams.Output, footer(summary, activeOutput.Style, footerOptions{Phases: activeOutput.Phases}))
+			fmt.Fprintln(
+				streams.Output,
+				footer(summary, activeOutput.Style, footerOptions{Phases: activeOutput.Phases}),
+			)
 		}
 	}
 	exitProcess(stored.ExitCode)
@@ -631,9 +673,13 @@ func declareFormatWalk(enumeration formatfiles.Enumeration) {
 	}
 	// The settings the root itself resolves to can sit above it, in a directory the walk never listed, and so
 	// can the directories between: a settings file created in one of those would take over the options.
-	if resolution, resolveError := formatoptions.Resolve(enumeration.Root); resolveError == nil && resolution.Source != "" {
+	if resolution, resolveError := formatoptions.Resolve(
+		enumeration.Root,
+	); resolveError == nil && resolution.Source != "" {
 		read = append(read, resolution.Source)
-		for directory := filepath.Clean(enumeration.Root); directory != filepath.Dir(resolution.Source); directory = filepath.Dir(directory) {
+		for directory := filepath.Clean(
+			enumeration.Root,
+		); directory != filepath.Dir(resolution.Source); directory = filepath.Dir(directory) {
 			session.extraDirectories = append(session.extraDirectories, directory)
 			if parent := filepath.Dir(directory); parent == directory {
 				break
@@ -727,10 +773,17 @@ func graduateSignatures(directory string, graph *program.Graph, shapes map[strin
 	if graph == nil || shapes == nil {
 		return 0
 	}
-	graduated, abandoned := graph.GraduateSignatures(shapes, time.Now().Add(signatureGraduationBudget), signatureGraduationBudget/2)
+	graduated, abandoned := graph.GraduateSignatures(
+		shapes,
+		time.Now().Add(signatureGraduationBudget),
+		signatureGraduationBudget/2,
+	)
 	if abandoned != "" {
-		cacheNote(directory, fmt.Sprintf("%s's declaration emit ran past %s, so its shape stays keyed on content until its bytes change",
-			abandoned, signatureGraduationBudget/2))
+		cacheNote(
+			directory,
+			fmt.Sprintf("%s's declaration emit ran past %s, so its shape stays keyed on content until its bytes change",
+				abandoned, signatureGraduationBudget/2),
+		)
 		return graduated + 1
 	}
 	return graduated
@@ -795,7 +848,13 @@ func (session *runCacheSession) write(recorded *program.RunCache) {
 			sections.Types = true
 		}
 	}
-	if writeCacheTableError := program.WriteCacheTable(session.directory, table, cacheTableIdentity(), sections, session.anchor); writeCacheTableError != nil {
+	if writeCacheTableError := program.WriteCacheTable(
+		session.directory,
+		table,
+		cacheTableIdentity(),
+		sections,
+		session.anchor,
+	); writeCacheTableError != nil {
 		session.note(fmt.Sprintf("the cache table could not be written: %v", firstLine(writeCacheTableError.Error())))
 	}
 }
@@ -1006,7 +1065,8 @@ func attachFindingsCache(graph *program.Graph, location projectLocation) {
 	case previous == nil:
 		session.findingsMissed = "no findings are on record"
 	case previous.Key != key:
-		session.findingsMissed = "the findings on record were taken under another key: " + parts.Changed(previous.KeyParts)
+		session.findingsMissed = "the findings on record were taken under another key: " +
+			parts.Changed(previous.KeyParts)
 	}
 	session.findings = program.NewFindingsReuse(key, session.table.Findings, session.anchor)
 
@@ -1103,10 +1163,22 @@ func attachTypesCache(graph *program.Graph, location projectLocation) {
 	anchor := program.NewPathAnchor(location.Root)
 	// Ignored: a table missing or unreadable reads as empty, so the types section and the shapes start cold and are
 	// written whole; beginRunCache is where a discarded table is said.
-	table, _ := program.ReadCacheTable(directory, cacheTableIdentity(), program.CacheTableSections{Signatures: true, Types: true}, anchor)
+	table, _ := program.ReadCacheTable(
+		directory,
+		cacheTableIdentity(),
+		program.CacheTableSections{Signatures: true, Types: true},
+		anchor,
+	)
 	release()
-	record := &typesRecord{directory: directory, anchor: anchor, reuse: program.NewTypeDiagnosticsReuse(table.Types, typesKey)}
-	record.shapes, record.computedShapes = graph.Signatures(context.Background(), graph.SeedSignatures(table.Signatures))
+	record := &typesRecord{
+		directory: directory,
+		anchor:    anchor,
+		reuse:     program.NewTypeDiagnosticsReuse(table.Types, typesKey),
+	}
+	record.shapes, record.computedShapes = graph.Signatures(
+		context.Background(),
+		graph.SeedSignatures(table.Signatures),
+	)
 	record.shapesGraph = graph
 	graph.Shapes = record.shapes
 	pendingTypes = record
@@ -1128,8 +1200,17 @@ func (record *typesRecord) write() {
 		table.Signatures = record.shapes
 		sections.Signatures = true
 	}
-	if writeCacheTableError := program.WriteCacheTable(record.directory, table, cacheTableIdentity(), sections, record.anchor); writeCacheTableError != nil {
-		cacheNote(record.directory, fmt.Sprintf("the cache table could not be written: %v", firstLine(writeCacheTableError.Error())))
+	if writeCacheTableError := program.WriteCacheTable(
+		record.directory,
+		table,
+		cacheTableIdentity(),
+		sections,
+		record.anchor,
+	); writeCacheTableError != nil {
+		cacheNote(
+			record.directory,
+			fmt.Sprintf("the cache table could not be written: %v", firstLine(writeCacheTableError.Error())),
+		)
 	}
 }
 

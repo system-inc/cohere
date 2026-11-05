@@ -67,7 +67,9 @@ func adjustStrings(value string, options *printerOptions) string {
 }
 
 // attributeFlagPattern is /^(?<value>.+?)\s+(?<flag>[a-z])$/i with JavaScript's `.` and \s.
-var attributeFlagPattern = regexp.MustCompile(`(?i)^([^\n\r\x{2028}\x{2029}]+?)` + javaScriptWhitespaceClass + `+([a-z])$`)
+var attributeFlagPattern = regexp.MustCompile(
+	`(?i)^([^\n\r\x{2028}\x{2029}]+?)` + javaScriptWhitespaceClass + `+([a-z])$`,
+)
 
 func quoteAttributeValue(value string, options *printerOptions) string {
 	quote := `"`
@@ -113,7 +115,10 @@ func skipDigits(value string, index int) int {
 func matchNumberAt(value string, start int) (int, bool) {
 	end := -1
 	integerEnd := skipDigits(value, start)
-	if integerEnd < len(value) && value[integerEnd] == '.' && integerEnd+1 < len(value) && isDigit(value[integerEnd+1]) {
+	if integerEnd < len(value) &&
+		value[integerEnd] == '.' &&
+		integerEnd+1 < len(value) &&
+		isDigit(value[integerEnd+1]) {
 		end = skipDigits(value, integerEnd+1)
 	} else if integerEnd > start {
 		end = integerEnd

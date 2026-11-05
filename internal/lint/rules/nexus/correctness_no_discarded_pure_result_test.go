@@ -60,7 +60,11 @@ func correctnessNoDiscardedPureResultExpect(test *testing.T, result rule_testing
 			test.Fatalf("unexpected message id %q", diagnostic.Message.Id)
 		}
 		if len(diagnostic.Fixes) != 0 || len(diagnostic.Suggestions) != 0 {
-			test.Fatalf("expected no fix and no suggestion, got %d and %d", len(diagnostic.Fixes), len(diagnostic.Suggestions))
+			test.Fatalf(
+				"expected no fix and no suggestion, got %d and %d",
+				len(diagnostic.Fixes),
+				len(diagnostic.Suggestions),
+			)
 		}
 		got = append(got, text[diagnostic.Range.Pos():diagnostic.Range.End()])
 	}
@@ -86,7 +90,13 @@ func TestCorrectnessNoDiscardedPureResultFiresOnTheSlipAndNotOnItsFix(test *test
 		"    list.concat(more);",
 		"}",
 	))
-	correctnessNoDiscardedPureResultExpect(test, slip, "name.trim()", "path.replace('/old/', '/new/')", "list.concat(more)")
+	correctnessNoDiscardedPureResultExpect(
+		test,
+		slip,
+		"name.trim()",
+		"path.replace('/old/', '/new/')",
+		"list.concat(more)",
+	)
 
 	fixed := correctnessNoDiscardedPureResultRun(test, correctnessNoDiscardedPureResultSource(
 		"export function normalize() {",
@@ -112,8 +122,16 @@ func TestCorrectnessNoDiscardedPureResultFires(test *testing.T) {
 		{"parenthesized", []string{"(name.toUpperCase());"}, []string{"name.toUpperCase()"}},
 		{"a readonly array", []string{"items.indexOf('a');"}, []string{"items.indexOf('a')"}},
 		{"a union of string and array", []string{"either.includes('a');"}, []string{"either.includes('a')"}},
-		{"a replace with a regex and a string", []string{"name.replace(pattern, '');"}, []string{"name.replace(pattern, '')"}},
-		{"a join and a split", []string{"list.join(',');", "path.split('/');"}, []string{"list.join(',')", "path.split('/')"}},
+		{
+			"a replace with a regex and a string",
+			[]string{"name.replace(pattern, '');"},
+			[]string{"name.replace(pattern, '')"},
+		},
+		{
+			"a join and a split",
+			[]string{"list.join(',');", "path.split('/');"},
+			[]string{"list.join(',')", "path.split('/')"},
+		},
 		{"a chain ending in a pure call", []string{"name.trim().padStart(4);"}, []string{"name.trim().padStart(4)"}},
 	}
 
@@ -121,7 +139,10 @@ func TestCorrectnessNoDiscardedPureResultFires(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 
-			result := correctnessNoDiscardedPureResultRun(test, correctnessNoDiscardedPureResultSource(testCase.lines...))
+			result := correctnessNoDiscardedPureResultRun(
+				test,
+				correctnessNoDiscardedPureResultSource(testCase.lines...),
+			)
 			correctnessNoDiscardedPureResultExpect(test, result, testCase.want...)
 		})
 	}
@@ -139,10 +160,16 @@ func TestCorrectnessNoDiscardedPureResultStaysSilent(test *testing.T) {
 			"name.replace(pattern, function(match) { matches.push(match); return match; });",
 		}},
 		{"a replace with a named replacer function", []string{"name.replace(pattern, replacer);"}},
-		{"a replace with a replacer of type any", []string{"declare const loose: any;", "name.replace(pattern, loose);"}},
+		{
+			"a replace with a replacer of type any",
+			[]string{"declare const loose: any;", "name.replace(pattern, loose);"},
+		},
 		{"a mutating array method", []string{"list.push('a');", "list.sort();", "list.splice(0, 1);"}},
 		{"a callback array method, a style question", []string{"list.map((each) => use(each));", "list.forEach(use);"}},
-		{"a method that can throw on a bad argument", []string{"name.normalize('NFC');", "name.repeat(2);", "name.localeCompare('a');"}},
+		{
+			"a method that can throw on a bad argument",
+			[]string{"name.normalize('NFC');", "name.repeat(2);", "name.localeCompare('a');"},
+		},
 		{"a class of the project's own with a trim method", []string{
 			"class Text { trim(): Text { use(this); return this; } }",
 			"new Text().trim();",
@@ -165,7 +192,10 @@ func TestCorrectnessNoDiscardedPureResultStaysSilent(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 
-			rule_testing.ExpectClean(test, correctnessNoDiscardedPureResultRun(test, correctnessNoDiscardedPureResultSource(testCase.lines...)))
+			rule_testing.ExpectClean(
+				test,
+				correctnessNoDiscardedPureResultRun(test, correctnessNoDiscardedPureResultSource(testCase.lines...)),
+			)
 		})
 	}
 }

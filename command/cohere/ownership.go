@@ -144,7 +144,9 @@ func resolveOwnership(found *discovery) (ownership, error) {
 	// Solution roots: nothing to check, and their references are projects now.
 	running := found.Projects[:0:0]
 	for _, project := range found.Projects {
-		if read, isRead := reads[found.configPath(project)]; project.Engine == engineTypeScript && isRead && read.err == nil &&
+		if read, isRead := reads[found.configPath(
+			project,
+		)]; project.Engine == engineTypeScript && isRead && read.err == nil &&
 			len(read.config.FileNames) == 0 && len(read.config.References) > 0 {
 			decided.Solutions = append(decided.Solutions, projectLabel(project))
 			continue
@@ -181,7 +183,10 @@ func resolveOwnership(found *discovery) (ownership, error) {
 	var runningYields [][]string
 	for index, project := range found.Projects {
 		read, isRead := reads[found.configPath(project)]
-		if isRead && read.err == nil && len(read.config.FileNames) > 0 && len(yielded[index]) == len(read.config.FileNames) {
+		if isRead &&
+			read.err == nil &&
+			len(read.config.FileNames) > 0 &&
+			len(yielded[index]) == len(read.config.FileNames) {
 			decided.Yielding = append(decided.Yielding, projectLabel(project))
 			continue
 		}
@@ -205,7 +210,10 @@ func resolveOwnership(found *discovery) (ownership, error) {
 			cacheDirectories[directory] = true
 			for _, other := range found.Projects {
 				if other.Engine == engineTypeScript && isBelow(other.Directory, project.Directory) {
-					yield.Directories = append(yield.Directories, filepath.Join(found.Root, filepath.FromSlash(other.Directory)))
+					yield.Directories = append(
+						yield.Directories,
+						filepath.Join(found.Root, filepath.FromSlash(other.Directory)),
+					)
 				}
 			}
 		}
@@ -370,7 +378,11 @@ var activeProjectYield = sync.OnceValues(func() (projectYield, error) {
 	}
 	var yield projectYield
 	if decodeError := json.Unmarshal(contents, &yield); decodeError != nil {
-		return projectYield{}, fmt.Errorf("reading what this project yields to the others, %s: %w", yieldFile, decodeError)
+		return projectYield{}, fmt.Errorf(
+			"reading what this project yields to the others, %s: %w",
+			yieldFile,
+			decodeError,
+		)
 	}
 	return yield, nil
 })

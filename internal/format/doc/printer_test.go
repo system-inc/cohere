@@ -45,14 +45,34 @@ type specGenerator struct {
 	depth    int
 }
 
-var specWords = []string{"a", "bc", "def", "word", "longer", "identifier", "x", "", "中文", "😀", "trailing  ", "tab\t", "é"}
+var specWords = []string{
+	"a",
+	"bc",
+	"def",
+	"word",
+	"longer",
+	"identifier",
+	"x",
+	"",
+	"中文",
+	"😀",
+	"trailing  ",
+	"tab\t",
+	"é",
+}
 
 func (generator *specGenerator) text() *spec {
 	return &spec{Kind: "text", Text: specWords[generator.random.Intn(len(specWords))]}
 }
 
 func (generator *specGenerator) line() *spec {
-	return &spec{Kind: []string{"line", "softline", "hardline", "literalline", "hardlineWithoutBreakParent"}[generator.random.Intn(5)]}
+	return &spec{Kind: []string{
+		"line",
+		"softline",
+		"hardline",
+		"literalline",
+		"hardlineWithoutBreakParent",
+	}[generator.random.Intn(5)]}
 }
 
 func (generator *specGenerator) groupID() string {
@@ -93,7 +113,11 @@ func (generator *specGenerator) node() *spec {
 		case 0:
 			return &spec{Kind: "alignWidth", Number: generator.random.Intn(5) - 1, Children: []*spec{generator.node()}}
 		case 1:
-			return &spec{Kind: "alignString", Text: []string{"> ", "- ", "  ", "", "→ ", "中 "}[generator.random.Intn(6)], Children: []*spec{generator.node()}}
+			return &spec{
+				Kind:     "alignString",
+				Text:     []string{"> ", "- ", "  ", "", "→ ", "中 "}[generator.random.Intn(6)],
+				Children: []*spec{generator.node()},
+			}
 		case 2:
 			return &spec{Kind: "markAsRoot", Children: []*spec{generator.node()}}
 		default:
@@ -134,7 +158,12 @@ func (generator *specGenerator) node() *spec {
 		}
 		return ifBreak
 	case 12:
-		return &spec{Kind: "indentIfBreak", ID: generator.groupID(), Flag: generator.random.Intn(2) == 0, Children: []*spec{generator.node()}}
+		return &spec{
+			Kind:     "indentIfBreak",
+			ID:       generator.groupID(),
+			Flag:     generator.random.Intn(2) == 0,
+			Children: []*spec{generator.node()},
+		}
 	case 13:
 		return &spec{Kind: "lineSuffix", Children: []*spec{generator.node()}}
 	case 14:
@@ -301,9 +330,18 @@ func boundaryCases() ([]*spec, []Options) {
 	for width := 3; width <= 8; width++ {
 		word := strings.Repeat("w", width)
 		shapes := []*spec{
-			{Kind: "concat", Children: []*spec{{Kind: "group", Children: []*spec{{Kind: "concat", Children: []*spec{text(word), {Kind: "line"}, text("")}}}}, {Kind: "hardline"}}},
-			{Kind: "concat", Children: []*spec{{Kind: "group", Children: []*spec{{Kind: "concat", Children: []*spec{text(word), {Kind: "line"}, text(""), text("x")}}}}, {Kind: "hardline"}}},
-			{Kind: "concat", Children: []*spec{{Kind: "group", Children: []*spec{{Kind: "concat", Children: []*spec{text(word[:width-1]), {Kind: "line"}, text("")}}}}, {Kind: "softline"}, text("y")}},
+			{Kind: "concat", Children: []*spec{{
+				Kind:     "group",
+				Children: []*spec{{Kind: "concat", Children: []*spec{text(word), {Kind: "line"}, text("")}}},
+			}, {Kind: "hardline"}}},
+			{Kind: "concat", Children: []*spec{{
+				Kind:     "group",
+				Children: []*spec{{Kind: "concat", Children: []*spec{text(word), {Kind: "line"}, text(""), text("x")}}},
+			}, {Kind: "hardline"}}},
+			{Kind: "concat", Children: []*spec{{
+				Kind:     "group",
+				Children: []*spec{{Kind: "concat", Children: []*spec{text(word[:width-1]), {Kind: "line"}, text("")}}},
+			}, {Kind: "softline"}, text("y")}},
 			{Kind: "fill", Children: []*spec{text(word), {Kind: "line"}, text(""), {Kind: "line"}, text("z")}},
 		}
 		for _, shape := range shapes {
@@ -326,17 +364,28 @@ func TestPrintAgreesWithUpstream(test *testing.T) {
 	options := make([]Options, count)
 	for index := range cases {
 		generator := &specGenerator{random: random}
-		options[index] = Options{PrintWidth: 8 + random.Intn(40), TabWidth: []int{2, 4}[random.Intn(2)], UseTabs: random.Intn(4) == 0}
+		options[index] = Options{
+			PrintWidth: 8 + random.Intn(40),
+			TabWidth:   []int{2, 4}[random.Intn(2)],
+			UseTabs:    random.Intn(4) == 0,
+		}
 		cases[index] = printCase{
-			Spec:    generator.node(),
-			Options: map[string]any{"printWidth": options[index].PrintWidth, "tabWidth": options[index].TabWidth, "useTabs": options[index].UseTabs},
+			Spec: generator.node(),
+			Options: map[string]any{
+				"printWidth": options[index].PrintWidth,
+				"tabWidth":   options[index].TabWidth,
+				"useTabs":    options[index].UseTabs,
+			},
 		}
 	}
 
 	boundarySpecs, boundaryOptions := boundaryCases()
 	for index, boundary := range boundarySpecs {
 		options = append(options, boundaryOptions[index])
-		cases = append(cases, printCase{Spec: boundary, Options: map[string]any{"printWidth": boundaryOptions[index].PrintWidth, "tabWidth": 2, "useTabs": false}})
+		cases = append(cases, printCase{
+			Spec:    boundary,
+			Options: map[string]any{"printWidth": boundaryOptions[index].PrintWidth, "tabWidth": 2, "useTabs": false},
+		})
 	}
 
 	encoded, encodeError := json.Marshal(cases)
@@ -373,13 +422,31 @@ func TestPrintAgreesWithUpstream(test *testing.T) {
 			mismatches++
 			if mismatches <= 5 {
 				specJSON, _ := json.Marshal(testCase.Spec)
-				test.Errorf("case %d (%+v)\nspec %s\nwant %q\ngot  %q", index, options[index], specJSON, upstream[index].Formatted, got)
+				test.Errorf(
+					"case %d (%+v)\nspec %s\nwant %q\ngot  %q",
+					index,
+					options[index],
+					specJSON,
+					upstream[index].Formatted,
+					got,
+				)
 			}
 		}
 	}
-	test.Logf("%d docs printed (%d random, %d at the width boundary), %d upstream refused, %d with line breaks, %d mismatches",
-		len(cases), count, len(boundarySpecs), upstreamErrors, rewrites, mismatches)
+	test.Logf(
+		"%d docs printed (%d random, %d at the width boundary), %d upstream refused, %d with line breaks, %d mismatches",
+		len(cases),
+		count,
+		len(boundarySpecs),
+		upstreamErrors,
+		rewrites,
+		mismatches,
+	)
 	if upstreamErrors > count/10 {
-		test.Errorf("upstream refused %d of %d generated docs; the generator is producing invalid docs and the comparison is thinner than it looks", upstreamErrors, count)
+		test.Errorf(
+			"upstream refused %d of %d generated docs; the generator is producing invalid docs and the comparison is thinner than it looks",
+			upstreamErrors,
+			count,
+		)
 	}
 }

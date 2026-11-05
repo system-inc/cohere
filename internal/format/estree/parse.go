@@ -33,7 +33,12 @@ func ParseTypeScript(fileName string, text string, nodes *Arena) (*Node, []*Node
 // property of the file and no node), so a tree that matches them is the tree a fresh parse returns.
 // Anything else is parsed here as before, so a nil tree, or the wrong one, costs a parse and never a
 // different result.
-func ParseTypeScriptFrom(fileName string, text string, parsed *ast.SourceFile, nodes *Arena) (*Node, []*Node, *StrippedText, error) {
+func ParseTypeScriptFrom(
+	fileName string,
+	text string,
+	parsed *ast.SourceFile,
+	nodes *Arena,
+) (*Node, []*Node, *StrippedText, error) {
 	if !treeIsFor(fileName, text, parsed) {
 		parsed = ParseSourceFile(fileName, ReplaceHashbang(text))
 	}
@@ -42,7 +47,10 @@ func ParseTypeScriptFrom(fileName string, text string, parsed *ast.SourceFile, n
 
 // treeIsFor reports whether parsed is the tree ParseTypeScript would build for text: see ParseTypeScriptFrom.
 func treeIsFor(fileName string, text string, parsed *ast.SourceFile) bool {
-	return parsed != nil && parsed.Text() == text && parsed.ScriptKind == scriptKindOf(fileName) && !strings.HasPrefix(text, "#!") &&
+	return parsed != nil &&
+		parsed.Text() == text &&
+		parsed.ScriptKind == scriptKindOf(fileName) &&
+		!strings.HasPrefix(text, "#!") &&
 		tspath.IsDeclarationFileName(parsed.FileName().AsString()) == tspath.IsDeclarationFileName(fileName)
 }
 
@@ -103,7 +111,11 @@ func ParseSourceFile(fileName string, text string) *ast.SourceFile {
 		rooted = "/" + strings.TrimPrefix(rooted, "/")
 	}
 	rooted = tspath.NormalizePath(rooted)
-	return parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: tspath.RootedFilePath(rooted), PathKey: tspath.PathKey(rooted)}, text, scriptKindOf(fileName))
+	return parser.ParseSourceFile(
+		ast.SourceFileParseOptions{FileName: tspath.RootedFilePath(rooted), PathKey: tspath.PathKey(rooted)},
+		text,
+		scriptKindOf(fileName),
+	)
 }
 
 // scriptKindOf is the script kind ParseSourceFile parses a file as, chosen by extension.

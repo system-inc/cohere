@@ -44,7 +44,10 @@ func (paths Paths) SwiftBuildDirectory() string {
 // SwiftEngineBinaryPath is where the engine built from inputs with this hash lives, named the way
 // BinaryPath names cohere's, platform included.
 func (paths Paths) SwiftEngineBinaryPath(hash string) string {
-	return filepath.Join(paths.BinaryDirectory(), fmt.Sprintf("cohere-swift-%s-%s-%s", runtime.GOOS, runtime.GOARCH, hash))
+	return filepath.Join(
+		paths.BinaryDirectory(),
+		fmt.Sprintf("cohere-swift-%s-%s-%s", runtime.GOOS, runtime.GOARCH, hash),
+	)
 }
 
 // ResolveSwiftEngine returns the path to a cohere-swift binary matching the engine's sources and the
@@ -102,11 +105,16 @@ func ResolveSwiftEngine(paths Paths, commit string, contract int) (string, bool,
 func swiftToolchain() (string, error) {
 	output, outputError := exec.Command("swift", "--version").Output()
 	if outputError != nil {
-		return "", fmt.Errorf("no Swift toolchain answered `swift --version` (%w), so the Swift engine cannot be built and nothing was checked", outputError)
+		return "", fmt.Errorf(
+			"no Swift toolchain answered `swift --version` (%w), so the Swift engine cannot be built and nothing was checked",
+			outputError,
+		)
 	}
 	identity := strings.Join(strings.Fields(string(output)), " ")
 	if identity == "" {
-		return "", fmt.Errorf("`swift --version` printed nothing, so the toolchain the Swift engine would link against is unknown")
+		return "", fmt.Errorf(
+			"`swift --version` printed nothing, so the toolchain the Swift engine would link against is unknown",
+		)
 	}
 	return identity, nil
 }
@@ -241,8 +249,10 @@ func buildSwiftProductWithSwiftPM(packageDirectory string, scratchDirectory stri
 		return fmt.Errorf("creating the binary cache directory: %w", createDirectoryError)
 	}
 
-	Report.Step("cohere: building the Swift engine from %s (its sources or the toolchain changed; a cold build takes minutes)",
-		packageDirectory)
+	Report.Step(
+		"cohere: building the Swift engine from %s (its sources or the toolchain changed; a cold build takes minutes)",
+		packageDirectory,
+	)
 
 	// `--manifest-cache none`, because the manifest reads the tree's git state into the engine's
 	// `sourceTreeModified`, and SwiftPM's shared manifest cache answers it from an earlier evaluation of
@@ -265,7 +275,12 @@ func buildSwiftProductWithSwiftPM(packageDirectory string, scratchDirectory stri
 		build.Stdout, build.Stderr = stream, stream
 	}
 	if runBuildToolError := runBuildTool(build); runBuildToolError != nil {
-		return fmt.Errorf("building the Swift engine (swift %s): %w%s", strings.Join(arguments, " "), runBuildToolError, lastLines(kept.String(), 40))
+		return fmt.Errorf(
+			"building the Swift engine (swift %s): %w%s",
+			strings.Join(arguments, " "),
+			runBuildToolError,
+			lastLines(kept.String(), 40),
+		)
 	}
 
 	binPath, outputError := exec.Command("swift", append(arguments, "--show-bin-path")...).Output()
@@ -276,7 +291,11 @@ func buildSwiftProductWithSwiftPM(packageDirectory string, scratchDirectory stri
 
 	// The build said it worked; the file is what gets run. The same gap build() closes for cohere.
 	if copyExecutableError := copyExecutable(product, binaryPath); copyExecutableError != nil {
-		return fmt.Errorf("swift build reported success but the engine could not be taken from %s: %w", product, copyExecutableError)
+		return fmt.Errorf(
+			"swift build reported success but the engine could not be taken from %s: %w",
+			product,
+			copyExecutableError,
+		)
 	}
 	return nil
 }

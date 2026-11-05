@@ -57,7 +57,12 @@ func resolveToSetextUnderline(events []Event, context *TokenizeContext) []Event 
 	// but we need move it.
 	if definition != 0 {
 		events = spliceEvents(events, text, 0, []Event{{Enter: true, Token: heading, Context: context}})
-		events = spliceEvents(events, definition+1, 0, []Event{{Enter: false, Token: events[content].Token, Context: context}})
+		events = spliceEvents(
+			events,
+			definition+1,
+			0,
+			[]Event{{Enter: false, Token: events[content].Token, Context: context}},
+		)
 		events[content].Token.End = events[definition].Token.End
 	} else {
 		events[content].Token = heading

@@ -32,7 +32,11 @@ func TestTheVerdictDescriptorIsNotInheritedByAChild(test *testing.T) {
 		test.Fatal(err)
 	}
 	probe := func() string {
-		script := fmt.Sprintf("if [ -e /dev/fd/%d ]; then echo open; else echo closed; fi; echo ${%s:-unset}", descriptor, VerdictVariable)
+		script := fmt.Sprintf(
+			"if [ -e /dev/fd/%d ]; then echo open; else echo closed; fi; echo ${%s:-unset}",
+			descriptor,
+			VerdictVariable,
+		)
 		output, outputError := exec.Command("/bin/sh", "-c", script).Output()
 		if outputError != nil {
 			test.Fatal(outputError)
@@ -51,7 +55,10 @@ func TestTheVerdictDescriptorIsNotInheritedByAChild(test *testing.T) {
 	// Ignored: never written.
 	defer file.Close()
 	if after := probe(); after != "closed unset" {
-		test.Errorf("a child started after the verdict descriptor was taken sees %q, want the descriptor closed and the variable unset", after)
+		test.Errorf(
+			"a child started after the verdict descriptor was taken sees %q, want the descriptor closed and the variable unset",
+			after,
+		)
 	}
 }
 

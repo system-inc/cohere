@@ -994,7 +994,9 @@ func (walk *typeUsageWalk) visitSignature(signature *checker.Signature) {
 	// A type predicate stands in for the return type when the signature has one, so `input is T`
 	// counts its T in return position exactly as a returned `T` would.
 	returnType := walk.ctx.TypeChecker.GetReturnTypeOfSignature(signature)
-	if predicate := walk.ctx.TypeChecker.GetTypePredicateOfSignature(signature); predicate != nil && predicate.Type() != nil {
+	if predicate := walk.ctx.TypeChecker.GetTypePredicateOfSignature(
+		signature,
+	); predicate != nil && predicate.Type() != nil {
 		returnType = predicate.Type()
 	}
 	walk.visitType(returnType, false, true)

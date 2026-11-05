@@ -89,7 +89,11 @@ var ConsistencyNoReturnVoid = rule.Rule{
 					ruleContext.ReportNode(node, consistencyNoReturnVoidMessage())
 					return
 				}
-				ruleContext.ReportNodeWithFixes(node, consistencyNoReturnVoidMessage(), ruleContext.ReplaceNode(node, replacement))
+				ruleContext.ReportNodeWithFixes(
+					node,
+					consistencyNoReturnVoidMessage(),
+					ruleContext.ReplaceNode(node, replacement),
+				)
 			},
 		}
 	},
@@ -104,7 +108,11 @@ var consistencyNoReturnVoidUnsafeLeadingWords = regexp.MustCompile(`^(function|c
 //
 // Parentheses around the `void` (`return (void f());`) need no check of their own: the statement text
 // then fails the canonical match below, and a mutant removing a separate check survived every fixture.
-func consistencyNoReturnVoidReplacement(ruleContext rule.Context, node *ast.Node, voidExpression *ast.Node) (string, bool) {
+func consistencyNoReturnVoidReplacement(
+	ruleContext rule.Context,
+	node *ast.Node,
+	voidExpression *ast.Node,
+) (string, bool) {
 	sourceText := ruleContext.SourceFile.Text()
 	statementRange := rule.TokenRange(ruleContext.SourceFile, node)
 	statementText := sourceText[statementRange.Pos():statementRange.End()]

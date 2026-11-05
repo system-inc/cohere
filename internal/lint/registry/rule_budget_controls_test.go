@@ -58,9 +58,12 @@ func TestRuleBudgetBoundsANonReturningListener(test *testing.T) {
 	const helper = "COHERE_BUDGET_DEADLINE_CONTROL"
 	if os.Getenv(helper) == "1" {
 		graph := buildBudgetGraph(test, map[string]string{"file.ts": "export const value = 1;\n"})
-		stuck := rule.Rule{Name: "planted-nonreturning", Run: func(ruleContext rule.Context, options any) rule.Listeners {
-			return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) { select {} }}
-		}}
+		stuck := rule.Rule{
+			Name: "planted-nonreturning",
+			Run: func(ruleContext rule.Context, options any) rule.Listeners {
+				return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) { select {} }}
+			},
+		}
 		_, checkRuleBudgetError := checkRuleBudget(test, graph, []rule.Rule{stuck}, 20*time.Millisecond)
 		if checkRuleBudgetError != nil {
 			test.Fatal(checkRuleBudgetError)
@@ -71,11 +74,17 @@ func TestRuleBudgetBoundsANonReturningListener(test *testing.T) {
 	if err != nil {
 		test.Fatal(err)
 	}
-	command := exec.Command(binary, "-test.run=^TestRuleBudgetBoundsANonReturningListener$", "-test.v", "-test.timeout=5s")
+	command := exec.Command(
+		binary,
+		"-test.run=^TestRuleBudgetBoundsANonReturningListener$",
+		"-test.v",
+		"-test.timeout=5s",
+	)
 	command.Env = append(os.Environ(), helper+"=1")
 	output, err := command.CombinedOutput()
 	text := string(output)
-	if err == nil || !strings.Contains(text, "rule CPU budget exceeded: planted-nonreturning reached deadline 60.000ms") ||
+	if err == nil ||
+		!strings.Contains(text, "rule CPU budget exceeded: planted-nonreturning reached deadline 60.000ms") ||
 		!strings.Contains(text, "rules run=0 registered=1 corpus nodes=8 files=1") {
 		test.Fatalf("unbounded or unnamed refusal (%v):\n%s", err, text)
 	}
@@ -112,7 +121,9 @@ func TestRuleBudgetRefuses6911526cThroughGoOverlay(test *testing.T) {
 import "github.com/system-inc/cohere/internal/lint/rule"
 func init() { rule.Register(rule.Registration{Rule: NoCrossEnumNarrowing}) }
 `))
-		add("policy/messages/no-cross-enum-narrowing.json", []byte(`{"rules":{"TypeScript":"adamic/no-cross-enum-narrowing"},"messages":{"crossEnumNarrowing":{"text":"{{other}} collides with {{member}} at {{value}}"}}}`))
+		add("policy/messages/no-cross-enum-narrowing.json", []byte(
+			`{"rules":{"TypeScript":"adamic/no-cross-enum-narrowing"},"messages":{"crossEnumNarrowing":{"text":"{{other}} collides with {{member}} at {{value}}"}}}`,
+		))
 	} else if statError != nil {
 		test.Fatal(statError)
 	}
@@ -127,11 +138,22 @@ func init() { rule.Register(rule.Registration{Rule: NoCrossEnumNarrowing}) }
 	}
 	// Uncached: the child run measures a rule's CPU time, so it has to run again each time rather than replay a
 	// cached result from a run that happened to land under the budget.
-	command := exec.Command("go", "test", "-overlay="+overlayPath, "./internal/lint/registry", "-count=1", "-timeout=30s", "-run=^TestRegisteredRuleCPUBudget$", "-v")
+	command := exec.Command(
+		"go",
+		"test",
+		"-overlay="+overlayPath,
+		"./internal/lint/registry",
+		"-count=1",
+		"-timeout=30s",
+		"-run=^TestRegisteredRuleCPUBudget$",
+		"-v",
+	)
 	command.Dir = root
 	output, err := command.CombinedOutput()
 	text := string(output)
-	if err == nil || !strings.Contains(text, "rule CPU budget exceeded: adamic/no-cross-enum-narrowing") || !strings.Contains(text, "rule CPU coverage:") {
+	if err == nil ||
+		!strings.Contains(text, "rule CPU budget exceeded: adamic/no-cross-enum-narrowing") ||
+		!strings.Contains(text, "rule CPU coverage:") {
 		test.Fatalf("historical rule was not refused by name (%v):\n%s", err, text)
 	}
 	test.Logf("6911526c refused:\n%s", text)

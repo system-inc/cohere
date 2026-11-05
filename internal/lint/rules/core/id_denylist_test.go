@@ -70,99 +70,437 @@ func TestIdDenylistFires(test *testing.T) {
 	}{
 		{source: "foo = \"bar\"", settings: idDenylistOf("foo"), findings: []string{messageIdDenylistRestricted.Id}},
 		{source: "bar = \"bar\"", settings: idDenylistOf("bar"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "foo = \"bar\"", settings: idDenylistOf("f", "fo", "foo", "bar"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "function foo(){}", settings: idDenylistOf("f", "fo", "foo", "bar"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "import foo from 'mod'", settings: idDenylistOf("foo"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "import * as foo from 'mod'", settings: idDenylistOf("foo"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "export * as foo from 'mod'", settings: idDenylistOf("foo"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "import { foo } from 'mod'", settings: idDenylistOf("foo"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "import { foo as bar } from 'mod'", settings: idDenylistOf("bar"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "import { foo as bar } from 'mod'", settings: idDenylistOf("foo", "bar"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "import { foo as foo } from 'mod'", settings: idDenylistOf("foo"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "import { foo, foo as bar } from 'mod'", settings: idDenylistOf("foo"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "import { foo as bar, foo } from 'mod'", settings: idDenylistOf("foo"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "import foo, { foo as bar } from 'mod'", settings: idDenylistOf("foo"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "var foo; export { foo as bar };", settings: idDenylistOf("bar"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "var foo; export { foo };", settings: idDenylistOf("foo"), findings: []string{messageIdDenylistRestricted.Id, messageIdDenylistRestricted.Id}},
-		{source: "var foo; export { foo as bar };", settings: idDenylistOf("foo"), findings: []string{messageIdDenylistRestricted.Id, messageIdDenylistRestricted.Id}},
-		{source: "var foo; export { foo as foo };", settings: idDenylistOf("foo"), findings: []string{messageIdDenylistRestricted.Id, messageIdDenylistRestricted.Id, messageIdDenylistRestricted.Id}},
-		{source: "var foo; export { foo as bar };", settings: idDenylistOf("foo", "bar"), findings: []string{messageIdDenylistRestricted.Id, messageIdDenylistRestricted.Id, messageIdDenylistRestricted.Id}},
-		{source: "export { foo } from 'mod'", settings: idDenylistOf("foo"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "export { foo as bar } from 'mod'", settings: idDenylistOf("bar"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "export { foo as bar } from 'mod'", settings: idDenylistOf("foo", "bar"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "export { foo as foo } from 'mod'", settings: idDenylistOf("foo"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "export { foo, foo as bar } from 'mod'", settings: idDenylistOf("foo"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "export { foo as bar, foo } from 'mod'", settings: idDenylistOf("foo"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "foo.bar()", settings: idDenylistOf("f", "fo", "foo", "b", "ba", "baz"), findings: []string{messageIdDenylistRestricted.Id}},
+		{
+			source:   "foo = \"bar\"",
+			settings: idDenylistOf("f", "fo", "foo", "bar"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "function foo(){}",
+			settings: idDenylistOf("f", "fo", "foo", "bar"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "import foo from 'mod'",
+			settings: idDenylistOf("foo"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "import * as foo from 'mod'",
+			settings: idDenylistOf("foo"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "export * as foo from 'mod'",
+			settings: idDenylistOf("foo"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "import { foo } from 'mod'",
+			settings: idDenylistOf("foo"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "import { foo as bar } from 'mod'",
+			settings: idDenylistOf("bar"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "import { foo as bar } from 'mod'",
+			settings: idDenylistOf("foo", "bar"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "import { foo as foo } from 'mod'",
+			settings: idDenylistOf("foo"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "import { foo, foo as bar } from 'mod'",
+			settings: idDenylistOf("foo"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "import { foo as bar, foo } from 'mod'",
+			settings: idDenylistOf("foo"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "import foo, { foo as bar } from 'mod'",
+			settings: idDenylistOf("foo"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "var foo; export { foo as bar };",
+			settings: idDenylistOf("bar"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "var foo; export { foo };",
+			settings: idDenylistOf("foo"),
+			findings: []string{messageIdDenylistRestricted.Id, messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "var foo; export { foo as bar };",
+			settings: idDenylistOf("foo"),
+			findings: []string{messageIdDenylistRestricted.Id, messageIdDenylistRestricted.Id},
+		},
+		{source: "var foo; export { foo as foo };", settings: idDenylistOf("foo"), findings: []string{
+			messageIdDenylistRestricted.Id,
+			messageIdDenylistRestricted.Id,
+			messageIdDenylistRestricted.Id,
+		}},
+		{source: "var foo; export { foo as bar };", settings: idDenylistOf("foo", "bar"), findings: []string{
+			messageIdDenylistRestricted.Id,
+			messageIdDenylistRestricted.Id,
+			messageIdDenylistRestricted.Id,
+		}},
+		{
+			source:   "export { foo } from 'mod'",
+			settings: idDenylistOf("foo"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "export { foo as bar } from 'mod'",
+			settings: idDenylistOf("bar"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "export { foo as bar } from 'mod'",
+			settings: idDenylistOf("foo", "bar"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "export { foo as foo } from 'mod'",
+			settings: idDenylistOf("foo"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "export { foo, foo as bar } from 'mod'",
+			settings: idDenylistOf("foo"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "export { foo as bar, foo } from 'mod'",
+			settings: idDenylistOf("foo"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "foo.bar()",
+			settings: idDenylistOf("f", "fo", "foo", "b", "ba", "baz"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
 		{source: "foo[bar] = baz;", settings: idDenylistOf("bar"), findings: []string{messageIdDenylistRestricted.Id}},
 		{source: "baz = foo[bar];", settings: idDenylistOf("bar"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "var foo = bar.baz;", settings: idDenylistOf("f", "fo", "foo", "b", "ba", "barr", "bazz"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "var foo = bar.baz;", settings: idDenylistOf("f", "fo", "fooo", "b", "ba", "bar", "bazz"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "if (foo.bar) {}", settings: idDenylistOf("f", "fo", "foo", "b", "ba", "barr", "bazz", "bingg"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "var obj = { key: foo.bar };", settings: idDenylistOf("obj"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "var obj = { key: foo.bar };", settings: idDenylistOf("key"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "var obj = { key: foo.bar };", settings: idDenylistOf("foo"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "var arr = [foo.bar];", settings: idDenylistOf("arr"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "var arr = [foo.bar];", settings: idDenylistOf("foo"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "[foo.bar]", settings: idDenylistOf("f", "fo", "foo", "b", "ba", "barr", "bazz", "bingg"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "if (foo.bar === bar.baz) { [bing.baz] }", settings: idDenylistOf("f", "fo", "foo", "b", "ba", "barr", "bazz", "bingg"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "if (foo.bar === bar.baz) { [foo.bar] }", settings: idDenylistOf("f", "fo", "fooo", "b", "ba", "bar", "bazz", "bingg"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "var myArray = new Array(); var myDate = new Date();", settings: idDenylistOf("array", "date", "myDate", "myarray", "new", "var"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "var myArray = new Array(); var myDate = new Date();", settings: idDenylistOf("array", "date", "mydate", "myArray", "new", "var"), findings: []string{messageIdDenylistRestricted.Id}},
+		{
+			source:   "var foo = bar.baz;",
+			settings: idDenylistOf("f", "fo", "foo", "b", "ba", "barr", "bazz"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "var foo = bar.baz;",
+			settings: idDenylistOf("f", "fo", "fooo", "b", "ba", "bar", "bazz"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "if (foo.bar) {}",
+			settings: idDenylistOf("f", "fo", "foo", "b", "ba", "barr", "bazz", "bingg"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "var obj = { key: foo.bar };",
+			settings: idDenylistOf("obj"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "var obj = { key: foo.bar };",
+			settings: idDenylistOf("key"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "var obj = { key: foo.bar };",
+			settings: idDenylistOf("foo"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "var arr = [foo.bar];",
+			settings: idDenylistOf("arr"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "var arr = [foo.bar];",
+			settings: idDenylistOf("foo"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "[foo.bar]",
+			settings: idDenylistOf("f", "fo", "foo", "b", "ba", "barr", "bazz", "bingg"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "if (foo.bar === bar.baz) { [bing.baz] }",
+			settings: idDenylistOf("f", "fo", "foo", "b", "ba", "barr", "bazz", "bingg"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "if (foo.bar === bar.baz) { [foo.bar] }",
+			settings: idDenylistOf("f", "fo", "fooo", "b", "ba", "bar", "bazz", "bingg"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "var myArray = new Array(); var myDate = new Date();",
+			settings: idDenylistOf("array", "date", "myDate", "myarray", "new", "var"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "var myArray = new Array(); var myDate = new Date();",
+			settings: idDenylistOf("array", "date", "mydate", "myArray", "new", "var"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
 		{source: "foo.bar = 1", settings: idDenylistOf("bar"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "foo.bar.baz = 1", settings: idDenylistOf("bar", "baz"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "const {foo} = baz", settings: idDenylistOf("foo"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "const {foo: bar} = baz", settings: idDenylistOf("foo", "bar"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "const {[foo]: bar} = baz", settings: idDenylistOf("foo", "bar"), findings: []string{messageIdDenylistRestricted.Id, messageIdDenylistRestricted.Id}},
-		{source: "const {foo: {bar: baz}} = qux", settings: idDenylistOf("foo", "bar", "baz"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "const {foo: {[bar]: baz}} = qux", settings: idDenylistOf("foo", "bar", "baz"), findings: []string{messageIdDenylistRestricted.Id, messageIdDenylistRestricted.Id}},
-		{source: "const {[foo]: {[bar]: baz}} = qux", settings: idDenylistOf("foo", "bar", "baz"), findings: []string{messageIdDenylistRestricted.Id, messageIdDenylistRestricted.Id, messageIdDenylistRestricted.Id}},
-		{source: "function foo({ bar: baz }) {}", settings: idDenylistOf("bar", "baz"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "function foo({ bar: {baz: qux} }) {}", settings: idDenylistOf("bar", "baz", "qux"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "({foo: obj.bar} = baz);", settings: idDenylistOf("foo", "bar"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "({foo: obj.bar.bar.bar.baz} = {});", settings: idDenylistOf("foo", "bar", "baz"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "({[foo]: obj.bar} = baz);", settings: idDenylistOf("foo", "bar"), findings: []string{messageIdDenylistRestricted.Id, messageIdDenylistRestricted.Id}},
-		{source: "({foo: { a: obj.bar }} = baz);", settings: idDenylistOf("bar"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "({a: obj.bar = baz} = qux);", settings: idDenylistOf("bar"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "({a: obj.bar.bar.baz = obj.qux} = obj.qux);", settings: idDenylistOf("a", "bar", "baz", "qux"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "({a: obj[bar] = obj.qux} = obj.qux);", settings: idDenylistOf("a", "bar", "baz", "qux"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "({a: [obj.bar] = baz} = qux);", settings: idDenylistOf("bar"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "({foo: { a: obj.bar = baz}} = qux);", settings: idDenylistOf("bar"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "({foo: { [a]: obj.bar }} = baz);", settings: idDenylistOf("bar"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "({...obj.bar} = baz);", settings: idDenylistOf("bar"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "([obj.bar] = baz);", settings: idDenylistOf("bar"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "const [bar] = baz;", settings: idDenylistOf("bar"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "foo.undefined = 1;", settings: idDenylistOf("undefined"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "var foo = { undefined: 1 };", settings: idDenylistOf("undefined"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "var foo = { undefined: undefined };", settings: idDenylistOf("undefined"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "var foo = { Number() {} };", settings: idDenylistOf("Number"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "class Foo { Number() {} }", settings: idDenylistOf("Number"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "const foo = 1; bar = foo;", settings: idDenylistOf("foo"), findings: []string{messageIdDenylistRestricted.Id, messageIdDenylistRestricted.Id}},
-		{source: "let foo; foo = bar;", settings: idDenylistOf("foo"), findings: []string{messageIdDenylistRestricted.Id, messageIdDenylistRestricted.Id}},
-		{source: "bar = foo; var foo;", settings: idDenylistOf("foo"), findings: []string{messageIdDenylistRestricted.Id, messageIdDenylistRestricted.Id}},
-		{source: "function foo() {} var bar = foo;", settings: idDenylistOf("foo"), findings: []string{messageIdDenylistRestricted.Id, messageIdDenylistRestricted.Id}},
-		{source: "class Foo {} var bar = Foo;", settings: idDenylistOf("Foo"), findings: []string{messageIdDenylistRestricted.Id, messageIdDenylistRestricted.Id}},
-		{source: "let undefined; undefined = 1;", settings: idDenylistOf("undefined"), findings: []string{messageIdDenylistRestricted.Id, messageIdDenylistRestricted.Id}},
-		{source: "foo = undefined; var undefined;", settings: idDenylistOf("undefined"), findings: []string{messageIdDenylistRestricted.Id, messageIdDenylistRestricted.Id}},
-		{source: "function undefined(){} x = undefined;", settings: idDenylistOf("undefined"), findings: []string{messageIdDenylistRestricted.Id, messageIdDenylistRestricted.Id}},
-		{source: "class Number {} x = Number.NaN;", settings: idDenylistOf("Number"), findings: []string{messageIdDenylistRestricted.Id, messageIdDenylistRestricted.Id}},
-		{source: "if (foo) { let undefined; bar = undefined; }", settings: idDenylistOf("undefined"), findings: []string{messageIdDenylistRestricted.Id, messageIdDenylistRestricted.Id}},
-		{source: "function foo(Number) { var x = Number.NaN; }", settings: idDenylistOf("Number"), findings: []string{messageIdDenylistRestricted.Id, messageIdDenylistRestricted.Id}},
-		{source: "function foo(bar) { return Number.parseInt(bar); } const Number = 1;", settings: idDenylistOf("Number"), findings: []string{messageIdDenylistRestricted.Id, messageIdDenylistRestricted.Id}},
-		{source: "import Number from 'myNumber'; const foo = Number.parseInt(bar);", settings: idDenylistOf("Number"), findings: []string{messageIdDenylistRestricted.Id, messageIdDenylistRestricted.Id}},
-		{source: "var foo = function undefined() {};", settings: idDenylistOf("undefined"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "var foo = { undefined }", settings: idDenylistOf("undefined"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "class C { camelCase; #camelCase; #camelCase2() {} }", settings: idDenylistOf("camelCase"), findings: []string{messageIdDenylistRestricted.Id, messageIdDenylistRestrictedPrivate.Id}},
-		{source: "class C { snake_case; #snake_case() {}; #snake_case2() {} }", settings: idDenylistOf("snake_case"), findings: []string{messageIdDenylistRestricted.Id, messageIdDenylistRestrictedPrivate.Id}},
-		{source: "import('foo.json', { with: { [type]: 'json' } })", settings: idDenylistOf("type"), findings: []string{messageIdDenylistRestricted.Id}},
-		{source: "import('foo.json', { with: { type: json } })", settings: idDenylistOf("json"), findings: []string{messageIdDenylistRestricted.Id}},
+		{
+			source:   "foo.bar.baz = 1",
+			settings: idDenylistOf("bar", "baz"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "const {foo} = baz",
+			settings: idDenylistOf("foo"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "const {foo: bar} = baz",
+			settings: idDenylistOf("foo", "bar"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "const {[foo]: bar} = baz",
+			settings: idDenylistOf("foo", "bar"),
+			findings: []string{messageIdDenylistRestricted.Id, messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "const {foo: {bar: baz}} = qux",
+			settings: idDenylistOf("foo", "bar", "baz"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "const {foo: {[bar]: baz}} = qux",
+			settings: idDenylistOf("foo", "bar", "baz"),
+			findings: []string{messageIdDenylistRestricted.Id, messageIdDenylistRestricted.Id},
+		},
+		{source: "const {[foo]: {[bar]: baz}} = qux", settings: idDenylistOf("foo", "bar", "baz"), findings: []string{
+			messageIdDenylistRestricted.Id,
+			messageIdDenylistRestricted.Id,
+			messageIdDenylistRestricted.Id,
+		}},
+		{
+			source:   "function foo({ bar: baz }) {}",
+			settings: idDenylistOf("bar", "baz"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "function foo({ bar: {baz: qux} }) {}",
+			settings: idDenylistOf("bar", "baz", "qux"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "({foo: obj.bar} = baz);",
+			settings: idDenylistOf("foo", "bar"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "({foo: obj.bar.bar.bar.baz} = {});",
+			settings: idDenylistOf("foo", "bar", "baz"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "({[foo]: obj.bar} = baz);",
+			settings: idDenylistOf("foo", "bar"),
+			findings: []string{messageIdDenylistRestricted.Id, messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "({foo: { a: obj.bar }} = baz);",
+			settings: idDenylistOf("bar"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "({a: obj.bar = baz} = qux);",
+			settings: idDenylistOf("bar"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "({a: obj.bar.bar.baz = obj.qux} = obj.qux);",
+			settings: idDenylistOf("a", "bar", "baz", "qux"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "({a: obj[bar] = obj.qux} = obj.qux);",
+			settings: idDenylistOf("a", "bar", "baz", "qux"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "({a: [obj.bar] = baz} = qux);",
+			settings: idDenylistOf("bar"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "({foo: { a: obj.bar = baz}} = qux);",
+			settings: idDenylistOf("bar"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "({foo: { [a]: obj.bar }} = baz);",
+			settings: idDenylistOf("bar"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "({...obj.bar} = baz);",
+			settings: idDenylistOf("bar"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "([obj.bar] = baz);",
+			settings: idDenylistOf("bar"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "const [bar] = baz;",
+			settings: idDenylistOf("bar"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "foo.undefined = 1;",
+			settings: idDenylistOf("undefined"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "var foo = { undefined: 1 };",
+			settings: idDenylistOf("undefined"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "var foo = { undefined: undefined };",
+			settings: idDenylistOf("undefined"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "var foo = { Number() {} };",
+			settings: idDenylistOf("Number"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "class Foo { Number() {} }",
+			settings: idDenylistOf("Number"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "const foo = 1; bar = foo;",
+			settings: idDenylistOf("foo"),
+			findings: []string{messageIdDenylistRestricted.Id, messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "let foo; foo = bar;",
+			settings: idDenylistOf("foo"),
+			findings: []string{messageIdDenylistRestricted.Id, messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "bar = foo; var foo;",
+			settings: idDenylistOf("foo"),
+			findings: []string{messageIdDenylistRestricted.Id, messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "function foo() {} var bar = foo;",
+			settings: idDenylistOf("foo"),
+			findings: []string{messageIdDenylistRestricted.Id, messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "class Foo {} var bar = Foo;",
+			settings: idDenylistOf("Foo"),
+			findings: []string{messageIdDenylistRestricted.Id, messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "let undefined; undefined = 1;",
+			settings: idDenylistOf("undefined"),
+			findings: []string{messageIdDenylistRestricted.Id, messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "foo = undefined; var undefined;",
+			settings: idDenylistOf("undefined"),
+			findings: []string{messageIdDenylistRestricted.Id, messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "function undefined(){} x = undefined;",
+			settings: idDenylistOf("undefined"),
+			findings: []string{messageIdDenylistRestricted.Id, messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "class Number {} x = Number.NaN;",
+			settings: idDenylistOf("Number"),
+			findings: []string{messageIdDenylistRestricted.Id, messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "if (foo) { let undefined; bar = undefined; }",
+			settings: idDenylistOf("undefined"),
+			findings: []string{messageIdDenylistRestricted.Id, messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "function foo(Number) { var x = Number.NaN; }",
+			settings: idDenylistOf("Number"),
+			findings: []string{messageIdDenylistRestricted.Id, messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "function foo(bar) { return Number.parseInt(bar); } const Number = 1;",
+			settings: idDenylistOf("Number"),
+			findings: []string{messageIdDenylistRestricted.Id, messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "import Number from 'myNumber'; const foo = Number.parseInt(bar);",
+			settings: idDenylistOf("Number"),
+			findings: []string{messageIdDenylistRestricted.Id, messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "var foo = function undefined() {};",
+			settings: idDenylistOf("undefined"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "var foo = { undefined }",
+			settings: idDenylistOf("undefined"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "class C { camelCase; #camelCase; #camelCase2() {} }",
+			settings: idDenylistOf("camelCase"),
+			findings: []string{messageIdDenylistRestricted.Id, messageIdDenylistRestrictedPrivate.Id},
+		},
+		{
+			source:   "class C { snake_case; #snake_case() {}; #snake_case2() {} }",
+			settings: idDenylistOf("snake_case"),
+			findings: []string{messageIdDenylistRestricted.Id, messageIdDenylistRestrictedPrivate.Id},
+		},
+		{
+			source:   "import('foo.json', { with: { [type]: 'json' } })",
+			settings: idDenylistOf("type"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
+		{
+			source:   "import('foo.json', { with: { type: json } })",
+			settings: idDenylistOf("json"),
+			findings: []string{messageIdDenylistRestricted.Id},
+		},
 	}
 
 	for _, testCase := range cases {
 		result := rule_testing.RunTypedWithOptions(test, IdDenylist, idDenylistFile, testCase.source, testCase.settings)
 		if len(result.Diagnostics) != len(testCase.findings) {
-			test.Errorf("%q with %v: expected %d findings, got %d %v",
-				testCase.source, testCase.settings, len(testCase.findings), len(result.Diagnostics), result.MessageIds())
+			test.Errorf(
+				"%q with %v: expected %d findings, got %d %v",
+				testCase.source,
+				testCase.settings,
+				len(testCase.findings),
+				len(result.Diagnostics),
+				result.MessageIds(),
+			)
 			continue
 		}
 		rule_testing.ExpectFindings(test, result, testCase.findings...)
@@ -187,10 +525,19 @@ func TestIdDenylistStaysSilent(test *testing.T) {
 		{source: "export { foo as bar } from 'mod'", settings: idDenylistOf("foo")},
 		{source: "foo.bar()", settings: idDenylistOf("f", "fo", "fooo", "b", "ba", "baz")},
 		{source: "var foo = bar.baz;", settings: idDenylistOf("f", "fo", "fooo", "b", "ba", "barr", "bazz")},
-		{source: "var foo = bar.baz.bing;", settings: idDenylistOf("f", "fo", "fooo", "b", "ba", "barr", "bazz", "bingg")},
-		{source: "foo.bar.baz = bing.bong.bash;", settings: idDenylistOf("f", "fo", "fooo", "b", "ba", "barr", "bazz", "bingg")},
+		{
+			source:   "var foo = bar.baz.bing;",
+			settings: idDenylistOf("f", "fo", "fooo", "b", "ba", "barr", "bazz", "bingg"),
+		},
+		{
+			source:   "foo.bar.baz = bing.bong.bash;",
+			settings: idDenylistOf("f", "fo", "fooo", "b", "ba", "barr", "bazz", "bingg"),
+		},
 		{source: "if (foo.bar) {}", settings: idDenylistOf("f", "fo", "fooo", "b", "ba", "barr", "bazz", "bingg")},
-		{source: "var obj = { key: foo.bar };", settings: idDenylistOf("f", "fo", "fooo", "b", "ba", "barr", "bazz", "bingg")},
+		{
+			source:   "var obj = { key: foo.bar };",
+			settings: idDenylistOf("f", "fo", "fooo", "b", "ba", "barr", "bazz", "bingg"),
+		},
 		{source: "const {foo: bar} = baz", settings: idDenylistOf("foo")},
 		{source: "const {foo: {bar: baz}} = qux", settings: idDenylistOf("foo", "bar")},
 		{source: "function foo({ bar: baz }) {}", settings: idDenylistOf("bar")},
@@ -202,8 +549,14 @@ func TestIdDenylistStaysSilent(test *testing.T) {
 		{source: "var arr = [foo.bar];", settings: idDenylistOf("f", "fo", "fooo", "b", "ba", "barr", "bazz", "bingg")},
 		{source: "[foo.bar]", settings: idDenylistOf("f", "fo", "fooo", "b", "ba", "barr", "bazz", "bingg")},
 		{source: "[foo.bar.nesting]", settings: idDenylistOf("f", "fo", "fooo", "b", "ba", "barr", "bazz", "bingg")},
-		{source: "if (foo.bar === bar.baz) { [foo.bar] }", settings: idDenylistOf("f", "fo", "fooo", "b", "ba", "barr", "bazz", "bingg")},
-		{source: "var myArray = new Array(); var myDate = new Date();", settings: idDenylistOf("array", "date", "mydate", "myarray", "new", "var")},
+		{
+			source:   "if (foo.bar === bar.baz) { [foo.bar] }",
+			settings: idDenylistOf("f", "fo", "fooo", "b", "ba", "barr", "bazz", "bingg"),
+		},
+		{
+			source:   "var myArray = new Array(); var myDate = new Date();",
+			settings: idDenylistOf("array", "date", "mydate", "myarray", "new", "var"),
+		},
 		{source: "foo()", settings: idDenylistOf("foo")},
 		{source: "foo.bar()", settings: idDenylistOf("bar")},
 		{source: "foo.bar", settings: idDenylistOf("bar")},
@@ -268,22 +621,77 @@ func TestIdDenylistDivergesOnTheEslintGlobalsSurface(test *testing.T) {
 		upstream int
 		why      string
 	}{
-		// Diverges: upstream 0, here 1 -- myGlobal is declared only by the config, so here it resolves to nothing and is checked.
-		{source: "foo = { [myGlobal]: 1 };", settings: idDenylistOf("myGlobal"), findings: 1, upstream: 0, why: "myGlobal is declared only by the config, so here it resolves to nothing and is checked"},
-		// Diverges: upstream 0, here 1 -- the shorthand target declares myGlobal in source here, so it is ours rather than the environment's.
-		{source: "({ myGlobal } = foo);", settings: idDenylistOf("myGlobal"), findings: 1, upstream: 0, why: "the shorthand target declares myGlobal in source here, so it is ours rather than the environment's"},
-		// Diverges: upstream 0, here 1 -- the directive is a comment here, so myGlobal resolves to nothing and is checked.
-		{source: "/* global myGlobal: readonly */ myGlobal = 5;", settings: idDenylistOf("myGlobal"), findings: 1, upstream: 0, why: "the directive is a comment here, so myGlobal resolves to nothing and is checked"},
-		// Diverges: upstream 0, here 1 -- window is the member's object rather than its property, so the read exemption does not cover it, and nothing declares window under the fixture lib.
-		{source: "var foo = { bar: window.baz };", settings: idDenylistOf("window"), findings: 1, upstream: 0, why: "window is the member's OBJECT rather than its property, so the read exemption does not cover it, and nothing declares window under the fixture lib"},
+		// Diverges: upstream 0, here 1 -- myGlobal is declared only by the config, so here it resolves to nothing and
+		// is checked.
+		{
+			source:   "foo = { [myGlobal]: 1 };",
+			settings: idDenylistOf("myGlobal"),
+			findings: 1,
+			upstream: 0,
+			why:      "myGlobal is declared only by the config, so here it resolves to nothing and is checked",
+		},
+		// Diverges: upstream 0, here 1 -- the shorthand target declares myGlobal in source here, so it is ours rather
+		// than the environment's.
+		{
+			source:   "({ myGlobal } = foo);",
+			settings: idDenylistOf("myGlobal"),
+			findings: 1,
+			upstream: 0,
+			why:      "the shorthand target declares myGlobal in source here, so it is ours rather than the environment's",
+		},
+		// Diverges: upstream 0, here 1 -- the directive is a comment here, so myGlobal resolves to nothing and is
+		// checked.
+		{
+			source:   "/* global myGlobal: readonly */ myGlobal = 5;",
+			settings: idDenylistOf("myGlobal"),
+			findings: 1,
+			upstream: 0,
+			why:      "the directive is a comment here, so myGlobal resolves to nothing and is checked",
+		},
+		// Diverges: upstream 0, here 1 -- window is the member's object rather than its property, so the read exemption
+		// does not cover it, and nothing declares window under the fixture lib.
+		{
+			source:   "var foo = { bar: window.baz };",
+			settings: idDenylistOf("window"),
+			findings: 1,
+			upstream: 0,
+			why:      "window is the member's OBJECT rather than its property, so the read exemption does not cover it, and nothing declares window under the fixture lib",
+		},
 		// agrees: upstream 2, here 2 -- a label is never a global reference, so both instruments agree.
-		{source: "myGlobal: while(foo) { break myGlobal; } ", settings: idDenylistOf("myGlobal"), findings: 2, upstream: 2, why: "a label is never a global reference, so both instruments agree"},
-		// Diverges: upstream 1, here 2 -- the bare myGlobal reports under both, and the written property window.myGlobal additionally reports here because window is undeclared under the fixture lib rather than a config-declared global.
-		{source: "/* globals myGlobal */ window.myGlobal = 5; foo = myGlobal;", settings: idDenylistOf("myGlobal"), findings: 2, upstream: 1, why: "the bare myGlobal reports under both, and the written property window.myGlobal additionally reports here because window is undeclared under the fixture lib rather than a config-declared global"},
-		// Diverges: upstream 1, here 0 -- the directive cannot switch Number off here, so it stays a lib-declared global and is exempt.
-		{source: "/* globals Number: off */ Number.parseInt()", settings: idDenylistOf("Number"), findings: 0, upstream: 1, why: "the directive cannot switch Number off here, so it stays a lib-declared global and is exempt"},
+		{
+			source:   "myGlobal: while(foo) { break myGlobal; } ",
+			settings: idDenylistOf("myGlobal"),
+			findings: 2,
+			upstream: 2,
+			why:      "a label is never a global reference, so both instruments agree",
+		},
+		// Diverges: upstream 1, here 2 -- the bare myGlobal reports under both, and the written property
+		// window.myGlobal additionally reports here because window is undeclared under the fixture lib rather than a
+		// config-declared global.
+		{
+			source:   "/* globals myGlobal */ window.myGlobal = 5; foo = myGlobal;",
+			settings: idDenylistOf("myGlobal"),
+			findings: 2,
+			upstream: 1,
+			why:      "the bare myGlobal reports under both, and the written property window.myGlobal additionally reports here because window is undeclared under the fixture lib rather than a config-declared global",
+		},
+		// Diverges: upstream 1, here 0 -- the directive cannot switch Number off here, so it stays a lib-declared
+		// global and is exempt.
+		{
+			source:   "/* globals Number: off */ Number.parseInt()",
+			settings: idDenylistOf("Number"),
+			findings: 0,
+			upstream: 1,
+			why:      "the directive cannot switch Number off here, so it stays a lib-declared global and is exempt",
+		},
 		// agrees: upstream 2, here 2 -- a source declaration shadows the global under both instruments.
-		{source: "function foo() { var myGlobal; x = myGlobal; }", settings: idDenylistOf("myGlobal"), findings: 2, upstream: 2, why: "a source declaration shadows the global under both instruments"},
+		{
+			source:   "function foo() { var myGlobal; x = myGlobal; }",
+			settings: idDenylistOf("myGlobal"),
+			findings: 2,
+			upstream: 2,
+			why:      "a source declaration shadows the global under both instruments",
+		},
 	}
 
 	for _, testCase := range cases {
@@ -596,7 +1004,9 @@ func TestIdDenylistDecoderAcceptsTheConfigLayersShape(test *testing.T) {
 		// The nested workaround spelling, an element that is not a string.
 		`[["data", "err"]]`,
 	} {
-		if _, decodeIdDenylistOptionsError := DecodeIdDenylistOptions([]byte(raw)); decodeIdDenylistOptionsError == nil {
+		if _, decodeIdDenylistOptionsError := DecodeIdDenylistOptions(
+			[]byte(raw),
+		); decodeIdDenylistOptionsError == nil {
 			test.Errorf("expected %s to be refused, got no error", raw)
 		}
 	}

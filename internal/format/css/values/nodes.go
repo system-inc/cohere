@@ -40,7 +40,19 @@ func newValue() *estree.Node {
 // leaf builds the Node subclasses that take { value, source, sourceIndex }: colon, comma, operator,
 // unicode-range and word.
 func leaf(nodeType string, value string, nodeSource map[string]any, sourceIndex int) *estree.Node {
-	return estree.New(nodeType, 0, 0, "raws", newRaws(), "value", value, "source", nodeSource, "sourceIndex", sourceIndex)
+	return estree.New(
+		nodeType,
+		0,
+		0,
+		"raws",
+		newRaws(),
+		"value",
+		value,
+		"source",
+		nodeSource,
+		"sourceIndex",
+		sourceIndex,
+	)
 }
 
 // Paren: Node with type 'paren' and parenType "".
@@ -52,28 +64,100 @@ func newParen(value string, nodeSource map[string]any, sourceIndex int) *estree.
 
 // Comment: Node with type 'comment' and inline from its options.
 func newComment(value string, inline bool, nodeSource map[string]any, sourceIndex int) *estree.Node {
-	return estree.New("comment", 0, 0, "raws", newRaws(), "value", value, "inline", inline, "source", nodeSource, "sourceIndex", sourceIndex)
+	return estree.New(
+		"comment",
+		0,
+		0,
+		"raws",
+		newRaws(),
+		"value",
+		value,
+		"inline",
+		inline,
+		"source",
+		nodeSource,
+		"sourceIndex",
+		sourceIndex,
+	)
 }
 
 // AtWord: Container with type 'atword'.
 func newAtWord(value string, nodeSource map[string]any, sourceIndex int) *estree.Node {
-	return estree.New("atword", 0, 0, "raws", newRaws(), "value", value, "source", nodeSource, "sourceIndex", sourceIndex, "nodes", []*estree.Node{})
+	return estree.New(
+		"atword",
+		0,
+		0,
+		"raws",
+		newRaws(),
+		"value",
+		value,
+		"source",
+		nodeSource,
+		"sourceIndex",
+		sourceIndex,
+		"nodes",
+		[]*estree.Node{},
+	)
 }
 
 // NumberNode: Node with type 'number' and unit from its options, or "".
 func newNumber(value string, nodeSource map[string]any, sourceIndex int, unit string) *estree.Node {
-	return estree.New("number", 0, 0, "raws", newRaws(), "value", value, "source", nodeSource, "sourceIndex", sourceIndex, "unit", unit)
+	return estree.New(
+		"number",
+		0,
+		0,
+		"raws",
+		newRaws(),
+		"value",
+		value,
+		"source",
+		nodeSource,
+		"sourceIndex",
+		sourceIndex,
+		"unit",
+		unit,
+	)
 }
 
 // FunctionNode: Container with type 'func', unbalanced starting at -1 so the parser knows no parens
 // have been added yet.
 func newFunc(value string, nodeSource map[string]any, sourceIndex int) *estree.Node {
-	return estree.New("func", 0, 0, "raws", newRaws(), "value", value, "source", nodeSource, "sourceIndex", sourceIndex, "nodes", []*estree.Node{}, "unbalanced", float64(-1))
+	return estree.New(
+		"func",
+		0,
+		0,
+		"raws",
+		newRaws(),
+		"value",
+		value,
+		"source",
+		nodeSource,
+		"sourceIndex",
+		sourceIndex,
+		"nodes",
+		[]*estree.Node{},
+		"unbalanced",
+		float64(-1),
+	)
 }
 
 // StringNode: Node with type 'string' and quoted from its options.
 func newString(value string, nodeSource map[string]any, sourceIndex int, quoted bool) *estree.Node {
-	return estree.New("string", 0, 0, "raws", newRaws(), "value", value, "source", nodeSource, "sourceIndex", sourceIndex, "quoted", quoted)
+	return estree.New(
+		"string",
+		0,
+		0,
+		"raws",
+		newRaws(),
+		"value",
+		value,
+		"source",
+		nodeSource,
+		"sourceIndex",
+		sourceIndex,
+		"quoted",
+		quoted,
+	)
 }
 
 // raws is node.raws.

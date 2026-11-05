@@ -21,8 +21,10 @@ var tailwindNoPhysicalDirectionText = policy.MessageOf("structure/tailwind-no-ph
 // documentation; "use `ms-4` instead of `ml-4`" is the edit.
 func messagePhysicalDirection(original string, replacement string) rule.Message {
 	return rule.Message{
-		Id:          tailwindNoPhysicalDirectionText.Id,
-		Description: tailwindNoPhysicalDirectionText.Render(map[string]string{"original": original, "replacement": replacement}),
+		Id: tailwindNoPhysicalDirectionText.Id,
+		Description: tailwindNoPhysicalDirectionText.Render(
+			map[string]string{"original": original, "replacement": replacement},
+		),
 	}
 }
 
@@ -135,7 +137,8 @@ var NoPhysicalDirection = rule.Rule{
 		}
 		// An Adamic `.a` file is checked as the `.ts` it is (#kwt1htp).
 		fileName := ruleContext.SourceFile.FileName()
-		if !strings.HasSuffix(sourcename.TreatedAs(fileName.AsString()), ".ts") && !strings.HasSuffix(fileName.AsString(), ".tsx") {
+		if !strings.HasSuffix(sourcename.TreatedAs(fileName.AsString()), ".ts") &&
+			!strings.HasSuffix(fileName.AsString(), ".tsx") {
 			return nil
 		}
 

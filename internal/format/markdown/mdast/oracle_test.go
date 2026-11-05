@@ -92,8 +92,10 @@ func (oracle *treeOracle) parse(text string) (any, error) {
 // serialize is upstream's tree for text, as the JSON text the bundle's parser and JSON.stringify give.
 func (oracle *treeOracle) serialize(text string) (string, error) {
 	oracle.runtime.Set("__text", text)
-	value, runStringError := oracle.runtime.RunString(`JSON.stringify(prettierPlugins.markdown.parsers.markdown.parse(__text),
-		(key, value) => key === "data" ? undefined : value)`)
+	value, runStringError := oracle.runtime.RunString(
+		`JSON.stringify(prettierPlugins.markdown.parsers.markdown.parse(__text),
+		(key, value) => key === "data" ? undefined : value)`,
+	)
 	if runStringError != nil {
 		return "", runStringError
 	}
@@ -281,12 +283,23 @@ func firstTreeDifference(path string, expected any, actual any) string {
 		}
 		sort.Strings(sorted)
 		// Type first, so a wrong node reads as a wrong node, not as a field mismatch.
-		sort.SliceStable(sorted, func(left, right int) bool { return sorted[left] == "type" && sorted[right] != "type" })
+		sort.SliceStable(
+			sorted,
+			func(left, right int) bool { return sorted[left] == "type" && sorted[right] != "type" },
+		)
 		for _, key := range sorted {
 			wantValue, wantPresent := want[key]
 			gotValue, gotPresent := got[key]
 			if wantPresent != gotPresent {
-				return fmt.Sprintf("%s.%s: present upstream %v, in the port %v (want %v, got %v)", path, key, wantPresent, gotPresent, wantValue, gotValue)
+				return fmt.Sprintf(
+					"%s.%s: present upstream %v, in the port %v (want %v, got %v)",
+					path,
+					key,
+					wantPresent,
+					gotPresent,
+					wantValue,
+					gotValue,
+				)
 			}
 			if difference := firstTreeDifference(path+"."+key, wantValue, gotValue); difference != "" {
 				return difference
@@ -302,7 +315,11 @@ func firstTreeDifference(path string, expected any, actual any) string {
 			if index >= len(want) || index >= len(got) {
 				return fmt.Sprintf("%s: want %d items, got %d", path, len(want), len(got))
 			}
-			if difference := firstTreeDifference(fmt.Sprintf("%s[%d]", path, index), want[index], got[index]); difference != "" {
+			if difference := firstTreeDifference(
+				fmt.Sprintf("%s[%d]", path, index),
+				want[index],
+				got[index],
+			); difference != "" {
 				return difference
 			}
 		}
@@ -399,7 +416,10 @@ func TestCorpusTreesMatchUpstream(test *testing.T) {
 	for class := range byDifference {
 		classes = append(classes, class)
 	}
-	sort.Slice(classes, func(left, right int) bool { return byDifference[classes[left]] > byDifference[classes[right]] })
+	sort.Slice(
+		classes,
+		func(left, right int) bool { return byDifference[classes[left]] > byDifference[classes[right]] },
+	)
 	for _, class := range classes {
 		test.Logf("%5d  %s", byDifference[class], class)
 	}

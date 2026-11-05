@@ -61,8 +61,13 @@ func gapProbesFor(descriptor *Descriptor) []gapProbe {
 	for _, axis := range axes {
 		for dataType, reading := range axis.axis.ByType {
 			probes = append(probes, gapProbe{
-				name:    axis.name + ".ByType[" + string(dataType) + "]",
-				branch:  UtilityBranch{HasValue: true, IsArbitrary: true, DataType: dataType, HasModifier: axis.hasModifier},
+				name: axis.name + ".ByType[" + string(dataType) + "]",
+				branch: UtilityBranch{
+					HasValue:    true,
+					IsArbitrary: true,
+					DataType:    dataType,
+					HasModifier: axis.hasModifier,
+				},
 				reading: reading,
 			})
 		}
@@ -181,7 +186,10 @@ func TestGapRootEmittersAgreeWithTheirMeasuredReadings(test *testing.T) {
 	for _, root := range gapRoots {
 		descriptor, found := baseDescriptors[root]
 		if !found {
-			test.Errorf("%s is in the list this slice ports and has no baseDescriptors row, so there is nothing to compare it against", root)
+			test.Errorf(
+				"%s is in the list this slice ports and has no baseDescriptors row, so there is nothing to compare it against",
+				root,
+			)
 			continue
 		}
 		if _, ported := gapEmitters[root]; !ported {
@@ -217,7 +225,10 @@ func TestGapRootEmittersAgreeWithTheirMeasuredReadings(test *testing.T) {
 		len(gapRoots), compared, agreed, len(unported), len(disagreements))
 
 	if len(gapRoots) != 57 {
-		test.Errorf("this slice lists %d roots and the assertions below were sized for 57; the population moved", len(gapRoots))
+		test.Errorf(
+			"this slice lists %d roots and the assertions below were sized for 57; the population moved",
+			len(gapRoots),
+		)
 	}
 	if compared == 0 {
 		test.Error("no cell was compared, so this test proves nothing about any emitter")
@@ -273,7 +284,10 @@ func TestEveryGapRootHasAnEmitter(test *testing.T) {
 	}
 	for root := range gapEmitters {
 		if !inSlice[root] {
-			test.Errorf("gapEmitters carries %s, which is not one of the 57 this slice ports and which no test compares", root)
+			test.Errorf(
+				"gapEmitters carries %s, which is not one of the 57 this slice ports and which no test compares",
+				root,
+			)
 		}
 	}
 	test.Logf("emitters: %d roots in the slice, %d in gapEmitters", len(gapRoots), len(gapEmitters))
@@ -349,7 +363,10 @@ func TestObjectRootAndItsStaticsDeclareDifferentProperties(test *testing.T) {
 	for _, className := range []string{"object-cover", "object-fill", "object-contain"} {
 		declarations, isStatic := FrameworkStaticDeclarations[className]
 		if !isStatic {
-			test.Errorf("%s is not in FrameworkStaticDeclarations; it is a staticUtility declaring object-fit", className)
+			test.Errorf(
+				"%s is not in FrameworkStaticDeclarations; it is a staticUtility declaring object-fit",
+				className,
+			)
 			continue
 		}
 		if len(declarations) != 1 || declarations[0].Property != "object-fit" {
@@ -372,16 +389,25 @@ func TestBlockAndInlineHaveNoFunctionalRegistration(test *testing.T) {
 	for _, root := range []string{"block", "inline"} {
 		emitted := EmitGapRoot(root, UtilityBranch{HasValue: true})
 		if len(emitted) != 0 {
-			test.Errorf("%s emitted %s for a value form; it has no functional registration, so a value form compiles to nothing",
-				root, describeDeclarations(emitted))
+			test.Errorf(
+				"%s emitted %s for a value form; it has no functional registration, so a value form compiles to nothing",
+				root,
+				describeDeclarations(emitted),
+			)
 		}
 		descriptor, found := baseDescriptors[root]
 		if !found {
-			test.Errorf("%s has no baseDescriptors row, so the collision this test records is no longer observable", root)
+			test.Errorf(
+				"%s has no baseDescriptors row, so the collision this test records is no longer observable",
+				root,
+			)
 			continue
 		}
 		if descriptor.Absent.Empty == nil {
-			test.Errorf("%s has no Empty reading; the row exists because the static utility of the same name has one", root)
+			test.Errorf(
+				"%s has no Empty reading; the row exists because the static utility of the same name has one",
+				root,
+			)
 			continue
 		}
 		// The static utility's own reading, which is what the row's Empty is recording.
@@ -417,8 +443,13 @@ func TestShadowFamilyAlphaDeclarationDecidesTheCount(test *testing.T) {
 				root, unmodified.Count, modified.Count)
 		}
 		if len(modified.Order) != len(unmodified.Order) {
-			test.Errorf("%s reads %d positions unmodified and %d modified; the alpha property is outside PropertyOrder, "+
-				"so it changes the count and never the order", root, len(unmodified.Order), len(modified.Order))
+			test.Errorf(
+				"%s reads %d positions unmodified and %d modified; the alpha property is outside PropertyOrder, "+
+					"so it changes the count and never the order",
+				root,
+				len(unmodified.Order),
+				len(modified.Order),
+			)
 		}
 	}
 }
@@ -437,10 +468,16 @@ func TestGapRootArbitraryAndNamedCanDiffer(test *testing.T) {
 	named := PropertySort(EmitGapRoot("scale", UtilityBranch{HasValue: true}))
 
 	if arbitrary.Count != 1 {
-		test.Errorf("scale-[2] emitted %d declarations; upstream's arbitrary arm returns a single scale declaration", arbitrary.Count)
+		test.Errorf(
+			"scale-[2] emitted %d declarations; upstream's arbitrary arm returns a single scale declaration",
+			arbitrary.Count,
+		)
 	}
 	if named.Count != 4 {
-		test.Errorf("scale-150 emitted %d declarations; upstream's named path writes three axis variables and the shorthand", named.Count)
+		test.Errorf(
+			"scale-150 emitted %d declarations; upstream's named path writes three axis variables and the shorthand",
+			named.Count,
+		)
 	}
 	if arbitrary.Count == named.Count {
 		test.Error("scale reads the same for an arbitrary and a named value, so IsArbitrary is deletable and this " +

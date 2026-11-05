@@ -31,7 +31,10 @@ func zeroConfigTailwindProject(test *testing.T, files map[string]string) string 
 	if createDirectoryError := os.MkdirAll(filepath.Join(root, "node_modules"), 0o755); createDirectoryError != nil {
 		test.Fatal(createDirectoryError)
 	}
-	if symlinkError := os.Symlink(packageRoot, filepath.Join(root, "node_modules", "tailwindcss")); symlinkError != nil {
+	if symlinkError := os.Symlink(
+		packageRoot,
+		filepath.Join(root, "node_modules", "tailwindcss"),
+	); symlinkError != nil {
 		test.Fatal(symlinkError)
 	}
 	return root
@@ -76,7 +79,10 @@ func TestZeroConfigReadsTailwindSettingsOrRefusesThem(test *testing.T) {
 			"index.ts":            "export const value = 1;\n",
 		})
 		output, exitCode := runCohereWithEnvironment(test, binary, root, environment, "--no-fix", "--no-cache")
-		if exitCode == 0 || !strings.Contains(output, `writes settings["better-tailwindcss"], and zero config does not apply cohere:tailwind`) {
+		if exitCode == 0 || !strings.Contains(
+			output,
+			`writes settings["better-tailwindcss"], and zero config does not apply cohere:tailwind`,
+		) {
 			test.Fatalf("settings nothing would read loaded (exit %d):\n%s", exitCode, output)
 		}
 	})

@@ -85,8 +85,18 @@ var deprecations = []deprecation{
 	{Pattern: regexp.MustCompile(`^flex-grow-(.*)$`), Replacement: "grow-$1", SinceMajor: 4, SinceMinor: 0},
 
 	{Pattern: regexp.MustCompile(`^overflow-ellipsis$`), Replacement: "text-ellipsis", SinceMajor: 4, SinceMinor: 0},
-	{Pattern: regexp.MustCompile(`^decoration-slice$`), Replacement: "box-decoration-slice", SinceMajor: 4, SinceMinor: 0},
-	{Pattern: regexp.MustCompile(`^decoration-clone$`), Replacement: "box-decoration-clone", SinceMajor: 4, SinceMinor: 0},
+	{
+		Pattern:     regexp.MustCompile(`^decoration-slice$`),
+		Replacement: "box-decoration-slice",
+		SinceMajor:  4,
+		SinceMinor:  0,
+	},
+	{
+		Pattern:     regexp.MustCompile(`^decoration-clone$`),
+		Replacement: "box-decoration-clone",
+		SinceMajor:  4,
+		SinceMinor:  0,
+	},
 
 	// Tailwind 4.1 reordered the two-axis position names so the block axis comes first.
 	{Pattern: regexp.MustCompile(`^bg-left-top$`), Replacement: "bg-top-left", SinceMajor: 4, SinceMinor: 1},
@@ -94,9 +104,19 @@ var deprecations = []deprecation{
 	{Pattern: regexp.MustCompile(`^bg-right-top$`), Replacement: "bg-top-right", SinceMajor: 4, SinceMinor: 1},
 	{Pattern: regexp.MustCompile(`^bg-right-bottom$`), Replacement: "bg-bottom-right", SinceMajor: 4, SinceMinor: 1},
 	{Pattern: regexp.MustCompile(`^object-left-top$`), Replacement: "object-top-left", SinceMajor: 4, SinceMinor: 1},
-	{Pattern: regexp.MustCompile(`^object-left-bottom$`), Replacement: "object-bottom-left", SinceMajor: 4, SinceMinor: 1},
+	{
+		Pattern:     regexp.MustCompile(`^object-left-bottom$`),
+		Replacement: "object-bottom-left",
+		SinceMajor:  4,
+		SinceMinor:  1,
+	},
 	{Pattern: regexp.MustCompile(`^object-right-top$`), Replacement: "object-top-right", SinceMajor: 4, SinceMinor: 1},
-	{Pattern: regexp.MustCompile(`^object-right-bottom$`), Replacement: "object-bottom-right", SinceMajor: 4, SinceMinor: 1},
+	{
+		Pattern:     regexp.MustCompile(`^object-right-bottom$`),
+		Replacement: "object-bottom-right",
+		SinceMajor:  4,
+		SinceMinor:  1,
+	},
 }
 
 // NoDeprecatedClasses reports class names a Tailwind release renamed or removed.

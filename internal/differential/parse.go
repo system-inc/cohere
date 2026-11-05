@@ -203,7 +203,10 @@ func relativeTo(root string, path string) string {
 	if root == "" {
 		return cleaned
 	}
-	if relative, relativePathError := filepath.Rel(filepath.Clean(root), cleaned); relativePathError == nil && !strings.HasPrefix(relative, "..") {
+	if relative, relativePathError := filepath.Rel(
+		filepath.Clean(root),
+		cleaned,
+	); relativePathError == nil && !strings.HasPrefix(relative, "..") {
 		return relative
 	}
 	return cleaned

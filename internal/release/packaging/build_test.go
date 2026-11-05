@@ -76,7 +76,10 @@ func TestVerifyBinaryRefusesSomethingThatIsNotAnExecutable(test *testing.T) {
 
 	// Large enough to clear the size floor and still not a program.
 	notABinary := writeFakeExecutable(test, []byte("#!/bin/sh\necho nope\n"))
-	if _, cohereBinaryError := cohereBinary(notABinary, Target{GoOperatingSystem: "linux", GoArchitecture: "amd64"}); cohereBinaryError == nil {
+	if _, cohereBinaryError := cohereBinary(
+		notABinary,
+		Target{GoOperatingSystem: "linux", GoArchitecture: "amd64"},
+	); cohereBinaryError == nil {
 		test.Fatalf("plain text passed verification as a Linux binary")
 	}
 }
@@ -168,7 +171,11 @@ func TestExecutableMagicMatchesWhatTheCompilerActuallyEmits(test *testing.T) {
 		}
 
 		if _, cohereBinaryFormatOnlyError := cohereBinaryFormatOnly(path, target); cohereBinaryFormatOnlyError != nil {
-			test.Errorf("the magic table rejects a binary Go actually produced for %s: %v", target, cohereBinaryFormatOnlyError)
+			test.Errorf(
+				"the magic table rejects a binary Go actually produced for %s: %v",
+				target,
+				cohereBinaryFormatOnlyError,
+			)
 		}
 	}
 }

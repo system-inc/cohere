@@ -48,7 +48,12 @@ func TestParseGlueTypesAndOffsets(test *testing.T) {
 	}
 	rule := root.List("nodes")[0]
 	if !rule.Is("css-rule") || !rule.Child("selector").Is("selector-root") || rawsIn(rule)["selector"] != "a" {
-		test.Fatalf("rule: %s, selector %s, raws.selector %v", rule.Type(), rule.Child("selector").Type(), rawsIn(rule)["selector"])
+		test.Fatalf(
+			"rule: %s, selector %s, raws.selector %v",
+			rule.Type(),
+			rule.Child("selector").Type(),
+			rawsIn(rule)["selector"],
+		)
 	}
 
 	declaration := firstDeclaration(test, root)
@@ -89,7 +94,10 @@ func TestParseGlueOffsetsAreBytes(test *testing.T) {
 		test.Errorf("c is [%d, %d], want [%d, %d]", locStart(words[1]), locEnd(words[1]), want, want+1)
 	}
 	class := root.List("nodes")[2].Child("selector").List("nodes")[0].List("nodes")[0]
-	if want := strings.Index(text, ".\xc3\xa9"); !class.Is("selector-class") || locStart(class) != want || locEnd(class) != want+3 {
+	if want := strings.Index(
+		text,
+		".\xc3\xa9",
+	); !class.Is("selector-class") || locStart(class) != want || locEnd(class) != want+3 {
 		test.Errorf("%s is [%d, %d], want [%d, %d]", class.Type(), locStart(class), locEnd(class), want, want+3)
 	}
 }
@@ -116,7 +124,10 @@ func TestParseGlueCustomPropertyBlock(test *testing.T) {
 		test.Fatalf("value: %s with %d nodes", value.Type(), len(value.List("nodes")))
 	}
 	inner := value.List("nodes")[0]
-	if want := strings.Index(text, "a: b"); !inner.Is("css-decl") || locStart(inner) != want || locStart(value) != want {
+	if want := strings.Index(
+		text,
+		"a: b",
+	); !inner.Is("css-decl") || locStart(inner) != want || locStart(value) != want {
 		test.Errorf("inner %s at %d, rule at %d, want %d", inner.Type(), locStart(inner), locStart(value), want)
 	}
 }
@@ -126,8 +137,15 @@ func TestParseGlueFrontMatter(test *testing.T) {
 	text := "---\ntitle: x\n---\na { b: c }"
 	root := mustParse(test, text)
 	frontMatter := root.Child("frontMatter")
-	if !frontMatter.Is("front-matter") || frontMatter.String("raw") != "---\ntitle: x\n---" || frontMatter.String("value") != "title: x" {
-		test.Fatalf("front matter: %s raw %q value %q", frontMatter.Type(), frontMatter.String("raw"), frontMatter.String("value"))
+	if !frontMatter.Is("front-matter") ||
+		frontMatter.String("raw") != "---\ntitle: x\n---" ||
+		frontMatter.String("value") != "title: x" {
+		test.Fatalf(
+			"front matter: %s raw %q value %q",
+			frontMatter.Type(),
+			frontMatter.String("raw"),
+			frontMatter.String("value"),
+		)
 	}
 	if want := strings.Index(text, "b: c"); locStart(firstDeclaration(test, root)) != want {
 		test.Errorf("declaration at %d, want %d", locStart(firstDeclaration(test, root)), want)
@@ -153,7 +171,9 @@ func TestParseGlueVisitorKeys(test *testing.T) {
 	if keys := visitorKeys(estree.New("css-root", 0, 0)); !slices.Equal(keys, []string{"frontMatter", "nodes"}) {
 		test.Errorf("css-root: %v", keys)
 	}
-	if keys := visitorKeys(estree.New("value-paren_group", 0, 0)); !slices.Equal(keys, []string{"open", "groups", "close"}) {
+	if keys := visitorKeys(
+		estree.New("value-paren_group", 0, 0),
+	); !slices.Equal(keys, []string{"open", "groups", "close"}) {
 		test.Errorf("value-paren_group: %v", keys)
 	}
 	if _, known := lookupVisitorKeys(estree.New("front-matter", 0, 0)); known {

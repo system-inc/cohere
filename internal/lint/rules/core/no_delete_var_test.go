@@ -39,13 +39,28 @@ func TestNoDeleteVarStaysSilent(test *testing.T) {
 	}{
 		// The boundary is "bare name versus property access", and every legitimate use of delete
 		// is on the other side of it.
-		{"a dotted property", "declare const record: { key?: number };\nexport function run() {\n    delete record.key;\n}\n"},
-		{"a computed property with a literal", "declare const record: Record<string, number>;\nexport function run() {\n    delete record['key'];\n}\n"},
-		{"a computed property with a variable", "declare const record: Record<string, number>;\nexport function run(key: string) {\n    delete record[key];\n}\n"},
-		{"a nested property", "declare const outer: { inner: { key?: number } };\nexport function run() {\n    delete outer.inner.key;\n}\n"},
+		{
+			"a dotted property",
+			"declare const record: { key?: number };\nexport function run() {\n    delete record.key;\n}\n",
+		},
+		{
+			"a computed property with a literal",
+			"declare const record: Record<string, number>;\nexport function run() {\n    delete record['key'];\n}\n",
+		},
+		{
+			"a computed property with a variable",
+			"declare const record: Record<string, number>;\nexport function run(key: string) {\n    delete record[key];\n}\n",
+		},
+		{
+			"a nested property",
+			"declare const outer: { inner: { key?: number } };\nexport function run() {\n    delete outer.inner.key;\n}\n",
+		},
 		// A property access wrapped in parentheses is still a property access, so stripping the
 		// grouping must not turn it into a bare name.
-		{"a parenthesized property access", "declare const record: { key?: number };\nexport function run() {\n    delete (record.key);\n}\n"},
+		{
+			"a parenthesized property access",
+			"declare const record: { key?: number };\nexport function run() {\n    delete (record.key);\n}\n",
+		},
 		{"no delete at all", "export function run() {\n    return 1;\n}\n"},
 	}
 	for _, testCase := range cases {

@@ -100,49 +100,178 @@ var noUselessAssignmentUpstreamFail = []struct {
 	source string
 	count  int
 }{
-	{source: "let v = 'used';\n                        console.log(v);\n                        v = 'unused'", count: 1},
-	{source: "function foo() {\n                            let v = 'used';\n                            console.log(v);\n                            v = 'unused';\n                        }", count: 1},
-	{source: "function foo() {\n                            let v = 'used';\n                            if (condition) {\n                                v = 'unused';\n                                return\n                            }\n                            console.log(v);\n                        }", count: 1},
-	{source: "function foo() {\n                            let v = 'used';\n                            if (condition) {\n                                console.log(v);\n                            } else {\n                                v = 'unused';\n                            }\n                        }", count: 1},
-	{source: "var foo = function () {\n                            let v = 'used';\n                            console.log(v);\n                            v = 'unused'\n                        }", count: 1},
-	{source: "var foo = () => {\n                            let v = 'used';\n                            console.log(v);\n                            v = 'unused'\n                        }", count: 1},
-	{source: "class foo {\n                            static {\n                                let v = 'used';\n                                console.log(v);\n                                v = 'unused'\n                            }\n                        }", count: 1},
-	{source: "function foo() {\n                            let v = 'unused';\n                            if (condition) {\n                                v = 'used';\n                                console.log(v);\n                                return\n                            }\n                        }", count: 1},
-	{source: "function foo() {\n                            let v = 'used';\n                            console.log(v);\n                            v = 'unused';\n                            v = 'unused';\n                        }", count: 2},
-	{source: "function foo() {\n                            let v = 'used';\n                            console.log(v);\n                            v = 'unused';\n                            v = 'used';\n                            console.log(v);\n                            v = 'used';\n                            console.log(v);\n                        }", count: 1},
-	{source: "\n                        let v;\n                        v = 'unused';\n                        if (foo) {\n                            v = 'used';\n                        } else {\n                            v = 'used';\n                        }\n                        console.log(v);", count: 1},
-	{source: "function foo() {\n                            let v = 'used';\n                            console.log(v);\n                            v = 'unused';\n                            v = 'unused';\n                            v = 'used';\n                            console.log(v);\n                        }", count: 2},
-	{source: "function foo() {\n                            let v = 'unused';\n                            if (condition) {\n                                if (condition2) {\n                                    v = 'used-2';\n                                } else {\n                                    v = 'used-3';\n                                }\n                            } else {\n                                v = 'used-4';\n                            }\n                            console.log(v);\n                        }", count: 1},
-	{source: "function foo() {\n                            let v;\n                            if (condition) {\n                                v = 'unused';\n                            } else {\n                                //\n                            }\n                            if (condition2) {\n                                v = 'used-1';\n                            } else {\n                                v = 'used-2';\n                            }\n                            console.log(v);\n                        }", count: 1},
-	{source: "function foo() {\n                            let v = 'used';\n                            if (condition) {\n                                v = 'unused';\n                                v = 'unused';\n                                v = 'used';\n                            }\n                            console.log(v);\n                        }", count: 2},
-	{source: "function foo() {\n                            let a = 42;\n                            console.log(a);\n                            a++;\n                        }", count: 1},
-	{source: "function foo() {\n                            let a = 42;\n                            console.log(a);\n                            a--;\n                        }", count: 1},
-	{source: "function foo() {\n                            let a = 'used', b = 'used', c = 'used', d = 'used';\n                            console.log(a, b, c, d);\n                            ({ a, arr: [b, c,, ...d] } = fn());\n                            console.log(c);\n                        }", count: 3},
-	{source: "function foo() {\n                            let a = 'used', b = 'used', c = 'used';\n                            console.log(a, b, c);\n                            ({ a = 'unused', foo: b, ...c } = fn());\n                        }", count: 3},
-	{source: "function foo () {\n                            let v = 'used';\n                            console.log(v);\n                            setTimeout(() => v = 42, 1);\n                            v = 'unused and variable is only updated in other scopes';\n                        }", count: 1},
-	{source: "function foo() {\n                            let v = 'used';\n                            if (condition) {\n                                let v = 'used';\n                                console.log(v);\n                                v = 'unused';\n                            }\n                            console.log(v);\n                            v = 'unused';\n                        }", count: 2},
-	{source: "function foo() {\n                            let v = 'used';\n                            if (condition) {\n                                console.log(v);\n                                v = 'unused';\n                            } else {\n                                v = 'unused';\n                            }\n                        }", count: 2},
-	{source: "function foo () {\n                            let v = 'used';\n                            console.log(v);\n                            v = 'unused';\n                            return;\n                            console.log(v);\n                        }", count: 1},
-	{source: "function foo () {\n                            let v = 'used';\n                            console.log(v);\n                            v = 'unused';\n                            throw new Error();\n                            console.log(v);\n                        }", count: 1},
-	{source: "function foo () {\n                            let v = 'used';\n                            console.log(v);\n                            for (let i = 0; i < 10; i++) {\n                                v = 'unused';\n                                continue;\n                                console.log(v);\n                            }\n                        }\n                        function bar () {\n                            let v = 'used';\n                            console.log(v);\n                            for (let i = 0; i < 10; i++) {\n                                v = 'unused';\n                                break;\n                                console.log(v);\n                            }\n                        }", count: 2},
-	{source: "function foo () {\n                            let v = 'used';\n                            console.log(v);\n                            for (let i = 0; i < 10; i++) {\n                                if (condition) {\n                                    v = 'unused';\n                                    break;\n                                }\n                                console.log(v);\n                            }\n                        }", count: 1},
-	{source: "let message = 'unused';\n                        try {\n                            const result = call();\n                            message = result.message;\n                        } catch (e) {\n                            message = 'used';\n                        }\n                        console.log(message)", count: 1},
-	{source: "let message = 'unused';\n                        try {\n                            message = 'used';\n                            console.log(message)\n                        } catch (e) {\n                        }", count: 1},
-	{source: "let message = 'unused';\n                        try {\n                            message = call();\n                        } catch (e) {\n                            message = 'used';\n                        }\n                        console.log(message)", count: 1},
-	{source: "let v = 'unused';\n                        try {\n                            v = callA();\n                            try {\n                                v = callB();\n                            } catch (e) {\n                                // ignore\n                            }\n                        } catch (e) {\n                            v = 'used';\n                        }\n                        console.log(v)", count: 1},
-	{source: "\n                        var x = 1; // used\n                        x = x + 1; // unused\n                        x = 5; // used\n                        f(x);", count: 1},
-	{source: "\n                        var x = 1; // used\n                        x = // used\n                            x++; // unused\n                        f(x);", count: 1},
-	{source: "const obj = { a: 1 };\n                        let {\n                            a,\n                            b = (a = 2)\n                        } = obj;\n                        a = 3\n                        console.log(a, b);", count: 1},
-	{source: "const arr = [1, 2];\n                        let [\n                            a,\n                            b\n                        ] = arr;\n                        a = 3\n                        console.log(a, b);", count: 1},
-	{source: "function App() {\n                        let A = \"unused\";\n                        A = \"used\";\n                        return <A/>;\n                        }", count: 1},
-	{source: "function App() {\n                        let A = \"unused\";\n                        A = \"used\";\n                        return <A></A>;\n                        }", count: 1},
-	{source: "function App() {\n                        let A = \"unused\";\n                        A = \"used\";\n                        return <A.B />;\n                        }", count: 1},
-	{source: "function App() {\n                        let x = \"used\";\n                        if (cond) {\n                          return <A prop={x} />;\n                        } else {\n                          x = \"unused\";\n                        }\n                        }", count: 1},
-	{source: "function App() {\n                        let A;\n                        A = \"unused\";\n                        if (cond) {\n                          A = \"used1\";\n                        } else {\n                          A = \"used2\";\n                        }\n                        return <A/>;\n                        }", count: 1},
-	{source: "function App() {\n                        let message = 'unused';\n                        try {\n                          const result = call();\n                          message = result.message;\n                        } catch (e) {\n                          message = 'used';\n                        }\n                        return <A prop={message} />;\n                        }", count: 1},
-	{source: "function App() {\n                        let x = 1;\n                        x = x + 1;\n                        x = 5;\n                        return <A prop={x} />;\n                        }", count: 1},
-	{source: "function App() {\n                        let x = 1;\n                        x = 2;\n                        return <A>{x}</A>;\n                        }", count: 1},
-	{source: "function App() {\n                        let x = 0;\n                        x = 1;\n                        x = 2;\n                        return <A prop={x} />;\n                        }", count: 2},
+	{
+		source: "let v = 'used';\n                        console.log(v);\n                        v = 'unused'",
+		count:  1,
+	},
+	{
+		source: "function foo() {\n                            let v = 'used';\n                            console.log(v);\n                            v = 'unused';\n                        }",
+		count:  1,
+	},
+	{
+		source: "function foo() {\n                            let v = 'used';\n                            if (condition) {\n                                v = 'unused';\n                                return\n                            }\n                            console.log(v);\n                        }",
+		count:  1,
+	},
+	{
+		source: "function foo() {\n                            let v = 'used';\n                            if (condition) {\n                                console.log(v);\n                            } else {\n                                v = 'unused';\n                            }\n                        }",
+		count:  1,
+	},
+	{
+		source: "var foo = function () {\n                            let v = 'used';\n                            console.log(v);\n                            v = 'unused'\n                        }",
+		count:  1,
+	},
+	{
+		source: "var foo = () => {\n                            let v = 'used';\n                            console.log(v);\n                            v = 'unused'\n                        }",
+		count:  1,
+	},
+	{
+		source: "class foo {\n                            static {\n                                let v = 'used';\n                                console.log(v);\n                                v = 'unused'\n                            }\n                        }",
+		count:  1,
+	},
+	{
+		source: "function foo() {\n                            let v = 'unused';\n                            if (condition) {\n                                v = 'used';\n                                console.log(v);\n                                return\n                            }\n                        }",
+		count:  1,
+	},
+	{
+		source: "function foo() {\n                            let v = 'used';\n                            console.log(v);\n                            v = 'unused';\n                            v = 'unused';\n                        }",
+		count:  2,
+	},
+	{
+		source: "function foo() {\n                            let v = 'used';\n                            console.log(v);\n                            v = 'unused';\n                            v = 'used';\n                            console.log(v);\n                            v = 'used';\n                            console.log(v);\n                        }",
+		count:  1,
+	},
+	{
+		source: "\n                        let v;\n                        v = 'unused';\n                        if (foo) {\n                            v = 'used';\n                        } else {\n                            v = 'used';\n                        }\n                        console.log(v);",
+		count:  1,
+	},
+	{
+		source: "function foo() {\n                            let v = 'used';\n                            console.log(v);\n                            v = 'unused';\n                            v = 'unused';\n                            v = 'used';\n                            console.log(v);\n                        }",
+		count:  2,
+	},
+	{
+		source: "function foo() {\n                            let v = 'unused';\n                            if (condition) {\n                                if (condition2) {\n                                    v = 'used-2';\n                                } else {\n                                    v = 'used-3';\n                                }\n                            } else {\n                                v = 'used-4';\n                            }\n                            console.log(v);\n                        }",
+		count:  1,
+	},
+	{
+		source: "function foo() {\n                            let v;\n                            if (condition) {\n                                v = 'unused';\n                            } else {\n                                //\n                            }\n                            if (condition2) {\n                                v = 'used-1';\n                            } else {\n                                v = 'used-2';\n                            }\n                            console.log(v);\n                        }",
+		count:  1,
+	},
+	{
+		source: "function foo() {\n                            let v = 'used';\n                            if (condition) {\n                                v = 'unused';\n                                v = 'unused';\n                                v = 'used';\n                            }\n                            console.log(v);\n                        }",
+		count:  2,
+	},
+	{
+		source: "function foo() {\n                            let a = 42;\n                            console.log(a);\n                            a++;\n                        }",
+		count:  1,
+	},
+	{
+		source: "function foo() {\n                            let a = 42;\n                            console.log(a);\n                            a--;\n                        }",
+		count:  1,
+	},
+	{
+		source: "function foo() {\n                            let a = 'used', b = 'used', c = 'used', d = 'used';\n                            console.log(a, b, c, d);\n                            ({ a, arr: [b, c,, ...d] } = fn());\n                            console.log(c);\n                        }",
+		count:  3,
+	},
+	{
+		source: "function foo() {\n                            let a = 'used', b = 'used', c = 'used';\n                            console.log(a, b, c);\n                            ({ a = 'unused', foo: b, ...c } = fn());\n                        }",
+		count:  3,
+	},
+	{
+		source: "function foo () {\n                            let v = 'used';\n                            console.log(v);\n                            setTimeout(() => v = 42, 1);\n                            v = 'unused and variable is only updated in other scopes';\n                        }",
+		count:  1,
+	},
+	{
+		source: "function foo() {\n                            let v = 'used';\n                            if (condition) {\n                                let v = 'used';\n                                console.log(v);\n                                v = 'unused';\n                            }\n                            console.log(v);\n                            v = 'unused';\n                        }",
+		count:  2,
+	},
+	{
+		source: "function foo() {\n                            let v = 'used';\n                            if (condition) {\n                                console.log(v);\n                                v = 'unused';\n                            } else {\n                                v = 'unused';\n                            }\n                        }",
+		count:  2,
+	},
+	{
+		source: "function foo () {\n                            let v = 'used';\n                            console.log(v);\n                            v = 'unused';\n                            return;\n                            console.log(v);\n                        }",
+		count:  1,
+	},
+	{
+		source: "function foo () {\n                            let v = 'used';\n                            console.log(v);\n                            v = 'unused';\n                            throw new Error();\n                            console.log(v);\n                        }",
+		count:  1,
+	},
+	{
+		source: "function foo () {\n                            let v = 'used';\n                            console.log(v);\n                            for (let i = 0; i < 10; i++) {\n                                v = 'unused';\n                                continue;\n                                console.log(v);\n                            }\n                        }\n                        function bar () {\n                            let v = 'used';\n                            console.log(v);\n                            for (let i = 0; i < 10; i++) {\n                                v = 'unused';\n                                break;\n                                console.log(v);\n                            }\n                        }",
+		count:  2,
+	},
+	{
+		source: "function foo () {\n                            let v = 'used';\n                            console.log(v);\n                            for (let i = 0; i < 10; i++) {\n                                if (condition) {\n                                    v = 'unused';\n                                    break;\n                                }\n                                console.log(v);\n                            }\n                        }",
+		count:  1,
+	},
+	{
+		source: "let message = 'unused';\n                        try {\n                            const result = call();\n                            message = result.message;\n                        } catch (e) {\n                            message = 'used';\n                        }\n                        console.log(message)",
+		count:  1,
+	},
+	{
+		source: "let message = 'unused';\n                        try {\n                            message = 'used';\n                            console.log(message)\n                        } catch (e) {\n                        }",
+		count:  1,
+	},
+	{
+		source: "let message = 'unused';\n                        try {\n                            message = call();\n                        } catch (e) {\n                            message = 'used';\n                        }\n                        console.log(message)",
+		count:  1,
+	},
+	{
+		source: "let v = 'unused';\n                        try {\n                            v = callA();\n                            try {\n                                v = callB();\n                            } catch (e) {\n                                // ignore\n                            }\n                        } catch (e) {\n                            v = 'used';\n                        }\n                        console.log(v)",
+		count:  1,
+	},
+	{
+		source: "\n                        var x = 1; // used\n                        x = x + 1; // unused\n                        x = 5; // used\n                        f(x);",
+		count:  1,
+	},
+	{
+		source: "\n                        var x = 1; // used\n                        x = // used\n                            x++; // unused\n                        f(x);",
+		count:  1,
+	},
+	{
+		source: "const obj = { a: 1 };\n                        let {\n                            a,\n                            b = (a = 2)\n                        } = obj;\n                        a = 3\n                        console.log(a, b);",
+		count:  1,
+	},
+	{
+		source: "const arr = [1, 2];\n                        let [\n                            a,\n                            b\n                        ] = arr;\n                        a = 3\n                        console.log(a, b);",
+		count:  1,
+	},
+	{
+		source: "function App() {\n                        let A = \"unused\";\n                        A = \"used\";\n                        return <A/>;\n                        }",
+		count:  1,
+	},
+	{
+		source: "function App() {\n                        let A = \"unused\";\n                        A = \"used\";\n                        return <A></A>;\n                        }",
+		count:  1,
+	},
+	{
+		source: "function App() {\n                        let A = \"unused\";\n                        A = \"used\";\n                        return <A.B />;\n                        }",
+		count:  1,
+	},
+	{
+		source: "function App() {\n                        let x = \"used\";\n                        if (cond) {\n                          return <A prop={x} />;\n                        } else {\n                          x = \"unused\";\n                        }\n                        }",
+		count:  1,
+	},
+	{
+		source: "function App() {\n                        let A;\n                        A = \"unused\";\n                        if (cond) {\n                          A = \"used1\";\n                        } else {\n                          A = \"used2\";\n                        }\n                        return <A/>;\n                        }",
+		count:  1,
+	},
+	{
+		source: "function App() {\n                        let message = 'unused';\n                        try {\n                          const result = call();\n                          message = result.message;\n                        } catch (e) {\n                          message = 'used';\n                        }\n                        return <A prop={message} />;\n                        }",
+		count:  1,
+	},
+	{
+		source: "function App() {\n                        let x = 1;\n                        x = x + 1;\n                        x = 5;\n                        return <A prop={x} />;\n                        }",
+		count:  1,
+	},
+	{
+		source: "function App() {\n                        let x = 1;\n                        x = 2;\n                        return <A>{x}</A>;\n                        }",
+		count:  1,
+	},
+	{
+		source: "function App() {\n                        let x = 0;\n                        x = 1;\n                        x = 2;\n                        return <A prop={x} />;\n                        }",
+		count:  2,
+	},
 }
 
 // noUselessAssignmentFile is where the fixtures pretend to live. The .tsx extension matters: the
@@ -308,10 +437,14 @@ func TestNoUselessAssignmentNeedsTheTypedHarness(test *testing.T) {
 	if !NoUselessAssignment.NeedsTypeChecker {
 		test.Fatal("the rule no longer declares NeedsTypeChecker, so the fixtures below assert nothing")
 	}
-	if findings := len(rule_testing.RunTyped(test, NoUselessAssignment, noUselessAssignmentFile, source).Diagnostics); findings != 1 {
+	if findings := len(
+		rule_testing.RunTyped(test, NoUselessAssignment, noUselessAssignmentFile, source).Diagnostics,
+	); findings != 1 {
 		test.Fatalf("the typed harness produced %d findings, want 1", findings)
 	}
-	if findings := len(rule_testing.Run(test, NoUselessAssignment, noUselessAssignmentFile, source).Diagnostics); findings != 0 {
+	if findings := len(
+		rule_testing.Run(test, NoUselessAssignment, noUselessAssignmentFile, source).Diagnostics,
+	); findings != 0 {
 		test.Errorf("the untyped harness produced %d findings; it hands a nil checker, so this rule "+
 			"is silent there and a fixture using it would pass vacuously", findings)
 	}
@@ -331,10 +464,26 @@ func TestNoUselessAssignmentBoundary(test *testing.T) {
 		why   string
 		index int
 	}{
-		{"an update expression", "the graph emits a real store for the increment, judged before the load half puts the bit back", 15},
-		{"a destructuring assignment target", "the graph places a pattern element's write where it happens, so no flow node has to line up", 17},
-		{"a write inside a try block", "still never reported itself, but it now kills the earlier write it overwrites", 26},
-		{"a self-referential write chain", "the graph emits the right-hand read before the store, so no reordering is needed", 30},
+		{
+			"an update expression",
+			"the graph emits a real store for the increment, judged before the load half puts the bit back",
+			15,
+		},
+		{
+			"a destructuring assignment target",
+			"the graph places a pattern element's write where it happens, so no flow node has to line up",
+			17,
+		},
+		{
+			"a write inside a try block",
+			"still never reported itself, but it now kills the earlier write it overwrites",
+			26,
+		},
+		{
+			"a self-referential write chain",
+			"the graph emits the right-hand read before the store, so no reordering is needed",
+			30,
+		},
 		{"a destructuring declarator", "the declarator is reached by walking up through the binding pattern", 33},
 	}
 

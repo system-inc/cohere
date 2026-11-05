@@ -94,30 +94,62 @@ func noRestrictedExportsCases() []noRestrictedExportsCase {
 		{"export function a() {}", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"x"}}, []string{}},
 		{"export function *a() {}", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"x"}}, []string{}},
 		{"export async function a() {}", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"x"}}, []string{}},
-		{"export async function *a() {}", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"x"}}, []string{}},
+		{
+			"export async function *a() {}",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"x"}},
+			[]string{},
+		},
 		{"export class A {}", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"x"}}, []string{}},
 		{"var a; export { a };", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"x"}}, []string{}},
 		{"var b; export { b as a };", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"x"}}, []string{}},
 		{"export { a } from 'foo';", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"x"}}, []string{}},
-		{"export { b as a } from 'foo';", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"x"}}, []string{}},
-		{"export { '' } from 'foo';", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"undefined"}}, []string{}},
+		{
+			"export { b as a } from 'foo';",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"x"}},
+			[]string{},
+		},
+		{
+			"export { '' } from 'foo';",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"undefined"}},
+			[]string{},
+		},
 		{"export { '' } from 'foo';", NoRestrictedExportsOptions{RestrictedNamedExports: []string{" "}}, []string{}},
 		{"export { ' ' } from 'foo';", NoRestrictedExportsOptions{RestrictedNamedExports: []string{""}}, []string{}},
-		{"export { ' a', 'a ' } from 'foo';", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{}},
+		{
+			"export { ' a', 'a ' } from 'foo';",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{},
+		},
 		{"export var b = a;", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{}},
 		{"export let [b = a] = [];", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{}},
 		{"export const [b] = [a];", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{}},
 		{"export var { a: b } = {};", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{}},
 		{"export let { b = a } = {};", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{}},
-		{"export const { c: b = a } = {};", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{}},
+		{
+			"export const { c: b = a } = {};",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{},
+		},
 		{"export function b(a) {}", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{}},
 		{"export class A { a(){} }", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{}},
 		{"export class A extends B {}", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"B"}}, []string{}},
 		{"var a; export { a as b };", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{}},
 		{"var a; export { a as 'a ' };", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{}},
-		{"export { a as b } from 'foo';", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{}},
-		{"export { a as 'a ' } from 'foo';", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{}},
-		{"export { 'a' as 'a ' } from 'foo';", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{}},
+		{
+			"export { a as b } from 'foo';",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{},
+		},
+		{
+			"export { a as 'a ' } from 'foo';",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{},
+		},
+		{
+			"export { 'a' as 'a ' } from 'foo';",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{},
+		},
 		{"export { b } from 'a';", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{}},
 		{"export * as b from 'a';", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{}},
 		{"var a;", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{}},
@@ -127,129 +159,582 @@ func noRestrictedExportsCases() []noRestrictedExportsCase {
 		{"class A {}", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"A"}}, []string{}},
 		{"import a from 'foo';", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{}},
 		{"import { a } from 'foo';", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{}},
-		{"import { b as a } from 'foo';", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{}},
-		{"var setSomething; export { setSomething };", NoRestrictedExportsOptions{RestrictedNamedExportsPattern: "^get"}, []string{}},
-		{"var foo, bar; export { foo, bar };", NoRestrictedExportsOptions{RestrictedNamedExportsPattern: "^(?!foo)(?!bar).+$"}, []string{}},
-		{"var foobar; export default foobar;", NoRestrictedExportsOptions{RestrictedNamedExportsPattern: "bar$"}, []string{}},
-		{"var foobar; export default foobar;", NoRestrictedExportsOptions{RestrictedNamedExportsPattern: "default"}, []string{}},
+		{
+			"import { b as a } from 'foo';",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{},
+		},
+		{
+			"var setSomething; export { setSomething };",
+			NoRestrictedExportsOptions{RestrictedNamedExportsPattern: "^get"},
+			[]string{},
+		},
+		{
+			"var foo, bar; export { foo, bar };",
+			NoRestrictedExportsOptions{RestrictedNamedExportsPattern: "^(?!foo)(?!bar).+$"},
+			[]string{},
+		},
+		{
+			"var foobar; export default foobar;",
+			NoRestrictedExportsOptions{RestrictedNamedExportsPattern: "bar$"},
+			[]string{},
+		},
+		{
+			"var foobar; export default foobar;",
+			NoRestrictedExportsOptions{RestrictedNamedExportsPattern: "default"},
+			[]string{},
+		},
 		{"export default 'default';", NoRestrictedExportsOptions{RestrictedNamedExportsPattern: "default"}, []string{}},
-		{"var foobar; export { foobar as default };", NoRestrictedExportsOptions{RestrictedNamedExportsPattern: "default"}, []string{}},
-		{"var foobar; export { foobar as 'default' };", NoRestrictedExportsOptions{RestrictedNamedExportsPattern: "default"}, []string{}},
-		{"export { default } from 'mod';", NoRestrictedExportsOptions{RestrictedNamedExportsPattern: "default"}, []string{}},
-		{"export { default as default } from 'mod';", NoRestrictedExportsOptions{RestrictedNamedExportsPattern: "default"}, []string{}},
-		{"export { foobar as default } from 'mod';", NoRestrictedExportsOptions{RestrictedNamedExportsPattern: "default"}, []string{}},
-		{"export * as default from 'mod';", NoRestrictedExportsOptions{RestrictedNamedExportsPattern: "default"}, []string{}},
+		{
+			"var foobar; export { foobar as default };",
+			NoRestrictedExportsOptions{RestrictedNamedExportsPattern: "default"},
+			[]string{},
+		},
+		{
+			"var foobar; export { foobar as 'default' };",
+			NoRestrictedExportsOptions{RestrictedNamedExportsPattern: "default"},
+			[]string{},
+		},
+		{
+			"export { default } from 'mod';",
+			NoRestrictedExportsOptions{RestrictedNamedExportsPattern: "default"},
+			[]string{},
+		},
+		{
+			"export { default as default } from 'mod';",
+			NoRestrictedExportsOptions{RestrictedNamedExportsPattern: "default"},
+			[]string{},
+		},
+		{
+			"export { foobar as default } from 'mod';",
+			NoRestrictedExportsOptions{RestrictedNamedExportsPattern: "default"},
+			[]string{},
+		},
+		{
+			"export * as default from 'mod';",
+			NoRestrictedExportsOptions{RestrictedNamedExportsPattern: "default"},
+			[]string{},
+		},
 		{"export * from 'foo';", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{}},
 		{"export * from 'a';", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{}},
 		{"export default a;", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{}},
-		{"export default function a() {}", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{}},
+		{
+			"export default function a() {}",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{},
+		},
 		{"export default class A {}", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"A"}}, []string{}},
-		{"export default (function a() {});", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{}},
+		{
+			"export default (function a() {});",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{},
+		},
 		{"export default (class A {});", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"A"}}, []string{}},
 		{"export default 1;", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"default"}}, []string{}},
-		{"export { default as a } from 'foo';", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"default"}}, []string{}},
-		{"export default foo;", NoRestrictedExportsOptions{RestrictDefaultExports: &NoRestrictedExportsRestrictDefaultExports{Direct: noRestrictedExportsFlag(false)}}, []string{}},
-		{"export default 42;", NoRestrictedExportsOptions{RestrictDefaultExports: &NoRestrictedExportsRestrictDefaultExports{Direct: noRestrictedExportsFlag(false)}}, []string{}},
-		{"export default function foo() {}", NoRestrictedExportsOptions{RestrictDefaultExports: &NoRestrictedExportsRestrictDefaultExports{Direct: noRestrictedExportsFlag(false)}}, []string{}},
-		{"const foo = 123;\nexport { foo as default };", NoRestrictedExportsOptions{RestrictDefaultExports: &NoRestrictedExportsRestrictDefaultExports{Named: noRestrictedExportsFlag(false)}}, []string{}},
-		{"export { default } from 'mod';", NoRestrictedExportsOptions{RestrictDefaultExports: &NoRestrictedExportsRestrictDefaultExports{DefaultFrom: noRestrictedExportsFlag(false)}}, []string{}},
-		{"export { default as default } from 'mod';", NoRestrictedExportsOptions{RestrictDefaultExports: &NoRestrictedExportsRestrictDefaultExports{DefaultFrom: noRestrictedExportsFlag(false)}}, []string{}},
-		{"export { foo as default } from 'mod';", NoRestrictedExportsOptions{RestrictDefaultExports: &NoRestrictedExportsRestrictDefaultExports{DefaultFrom: noRestrictedExportsFlag(true)}}, []string{}},
-		{"export { default } from 'mod';", NoRestrictedExportsOptions{RestrictDefaultExports: &NoRestrictedExportsRestrictDefaultExports{Named: noRestrictedExportsFlag(true), DefaultFrom: noRestrictedExportsFlag(false)}}, []string{}},
-		{"export { 'default' } from 'mod'; ", NoRestrictedExportsOptions{RestrictDefaultExports: &NoRestrictedExportsRestrictDefaultExports{DefaultFrom: noRestrictedExportsFlag(false)}}, []string{}},
-		{"export { foo as default } from 'mod';", NoRestrictedExportsOptions{RestrictDefaultExports: &NoRestrictedExportsRestrictDefaultExports{NamedFrom: noRestrictedExportsFlag(false)}}, []string{}},
-		{"export { default as default } from 'mod';", NoRestrictedExportsOptions{RestrictDefaultExports: &NoRestrictedExportsRestrictDefaultExports{NamedFrom: noRestrictedExportsFlag(true)}}, []string{}},
-		{"export { default as default } from 'mod';", NoRestrictedExportsOptions{RestrictDefaultExports: &NoRestrictedExportsRestrictDefaultExports{NamedFrom: noRestrictedExportsFlag(false)}}, []string{}},
-		{"export { 'default' } from 'mod'; ", NoRestrictedExportsOptions{RestrictDefaultExports: &NoRestrictedExportsRestrictDefaultExports{DefaultFrom: noRestrictedExportsFlag(false), NamedFrom: noRestrictedExportsFlag(true)}}, []string{}},
-		{"export * as default from 'mod';", NoRestrictedExportsOptions{RestrictDefaultExports: &NoRestrictedExportsRestrictDefaultExports{NamespaceFrom: noRestrictedExportsFlag(false)}}, []string{}},
-		{"export function someFunction() {}", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"someFunction"}}, []string{"restrictedNamed"}},
-		{"export var a;", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{"restrictedNamed"}},
-		{"export var a = 1;", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{"restrictedNamed"}},
-		{"export let a;", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{"restrictedNamed"}},
-		{"export let a = 1;", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{"restrictedNamed"}},
-		{"export const a = 1;", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{"restrictedNamed"}},
-		{"export function a() {}", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{"restrictedNamed"}},
-		{"export function *a() {}", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{"restrictedNamed"}},
-		{"export async function a() {}", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{"restrictedNamed"}},
-		{"export async function *a() {}", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{"restrictedNamed"}},
-		{"export class A {}", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"A"}}, []string{"restrictedNamed"}},
-		{"let a; export { a };", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{"restrictedNamed"}},
-		{"export { a }; var a;", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{"restrictedNamed"}},
-		{"let b; export { b as a };", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{"restrictedNamed"}},
-		{"export { a } from 'foo';", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{"restrictedNamed"}},
-		{"export { b as a } from 'foo';", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{"restrictedNamed"}},
-		{"let a; export { a as 'a' };", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{"restrictedNamed"}},
-		{"let a; export { a as 'b' };", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"b"}}, []string{"restrictedNamed"}},
-		{"let a; export { a as ' b ' };", NoRestrictedExportsOptions{RestrictedNamedExports: []string{" b "}}, []string{"restrictedNamed"}},
-		{"let a; export { a as '👍' };", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"👍"}}, []string{"restrictedNamed"}},
-		{"export { 'a' } from 'foo';", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{"restrictedNamed"}},
-		{"export { '' } from 'foo';", NoRestrictedExportsOptions{RestrictedNamedExports: []string{""}}, []string{"restrictedNamed"}},
-		{"export { ' ' } from 'foo';", NoRestrictedExportsOptions{RestrictedNamedExports: []string{" "}}, []string{"restrictedNamed"}},
-		{"export { b as 'a' } from 'foo';", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{"restrictedNamed"}},
-		{"export { b as '\\u0061' } from 'foo';", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{"restrictedNamed"}},
-		{"export * as 'a' from 'foo';", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{"restrictedNamed"}},
-		{"export var [a] = [];", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{"restrictedNamed"}},
-		{"export let { a } = {};", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{"restrictedNamed"}},
-		{"export const { b: a } = {};", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{"restrictedNamed"}},
-		{"export var [{ a }] = [];", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{"restrictedNamed"}},
-		{"export let { b: { c: a = d } = e } = {};", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{"restrictedNamed"}},
-		{"var a; export var a;", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{"restrictedNamed"}},
-		{"export var a; var a;", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{"restrictedNamed"}},
-		{"export var a = a;", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{"restrictedNamed"}},
-		{"export let b = a, a;", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{"restrictedNamed"}},
-		{"export const a = 1, b = a;", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{"restrictedNamed"}},
-		{"export var [a] = a;", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{"restrictedNamed"}},
-		{"export let { a: a } = {};", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{"restrictedNamed"}},
-		{"export const { a: b, b: a } = {};", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{"restrictedNamed"}},
-		{"export var { b: a, a: b } = {};", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{"restrictedNamed"}},
-		{"export let a, { a: b } = {};", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{"restrictedNamed"}},
-		{"export const { a: b } = {}, a = 1;", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{"restrictedNamed"}},
-		{"export var [a = a] = [];", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{"restrictedNamed"}},
-		{"export var { a: a = a } = {};", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{"restrictedNamed"}},
-		{"export let { a } = { a };", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{"restrictedNamed"}},
-		{"export function a(a) {};", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{"restrictedNamed"}},
-		{"export class A { A(){} };", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"A"}}, []string{"restrictedNamed"}},
-		{"var a; export { a as a };", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{"restrictedNamed"}},
-		{"let a, b; export { a as b, b as a };", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{"restrictedNamed"}},
-		{"const a = 1, b = 2; export { b as a, a as b };", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{"restrictedNamed"}},
-		{"var a; export { a as b, a };", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{"restrictedNamed"}},
-		{"export { a as a } from 'a';", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{"restrictedNamed"}},
-		{"export { a as b, b as a } from 'foo';", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{"restrictedNamed"}},
-		{"export { b as a, a as b } from 'foo';", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{"restrictedNamed"}},
-		{"export * as a from 'a';", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{"restrictedNamed"}},
-		{"export var a, b;", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{"restrictedNamed"}},
-		{"export let b, a;", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{"restrictedNamed"}},
-		{"export const b = 1, a = 2;", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a", "b"}}, []string{"restrictedNamed", "restrictedNamed"}},
-		{"export var a, b, c;", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a", "c"}}, []string{"restrictedNamed", "restrictedNamed"}},
-		{"export let { a, b, c } = {};", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"b", "c"}}, []string{"restrictedNamed", "restrictedNamed"}},
-		{"export const [a, b, c, d] = {};", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"b", "c"}}, []string{"restrictedNamed", "restrictedNamed"}},
-		{"export var { a, x: b, c, d, e: y } = {}, e, f = {};", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"foo", "a", "b", "bar", "d", "e", "baz"}}, []string{"restrictedNamed", "restrictedNamed", "restrictedNamed", "restrictedNamed"}},
-		{"var a, b; export { a, b };", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{"restrictedNamed"}},
-		{"let a, b; export { b, a };", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{"restrictedNamed"}},
-		{"const a = 1, b = 1; export { a, b };", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a", "b"}}, []string{"restrictedNamed", "restrictedNamed"}},
-		{"export { a, b, c }; var a, b, c;", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a", "c"}}, []string{"restrictedNamed", "restrictedNamed"}},
-		{"export { b as a, b } from 'foo';", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}}, []string{"restrictedNamed"}},
-		{"export { b as a, b } from 'foo';", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"b"}}, []string{"restrictedNamed"}},
-		{"export { b as a, b } from 'foo';", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a", "b"}}, []string{"restrictedNamed", "restrictedNamed"}},
-		{"export { a, b, c, d, x as e, f, g } from 'foo';", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"foo", "b", "bar", "d", "e", "f", "baz"}}, []string{"restrictedNamed", "restrictedNamed", "restrictedNamed", "restrictedNamed"}},
-		{"var getSomething; export { getSomething };", NoRestrictedExportsOptions{RestrictedNamedExportsPattern: "get*"}, []string{"restrictedNamed"}},
-		{"var getSomethingFromUser; export { getSomethingFromUser };", NoRestrictedExportsOptions{RestrictedNamedExportsPattern: "User$"}, []string{"restrictedNamed"}},
-		{"var foo, ab, xy; export { foo, ab, xy };", NoRestrictedExportsOptions{RestrictedNamedExportsPattern: "(b|y)$"}, []string{"restrictedNamed", "restrictedNamed"}},
-		{"var foo; export { foo as ab };", NoRestrictedExportsOptions{RestrictedNamedExportsPattern: "(b|y)$"}, []string{"restrictedNamed"}},
-		{"var privateUserEmail; export { privateUserEmail };", NoRestrictedExportsOptions{RestrictedNamedExportsPattern: "^privateUser"}, []string{"restrictedNamed"}},
-		{"export const a = 1;", NoRestrictedExportsOptions{RestrictedNamedExportsPattern: "^(?!foo)(?!bar).+$"}, []string{"restrictedNamed"}},
-		{"var a; export { a as default };", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"default"}}, []string{"restrictedNamed"}},
-		{"export { default } from 'foo';", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"default"}}, []string{"restrictedNamed"}},
-		{"export default foo;", NoRestrictedExportsOptions{RestrictDefaultExports: &NoRestrictedExportsRestrictDefaultExports{Direct: noRestrictedExportsFlag(true)}}, []string{"restrictedDefault"}},
-		{"export default 42;", NoRestrictedExportsOptions{RestrictDefaultExports: &NoRestrictedExportsRestrictDefaultExports{Direct: noRestrictedExportsFlag(true)}}, []string{"restrictedDefault"}},
-		{"export default function foo() {}", NoRestrictedExportsOptions{RestrictDefaultExports: &NoRestrictedExportsRestrictDefaultExports{Direct: noRestrictedExportsFlag(true)}}, []string{"restrictedDefault"}},
-		{"export default foo;", NoRestrictedExportsOptions{RestrictedNamedExports: []string{"bar"}, RestrictDefaultExports: &NoRestrictedExportsRestrictDefaultExports{Direct: noRestrictedExportsFlag(true)}}, []string{"restrictedDefault"}},
-		{"const foo = 123;\nexport { foo as default };", NoRestrictedExportsOptions{RestrictDefaultExports: &NoRestrictedExportsRestrictDefaultExports{Named: noRestrictedExportsFlag(true)}}, []string{"restrictedDefault"}},
-		{"export { default } from 'mod';", NoRestrictedExportsOptions{RestrictDefaultExports: &NoRestrictedExportsRestrictDefaultExports{DefaultFrom: noRestrictedExportsFlag(true)}}, []string{"restrictedDefault"}},
-		{"export { default as default } from 'mod';", NoRestrictedExportsOptions{RestrictDefaultExports: &NoRestrictedExportsRestrictDefaultExports{DefaultFrom: noRestrictedExportsFlag(true)}}, []string{"restrictedDefault"}},
-		{"export { 'default' } from 'mod';", NoRestrictedExportsOptions{RestrictDefaultExports: &NoRestrictedExportsRestrictDefaultExports{DefaultFrom: noRestrictedExportsFlag(true)}}, []string{"restrictedDefault"}},
-		{"export { foo as default } from 'mod';", NoRestrictedExportsOptions{RestrictDefaultExports: &NoRestrictedExportsRestrictDefaultExports{NamedFrom: noRestrictedExportsFlag(true)}}, []string{"restrictedDefault"}},
-		{"export * as default from 'mod';", NoRestrictedExportsOptions{RestrictDefaultExports: &NoRestrictedExportsRestrictDefaultExports{NamespaceFrom: noRestrictedExportsFlag(true)}}, []string{"restrictedDefault"}},
+		{
+			"export { default as a } from 'foo';",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"default"}},
+			[]string{},
+		},
+		{"export default foo;", NoRestrictedExportsOptions{
+			RestrictDefaultExports: &NoRestrictedExportsRestrictDefaultExports{Direct: noRestrictedExportsFlag(false)},
+		}, []string{}},
+		{"export default 42;", NoRestrictedExportsOptions{
+			RestrictDefaultExports: &NoRestrictedExportsRestrictDefaultExports{Direct: noRestrictedExportsFlag(false)},
+		}, []string{}},
+		{"export default function foo() {}", NoRestrictedExportsOptions{
+			RestrictDefaultExports: &NoRestrictedExportsRestrictDefaultExports{Direct: noRestrictedExportsFlag(false)},
+		}, []string{}},
+		{"const foo = 123;\nexport { foo as default };", NoRestrictedExportsOptions{
+			RestrictDefaultExports: &NoRestrictedExportsRestrictDefaultExports{Named: noRestrictedExportsFlag(false)},
+		}, []string{}},
+		{"export { default } from 'mod';", NoRestrictedExportsOptions{
+			RestrictDefaultExports: &NoRestrictedExportsRestrictDefaultExports{
+				DefaultFrom: noRestrictedExportsFlag(false),
+			},
+		}, []string{}},
+		{"export { default as default } from 'mod';", NoRestrictedExportsOptions{
+			RestrictDefaultExports: &NoRestrictedExportsRestrictDefaultExports{
+				DefaultFrom: noRestrictedExportsFlag(false),
+			},
+		}, []string{}},
+		{"export { foo as default } from 'mod';", NoRestrictedExportsOptions{
+			RestrictDefaultExports: &NoRestrictedExportsRestrictDefaultExports{
+				DefaultFrom: noRestrictedExportsFlag(true),
+			},
+		}, []string{}},
+		{
+			"export { default } from 'mod';",
+			NoRestrictedExportsOptions{RestrictDefaultExports: &NoRestrictedExportsRestrictDefaultExports{
+				Named:       noRestrictedExportsFlag(true),
+				DefaultFrom: noRestrictedExportsFlag(false),
+			}},
+			[]string{},
+		},
+		{"export { 'default' } from 'mod'; ", NoRestrictedExportsOptions{
+			RestrictDefaultExports: &NoRestrictedExportsRestrictDefaultExports{
+				DefaultFrom: noRestrictedExportsFlag(false),
+			},
+		}, []string{}},
+		{"export { foo as default } from 'mod';", NoRestrictedExportsOptions{
+			RestrictDefaultExports: &NoRestrictedExportsRestrictDefaultExports{
+				NamedFrom: noRestrictedExportsFlag(false),
+			},
+		}, []string{}},
+		{"export { default as default } from 'mod';", NoRestrictedExportsOptions{
+			RestrictDefaultExports: &NoRestrictedExportsRestrictDefaultExports{
+				NamedFrom: noRestrictedExportsFlag(true),
+			},
+		}, []string{}},
+		{"export { default as default } from 'mod';", NoRestrictedExportsOptions{
+			RestrictDefaultExports: &NoRestrictedExportsRestrictDefaultExports{
+				NamedFrom: noRestrictedExportsFlag(false),
+			},
+		}, []string{}},
+		{
+			"export { 'default' } from 'mod'; ",
+			NoRestrictedExportsOptions{RestrictDefaultExports: &NoRestrictedExportsRestrictDefaultExports{
+				DefaultFrom: noRestrictedExportsFlag(false),
+				NamedFrom:   noRestrictedExportsFlag(true),
+			}},
+			[]string{},
+		},
+		{"export * as default from 'mod';", NoRestrictedExportsOptions{
+			RestrictDefaultExports: &NoRestrictedExportsRestrictDefaultExports{
+				NamespaceFrom: noRestrictedExportsFlag(false),
+			},
+		}, []string{}},
+		{
+			"export function someFunction() {}",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"someFunction"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"export var a;",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"export var a = 1;",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"export let a;",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"export let a = 1;",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"export const a = 1;",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"export function a() {}",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"export function *a() {}",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"export async function a() {}",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"export async function *a() {}",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"export class A {}",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"A"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"let a; export { a };",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"export { a }; var a;",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"let b; export { b as a };",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"export { a } from 'foo';",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"export { b as a } from 'foo';",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"let a; export { a as 'a' };",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"let a; export { a as 'b' };",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"b"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"let a; export { a as ' b ' };",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{" b "}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"let a; export { a as '👍' };",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"👍"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"export { 'a' } from 'foo';",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"export { '' } from 'foo';",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{""}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"export { ' ' } from 'foo';",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{" "}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"export { b as 'a' } from 'foo';",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"export { b as '\\u0061' } from 'foo';",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"export * as 'a' from 'foo';",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"export var [a] = [];",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"export let { a } = {};",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"export const { b: a } = {};",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"export var [{ a }] = [];",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"export let { b: { c: a = d } = e } = {};",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"var a; export var a;",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"export var a; var a;",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"export var a = a;",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"export let b = a, a;",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"export const a = 1, b = a;",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"export var [a] = a;",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"export let { a: a } = {};",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"export const { a: b, b: a } = {};",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"export var { b: a, a: b } = {};",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"export let a, { a: b } = {};",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"export const { a: b } = {}, a = 1;",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"export var [a = a] = [];",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"export var { a: a = a } = {};",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"export let { a } = { a };",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"export function a(a) {};",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"export class A { A(){} };",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"A"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"var a; export { a as a };",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"let a, b; export { a as b, b as a };",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"const a = 1, b = 2; export { b as a, a as b };",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"var a; export { a as b, a };",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"export { a as a } from 'a';",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"export { a as b, b as a } from 'foo';",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"export { b as a, a as b } from 'foo';",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"export * as a from 'a';",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"export var a, b;",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"export let b, a;",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"export const b = 1, a = 2;",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a", "b"}},
+			[]string{"restrictedNamed", "restrictedNamed"},
+		},
+		{
+			"export var a, b, c;",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a", "c"}},
+			[]string{"restrictedNamed", "restrictedNamed"},
+		},
+		{
+			"export let { a, b, c } = {};",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"b", "c"}},
+			[]string{"restrictedNamed", "restrictedNamed"},
+		},
+		{
+			"export const [a, b, c, d] = {};",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"b", "c"}},
+			[]string{"restrictedNamed", "restrictedNamed"},
+		},
+		{
+			"export var { a, x: b, c, d, e: y } = {}, e, f = {};",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"foo", "a", "b", "bar", "d", "e", "baz"}},
+			[]string{"restrictedNamed", "restrictedNamed", "restrictedNamed", "restrictedNamed"},
+		},
+		{
+			"var a, b; export { a, b };",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"let a, b; export { b, a };",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"const a = 1, b = 1; export { a, b };",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a", "b"}},
+			[]string{"restrictedNamed", "restrictedNamed"},
+		},
+		{
+			"export { a, b, c }; var a, b, c;",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a", "c"}},
+			[]string{"restrictedNamed", "restrictedNamed"},
+		},
+		{
+			"export { b as a, b } from 'foo';",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"export { b as a, b } from 'foo';",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"b"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"export { b as a, b } from 'foo';",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"a", "b"}},
+			[]string{"restrictedNamed", "restrictedNamed"},
+		},
+		{
+			"export { a, b, c, d, x as e, f, g } from 'foo';",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"foo", "b", "bar", "d", "e", "f", "baz"}},
+			[]string{"restrictedNamed", "restrictedNamed", "restrictedNamed", "restrictedNamed"},
+		},
+		{
+			"var getSomething; export { getSomething };",
+			NoRestrictedExportsOptions{RestrictedNamedExportsPattern: "get*"},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"var getSomethingFromUser; export { getSomethingFromUser };",
+			NoRestrictedExportsOptions{RestrictedNamedExportsPattern: "User$"},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"var foo, ab, xy; export { foo, ab, xy };",
+			NoRestrictedExportsOptions{RestrictedNamedExportsPattern: "(b|y)$"},
+			[]string{"restrictedNamed", "restrictedNamed"},
+		},
+		{
+			"var foo; export { foo as ab };",
+			NoRestrictedExportsOptions{RestrictedNamedExportsPattern: "(b|y)$"},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"var privateUserEmail; export { privateUserEmail };",
+			NoRestrictedExportsOptions{RestrictedNamedExportsPattern: "^privateUser"},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"export const a = 1;",
+			NoRestrictedExportsOptions{RestrictedNamedExportsPattern: "^(?!foo)(?!bar).+$"},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"var a; export { a as default };",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"default"}},
+			[]string{"restrictedNamed"},
+		},
+		{
+			"export { default } from 'foo';",
+			NoRestrictedExportsOptions{RestrictedNamedExports: []string{"default"}},
+			[]string{"restrictedNamed"},
+		},
+		{"export default foo;", NoRestrictedExportsOptions{
+			RestrictDefaultExports: &NoRestrictedExportsRestrictDefaultExports{Direct: noRestrictedExportsFlag(true)},
+		}, []string{"restrictedDefault"}},
+		{"export default 42;", NoRestrictedExportsOptions{
+			RestrictDefaultExports: &NoRestrictedExportsRestrictDefaultExports{Direct: noRestrictedExportsFlag(true)},
+		}, []string{"restrictedDefault"}},
+		{"export default function foo() {}", NoRestrictedExportsOptions{
+			RestrictDefaultExports: &NoRestrictedExportsRestrictDefaultExports{Direct: noRestrictedExportsFlag(true)},
+		}, []string{"restrictedDefault"}},
+		{"export default foo;", NoRestrictedExportsOptions{
+			RestrictedNamedExports: []string{"bar"},
+			RestrictDefaultExports: &NoRestrictedExportsRestrictDefaultExports{Direct: noRestrictedExportsFlag(true)},
+		}, []string{"restrictedDefault"}},
+		{"const foo = 123;\nexport { foo as default };", NoRestrictedExportsOptions{
+			RestrictDefaultExports: &NoRestrictedExportsRestrictDefaultExports{Named: noRestrictedExportsFlag(true)},
+		}, []string{"restrictedDefault"}},
+		{"export { default } from 'mod';", NoRestrictedExportsOptions{
+			RestrictDefaultExports: &NoRestrictedExportsRestrictDefaultExports{
+				DefaultFrom: noRestrictedExportsFlag(true),
+			},
+		}, []string{"restrictedDefault"}},
+		{"export { default as default } from 'mod';", NoRestrictedExportsOptions{
+			RestrictDefaultExports: &NoRestrictedExportsRestrictDefaultExports{
+				DefaultFrom: noRestrictedExportsFlag(true),
+			},
+		}, []string{"restrictedDefault"}},
+		{"export { 'default' } from 'mod';", NoRestrictedExportsOptions{
+			RestrictDefaultExports: &NoRestrictedExportsRestrictDefaultExports{
+				DefaultFrom: noRestrictedExportsFlag(true),
+			},
+		}, []string{"restrictedDefault"}},
+		{"export { foo as default } from 'mod';", NoRestrictedExportsOptions{
+			RestrictDefaultExports: &NoRestrictedExportsRestrictDefaultExports{
+				NamedFrom: noRestrictedExportsFlag(true),
+			},
+		}, []string{"restrictedDefault"}},
+		{"export * as default from 'mod';", NoRestrictedExportsOptions{
+			RestrictDefaultExports: &NoRestrictedExportsRestrictDefaultExports{
+				NamespaceFrom: noRestrictedExportsFlag(true),
+			},
+		}, []string{"restrictedDefault"}},
 	}
 }
 
@@ -322,7 +807,11 @@ func TestNoRestrictedExportsRejectsContradictoryConfiguration(test *testing.T) {
 		configured string
 		wantError  bool
 	}{
-		{"default beside the flags", `{"restrictedNamedExports":["default"],"restrictDefaultExports":{"direct":true}}`, true},
+		{
+			"default beside the flags",
+			`{"restrictedNamedExports":["default"],"restrictDefaultExports":{"direct":true}}`,
+			true,
+		},
 		{"default alone is fine", `{"restrictedNamedExports":["default"]}`, false},
 		{"an uncompilable pattern", `{"restrictedNamedExportsPattern":"("}`, true},
 		{"a lookahead pattern compiles", `{"restrictedNamedExportsPattern":"^(?!foo)(?!bar).+$"}`, false},
@@ -334,7 +823,12 @@ func TestNoRestrictedExportsRejectsContradictoryConfiguration(test *testing.T) {
 			test.Errorf("%s: expected the decoder to refuse %s", testCase.name, testCase.configured)
 		}
 		if !testCase.wantError && decodeNoRestrictedExportsOptionsError != nil {
-			test.Errorf("%s: expected the decoder to accept %s, got %v", testCase.name, testCase.configured, decodeNoRestrictedExportsOptionsError)
+			test.Errorf(
+				"%s: expected the decoder to accept %s, got %v",
+				testCase.name,
+				testCase.configured,
+				decodeNoRestrictedExportsOptionsError,
+			)
 		}
 	}
 }

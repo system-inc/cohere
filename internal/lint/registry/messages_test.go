@@ -38,7 +38,13 @@ func TestEveryHouseMessageIsRenderedByARegisteredRule(test *testing.T) {
 	}
 	for _, option := range policy.Messages.OptionsFor(policy.MessageLanguageTypeScript) {
 		if !claimed[option] {
-			test.Errorf("policy/messages holds the option %q of %q in %s %q, and no rule picks it", option.Name, option.Phrase, option.Rule, option.Id)
+			test.Errorf(
+				"policy/messages holds the option %q of %q in %s %q, and no rule picks it",
+				option.Name,
+				option.Phrase,
+				option.Rule,
+				option.Id,
+			)
 		}
 	}
 }

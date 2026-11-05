@@ -32,27 +32,87 @@ func TestNoFallthroughFires(test *testing.T) {
 		{"a bare fall into default", "switch(foo) { case 0: a();\ndefault: b() }", nil, []string{"default"}},
 		{"a fall into default on one line", "switch(foo) { case 0: a(); default: b() }", nil, []string{"default"}},
 		// An if with no else leaves a path through, so the break in the then arm is not enough.
-		{"an if whose break is conditional", "switch(foo) { case 0: if (a) { break; } default: b() }", nil, []string{"default"}},
+		{
+			"an if whose break is conditional",
+			"switch(foo) { case 0: if (a) { break; } default: b() }",
+			nil,
+			[]string{"default"},
+		},
 		// A catch that swallows the throw restores the fallthrough path.
-		{"a try whose catch swallows the throw", "switch(foo) { case 0: try { throw 0; } catch (err) {} default: b() }", nil, []string{"default"}},
+		{
+			"a try whose catch swallows the throw",
+			"switch(foo) { case 0: try { throw 0; } catch (err) {} default: b() }",
+			nil,
+			[]string{"default"},
+		},
 		// A break inside a loop breaks the loop, not the switch.
-		{"a break belonging to a while", "switch(foo) { case 0: while (a) { break; } default: b() }", nil, []string{"default"}},
-		{"a break belonging to a do-while", "switch(foo) { case 0: do { break; } while (a); default: b() }", nil, []string{"default"}},
+		{
+			"a break belonging to a while",
+			"switch(foo) { case 0: while (a) { break; } default: b() }",
+			nil,
+			[]string{"default"},
+		},
+		{
+			"a break belonging to a do-while",
+			"switch(foo) { case 0: do { break; } while (a); default: b() }",
+			nil,
+			[]string{"default"},
+		},
 		// An empty clause separated by a blank line reads as a forgotten body rather than a
 		// deliberate grouped case, which is the whole point of the blank-line rule.
-		{"an empty clause with a blank line before default", "switch(foo) { case 0:\n\n default: b() }", nil, []string{"default"}},
+		{
+			"an empty clause with a blank line before default",
+			"switch(foo) { case 0:\n\n default: b() }",
+			nil,
+			[]string{"default"},
+		},
 		{"an empty block body", "switch(foo) { case 0: {} default: b() }", nil, []string{"default"}},
 		// The comment is in a block that is not the clause's only statement, so it is not in the
 		// window a fallthrough comment may occupy.
-		{"a fallthrough comment in a trailing block after a call", "switch(foo) { case 0: a(); { /* falls through */ } default: b() }", nil, []string{"default"}},
-		{"a fallthrough comment in a leading block", "switch(foo) { case 0: { /* falls through */ } a(); default: b() }", nil, []string{"default"}},
-		{"a fallthrough comment inside an if", "switch(foo) { case 0: if (a) { /* falls through */ } default: b() }", nil, []string{"default"}},
-		{"a fallthrough comment nested two blocks deep", "switch(foo) { case 0: { { /* falls through */ } } default: b() }", nil, []string{"default"}},
-		{"a block holding an unrelated comment", "switch(foo) { case 0: { /* comment */ } default: b() }", nil, []string{"default"}},
-		{"an unrelated line comment before default", "switch(foo) { case 0:\n // comment\n default: b() }", nil, []string{"default"}},
+		{
+			"a fallthrough comment in a trailing block after a call",
+			"switch(foo) { case 0: a(); { /* falls through */ } default: b() }",
+			nil,
+			[]string{"default"},
+		},
+		{
+			"a fallthrough comment in a leading block",
+			"switch(foo) { case 0: { /* falls through */ } a(); default: b() }",
+			nil,
+			[]string{"default"},
+		},
+		{
+			"a fallthrough comment inside an if",
+			"switch(foo) { case 0: if (a) { /* falls through */ } default: b() }",
+			nil,
+			[]string{"default"},
+		},
+		{
+			"a fallthrough comment nested two blocks deep",
+			"switch(foo) { case 0: { { /* falls through */ } } default: b() }",
+			nil,
+			[]string{"default"},
+		},
+		{
+			"a block holding an unrelated comment",
+			"switch(foo) { case 0: { /* comment */ } default: b() }",
+			nil,
+			[]string{"default"},
+		},
+		{
+			"an unrelated line comment before default",
+			"switch(foo) { case 0:\n // comment\n default: b() }",
+			nil,
+			[]string{"default"},
+		},
 		// `falling through` is not one of the four accepted spellings, and oxc matches the set
 		// rather than ESLint's `/falls?\s?through/iu` regular expression. Reproduced, not improved.
-		{"a comment reading falling through", "switch(foo) { case 0: a(); /* falling through */ default: b() }", nil, []string{"default"}},
+		{
+			"a comment reading falling through",
+			"switch(foo) { case 0: a(); /* falling through */ default: b() }",
+			nil,
+			[]string{"default"},
+		},
 		{
 			"a custom pattern the comment does not match",
 			"switch(foo) { case 0: a();\n/* no break */\ncase 1: b(); }",
@@ -88,14 +148,24 @@ func TestNoFallthroughFires(test *testing.T) {
 			NoFallthroughOptions{CommentPattern: "no break"},
 			[]string{"default"},
 		},
-		{"an empty clause with comments and a blank line", "switch(foo) { case 0: \n /* with comments */  \ncase 1: b(); }", nil, []string{"case"}},
+		{
+			"an empty clause with comments and a blank line",
+			"switch(foo) { case 0: \n /* with comments */  \ncase 1: b(); }",
+			nil,
+			[]string{"case"},
+		},
 		{
 			"an empty clause with a blank line, allowEmptyCase off explicitly",
 			"switch(foo) { case 0:\n\ncase 1: b(); }",
 			NoFallthroughOptions{},
 			[]string{"case"},
 		},
-		{"an empty clause with a blank line, an empty options object", "switch(foo) { case 0:\n\ncase 1: b(); }", NoFallthroughOptions{}, []string{"case"}},
+		{
+			"an empty clause with a blank line, an empty options object",
+			"switch(foo) { case 0:\n\ncase 1: b(); }",
+			NoFallthroughOptions{},
+			[]string{"case"},
+		},
 		{
 			"an empty statement body across lines",
 			"switch (a) { case 1: \n ; case 2:  }",
@@ -131,12 +201,27 @@ func TestNoFallthroughFires(test *testing.T) {
 		{"a default falling into a case", "switch(foo) { default: a(); case 1: b(); }", nil, []string{"case"}},
 		// The second input reporting twice: a default in the middle falls in from the case before it
 		// and out into the case after it.
-		{"a default in the middle falling both directions", "switch(foo) { case 0: a(); default: b(); case 1: c(); }", nil, []string{"default", "case"}},
+		{
+			"a default in the middle falling both directions",
+			"switch(foo) { case 0: a(); default: b(); case 1: c(); }",
+			nil,
+			[]string{"default", "case"},
+		},
 		// A logical operator in the discriminant test is still an ordinary case clause. Upstream
 		// carried a bug here (its issue 6417) where the extra condition instructions confused the
 		// control flow graph; a structural analysis has nothing to be confused by.
-		{"a case whose test uses logical or", "switch(true) { case x === 1 || x === 2: a(); case x === 3: b(); }", nil, []string{"case"}},
-		{"a case whose test uses logical and", "switch(true) { case x === 1 && y: a(); case x === 3: b(); }", nil, []string{"case"}},
+		{
+			"a case whose test uses logical or",
+			"switch(true) { case x === 1 || x === 2: a(); case x === 3: b(); }",
+			nil,
+			[]string{"case"},
+		},
+		{
+			"a case whose test uses logical and",
+			"switch(true) { case x === 1 && y: a(); case x === 3: b(); }",
+			nil,
+			[]string{"case"},
+		},
 	}
 
 	for _, testCase := range cases {
@@ -164,24 +249,56 @@ func TestNoFallthroughStaysSilent(test *testing.T) {
 		options    any
 	}{
 		{"a falls-through comment", "switch(foo) { case 0: a(); /* falls through */ case 1: b(); }", nil},
-		{"a falls-through comment on its own line", "switch(foo) { case 0: a()\n /* falls through */ case 1: b(); }", nil},
+		{
+			"a falls-through comment on its own line",
+			"switch(foo) { case 0: a()\n /* falls through */ case 1: b(); }",
+			nil,
+		},
 		{"a fall-through comment", "switch(foo) { case 0: a(); /* fall through */ case 1: b(); }", nil},
 		{"a fallthrough comment", "switch(foo) { case 0: a(); /* fallthrough */ case 1: b(); }", nil},
 		{"an upper-case falls-through comment", "switch(foo) { case 0: a(); /* FALLS THROUGH */ case 1: b(); }", nil},
 		// The block form: a clause whose only statement is a block may carry the comment inside it,
 		// before the closing brace, which is a second window the plain scan never looks at.
-		{"a comment inside the clause's only block", "switch(foo) { case 0: { a(); /* falls through */ } case 1: b(); }", nil},
-		{"a comment inside a block on its own line", "switch(foo) { case 0: { a()\n /* falls through */ } case 1: b(); }", nil},
-		{"a fall-through comment inside a block", "switch(foo) { case 0: { a(); /* fall through */ } case 1: b(); }", nil},
-		{"a fallthrough comment inside a block", "switch(foo) { case 0: { a(); /* fallthrough */ } case 1: b(); }", nil},
-		{"an upper-case comment inside a block", "switch(foo) { case 0: { a(); /* FALLS THROUGH */ } case 1: b(); }", nil},
+		{
+			"a comment inside the clause's only block",
+			"switch(foo) { case 0: { a(); /* falls through */ } case 1: b(); }",
+			nil,
+		},
+		{
+			"a comment inside a block on its own line",
+			"switch(foo) { case 0: { a()\n /* falls through */ } case 1: b(); }",
+			nil,
+		},
+		{
+			"a fall-through comment inside a block",
+			"switch(foo) { case 0: { a(); /* fall through */ } case 1: b(); }",
+			nil,
+		},
+		{
+			"a fallthrough comment inside a block",
+			"switch(foo) { case 0: { a(); /* fallthrough */ } case 1: b(); }",
+			nil,
+		},
+		{
+			"an upper-case comment inside a block",
+			"switch(foo) { case 0: { a(); /* FALLS THROUGH */ } case 1: b(); }",
+			nil,
+		},
 		{"a comment after the block", "switch(foo) { case 0: { a(); } /* falls through */ case 1: b(); }", nil},
 		// The in-block window wins even when a later comment does not match, which is the pair with
 		// the fail case where the same shape has the non-matching comment *inside* the block.
-		{"a matching in-block comment then an unrelated one", "switch(foo) { case 0: { a(); /* falls through */ } /* comment */ case 1: b(); }", nil},
+		{
+			"a matching in-block comment then an unrelated one",
+			"switch(foo) { case 0: { a(); /* falls through */ } /* comment */ case 1: b(); }",
+			nil,
+		},
 		// The comment is the block's only content, so there is no statement to anchor a scan on.
 		// This is the case that proved the shared comment scan cannot see it.
-		{"a comment alone in the clause's only block", "switch(foo) { case 0: { /* falls through */ } case 1: b(); }", nil},
+		{
+			"a comment alone in the clause's only block",
+			"switch(foo) { case 0: { /* falls through */ } case 1: b(); }",
+			nil,
+		},
 		{"a return", "function foo() { switch(foo) { case 0: a(); return; case 1: b(); }; }", nil},
 		{"a throw", "switch(foo) { case 0: a(); throw 'foo'; case 1: b(); }", nil},
 		// `continue` targets the enclosing loop and so leaves the switch.
@@ -203,16 +320,40 @@ func TestNoFallthroughStaysSilent(test *testing.T) {
 		{"a switch with no clauses at all", "switch(foo) { }", nil},
 		// The inner switch's break belongs to the inner switch, so the outer clause does fall
 		// through, and the comment is what makes this clean.
-		{"a nested switch with a fallthrough comment", "switch(foo) { case 0: switch(bar) { case 2: break; } /* falls through */ case 1: break; }", nil},
+		{
+			"a nested switch with a fallthrough comment",
+			"switch(foo) { case 0: switch(bar) { case 2: break; } /* falls through */ case 1: break; }",
+			nil,
+		},
 		// Statements after a return are unreachable, so the clause still exits.
 		{"code after a return", "function foo() { switch(foo) { case 1: return a; a++; }}", nil},
-		{"a fallthrough comment before default with a trailing comment", "switch (foo) { case 0: a(); /* falls through */ default:  b(); /* comment */ }", nil},
-		{"a fallthrough comment before a default whose body starts with a comment", "switch (foo) { case 0: a(); /* falls through */ default: /* comment */ b(); }", nil},
+		{
+			"a fallthrough comment before default with a trailing comment",
+			"switch (foo) { case 0: a(); /* falls through */ default:  b(); /* comment */ }",
+			nil,
+		},
+		{
+			"a fallthrough comment before a default whose body starts with a comment",
+			"switch (foo) { case 0: a(); /* falls through */ default: /* comment */ b(); }",
+			nil,
+		},
 		// Both arms of the if leave the clause, so there is no path through.
-		{"an if whose both arms exit", "switch (foo) { case 0: if (a) { break; } else { throw 0; } default: b(); }", nil},
-		{"a try that breaks with an empty finally", "switch (foo) { case 0: try { break; } finally {} default: b(); }", nil},
+		{
+			"an if whose both arms exit",
+			"switch (foo) { case 0: if (a) { break; } else { throw 0; } default: b(); }",
+			nil,
+		},
+		{
+			"a try that breaks with an empty finally",
+			"switch (foo) { case 0: try { break; } finally {} default: b(); }",
+			nil,
+		},
 		{"a finally that breaks", "switch (foo) { case 0: try {} finally { break; } default: b(); }", nil},
-		{"a catch that breaks after a throw", "switch (foo) { case 0: try { throw 0; } catch (err) { break; } default: b(); }", nil},
+		{
+			"a catch that breaks after a throw",
+			"switch (foo) { case 0: try { throw 0; } catch (err) { break; } default: b(); }",
+			nil,
+		},
 		// A do-while runs its body at least once, so a throw inside it always happens.
 		{"a do-while whose body throws", "switch (foo) { case 0: do { throw 0; } while(a); default: b(); }", nil},
 		// A default in the middle that breaks does not fall out of itself.
@@ -288,10 +429,18 @@ func TestNoFallthroughStaysSilent(test *testing.T) {
 			NoFallthroughOptions{ReportUnusedFallthroughComment: false},
 		},
 		// Upstream issue 11340: a default in the middle whose body returns.
-		{"a default in the middle that returns", "function f(name) { switch(name) { case 'a': case 'b': default: return 'x'; case 'c': return 'y'; } }", nil},
+		{
+			"a default in the middle that returns",
+			"function f(name) { switch(name) { case 'a': case 'b': default: return 'x'; case 'c': return 'y'; } }",
+			nil,
+		},
 		{"a default first that breaks", "switch(foo) { default: a(); break; case 1: b(); }", nil},
 		// Upstream issue 6417: a logical operator in the test with a break present.
-		{"a logical-or test with a break", "switch(true) { case x === 1 || x === 2: a(); break; case x === 3: b(); }", nil},
+		{
+			"a logical-or test with a break",
+			"switch(true) { case x === 1 || x === 2: a(); break; case x === 3: b(); }",
+			nil,
+		},
 		{"a logical-and test with a break", "switch(true) { case x === 1 && y: a(); break; case x === 3: b(); }", nil},
 		{
 			"clauses whose blocks each return, in JSX",
@@ -343,8 +492,18 @@ func TestNoFallthroughPointsAtTheClauseFallenInto(test *testing.T) {
 		{"an empty block body", "switch(foo) { case 0: {} default: b() }", nil, []string{"default: b()"}},
 		// The blank line is trivia before the clause, so the finding must not start at it. This is
 		// the case that would catch a range built from Pos() rather than the first token.
-		{"an empty clause with a blank line", "switch(foo) { case 0:\n\n default: b() }", nil, []string{"default: b()"}},
-		{"an unrelated line comment before default", "switch(foo) { case 0:\n // comment\n default: b() }", nil, []string{"default: b()"}},
+		{
+			"an empty clause with a blank line",
+			"switch(foo) { case 0:\n\n default: b() }",
+			nil,
+			[]string{"default: b()"},
+		},
+		{
+			"an unrelated line comment before default",
+			"switch(foo) { case 0:\n // comment\n default: b() }",
+			nil,
+			[]string{"default: b()"},
+		},
 		// Both findings, in source order, from the one input that reports in two directions.
 		{
 			"a default in the middle",

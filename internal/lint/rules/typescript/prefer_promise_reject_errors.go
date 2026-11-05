@@ -195,7 +195,12 @@ var PreferPromiseRejectErrors = rule.Rule{
 				return
 			}
 
-			if type_checking.TypeMatchesSomeSpecifier(argumentType, settings.Allow, settings.AllowInline, ruleContext.Program) {
+			if type_checking.TypeMatchesSomeSpecifier(
+				argumentType,
+				settings.Allow,
+				settings.AllowInline,
+				ruleContext.Program,
+			) {
 				return
 			}
 			if settings.AllowThrowingAny && type_checking.IsTypeAnyType(argumentType) {
@@ -239,7 +244,11 @@ var PreferPromiseRejectErrors = rule.Rule{
 				if receiverType == nil {
 					return
 				}
-				if !type_checking.IsPromiseConstructorLike(ruleContext.Program, ruleContext.TypeChecker, receiverType) &&
+				if !type_checking.IsPromiseConstructorLike(
+					ruleContext.Program,
+					ruleContext.TypeChecker,
+					receiverType,
+				) &&
 					!type_checking.IsPromiseLike(ruleContext.Program, ruleContext.TypeChecker, receiverType) {
 					return
 				}
@@ -258,7 +267,8 @@ var PreferPromiseRejectErrors = rule.Rule{
 					return
 				}
 				calleeType := ruleContext.TypeChecker.GetTypeAtLocation(callee)
-				if calleeType == nil || !type_checking.IsPromiseConstructorLike(ruleContext.Program, ruleContext.TypeChecker, calleeType) {
+				if calleeType == nil ||
+					!type_checking.IsPromiseConstructorLike(ruleContext.Program, ruleContext.TypeChecker, calleeType) {
 					return
 				}
 

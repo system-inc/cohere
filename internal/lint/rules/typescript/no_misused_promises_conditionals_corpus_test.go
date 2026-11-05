@@ -32,9 +32,15 @@ func TestNoMisusedPromisesConditionalsUpstreamCorpus(test *testing.T) {
 			invalid++
 		}
 	}
-	if valid != noMisusedPromisesConditionalsCorpusUpstreamValid || invalid != noMisusedPromisesConditionalsCorpusUpstreamInvalid {
-		test.Fatalf("the corpus holds %d valid and %d invalid upstream rows, and upstream has %d and %d",
-			valid, invalid, noMisusedPromisesConditionalsCorpusUpstreamValid, noMisusedPromisesConditionalsCorpusUpstreamInvalid)
+	if valid != noMisusedPromisesConditionalsCorpusUpstreamValid ||
+		invalid != noMisusedPromisesConditionalsCorpusUpstreamInvalid {
+		test.Fatalf(
+			"the corpus holds %d valid and %d invalid upstream rows, and upstream has %d and %d",
+			valid,
+			invalid,
+			noMisusedPromisesConditionalsCorpusUpstreamValid,
+			noMisusedPromisesConditionalsCorpusUpstreamInvalid,
+		)
 	}
 
 	decode := rule.DecodeOptionsInto[NoMisusedPromisesOptions]()
@@ -49,9 +55,15 @@ func TestNoMisusedPromisesConditionalsUpstreamCorpus(test *testing.T) {
 			if err != nil {
 				test.Fatalf("decoding %q: %v", row.options, err)
 			}
-			result := rule_testing.RunTypedFilesWithSetupAndOptions(test, NoMisusedPromises, map[string]string{"file.ts": row.source}, "file.ts", options,
+			result := rule_testing.RunTypedFilesWithSetupAndOptions(test, NoMisusedPromises, map[string]string{
+				"file.ts": row.source,
+			}, "file.ts", options,
 				func(directory string) {
-					if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(noMisusedPromisesConditionalsCorpusTsconfig), 0o644); writeError != nil {
+					if writeError := os.WriteFile(
+						filepath.Join(directory, "tsconfig.json"),
+						[]byte(noMisusedPromisesConditionalsCorpusTsconfig),
+						0o644,
+					); writeError != nil {
 						test.Fatal(writeError)
 					}
 				})

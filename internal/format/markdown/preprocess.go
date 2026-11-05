@@ -31,7 +31,11 @@ func addRawToText(ast *Node, originalText string) *Node {
 	})
 }
 
-func mergeChildren(ast *Node, shouldMerge func(previous *Node, node *Node) bool, mergeNode func(previous *Node, node *Node) *Node) *Node {
+func mergeChildren(
+	ast *Node,
+	shouldMerge func(previous *Node, node *Node) bool,
+	mergeNode func(previous *Node, node *Node) *Node,
+) *Node {
 	return mapAst(ast, func(node *Node, _ int, _ []*Node) *Node {
 		if node.Children == nil {
 			return node
@@ -167,7 +171,12 @@ func splitTextIntoSentences(ast *Node, nodes *arena.Arena[Node]) *Node {
 			return nodes.New(Node{NodeType: "text", IsLiteral: true, Position: node.Position, Value: text})
 		}
 
-		return nodes.New(Node{NodeType: "sentence", Position: node.Position, IsParent: true, Children: nonNil(splitText(text, nodes))})
+		return nodes.New(Node{
+			NodeType: "sentence",
+			Position: node.Position,
+			IsParent: true,
+			Children: nonNil(splitText(text, nodes)),
+		})
 	})
 }
 
@@ -214,7 +223,9 @@ func transformIndentedCodeblock(ast *Node, originalText string) *Node {
 			return node
 		}
 		// the first char may point to `\n`, e.g. `\n\t\tbar`, just ignore it
-		node.IsIndented = indentedCodePattern.MatchString(originalText[node.Position.Start.Offset:node.Position.End.Offset])
+		node.IsIndented = indentedCodePattern.MatchString(
+			originalText[node.Position.Start.Offset:node.Position.End.Offset],
+		)
 		return node
 	})
 }

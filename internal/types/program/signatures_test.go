@@ -19,7 +19,9 @@ func newSignatureTree(test *testing.T, files map[string]string) *signatureTree {
 	test.Helper()
 	tree := &signatureTree{t: test, directory: test.TempDir()}
 	tree.write(files)
-	tree.write(map[string]string{"tsconfig.json": `{"compilerOptions":{"strict":true,"module":"esnext","target":"esnext","moduleResolution":"bundler"},"include":["**/*.ts"]}`})
+	tree.write(map[string]string{
+		"tsconfig.json": `{"compilerOptions":{"strict":true,"module":"esnext","target":"esnext","moduleResolution":"bundler"},"include":["**/*.ts"]}`,
+	})
 	return tree
 }
 
@@ -63,7 +65,13 @@ func (tree *signatureTree) state(previous map[string]SignatureEntry) signatureSt
 		previous = RecordedRealSignatures(graph)
 	}
 	signatures, computed := graph.Signatures(context.Background(), previous)
-	state := signatureState{signatures: signatures, computed: computed, emits: graph.SignatureEmits(), bySignature: map[string]string{}, byContent: map[string]string{}}
+	state := signatureState{
+		signatures:  signatures,
+		computed:    computed,
+		emits:       graph.SignatureEmits(),
+		bySignature: map[string]string{},
+		byContent:   map[string]string{},
+	}
 	signatureFingerprints := graph.SignatureFingerprints(signatures)
 	contentFingerprints := graph.TypeFingerprints()
 	for _, sourceFile := range graph.ProjectFiles() {
@@ -94,7 +102,10 @@ const signatureFixtureB = "import type { Shape } from \"./c\";\n" +
 const signatureFixtureA = "import { measure } from \"./b\";\nexport const width = measure({ width: 2 });\n"
 
 func signatureFixture(test *testing.T) *signatureTree {
-	return newSignatureTree(test, map[string]string{"a.ts": signatureFixtureA, "b.ts": signatureFixtureB, "c.ts": signatureFixtureC})
+	return newSignatureTree(
+		test,
+		map[string]string{"a.ts": signatureFixtureA, "b.ts": signatureFixtureB, "c.ts": signatureFixtureC},
+	)
 }
 
 // A body edit is the case the whole table exists for: the edited file's own fingerprint moves, and its
@@ -103,7 +114,9 @@ func TestABodyEditLeavesItsImportersSignatureFingerprintAlone(test *testing.T) {
 	test.Parallel()
 	tree := signatureFixture(test)
 	before := tree.state(nil)
-	tree.write(map[string]string{"b.ts": strings.Replace(signatureFixtureB, "return shape.width;", "return shape.width * 1;", 1)})
+	tree.write(map[string]string{
+		"b.ts": strings.Replace(signatureFixtureB, "return shape.width;", "return shape.width * 1;", 1),
+	})
 	after := tree.state(before.signatures)
 
 	if after.signature(test, "b.ts") != before.signature(test, "b.ts") {
@@ -128,7 +141,12 @@ func TestAnExportEditMovesItsImportersSignatureFingerprint(test *testing.T) {
 	test.Parallel()
 	tree := signatureFixture(test)
 	before := tree.state(nil)
-	tree.write(map[string]string{"b.ts": strings.Replace(signatureFixtureB, "export function measure(shape: Shape): number {", "export function measure(shape: Shape): number | string {", 1)})
+	tree.write(map[string]string{"b.ts": strings.Replace(
+		signatureFixtureB,
+		"export function measure(shape: Shape): number {",
+		"export function measure(shape: Shape): number | string {",
+		1,
+	)})
 	after := tree.state(before.signatures)
 
 	if after.signature(test, "b.ts") == before.signature(test, "b.ts") {
@@ -162,7 +180,12 @@ func TestAJSDocEditOnAnExportChangesTheSignature(test *testing.T) {
 	test.Parallel()
 	tree := signatureFixture(test)
 	before := tree.state(nil)
-	tree.write(map[string]string{"b.ts": strings.Replace(signatureFixtureB, "export function measure(", "/** @deprecated use something else */\nexport function measure(", 1)})
+	tree.write(map[string]string{"b.ts": strings.Replace(
+		signatureFixtureB,
+		"export function measure(",
+		"/** @deprecated use something else */\nexport function measure(",
+		1,
+	)})
 	after := tree.state(before.signatures)
 
 	if after.signature(test, "b.ts") == before.signature(test, "b.ts") {
@@ -176,14 +199,21 @@ func TestAnAsyncOnlyEditReachesImportersThroughTheSyntaxHalf(test *testing.T) {
 	test.Parallel()
 	tree := signatureFixture(test)
 	before := tree.state(nil)
-	tree.write(map[string]string{"b.ts": strings.Replace(signatureFixtureB, "export async function load(): Promise<number> {\n  return 1;", "export function load(): Promise<number> {\n  return Promise.resolve(1);", 1)})
+	tree.write(map[string]string{"b.ts": strings.Replace(
+		signatureFixtureB,
+		"export async function load(): Promise<number> {\n  return 1;",
+		"export function load(): Promise<number> {\n  return Promise.resolve(1);",
+		1,
+	)})
 	after := tree.state(before.signatures)
 
 	if after.signature(test, "b.ts") != before.signature(test, "b.ts") {
 		test.Fatal("the declaration output saw an async-only edit, so this fixture no longer isolates the syntax half")
 	}
 	if after.bySignature["a.ts"] == before.bySignature["a.ts"] {
-		test.Error("an async-only edit did not reach the importer, so a rule reading `async` off an imported declaration would replay stale")
+		test.Error(
+			"an async-only edit did not reach the importer, so a rule reading `async` off an imported declaration would replay stale",
+		)
 	}
 }
 
@@ -211,7 +241,9 @@ func TestAGlobalDeclarationMovesEverySignatureFingerprint(test *testing.T) {
 	tree := signatureFixture(test)
 	tree.write(map[string]string{"globals.d.ts": "declare global { interface Window { first: string } }\nexport {};\n"})
 	before := tree.state(nil)
-	tree.write(map[string]string{"globals.d.ts": "declare global { interface Window { second: string } }\nexport {};\n"})
+	tree.write(
+		map[string]string{"globals.d.ts": "declare global { interface Window { second: string } }\nexport {};\n"},
+	)
 	after := tree.state(before.signatures)
 
 	for _, name := range []string{"a.ts", "b.ts", "c.ts"} {
@@ -249,9 +281,13 @@ func TestAnUnchangedTreeComputesNoSignatures(test *testing.T) {
 func TestSeededSignaturesEqualComputedOnes(test *testing.T) {
 	test.Parallel()
 	tree := signatureFixture(test)
-	tree.write(map[string]string{"tsconfig.json": `{"compilerOptions":{"strict":true,"module":"esnext","target":"esnext","moduleResolution":"bundler","incremental":true,"noEmit":true,"tsBuildInfoFile":".cache/tsconfig.tsbuildinfo"},"include":["**/*.ts"]}`})
+	tree.write(map[string]string{
+		"tsconfig.json": `{"compilerOptions":{"strict":true,"module":"esnext","target":"esnext","moduleResolution":"bundler","incremental":true,"noEmit":true,"tsBuildInfoFile":".cache/tsconfig.tsbuildinfo"},"include":["**/*.ts"]}`,
+	})
 	tree.graph().IncrementalDiagnostics(context.Background())
-	tree.write(map[string]string{"b.ts": strings.Replace(signatureFixtureB, "return shape.width;", "return shape.width * 1;", 1)})
+	tree.write(map[string]string{
+		"b.ts": strings.Replace(signatureFixtureB, "return shape.width;", "return shape.width * 1;", 1),
+	})
 	tree.graph().IncrementalDiagnostics(context.Background())
 
 	graph := tree.graph()
@@ -325,8 +361,11 @@ func TestOnlyAnEditedFileWithARealSignatureIsEmitted(test *testing.T) {
 	}
 	moved := graph.SignatureFingerprints(after)
 	for _, sourceFile := range graph.ProjectFiles() {
-		if filepath.Base(sourceFile.FileName().AsString()) == "a.ts" && moved[sourceFile.PathKey()] == before[sourceFile.PathKey()] {
-			test.Error("a body edit to a file keyed on content did not reach its importer, so the importer would replay stale")
+		if filepath.Base(sourceFile.FileName().AsString()) == "a.ts" &&
+			moved[sourceFile.PathKey()] == before[sourceFile.PathKey()] {
+			test.Error(
+				"a body edit to a file keyed on content did not reach its importer, so the importer would replay stale",
+			)
 		}
 	}
 }

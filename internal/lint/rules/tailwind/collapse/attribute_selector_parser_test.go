@@ -39,7 +39,11 @@ func TestParseAttributeSelectorRejectsInvalid(test *testing.T) {
 		test.Run(input, func(test *testing.T) {
 			test.Parallel()
 			if selector, ok := ParseAttributeSelector(input); ok {
-				test.Errorf("ParseAttributeSelector(%q) = %s, want rejected", input, describeAttributeSelector(selector))
+				test.Errorf(
+					"ParseAttributeSelector(%q) = %s, want rejected",
+					input,
+					describeAttributeSelector(selector),
+				)
 			}
 		})
 	}
@@ -55,11 +59,33 @@ func TestParseAttributeSelectorParsesValid(test *testing.T) {
 		{`[ data-foo ]`, AttributeSelector{Attribute: "data-foo"}},
 		// Non-ASCII code points are valid in a CSS ident.
 		{`[data-état]`, AttributeSelector{Attribute: "data-état"}},
-		{`[data-state=expanded]`, AttributeSelector{Attribute: "data-state", Operator: "=", Value: attributeSelectorValue("expanded")}},
-		{`[data-state = expanded ]`, AttributeSelector{Attribute: "data-state", Operator: "=", Value: attributeSelectorValue("expanded")}},
-		{`[data-state*="expanded"]`, AttributeSelector{Attribute: "data-state", Operator: "*=", Quote: `"`, Value: attributeSelectorValue("expanded")}},
-		{`[data-state*="expanded"i]`, AttributeSelector{Attribute: "data-state", Operator: "*=", Quote: `"`, Value: attributeSelectorValue("expanded"), Sensitivity: "i"}},
-		{`[data-state*=expanded i]`, AttributeSelector{Attribute: "data-state", Operator: "*=", Value: attributeSelectorValue("expanded"), Sensitivity: "i"}},
+		{
+			`[data-state=expanded]`,
+			AttributeSelector{Attribute: "data-state", Operator: "=", Value: attributeSelectorValue("expanded")},
+		},
+		{
+			`[data-state = expanded ]`,
+			AttributeSelector{Attribute: "data-state", Operator: "=", Value: attributeSelectorValue("expanded")},
+		},
+		{`[data-state*="expanded"]`, AttributeSelector{
+			Attribute: "data-state",
+			Operator:  "*=",
+			Quote:     `"`,
+			Value:     attributeSelectorValue("expanded"),
+		}},
+		{`[data-state*="expanded"i]`, AttributeSelector{
+			Attribute:   "data-state",
+			Operator:    "*=",
+			Quote:       `"`,
+			Value:       attributeSelectorValue("expanded"),
+			Sensitivity: "i",
+		}},
+		{`[data-state*=expanded i]`, AttributeSelector{
+			Attribute:   "data-state",
+			Operator:    "*=",
+			Value:       attributeSelectorValue("expanded"),
+			Sensitivity: "i",
+		}},
 	} {
 		test.Run(testCase.input, func(test *testing.T) {
 			test.Parallel()
@@ -86,35 +112,101 @@ func TestParseAttributeSelectorMatchesUpstreamBeyondItsTests(test *testing.T) {
 		input    string
 		expected *AttributeSelector
 	}{
-		{"operator includes", `[a~=b]`, &AttributeSelector{Attribute: "a", Operator: "~=", Value: attributeSelectorValue("b")}},
-		{"operator dash match", `[a|=b]`, &AttributeSelector{Attribute: "a", Operator: "|=", Value: attributeSelectorValue("b")}},
-		{"operator prefix", `[a^=b]`, &AttributeSelector{Attribute: "a", Operator: "^=", Value: attributeSelectorValue("b")}},
-		{"operator suffix", `[a$=b]`, &AttributeSelector{Attribute: "a", Operator: "$=", Value: attributeSelectorValue("b")}},
+		{
+			"operator includes",
+			`[a~=b]`,
+			&AttributeSelector{Attribute: "a", Operator: "~=", Value: attributeSelectorValue("b")},
+		},
+		{
+			"operator dash match",
+			`[a|=b]`,
+			&AttributeSelector{Attribute: "a", Operator: "|=", Value: attributeSelectorValue("b")},
+		},
+		{
+			"operator prefix",
+			`[a^=b]`,
+			&AttributeSelector{Attribute: "a", Operator: "^=", Value: attributeSelectorValue("b")},
+		},
+		{
+			"operator suffix",
+			`[a$=b]`,
+			&AttributeSelector{Attribute: "a", Operator: "$=", Value: attributeSelectorValue("b")},
+		},
 		{"unknown operator", `[a!=b]`, nil},
 		{"whitespace only", `[ ]`, nil},
-		{"uppercase flag lowercased", `[a="v"S]`, &AttributeSelector{Attribute: "a", Operator: "=", Quote: `"`, Value: attributeSelectorValue("v"), Sensitivity: "s"}},
-		{"single quote and s flag", `[a='v' s ]`, &AttributeSelector{Attribute: "a", Operator: "=", Quote: `'`, Value: attributeSelectorValue("v"), Sensitivity: "s"}},
+		{"uppercase flag lowercased", `[a="v"S]`, &AttributeSelector{
+			Attribute:   "a",
+			Operator:    "=",
+			Quote:       `"`,
+			Value:       attributeSelectorValue("v"),
+			Sensitivity: "s",
+		}},
+		{"single quote and s flag", `[a='v' s ]`, &AttributeSelector{
+			Attribute:   "a",
+			Operator:    "=",
+			Quote:       `'`,
+			Value:       attributeSelectorValue("v"),
+			Sensitivity: "s",
+		}},
 		// An unquoted value runs to whitespace, so a flag written against it joins the value.
-		{"flag against unquoted value", `[a=bi]`, &AttributeSelector{Attribute: "a", Operator: "=", Value: attributeSelectorValue("bi")}},
+		{
+			"flag against unquoted value",
+			`[a=bi]`,
+			&AttributeSelector{Attribute: "a", Operator: "=", Value: attributeSelectorValue("bi")},
+		},
 		// Tab, line feed and carriage return are whitespace. Form feed is not, so it stays in the value.
-		{"ascii whitespace", "[a\t=\nb\r]", &AttributeSelector{Attribute: "a", Operator: "=", Value: attributeSelectorValue("b")}},
-		{"form feed is not whitespace", "[a=b\fi]", &AttributeSelector{Attribute: "a", Operator: "=", Value: attributeSelectorValue("b\fi")}},
-		{"escaped space in name", `[a\ b=c]`, &AttributeSelector{Attribute: `a\ b`, Operator: "=", Value: attributeSelectorValue("c")}},
+		{
+			"ascii whitespace",
+			"[a\t=\nb\r]",
+			&AttributeSelector{Attribute: "a", Operator: "=", Value: attributeSelectorValue("b")},
+		},
+		{
+			"form feed is not whitespace",
+			"[a=b\fi]",
+			&AttributeSelector{Attribute: "a", Operator: "=", Value: attributeSelectorValue("b\fi")},
+		},
+		{
+			"escaped space in name",
+			`[a\ b=c]`,
+			&AttributeSelector{Attribute: `a\ b`, Operator: "=", Value: attributeSelectorValue("c")},
+		},
 		{"escaped astral character in name", `[a\😀]`, &AttributeSelector{Attribute: `a\😀`}},
-		{"astral character in value", `[a=😀]`, &AttributeSelector{Attribute: "a", Operator: "=", Value: attributeSelectorValue("😀")}},
-		{"escaped quote in value", `[a="x\"y"]`, &AttributeSelector{Attribute: "a", Operator: "=", Quote: `"`, Value: attributeSelectorValue(`x\"y`)}},
+		{
+			"astral character in value",
+			`[a=😀]`,
+			&AttributeSelector{Attribute: "a", Operator: "=", Value: attributeSelectorValue("😀")},
+		},
+		{
+			"escaped quote in value",
+			`[a="x\"y"]`,
+			&AttributeSelector{Attribute: "a", Operator: "=", Quote: `"`, Value: attributeSelectorValue(`x\"y`)},
+		},
 		// An escape at the end of the name steps over the `]`, and the read past the end rejects.
 		{"escaped closing bracket", `[a\]`, nil},
 		// The last matching quote closes the value, not the first.
-		{"last quote closes", `[a="x"y"]`, &AttributeSelector{Attribute: "a", Operator: "=", Quote: `"`, Value: attributeSelectorValue(`x"y`)}},
+		{
+			"last quote closes",
+			`[a="x"y"]`,
+			&AttributeSelector{Attribute: "a", Operator: "=", Quote: `"`, Value: attributeSelectorValue(`x"y`)},
+		},
 		// An unterminated quote is an empty value, and what follows the quote is read as the flag.
-		{"unterminated quote", `[a="i]`, &AttributeSelector{Attribute: "a", Operator: "=", Quote: `"`, Value: attributeSelectorValue(""), Sensitivity: "i"}},
+		{"unterminated quote", `[a="i]`, &AttributeSelector{
+			Attribute:   "a",
+			Operator:    "=",
+			Quote:       `"`,
+			Value:       attributeSelectorValue(""),
+			Sensitivity: "i",
+		}},
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			if testCase.expected == nil {
 				if selector, ok := ParseAttributeSelector(testCase.input); ok {
-					test.Errorf("ParseAttributeSelector(%q) = %s, want rejected", testCase.input, describeAttributeSelector(selector))
+					test.Errorf(
+						"ParseAttributeSelector(%q) = %s, want rejected",
+						testCase.input,
+						describeAttributeSelector(selector),
+					)
 				}
 				return
 			}
@@ -132,7 +224,12 @@ func assertAttributeSelector(test *testing.T, input string, expected AttributeSe
 		test.Fatalf("ParseAttributeSelector(%q) rejected, want %s", input, describeAttributeSelector(expected))
 	}
 	if !reflect.DeepEqual(selector, expected) {
-		test.Errorf("ParseAttributeSelector(%q) = %s, want %s", input, describeAttributeSelector(selector), describeAttributeSelector(expected))
+		test.Errorf(
+			"ParseAttributeSelector(%q) = %s, want %s",
+			input,
+			describeAttributeSelector(selector),
+			describeAttributeSelector(expected),
+		)
 	}
 }
 

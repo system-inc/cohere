@@ -64,7 +64,11 @@ func TestSourceVisitorsSeeEveryShape(test *testing.T) {
 		{"a namespace import", "import * as Thing from '@project/Thing';\n", "@project/Thing"},
 		{"a side-effect import", "import '@project/Thing';\n", "@project/Thing"},
 		{"a type-only import", "import type { Thing } from '@project/Thing';\n", "@project/Thing"},
-		{"a dynamic import", "export async function run() {\n    await import('@project/Thing');\n}\n", "@project/Thing"},
+		{
+			"a dynamic import",
+			"export async function run() {\n    await import('@project/Thing');\n}\n",
+			"@project/Thing",
+		},
 		{"a require call", "const thing = require('@project/Thing');\n", "@project/Thing"},
 	}
 	for _, testCase := range cases {
@@ -84,7 +88,10 @@ func TestSourceVisitorsSeeEveryShape(test *testing.T) {
 // A file mixing the shapes reports all of them, which is what a boundary rule actually meets.
 func TestSourceVisitorsSeeAllShapesInOneFile(test *testing.T) {
 	test.Parallel()
-	sources := collect(test, "import A from 'a';\nconst b = require('b');\nexport async function run() {\n    await import('c');\n}\n")
+	sources := collect(
+		test,
+		"import A from 'a';\nconst b = require('b');\nexport async function run() {\n    await import('c');\n}\n",
+	)
 	if len(sources) != 3 {
 		test.Fatalf("want three specifiers, got %d: %v", len(sources), sources)
 	}
@@ -101,7 +108,10 @@ func TestSourceVisitorsDeclineNonLiteralSpecifiers(test *testing.T) {
 	}{
 		{"a dynamic import of a variable", "export async function run(name: string) {\n    await import(name);\n}\n"},
 		{"a require of a variable", "export function run(name: string) {\n    return require(name);\n}\n"},
-		{"a template specifier", "export async function run(name: string) {\n    await import(`@project/${name}`);\n}\n"},
+		{
+			"a template specifier",
+			"export async function run(name: string) {\n    await import(`@project/${name}`);\n}\n",
+		},
 		{"a call that is not an import", "export function run() {\n    return other('@project/Thing');\n}\n"},
 	}
 	for _, testCase := range cases {

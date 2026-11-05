@@ -200,7 +200,11 @@ func coveredRepositoryCases(test *testing.T, fixture themeCorpus) int {
 		}
 		if !spelled {
 			if filepath.IsAbs(aCase.EntryPath) {
-				test.Fatalf("repository case %q records the absolute path %q, which reads the same on no other machine", aCase.Name, aCase.EntryPath)
+				test.Fatalf(
+					"repository case %q records the absolute path %q, which reads the same on no other machine",
+					aCase.Name,
+					aCase.EntryPath,
+				)
 			}
 			covered++
 			continue
@@ -316,7 +320,9 @@ func expectThemeMatchesEngine(test *testing.T, fixture themeCorpus) {
 				if !equalStringSlices(gotKeys, wantNamespace.KeysInNamespace) {
 					test.Errorf(
 						"KeysInNamespaces([%q]) = %s, engine says %s",
-						wantNamespace.Namespace, summarizeStrings(gotKeys), summarizeStrings(wantNamespace.KeysInNamespace),
+						wantNamespace.Namespace,
+						summarizeStrings(gotKeys),
+						summarizeStrings(wantNamespace.KeysInNamespace),
 					)
 				}
 				totalKeysInNamespace += len(wantNamespace.KeysInNamespace)
@@ -329,16 +335,29 @@ func expectThemeMatchesEngine(test *testing.T, fixture themeCorpus) {
 			for _, want := range aCase.Theme.Resolutions {
 				candidatePresent := !want.CandidateValueIsNull
 
-				gotResolve, gotResolveOK := theme.Resolve(want.CandidateValue, candidatePresent, want.ThemeKeys, ThemeOptionNone)
+				gotResolve, gotResolveOK := theme.Resolve(
+					want.CandidateValue,
+					candidatePresent,
+					want.ThemeKeys,
+					ThemeOptionNone,
+				)
 				assertOptionalString(
 					test, gotResolve, gotResolveOK, want.Resolve,
-					fmt.Sprintf("Resolve(%s, %v)", describeCandidate(want.CandidateValue, candidatePresent), want.ThemeKeys),
+					fmt.Sprintf(
+						"Resolve(%s, %v)",
+						describeCandidate(want.CandidateValue, candidatePresent),
+						want.ThemeKeys,
+					),
 				)
 
 				gotValue, gotValueOK := theme.ResolveValue(want.CandidateValue, candidatePresent, want.ThemeKeys)
 				assertOptionalString(
 					test, gotValue, gotValueOK, want.ResolveValue,
-					fmt.Sprintf("ResolveValue(%s, %v)", describeCandidate(want.CandidateValue, candidatePresent), want.ThemeKeys),
+					fmt.Sprintf(
+						"ResolveValue(%s, %v)",
+						describeCandidate(want.CandidateValue, candidatePresent),
+						want.ThemeKeys,
+					),
 				)
 			}
 			totalResolutions += len(aCase.Theme.Resolutions)
@@ -408,7 +427,11 @@ func expectThemeMatchesEngine(test *testing.T, fixture themeCorpus) {
 	// it. Every repository case whose corpus is set must have run; the rest skipped naming their
 	// variable, so the run says what it did not compare.
 	if covered := coveredRepositoryCases(test, fixture); repositoriesChecked != covered {
-		test.Errorf("%d repository cases ran and %d have their corpus set: the exit criterion for this component is a comparison against two real design systems", repositoriesChecked, covered)
+		test.Errorf(
+			"%d repository cases ran and %d have their corpus set: the exit criterion for this component is a comparison against two real design systems",
+			repositoriesChecked,
+			covered,
+		)
 	}
 	if syntheticChecked != fixture.SyntheticCaseCount {
 		test.Errorf("ran %d of %d synthetic cases", syntheticChecked, fixture.SyntheticCaseCount)
@@ -546,7 +569,9 @@ func TestDesignSystemReportsSkippedDirectivesFromAnywhereInTheGraph(test *testin
 	if err != nil {
 		test.Fatal(err)
 	}
-	system, err := LoadDesignSystem(LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: vendored.TailwindPackageRoot()})
+	system, err := LoadDesignSystem(
+		LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: vendored.TailwindPackageRoot()},
+	)
 	if err != nil {
 		test.Fatalf("loading the directives theme: %v", err)
 	}
@@ -555,14 +580,23 @@ func TestDesignSystemReportsSkippedDirectivesFromAnywhereInTheGraph(test *testin
 	for _, skipped := range system.SkippedDirectives {
 		names = append(names, skipped.Name+" "+skipped.Params)
 		if filepath.Base(skipped.Path) != "settings.css" {
-			test.Errorf("%s %s was reported in %s, and it is written in settings.css", skipped.Name, skipped.Params, skipped.Path)
+			test.Errorf(
+				"%s %s was reported in %s, and it is written in settings.css",
+				skipped.Name,
+				skipped.Params,
+				skipped.Path,
+			)
 		}
 	}
 	if want := []string{"@config './tailwind.config.ts'", "@plugin './plugin.js'"}; !slices.Equal(names, want) {
 		test.Errorf("skipped %q, want %q", names, want)
 	}
 	if value, found := system.Theme().Get([]string{"--color-signal"}); !found || value != "#dc2626" {
-		test.Errorf("--color-signal read %q, %v beside the skipped directives; the theme in that file must still load", value, found)
+		test.Errorf(
+			"--color-signal read %q, %v beside the skipped directives; the theme in that file must still load",
+			value,
+			found,
+		)
 	}
 }
 
@@ -633,7 +667,12 @@ func TestThemeKeyOrderCompacts(test *testing.T) {
 	// The slice is bounded by twice the live size plus the in-flight dead entries, never by the
 	// number of writes. A port without compaction reaches `rounds` here.
 	if len(theme.keyOrder) > 2*theme.Size()+2 {
-		test.Errorf("keyOrder holds %d slots for %d live keys after %d rounds; compaction is not reclaiming", len(theme.keyOrder), theme.Size(), rounds)
+		test.Errorf(
+			"keyOrder holds %d slots for %d live keys after %d rounds; compaction is not reclaiming",
+			len(theme.keyOrder),
+			theme.Size(),
+			rounds,
+		)
 	}
 }
 

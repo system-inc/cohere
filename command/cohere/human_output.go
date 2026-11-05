@@ -122,6 +122,13 @@ func findingLine(finding runFinding, style textStyle) string {
 	if finding.Path == "" {
 		return fmt.Sprintf("%s %s %s", severity, style.dim(finding.Rule), singleLineDescription(finding.Message))
 	}
-	return fmt.Sprintf("%s:%d:%d %s %s %s",
-		finding.Path, finding.Line, finding.Column, severity, style.dim(finding.Rule), singleLineDescription(finding.Message))
+	return fmt.Sprintf(
+		"%s:%d:%d %s %s %s",
+		finding.Path,
+		finding.Line,
+		finding.Column,
+		severity,
+		style.dim(finding.Rule),
+		singleLineDescription(finding.Message),
+	)
 }

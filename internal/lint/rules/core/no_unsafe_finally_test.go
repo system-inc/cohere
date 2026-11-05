@@ -18,7 +18,10 @@ func TestNoUnsafeFinallyReportsEscapingControlFlow(test *testing.T) {
 	}{
 		{"var foo = function() { try { return 1; } catch (err) { return 2; } finally { return 3; } };", "unsafeReturn"},
 		{"var foo = function() { try { return 1; } finally { return 3; } };", "unsafeReturn"},
-		{"var foo = function() { try { return 1; } catch (err) { return 2; } finally { throw new Error(); } };", "unsafeThrow"},
+		{
+			"var foo = function() { try { return 1; } catch (err) { return 2; } finally { throw new Error(); } };",
+			"unsafeThrow",
+		},
 		{"var foo = function() { try {} finally { throw new Error(); } };", "unsafeThrow"},
 		{"while (true) try {} finally { break; }", "unsafeBreak"},
 		{"while (true) try {} finally { continue; }", "unsafeContinue"},

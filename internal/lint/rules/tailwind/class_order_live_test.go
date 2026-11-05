@@ -293,7 +293,10 @@ func TestClassOrderLiveMatchesTheEngineOverTheSyntheticCases(test *testing.T) {
 			continue
 		}
 		if list.input == "" {
-			test.Fatalf("%s has neither an entry path nor a stylesheet, so nothing says which system sorted it", list.name)
+			test.Fatalf(
+				"%s has neither an entry path nor a stylesheet, so nothing says which system sorted it",
+				list.name,
+			)
 		}
 		entryPoint := filepath.Join(test.TempDir(), "theme.css")
 		if writeError := os.WriteFile(entryPoint, []byte(list.input), 0o644); writeError != nil {
@@ -310,9 +313,15 @@ func TestClassOrderLiveMatchesTheEngineOverTheSyntheticCases(test *testing.T) {
 	}
 
 	measurement := classOrderLiveMeasure(test, synthetic, systems)
-	test.Logf("synthetic cases vs the engine: %d disagreeing pairs of %d compared pairs across %d lists on %d stylesheets (%d classes placed, %d lists declined)",
-		measurement.disagreeingPairs, measurement.comparedPairs, measurement.lists, len(systems),
-		measurement.placedClasses, measurement.listsSkipped)
+	test.Logf(
+		"synthetic cases vs the engine: %d disagreeing pairs of %d compared pairs across %d lists on %d stylesheets (%d classes placed, %d lists declined)",
+		measurement.disagreeingPairs,
+		measurement.comparedPairs,
+		measurement.lists,
+		len(systems),
+		measurement.placedClasses,
+		measurement.listsSkipped,
+	)
 	for _, example := range measurement.examples {
 		test.Log("  " + example)
 	}
@@ -615,7 +624,10 @@ func TestClassOrderLiveUnrankedLeadInSourceOrder(test *testing.T) {
 
 		for _, nullClass := range []string{"peer", "group", "text-dark", "dark:bg-dark-2", "ahralia-splash"} {
 			if !isMarkerClass(nullClass) && classCompilesIn(nullClass, designSystem) {
-				test.Fatalf("%q compiles in this repository, so it is not a null and this test proves nothing", nullClass)
+				test.Fatalf(
+					"%q compiles in this repository, so it is not a null and this test proves nothing",
+					nullClass,
+				)
 			}
 		}
 
@@ -625,12 +637,20 @@ func TestClassOrderLiveUnrankedLeadInSourceOrder(test *testing.T) {
 			{[]string{"flex", "peer", "group", "items-center"}, []string{"peer", "group"}},
 			{[]string{"flex", "group", "peer", "items-center"}, []string{"group", "peer"}},
 			{[]string{"flex", "text-dark", "peer", "items-center"}, []string{"text-dark", "peer"}},
-			{[]string{"items-center", "ahralia-splash", "dark:bg-dark-2", "flex"}, []string{"ahralia-splash", "dark:bg-dark-2"}},
+			{
+				[]string{"items-center", "ahralia-splash", "dark:bg-dark-2", "flex"},
+				[]string{"ahralia-splash", "dark:bg-dark-2"},
+			},
 		} {
 			unranked, placeable := partitionUnranked(testCase.input, designSystem)
 			// Source order between them, which is what makes `peer group` and `group peer` both legal.
 			if strings.Join(unranked, " ") != strings.Join(testCase.unranked, " ") {
-				test.Errorf("from %v the nulls are %v; they should be %v, in source order", testCase.input, unranked, testCase.unranked)
+				test.Errorf(
+					"from %v the nulls are %v; they should be %v, in source order",
+					testCase.input,
+					unranked,
+					testCase.unranked,
+				)
 			}
 			if len(placeable) != 2 {
 				test.Errorf("expected two placeable classes from %v, got %v", testCase.input, placeable)
@@ -675,8 +695,11 @@ func TestClassOrderLiveDeclinesNoList(test *testing.T) {
 	}
 
 	for name, unplaceable := range declined {
-		test.Errorf("%s declined on %q; the rule orders every corpus list, so it has stopped answering for a class it used to place",
-			name, unplaceable)
+		test.Errorf(
+			"%s declined on %q; the rule orders every corpus list, so it has stopped answering for a class it used to place",
+			name,
+			unplaceable,
+		)
 	}
 }
 
@@ -696,9 +719,18 @@ func TestClassOrderRanksByTheReadingThatCompiles(test *testing.T) {
 	for _, testCase := range []struct {
 		input, want []string
 	}{
-		{[]string{"shadow--0", "background--0", "border--0", "border"}, []string{"border", "border--0", "background--0", "shadow--0"}},
-		{[]string{"shadow--6", "hover:shadow--3", "p-2", "rounded-md"}, []string{"rounded-md", "p-2", "shadow--6", "hover:shadow--3"}},
-		{[]string{"flex", "dark:bg-transparent", "hover:content--0-4"}, []string{"hover:content--0-4", "flex", "dark:bg-transparent"}},
+		{
+			[]string{"shadow--0", "background--0", "border--0", "border"},
+			[]string{"border", "border--0", "background--0", "shadow--0"},
+		},
+		{
+			[]string{"shadow--6", "hover:shadow--3", "p-2", "rounded-md"},
+			[]string{"rounded-md", "p-2", "shadow--6", "hover:shadow--3"},
+		},
+		{
+			[]string{"flex", "dark:bg-transparent", "hover:content--0-4"},
+			[]string{"hover:content--0-4", "flex", "dark:bg-transparent"},
+		},
 	} {
 		ordered, decided := orderClasses(testCase.input, designSystem, defaultClassOrderOptions())
 		if !decided {
@@ -727,7 +759,14 @@ func TestClassExistenceAsksTheEvaluatorForRepositoryRoots(test *testing.T) {
 			test.Errorf("%q generates no CSS and was read as existing", dead)
 		}
 	}
-	for _, live := range []string{"content--1", "content--4", "background--2", "shadow--0", "hover:shadow--3", "markdown-content"} {
+	for _, live := range []string{
+		"content--1",
+		"content--4",
+		"background--2",
+		"shadow--0",
+		"hover:shadow--3",
+		"markdown-content",
+	} {
 		if !classExistsIn(live, designSystem.System) {
 			test.Errorf("%q generates CSS and was read as unknown", live)
 		}

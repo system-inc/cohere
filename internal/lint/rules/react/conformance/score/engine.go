@@ -101,7 +101,10 @@ var Rules = map[string]RuleUnderTest{
 		Upstream: "globals",
 		Rule:     react.Globals,
 		Messages: map[string]UpstreamMessage{
-			"globalReassignment": {Heading: "Error", Text: "Cannot reassign variables declared outside of the component/hook"},
+			"globalReassignment": {
+				Heading: "Error",
+				Text:    "Cannot reassign variables declared outside of the component/hook",
+			},
 		},
 	},
 	"hooks": {
@@ -131,11 +134,26 @@ var Rules = map[string]RuleUnderTest{
 		Upstream: "use-memo",
 		Rule:     react.UseMemo,
 		Messages: map[string]UpstreamMessage{
-			"useMemoCallbackNotInline":              {Heading: "Error", Text: "Expected the first argument to be an inline function expression"},
-			"useMemoDependencyListNotArrayLiteral":  {Heading: "Error", Text: "Expected the dependency list for useMemo to be an array literal"},
-			"useMemoCallbackHasParameters":          {Heading: "Error", Text: "useMemo() callbacks may not accept parameters"},
-			"useMemoCallbackAsyncOrGenerator":       {Heading: "Error", Text: "useMemo() callbacks may not be async or generator functions"},
-			"useMemoCallbackReassignsOuterVariable": {Heading: "Error", Text: "useMemo() callbacks may not reassign variables declared outside of the callback"},
+			"useMemoCallbackNotInline": {
+				Heading: "Error",
+				Text:    "Expected the first argument to be an inline function expression",
+			},
+			"useMemoDependencyListNotArrayLiteral": {
+				Heading: "Error",
+				Text:    "Expected the dependency list for useMemo to be an array literal",
+			},
+			"useMemoCallbackHasParameters": {
+				Heading: "Error",
+				Text:    "useMemo() callbacks may not accept parameters",
+			},
+			"useMemoCallbackAsyncOrGenerator": {
+				Heading: "Error",
+				Text:    "useMemo() callbacks may not be async or generator functions",
+			},
+			"useMemoCallbackReassignsOuterVariable": {
+				Heading: "Error",
+				Text:    "useMemo() callbacks may not reassign variables declared outside of the callback",
+			},
 		},
 	},
 	"config": {
@@ -149,7 +167,10 @@ var Rules = map[string]RuleUnderTest{
 		Upstream: "gating",
 		Rule:     react.Gating,
 		Messages: map[string]UpstreamMessage{
-			"invalidGatingDirective": {Heading: "Error", Text: "Dynamic gating directive is not a valid JavaScript identifier"},
+			"invalidGatingDirective": {
+				Heading: "Error",
+				Text:    "Dynamic gating directive is not a valid JavaScript identifier",
+			},
 		},
 	},
 	"unsupported-syntax": {
@@ -266,7 +287,11 @@ const tsConfigText = `{
 // being asked at all: a parse failure, a missing checker. An empty Result is the claim "this rule
 // found nothing here", which on this corpus is a wrong answer rather than an absent one, and the
 // two have to stay in different columns.
-func Analyze(subject RuleUnderTest, fixture react_conformance.Fixture, directory string) (react_conformance.Result, error) {
+func Analyze(
+	subject RuleUnderTest,
+	fixture react_conformance.Fixture,
+	directory string,
+) (react_conformance.Result, error) {
 	// The fixture is written under its own filename, never under the one the golden's location line
 	// names, and this is the opposite of what this function did until 2026-08-24.
 	//
@@ -303,12 +328,16 @@ func Analyze(subject RuleUnderTest, fixture react_conformance.Fixture, directory
 		SingleThreaded:   true,
 	})
 	if buildError != nil {
-		return react_conformance.Result{}, &react_conformance.ErrUnsupported{Reason: "the fixture does not parse: " + buildError.Error()}
+		return react_conformance.Result{}, &react_conformance.ErrUnsupported{
+			Reason: "the fixture does not parse: " + buildError.Error(),
+		}
 	}
 
 	projectFiles := graph.ProjectFiles()
 	if len(projectFiles) == 0 {
-		return react_conformance.Result{}, &react_conformance.ErrUnsupported{Reason: "the fixture produced no project files"}
+		return react_conformance.Result{}, &react_conformance.ErrUnsupported{
+			Reason: "the fixture produced no project files",
+		}
 	}
 
 	var sourceFile *ast.SourceFile
@@ -319,7 +348,9 @@ func Analyze(subject RuleUnderTest, fixture react_conformance.Fixture, directory
 		}
 	}
 	if sourceFile == nil {
-		return react_conformance.Result{}, &react_conformance.ErrUnsupported{Reason: "the fixture is not in the built program"}
+		return react_conformance.Result{}, &react_conformance.ErrUnsupported{
+			Reason: "the fixture is not in the built program",
+		}
 	}
 
 	fileChecker, release := graph.CheckerForFile(context.Background(), sourceFile)

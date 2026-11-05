@@ -111,7 +111,11 @@ func designSystemProject(test *testing.T, sourceFileCount int) string {
 	// coincidence, and enough that the walk actually uses more than one worker.
 	for index := range sourceFileCount {
 		write(
-			filepath.Join("app", "components", "Component"+string(rune('A'+index%26))+string(rune('0'+index/26))+".tsx"),
+			filepath.Join(
+				"app",
+				"components",
+				"Component"+string(rune('A'+index%26))+string(rune('0'+index/26))+".tsx",
+			),
 			"export function Component() {\n    return <div className=\"flex items-center\" />;\n}\n",
 		)
 	}
@@ -133,7 +137,11 @@ type designSystemProbe struct {
 // designSystemProgram is a program as a rule calling DesignSystemForProgram sees it, declaring what the
 // design system reads.
 func designSystemProgram(program *compiler.Program) rule.Program {
-	return rule.ViewProgram(program, nil, rule.Rule{Name: "test/design-system", ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDesignSystem})
+	return rule.ViewProgram(
+		program,
+		nil,
+		rule.Rule{Name: "test/design-system", ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDesignSystem},
+	)
 }
 
 func (probe *designSystemProbe) rule() rule.Rule {
@@ -324,7 +332,11 @@ func TestDesignSystemDeclinesRatherThanReportingClean(test *testing.T) {
 	resetDesignSystemCacheForTest()
 
 	root := test.TempDir()
-	if writeError := os.WriteFile(filepath.Join(root, "tsconfig.json"), []byte(designSystemTestConfig), 0o644); writeError != nil {
+	if writeError := os.WriteFile(
+		filepath.Join(root, "tsconfig.json"),
+		[]byte(designSystemTestConfig),
+		0o644,
+	); writeError != nil {
 		test.Fatalf("writing tsconfig: %v", writeError)
 	}
 	if writeError := os.WriteFile(
@@ -368,7 +380,11 @@ func TestDesignSystemFailedBuildIsCachedToo(test *testing.T) {
 	resetDesignSystemCacheForTest()
 
 	root := test.TempDir()
-	if writeError := os.WriteFile(filepath.Join(root, "tsconfig.json"), []byte(designSystemTestConfig), 0o644); writeError != nil {
+	if writeError := os.WriteFile(
+		filepath.Join(root, "tsconfig.json"),
+		[]byte(designSystemTestConfig),
+		0o644,
+	); writeError != nil {
 		test.Fatalf("writing tsconfig: %v", writeError)
 	}
 	for index := range 8 {

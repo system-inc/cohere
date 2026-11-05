@@ -88,7 +88,10 @@ func TestEachChangeAllowsTheSmallestVersionThePolicySays(test *testing.T) {
 
 func TestASeverityThatIsNotOneIsRefused(test *testing.T) {
 	test.Parallel()
-	if _, diffSetError := DiffSet([]byte(`{"rules":{"a":"error"}}`), []byte(`{"rules":{"a":"fatal"}}`)); diffSetError == nil {
+	if _, diffSetError := DiffSet(
+		[]byte(`{"rules":{"a":"error"}}`),
+		[]byte(`{"rules":{"a":"fatal"}}`),
+	); diffSetError == nil {
 		test.Fatal("a severity of \"fatal\" was read as one")
 	}
 }
@@ -125,7 +128,14 @@ func TestRequireBump(test *testing.T) {
 	} {
 		requireBumpError := RequireBump(testCase.previous, testCase.next, testCase.bump)
 		if (requireBumpError == nil) != testCase.allowed {
-			test.Errorf("%s -> %s at %s: allowed %v, err %v", testCase.previous, testCase.next, testCase.bump, requireBumpError == nil, requireBumpError)
+			test.Errorf(
+				"%s -> %s at %s: allowed %v, err %v",
+				testCase.previous,
+				testCase.next,
+				testCase.bump,
+				requireBumpError == nil,
+				requireBumpError,
+			)
 		}
 	}
 }
@@ -139,7 +149,8 @@ func TestRequireBumpBelowOneNamesTheMinor(test *testing.T) {
 		if requireBumpError == nil {
 			test.Fatalf("0.1.0 -> 0.1.1 at %s was allowed", bump)
 		}
-		if !strings.Contains(requireBumpError.Error(), "next minor") || strings.Contains(requireBumpError.Error(), "needs a major") {
+		if !strings.Contains(requireBumpError.Error(), "next minor") ||
+			strings.Contains(requireBumpError.Error(), "needs a major") {
 			test.Errorf("0.1.0 -> 0.1.1 at %s was refused without naming the next minor: %v", bump, requireBumpError)
 		}
 	}
@@ -149,7 +160,10 @@ func TestRenderNamesEverySetThatChanged(test *testing.T) {
 	test.Parallel()
 	changed, bump, diffError := Diff(
 		map[string][]byte{"typescript": []byte(`{"rules":{"a":"error"}}`), "react": []byte(`{"rules":{"b":"error"}}`)},
-		map[string][]byte{"typescript": []byte(`{"rules":{"a":"error","c":"error"}}`), "react": []byte(`{"rules":{"b":"error"}}`)},
+		map[string][]byte{
+			"typescript": []byte(`{"rules":{"a":"error","c":"error"}}`),
+			"react":      []byte(`{"rules":{"b":"error"}}`),
+		},
 	)
 	if diffError != nil {
 		test.Fatal(diffError)
@@ -172,8 +186,19 @@ func TestSetsAtACommitMatchTheTree(test *testing.T) {
 	if err != nil {
 		test.Fatal(err)
 	}
-	if status, outputError := exec.Command("git", "-C", module, "status", "--porcelain", "--", SetDirectory).Output(); outputError != nil || len(status) > 0 {
-		test.Skipf("NOT MEASURED: the sets have uncommitted changes, so HEAD and the tree differ by design (%s)", bytes.TrimSpace(status))
+	if status, outputError := exec.Command(
+		"git",
+		"-C",
+		module,
+		"status",
+		"--porcelain",
+		"--",
+		SetDirectory,
+	).Output(); outputError != nil || len(status) > 0 {
+		test.Skipf(
+			"NOT MEASURED: the sets have uncommitted changes, so HEAD and the tree differ by design (%s)",
+			bytes.TrimSpace(status),
+		)
 	}
 	committed, err := SetsAt(module, "HEAD")
 	if err != nil {

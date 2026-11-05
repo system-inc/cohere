@@ -46,9 +46,15 @@ func TestNoEmptyObjectTypeUpstreamCorpus(test *testing.T) {
 			if decodeNoEmptyObjectTypeOptionsError != nil {
 				test.Fatalf("decoding %q: %v", row.options, decodeNoEmptyObjectTypeOptionsError)
 			}
-			result := rule_testing.RunTypedFilesWithSetupAndOptions(test, NoEmptyObjectType, map[string]string{"file.ts": row.source}, "file.ts", options,
+			result := rule_testing.RunTypedFilesWithSetupAndOptions(test, NoEmptyObjectType, map[string]string{
+				"file.ts": row.source,
+			}, "file.ts", options,
 				func(directory string) {
-					if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(noEmptyObjectTypeCorpusTsconfig), 0o644); writeError != nil {
+					if writeError := os.WriteFile(
+						filepath.Join(directory, "tsconfig.json"),
+						[]byte(noEmptyObjectTypeCorpusTsconfig),
+						0o644,
+					); writeError != nil {
 						test.Fatal(writeError)
 					}
 				})
@@ -62,7 +68,10 @@ func TestNoEmptyObjectTypeUpstreamCorpus(test *testing.T) {
 				if len(diagnostic.Fixes) > 0 {
 					test.Fatalf("the rule proposes a fix, and upstream only ever suggests")
 				}
-				finding := noEmptyObjectTypeCorpusFinding{id: diagnostic.Message.Id, text: row.source[diagnostic.Range.Pos():diagnostic.Range.End()]}
+				finding := noEmptyObjectTypeCorpusFinding{
+					id:   diagnostic.Message.Id,
+					text: row.source[diagnostic.Range.Pos():diagnostic.Range.End()],
+				}
 				for _, suggestion := range diagnostic.Suggestions {
 					finding.suggestions = append(finding.suggestions, noEmptyObjectTypeCorpusSuggestion{
 						id:     suggestion.Message.Id,

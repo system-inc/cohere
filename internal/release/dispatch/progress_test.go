@@ -51,7 +51,8 @@ func TestProgressOnATerminalIsOneLineThatClears(test *testing.T) {
 	progress.Step("%s", strings.Repeat("x", 200))
 	progress.Fail("cohere: failed")
 	got := out.String()
-	if !strings.Contains(got, strings.Repeat("x", stepWidth-1)+"…") || strings.Contains(got, strings.Repeat("x", stepWidth)) {
+	if !strings.Contains(got, strings.Repeat("x", stepWidth-1)+"…") ||
+		strings.Contains(got, strings.Repeat("x", stepWidth)) {
 		test.Errorf("a long step was not kept to one row: %q", got)
 	}
 	if !strings.HasSuffix(got, "\r\x1b[2Kcohere: failed\n") {
@@ -89,11 +90,20 @@ func TestALaunchedRunPrintsOnlyCoheresOwnOutputOffATerminal(test *testing.T) {
 
 	fixture := newCommittedFixture(test)
 	launcher := filepath.Join(test.TempDir(), "cohere-dispatch")
-	if output, outputError := exec.Command("go", "build", "-o", launcher, "../../../command/cohere-dispatch").CombinedOutput(); outputError != nil {
+	if output, outputError := exec.Command(
+		"go",
+		"build",
+		"-o",
+		launcher,
+		"../../../command/cohere-dispatch",
+	).CombinedOutput(); outputError != nil {
 		test.Fatalf("building the launcher: %v\n%s", outputError, output)
 	}
 	// The launcher keeps its cache in the checkout, and builds through the toolchain's own Go cache.
-	if createDirectoryError := os.MkdirAll(filepath.Join(fixture.superproject, ".cache", "cohere"), 0o755); createDirectoryError != nil {
+	if createDirectoryError := os.MkdirAll(
+		filepath.Join(fixture.superproject, ".cache", "cohere"),
+		0o755,
+	); createDirectoryError != nil {
 		test.Fatal(createDirectoryError)
 	}
 
@@ -115,10 +125,15 @@ func TestALaunchedRunPrintsOnlyCoheresOwnOutputOffATerminal(test *testing.T) {
 		}
 	}
 
-	writeFile(test, filepath.Join(fixture.superproject, "rules", "rules.go"), "package rules\n\nconst Value = \"two\"\n")
+	writeFile(
+		test,
+		filepath.Join(fixture.superproject, "rules", "rules.go"),
+		"package rules\n\nconst Value = \"two\"\n",
+	)
 	fixture.commit(test, "rules/rules.go")
 	output := launch("--verbose")
-	if !strings.Contains(output, "cohere: building from commit") || !strings.HasSuffix(output, "rule=two compiler=pinned\n") {
+	if !strings.Contains(output, "cohere: building from commit") ||
+		!strings.HasSuffix(output, "rule=two compiler=pinned\n") {
 		test.Fatalf("a --verbose rebuild does not name the build, or lost cohere's output:\n%s", output)
 	}
 }
@@ -172,7 +187,11 @@ func TestSwiftPMSpeaksOnlyUnderVerboseOrOnFailure(test *testing.T) {
 		previous := Report
 		Report = NewProgress(&out, verbose, false)
 		defer func() { Report = previous }()
-		buildSwiftProductWithSwiftPMError := buildSwiftProductWithSwiftPM(test.TempDir(), test.TempDir(), filepath.Join(test.TempDir(), "bin", "cohere-swift"))
+		buildSwiftProductWithSwiftPMError := buildSwiftProductWithSwiftPM(
+			test.TempDir(),
+			test.TempDir(),
+			filepath.Join(test.TempDir(), "bin", "cohere-swift"),
+		)
 		return out.String(), buildSwiftProductWithSwiftPMError
 	}
 

@@ -67,8 +67,8 @@
 //
 // `-check` regenerates and fails when the committed table disagrees, which is what makes a Tailwind
 // upgrade that registers a new variant show up as a failing gate rather than as a rule that quietly
-// stops parsing classes using it. Like the sibling internal/lint/rules/tailwind/tools/generate_* tools, nothing invokes it
-// automatically; it is a manual gate.
+// stops parsing classes using it. Like the sibling internal/lint/rules/tailwind/tools/generate_* tools, nothing invokes
+// it automatically; it is a manual gate.
 //
 // Node is required to run it and never to use the result.
 package main
@@ -144,7 +144,10 @@ func portablePath(path string) string {
 	if homeDirectoryError != nil || home == "" {
 		return path
 	}
-	if relative, relativePathError := filepath.Rel(home, path); relativePathError == nil && !strings.HasPrefix(relative, "..") {
+	if relative, relativePathError := filepath.Rel(
+		home,
+		path,
+	); relativePathError == nil && !strings.HasPrefix(relative, "..") {
 		return filepath.Join("~", relative)
 	}
 	return path
@@ -181,13 +184,31 @@ func registrationDifference(left, right []registryEntry) string {
 		rightEntry, inRightPresent := inRight[name]
 		switch {
 		case !inRightPresent:
-			return fmt.Sprintf("%q is registered at order %d in the first system and absent from the second", name, leftEntry.Order)
+			return fmt.Sprintf(
+				"%q is registered at order %d in the first system and absent from the second",
+				name,
+				leftEntry.Order,
+			)
 		case !inLeftPresent:
-			return fmt.Sprintf("%q is registered at order %d in the second system and absent from the first", name, rightEntry.Order)
+			return fmt.Sprintf(
+				"%q is registered at order %d in the second system and absent from the first",
+				name,
+				rightEntry.Order,
+			)
 		case leftEntry.Order != rightEntry.Order:
-			return fmt.Sprintf("%q is order %d in the first system and %d in the second", name, leftEntry.Order, rightEntry.Order)
+			return fmt.Sprintf(
+				"%q is order %d in the first system and %d in the second",
+				name,
+				leftEntry.Order,
+				rightEntry.Order,
+			)
 		case leftEntry.Kind != rightEntry.Kind:
-			return fmt.Sprintf("%q is kind %q in the first system and %q in the second", name, leftEntry.Kind, rightEntry.Kind)
+			return fmt.Sprintf(
+				"%q is kind %q in the first system and %q in the second",
+				name,
+				leftEntry.Kind,
+				rightEntry.Kind,
+			)
 		}
 	}
 	return ""
@@ -218,19 +239,38 @@ type groupedComparison struct {
 }
 
 func main() {
-	packageRoot := flag.String("package-root", "", "path to the tailwindcss package root (the directory holding package.json)")
-	designSystem := flag.String("design-system", "", "CSS entry point to read the registry from; defaults to a bare `@import \"tailwindcss\"`")
-	output := flag.String("output", filepath.Join("internal", "tailwind", "framework_variant_table.go"), "where to write the generated table")
+	packageRoot := flag.String(
+		"package-root",
+		"",
+		"path to the tailwindcss package root (the directory holding package.json)",
+	)
+	designSystem := flag.String(
+		"design-system",
+		"",
+		"CSS entry point to read the registry from; defaults to a bare `@import \"tailwindcss\"`",
+	)
+	output := flag.String(
+		"output",
+		filepath.Join("internal", "tailwind", "framework_variant_table.go"),
+		"where to write the generated table",
+	)
 	check := flag.Bool("check", false, "regenerate and fail if the committed table disagrees, instead of writing it")
 	var invarianceInputs pathList
-	flag.Var(&invarianceInputs, "verify-invariance-against", "a design system entry point whose registrations must match; repeatable")
+	flag.Var(
+		&invarianceInputs,
+		"verify-invariance-against",
+		"a design system entry point whose registrations must match; repeatable",
+	)
 	flag.Parse()
 
 	if *packageRoot == "" {
 		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
 		fmt.Fprintln(os.Stderr, "generate_framework_variants: -package-root is required")
 		// Ignored: the rest of the same message, and the same exit code says it either way.
-		fmt.Fprintln(os.Stderr, "  example: go run ./internal/lint/rules/tailwind/tools/generate_framework_variants -package-root ~/Projects/ahra/node_modules/tailwindcss")
+		fmt.Fprintln(
+			os.Stderr,
+			"  example: go run ./internal/lint/rules/tailwind/tools/generate_framework_variants -package-root ~/Projects/ahra/node_modules/tailwindcss",
+		)
 		os.Exit(2)
 	}
 
@@ -265,7 +305,12 @@ func main() {
 		otherResult, enumerateError := enumerate(*packageRoot, entryPoint)
 		if enumerateError != nil {
 			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
-			fmt.Fprintf(os.Stderr, "generate_framework_variants: enumerating %s for the invariance check: %v\n", entryPoint, enumerateError)
+			fmt.Fprintf(
+				os.Stderr,
+				"generate_framework_variants: enumerating %s for the invariance check: %v\n",
+				entryPoint,
+				enumerateError,
+			)
 			os.Exit(1)
 		}
 		if validateError := validate(otherResult); validateError != nil {
@@ -280,7 +325,10 @@ func main() {
 			// Ignored: the rest of the same message, and the same exit code says it either way.
 			fmt.Fprintf(os.Stderr, "  %s\n", difference)
 			// Ignored: the rest of the same message, and the same exit code says it either way.
-			fmt.Fprintln(os.Stderr, "  A repository that moves a framework registration cannot be linted from a baked table.")
+			fmt.Fprintln(
+				os.Stderr,
+				"  A repository that moves a framework registration cannot be linted from a baked table.",
+			)
 			// Ignored: the rest of the same message, and the same exit code says it either way.
 			fmt.Fprintln(os.Stderr, "  This finding is worth more than the confirmation.")
 			os.Exit(1)
@@ -305,9 +353,17 @@ func main() {
 		}
 		if !bytes.Equal(committed, rendered) {
 			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
-			fmt.Fprintf(os.Stderr, "generate_framework_variants: %s is stale for Tailwind %s.\n", *output, result.TailwindVersion)
+			fmt.Fprintf(
+				os.Stderr,
+				"generate_framework_variants: %s is stale for Tailwind %s.\n",
+				*output,
+				result.TailwindVersion,
+			)
 			// Ignored: the rest of the same message, and the same exit code says it either way.
-			fmt.Fprintln(os.Stderr, "  The installed Tailwind registers a different set of variants, or registers them in a different order.")
+			fmt.Fprintln(
+				os.Stderr,
+				"  The installed Tailwind registers a different set of variants, or registers them in a different order.",
+			)
 			// Ignored: the rest of the same message, and the same exit code says it either way.
 			fmt.Fprintln(os.Stderr, "  Regenerate it and read the diff: what changed is what this upgrade changed.")
 			os.Exit(1)
@@ -340,7 +396,13 @@ func main() {
 			direction = "ascending"
 		}
 		// Ignored: the rest of the same summary, which changes nothing already written.
-		fmt.Fprintf(os.Stderr, "  order %d %s: %s\n", comparison.Order, direction, strings.Join(comparison.Members, ", "))
+		fmt.Fprintf(
+			os.Stderr,
+			"  order %d %s: %s\n",
+			comparison.Order,
+			direction,
+			strings.Join(comparison.Members, ", "),
+		)
 	}
 }
 
@@ -396,7 +458,10 @@ func validate(result *enumeration) error {
 			)
 		}
 		if len(byOrder[comparison.Order]) == 0 {
-			return fmt.Errorf("order %d carries a comparison function but no registration holds that order", comparison.Order)
+			return fmt.Errorf(
+				"order %d carries a comparison function but no registration holds that order",
+				comparison.Order,
+			)
 		}
 	}
 
@@ -464,7 +529,9 @@ func render(result *enumeration) ([]byte, error) {
 	}
 
 	var builder strings.Builder
-	fmt.Fprintf(&builder, `// Code generated by internal/lint/rules/tailwind/tools/generate_framework_variants. DO NOT EDIT.
+	fmt.Fprintf(
+		&builder,
+		`// Code generated by internal/lint/rules/tailwind/tools/generate_framework_variants. DO NOT EDIT.
 //
 // Regenerate with:
 //
@@ -496,9 +563,17 @@ func render(result *enumeration) ([]byte, error) {
 
 package tailwind
 
-`, result.TailwindVersion, len(entries), len(distinctOrders), sharedCount, len(comparisons), invarianceProvenance(result.VerifiedAgainst))
+`,
+		result.TailwindVersion,
+		len(entries),
+		len(distinctOrders),
+		sharedCount,
+		len(comparisons),
+		invarianceProvenance(result.VerifiedAgainst),
+	)
 
-	builder.WriteString(`// FrameworkVariantRegistration is one variant the framework registers, with the order number the
+	builder.WriteString(
+		`// FrameworkVariantRegistration is one variant the framework registers, with the order number the
 // engine assigned it.
 //
 // Order is carried rather than re-derived, and that is the whole reason this type exists alongside
@@ -538,16 +613,20 @@ type FrameworkVariantComparisonGroup struct {
 	Members []string
 }
 
-`)
+`,
+	)
 
-	fmt.Fprintf(&builder, `// FrameworkVariantRegistrations is every variant the installed Tailwind registers, in registration
+	fmt.Fprintf(
+		&builder,
+		`// FrameworkVariantRegistrations is every variant the installed Tailwind registers, in registration
 // order.
 //
 // In order rather than sorted by name, so a reader sees the sequence the engine performed and an
 // upgrade's diff shows where a new variant was inserted. Registrations() sorts by name when a
 // caller needs that.
 var FrameworkVariantRegistrations = []FrameworkVariantRegistration{
-`)
+`,
+	)
 	for _, entry := range entries {
 		fmt.Fprintf(
 			&builder,

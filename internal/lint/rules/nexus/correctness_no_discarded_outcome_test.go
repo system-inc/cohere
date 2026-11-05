@@ -98,7 +98,11 @@ type correctnessNoDiscardedOutcomeFinding struct {
 
 // correctnessNoDiscardedOutcomeExpect asserts the findings in source order. The harness trims the
 // subject file before writing it, so spans are read from the program's own text.
-func correctnessNoDiscardedOutcomeExpect(test *testing.T, result rule_testing.Result, want []correctnessNoDiscardedOutcomeFinding) {
+func correctnessNoDiscardedOutcomeExpect(
+	test *testing.T,
+	result rule_testing.Result,
+	want []correctnessNoDiscardedOutcomeFinding,
+) {
 	test.Helper()
 	diagnostics := append(result.Diagnostics[:0:0], result.Diagnostics...)
 	sort.SliceStable(diagnostics, func(left int, right int) bool {
@@ -115,7 +119,11 @@ func correctnessNoDiscardedOutcomeExpect(test *testing.T, result rule_testing.Re
 	var got []correctnessNoDiscardedOutcomeFinding
 	for _, diagnostic := range diagnostics {
 		if len(diagnostic.Fixes) != 0 || len(diagnostic.Suggestions) != 0 {
-			test.Fatalf("expected no fix and no suggestion, got %d and %d", len(diagnostic.Fixes), len(diagnostic.Suggestions))
+			test.Fatalf(
+				"expected no fix and no suggestion, got %d and %d",
+				len(diagnostic.Fixes),
+				len(diagnostic.Suggestions),
+			)
 		}
 		typeName := ""
 		for _, known := range correctnessNoDiscardedOutcomeDeclarations {
@@ -123,7 +131,10 @@ func correctnessNoDiscardedOutcomeExpect(test *testing.T, result rule_testing.Re
 				typeName = known.typeName
 			}
 		}
-		got = append(got, correctnessNoDiscardedOutcomeFinding{typeName, strings.TrimSpace(text[diagnostic.Range.Pos():diagnostic.Range.End()])})
+		got = append(got, correctnessNoDiscardedOutcomeFinding{
+			typeName,
+			strings.TrimSpace(text[diagnostic.Range.Pos():diagnostic.Range.End()]),
+		})
 	}
 	for index := range want {
 		if got[index] != want[index] {
@@ -267,7 +278,10 @@ func TestCorrectnessNoDiscardedOutcomeStaysSilentOnTheFixedSites(test *testing.T
 		test.Run(site.name, func(test *testing.T) {
 			test.Parallel()
 
-			rule_testing.ExpectClean(test, correctnessNoDiscardedOutcomeRun(test, correctnessNoDiscardedOutcomeSource(site.after...)))
+			rule_testing.ExpectClean(
+				test,
+				correctnessNoDiscardedOutcomeRun(test, correctnessNoDiscardedOutcomeSource(site.after...)),
+			)
 		})
 	}
 }
@@ -285,16 +299,25 @@ func TestCorrectnessNoDiscardedOutcomeFires(test *testing.T) {
 			"    parseJson(text, 'webhook payload');",
 			"}",
 		}, []correctnessNoDiscardedOutcomeFinding{{"JsonParseOutcomeType", "parseJson(text, 'webhook payload');"}}},
-		{"a JSONC parse dropped", []string{
-			"export function check() {",
-			"    parseJsonc(text, 'ProjectSecrets.jsonc');",
-			"}",
-		}, []correctnessNoDiscardedOutcomeFinding{{"JsoncParseOutcomeType", "parseJsonc(text, 'ProjectSecrets.jsonc');"}}},
+		{
+			"a JSONC parse dropped",
+			[]string{
+				"export function check() {",
+				"    parseJsonc(text, 'ProjectSecrets.jsonc');",
+				"}",
+			},
+			[]correctnessNoDiscardedOutcomeFinding{
+				{"JsoncParseOutcomeType", "parseJsonc(text, 'ProjectSecrets.jsonc');"},
+			},
+		},
 		{"a file read dropped, instantiated with a type argument", []string{
 			"export function check() {",
 			"    readJsonFile<{ lastSeen: Record<string, string> }>(statePath, 'meta polling state');",
 			"}",
-		}, []correctnessNoDiscardedOutcomeFinding{{"JsonFileReadOutcomeType", "readJsonFile<{ lastSeen: Record<string, string> }>(statePath, 'meta polling state');"}}},
+		}, []correctnessNoDiscardedOutcomeFinding{{
+			"JsonFileReadOutcomeType",
+			"readJsonFile<{ lastSeen: Record<string, string> }>(statePath, 'meta polling state');",
+		}}},
 		{"a package.json read dropped", []string{
 			"export function check() {",
 			"    readPackageJson('package.json');",
@@ -304,7 +327,9 @@ func TestCorrectnessNoDiscardedOutcomeFires(test *testing.T) {
 			"export function save() {",
 			"    (writeJsonFile(statePath, state, 'plaid pending links', { mode: 0o600 }));",
 			"}",
-		}, []correctnessNoDiscardedOutcomeFinding{correctnessNoDiscardedOutcomeWrite("(writeJsonFile(statePath, state, 'plaid pending links', { mode: 0o600 }));")}},
+		}, []correctnessNoDiscardedOutcomeFinding{correctnessNoDiscardedOutcomeWrite(
+			"(writeJsonFile(statePath, state, 'plaid pending links', { mode: 0o600 }));",
+		)}},
 		{"a project wrapper with an inferred return type", []string{
 			"function saveState() {",
 			"    return writeJsonFile(statePath, state, 'meta polling state');",
@@ -357,7 +382,9 @@ func TestCorrectnessNoDiscardedOutcomeFires(test *testing.T) {
 		}},
 		{"a write at module level", []string{
 			"writeJsonFile(statePath, state, 'meta polling state');",
-		}, []correctnessNoDiscardedOutcomeFinding{correctnessNoDiscardedOutcomeWrite("writeJsonFile(statePath, state, 'meta polling state');")}},
+		}, []correctnessNoDiscardedOutcomeFinding{
+			correctnessNoDiscardedOutcomeWrite("writeJsonFile(statePath, state, 'meta polling state');"),
+		}},
 	}
 
 	for _, testCase := range cases {
@@ -440,7 +467,10 @@ func TestCorrectnessNoDiscardedOutcomeStaysSilent(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 
-			rule_testing.ExpectClean(test, correctnessNoDiscardedOutcomeRun(test, correctnessNoDiscardedOutcomeSource(testCase.lines...)))
+			rule_testing.ExpectClean(
+				test,
+				correctnessNoDiscardedOutcomeRun(test, correctnessNoDiscardedOutcomeSource(testCase.lines...)),
+			)
 		})
 	}
 }

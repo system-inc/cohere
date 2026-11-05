@@ -68,16 +68,56 @@ func TestScopeHullMatchesReact(test *testing.T) {
 		ranges []mutation_aliasing.MutableRange
 		want   mutation_aliasing.MutableRange
 	}{
-		{"simpleHull", []mutation_aliasing.MutableRange{{Start: 3, End: 5}, {Start: 1, End: 9}, {Start: 7, End: 8}}, mutation_aliasing.MutableRange{Start: 1, End: 9}},
-		{"firstUnset", []mutation_aliasing.MutableRange{{Start: 0, End: 0}, {Start: 4, End: 6}, {Start: 2, End: 9}}, mutation_aliasing.MutableRange{Start: 2, End: 9}},
-		{"middleUnset", []mutation_aliasing.MutableRange{{Start: 4, End: 6}, {Start: 0, End: 0}, {Start: 2, End: 9}}, mutation_aliasing.MutableRange{Start: 2, End: 9}},
-		{"allUnset", []mutation_aliasing.MutableRange{{Start: 0, End: 0}, {Start: 0, End: 0}}, mutation_aliasing.MutableRange{Start: 0, End: 0}},
-		{"runOfUnsets", []mutation_aliasing.MutableRange{{Start: 0, End: 0}, {Start: 0, End: 0}, {Start: 5, End: 7}}, mutation_aliasing.MutableRange{Start: 5, End: 7}},
-		{"singleton", []mutation_aliasing.MutableRange{{Start: 3, End: 7}}, mutation_aliasing.MutableRange{Start: 3, End: 7}},
-		{"identicalRanges", []mutation_aliasing.MutableRange{{Start: 2, End: 4}, {Start: 2, End: 4}}, mutation_aliasing.MutableRange{Start: 2, End: 4}},
-		{"laterStartsHigher", []mutation_aliasing.MutableRange{{Start: 2, End: 4}, {Start: 6, End: 9}}, mutation_aliasing.MutableRange{Start: 2, End: 9}},
-		{"trailingUnsetOnly", []mutation_aliasing.MutableRange{{Start: 2, End: 4}, {Start: 0, End: 0}}, mutation_aliasing.MutableRange{Start: 2, End: 4}},
-		{"unsetEndOnlyGuard", []mutation_aliasing.MutableRange{{Start: 5, End: 9}, {Start: 0, End: 0}, {Start: 0, End: 0}}, mutation_aliasing.MutableRange{Start: 5, End: 9}},
+		{
+			"simpleHull",
+			[]mutation_aliasing.MutableRange{{Start: 3, End: 5}, {Start: 1, End: 9}, {Start: 7, End: 8}},
+			mutation_aliasing.MutableRange{Start: 1, End: 9},
+		},
+		{
+			"firstUnset",
+			[]mutation_aliasing.MutableRange{{Start: 0, End: 0}, {Start: 4, End: 6}, {Start: 2, End: 9}},
+			mutation_aliasing.MutableRange{Start: 2, End: 9},
+		},
+		{
+			"middleUnset",
+			[]mutation_aliasing.MutableRange{{Start: 4, End: 6}, {Start: 0, End: 0}, {Start: 2, End: 9}},
+			mutation_aliasing.MutableRange{Start: 2, End: 9},
+		},
+		{
+			"allUnset",
+			[]mutation_aliasing.MutableRange{{Start: 0, End: 0}, {Start: 0, End: 0}},
+			mutation_aliasing.MutableRange{Start: 0, End: 0},
+		},
+		{
+			"runOfUnsets",
+			[]mutation_aliasing.MutableRange{{Start: 0, End: 0}, {Start: 0, End: 0}, {Start: 5, End: 7}},
+			mutation_aliasing.MutableRange{Start: 5, End: 7},
+		},
+		{
+			"singleton",
+			[]mutation_aliasing.MutableRange{{Start: 3, End: 7}},
+			mutation_aliasing.MutableRange{Start: 3, End: 7},
+		},
+		{
+			"identicalRanges",
+			[]mutation_aliasing.MutableRange{{Start: 2, End: 4}, {Start: 2, End: 4}},
+			mutation_aliasing.MutableRange{Start: 2, End: 4},
+		},
+		{
+			"laterStartsHigher",
+			[]mutation_aliasing.MutableRange{{Start: 2, End: 4}, {Start: 6, End: 9}},
+			mutation_aliasing.MutableRange{Start: 2, End: 9},
+		},
+		{
+			"trailingUnsetOnly",
+			[]mutation_aliasing.MutableRange{{Start: 2, End: 4}, {Start: 0, End: 0}},
+			mutation_aliasing.MutableRange{Start: 2, End: 4},
+		},
+		{
+			"unsetEndOnlyGuard",
+			[]mutation_aliasing.MutableRange{{Start: 5, End: 9}, {Start: 0, End: 0}, {Start: 0, End: 0}},
+			mutation_aliasing.MutableRange{Start: 5, End: 9},
+		},
 	}
 
 	for _, testCase := range cases {
@@ -157,7 +197,10 @@ func TestScopeIsOnePerEquivalenceClass(test *testing.T) {
 	function := &Function{Identifiers: []*Identifier{nil, nil, nil, nil, nil, nil}}
 	ranges := &mutation_aliasing.MutableRanges{}
 	for id := static_single_assignment.IdentifierId(1); id <= 5; id++ {
-		ranges.Set(id, mutation_aliasing.MutableRange{Start: static_single_assignment.EvaluationOrder(id), End: static_single_assignment.EvaluationOrder(id) + 3})
+		ranges.Set(id, mutation_aliasing.MutableRange{
+			Start: static_single_assignment.EvaluationOrder(id),
+			End:   static_single_assignment.EvaluationOrder(id) + 3,
+		})
 	}
 
 	set := &DisjointSet{}
@@ -317,7 +360,10 @@ func TestScopeAssignmentIsASinglePass(test *testing.T) {
 		for member := 0; member < perClass; member++ {
 			id := static_single_assignment.IdentifierId(class*perClass + member + 1)
 			function.Identifiers = append(function.Identifiers, nil)
-			ranges.Set(id, mutation_aliasing.MutableRange{Start: static_single_assignment.EvaluationOrder(id), End: static_single_assignment.EvaluationOrder(id) + 2})
+			ranges.Set(id, mutation_aliasing.MutableRange{
+				Start: static_single_assignment.EvaluationOrder(id),
+				End:   static_single_assignment.EvaluationOrder(id) + 2,
+			})
 			members = append(members, id)
 		}
 		set.Union(members)

@@ -37,7 +37,10 @@ func TestTheContentPackServesAReplacedDeclarationFresh(test *testing.T) {
 	// The same size both ways, so only the bytes differ.
 	const withoutFinding = "export type Event = number;\n"
 	const withFinding = "export type Event = 'abcd';\n"
-	write("tsconfig.json", `{"compilerOptions":{"strict":true,"noEmit":true,"target":"es2022","module":"esnext","moduleResolution":"bundler"},"include":["source"]}`)
+	write(
+		"tsconfig.json",
+		`{"compilerOptions":{"strict":true,"noEmit":true,"target":"es2022","module":"esnext","moduleResolution":"bundler"},"include":["source"]}`,
+	)
 	write("CohereSettings.json", `{"rules":{"@typescript-eslint/no-redundant-type-constituents":"error"}}`)
 	write("package.json", `{"name":"fixture","private":true,"type":"module"}`)
 	write(".gitignore", ".cache/\nnode_modules/\n")
@@ -71,16 +74,28 @@ func TestTheContentPackServesAReplacedDeclarationFresh(test *testing.T) {
 		if writeError := os.WriteFile(staged, []byte(step.replacement), 0o644); writeError != nil {
 			test.Fatal(writeError)
 		}
-		if changeTimesError := os.Chtimes(staged, information.ModTime(), information.ModTime()); changeTimesError != nil {
+		if changeTimesError := os.Chtimes(
+			staged,
+			information.ModTime(),
+			information.ModTime(),
+		); changeTimesError != nil {
 			test.Fatal(changeTimesError)
 		}
 		if renameError := os.Rename(staged, declaration); renameError != nil {
 			test.Fatal(renameError)
 		}
 		warm, cold := run(), run("--no-cache")
-		if strings.Join(findings(warm), "\n") != strings.Join(findings(cold), "\n") || len(findings(cold)) != step.want {
-			test.Fatalf("after the declaration became %q, warm reports %d findings and cold %d, want %d\n--- warm\n%s\n--- cold\n%s",
-				strings.TrimSpace(step.replacement), len(findings(warm)), len(findings(cold)), step.want, warm, cold)
+		if strings.Join(findings(warm), "\n") != strings.Join(findings(cold), "\n") ||
+			len(findings(cold)) != step.want {
+			test.Fatalf(
+				"after the declaration became %q, warm reports %d findings and cold %d, want %d\n--- warm\n%s\n--- cold\n%s",
+				strings.TrimSpace(step.replacement),
+				len(findings(warm)),
+				len(findings(cold)),
+				step.want,
+				warm,
+				cold,
+			)
 		}
 	}
 }
@@ -110,7 +125,10 @@ func TestARebuildAfterAFixReadsTheFixedBytes(test *testing.T) {
 			test.Fatal(writeError)
 		}
 	}
-	write("tsconfig.json", `{"compilerOptions":{"strict":true,"noEmit":true,"target":"es2022","module":"esnext","moduleResolution":"bundler"},"include":["source"]}`)
+	write(
+		"tsconfig.json",
+		`{"compilerOptions":{"strict":true,"noEmit":true,"target":"es2022","module":"esnext","moduleResolution":"bundler"},"include":["source"]}`,
+	)
 	write("CohereSettings.json", `{"rules":{"@typescript-eslint/non-nullable-type-assertion-style":"error"}}`)
 	write("package.json", `{"name":"fixture","private":true,"type":"module"}`)
 	write(".gitignore", ".cache/\nnode_modules/\n")
@@ -137,8 +155,14 @@ func TestARebuildAfterAFixReadsTheFixedBytes(test *testing.T) {
 	}
 	finding := regexp.MustCompile(`(?m)^\S+:\d+:\d+ - .*$`)
 	cold, _ := runCohere(test, binary, root, "--no-fix", "--no-cache")
-	if got, want := finding.FindAllString(warm, -1), finding.FindAllString(cold, -1); strings.Join(got, "\n") != strings.Join(want, "\n") {
-		test.Errorf("the run that fixed Use.ts reported other findings after its rebuild than a run with no cache over the fixed tree\n--- warm\n%s\n--- cold\n%s",
-			warm, cold)
+	if got, want := finding.FindAllString(
+		warm,
+		-1,
+	), finding.FindAllString(cold, -1); strings.Join(got, "\n") != strings.Join(want, "\n") {
+		test.Errorf(
+			"the run that fixed Use.ts reported other findings after its rebuild than a run with no cache over the fixed tree\n--- warm\n%s\n--- cold\n%s",
+			warm,
+			cold,
+		)
 	}
 }

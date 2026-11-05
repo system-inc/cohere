@@ -153,12 +153,21 @@ func (tokens *scssTokenizer) nextToken() (token, bool) {
 		for {
 			tokens.next += 1
 			tokens.code = tokens.charCodeAt(tokens.next)
-			if !(tokens.code == space || tokens.code == newline || tokens.code == tab || tokens.code == carriageReturn || tokens.code == feed) {
+			if !(tokens.code == space ||
+				tokens.code == newline ||
+				tokens.code == tab ||
+				tokens.code == carriageReturn ||
+				tokens.code == feed) {
 				break
 			}
 		}
 
-		tokens.currentToken = token{kind: "space", value: tokens.input.slice(tokens.pos, tokens.next), start: -1, end: -1}
+		tokens.currentToken = token{
+			kind:  "space",
+			value: tokens.input.slice(tokens.pos, tokens.next),
+			start: -1,
+			end:   -1,
+		}
 		tokens.pos = tokens.next - 1
 
 	case openSquare, closeSquare, openCurly, closeCurly, colon, semicolon, closeParentheses:
@@ -209,7 +218,12 @@ func (tokens *scssTokenizer) nextToken() (token, bool) {
 			if tokens.next == -1 || hasBadBracket(tokens.css[tokens.pos:tokens.next+1]) {
 				tokens.currentToken = token{kind: "(", value: "(", start: tokens.pos, end: -1}
 			} else {
-				tokens.currentToken = token{kind: "brackets", value: tokens.content, start: tokens.pos, end: tokens.next}
+				tokens.currentToken = token{
+					kind:  "brackets",
+					value: tokens.content,
+					start: tokens.pos,
+					end:   tokens.next,
+				}
 				tokens.pos = tokens.next
 			}
 		}
@@ -241,7 +255,12 @@ func (tokens *scssTokenizer) nextToken() (token, bool) {
 		}
 		// } SCSS PATCH
 
-		tokens.currentToken = token{kind: "string", value: tokens.input.slice(tokens.pos, tokens.next+1), start: tokens.pos, end: tokens.next}
+		tokens.currentToken = token{
+			kind:  "string",
+			value: tokens.input.slice(tokens.pos, tokens.next+1),
+			start: tokens.pos,
+			end:   tokens.next,
+		}
 		tokens.pos = tokens.next
 
 	case at:
@@ -260,7 +279,12 @@ func (tokens *scssTokenizer) nextToken() (token, bool) {
 			tokens.next = match - 1
 		}
 
-		tokens.currentToken = token{kind: "at-word", value: tokens.input.slice(tokens.pos, tokens.next+1), start: tokens.pos, end: tokens.next}
+		tokens.currentToken = token{
+			kind:  "at-word",
+			value: tokens.input.slice(tokens.pos, tokens.next+1),
+			start: tokens.pos,
+			end:   tokens.next,
+		}
 
 		tokens.pos = tokens.next
 
@@ -290,7 +314,12 @@ func (tokens *scssTokenizer) nextToken() (token, bool) {
 			}
 		}
 
-		tokens.currentToken = token{kind: "word", value: tokens.input.slice(tokens.pos, tokens.next+1), start: tokens.pos, end: tokens.next}
+		tokens.currentToken = token{
+			kind:  "word",
+			value: tokens.input.slice(tokens.pos, tokens.next+1),
+			start: tokens.pos,
+			end:   tokens.next,
+		}
 
 		tokens.pos = tokens.next
 
@@ -312,7 +341,12 @@ func (tokens *scssTokenizer) nextToken() (token, bool) {
 				tokens.unclosed("comment")
 			}
 
-			tokens.currentToken = token{kind: "comment", value: tokens.input.slice(tokens.pos, tokens.next+1), start: tokens.pos, end: tokens.next}
+			tokens.currentToken = token{
+				kind:  "comment",
+				value: tokens.input.slice(tokens.pos, tokens.next+1),
+				start: tokens.pos,
+				end:   tokens.next,
+			}
 			tokens.pos = tokens.next
 
 			// SCSS PATCH {
@@ -332,7 +366,13 @@ func (tokens *scssTokenizer) nextToken() (token, bool) {
 			}
 
 			tokens.content = tokens.input.slice(tokens.pos, tokens.next+1)
-			tokens.currentToken = token{kind: "comment", value: tokens.content, start: tokens.pos, end: tokens.next, inline: true}
+			tokens.currentToken = token{
+				kind:   "comment",
+				value:  tokens.content,
+				start:  tokens.pos,
+				end:    tokens.next,
+				inline: true,
+			}
 
 			tokens.pos = tokens.next
 			// } SCSS PATCH
@@ -352,7 +392,12 @@ func (tokens *scssTokenizer) nextToken() (token, bool) {
 				tokens.next = match - 1
 			}
 
-			tokens.currentToken = token{kind: "word", value: tokens.input.slice(tokens.pos, tokens.next+1), start: tokens.pos, end: tokens.next}
+			tokens.currentToken = token{
+				kind:  "word",
+				value: tokens.input.slice(tokens.pos, tokens.next+1),
+				start: tokens.pos,
+				end:   tokens.next,
+			}
 			tokens.buffer = append(tokens.buffer, tokens.currentToken)
 			tokens.pos = tokens.next
 		}

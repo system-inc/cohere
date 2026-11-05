@@ -9,8 +9,8 @@
 //	    -output <base_table.go>
 //
 // The inputs are what `internal/lint/rules/tailwind/tools/generate_descriptors/extract.mjs --json` and
-// `internal/lint/rules/tailwind/tools/generate_descriptor_table/context.mjs` write, one pair per design system. Several pairs
-// are accepted and at least two are required, because this command's entire job is to separate what
+// `internal/lint/rules/tailwind/tools/generate_descriptor_table/context.mjs` write, one pair per design system. Several
+// pairs are accepted and at least two are required, because this command's entire job is to separate what
 // is a fact about Tailwind from what is a fact about one repository, and a single extraction cannot
 // tell those apart. With one input every per-repository token looks invariant.
 //
@@ -148,7 +148,11 @@ func main() {
 	var inputPaths pathList
 	var contextPaths pathList
 	flag.Var(&inputPaths, "input", "path to a JSON file written by generate_descriptors/extract.mjs --json; repeatable")
-	flag.Var(&contextPaths, "context", "path to a JSON file written by context.mjs, in the same order as -input; repeatable")
+	flag.Var(
+		&contextPaths,
+		"context",
+		"path to a JSON file written by context.mjs, in the same order as -input; repeatable",
+	)
 	outputPath := flag.String("output", "", "path to write the generated Go file to; - writes to stdout")
 	packageName := flag.String("package", "tailwind", "package clause of the generated file")
 	flag.Parse()
@@ -169,7 +173,10 @@ func main() {
 	// as framework facts, which is precisely the bug the port exists to remove.
 	if len(inputPaths) < 2 {
 		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
-		fmt.Fprintln(os.Stderr, "generate_descriptor_base: at least two design systems are required; one cannot separate the framework from a repository")
+		fmt.Fprintln(
+			os.Stderr,
+			"generate_descriptor_base: at least two design systems are required; one cannot separate the framework from a repository",
+		)
 		os.Exit(2)
 	}
 
@@ -180,20 +187,37 @@ func main() {
 		readJSON(contextPaths[index], &loaded.context)
 		if len(loaded.table.Roots) == 0 || len(loaded.table.Statics) == 0 || loaded.table.TailwindVersion == "" {
 			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
-			fmt.Fprintf(os.Stderr, "generate_descriptor_base: %s looks empty (%d roots, %d statics, version %q); refusing to generate\n",
-				inputPaths[index], len(loaded.table.Roots), len(loaded.table.Statics), loaded.table.TailwindVersion)
+			fmt.Fprintf(
+				os.Stderr,
+				"generate_descriptor_base: %s looks empty (%d roots, %d statics, version %q); refusing to generate\n",
+				inputPaths[index],
+				len(loaded.table.Roots),
+				len(loaded.table.Statics),
+				loaded.table.TailwindVersion,
+			)
 			os.Exit(3)
 		}
 		if loaded.context.TailwindVersion != loaded.table.TailwindVersion {
 			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
-			fmt.Fprintf(os.Stderr, "generate_descriptor_base: %s is Tailwind %s and %s is Tailwind %s; refusing to generate\n",
-				inputPaths[index], loaded.table.TailwindVersion, contextPaths[index], loaded.context.TailwindVersion)
+			fmt.Fprintf(
+				os.Stderr,
+				"generate_descriptor_base: %s is Tailwind %s and %s is Tailwind %s; refusing to generate\n",
+				inputPaths[index],
+				loaded.table.TailwindVersion,
+				contextPaths[index],
+				loaded.context.TailwindVersion,
+			)
 			os.Exit(3)
 		}
 		if loaded.table.TailwindVersion != systems0Version(systems) && len(systems) > 0 {
 			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
-			fmt.Fprintf(os.Stderr, "generate_descriptor_base: %s is Tailwind %s and an earlier input is Tailwind %s; refusing to mix engines\n",
-				inputPaths[index], loaded.table.TailwindVersion, systems0Version(systems))
+			fmt.Fprintf(
+				os.Stderr,
+				"generate_descriptor_base: %s is Tailwind %s and an earlier input is Tailwind %s; refusing to mix engines\n",
+				inputPaths[index],
+				loaded.table.TailwindVersion,
+				systems0Version(systems),
+			)
 			os.Exit(3)
 		}
 		systems = append(systems, loaded)
@@ -224,11 +248,19 @@ func main() {
 	// future extraction that moves them says so out loud rather than silently printing a table with
 	// a different meaning.
 	// Ignored: what it reports is already written, and a summary that cannot reach the terminal changes none of it.
-	fmt.Printf("generate_descriptor_base: %d design systems, %d roots invariant across all of them (%d dropped as not shared)\n",
-		len(systems), stats.roots, stats.rootsDropped)
+	fmt.Printf(
+		"generate_descriptor_base: %d design systems, %d roots invariant across all of them (%d dropped as not shared)\n",
+		len(systems),
+		stats.roots,
+		stats.rootsDropped,
+	)
 	// Ignored: the rest of the same summary, which changes nothing already written.
-	fmt.Printf("  namespace buckets: %d consumed identically by every system, %d equal to their axis @none and derived live, %d violations\n",
-		stats.consumedBuckets, stats.noneBuckets, stats.violations)
+	fmt.Printf(
+		"  namespace buckets: %d consumed identically by every system, %d equal to their axis @none and derived live, %d violations\n",
+		stats.consumedBuckets,
+		stats.noneBuckets,
+		stats.violations,
+	)
 	// Ignored: the rest of the same summary, which changes nothing already written.
 	fmt.Printf("  %d framework namespaces, %d statics invariant (%d dropped as repository-specific)\n",
 		stats.frameworkNamespaces, stats.statics, stats.staticsDropped)
@@ -423,7 +455,8 @@ func generate(systems []system, packageName string) ([]byte, generationStats) {
 						stats.noneBuckets++
 					default:
 						stats.violations++
-						// Ignored: each violation is told on the way to the refusal below, whose exit code says it either way.
+						// Ignored: each violation is told on the way to the refusal below, whose exit code says it
+						// either way.
 						fmt.Fprintf(os.Stderr,
 							"generate_descriptor_base: %s %s namespace %q reads %s, which is neither shared by every system nor equal to its axis @none (%s)\n",
 							root, axis.goName, key, readingKey(value), readingKey(noneReading))
@@ -436,7 +469,11 @@ func generate(systems []system, packageName string) ([]byte, generationStats) {
 	// generated table would be wrong in a way no test names. Refuse rather than print it.
 	if stats.violations > 0 {
 		// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
-		fmt.Fprintf(os.Stderr, "generate_descriptor_base: %d namespace buckets fit neither half of the split; refusing to generate\n", stats.violations)
+		fmt.Fprintf(
+			os.Stderr,
+			"generate_descriptor_base: %d namespace buckets fit neither half of the split; refusing to generate\n",
+			stats.violations,
+		)
 		os.Exit(4)
 	}
 
@@ -664,7 +701,13 @@ func writeDescriptor(out *bytes.Buffer, entry *rootEntry, frameworkNamespaces ma
 	fmt.Fprintf(out, "\t},\n")
 }
 
-func writeAxis(out *bytes.Buffer, axis axisSelector, entry *rootEntry, frameworkNamespaces map[string]bool, pool *readingPool) {
+func writeAxis(
+	out *bytes.Buffer,
+	axis axisSelector,
+	entry *rootEntry,
+	frameworkNamespaces map[string]bool,
+	pool *readingPool,
+) {
 	fallback := axis.fallback(entry)
 	empty := axis.empty(entry)
 
@@ -698,7 +741,14 @@ func writeAxis(out *bytes.Buffer, axis axisSelector, entry *rootEntry, framework
 // The keep filter is the framework/repository seam, and it applies only to ByNamespace. The two
 // pseudo-namespaces are always kept: `@colorKeyword` is Tailwind's own colour keywords and `@none`
 // is the last step of the bare path, which is also the reading every unconsumed namespace takes.
-func writeStringReadingMap(out *bytes.Buffer, name, indent string, entries map[string]*reading, fallback *reading, keep map[string]bool, pool *readingPool) {
+func writeStringReadingMap(
+	out *bytes.Buffer,
+	name, indent string,
+	entries map[string]*reading,
+	fallback *reading,
+	keep map[string]bool,
+	pool *readingPool,
+) {
 	if len(entries) == 0 {
 		return
 	}

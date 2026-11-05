@@ -100,7 +100,9 @@ func (layer ignoreLayer) covers(root string, relative string, directory bool) bo
 	}
 
 	fromSettings, relativePathError := filepath.Rel(layer.globsFrom, filepath.Join(root, relative))
-	if relativePathError != nil || fromSettings == ".." || strings.HasPrefix(fromSettings, ".."+string(filepath.Separator)) {
+	if relativePathError != nil ||
+		fromSettings == ".." ||
+		strings.HasPrefix(fromSettings, ".."+string(filepath.Separator)) {
 		return false
 	}
 	fromSettings = filepath.ToSlash(fromSettings)
@@ -132,10 +134,10 @@ const (
 //
 // The layers, in order: git's ignore rules, read as git reads them (every `.gitignore` from the root down,
 // each scoped to its directory, and info/exclude; see internal/gitignore); the house list, the `ignore`
-// key of the format block in the Nexus tier, read with the same syntax; and the `ignorePatterns` of the CohereSettings.json governing root, the one
-// list lint and the format walk share, read as lint reads it. Each is counted separately so a
-// misconfigured layer shows as a suspicious zero rather than as a slightly smaller total. That is the
-// difference between a corpus that measures the tree and one that measures a smaller subject while
+// key of the format block in the Nexus tier, read with the same syntax; and the `ignorePatterns` of the
+// CohereSettings.json governing root, the one list lint and the format walk share, read as lint reads it. Each is
+// counted separately so a misconfigured layer shows as a suspicious zero rather than as a slightly smaller total. That
+// is the difference between a corpus that measures the tree and one that measures a smaller subject while
 // looking complete.
 //
 // Every resolution carries a house list: our tiers' from the Nexus tier, an outsider's from its own
@@ -167,8 +169,12 @@ func EnumerateListed(root string, handles func(fileName string) bool, listing gi
 	}
 	leftover := filepath.Join(root, ".prettierignore")
 	if _, statError := os.Lstat(leftover); statError == nil {
-		return enumeration, fmt.Errorf("%s: %w; delete it, since the format block's \"ignore\" in the Nexus tier (%s) and the ignorePatterns of CohereSettings.json say what the walk skips",
-			leftover, formatoptions.ErrPrettierConfigRemains, formatoptions.NexusTierFileName)
+		return enumeration, fmt.Errorf(
+			"%s: %w; delete it, since the format block's \"ignore\" in the Nexus tier (%s) and the ignorePatterns of CohereSettings.json say what the walk skips",
+			leftover,
+			formatoptions.ErrPrettierConfigRemains,
+			formatoptions.NexusTierFileName,
+		)
 	}
 
 	matcher, err := gitignore.New(root)
@@ -180,7 +186,10 @@ func EnumerateListed(root string, handles func(fileName string) bool, listing gi
 	}
 	enumeration.IgnoreFiles = append(enumeration.IgnoreFiles, filepath.Join(root, gitignore.IgnoreFileName))
 	if information, statError := os.Stat(filepath.Join(root, ".git")); statError == nil && information.IsDir() {
-		enumeration.IgnoreFiles = append(enumeration.IgnoreFiles, filepath.Join(root, filepath.FromSlash(gitignore.ExcludeFile)))
+		enumeration.IgnoreFiles = append(
+			enumeration.IgnoreFiles,
+			filepath.Join(root, filepath.FromSlash(gitignore.ExcludeFile)),
+		)
 	}
 	enumeration.IgnoredByLayer[GitignoreLayer] = 0
 	var layers []ignoreLayer
@@ -348,7 +357,12 @@ func walkListedFrom(path string, information os.FileInfo, listing gitignore.List
 		if entry == nil {
 			continue
 		}
-		if walkListedFromError := walkListedFrom(filepath.Join(path, entry.Name()), entry, listing, walkFn); walkListedFromError != nil {
+		if walkListedFromError := walkListedFrom(
+			filepath.Join(path, entry.Name()),
+			entry,
+			listing,
+			walkFn,
+		); walkListedFromError != nil {
 			if !entry.IsDir() || walkListedFromError != filepath.SkipDir {
 				return walkListedFromError
 			}
@@ -456,8 +470,8 @@ func repositoryBoundaryBetween(root string, settingsDirectory string) bool {
 // to root: what a corpus harness measures beside root, each as its own corpus.
 //
 // It checks a directory for a repository before pruning it, as Enumerate does, and prunes only by git's
-// ignore rules, read as Enumerate reads them. The project's own lists (the house list, ignorePatterns) are not read: they say
-// what root formats, and a repository under a path root never formats is still a body of code a printer
+// ignore rules, read as Enumerate reads them. The project's own lists (the house list, ignorePatterns) are not read:
+// they say what root formats, and a repository under a path root never formats is still a body of code a printer
 // can be measured on. Reading them is how ahra's `projects/**` hid five repositories from the
 // differential (#k6vebep).
 func NestedRepositoriesBelow(root string) ([]string, error) {
@@ -522,7 +536,10 @@ func NestedRepositoryContaining(root string, fileName string) string {
 	nested := ""
 	for directory := filepath.Dir(filepath.Clean(fileName)); ; directory = filepath.Dir(directory) {
 		relative, relativePathError := filepath.Rel(root, directory)
-		if relativePathError != nil || relative == "." || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		if relativePathError != nil ||
+			relative == "." ||
+			relative == ".." ||
+			strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
 			return nested
 		}
 		if HasOwnRepository(directory) {

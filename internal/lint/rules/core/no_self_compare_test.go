@@ -68,8 +68,10 @@ func TestNoSelfCompareFires(test *testing.T) {
 		{"x < x"},                 // errors=["comparingToSelf"]
 		{"x >= x"},                // errors=["comparingToSelf"]
 		{"x <= x"},                // errors=["comparingToSelf"]
-		{"foo.bar().baz.qux >= foo.bar ().baz .qux"},                   // errors=["comparingToSelf"]
-		{"class C { #field; foo() { this.#field === this.#field; } }"}, // errors=["comparingToSelf"] lang={"ecmaVersion":2022}
+		{"foo.bar().baz.qux >= foo.bar ().baz .qux"}, // errors=["comparingToSelf"]
+		{
+			"class C { #field; foo() { this.#field === this.#field; } }",
+		}, // errors=["comparingToSelf"] lang={"ecmaVersion":2022}
 	}
 
 	for _, testCase := range cases {
@@ -154,7 +156,11 @@ func TestNoSelfCompareReadsAJsxElementWithAnEmptyAttributeList(test *testing.T) 
 	for _, sourceText := range []string{"<a /> === <a />;", "<a ></a> === <a ></a>;"} {
 		test.Run(sourceText, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectFindings(test, rule_testing.Run(test, NoSelfCompare, fileName, sourceText), "comparingToSelf")
+			rule_testing.ExpectFindings(
+				test,
+				rule_testing.Run(test, NoSelfCompare, fileName, sourceText),
+				"comparingToSelf",
+			)
 		})
 	}
 }

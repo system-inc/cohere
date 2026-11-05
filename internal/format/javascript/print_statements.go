@@ -38,7 +38,11 @@ func printIfStatement(path *Path, options *Options, print PrintFunc) Doc {
 			hasNewline(options.OriginalText, locEnd(danglingComments[len(danglingComments)-1])) {
 			separator = hardline
 		}
-		parts = append(parts, printing.PrintDanglingComments(path, options, printing.DanglingOptions[Node]{}), separator)
+		parts = append(
+			parts,
+			printing.PrintDanglingComments(path, options, printing.DanglingOptions[Node]{}),
+			separator,
+		)
 	}
 	parts = append(parts, "else", groupIn(path, printIfStatementAlternate(path, options, print)))
 	return concatIn(path, parts...)
@@ -57,7 +61,11 @@ func printForStatement(path *Path, options *Options, print PrintFunc) Doc {
 	}
 
 	if current.Child("init") == nil && current.Child("test") == nil && current.Child("update") == nil {
-		return concatIn(path, printedComments, groupIn(path, concatIn(path /* @system-inc: no space */, "for(;;)", body)))
+		return concatIn(
+			path,
+			printedComments,
+			groupIn(path, concatIn(path /* @system-inc: no space */, "for(;;)", body)),
+		)
 	}
 
 	var update Doc = emptyDoc
@@ -67,7 +75,10 @@ func printForStatement(path *Path, options *Options, print PrintFunc) Doc {
 	return concatIn(path, printedComments,
 		groupIn(path, concatIn(path, // @system-inc: no space between `for` and `(`.
 			"for(",
-			groupIn(path, concatIn(path, indentIn(path, concatIn(path, softline, print("init", nil), ";", line, print("test", nil), ";", update)),
+			groupIn(path, concatIn(path, indentIn(
+				path,
+				concatIn(path, softline, print("init", nil), ";", line, print("test", nil), ";", update),
+			),
 				softline,
 			)),
 			")",
@@ -260,7 +271,8 @@ func printClause(path *Path, options *Options, print PrintFunc, property string)
 			}
 			return indentIn(path, concatIn(path, hardline, printed))
 		}
-		if isBlockStatement || current.Is("IfStatement") && parentOf(path).Is("IfStatement") && keyOf(path) == "alternate" {
+		if isBlockStatement ||
+			current.Is("IfStatement") && parentOf(path).Is("IfStatement") && keyOf(path) == "alternate" {
 			return concatIn(path, " ", printed)
 		}
 		return indentIn(path, concatIn(path, line, printed))

@@ -275,8 +275,12 @@ func (dependencies *ScopeDependencies) OriginOf(identifier static_single_assignm
 //
 // A declaration with no recorded last usage is kept, which is the conservative direction: a value
 // this pass knows nothing about is not a value proven dead.
-func (dependencies *ScopeDependencies) PruneDeclarationsLastUsedBefore(scope ScopeId, end static_single_assignment.EvaluationOrder,
-	usage *LastUsage, function *Function) int {
+func (dependencies *ScopeDependencies) PruneDeclarationsLastUsedBefore(
+	scope ScopeId,
+	end static_single_assignment.EvaluationOrder,
+	usage *LastUsage,
+	function *Function,
+) int {
 	if dependencies == nil || dependencies.declarations == nil || usage == nil || function == nil {
 		return 0
 	}
@@ -665,7 +669,11 @@ func collectTemporaries(function *Function, usedOutside map[static_single_assign
 // function resolves to the nested value rather than to a path through the outer one, so a path is
 // reported shallower rather than wrong. Recorded because a reader diffing against the bundle will
 // see the shared map missing.
-func collectTemporariesInto(function *Function, usedOutside map[static_single_assignment.DeclarationId]bool, into temporaries) {
+func collectTemporariesInto(
+	function *Function,
+	usedOutside map[static_single_assignment.DeclarationId]bool,
+	into temporaries,
+) {
 	for _, block := range function.Blocks {
 		if block == nil {
 			continue
@@ -1163,14 +1171,20 @@ func CollectScopeDependenciesWithHoistable(function *Function, scopes *ReactiveS
 	}
 	result.temporaries = collected
 	collector := &dependencyCollector{
-		function:                      function,
-		temporaries:                   collected,
-		declarations:                  map[static_single_assignment.DeclarationId]declaration{},
-		reassignments:                 map[static_single_assignment.IdentifierId]declaration{},
-		objectMethods:                 objectMethodValues(function),
-		result:                        result,
-		scopeRange:                    identity.RangeOf,
-		hoistable:                     CollectHoistablePropertyLoads(function, scopes, identity, ranges, optionalHoistable(optional)),
+		function:      function,
+		temporaries:   collected,
+		declarations:  map[static_single_assignment.DeclarationId]declaration{},
+		reassignments: map[static_single_assignment.IdentifierId]declaration{},
+		objectMethods: objectMethodValues(function),
+		result:        result,
+		scopeRange:    identity.RangeOf,
+		hoistable: CollectHoistablePropertyLoads(
+			function,
+			scopes,
+			identity,
+			ranges,
+			optionalHoistable(optional),
+		),
 		processedOptionalInstructions: optionalProcessedInstructions(optional),
 		processedOptionalTests:        optionalProcessedTests(optional),
 	}
@@ -1225,7 +1239,10 @@ func objectMethodValues(function *Function) map[static_single_assignment.Identif
 // One traversal of the blocks in execution order, maintaining the scope stack. Every block, every
 // instruction and every operand is visited exactly once, which is the whole termination argument:
 // the work is linear in the graph and the loops are over slices fixed before the walk begins.
-func (collector *dependencyCollector) walk(function *Function, terminals map[static_single_assignment.BlockId]scopeBlockInfo) {
+func (collector *dependencyCollector) walk(
+	function *Function,
+	terminals map[static_single_assignment.BlockId]scopeBlockInfo,
+) {
 	for _, block := range function.Blocks {
 		if block == nil {
 			continue

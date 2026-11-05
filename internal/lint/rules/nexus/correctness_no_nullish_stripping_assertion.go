@@ -13,7 +13,10 @@ const correctnessNoNullishStrippingAssertionId = "nullishStrippedByAssertion"
 // correctnessNoNullishStrippingAssertionText is the rule's message, whose wording lives in
 // `policy/messages/correctness-no-nullish-stripping-assertion.json`. It gives the repairs in the
 // order `no-non-null-assertion` does, since the two rules report the same claim through two doors.
-var correctnessNoNullishStrippingAssertionText = policy.MessageOf("nexus/correctness-no-nullish-stripping-assertion", correctnessNoNullishStrippingAssertionId)
+var correctnessNoNullishStrippingAssertionText = policy.MessageOf(
+	"nexus/correctness-no-nullish-stripping-assertion",
+	correctnessNoNullishStrippingAssertionId,
+)
 
 func correctnessNoNullishStrippingAssertionMessage() rule.Message {
 	return rule.Message{
@@ -202,7 +205,11 @@ func correctnessNoNullishStrippingAssertionStrips(
 // answers for its base constraint, and one with no constraint answers yes, because a caller can
 // instantiate it with `undefined`. The depth bound is a guard against a constraint chain that
 // refers back to itself; a chain that deep answers yes, which declines.
-func correctnessNoNullishStrippingAssertionCouldBeNullish(typeChecker *checker.Checker, candidate *checker.Type, depth int) bool {
+func correctnessNoNullishStrippingAssertionCouldBeNullish(
+	typeChecker *checker.Checker,
+	candidate *checker.Type,
+	depth int,
+) bool {
 	if candidate == nil || depth > 8 {
 		return true
 	}
@@ -230,7 +237,10 @@ func correctnessNoNullishStrippingAssertionCouldBeNullish(typeChecker *checker.C
 // nullish, which is a strictly wider test than the style rule's). What remains is the identity
 // comparison both ways, by pointer, because the checker interns a type and hands back the same object
 // for it from anywhere in one program.
-func correctnessNoNullishStrippingAssertionIsPureRemoval(assertedTypes []*checker.Type, nonNullishOriginalTypes []*checker.Type) bool {
+func correctnessNoNullishStrippingAssertionIsPureRemoval(
+	assertedTypes []*checker.Type,
+	nonNullishOriginalTypes []*checker.Type,
+) bool {
 	for _, assertedPart := range assertedTypes {
 		if !correctnessNoNullishStrippingAssertionContains(nonNullishOriginalTypes, assertedPart) {
 			return false

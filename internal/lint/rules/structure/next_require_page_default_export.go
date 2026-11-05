@@ -12,32 +12,50 @@ import (
 
 // messagePageRequireDefaultExportText is the rule's `pageRequireDefaultExport` message, whose
 // wording lives in `policy/messages/next-require-page-default-export.json`.
-var messagePageRequireDefaultExportText = policy.MessageOf("structure/next-require-page-default-export", "pageRequireDefaultExport")
+var messagePageRequireDefaultExportText = policy.MessageOf(
+	"structure/next-require-page-default-export",
+	"pageRequireDefaultExport",
+)
 
 // messagePageRequireDefaultExport is the finding, rendered when it is reported so the text comes
 // from the current catalog.
 func messagePageRequireDefaultExport() rule.Message {
-	return rule.Message{Id: messagePageRequireDefaultExportText.Id, Description: messagePageRequireDefaultExportText.Render(nil)}
+	return rule.Message{
+		Id:          messagePageRequireDefaultExportText.Id,
+		Description: messagePageRequireDefaultExportText.Render(nil),
+	}
 }
 
 // messagePageDefaultExportInlineText is the rule's `pageDefaultExportInline` message, whose wording
 // lives in `policy/messages/next-require-page-default-export.json`.
-var messagePageDefaultExportInlineText = policy.MessageOf("structure/next-require-page-default-export", "pageDefaultExportInline")
+var messagePageDefaultExportInlineText = policy.MessageOf(
+	"structure/next-require-page-default-export",
+	"pageDefaultExportInline",
+)
 
 // messagePageDefaultExportInline is the finding, rendered when it is reported so the text comes
 // from the current catalog.
 func messagePageDefaultExportInline() rule.Message {
-	return rule.Message{Id: messagePageDefaultExportInlineText.Id, Description: messagePageDefaultExportInlineText.Render(nil)}
+	return rule.Message{
+		Id:          messagePageDefaultExportInlineText.Id,
+		Description: messagePageDefaultExportInlineText.Render(nil),
+	}
 }
 
 // messagePageDefaultExportNameSuffixText is the rule's `pageDefaultExportNameSuffix` message, whose
 // wording lives in `policy/messages/next-require-page-default-export.json`.
-var messagePageDefaultExportNameSuffixText = policy.MessageOf("structure/next-require-page-default-export", "pageDefaultExportNameSuffix")
+var messagePageDefaultExportNameSuffixText = policy.MessageOf(
+	"structure/next-require-page-default-export",
+	"pageDefaultExportNameSuffix",
+)
 
 // messagePageDefaultExportNameSuffix is the finding, rendered when it is reported so the text comes
 // from the current catalog.
 func messagePageDefaultExportNameSuffix() rule.Message {
-	return rule.Message{Id: messagePageDefaultExportNameSuffixText.Id, Description: messagePageDefaultExportNameSuffixText.Render(nil)}
+	return rule.Message{
+		Id:          messagePageDefaultExportNameSuffixText.Id,
+		Description: messagePageDefaultExportNameSuffixText.Render(nil),
+	}
 }
 
 // NextRequirePageDefaultExport flags a Next.js page whose default export is missing or misshapen.
@@ -166,7 +184,9 @@ func pageDefaultExportOf(statement *ast.Node, imported map[string]bool) (pageDef
 
 	case ast.KindExportDeclaration:
 		declaration := statement.AsExportDeclaration()
-		if declaration.IsTypeOnly || declaration.ExportClause == nil || declaration.ExportClause.Kind != ast.KindNamedExports {
+		if declaration.IsTypeOnly ||
+			declaration.ExportClause == nil ||
+			declaration.ExportClause.Kind != ast.KindNamedExports {
 			return pageDefaultExport{}, false
 		}
 		elements := declaration.ExportClause.AsNamedExports().Elements

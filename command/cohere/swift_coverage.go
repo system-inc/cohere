@@ -85,7 +85,10 @@ func resolveSwiftCoverage(found *discovery) swiftCoverage {
 	answers := querySwiftCoverage(found.Root, swiftProjects)
 	for _, project := range swiftProjects {
 		if answer := answers[project.Directory]; answer.err != nil {
-			decided.FailedQueries = append(decided.FailedQueries, failedCoverageQuery{Label: projectLabel(project), Reason: answer.err.Error()})
+			decided.FailedQueries = append(
+				decided.FailedQueries,
+				failedCoverageQuery{Label: projectLabel(project), Reason: answer.err.Error()},
+			)
 		}
 	}
 
@@ -159,11 +162,16 @@ func querySwiftCoverage(root string, projects []discoveredProject) map[string]co
 	streams.Show(streams.Output)
 	streams.Show(streams.Errors)
 	dispatch.Report.SetVerbose(activeOutput.Mode == outputVerbose)
-	binaryPath, _, resolveSwiftEngineBinaryError := resolveSwiftEngineBinary(projectLocation{Root: directories[0], Engine: engineSwift}, release.Current())
+	binaryPath, _, resolveSwiftEngineBinaryError := resolveSwiftEngineBinary(
+		projectLocation{Root: directories[0], Engine: engineSwift},
+		release.Current(),
+	)
 	dispatch.Report.Clear()
 	if resolveSwiftEngineBinaryError != nil {
 		for _, project := range projects {
-			answers[project.Directory] = coverageAnswer{err: fmt.Errorf("resolving the Swift engine: %w", resolveSwiftEngineBinaryError)}
+			answers[project.Directory] = coverageAnswer{
+				err: fmt.Errorf("resolving the Swift engine: %w", resolveSwiftEngineBinaryError),
+			}
 		}
 		return answers
 	}
@@ -202,7 +210,14 @@ func querySwiftCoverage(root string, projects []discoveredProject) map[string]co
 // It stays in this process's group, unlike a checking run's engine, so an interrupt from the terminal reaches
 // it and whatever SwiftPM command it started, before any project's run has begun.
 func queryCoveredPackages(binaryPath string, directory string) (coveredPackagesRecord, error) {
-	command := exec.Command(binaryPath, "--contract", fmt.Sprint(engineContractVersion), "--root", directory, "--covered-packages")
+	command := exec.Command(
+		binaryPath,
+		"--contract",
+		fmt.Sprint(engineContractVersion),
+		"--root",
+		directory,
+		"--covered-packages",
+	)
 	command.Dir = directory
 	var standardOutput bytes.Buffer
 	var standardError bytes.Buffer
@@ -226,7 +241,10 @@ func queryCoveredPackages(binaryPath string, directory string) (coveredPackagesR
 	for scanner.Scan() {
 		var record coveredPackagesRecord
 		if decodeError := json.Unmarshal(scanner.Bytes(), &record); decodeError != nil {
-			return coveredPackagesRecord{}, fmt.Errorf("the engine printed a line that is not a record: %q", lastLine(scanner.Text()))
+			return coveredPackagesRecord{}, fmt.Errorf(
+				"the engine printed a line that is not a record: %q",
+				lastLine(scanner.Text()),
+			)
 		}
 		if record.Kind == "coveredPackages" {
 			found = append(found, record)

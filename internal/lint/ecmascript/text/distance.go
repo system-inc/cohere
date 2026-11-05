@@ -102,9 +102,9 @@ func MinimumEditDistance(a string, b string) int {
 // alphabet, at thresholds 0 through 3, which is 7,086,244 comparisons, the filtered and unfiltered
 // searches agreed on every one. The exact-match decline is the case worth checking by hand, and it
 // is safe for a structural reason rather than a measured one: an exact match has zero length
-// difference, so the filter can never skip the candidate that would have triggered it. oxc compares byte lengths there while computing over runes, which for
-// non-ASCII input would prefilter away a candidate the distance would have accepted. Rune lengths
-// are used here on both sides instead. That is a deliberate narrow divergence toward internal
+// difference, so the filter can never skip the candidate that would have triggered it. oxc compares byte lengths there
+// while computing over runes, which for non-ASCII input would prefilter away a candidate the distance would have
+// accepted. Rune lengths are used here on both sides instead. That is a deliberate narrow divergence toward internal
 // consistency, and it cannot change an answer for any caller whose candidates are ASCII.
 func BestMatch(needle string, candidates []string, threshold int) (string, bool) {
 	needleLength := len([]rune(needle))

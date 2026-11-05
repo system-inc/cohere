@@ -49,7 +49,11 @@ func TestComputedLoadCopiesReceiverKind(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			function, effects := effectsFor(test, "function "+testCase.name+"(items, key) { return items[key]; }")
-			aliasingGraph := mutation_aliasing.BuildAliasingGraph(newRangeGraph(function, effects), function, mutation_aliasing.Options{})
+			aliasingGraph := mutation_aliasing.BuildAliasingGraph(
+				newRangeGraph(function, effects),
+				function,
+				mutation_aliasing.Options{},
+			)
 			matched := 0
 			for _, instruction := range function.Instructions {
 				if instruction == nil {
@@ -61,7 +65,9 @@ func TestComputedLoadCopiesReceiverKind(test *testing.T) {
 				}
 				matched++
 				list := effects.Get(instruction.Id)
-				if len(list) == 0 || list[0].Kind != mutation_aliasing.AliasingEffectCreateFrom || list[0].From.Identifier != load.Object.Identifier {
+				if len(list) == 0 ||
+					list[0].Kind != mutation_aliasing.AliasingEffectCreateFrom ||
+					list[0].From.Identifier != load.Object.Identifier {
 					test.Errorf("computed load effects=%v, want CreateFrom receiver", list)
 				}
 				if got := aliasingGraph.Kind(instruction.LValue.Identifier); got != testCase.want {

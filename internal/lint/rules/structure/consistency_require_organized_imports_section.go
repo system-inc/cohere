@@ -146,7 +146,14 @@ func classifyDeclarations(
 		isTypeOnly := isTypeOnlyImport(declaration)
 		localNames := localBindingNames(declaration)
 
-		preserved := preservedCommentsFor(sourceFile, sourceText, fileComments, declaration, sectionStart, descriptionBlock)
+		preserved := preservedCommentsFor(
+			sourceFile,
+			sourceText,
+			fileComments,
+			declaration,
+			sectionStart,
+			descriptionBlock,
+		)
 
 		importText := sourceText[tokenStart(sourceFile, declaration):declaration.End()]
 		if trailing, hasTrailing := trailingCommentFor(sourceText, fileComments, declaration); hasTrailing {

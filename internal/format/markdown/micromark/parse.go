@@ -84,7 +84,14 @@ func combineExtensions(extensions []*Extension) *Extension {
 		all.Disable = append(append([]string(nil), extension.Disable...), all.Disable...)
 	}
 
-	for _, record := range []*ConstructRecord{all.Document, all.ContentInitial, all.FlowInitial, all.Flow, all.String, all.Text} {
+	for _, record := range []*ConstructRecord{
+		all.Document,
+		all.ContentInitial,
+		all.FlowInitial,
+		all.Flow,
+		all.String,
+		all.Text,
+	} {
 		record.combine()
 	}
 

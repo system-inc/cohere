@@ -26,7 +26,11 @@ func TestVersionRangeAdmitsExactlyWhatNpmWould(test *testing.T) {
 		{"1.3.0 || 1.4.0", []string{"1.3.0", "1.4.0"}, []string{"1.3.1", "1.5.0"}},
 		{"=1.3.0", []string{"1.3.0", "1.3.0+build.7"}, []string{"1.3.1"}},
 		// A prerelease is admitted only where a comparator names its own major, minor and patch.
-		{">=1.1.0-beta.0 <2.0.0", []string{"1.1.0-beta.1", "1.1.0", "1.5.0"}, []string{"1.2.0-beta.1", "1.1.0-alpha.9"}},
+		{
+			">=1.1.0-beta.0 <2.0.0",
+			[]string{"1.1.0-beta.1", "1.1.0", "1.5.0"},
+			[]string{"1.2.0-beta.1", "1.1.0-alpha.9"},
+		},
 		{"1.0.0-rc.1", []string{"1.0.0-rc.1"}, []string{"1.0.0-rc.2", "1.0.0"}},
 	}
 	for _, testCase := range cases {
@@ -51,7 +55,19 @@ func TestVersionRangeAdmitsExactlyWhatNpmWould(test *testing.T) {
 // directions, so a comparison that only ever answered "less" or "equal" fails.
 func TestVersionPrecedenceIsSemverOrder(test *testing.T) {
 	test.Parallel()
-	ordered := []string{"1.0.0-alpha", "1.0.0-alpha.1", "1.0.0-alpha.beta", "1.0.0-beta", "1.0.0-beta.2", "1.0.0-beta.11", "1.0.0-rc.1", "1.0.0", "1.0.1", "1.1.0", "2.0.0"}
+	ordered := []string{
+		"1.0.0-alpha",
+		"1.0.0-alpha.1",
+		"1.0.0-alpha.beta",
+		"1.0.0-beta",
+		"1.0.0-beta.2",
+		"1.0.0-beta.11",
+		"1.0.0-rc.1",
+		"1.0.0",
+		"1.0.1",
+		"1.1.0",
+		"2.0.0",
+	}
 	for index := 0; index+1 < len(ordered); index++ {
 		lower, _ := parseSemanticVersion(ordered[index])
 		higher, _ := parseSemanticVersion(ordered[index+1])
@@ -66,7 +82,20 @@ func TestVersionPrecedenceIsSemverOrder(test *testing.T) {
 
 func TestVersionRangeRefusesWhatItCannotReadExactly(test *testing.T) {
 	test.Parallel()
-	for _, text := range []string{"", "  ", "1.x", "*", "1.0", "1.0.0 - 2.0.0", "01.0.0", "^1.0", "||", "^1.0.0 ||", "1.0.0-", "latest"} {
+	for _, text := range []string{
+		"",
+		"  ",
+		"1.x",
+		"*",
+		"1.0",
+		"1.0.0 - 2.0.0",
+		"01.0.0",
+		"^1.0",
+		"||",
+		"^1.0.0 ||",
+		"1.0.0-",
+		"latest",
+	} {
 		if _, parseVersionRangeError := ParseVersionRange(text); parseVersionRangeError == nil {
 			test.Errorf("%q should be refused", text)
 		}
@@ -132,7 +161,9 @@ func TestAPublishedReleaseOutsideThePinRefusesNamingBothVersions(test *testing.T
 
 	releaseVersion = func() string { return "2.0.0" }
 	_, loadError := Load(path)
-	if loadError == nil || !strings.Contains(loadError.Error(), "^1.0.0") || !strings.Contains(loadError.Error(), "cohere 2.0.0") {
+	if loadError == nil ||
+		!strings.Contains(loadError.Error(), "^1.0.0") ||
+		!strings.Contains(loadError.Error(), "cohere 2.0.0") {
 		test.Fatalf("2.0.0 is outside ^1.0.0 and should refuse naming both, got %v", loadError)
 	}
 

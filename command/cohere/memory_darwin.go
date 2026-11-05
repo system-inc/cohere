@@ -10,7 +10,11 @@ import (
 // availableMemory reads the kernel's page counts. See darwinAvailableMemory for which pages count.
 func availableMemory() (uint64, error) {
 	var counts [3]uint64
-	for index, name := range []string{"vm.page_free_count", "vm.page_pageable_external_count", "vm.page_purgeable_count"} {
+	for index, name := range []string{
+		"vm.page_free_count",
+		"vm.page_pageable_external_count",
+		"vm.page_purgeable_count",
+	} {
 		count, sysctlCountError := sysctlCount(name)
 		if sysctlCountError != nil {
 			return 0, fmt.Errorf("reading %s: %w", name, sysctlCountError)

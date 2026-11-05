@@ -6,5 +6,11 @@ package postcss
 // The constructor runs Node's (raws), then sets type, isNested and nodes, so those are its first own
 // fields after raws and type, in that order.
 func newNestedDeclaration() *node {
-	return &node{nodeType: "decl", raws: map[string]any{}, keys: []string{"isNested", "nodes"}, isNested: true, nodes: []*node{}}
+	return &node{
+		nodeType: "decl",
+		raws:     map[string]any{},
+		keys:     []string{"isNested", "nodes"},
+		isNested: true,
+		nodes:    []*node{},
+	}
 }

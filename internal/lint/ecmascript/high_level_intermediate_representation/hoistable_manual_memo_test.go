@@ -22,9 +22,17 @@ return {result};
 		fires  bool
 	}{
 		{"non-optional dependency", source, false},
-		{"optional dependency", strings.Replace(source, "[options.rows, selected]", "[options?.rows, selected]", 1), true},
+		{
+			"optional dependency",
+			strings.Replace(source, "[options.rows, selected]", "[options?.rows, selected]", 1),
+			true,
+		},
 		{"unconditional read", strings.Replace(source, "if (selected === null) return null;", "", 1), false},
-		{"unpreserved dependency", `import {useMemo} from 'react'; function Component({propA}) {return useMemo(() => propA.x(), [propA.x]);}`, true},
+		{
+			"unpreserved dependency",
+			`import {useMemo} from 'react'; function Component({propA}) {return useMemo(() => propA.x(), [propA.x]);}`,
+			true,
+		},
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()

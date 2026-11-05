@@ -35,10 +35,20 @@ func TestPlatformManifestDeclaresTheOperatingSystemAndArchitectureNpmResolvesBy(
 			test.Errorf("%s published as %v, wanted %s", testCase.target, manifest["name"], testCase.expectedName)
 		}
 		if got := singleString(test, manifest["os"]); got != testCase.expectedOperatingSystem {
-			test.Errorf("%s declared os %q, wanted %q — npm would install it on the wrong machine", testCase.target, got, testCase.expectedOperatingSystem)
+			test.Errorf(
+				"%s declared os %q, wanted %q — npm would install it on the wrong machine",
+				testCase.target,
+				got,
+				testCase.expectedOperatingSystem,
+			)
 		}
 		if got := singleString(test, manifest["cpu"]); got != testCase.expectedArchitecture {
-			test.Errorf("%s declared cpu %q, wanted %q — npm would install it on the wrong machine", testCase.target, got, testCase.expectedArchitecture)
+			test.Errorf(
+				"%s declared cpu %q, wanted %q — npm would install it on the wrong machine",
+				testCase.target,
+				got,
+				testCase.expectedArchitecture,
+			)
 		}
 	}
 }
@@ -52,7 +62,10 @@ func TestPlatformManifestMatchesWhatTheLauncherLooksFor(test *testing.T) {
 	for _, target := range Targets {
 		manifest := decodeManifest(test, mustPlatformManifest(test, target, "1.2.3"))
 
-		expected := PlatformPackagePrefix + singleString(test, manifest["os"]) + "-" + singleString(test, manifest["cpu"])
+		expected := PlatformPackagePrefix +
+			singleString(test, manifest["os"]) +
+			"-" +
+			singleString(test, manifest["cpu"])
 		if manifest["name"] != expected {
 			test.Errorf(
 				"%s publishes as %v, but the launcher on that machine asks for %s",
@@ -70,7 +83,10 @@ func TestPlatformManifestClaimsNoCommand(test *testing.T) {
 	for _, target := range Targets {
 		manifest := decodeManifest(test, mustPlatformManifest(test, target, "1.2.3"))
 		if _, claimed := manifest["bin"]; claimed {
-			test.Errorf("%s declares a bin field, which would fight the dispatcher for node_modules/.bin/cohere", target)
+			test.Errorf(
+				"%s declares a bin field, which would fight the dispatcher for node_modules/.bin/cohere",
+				target,
+			)
 		}
 	}
 }
@@ -114,7 +130,10 @@ func TestDispatcherPublishesUnderTheNameStructureTellsPeopleToInstall(test *test
 
 	manifest := decodeManifest(test, mustDispatcherManifest(test, "1.2.3"))
 	if manifest["name"] != "@system-inc/cohere" {
-		test.Errorf("the dispatcher publishes as %v, but Structure tells people to install @system-inc/cohere", manifest["name"])
+		test.Errorf(
+			"the dispatcher publishes as %v, but Structure tells people to install @system-inc/cohere",
+			manifest["name"],
+		)
 	}
 
 	// Every platform package lives in the same scope, so one scope's access settings govern the
@@ -166,13 +185,21 @@ func TestLauncherHoldsTheNoFallbackRule(test *testing.T) {
 	// bare command name appears as something it could run instead.
 	launcher := DispatcherLauncher()
 
-	for _, placeholder := range []string{"__PLATFORM_PACKAGE_PREFIX__", "__PACKAGE_SCOPE__", "__OVERRIDE_VARIABLE__", "__CHECKSUMS_FILE_NAME__"} {
+	for _, placeholder := range []string{
+		"__PLATFORM_PACKAGE_PREFIX__",
+		"__PACKAGE_SCOPE__",
+		"__OVERRIDE_VARIABLE__",
+		"__CHECKSUMS_FILE_NAME__",
+	} {
 		if strings.Contains(launcher, placeholder) {
 			test.Fatalf("the launcher shipped with %s unreplaced, so it would resolve or check nothing", placeholder)
 		}
 	}
 	if !strings.Contains(launcher, "'"+PlatformPackagePrefix+"'") {
-		test.Errorf("the launcher never names the %s prefix, so it cannot find a platform package", PlatformPackagePrefix)
+		test.Errorf(
+			"the launcher never names the %s prefix, so it cannot find a platform package",
+			PlatformPackagePrefix,
+		)
 	}
 	if !strings.Contains(launcher, BinaryOverrideVariable) {
 		test.Errorf("the launcher never reads %s, so a local build cannot be pointed at", BinaryOverrideVariable)

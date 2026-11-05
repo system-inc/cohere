@@ -41,7 +41,9 @@ func relationMessages(test *testing.T, files map[string]string, anotherFirst boo
 			test.Fatal(writeError)
 		}
 	}
-	graph, err := program.Build(program.Options{ConfigFileName: filepath.Join(directory, "tsconfig.json"), SingleThreaded: true})
+	graph, err := program.Build(
+		program.Options{ConfigFileName: filepath.Join(directory, "tsconfig.json"), SingleThreaded: true},
+	)
 	if err != nil {
 		test.Fatalf("building: %v", err)
 	}
@@ -53,7 +55,11 @@ func relationMessages(test *testing.T, files map[string]string, anotherFirst boo
 	if anotherFirst {
 		graph.Program.GetSemanticDiagnostics(context.Background(), another)
 	}
-	result, err := graph.Walk(context.Background(), []*ast.SourceFile{caseFile}, []rule.Rule{InvariantMutable, NoOptionalWidening})
+	result, err := graph.Walk(
+		context.Background(),
+		[]*ast.SourceFile{caseFile},
+		[]rule.Rule{InvariantMutable, NoOptionalWidening},
+	)
 	if err != nil {
 		test.Fatalf("walking: %v", err)
 	}
@@ -73,10 +79,20 @@ func TestTheRelationRulesPrintTheSameTextWhateverTheCheckerMetFirst(test *testin
 	alone, afterAnother := relationMessages(test, stableTextFiles, false), relationMessages(test, stableTextFiles, true)
 	for _, ruleName := range []string{InvariantMutable.Name, NoOptionalWidening.Name} {
 		if alone[ruleName] == "" || afterAnother[ruleName] == "" {
-			test.Fatalf("%s did not report in both orders (%q, %q), so this compares nothing", ruleName, alone[ruleName], afterAnother[ruleName])
+			test.Fatalf(
+				"%s did not report in both orders (%q, %q), so this compares nothing",
+				ruleName,
+				alone[ruleName],
+				afterAnother[ruleName],
+			)
 		}
 		if alone[ruleName] != afterAnother[ruleName] {
-			test.Errorf("%s reads differently once the checker met Another.ts first:\n  alone:  %s\n  after:  %s", ruleName, alone[ruleName], afterAnother[ruleName])
+			test.Errorf(
+				"%s reads differently once the checker met Another.ts first:\n  alone:  %s\n  after:  %s",
+				ruleName,
+				alone[ruleName],
+				afterAnother[ruleName],
+			)
 		}
 	}
 }
@@ -109,13 +125,28 @@ func TestOwnMembersAreTheContainersNotWhatItsRangeHolds(test *testing.T) {
 	const column = "id: string; note: string; extra?: never; }"
 	for _, ruleName := range []string{InvariantMutable.Name, NoOptionalWidening.Name} {
 		if alone[ruleName] == "" || afterAnother[ruleName] == "" {
-			test.Fatalf("%s did not report in both orders (%q, %q), so this compares nothing", ruleName, alone[ruleName], afterAnother[ruleName])
+			test.Fatalf(
+				"%s did not report in both orders (%q, %q), so this compares nothing",
+				ruleName,
+				alone[ruleName],
+				afterAnother[ruleName],
+			)
 		}
 		if alone[ruleName] != afterAnother[ruleName] {
-			test.Errorf("%s reads differently once the checker met Another.ts first:\n  alone:  %s\n  after:  %s", ruleName, alone[ruleName], afterAnother[ruleName])
+			test.Errorf(
+				"%s reads differently once the checker met Another.ts first:\n  alone:  %s\n  after:  %s",
+				ruleName,
+				alone[ruleName],
+				afterAnother[ruleName],
+			)
 		}
 		if !strings.Contains(alone[ruleName], column) {
-			test.Errorf("%s doesn't print the column's own members in their written order, then the borrowed one (%q):\n  %s", ruleName, column, alone[ruleName])
+			test.Errorf(
+				"%s doesn't print the column's own members in their written order, then the borrowed one (%q):\n  %s",
+				ruleName,
+				column,
+				alone[ruleName],
+			)
 		}
 	}
 }
@@ -134,7 +165,12 @@ func TestAnOptionalMemberPrintsWithoutTheMissingTypeItsQuestionMarkSays(test *te
 		name, configuration, written, printed string
 	}{
 		{"exact, written number", adamicConfiguration, "y?: number", "y?: number; }"},
-		{"exact, written number or undefined", adamicConfiguration, "y?: number | undefined", "y?: number | undefined; }"},
+		{
+			"exact, written number or undefined",
+			adamicConfiguration,
+			"y?: number | undefined",
+			"y?: number | undefined; }",
+		},
 		{"not exact, written number", withoutExactOptional, "y?: number", "y?: number | undefined; }"},
 	}
 	for _, testCase := range cases {
@@ -143,7 +179,9 @@ func TestAnOptionalMemberPrintsWithoutTheMissingTypeItsQuestionMarkSays(test *te
 			messages := relationMessages(test, map[string]string{
 				"tsconfig.json": testCase.configuration,
 				"Another.ts":    "export {};\n",
-				"Case.ts":       "declare const narrow: { x: number }; function draw(point: { x: number; " + testCase.written + " }): void {} draw(narrow);\n",
+				"Case.ts": "declare const narrow: { x: number }; function draw(point: { x: number; " +
+					testCase.written +
+					" }): void {} draw(narrow);\n",
 			}, false)
 			message := messages[NoOptionalWidening.Name]
 			if want := "seen here as '{ x: number; " + testCase.printed + "'"; !strings.Contains(message, want) {
@@ -162,7 +200,10 @@ func TestASymbolKeyedMemberPrintsWithoutItsCreationId(test *testing.T) {
 		"Case.ts":    "declare const brand: unique symbol; declare const narrow: { x: number }; function draw(point: { x: number; [brand]?: string }): void {} draw(narrow);\n",
 	}, false)
 	message := messages[NoOptionalWidening.Name]
-	for _, want := range []string{"seen here as '{ x: number; [brand]?: string; }'", "the optional property `[brand]`"} {
+	for _, want := range []string{
+		"seen here as '{ x: number; [brand]?: string; }'",
+		"the optional property `[brand]`",
+	} {
 		if !strings.Contains(message, want) {
 			test.Errorf("want %q in:\n  %q", want, message)
 		}

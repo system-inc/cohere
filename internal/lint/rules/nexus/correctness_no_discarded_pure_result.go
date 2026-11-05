@@ -12,7 +12,10 @@ const correctnessNoDiscardedPureResultId = "discardedPureResult"
 
 // correctnessNoDiscardedPureResultText is the rule's message, whose wording lives in
 // `policy/messages/correctness-no-discarded-pure-result.json`.
-var correctnessNoDiscardedPureResultText = policy.MessageOf("nexus/correctness-no-discarded-pure-result", correctnessNoDiscardedPureResultId)
+var correctnessNoDiscardedPureResultText = policy.MessageOf(
+	"nexus/correctness-no-discarded-pure-result",
+	correctnessNoDiscardedPureResultId,
+)
 
 func correctnessNoDiscardedPureResultMessage() rule.Message {
 	return rule.Message{

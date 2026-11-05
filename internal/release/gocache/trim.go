@@ -178,7 +178,9 @@ func readEntry(path string) (entry, bool) {
 // removeEntry removes one entry, an executable entry's files by name and then its emptied directory.
 func removeEntry(candidate entry) error {
 	for _, name := range candidate.files {
-		if removeError := os.Remove(filepath.Join(candidate.path, name)); removeError != nil && !os.IsNotExist(removeError) {
+		if removeError := os.Remove(
+			filepath.Join(candidate.path, name),
+		); removeError != nil && !os.IsNotExist(removeError) {
 			return fmt.Errorf("trimming the Go build cache: %w", removeError)
 		}
 	}

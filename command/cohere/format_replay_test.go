@@ -159,7 +159,9 @@ func TestAnIgnoreFileTheWalkReadBreaksTheFormatReplay(test *testing.T) {
 	// (a) A nested .gitignore stops ignoring an unformatted file. The edit is in place, so quiet/'s
 	// modification time does not move.
 	write("quiet/.gitignore", "\n")
-	if output := fresh("a nested .gitignore that stopped ignoring loose.json"); !strings.Contains(output, "loose.json") {
+	if output := fresh(
+		"a nested .gitignore that stopped ignoring loose.json",
+	); !strings.Contains(output, "loose.json") {
 		test.Fatalf("the run did not report loose.json once quiet/.gitignore stopped ignoring it:\n%s", output)
 	}
 	write("quiet/.gitignore", "loose.json\n")

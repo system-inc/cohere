@@ -244,7 +244,11 @@ var NoDuplicateTypeConstituents = rule.Rule{
 				// is why `type T = T | undefined` repairs by deleting `T` and its following `|`.
 				fixes = append(fixes,
 					rule.RemoveRange(core.NewTextRange(constituentRange.Pos(), closeEnd)))
-				if separatorAfter, hasSeparatorAfter := firstSeparatorAfter(text, closeEnd, parentRange.End()); hasSeparatorAfter {
+				if separatorAfter, hasSeparatorAfter := firstSeparatorAfter(
+					text,
+					closeEnd,
+					parentRange.End(),
+				); hasSeparatorAfter {
 					fixes = append(fixes,
 						rule.RemoveRange(core.NewTextRange(separatorAfter, separatorAfter+1)))
 				}
@@ -348,7 +352,11 @@ var NoDuplicateTypeConstituents = rule.Rule{
 					return
 				}
 
-				check(node, ast.KindUnionType, func(constituentType *checker.Type, constituent *ast.Node, parent *ast.Node) {
+				check(node, ast.KindUnionType, func(
+					constituentType *checker.Type,
+					constituent *ast.Node,
+					parent *ast.Node,
+				) {
 					// The second message: an explicit `undefined` in the type of a parameter that
 					// is already optional. The `?` has already widened the type, so the union member
 					// adds nothing.

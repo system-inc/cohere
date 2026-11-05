@@ -20,7 +20,10 @@ func TestNoDebuggerFires(test *testing.T) {
 		// The single-statement form of an if has no block, so the statement is the branch itself.
 		// This is the shape a listener keyed to blocks rather than to statements would miss.
 		{"as an unbraced if branch", "export function run(flag: boolean) {\n    if(flag) debugger;\n}\n"},
-		{"inside a loop", "export function run() {\n    for(let index = 0; index < 1; index++) {\n        debugger;\n    }\n}\n"},
+		{
+			"inside a loop",
+			"export function run() {\n    for(let index = 0; index < 1; index++) {\n        debugger;\n    }\n}\n",
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {

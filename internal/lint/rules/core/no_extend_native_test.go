@@ -304,7 +304,10 @@ func TestNoExtendNativeDeclinesADefineCallOnAnotherReceiver(test *testing.T) {
 		name       string
 		sourceText string
 	}{
-		{"Reflect.defineProperty, which really does the same thing", "Reflect.defineProperty(Array.prototype, \"p\", {value:0})"},
+		{
+			"Reflect.defineProperty, which really does the same thing",
+			"Reflect.defineProperty(Array.prototype, \"p\", {value:0})",
+		},
 		{"an unrelated object's defineProperty", "Foo.defineProperty(Array.prototype, \"p\", {value:0})"},
 		{"another builtin's defineProperty", "Math.defineProperty(Array.prototype, \"p\", {value:0})"},
 		{"another builtin's defineProperties", "JSON.defineProperties(Array.prototype, {})"},
@@ -338,8 +341,16 @@ func TestNoExtendNativeReadsATemplateSubscript(test *testing.T) {
 		builtin    string
 	}{
 		{"a template subscript for prototype", "Object[`prototype`].p = 0", "Object"},
-		{"a template prototype inside a define call", "Object.defineProperty(Array[`prototype`], \"p\", {value:0})", "Array"},
-		{"a template subscript for the define method", "Object[`defineProperty`](Array.prototype, \"p\", {value:0})", "Array"},
+		{
+			"a template prototype inside a define call",
+			"Object.defineProperty(Array[`prototype`], \"p\", {value:0})",
+			"Array",
+		},
+		{
+			"a template subscript for the define method",
+			"Object[`defineProperty`](Array.prototype, \"p\", {value:0})",
+			"Array",
+		},
 	}
 
 	for _, testCase := range cases {

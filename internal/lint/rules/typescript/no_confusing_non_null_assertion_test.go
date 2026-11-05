@@ -103,7 +103,11 @@ func TestNoConfusingNonNullAssertionFires(test *testing.T) {
 				description string
 				rewrite     string
 			}{
-				{id: "notNeedInEqualTest", description: "Remove unnecessary non-null assertion (!) in equality test.", rewrite: "a == b;"},
+				{
+					id:          "notNeedInEqualTest",
+					description: "Remove unnecessary non-null assertion (!) in equality test.",
+					rewrite:     "a == b;",
+				},
 			},
 		},
 		{
@@ -116,7 +120,11 @@ func TestNoConfusingNonNullAssertionFires(test *testing.T) {
 				description string
 				rewrite     string
 			}{
-				{id: "notNeedInEqualTest", description: "Remove unnecessary non-null assertion (!) in equality test.", rewrite: "a === b;"},
+				{
+					id:          "notNeedInEqualTest",
+					description: "Remove unnecessary non-null assertion (!) in equality test.",
+					rewrite:     "a === b;",
+				},
 			},
 		},
 		{
@@ -129,7 +137,11 @@ func TestNoConfusingNonNullAssertionFires(test *testing.T) {
 				description string
 				rewrite     string
 			}{
-				{id: "wrapUpLeft", description: "Wrap the left-hand side in parentheses to avoid confusion with \"==\" operator.", rewrite: "(a + b!) == c;"},
+				{
+					id:          "wrapUpLeft",
+					description: "Wrap the left-hand side in parentheses to avoid confusion with \"==\" operator.",
+					rewrite:     "(a + b!) == c;",
+				},
 			},
 		},
 		{
@@ -142,7 +154,11 @@ func TestNoConfusingNonNullAssertionFires(test *testing.T) {
 				description string
 				rewrite     string
 			}{
-				{id: "notNeedInEqualTest", description: "Remove unnecessary non-null assertion (!) in equality test.", rewrite: "(obj = new new OuterObj().InnerObj).Name == c;"},
+				{
+					id:          "notNeedInEqualTest",
+					description: "Remove unnecessary non-null assertion (!) in equality test.",
+					rewrite:     "(obj = new new OuterObj().InnerObj).Name == c;",
+				},
 			},
 		},
 		{
@@ -155,7 +171,11 @@ func TestNoConfusingNonNullAssertionFires(test *testing.T) {
 				description string
 				rewrite     string
 			}{
-				{id: "notNeedInEqualTest", description: "Remove unnecessary non-null assertion (!) in equality test.", rewrite: "(a==b) ==c;"},
+				{
+					id:          "notNeedInEqualTest",
+					description: "Remove unnecessary non-null assertion (!) in equality test.",
+					rewrite:     "(a==b) ==c;",
+				},
 			},
 		},
 		{
@@ -168,7 +188,11 @@ func TestNoConfusingNonNullAssertionFires(test *testing.T) {
 				description string
 				rewrite     string
 			}{
-				{id: "notNeedInAssign", description: "Remove unnecessary non-null assertion (!) in assignment left-hand side.", rewrite: "a = b;"},
+				{
+					id:          "notNeedInAssign",
+					description: "Remove unnecessary non-null assertion (!) in assignment left-hand side.",
+					rewrite:     "a = b;",
+				},
 			},
 		},
 		{
@@ -181,7 +205,11 @@ func TestNoConfusingNonNullAssertionFires(test *testing.T) {
 				description string
 				rewrite     string
 			}{
-				{id: "notNeedInAssign", description: "Remove unnecessary non-null assertion (!) in assignment left-hand side.", rewrite: "(obj = new new OuterObj().InnerObj).Name = c;"},
+				{
+					id:          "notNeedInAssign",
+					description: "Remove unnecessary non-null assertion (!) in assignment left-hand side.",
+					rewrite:     "(obj = new new OuterObj().InnerObj).Name = c;",
+				},
 			},
 		},
 		{
@@ -194,7 +222,11 @@ func TestNoConfusingNonNullAssertionFires(test *testing.T) {
 				description string
 				rewrite     string
 			}{
-				{id: "notNeedInAssign", description: "Remove unnecessary non-null assertion (!) in assignment left-hand side.", rewrite: "(a=b) =c;"},
+				{
+					id:          "notNeedInAssign",
+					description: "Remove unnecessary non-null assertion (!) in assignment left-hand side.",
+					rewrite:     "(a=b) =c;",
+				},
 			},
 		},
 		{
@@ -207,8 +239,16 @@ func TestNoConfusingNonNullAssertionFires(test *testing.T) {
 				description string
 				rewrite     string
 			}{
-				{id: "notNeedInOperator", description: "Remove possibly unnecessary non-null assertion (!) in the left operand of the `in` operator.", rewrite: "a in b;"},
-				{id: "wrapUpLeft", description: "Wrap the left-hand side in parentheses to avoid confusion with \"in\" operator.", rewrite: "(a!) in b;"},
+				{
+					id:          "notNeedInOperator",
+					description: "Remove possibly unnecessary non-null assertion (!) in the left operand of the `in` operator.",
+					rewrite:     "a in b;",
+				},
+				{
+					id:          "wrapUpLeft",
+					description: "Wrap the left-hand side in parentheses to avoid confusion with \"in\" operator.",
+					rewrite:     "(a!) in b;",
+				},
 			},
 		},
 		{
@@ -221,8 +261,16 @@ func TestNoConfusingNonNullAssertionFires(test *testing.T) {
 				description string
 				rewrite     string
 			}{
-				{id: "notNeedInOperator", description: "Remove possibly unnecessary non-null assertion (!) in the left operand of the `in` operator.", rewrite: "\na in b;\n      "},
-				{id: "wrapUpLeft", description: "Wrap the left-hand side in parentheses to avoid confusion with \"in\" operator.", rewrite: "\n(a !)in b;\n      "},
+				{
+					id:          "notNeedInOperator",
+					description: "Remove possibly unnecessary non-null assertion (!) in the left operand of the `in` operator.",
+					rewrite:     "\na in b;\n      ",
+				},
+				{
+					id:          "wrapUpLeft",
+					description: "Wrap the left-hand side in parentheses to avoid confusion with \"in\" operator.",
+					rewrite:     "\n(a !)in b;\n      ",
+				},
 			},
 		},
 		{
@@ -235,8 +283,16 @@ func TestNoConfusingNonNullAssertionFires(test *testing.T) {
 				description string
 				rewrite     string
 			}{
-				{id: "notNeedInOperator", description: "Remove possibly unnecessary non-null assertion (!) in the left operand of the `instanceof` operator.", rewrite: "a instanceof b;"},
-				{id: "wrapUpLeft", description: "Wrap the left-hand side in parentheses to avoid confusion with \"instanceof\" operator.", rewrite: "(a!) instanceof b;"},
+				{
+					id:          "notNeedInOperator",
+					description: "Remove possibly unnecessary non-null assertion (!) in the left operand of the `instanceof` operator.",
+					rewrite:     "a instanceof b;",
+				},
+				{
+					id:          "wrapUpLeft",
+					description: "Wrap the left-hand side in parentheses to avoid confusion with \"instanceof\" operator.",
+					rewrite:     "(a!) instanceof b;",
+				},
 			},
 		},
 	}

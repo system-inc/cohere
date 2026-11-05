@@ -51,7 +51,9 @@ func logicalAssignmentAlwaysIfOptions() LogicalAssignmentOperatorsOptions {
 
 // logicalAssignmentNeverOptions is ["never"], also routed through the decoder.
 func logicalAssignmentNeverOptions() LogicalAssignmentOperatorsOptions {
-	decoded, decodeLogicalAssignmentOperatorsOptionsError := DecodeLogicalAssignmentOperatorsOptions(json.RawMessage(`["never"]`))
+	decoded, decodeLogicalAssignmentOperatorsOptionsError := DecodeLogicalAssignmentOperatorsOptions(
+		json.RawMessage(`["never"]`),
+	)
 	if decodeLogicalAssignmentOperatorsOptionsError != nil {
 		panic(decodeLogicalAssignmentOperatorsOptionsError)
 	}
@@ -185,7 +187,10 @@ var logicalAssignmentCleanCases = []logicalAssignmentCleanCase{
 	{"if (undefined === undefined || a === a) a = b", logicalAssignmentAlwaysIfOptions()},
 	{"if (null === undefined || a === a) a = b", logicalAssignmentAlwaysIfOptions()},
 	{"{\n   const undefined = 0;\n   if (a == undefined) a = b\n}", logicalAssignmentAlwaysIfOptions()},
-	{"(() => {\n   const undefined = 0;\n   if (condition) {\n       if (a == undefined) a = b\n   }\n})()", logicalAssignmentAlwaysIfOptions()},
+	{
+		"(() => {\n   const undefined = 0;\n   if (condition) {\n       if (a == undefined) a = b\n   }\n})()",
+		logicalAssignmentAlwaysIfOptions(),
+	},
 	{"{\n   if (a == undefined) a = b\n}\nvar undefined = 0;", logicalAssignmentAlwaysIfOptions()},
 	{"{\n   const undefined = 0;\n   if (undefined == null) undefined = b\n}", logicalAssignmentAlwaysIfOptions()},
 	{"{\n   const undefined = 0;\n   if (a === undefined || a === null) a = b\n}", logicalAssignmentAlwaysIfOptions()},
@@ -451,7 +456,9 @@ var logicalAssignmentReportingCases = []logicalAssignmentReportingCase{
 		options:     nil,
 		messageId:   "assignment",
 		fixedSource: "",
-		suggestions: []logicalAssignmentSuggestion{{"useLogicalOperator", "with (object) {\n  \"use strict\";\n   a ||= b\n}"}},
+		suggestions: []logicalAssignmentSuggestion{
+			{"useLogicalOperator", "with (object) {\n  \"use strict\";\n   a ||= b\n}"},
+		},
 	},
 	{
 		source:      "fn(a = a || b)",
@@ -2007,7 +2014,9 @@ func TestDecodeLogicalAssignmentOperatorsOptions(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, decodeLogicalAssignmentOperatorsOptionsError := DecodeLogicalAssignmentOperatorsOptions([]byte(testCase.raw))
+			decoded, decodeLogicalAssignmentOperatorsOptionsError := DecodeLogicalAssignmentOperatorsOptions(
+				[]byte(testCase.raw),
+			)
 			if testCase.wantError {
 				if decodeLogicalAssignmentOperatorsOptionsError == nil {
 					test.Fatalf("wanted an error, got %+v", decoded)
@@ -2372,7 +2381,9 @@ func TestLogicalAssignmentOperatorsIsSilentInsideReactCompiledFunctions(test *te
 	test.Parallel()
 
 	decode := func(raw string) LogicalAssignmentOperatorsOptions {
-		decoded, decodeLogicalAssignmentOperatorsOptionsError := DecodeLogicalAssignmentOperatorsOptions(json.RawMessage(raw))
+		decoded, decodeLogicalAssignmentOperatorsOptionsError := DecodeLogicalAssignmentOperatorsOptions(
+			json.RawMessage(raw),
+		)
 		if decodeLogicalAssignmentOperatorsOptionsError != nil {
 			test.Fatalf("decoding %s: %v", raw, decodeLogicalAssignmentOperatorsOptionsError)
 		}
@@ -2451,11 +2462,23 @@ export function Defaults(properties: { label?: string }) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			off := rule_testing.RunTypedWithOptions(test, LogicalAssignmentOperators, "Compiled.tsx", testCase.sourceText, compilerOff)
+			off := rule_testing.RunTypedWithOptions(
+				test,
+				LogicalAssignmentOperators,
+				"Compiled.tsx",
+				testCase.sourceText,
+				compilerOff,
+			)
 			if len(off.Diagnostics) == 0 {
 				test.Fatalf("with the compiler off the rule must report here, or the row proves nothing")
 			}
-			on := rule_testing.RunTypedWithOptions(test, LogicalAssignmentOperators, "Compiled.tsx", testCase.sourceText, compilerOn)
+			on := rule_testing.RunTypedWithOptions(
+				test,
+				LogicalAssignmentOperators,
+				"Compiled.tsx",
+				testCase.sourceText,
+				compilerOn,
+			)
 			if testCase.compiled {
 				rule_testing.ExpectClean(test, on)
 				return

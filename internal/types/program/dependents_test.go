@@ -30,7 +30,11 @@ func buildFixtureGraph(test *testing.T, files map[string]string) *Graph {
 	}
 
 	configuration := `{"compilerOptions":{"strict":true,"module":"esnext","target":"esnext","moduleResolution":"bundler"},"include":["**/*.ts"]}`
-	if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration), 0o644); writeError != nil {
+	if writeError := os.WriteFile(
+		filepath.Join(directory, "tsconfig.json"),
+		[]byte(configuration),
+		0o644,
+	); writeError != nil {
 		test.Fatal(writeError)
 	}
 

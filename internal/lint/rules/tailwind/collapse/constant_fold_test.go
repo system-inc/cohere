@@ -19,7 +19,12 @@ func runConstantFoldCases(test *testing.T, cases []constantFoldCase) {
 		test.Run(testCase.input, func(test *testing.T) {
 			test.Parallel()
 			if actual := constantFoldDeclaration(testCase.input, nil); actual != testCase.expected {
-				test.Errorf("constantFoldDeclaration(%q) = %q, upstream gives %q", testCase.input, actual, testCase.expected)
+				test.Errorf(
+					"constantFoldDeclaration(%q) = %q, upstream gives %q",
+					testCase.input,
+					actual,
+					testCase.expected,
+				)
 			}
 		})
 	}
@@ -205,7 +210,12 @@ func TestConstantFoldJavaScriptNumberString(test *testing.T) {
 		{math.MaxFloat64, "1.7976931348623157e+308"},
 	} {
 		if actual := javaScriptNumberString(testCase.value); actual != testCase.expected {
-			test.Errorf("javaScriptNumberString(%v) = %q, JavaScript prints %q", testCase.value, actual, testCase.expected)
+			test.Errorf(
+				"javaScriptNumberString(%v) = %q, JavaScript prints %q",
+				testCase.value,
+				actual,
+				testCase.expected,
+			)
 		}
 	}
 }

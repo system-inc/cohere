@@ -55,7 +55,10 @@ if (p) {
 
 	untyped := rule_testing.Run(test, NoMisusedPromises, noMisusedPromisesFile, source)
 	if len(untyped.Diagnostics) != 0 {
-		test.Fatalf("the untyped harness hands the rule a nil checker, so the guard should decline it; got %d findings", len(untyped.Diagnostics))
+		test.Fatalf(
+			"the untyped harness hands the rule a nil checker, so the guard should decline it; got %d findings",
+			len(untyped.Diagnostics),
+		)
 	}
 
 	typed := rule_testing.RunTyped(test, NoMisusedPromises, noMisusedPromisesFile, source)
@@ -75,7 +78,10 @@ func TestNoMisusedPromisesDoesNotReadTheProgram(test *testing.T) {
 	test.Parallel()
 
 	if NoMisusedPromises.ProgramReads != 0 {
-		test.Fatalf("the rule body never names ctx.Program, so it must declare no ProgramReads; declares %s", NoMisusedPromises.ProgramReads)
+		test.Fatalf(
+			"the rule body never names ctx.Program, so it must declare no ProgramReads; declares %s",
+			NoMisusedPromises.ProgramReads,
+		)
 	}
 }
 
@@ -266,7 +272,9 @@ func TestNoMisusedPromisesDecodesOptionsThroughTheRegisteredDecoder(test *testin
 			config: `{"checksConditionals": false}`,
 			assert: func(test *testing.T, decoded NoMisusedPromisesOptions) {
 				if decoded.ChecksConditionals == nil {
-					test.Fatal("checksConditionals decoded to nil, so an explicit false is indistinguishable from silence")
+					test.Fatal(
+						"checksConditionals decoded to nil, so an explicit false is indistinguishable from silence",
+					)
 				}
 				if *decoded.ChecksConditionals {
 					test.Fatal("checksConditionals decoded to true from an explicit false")
@@ -293,7 +301,9 @@ func TestNoMisusedPromisesDecodesOptionsThroughTheRegisteredDecoder(test *testin
 			config: `{"checksVoidReturn": {"arguments": false, "attributes": true}}`,
 			assert: func(test *testing.T, decoded NoMisusedPromisesOptions) {
 				if decoded.ChecksVoidReturn == nil || !*decoded.ChecksVoidReturn {
-					test.Fatal("the object form should turn checksVoidReturn on, as upstream's parseChecksVoidReturn does")
+					test.Fatal(
+						"the object form should turn checksVoidReturn on, as upstream's parseChecksVoidReturn does",
+					)
 				}
 				if decoded.ChecksVoidReturnOpts == nil {
 					test.Fatal("the nested object did not bind at all")
@@ -356,14 +366,30 @@ func TestNoMisusedPromisesTreatsNilOptionsAsEveryCheckEnabled(test *testing.T) {
 		wantId     string
 	}{
 		{"checksConditionals", noMisusedPromisesFile, "const p = Promise.resolve();\nif (p) {\n}\n", "conditional"},
-		{"checksSpreads", noMisusedPromisesFile, "const p = Promise.resolve({ a: 1 });\nconst o = { ...p };\n", "spread"},
-		{"checksVoidReturn", noMisusedPromisesFile, "declare function f(cb: () => void): void;\nf(async () => {});\n", "voidReturnArgument"},
+		{
+			"checksSpreads",
+			noMisusedPromisesFile,
+			"const p = Promise.resolve({ a: 1 });\nconst o = { ...p };\n",
+			"spread",
+		},
+		{
+			"checksVoidReturn",
+			noMisusedPromisesFile,
+			"declare function f(cb: () => void): void;\nf(async () => {});\n",
+			"voidReturnArgument",
+		},
 	}
 
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(test, NoMisusedPromises, testCase.fileName, testCase.sourceText, nil)
+			result := rule_testing.RunTypedWithOptions(
+				test,
+				NoMisusedPromises,
+				testCase.fileName,
+				testCase.sourceText,
+				nil,
+			)
 			rule_testing.ExpectFindings(test, result, testCase.wantId)
 		})
 	}

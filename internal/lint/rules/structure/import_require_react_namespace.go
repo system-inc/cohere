@@ -13,10 +13,22 @@ import (
 // The rule's messages, one handle per id, whose wording lives in
 // `policy/messages/import-require-react-namespace.json`.
 var (
-	importRequireReactNamespaceNoNamedImportText                = policy.MessageOf("structure/import-require-react-namespace", "noNamedImport")
-	importRequireReactNamespaceNoDestructuringFromReactText     = policy.MessageOf("structure/import-require-react-namespace", "noDestructuringFromReact")
-	importRequireReactNamespaceNoCallWithoutPrefixText          = policy.MessageOf("structure/import-require-react-namespace", "noCallWithoutPrefix")
-	importRequireReactNamespaceNoTypeReferenceWithoutPrefixText = policy.MessageOf("structure/import-require-react-namespace", "noTypeReferenceWithoutPrefix")
+	importRequireReactNamespaceNoNamedImportText = policy.MessageOf(
+		"structure/import-require-react-namespace",
+		"noNamedImport",
+	)
+	importRequireReactNamespaceNoDestructuringFromReactText = policy.MessageOf(
+		"structure/import-require-react-namespace",
+		"noDestructuringFromReact",
+	)
+	importRequireReactNamespaceNoCallWithoutPrefixText = policy.MessageOf(
+		"structure/import-require-react-namespace",
+		"noCallWithoutPrefix",
+	)
+	importRequireReactNamespaceNoTypeReferenceWithoutPrefixText = policy.MessageOf(
+		"structure/import-require-react-namespace",
+		"noTypeReferenceWithoutPrefix",
+	)
 )
 
 // messageNoNamedImport is the finding, rendered when it is reported so the text comes from the current catalog.
@@ -27,7 +39,8 @@ func messageNoNamedImport() rule.Message {
 	}
 }
 
-// messageNoDestructuringFromReact is the finding, rendered when it is reported so the text comes from the current catalog.
+// messageNoDestructuringFromReact is the finding, rendered when it is reported so the text comes from the current
+// catalog.
 func messageNoDestructuringFromReact() rule.Message {
 	return rule.Message{
 		Id:          importRequireReactNamespaceNoDestructuringFromReactText.Id,
@@ -43,7 +56,8 @@ func messageNoCallWithoutPrefix() rule.Message {
 	}
 }
 
-// messageNoTypeReferenceWithoutPrefix is the finding, rendered when it is reported so the text comes from the current catalog.
+// messageNoTypeReferenceWithoutPrefix is the finding, rendered when it is reported so the text comes from the current
+// catalog.
 func messageNoTypeReferenceWithoutPrefix() rule.Message {
 	return rule.Message{
 		Id:          importRequireReactNamespaceNoTypeReferenceWithoutPrefixText.Id,

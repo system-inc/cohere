@@ -92,7 +92,10 @@ func TestPreferPromiseRejectErrorsStaysSilent(test *testing.T) {
 	for index, sourceText := range cases {
 		test.Run(fmt.Sprintf("upstream valid %d", index), func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, PreferPromiseRejectErrors, preferPromiseRejectErrorsFile, sourceText))
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.RunTyped(test, PreferPromiseRejectErrors, preferPromiseRejectErrorsFile, sourceText),
+			)
 		})
 	}
 }
@@ -133,16 +136,31 @@ func TestPreferPromiseRejectErrorsFires(test *testing.T) {
 		{"Promise.reject((foo &= new Error()));", 1},
 		{"\ndeclare const foo: never;\nPromise.reject(foo);\n      ", 1},
 		{"\ndeclare const foo: unknown;\nPromise.reject(foo);\n      ", 1},
-		{"\ntype FakeReadonly<T> = { 'fake readonly': T };\ndeclare const foo: FakeReadonly<Error>;\nPromise.reject(foo);\n      ", 1},
+		{
+			"\ntype FakeReadonly<T> = { 'fake readonly': T };\ndeclare const foo: FakeReadonly<Error>;\nPromise.reject(foo);\n      ",
+			1,
+		},
 		{"\ndeclare const foo: Readonly<'error'>;\nPromise.reject(foo);\n      ", 1},
 		{"\ndeclare const foo: Readonly<Error | 'error'>;\nPromise.reject(foo);\n      ", 1},
 		{"\ndeclare const foo: Readonly<Error> | 'error';\nPromise.reject(foo);\n      ", 1},
-		{"\ndeclare const foo: Readonly<Error> | Readonly<TypeError> | Readonly<'error'>;\nPromise.reject(foo);\n      ", 1},
+		{
+			"\ndeclare const foo: Readonly<Error> | Readonly<TypeError> | Readonly<'error'>;\nPromise.reject(foo);\n      ",
+			1,
+		},
 		{"\ndeclare const foo: Readonly<Readonly<'error'>>;\nPromise.reject(foo);\n      ", 1},
 		{"\ndeclare const foo: Readonly<Readonly<Readonly<Error> | 'error'>>;\nPromise.reject(foo);\n      ", 1},
-		{"\ndeclare const foo: Readonly<Readonly<Readonly<Error> & TypeError>> | 'error';\nPromise.reject(foo);\n      ", 1},
-		{"\ndeclare const foo: Readonly<Readonly<Error>> | Readonly<TypeError> | 'error';\nPromise.reject(foo);\n      ", 1},
-		{"\ntype Wrapper<T> = { foo: Readonly<T>[] };\ndeclare const foo: Wrapper<Error | 'error'>['foo'][5];\nPromise.reject(foo);\n      ", 1},
+		{
+			"\ndeclare const foo: Readonly<Readonly<Readonly<Error> & TypeError>> | 'error';\nPromise.reject(foo);\n      ",
+			1,
+		},
+		{
+			"\ndeclare const foo: Readonly<Readonly<Error>> | Readonly<TypeError> | 'error';\nPromise.reject(foo);\n      ",
+			1,
+		},
+		{
+			"\ntype Wrapper<T> = { foo: Readonly<T>[] };\ndeclare const foo: Wrapper<Error | 'error'>['foo'][5];\nPromise.reject(foo);\n      ",
+			1,
+		},
 		{"\ndeclare const foo: Error[];\nPromise.reject(foo);\n      ", 1},
 		{"\ndeclare const foo: ReadonlyArray<Error>;\nPromise.reject(foo);\n      ", 1},
 		{"\ndeclare const foo: [Error];\nPromise.reject(foo);\n      ", 1},
@@ -150,37 +168,73 @@ func TestPreferPromiseRejectErrorsFires(test *testing.T) {
 		{"\nnew Promise(function (resolve, reject) {\n  reject(5);\n});\n      ", 1},
 		{"\nnew Promise((resolve, reject) => {\n  reject();\n});\n      ", 1},
 		{"new Promise((resolve, reject) => reject(5));", 1},
-		{"\nnew Promise((resolve, reject) => {\n  fs.readFile('foo.txt', (err, file) => {\n    if (err) reject('File not found');\n    else resolve(file);\n  });\n});\n      ", 1},
+		{
+			"\nnew Promise((resolve, reject) => {\n  fs.readFile('foo.txt', (err, file) => {\n    if (err) reject('File not found');\n    else resolve(file);\n  });\n});\n      ",
+			1,
+		},
 		{"new Promise((yes, no) => no(5));", 1},
 		{"new Promise(({ foo, bar, baz }, reject) => reject(5));", 1},
-		{"\nnew Promise(function (reject, reject) {\n  reject(5);\n});\n      ", 0}, // upstream: 1, see the duplicate-parameter note in the rule
+		{
+			"\nnew Promise(function (reject, reject) {\n  reject(5);\n});\n      ",
+			0,
+		}, // upstream: 1, see the duplicate-parameter note in the rule
 		{"\nnew Promise(function (foo, arguments) {\n  arguments(5);\n});\n      ", 1},
 		{"new Promise((foo, arguments) => arguments(5));", 1},
 		{"\nnew Promise(function ({}, reject) {\n  reject(5);\n});\n      ", 1},
 		{"new Promise(({}, reject) => reject(5));", 1},
 		{"new Promise((resolve, reject, somethingElse = reject(5)) => {});", 1},
-		{"\ndeclare const foo: {\n  bar: PromiseConstructor;\n};\nnew foo.bar((resolve, reject) => reject(5));\n      ", 1},
-		{"\ndeclare const foo: {\n  bar: PromiseConstructor;\n};\nnew (foo?.bar)((resolve, reject) => reject(5));\n      ", 1},
+		{
+			"\ndeclare const foo: {\n  bar: PromiseConstructor;\n};\nnew foo.bar((resolve, reject) => reject(5));\n      ",
+			1,
+		},
+		{
+			"\ndeclare const foo: {\n  bar: PromiseConstructor;\n};\nnew (foo?.bar)((resolve, reject) => reject(5));\n      ",
+			1,
+		},
 		{"\nconst foo = Promise;\nnew foo((resolve, reject) => reject(5));\n      ", 1},
 		{"\ndeclare const foo: never;\nnew Promise((resolve, reject) => reject(foo));\n      ", 1},
 		{"\ndeclare const foo: unknown;\nnew Promise((resolve, reject) => reject(foo));\n      ", 1},
-		{"\ntype FakeReadonly<T> = { 'fake readonly': T };\ndeclare const foo: FakeReadonly<Error>;\nnew Promise((resolve, reject) => reject(foo));\n      ", 1},
+		{
+			"\ntype FakeReadonly<T> = { 'fake readonly': T };\ndeclare const foo: FakeReadonly<Error>;\nnew Promise((resolve, reject) => reject(foo));\n      ",
+			1,
+		},
 		{"\ndeclare const foo: Readonly<'error'>;\nnew Promise((resolve, reject) => reject(foo));\n      ", 1},
 		{"\ndeclare const foo: Readonly<Error | 'error'>;\nnew Promise((resolve, reject) => reject(foo));\n      ", 1},
 		{"\ndeclare const foo: Readonly<Error> | 'error';\nnew Promise((resolve, reject) => reject(foo));\n      ", 1},
-		{"\ndeclare const foo: Readonly<Error> | Readonly<TypeError> | Readonly<'error'>;\nnew Promise((resolve, reject) => reject(foo));\n      ", 1},
-		{"\ndeclare const foo: Readonly<Readonly<'error'>>;\nnew Promise((resolve, reject) => reject(foo));\n      ", 1},
-		{"\ndeclare const foo: Readonly<Readonly<Readonly<Error> | 'error'>>;\nnew Promise((resolve, reject) => reject(foo));\n      ", 1},
-		{"\ndeclare const foo: Readonly<Readonly<Readonly<Error> & TypeError>> | 'error';\nnew Promise((resolve, reject) => reject(foo));\n      ", 1},
-		{"\ndeclare const foo: Readonly<Readonly<Error>> | Readonly<TypeError> | 'error';\nnew Promise((resolve, reject) => reject(foo));\n      ", 1},
-		{"\ntype Wrapper<T> = { foo: Readonly<T>[] };\ndeclare const foo: Wrapper<Error | 'error'>['foo'][5];\nnew Promise((resolve, reject) => reject(foo));\n      ", 1},
+		{
+			"\ndeclare const foo: Readonly<Error> | Readonly<TypeError> | Readonly<'error'>;\nnew Promise((resolve, reject) => reject(foo));\n      ",
+			1,
+		},
+		{
+			"\ndeclare const foo: Readonly<Readonly<'error'>>;\nnew Promise((resolve, reject) => reject(foo));\n      ",
+			1,
+		},
+		{
+			"\ndeclare const foo: Readonly<Readonly<Readonly<Error> | 'error'>>;\nnew Promise((resolve, reject) => reject(foo));\n      ",
+			1,
+		},
+		{
+			"\ndeclare const foo: Readonly<Readonly<Readonly<Error> & TypeError>> | 'error';\nnew Promise((resolve, reject) => reject(foo));\n      ",
+			1,
+		},
+		{
+			"\ndeclare const foo: Readonly<Readonly<Error>> | Readonly<TypeError> | 'error';\nnew Promise((resolve, reject) => reject(foo));\n      ",
+			1,
+		},
+		{
+			"\ntype Wrapper<T> = { foo: Readonly<T>[] };\ndeclare const foo: Wrapper<Error | 'error'>['foo'][5];\nnew Promise((resolve, reject) => reject(foo));\n      ",
+			1,
+		},
 		{"\ndeclare const foo: Error[];\nnew Promise((resolve, reject) => reject(foo));\n      ", 1},
 		{"\ndeclare const foo: ReadonlyArray<Error>;\nnew Promise((resolve, reject) => reject(foo));\n      ", 1},
 		{"\ndeclare const foo: [Error];\nnew Promise((resolve, reject) => reject(foo));\n      ", 1},
 		{"\nclass Foo extends Promise<number> {}\nFoo.reject(5);\n      ", 1},
 		{"\ndeclare const foo: PromiseConstructor & string;\nfoo.reject(5);\n      ", 1},
 		{"\nclass Foo extends Promise<number> {}\nclass Bar extends Foo {}\nBar.reject(5);\n      ", 1},
-		{"\ndeclare const foo: PromiseConstructor;\nfunction fun<T extends number>(t: T): void {\n  foo.reject(t);\n}\n      ", 1},
+		{
+			"\ndeclare const foo: PromiseConstructor;\nfunction fun<T extends number>(t: T): void {\n  foo.reject(t);\n}\n      ",
+			1,
+		},
 		{"\ndeclare const someUnknownValue: unknown;\nPromise.reject(someUnknownValue);\n      ", 1},
 		{"\ndeclare const someAnyValue: any;\nPromise.reject(someAnyValue);\n      ", 1},
 		{"\nclass CustomRejection {}\nPromise.reject(new CustomRejection());\n      ", 1},
@@ -189,7 +243,12 @@ func TestPreferPromiseRejectErrorsFires(test *testing.T) {
 	for index, testCase := range cases {
 		test.Run(fmt.Sprintf("upstream invalid %d", index), func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTyped(test, PreferPromiseRejectErrors, preferPromiseRejectErrorsFile, testCase.sourceText)
+			result := rule_testing.RunTyped(
+				test,
+				PreferPromiseRejectErrors,
+				preferPromiseRejectErrorsFile,
+				testCase.sourceText,
+			)
 			expected := make([]string, testCase.findings)
 			for position := range expected {
 				expected[position] = "rejectAnError"
@@ -213,27 +272,71 @@ func TestPreferPromiseRejectErrorsWithOptions(test *testing.T) {
 		findings    int
 	}{
 		{"{\"allowEmptyReject\":true}", "Promise.reject();", 0},
-		{"{\"allowThrowingAny\":true,\"allowThrowingUnknown\":false}", "\ndeclare const someAnyValue: any;\nPromise.reject(someAnyValue);\n      ", 0},
-		{"{\"allowThrowingAny\":false,\"allowThrowingUnknown\":true}", "\ndeclare const someUnknownValue: unknown;\nPromise.reject(someUnknownValue);\n      ", 0},
+		{
+			"{\"allowThrowingAny\":true,\"allowThrowingUnknown\":false}",
+			"\ndeclare const someAnyValue: any;\nPromise.reject(someAnyValue);\n      ",
+			0,
+		},
+		{
+			"{\"allowThrowingAny\":false,\"allowThrowingUnknown\":true}",
+			"\ndeclare const someUnknownValue: unknown;\nPromise.reject(someUnknownValue);\n      ",
+			0,
+		},
 		{"{\"allowEmptyReject\":true}", "\nnew Promise(function (resolve, reject) {\n  reject();\n});\n      ", 0},
-		{"{\"allowThrowingAny\":true,\"allowThrowingUnknown\":true}", "\ndeclare const someAnyValue: any;\nPromise.reject(someAnyValue);\n      ", 0},
-		{"{\"allowThrowingAny\":true,\"allowThrowingUnknown\":true}", "\ndeclare const someUnknownValue: unknown;\nPromise.reject(someUnknownValue);\n      ", 0},
-		{"{\"allow\":[{\"from\":\"file\",\"name\":\"CustomRejection\"}]}", "\nclass CustomRejection {}\nPromise.reject(new CustomRejection());\n      ", 0},
-		{"{\"allow\":[\"CustomRejection\"]}", "\nclass CustomRejection {}\nPromise.reject(new CustomRejection());\n      ", 0},
+		{
+			"{\"allowThrowingAny\":true,\"allowThrowingUnknown\":true}",
+			"\ndeclare const someAnyValue: any;\nPromise.reject(someAnyValue);\n      ",
+			0,
+		},
+		{
+			"{\"allowThrowingAny\":true,\"allowThrowingUnknown\":true}",
+			"\ndeclare const someUnknownValue: unknown;\nPromise.reject(someUnknownValue);\n      ",
+			0,
+		},
+		{
+			"{\"allow\":[{\"from\":\"file\",\"name\":\"CustomRejection\"}]}",
+			"\nclass CustomRejection {}\nPromise.reject(new CustomRejection());\n      ",
+			0,
+		},
+		{
+			"{\"allow\":[\"CustomRejection\"]}",
+			"\nclass CustomRejection {}\nPromise.reject(new CustomRejection());\n      ",
+			0,
+		},
 		{"{\"allow\":[{\"from\":\"lib\",\"name\":\"Date\"}]}", "\nPromise.reject(new Date());\n      ", 0},
-		{"{\"allow\":[{\"from\":\"lib\",\"name\":\"Date\"}]}", "\nnew Promise((resolve, reject) => reject(new Date()));\n      ", 0},
+		{
+			"{\"allow\":[{\"from\":\"lib\",\"name\":\"Date\"}]}",
+			"\nnew Promise((resolve, reject) => reject(new Date()));\n      ",
+			0,
+		},
 		{"{\"allowEmptyReject\":true}", "Promise.reject(undefined);", 1},
-		{"{\"allowThrowingAny\":false,\"allowThrowingUnknown\":true}", "\ndeclare const someAnyValue: any;\nPromise.reject(someAnyValue);\n      ", 1},
-		{"{\"allowThrowingAny\":true,\"allowThrowingUnknown\":false}", "\ndeclare const someUnknownValue: unknown;\nPromise.reject(someUnknownValue);\n      ", 1},
+		{
+			"{\"allowThrowingAny\":false,\"allowThrowingUnknown\":true}",
+			"\ndeclare const someAnyValue: any;\nPromise.reject(someAnyValue);\n      ",
+			1,
+		},
+		{
+			"{\"allowThrowingAny\":true,\"allowThrowingUnknown\":false}",
+			"\ndeclare const someUnknownValue: unknown;\nPromise.reject(someUnknownValue);\n      ",
+			1,
+		},
 	}
 	for index, testCase := range cases {
 		test.Run(fmt.Sprintf("upstream option case %d", index), func(test *testing.T) {
 			test.Parallel()
-			decoded, decodePreferPromiseRejectErrorsOptionsError := DecodePreferPromiseRejectErrorsOptions(json.RawMessage(testCase.optionsJson))
+			decoded, decodePreferPromiseRejectErrorsOptionsError := DecodePreferPromiseRejectErrorsOptions(
+				json.RawMessage(testCase.optionsJson),
+			)
 			if decodePreferPromiseRejectErrorsOptionsError != nil {
 				test.Fatalf("decoding %s: %v", testCase.optionsJson, decodePreferPromiseRejectErrorsOptionsError)
 			}
-			result := rule_testing.RunTypedWithOptions(test, PreferPromiseRejectErrors, preferPromiseRejectErrorsFile, testCase.sourceText, decoded)
+			result := rule_testing.RunTypedWithOptions(
+				test,
+				PreferPromiseRejectErrors,
+				preferPromiseRejectErrorsFile,
+				testCase.sourceText,
+				decoded,
+			)
 			expected := make([]string, testCase.findings)
 			for position := range expected {
 				expected[position] = "rejectAnError"
@@ -267,10 +370,22 @@ func TestPreferPromiseRejectErrorsAcrossFiles(test *testing.T) {
 		sourceText  string
 		findings    int
 	}{
-		{"{\"allow\":[{\"from\":\"package\",\"name\":\"ErrorLike\",\"package\":\"errors\"}]}", "\nimport { createError } from 'errors';\nPromise.reject(createError());\n      ", 1},                           // upstream: 0, see the harness note above
-		{"{\"allow\":[{\"from\":\"package\",\"name\":\"ErrorLike\",\"package\":\"errors\"}]}", "\nimport { createError } from 'errors';\nnew Promise((resolve, reject) => reject(createError()));\n      ", 1}, // upstream: 0, see the harness note above
+		{
+			"{\"allow\":[{\"from\":\"package\",\"name\":\"ErrorLike\",\"package\":\"errors\"}]}",
+			"\nimport { createError } from 'errors';\nPromise.reject(createError());\n      ",
+			1,
+		}, // upstream: 0, see the harness note above
+		{
+			"{\"allow\":[{\"from\":\"package\",\"name\":\"ErrorLike\",\"package\":\"errors\"}]}",
+			"\nimport { createError } from 'errors';\nnew Promise((resolve, reject) => reject(createError()));\n      ",
+			1,
+		}, // upstream: 0, see the harness note above
 		{"", "\nimport { createError } from 'errors';\nPromise.reject(createError());\n      ", 1},
-		{"", "\nimport { createError } from 'errors';\nnew Promise((resolve, reject) => reject(createError()));\n      ", 1},
+		{
+			"",
+			"\nimport { createError } from 'errors';\nnew Promise((resolve, reject) => reject(createError()));\n      ",
+			1,
+		},
 	}
 	for index, testCase := range cases {
 		test.Run(fmt.Sprintf("upstream module case %d", index), func(test *testing.T) {
@@ -281,13 +396,21 @@ func TestPreferPromiseRejectErrorsAcrossFiles(test *testing.T) {
 			}
 			var decoded any
 			if testCase.optionsJson != "" {
-				value, decodePreferPromiseRejectErrorsOptionsError := DecodePreferPromiseRejectErrorsOptions(json.RawMessage(testCase.optionsJson))
+				value, decodePreferPromiseRejectErrorsOptionsError := DecodePreferPromiseRejectErrorsOptions(
+					json.RawMessage(testCase.optionsJson),
+				)
 				if decodePreferPromiseRejectErrorsOptionsError != nil {
 					test.Fatalf("decoding %s: %v", testCase.optionsJson, decodePreferPromiseRejectErrorsOptionsError)
 				}
 				decoded = value
 			}
-			result := rule_testing.RunTypedFilesWithOptions(test, PreferPromiseRejectErrors, files, "/repository/source/Rejections.ts", decoded)
+			result := rule_testing.RunTypedFilesWithOptions(
+				test,
+				PreferPromiseRejectErrors,
+				files,
+				"/repository/source/Rejections.ts",
+				decoded,
+			)
 			expected := make([]string, testCase.findings)
 			for position := range expected {
 				expected[position] = "rejectAnError"
@@ -324,8 +447,14 @@ func TestPreferPromiseRejectErrorsSpans(test *testing.T) {
 		{"Promise.reject({ foo: 1 });", "Promise.reject({ foo: 1 })"},
 		{"Promise.reject([1, 2, 3]);", "Promise.reject([1, 2, 3])"},
 		{"\ndeclare const foo: Error | undefined;\nPromise.reject(foo);\n      ", "Promise.reject(foo)"},
-		{"\ndeclare const foo: () => Promise<string>;\nPromise.reject(await foo());\n      ", "Promise.reject(await foo())"},
-		{"\ndeclare const foo: boolean;\nPromise.reject(foo && new Error());\n      ", "Promise.reject(foo && new Error())"},
+		{
+			"\ndeclare const foo: () => Promise<string>;\nPromise.reject(await foo());\n      ",
+			"Promise.reject(await foo())",
+		},
+		{
+			"\ndeclare const foo: boolean;\nPromise.reject(foo && new Error());\n      ",
+			"Promise.reject(foo && new Error())",
+		},
 		{"\nconst foo = Promise;\nfoo.reject();\n      ", "foo.reject()"},
 		{"Promise.reject?.(5);", "Promise.reject?.(5)"},
 		{"Promise?.reject(5);", "Promise?.reject(5)"},
@@ -341,19 +470,30 @@ func TestPreferPromiseRejectErrorsSpans(test *testing.T) {
 		{"Promise.reject((foo &= new Error()));", "Promise.reject((foo &= new Error()))"},
 		{"\nnew Promise(function (resolve, reject) {\n  reject();\n});\n      ", "reject()"},
 		{"\nnew Promise(function (resolve, reject) {\n  reject(5);\n});\n      ", "reject(5)"},
-		{"\nnew Promise((resolve, reject) => {\n  fs.readFile('foo.txt', (err, file) => {\n    if (err) reject('File not found');\n    else resolve(file);\n  });\n});\n      ", "reject('File not found')"},
+		{
+			"\nnew Promise((resolve, reject) => {\n  fs.readFile('foo.txt', (err, file) => {\n    if (err) reject('File not found');\n    else resolve(file);\n  });\n});\n      ",
+			"reject('File not found')",
+		},
 		{"new Promise((yes, no) => no(5));", "no(5)"},
 		{"\nnew Promise(function (foo, arguments) {\n  arguments(5);\n});\n      ", "arguments(5)"},
 		{"\ndeclare const foo: never;\nnew Promise((resolve, reject) => reject(foo));\n      ", "reject(foo)"},
 		{"\nclass Foo extends Promise<number> {}\nFoo.reject(5);\n      ", "Foo.reject(5)"},
 		{"\ndeclare const foo: PromiseConstructor & string;\nfoo.reject(5);\n      ", "foo.reject(5)"},
 		{"\nclass Foo extends Promise<number> {}\nclass Bar extends Foo {}\nBar.reject(5);\n      ", "Bar.reject(5)"},
-		{"\ndeclare const foo: PromiseConstructor;\nfunction fun<T extends number>(t: T): void {\n  foo.reject(t);\n}\n      ", "foo.reject(t)"},
+		{
+			"\ndeclare const foo: PromiseConstructor;\nfunction fun<T extends number>(t: T): void {\n  foo.reject(t);\n}\n      ",
+			"foo.reject(t)",
+		},
 	}
 	for index, testCase := range cases {
 		test.Run(fmt.Sprintf("span %d", index), func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTyped(test, PreferPromiseRejectErrors, preferPromiseRejectErrorsFile, testCase.sourceText)
+			result := rule_testing.RunTyped(
+				test,
+				PreferPromiseRejectErrors,
+				preferPromiseRejectErrorsFile,
+				testCase.sourceText,
+			)
 			if len(result.Diagnostics) != 1 {
 				test.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
 			}
@@ -408,7 +548,12 @@ func TestPreferPromiseRejectErrorsExecutorReferenceScan(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTyped(test, PreferPromiseRejectErrors, preferPromiseRejectErrorsFile, testCase.sourceText)
+			result := rule_testing.RunTyped(
+				test,
+				PreferPromiseRejectErrors,
+				preferPromiseRejectErrorsFile,
+				testCase.sourceText,
+			)
 			expected := make([]string, testCase.findings)
 			for position := range expected {
 				expected[position] = "rejectAnError"
@@ -438,7 +583,12 @@ func TestPreferPromiseRejectErrorsExecutorShape(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTyped(test, PreferPromiseRejectErrors, preferPromiseRejectErrorsFile, testCase.sourceText)
+			result := rule_testing.RunTyped(
+				test,
+				PreferPromiseRejectErrors,
+				preferPromiseRejectErrorsFile,
+				testCase.sourceText,
+			)
 			expected := make([]string, testCase.findings)
 			for position := range expected {
 				expected[position] = "rejectAnError"
@@ -468,7 +618,12 @@ func TestPreferPromiseRejectErrorsStaticReceiver(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTyped(test, PreferPromiseRejectErrors, preferPromiseRejectErrorsFile, testCase.sourceText)
+			result := rule_testing.RunTyped(
+				test,
+				PreferPromiseRejectErrors,
+				preferPromiseRejectErrorsFile,
+				testCase.sourceText,
+			)
 			expected := make([]string, testCase.findings)
 			for position := range expected {
 				expected[position] = "rejectAnError"
@@ -501,7 +656,13 @@ func TestPreferPromiseRejectErrorsDefaultsAreOff(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			// nil options, exactly as a rule configured as bare "error" receives.
-			result := rule_testing.RunTypedWithOptions(test, PreferPromiseRejectErrors, preferPromiseRejectErrorsFile, testCase.sourceText, nil)
+			result := rule_testing.RunTypedWithOptions(
+				test,
+				PreferPromiseRejectErrors,
+				preferPromiseRejectErrorsFile,
+				testCase.sourceText,
+				nil,
+			)
 			rule_testing.ExpectFindings(test, result, "rejectAnError")
 		})
 	}
@@ -571,7 +732,11 @@ func TestPreferPromiseRejectErrorsRequiresTheTypedHarness(test *testing.T) {
 		}
 		untyped := rule_testing.Run(test, PreferPromiseRejectErrors, preferPromiseRejectErrorsFile, source)
 		if len(untyped.Diagnostics) != 0 {
-			test.Fatalf("untyped harness on %q: want 0 from the nil-checker guard, got %d", source, len(untyped.Diagnostics))
+			test.Fatalf(
+				"untyped harness on %q: want 0 from the nil-checker guard, got %d",
+				source,
+				len(untyped.Diagnostics),
+			)
 		}
 	}
 }

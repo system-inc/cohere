@@ -86,7 +86,11 @@ func main() {
 	out := flag.String("out", "", "directory to write the fixture pairs into (required unless -dry-run)")
 	dryRun := flag.Bool("dry-run", false, "report the counts without writing")
 	expect := flag.Int("expect", expectedFixtureCount, "fixture pairs a correct run finds; a mismatch aborts")
-	expectClean := flag.Int("expect-clean", expectedCleanFixtureCount, "clean fixture pairs a correct run finds; a mismatch aborts")
+	expectClean := flag.Int(
+		"expect-clean",
+		expectedCleanFixtureCount,
+		"clean fixture pairs a correct run finds; a mismatch aborts",
+	)
 	flag.Parse()
 
 	if *sha == "" {
@@ -125,10 +129,16 @@ func main() {
 	// A run that found nothing nested is the exact shape of the depth-anchored defect, and it would
 	// otherwise write a corpus two thirds the size and report success.
 	if nested == 0 {
-		fail("found no fixtures in subdirectories at all, which is the signature of a path-anchored filter rather than an empty tree")
+		fail(
+			"found no fixtures in subdirectories at all, which is the signature of a path-anchored filter rather than an empty tree",
+		)
 	}
 	if len(names) != *expect {
-		fail("found %d error fixtures, expected %d; if upstream really changed, read the diff and pass -expect", len(names), *expect)
+		fail(
+			"found %d error fixtures, expected %d; if upstream really changed, read the diff and pass -expect",
+			len(names),
+			*expect,
+		)
 	}
 
 	clean, err := cleanFixtureNames(*sha)
@@ -186,7 +196,9 @@ func errorFixtureNames(sha string) ([]string, error) {
 	// truncated tree is missing files with no way to know which, so this refuses rather than
 	// vendoring a corpus of unknown completeness.
 	if tree.Truncated {
-		return nil, fmt.Errorf("the git tree came back truncated, so the listing is incomplete and any count from it is wrong")
+		return nil, fmt.Errorf(
+			"the git tree came back truncated, so the listing is incomplete and any count from it is wrong",
+		)
 	}
 
 	var names []string

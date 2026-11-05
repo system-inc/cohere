@@ -12,7 +12,10 @@ func TestUnrunRuleReferencesAreOneNoteMostNamedFirst(test *testing.T) {
 	test.Parallel()
 	var out bytes.Buffer
 	stream := bufio.NewWriter(&out)
-	writeUnrunRuleReferences(stream, map[string]int{"jsx-a11y/alt-text": 1, "import/no-cycle": 2, "@eslint-react/no-array-index-key": 1})
+	writeUnrunRuleReferences(
+		stream,
+		map[string]int{"jsx-a11y/alt-text": 1, "import/no-cycle": 2, "@eslint-react/no-array-index-key": 1},
+	)
 	flushStream(test, stream)
 	want := "  directives: 4 disable comments name rules cohere doesn't run, which silences nothing here: " +
 		"import/no-cycle 2, @eslint-react/no-array-index-key 1, jsx-a11y/alt-text 1\n"

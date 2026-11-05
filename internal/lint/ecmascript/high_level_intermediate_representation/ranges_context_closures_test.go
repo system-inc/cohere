@@ -22,7 +22,12 @@ return <div onClick={callback}>{props.flag ? (()=>{consume(item);return null;})(
 		{"mixed", source, 0},
 		{"frozen", strings.Replace(source, "props.item??{}", "props.item", 1), 0},
 		{"direct call", strings.Replace(source, "(()=>{consume(item);return null;})()", "consume(item)", 1), 0},
-		{"unconditional call", strings.Replace(source, "props.flag ? (()=>{consume(item);return null;})() : null", "(()=>{consume(item);return null;})()", 1), 0},
+		{"unconditional call", strings.Replace(
+			source,
+			"props.flag ? (()=>{consume(item);return null;})() : null",
+			"(()=>{consume(item);return null;})()",
+			1,
+		), 0},
 		{"mutable", strings.Replace(source, "props.item??{}", "getItem(props.item)??{}", 1), 2},
 		{"missing dependency", strings.Replace(source, "[value]);", "[]);", 1), 1},
 	} {
@@ -54,8 +59,15 @@ func TestMixedCaptureClosureRefinementRetainsEffectGuards(test *testing.T) {
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			function, effects := effectsFor(test, "function Component(props) { const item=props.item??{}; return ()=>{"+testCase.body+"}; }")
-			aliasingGraph := mutation_aliasing.BuildAliasingGraph(newRangeGraph(function, effects), function, mutation_aliasing.Options{})
+			function, effects := effectsFor(
+				test,
+				"function Component(props) { const item=props.item??{}; return ()=>{"+testCase.body+"}; }",
+			)
+			aliasingGraph := mutation_aliasing.BuildAliasingGraph(
+				newRangeGraph(function, effects),
+				function,
+				mutation_aliasing.Options{},
+			)
 			closures := 0
 			for _, instruction := range function.Instructions {
 				if instruction == nil {
@@ -65,7 +77,9 @@ func TestMixedCaptureClosureRefinementRetainsEffectGuards(test *testing.T) {
 					continue
 				}
 				closures++
-				if got := aliasingGraph.Kind(instruction.LValue.Identifier) == mutation_aliasing.EffectValueFrozen; got != testCase.frozen {
+				if got := aliasingGraph.Kind(
+					instruction.LValue.Identifier,
+				) == mutation_aliasing.EffectValueFrozen; got != testCase.frozen {
 					test.Errorf("closure frozen=%t, want %t", got, testCase.frozen)
 				}
 			}

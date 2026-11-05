@@ -41,7 +41,9 @@ func decodeNoUnnecessaryBooleanLiteralCompareOptions(test *testing.T, configurat
 		// here is what puts the rule's own fallback under test rather than the decoder's.
 		return nil
 	}
-	options, decodeNoUnnecessaryBooleanLiteralCompareOptionsError := DecodeNoUnnecessaryBooleanLiteralCompareOptions([]byte(configuration))
+	options, decodeNoUnnecessaryBooleanLiteralCompareOptionsError := DecodeNoUnnecessaryBooleanLiteralCompareOptions(
+		[]byte(configuration),
+	)
 	if decodeNoUnnecessaryBooleanLiteralCompareOptionsError != nil {
 		test.Fatalf("could not decode %s: %v", configuration, decodeNoUnnecessaryBooleanLiteralCompareOptionsError)
 	}
@@ -816,7 +818,12 @@ func TestNoUnnecessaryBooleanLiteralCompareDecoderKeepsTheDefaultsTrue(test *tes
 		{"{}", true, true, false},
 		{"{\"allowComparingNullableBooleansToFalse\": false}", false, true, false},
 		{"{\"allowComparingNullableBooleansToTrue\": false}", true, false, false},
-		{"{\"allowComparingNullableBooleansToFalse\": false, \"allowComparingNullableBooleansToTrue\": false}", false, false, false},
+		{
+			"{\"allowComparingNullableBooleansToFalse\": false, \"allowComparingNullableBooleansToTrue\": false}",
+			false,
+			false,
+			false,
+		},
 		{"{\"allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing\": true}", true, true, true},
 		// An explicit true is not distinguishable from the default in behavior, but it is what the
 		// pointer field exists to allow, so it is asserted rather than assumed.
@@ -825,9 +832,15 @@ func TestNoUnnecessaryBooleanLiteralCompareDecoderKeepsTheDefaultsTrue(test *tes
 	for index, testCase := range cases {
 		test.Run(noUnnecessaryBooleanLiteralCompareCaseName(index), func(test *testing.T) {
 			test.Parallel()
-			decoded, decodeNoUnnecessaryBooleanLiteralCompareOptionsError := DecodeNoUnnecessaryBooleanLiteralCompareOptions([]byte(testCase.configuration))
+			decoded, decodeNoUnnecessaryBooleanLiteralCompareOptionsError := DecodeNoUnnecessaryBooleanLiteralCompareOptions(
+				[]byte(testCase.configuration),
+			)
 			if decodeNoUnnecessaryBooleanLiteralCompareOptionsError != nil {
-				test.Fatalf("decoding %s: %v", testCase.configuration, decodeNoUnnecessaryBooleanLiteralCompareOptionsError)
+				test.Fatalf(
+					"decoding %s: %v",
+					testCase.configuration,
+					decodeNoUnnecessaryBooleanLiteralCompareOptionsError,
+				)
 			}
 			options, ok := decoded.(NoUnnecessaryBooleanLiteralCompareOptions)
 			if !ok {

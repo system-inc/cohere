@@ -76,13 +76,21 @@ func decodeNoHtmlLinkForPagesOptions(raw []byte, base rule.OptionsBase) (any, er
 		seen := make(map[string]bool, len(elements))
 		for index, element := range elements {
 			var directory string
+			decodeError := json.Unmarshal(element, &directory)
 			// Go whitespace: raw JSON bytes of a rule's options, whose whitespace is the same in both sets.
-			if decodeError := json.Unmarshal(element, &directory); decodeError != nil || bytes.TrimSpace(element)[0] != '"' {
-				return nil, fmt.Errorf("element %d of the pages directory list is %s, and each must be a string", index+1, element)
+			if decodeError != nil || bytes.TrimSpace(element)[0] != '"' {
+				return nil, fmt.Errorf(
+					"element %d of the pages directory list is %s, and each must be a string",
+					index+1,
+					element,
+				)
 			}
 			// Upstream's schema says uniqueItems, so ESLint refuses the config before the rule runs.
 			if seen[directory] {
-				return nil, fmt.Errorf("the pages directory list names %q twice, and its entries must be unique", directory)
+				return nil, fmt.Errorf(
+					"the pages directory list names %q twice, and its entries must be unique",
+					directory,
+				)
 			}
 			seen[directory] = true
 			written = append(written, directory)

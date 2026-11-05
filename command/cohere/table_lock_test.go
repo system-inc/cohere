@@ -138,10 +138,22 @@ func TestAReaderNeverSeesOneWritersRunBesideAnothersFindings(test *testing.T) {
 			table := program.NewCacheTable()
 			table.Runs["--no-fix"] = &program.RunCache{Key: marker(index)}
 			table.Findings = &program.LintCache{Key: program.HashRuleSet([]string{marker(index)})}
-			err := program.WriteCacheTable(directory, table, identity, program.CacheTableSections{Runs: []string{"--no-fix"}}, program.PathAnchor{})
+			err := program.WriteCacheTable(
+				directory,
+				table,
+				identity,
+				program.CacheTableSections{Runs: []string{"--no-fix"}},
+				program.PathAnchor{},
+			)
 			time.Sleep(2 * time.Millisecond)
 			if err == nil {
-				err = program.WriteCacheTable(directory, table, identity, program.CacheTableSections{Findings: true}, program.PathAnchor{})
+				err = program.WriteCacheTable(
+					directory,
+					table,
+					identity,
+					program.CacheTableSections{Findings: true},
+					program.PathAnchor{},
+				)
 			}
 			release()
 			if err != nil {
@@ -164,7 +176,12 @@ func TestAReaderNeverSeesOneWritersRunBesideAnothersFindings(test *testing.T) {
 		release, _ := holdTableReadLock(directory, 10*time.Second)
 		// Ignored: a table not read, before the first write or for any other reason, holds neither file and is
 		// skipped below, and a reader that never reads fails the test on its count of reads.
-		table, _ := program.ReadCacheTable(directory, identity, program.CacheTableSections{Runs: []string{"--no-fix"}, Findings: true}, program.PathAnchor{})
+		table, _ := program.ReadCacheTable(
+			directory,
+			identity,
+			program.CacheTableSections{Runs: []string{"--no-fix"}, Findings: true},
+			program.PathAnchor{},
+		)
 		release()
 		run := table.Runs["--no-fix"]
 		if run == nil || table.Findings == nil {
@@ -181,7 +198,11 @@ func TestAReaderNeverSeesOneWritersRunBesideAnothersFindings(test *testing.T) {
 	default:
 	}
 	if reads < writes/2 {
-		test.Fatalf("only %d reads saw both files across %d writes, so the reader barely overlapped the writer", reads, writes)
+		test.Fatalf(
+			"only %d reads saw both files across %d writes, so the reader barely overlapped the writer",
+			reads,
+			writes,
+		)
 	}
 	if disagreements > 0 {
 		test.Errorf("%d of %d reads saw a run beside findings from another write", disagreements, reads)

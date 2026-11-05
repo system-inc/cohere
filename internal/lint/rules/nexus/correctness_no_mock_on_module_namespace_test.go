@@ -89,7 +89,12 @@ func correctnessNoMockOnModuleNamespaceRun(test *testing.T, sourceText string) r
 // correctnessNoMockOnModuleNamespaceRunUnder builds the fixture under a tsconfig of its own, with the
 // `module` option given and every TypeScript extension included, so a `.mts` or `.cts` subject and a
 // CommonJS program can be reached.
-func correctnessNoMockOnModuleNamespaceRunUnder(test *testing.T, module string, subjectFileName string, sourceText string) rule_testing.Result {
+func correctnessNoMockOnModuleNamespaceRunUnder(
+	test *testing.T,
+	module string,
+	subjectFileName string,
+	sourceText string,
+) rule_testing.Result {
 	test.Helper()
 	configuration := `{
 	"compilerOptions": {
@@ -105,7 +110,11 @@ func correctnessNoMockOnModuleNamespaceRunUnder(test *testing.T, module string, 
 	return rule_testing.RunTypedFilesWithSetup(test, CorrectnessNoMockOnModuleNamespace,
 		correctnessNoMockOnModuleNamespaceFiles(subjectFileName, sourceText), subjectFileName,
 		func(directory string) {
-			if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration), 0o644); writeError != nil {
+			if writeError := os.WriteFile(
+				filepath.Join(directory, "tsconfig.json"),
+				[]byte(configuration),
+				0o644,
+			); writeError != nil {
 				test.Fatalf("writing the tsconfig: %v", writeError)
 			}
 		})
@@ -137,7 +146,11 @@ func correctnessNoMockOnModuleNamespaceExpect(test *testing.T, result rule_testi
 			test.Fatalf("finding %d starts %q, want %q", index, firstLine, want[index])
 		}
 		if len(diagnostic.Fixes) != 0 || len(diagnostic.Suggestions) != 0 {
-			test.Fatalf("expected no fix and no suggestion, got %d and %d", len(diagnostic.Fixes), len(diagnostic.Suggestions))
+			test.Fatalf(
+				"expected no fix and no suggestion, got %d and %d",
+				len(diagnostic.Fixes),
+				len(diagnostic.Suggestions),
+			)
 		}
 	}
 }
@@ -166,7 +179,10 @@ func correctnessNoMockOnModuleNamespaceTransportSecurity(fixed bool) string {
 		"declare function searchBroadly(query: string): Promise<unknown>;",
 	}
 	lines = append(lines, exports...)
-	for _, name := range []string{"source searches pass hostile query text as an argv value", "iMessage search keeps metacharacters in argv"} {
+	for _, name := range []string{
+		"source searches pass hostile query text as an argv value",
+		"iMessage search keeps metacharacters in argv",
+	} {
 		lines = append(lines,
 			"test('"+name+"', async function() {",
 			"    const executions: string[] = [];",
@@ -296,11 +312,21 @@ func TestCorrectnessNoMockOnModuleNamespaceReadsTheModuleOption(test *testing.T)
 		"mock.method(NodeOs, 'hostname');",
 	)
 	for _, module := range []string{"esnext", "es2020", "preserve"} {
-		result := correctnessNoMockOnModuleNamespaceRunUnder(test, module, correctnessNoMockOnModuleNamespaceFile, source)
+		result := correctnessNoMockOnModuleNamespaceRunUnder(
+			test,
+			module,
+			correctnessNoMockOnModuleNamespaceFile,
+			source,
+		)
 		correctnessNoMockOnModuleNamespaceExpect(test, result, []string{"mock.method(NodeOs, 'hostname')"})
 	}
 	for _, module := range []string{"commonjs", "nodenext"} {
-		result := correctnessNoMockOnModuleNamespaceRunUnder(test, module, correctnessNoMockOnModuleNamespaceFile, source)
+		result := correctnessNoMockOnModuleNamespaceRunUnder(
+			test,
+			module,
+			correctnessNoMockOnModuleNamespaceFile,
+			source,
+		)
 		correctnessNoMockOnModuleNamespaceExpect(test, result, nil)
 	}
 }

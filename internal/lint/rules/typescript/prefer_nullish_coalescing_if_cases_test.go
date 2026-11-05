@@ -82,7 +82,12 @@ function lazyInitialize() {
   foo ??= makeFoo();
 }
 `},
-		{id: "preferNullishOverOr", line: 6, column: 9, reported: `||=`, suggested: `declare let foo: { a: string } | null;
+		{
+			id:       "preferNullishOverOr",
+			line:     6,
+			column:   9,
+			reported: `||=`,
+			suggested: `declare let foo: { a: string } | null;
 declare function makeFoo(): { a: string };
 
 function lazyInitialize() {
@@ -90,7 +95,8 @@ function lazyInitialize() {
     foo ??= makeFoo();
   }
 }
-`},
+`,
+		},
 	}},
 	{name: "upstream invalid[330]", source: `
 declare let foo: { a: string } | null;
@@ -122,7 +128,12 @@ function lazyInitialize() {
   return bar;
 }
       `, optionsJson: "", findings: []preferNullishCoalescingReplayed{
-		{id: "preferNullishOverAssignment", line: 5, column: 3, reported: `if (foo == null) foo = makeFoo();`, suggested: `declare let foo: { a: string } | null;
+		{
+			id:       "preferNullishOverAssignment",
+			line:     5,
+			column:   3,
+			reported: `if (foo == null) foo = makeFoo();`,
+			suggested: `declare let foo: { a: string } | null;
 declare function makeFoo(): { a: string };
 
 function lazyInitialize() {
@@ -130,7 +141,8 @@ function lazyInitialize() {
   const bar = 42;
   return bar;
 }
-`},
+`,
+		},
 	}},
 	{name: "upstream invalid[332]", source: `
 declare let foo: { a: string } | null;
@@ -142,7 +154,12 @@ function lazyInitialize() {
   return bar;
 }
       `, optionsJson: "", findings: []preferNullishCoalescingReplayed{
-		{id: "preferNullishOverAssignment", line: 5, column: 3, reported: `if (foo == null) foo ??= makeFoo();`, suggested: `declare let foo: { a: string } | null;
+		{
+			id:       "preferNullishOverAssignment",
+			line:     5,
+			column:   3,
+			reported: `if (foo == null) foo ??= makeFoo();`,
+			suggested: `declare let foo: { a: string } | null;
 declare function makeFoo(): { a: string };
 
 function lazyInitialize() {
@@ -150,7 +167,8 @@ function lazyInitialize() {
   const bar = 42;
   return bar;
 }
-`},
+`,
+		},
 	}},
 	{name: "upstream invalid[333]", source: `
 declare let foo: { a: string } | null;
@@ -162,7 +180,12 @@ function lazyInitialize() {
   return bar;
 }
       `, optionsJson: "", findings: []preferNullishCoalescingReplayed{
-		{id: "preferNullishOverAssignment", line: 5, column: 3, reported: `if (foo == null) foo ||= makeFoo();`, suggested: `declare let foo: { a: string } | null;
+		{
+			id:       "preferNullishOverAssignment",
+			line:     5,
+			column:   3,
+			reported: `if (foo == null) foo ||= makeFoo();`,
+			suggested: `declare let foo: { a: string } | null;
 declare function makeFoo(): { a: string };
 
 function lazyInitialize() {
@@ -170,8 +193,14 @@ function lazyInitialize() {
   const bar = 42;
   return bar;
 }
-`},
-		{id: "preferNullishOverOr", line: 5, column: 24, reported: `||=`, suggested: `declare let foo: { a: string } | null;
+`,
+		},
+		{
+			id:       "preferNullishOverOr",
+			line:     5,
+			column:   24,
+			reported: `||=`,
+			suggested: `declare let foo: { a: string } | null;
 declare function makeFoo(): { a: string };
 
 function lazyInitialize() {
@@ -179,7 +208,8 @@ function lazyInitialize() {
   const bar = 42;
   return bar;
 }
-`},
+`,
+		},
 	}},
 	{name: "upstream invalid[334]", source: `
 declare let foo: { a: string } | undefined;
@@ -360,11 +390,17 @@ declare function makeFoo(): string;
 
 if (foo == null) /* comment before 1 */ /* comment before 2 */ foo = makeFoo(); // comment inline
       `, optionsJson: "", findings: []preferNullishCoalescingReplayed{
-		{id: "preferNullishOverAssignment", line: 4, column: 1, reported: `if (foo == null) /* comment before 1 */ /* comment before 2 */ foo = makeFoo();`, suggested: `declare let foo: string | null;
+		{
+			id:       "preferNullishOverAssignment",
+			line:     4,
+			column:   1,
+			reported: `if (foo == null) /* comment before 1 */ /* comment before 2 */ foo = makeFoo();`,
+			suggested: `declare let foo: string | null;
 declare function makeFoo(): string;
 
 /* comment before 1 */ /* comment before 2 */ foo ??= makeFoo(); // comment inline
-`},
+`,
+		},
 	}},
 	{name: "upstream invalid[341]", source: `
 declare let foo: { a: string | null };

@@ -122,7 +122,12 @@ type UtilityBranch struct {
 // else is read off the candidate the same way upstream's handle body reads it: the presence of a
 // value, its kind, and the type inferred against the root's list in the root's own order, which
 // InferDataType already implements and which the descriptor rows already carry per root.
-func UtilityBranchFor(candidate *ParsedCandidate, typeList []DataType, resolvedAsColor bool, resolvedNamespace string) UtilityBranch {
+func UtilityBranchFor(
+	candidate *ParsedCandidate,
+	typeList []DataType,
+	resolvedAsColor bool,
+	resolvedNamespace string,
+) UtilityBranch {
 	branch := UtilityBranch{ResolvedAsColor: resolvedAsColor, ResolvedNamespace: resolvedNamespace}
 	if candidate == nil {
 		return branch
@@ -338,10 +343,14 @@ func (branch UtilityBranch) shadowIsColor() bool {
 // function and twelve mask edge roots run another, and the grouping is what makes that visible.
 var gapEmitters = map[string]GapEmitter{
 	// The eleven `borderSideUtility` registrations, in the source's own order.
-	"border":    borderSideEmitter("border-style", "border-width", "border-color"),
-	"border-x":  borderSideEmitter("border-inline-style", "border-inline-width", "border-inline-color"),
-	"border-y":  borderSideEmitter("border-block-style", "border-block-width", "border-block-color"),
-	"border-s":  borderSideEmitter("border-inline-start-style", "border-inline-start-width", "border-inline-start-color"),
+	"border":   borderSideEmitter("border-style", "border-width", "border-color"),
+	"border-x": borderSideEmitter("border-inline-style", "border-inline-width", "border-inline-color"),
+	"border-y": borderSideEmitter("border-block-style", "border-block-width", "border-block-color"),
+	"border-s": borderSideEmitter(
+		"border-inline-start-style",
+		"border-inline-start-width",
+		"border-inline-start-color",
+	),
 	"border-e":  borderSideEmitter("border-inline-end-style", "border-inline-end-width", "border-inline-end-color"),
 	"border-bs": borderSideEmitter("border-block-start-style", "border-block-start-width", "border-block-start-color"),
 	"border-be": borderSideEmitter("border-block-end-style", "border-block-end-width", "border-block-end-color"),
@@ -374,9 +383,14 @@ var gapEmitters = map[string]GapEmitter{
 
 	// The shadow family. The size arm's property lists are upstream's, including the `box-shadow`
 	// three of them end with and the two `--tw-drop-shadow*` declarations drop-shadow emits.
-	"shadow":       shadowFamilyEmitter("--tw-shadow-alpha", "--tw-shadow-color", "--tw-shadow", "box-shadow"),
-	"inset-shadow": shadowFamilyEmitter("--tw-inset-shadow-alpha", "--tw-inset-shadow-color", "--tw-inset-shadow", "box-shadow"),
-	"text-shadow":  shadowFamilyEmitter("--tw-text-shadow-alpha", "--tw-text-shadow-color", "text-shadow"),
+	"shadow": shadowFamilyEmitter("--tw-shadow-alpha", "--tw-shadow-color", "--tw-shadow", "box-shadow"),
+	"inset-shadow": shadowFamilyEmitter(
+		"--tw-inset-shadow-alpha",
+		"--tw-inset-shadow-color",
+		"--tw-inset-shadow",
+		"box-shadow",
+	),
+	"text-shadow": shadowFamilyEmitter("--tw-text-shadow-alpha", "--tw-text-shadow-color", "text-shadow"),
 
 	// `drop-shadow` is the shadow family's odd member and does not share their emitter. Its colour
 	// arm emits two declarations rather than one, because it writes `--tw-drop-shadow` as well as

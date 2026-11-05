@@ -24,9 +24,15 @@ func TestPathsMatchingTheSameOverridesShareOneResolution(test *testing.T) {
 	unmatched := configuration.Resolve("source/d.ts")
 
 	if first.Identity() == nil || first.Identity() != second.Identity() {
-		test.Fatalf("two paths matching the same override resolved apart: %v and %v", first.Identity(), second.Identity())
+		test.Fatalf(
+			"two paths matching the same override resolved apart: %v and %v",
+			first.Identity(),
+			second.Identity(),
+		)
 	}
-	if tested.Identity() == first.Identity() || unmatched.Identity() == first.Identity() || tested.Identity() == unmatched.Identity() {
+	if tested.Identity() == first.Identity() ||
+		unmatched.Identity() == first.Identity() ||
+		tested.Identity() == unmatched.Identity() {
 		test.Fatal("paths matching different overrides shared a resolution")
 	}
 

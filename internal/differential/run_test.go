@@ -42,7 +42,10 @@ func TestAControlTheComparisonMissedIsReportedMissed(test *testing.T) {
 		OnlyOn:  SideCohere,
 	}}}, nil, nil)
 	if !found[0].Detected {
-		test.Fatalf("a control present in the differences on the expected side must be detected, got %q", found[0].Detail)
+		test.Fatalf(
+			"a control present in the differences on the expected side must be detected, got %q",
+			found[0].Detail,
+		)
 	}
 }
 
@@ -85,7 +88,11 @@ func TestAbsentCoverageReadsAsZeroRatherThanAGuess(test *testing.T) {
 		"  note: rule consistency-no-utils-folder listened to no files",
 	})
 	if filesWalked != 0 || rulesRun != 0 {
-		test.Fatalf("a summary with no lint coverage line must read as 0/0, got %d files and %d rules", filesWalked, rulesRun)
+		test.Fatalf(
+			"a summary with no lint coverage line must read as 0/0, got %d files and %d rules",
+			filesWalked,
+			rulesRun,
+		)
 	}
 
 	// The real line, so this test cannot pass by never parsing anything.
@@ -93,7 +100,11 @@ func TestAbsentCoverageReadsAsZeroRatherThanAGuess(test *testing.T) {
 		"lint: 1 findings — 23 rules over 3407 files, 2098302 nodes visited, in 813ms",
 	})
 	if filesWalked != 3407 || rulesRun != 23 {
-		test.Fatalf("expected 3407 files and 23 rules from the real coverage line, got %d and %d", filesWalked, rulesRun)
+		test.Fatalf(
+			"expected 3407 files and 23 rules from the real coverage line, got %d and %d",
+			filesWalked,
+			rulesRun,
+		)
 	}
 }
 
@@ -262,7 +273,9 @@ func TestASharedControlDoesNotProveDirection(test *testing.T) {
 		test.Fatal("a detected shared control must not count as proving either direction")
 	}
 	if trustworthy, _ := provenance.Trustworthy(); trustworthy {
-		test.Fatal("a run carrying only a shared control has not shown it can detect a difference, so it must not be trustworthy")
+		test.Fatal(
+			"a run carrying only a shared control has not shown it can detect a difference, so it must not be trustworthy",
+		)
 	}
 }
 
@@ -482,8 +495,12 @@ func TestASupportFileIsNotCountedAsAControl(test *testing.T) {
 // identically while producing different results.
 func TestTheCapturedVersionDistinguishesTwoBuilds(test *testing.T) {
 	test.Parallel()
-	older := versionLineFrom("cohere dev\n  platform:       darwin/arm64\n  typescript-go:  unknown (built from cohere bd344fc70555)\n")
-	newer := versionLineFrom("cohere dev\n  platform:       darwin/arm64\n  compiler:       unknown (built from cohere 107d82cf8568)\n")
+	older := versionLineFrom(
+		"cohere dev\n  platform:       darwin/arm64\n  typescript-go:  unknown (built from cohere bd344fc70555)\n",
+	)
+	newer := versionLineFrom(
+		"cohere dev\n  platform:       darwin/arm64\n  compiler:       unknown (built from cohere 107d82cf8568)\n",
+	)
 
 	if older == newer {
 		test.Fatalf("two builds from different commits rendered identically as %q, so the field proves nothing", older)
@@ -525,9 +542,15 @@ func TestAnyFindingInAPlantedFileIsPlanted(test *testing.T) {
 		// A different rule, same planted file. Still the harness's own footprint.
 		{Finding: Finding{File: "control/Planted.ts", Line: 1, Rule: "consistency-organize-imports"}, OnlyOn: SideGate},
 		// A support file asserts nothing but a rule may still fire on it.
-		{Finding: Finding{File: "control/Target.ts", Line: 1, Rule: "consistency-require-constant-casing"}, OnlyOn: SideGate},
+		{
+			Finding: Finding{File: "control/Target.ts", Line: 1, Rule: "consistency-require-constant-casing"},
+			OnlyOn:  SideGate,
+		},
 		// A real file the harness never touched.
-		{Finding: Finding{File: "app/Real.tsx", Line: 9, Rule: "react-component-no-multiple-primary"}, OnlyOn: SideGate},
+		{
+			Finding: Finding{File: "app/Real.tsx", Line: 9, Rule: "react-component-no-multiple-primary"},
+			OnlyOn:  SideGate,
+		},
 	}}
 
 	markPlantedDifferences(&report, planted)
@@ -537,7 +560,10 @@ func TestAnyFindingInAPlantedFileIsPlanted(test *testing.T) {
 		test.Fatalf("only the untouched file's finding is observed, got %d: %+v", len(observed), observed)
 	}
 	if observed[0].Finding.File != "app/Real.tsx" {
-		test.Fatalf("the observed difference must be the one in a file the harness did not write, got %q", observed[0].Finding.File)
+		test.Fatalf(
+			"the observed difference must be the one in a file the harness did not write, got %q",
+			observed[0].Finding.File,
+		)
 	}
 
 	// The control: a report with no planted files must leave everything observed, so this cannot
@@ -559,7 +585,9 @@ func TestAnyFindingInAPlantedFileIsPlanted(test *testing.T) {
 func TestAPlantedBothActiveDifferenceDoesNotBlockAgreement(test *testing.T) {
 	test.Parallel()
 	report := Compare(Inputs{
-		CohereFindings:   []Finding{{File: "control/Planted.ts", Line: 3, Rule: "consistency-no-enum", Side: SideCohere}},
+		CohereFindings: []Finding{
+			{File: "control/Planted.ts", Line: 3, Rule: "consistency-no-enum", Side: SideCohere},
+		},
 		CoherePopulation: Population{Findings: 1, FilesWalked: 3407, Rules: 23},
 		GatePopulation:   Population{FilesWalked: 3407},
 		CohereRules:      map[string]bool{"consistency-no-enum": true},
@@ -599,13 +627,19 @@ func TestControlMatchesNeedsBothTheRuleAndThePath(test *testing.T) {
 		ExpectedSide: SideGate,
 	}
 
-	if !controlMatches(control, Finding{File: "control/PlantedOrder.ts", Line: 3, Rule: "consistency-organize-imports"}) {
+	if !controlMatches(
+		control,
+		Finding{File: "control/PlantedOrder.ts", Line: 3, Rule: "consistency-organize-imports"},
+	) {
 		test.Fatal("the finding this control planted must match")
 	}
 
 	// Same rule, different file. This is the live case: the gate's ordering rule also fires on the
 	// other control's file, and attributing it here would credit a control that did not plant it.
-	if controlMatches(control, Finding{File: "control/PlantedImport.ts", Line: 3, Rule: "consistency-organize-imports"}) {
+	if controlMatches(
+		control,
+		Finding{File: "control/PlantedImport.ts", Line: 3, Rule: "consistency-organize-imports"},
+	) {
 		test.Fatal("a finding of the same rule in a different file must not match: the path half is what rejects it")
 	}
 
@@ -712,10 +746,14 @@ func TestTheRulesContractIsBareNamesOnly(test *testing.T) {
 	// this must fail loudly rather than be absorbed.
 	withNote := bare + "note: 39 rules from a local build, so this is whatever was on disk when it was compiled\n"
 	if _, namesFromRuleLinesError := namesFromRuleLines(withNote); namesFromRuleLinesError == nil {
-		test.Fatal("a line carrying prose must be rejected: the contract is bare names, and absorbing prose hides a format change")
+		test.Fatal(
+			"a line carrying prose must be rejected: the contract is bare names, and absorbing prose hides a format change",
+		)
 	}
 
 	if _, namesFromRuleLinesError := namesFromRuleLines("   \n\n"); namesFromRuleLinesError == nil {
-		test.Fatal("an empty list must be rejected: a harness believing cohere implements nothing excuses every disagreement")
+		test.Fatal(
+			"an empty list must be rejected: a harness believing cohere implements nothing excuses every disagreement",
+		)
 	}
 }

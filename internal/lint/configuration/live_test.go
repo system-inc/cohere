@@ -35,7 +35,11 @@ func TestAgainstTheLiveConfig(test *testing.T) {
 		test.Fatalf("only %d rules loaded from the live config, which is not a real corpus", len(loaded.Rules))
 	}
 	if len(loaded.Overrides) == 0 || len(loaded.IgnorePatterns) == 0 {
-		test.Fatalf("overrides=%d ignorePatterns=%d, expected both non-empty", len(loaded.Overrides), len(loaded.IgnorePatterns))
+		test.Fatalf(
+			"overrides=%d ignorePatterns=%d, expected both non-empty",
+			len(loaded.Overrides),
+			len(loaded.IgnorePatterns),
+		)
 	}
 
 	// Generated code gets every rule (#c076xbg). The one override left is the GraphQL output's
@@ -45,7 +49,9 @@ func TestAgainstTheLiveConfig(test *testing.T) {
 	if graphQlOutput.Enabled("nexus/consistency-no-abbreviated-identifier") {
 		test.Error("the GraphQL output's interim abbreviation override did not apply")
 	}
-	workerBundle := loaded.Resolve("libraries/structure/source/api/web-sockets/shared-worker/WebSocketSharedWorkerCode.generated.ts")
+	workerBundle := loaded.Resolve(
+		"libraries/structure/source/api/web-sockets/shared-worker/WebSocketSharedWorkerCode.generated.ts",
+	)
 	// The folder spelling the ruling retired: a `generated/` override coming back would turn rules off here.
 	inGeneratedFolder := loaded.Resolve("libraries/structure/source/api/graphql/generated/GraphQlOperations.ts")
 	for _, ruleName := range []string{

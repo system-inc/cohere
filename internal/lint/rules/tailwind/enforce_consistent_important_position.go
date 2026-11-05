@@ -82,7 +82,9 @@ var EnforceConsistentImportantPosition = rule.Rule{
 
 		surfaces := DefaultClassLiteralSurfaces()
 		position := importantPositionRecommended
-		if configured, isConfigured := rule.OptionsAs[EnforceConsistentImportantPositionOptions](options); isConfigured {
+		if configured, isConfigured := rule.OptionsAs[EnforceConsistentImportantPositionOptions](
+			options,
+		); isConfigured {
 			surfaces = configured.ClassLiteralSurfaces()
 			if configured.Position == importantPositionLegacy {
 				position = importantPositionLegacy

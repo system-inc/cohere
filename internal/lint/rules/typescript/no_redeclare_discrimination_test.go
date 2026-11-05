@@ -55,16 +55,41 @@ func TestPartitionAndKindSeparatesAllTwentyThree(test *testing.T) {
 		// symbol, so identity saw one binding and predicted clean while upstream reports. Kind
 		// arithmetic answers all five: none of these pairs is drawn from a merge set.
 		{"dup enum", "enum H {A}\nenum H {B}", 1, "identity predicted clean; two enums are not a merge set"},
-		{"dup function", "function F() {}\nfunction F() {}", 1, "identity predicted clean; two function bodies are not overloads"},
-		{"dup var", "var a = 1;\nvar a = 2;", 1, "identity predicted clean; the single most common shape this rule must catch"},
-		{"var and type alias", "var d = 1;\ntype d = string;", 1, "identity predicted clean; a type alias merges with nothing"},
+		{
+			"dup function",
+			"function F() {}\nfunction F() {}",
+			1,
+			"identity predicted clean; two function bodies are not overloads",
+		},
+		{
+			"dup var",
+			"var a = 1;\nvar a = 2;",
+			1,
+			"identity predicted clean; the single most common shape this rule must catch",
+		},
+		{
+			"var and type alias",
+			"var d = 1;\ntype d = string;",
+			1,
+			"identity predicted clean; a type alias merges with nothing",
+		},
 		{"let and type alias", "let u = 1;\ntype u = string;", 1, "identity predicted clean; same, through a let"},
 
 		// The two identity got wrong in the reporting direction. Each is one name in two scopes that
 		// do not overlap, so identity saw two bindings and predicted a finding while upstream is
 		// silent. The scope partition answers both: two groups of one rather than one group of two.
-		{"separate function scopes", "function f1() { var x = 1; }\nfunction f2() { var x = 2; }", 0, "identity predicted a finding; the partition keeps these apart"},
-		{"let separate blocks", "{ let y = 1; }\n{ let y = 2; }", 0, "identity predicted a finding; block scopes are distinct containers"},
+		{
+			"separate function scopes",
+			"function f1() { var x = 1; }\nfunction f2() { var x = 2; }",
+			0,
+			"identity predicted a finding; the partition keeps these apart",
+		},
+		{
+			"let separate blocks",
+			"{ let y = 1; }\n{ let y = 2; }",
+			0,
+			"identity predicted a finding; block scopes are distinct containers",
+		},
 	}
 
 	disagreements := 0
@@ -73,7 +98,13 @@ func TestPartitionAndKindSeparatesAllTwentyThree(test *testing.T) {
 		got := len(result.Diagnostics)
 		if got != testCase.wantCount {
 			disagreements++
-			test.Errorf("%-26s got %d findings, upstream reports %d  %s", testCase.label, got, testCase.wantCount, testCase.note)
+			test.Errorf(
+				"%-26s got %d findings, upstream reports %d  %s",
+				testCase.label,
+				got,
+				testCase.wantCount,
+				testCase.note,
+			)
 		}
 	}
 	if disagreements != 0 {
@@ -103,7 +134,10 @@ func TestNoRedeclareTypeAliasBelongsToNoMergeSet(test *testing.T) {
 		sourceText string
 	}{
 		// The real-tree shape, generics and exports included, since that is what actually reported.
-		{"the TrackedPromise shape", "export type TrackedPromiseType<T> = { promise: Promise<T> };\nexport namespace TrackedPromiseType { export function create<T>() {} }"},
+		{
+			"the TrackedPromise shape",
+			"export type TrackedPromiseType<T> = { promise: Promise<T> };\nexport namespace TrackedPromiseType { export function create<T>() {} }",
+		},
 		{"type then namespace", "type X = { a: number };\nnamespace X { export function create() {} }"},
 		// Order flipped, because a rule reading only the first declaration's kind would pass the
 		// row above and fail this one.
@@ -121,7 +155,13 @@ func TestNoRedeclareTypeAliasBelongsToNoMergeSet(test *testing.T) {
 			// And with the merge exemptions explicitly off, which must not move the verdict. This is
 			// the half that separates a type alias from a class: there is no exemption to lift.
 			rule_testing.ExpectFindings(test,
-				rule_testing.RunTypedWithOptions(test, NoRedeclare, redeclareFile, testCase.sourceText, redeclareOptions(false)),
+				rule_testing.RunTypedWithOptions(
+					test,
+					NoRedeclare,
+					redeclareFile,
+					testCase.sourceText,
+					redeclareOptions(false),
+				),
 				"redeclared")
 		})
 	}

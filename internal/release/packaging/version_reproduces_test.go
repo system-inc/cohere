@@ -20,7 +20,11 @@ func TestTheLocalBuildNoteSaysWhetherACommitReproducesIt(test *testing.T) {
 		test.Fatalf("a clean build of a named commit still claims its rules are whatever was on disk:\n%s", committed)
 	}
 
-	dirty := Provenance{Version: "dev", SelfCommit: "7b434bb4105bb12698ec04d4ea5b932d37cc77a5", SourceTreeModified: true}.String()
+	dirty := Provenance{
+		Version:            "dev",
+		SelfCommit:         "7b434bb4105bb12698ec04d4ea5b932d37cc77a5",
+		SourceTreeModified: true,
+	}.String()
 	if !strings.Contains(dirty, "whatever was on disk") {
 		test.Fatalf("a build from a dirty tree lost its disclaimer:\n%s", dirty)
 	}

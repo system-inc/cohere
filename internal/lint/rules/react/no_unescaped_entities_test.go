@@ -24,21 +24,45 @@ func TestNoUnescapedEntitiesStaysSilent(test *testing.T) {
 		source string
 	}{
 		// upstream valid[0]
-		{name: "upstreamValid0", source: "\n        var Hello = createReactClass({\n          render: function() {\n            return (\n              <div/>\n            );\n          }\n        });\n      "},
+		{
+			name:   "upstreamValid0",
+			source: "\n        var Hello = createReactClass({\n          render: function() {\n            return (\n              <div/>\n            );\n          }\n        });\n      ",
+		},
 		// upstream valid[1]
-		{name: "upstreamValid1", source: "\n        var Hello = createReactClass({\n          render: function() {\n            return <div>Here is some text!</div>;\n          }\n        });\n      "},
+		{
+			name:   "upstreamValid1",
+			source: "\n        var Hello = createReactClass({\n          render: function() {\n            return <div>Here is some text!</div>;\n          }\n        });\n      ",
+		},
 		// upstream valid[2]
-		{name: "upstreamValid2", source: "\n        var Hello = createReactClass({\n          render: function() {\n            return <div>I&rsquo;ve escaped some entities: &gt; &lt; &amp;</div>;\n          }\n        });\n      "},
+		{
+			name:   "upstreamValid2",
+			source: "\n        var Hello = createReactClass({\n          render: function() {\n            return <div>I&rsquo;ve escaped some entities: &gt; &lt; &amp;</div>;\n          }\n        });\n      ",
+		},
 		// upstream valid[3]
-		{name: "upstreamValid3", source: "\n        var Hello = createReactClass({\n          render: function() {\n            return <div>first line is ok\n            so is second\n            and here are some escaped entities: &gt; &lt; &amp;</div>;\n          }\n        });\n      "},
+		{
+			name:   "upstreamValid3",
+			source: "\n        var Hello = createReactClass({\n          render: function() {\n            return <div>first line is ok\n            so is second\n            and here are some escaped entities: &gt; &lt; &amp;</div>;\n          }\n        });\n      ",
+		},
 		// upstream valid[4]
-		{name: "upstreamValid4", source: "\n        var Hello = createReactClass({\n          render: function() {\n            return <div>{\">\" + \"<\" + \"&\" + '\"'}</div>;\n          },\n        });\n      "},
+		{
+			name:   "upstreamValid4",
+			source: "\n        var Hello = createReactClass({\n          render: function() {\n            return <div>{\">\" + \"<\" + \"&\" + '\"'}</div>;\n          },\n        });\n      ",
+		},
 		// upstream valid[5], fragment
-		{name: "upstreamValid5", source: "\n        var Hello = createReactClass({\n          render: function() {\n            return <>Here is some text!</>;\n          }\n        });\n      "},
+		{
+			name:   "upstreamValid5",
+			source: "\n        var Hello = createReactClass({\n          render: function() {\n            return <>Here is some text!</>;\n          }\n        });\n      ",
+		},
 		// upstream valid[6], fragment
-		{name: "upstreamValid6", source: "\n        var Hello = createReactClass({\n          render: function() {\n            return <>I&rsquo;ve escaped some entities: &gt; &lt; &amp;</>;\n          }\n        });\n      "},
+		{
+			name:   "upstreamValid6",
+			source: "\n        var Hello = createReactClass({\n          render: function() {\n            return <>I&rsquo;ve escaped some entities: &gt; &lt; &amp;</>;\n          }\n        });\n      ",
+		},
 		// upstream valid[7], fragment
-		{name: "upstreamValid7", source: "\n        var Hello = createReactClass({\n          render: function() {\n            return <>{\">\" + \"<\" + \"&\" + '\"'}</>;\n          },\n        });\n      "},
+		{
+			name:   "upstreamValid7",
+			source: "\n        var Hello = createReactClass({\n          render: function() {\n            return <>{\">\" + \"<\" + \"&\" + '\"'}</>;\n          },\n        });\n      ",
+		},
 	}
 
 	for _, testCase := range cases {
@@ -143,9 +167,12 @@ func TestNoUnescapedEntitiesFires(test *testing.T) {
 		},
 		// upstream invalid[10], options {"forbid":[{"char":"&","alternatives":["&amp;"]}]}
 		{
-			name:    "upstreamInvalid10",
-			source:  "\n        var Hello = createReactClass({\n          render: function() {\n            return <span>foo & bar</span>;\n          }\n        });\n      ",
-			options: decodeNoUnescapedEntitiesOptionsForTest(test, "{\"forbid\":[{\"char\":\"&\",\"alternatives\":[\"&amp;\"]}]}"),
+			name:   "upstreamInvalid10",
+			source: "\n        var Hello = createReactClass({\n          render: function() {\n            return <span>foo & bar</span>;\n          }\n        });\n      ",
+			options: decodeNoUnescapedEntitiesOptionsForTest(
+				test,
+				"{\"forbid\":[{\"char\":\"&\",\"alternatives\":[\"&amp;\"]}]}",
+			),
 			wantIds: []string{"unescapedEntityAlts"},
 		},
 		// upstream invalid[11]
@@ -512,7 +539,12 @@ func TestNoUnescapedEntitiesLeavesEscapedEntitiesAlone(test *testing.T) {
 	test.Parallel()
 
 	rule_testing.ExpectClean(test,
-		rule_testing.Run(test, NoUnescapedEntities, "component.tsx", "const a = <div>&gt;&amp;&quot;&apos;&#125;</div>;"))
+		rule_testing.Run(
+			test,
+			NoUnescapedEntities,
+			"component.tsx",
+			"const a = <div>&gt;&amp;&quot;&apos;&#125;</div>;",
+		))
 }
 
 // applyOneSuggestion rewrites the source with one suggestion's fixes and returns the result.

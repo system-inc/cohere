@@ -198,7 +198,12 @@ type GroupOptions struct {
 
 // NewGroup is upstream's group().
 func NewGroup(contents Doc, options GroupOptions) *Group {
-	return &Group{ID: options.ID, Contents: contents, Break: options.ShouldBreak, ExpandedStates: options.ExpandedStates}
+	return &Group{
+		ID:             options.ID,
+		Contents:       contents,
+		Break:          options.ShouldBreak,
+		ExpandedStates: options.ExpandedStates,
+	}
 }
 
 // ConditionalGroup is upstream's conditionalGroup(): the first state is the contents.

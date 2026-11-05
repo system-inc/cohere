@@ -57,13 +57,20 @@ func TestAReExportResolvingElsewhereMovesItsImportersKeys(test *testing.T) {
 		if createDirectoryError := os.MkdirAll(filepath.Join(root, "c"), 0o755); createDirectoryError != nil {
 			test.Fatal(createDirectoryError)
 		}
-		if writeError := os.WriteFile(filepath.Join(root, "c", "index.ts"), []byte("export const v = 1;\n"), 0o644); writeError != nil {
+		if writeError := os.WriteFile(
+			filepath.Join(root, "c", "index.ts"),
+			[]byte("export const v = 1;\n"),
+			0o644,
+		); writeError != nil {
 			test.Fatal(writeError)
 		}
 		movedTypes, movedShapes := keysOf(test, root, "a.ts")
 		if movedTypes == types || movedShapes == shapes {
-			test.Errorf("a.ts's keys did not move when b.ts's re-export resolved to another file (type moved %v, shape moved %v)",
-				movedTypes != types, movedShapes != shapes)
+			test.Errorf(
+				"a.ts's keys did not move when b.ts's re-export resolved to another file (type moved %v, shape moved %v)",
+				movedTypes != types,
+				movedShapes != shapes,
+			)
 		}
 	})
 
@@ -87,8 +94,12 @@ func TestAReExportResolvingElsewhereMovesItsImportersKeys(test *testing.T) {
 		}
 		movedTypes, movedShapes := keysOf(test, root, "a.ts")
 		if movedTypes == types || movedShapes == shapes {
-			test.Errorf("a.ts's keys did not move when b.ts's re-export resolved to another installed file, though v changed "+
-				"from number to string (type moved %v, shape moved %v)", movedTypes != types, movedShapes != shapes)
+			test.Errorf(
+				"a.ts's keys did not move when b.ts's re-export resolved to another installed file, though v changed "+
+					"from number to string (type moved %v, shape moved %v)",
+				movedTypes != types,
+				movedShapes != shapes,
+			)
 		}
 	})
 }

@@ -69,10 +69,14 @@ func loadDataTypeCorpus(test *testing.T) dataTypeCorpus {
 		test.Fatalf("fixture holds only %d cases; expected several hundred shapes", len(corpus.Cases))
 	}
 	if !corpus.SegmentResolved {
-		test.Fatal("fixture was generated without resolving the engine's segment; its segment columns are not measurements")
+		test.Fatal(
+			"fixture was generated without resolving the engine's segment; its segment columns are not measurements",
+		)
 	}
 	if !corpus.IsLengthResolved || !corpus.IsPositiveIntegerResolved {
-		test.Fatalf("fixture was generated without resolving both helper predicates; its isLength/isPositiveInteger columns are not measurements")
+		test.Fatalf(
+			"fixture was generated without resolving both helper predicates; its isLength/isPositiveInteger columns are not measurements",
+		)
 	}
 	if len(corpus.Types) != 17 {
 		test.Fatalf("fixture carries %d types; the engine declares 17", len(corpus.Types))

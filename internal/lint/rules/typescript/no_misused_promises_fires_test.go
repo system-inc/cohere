@@ -270,7 +270,9 @@ f = async () => {
   return 3;
 };
       `,
-			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(NoMisusedPromisesChecksVoidReturnOptions{Variables: type_checking.Ref(true)})},
+			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(
+				NoMisusedPromisesChecksVoidReturnOptions{Variables: type_checking.Ref(true)},
+			)},
 			wantIds: []string{"voidReturnVariable"},
 		},
 		{
@@ -321,7 +323,9 @@ const obj: O = {
   f: async () => 'foo',
 };
       `,
-			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(NoMisusedPromisesChecksVoidReturnOptions{Properties: type_checking.Ref(true)})},
+			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(
+				NoMisusedPromisesChecksVoidReturnOptions{Properties: type_checking.Ref(true)},
+			)},
 			wantIds: []string{"voidReturnProperty"},
 		},
 		{
@@ -389,7 +393,9 @@ function f(): () => void {
   return async () => 0;
 }
       `,
-			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(NoMisusedPromisesChecksVoidReturnOptions{Returns: type_checking.Ref(true)})},
+			options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: type_checking.Ref(
+				NoMisusedPromisesChecksVoidReturnOptions{Returns: type_checking.Ref(true)},
+			)},
 			wantIds: []string{"voidReturnReturnValue"},
 		},
 		{
@@ -1318,7 +1324,13 @@ const obj: O = {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(test, NoMisusedPromises, testCase.fileName, testCase.sourceText, testCase.options)
+			result := rule_testing.RunTypedWithOptions(
+				test,
+				NoMisusedPromises,
+				testCase.fileName,
+				testCase.sourceText,
+				testCase.options,
+			)
 			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}

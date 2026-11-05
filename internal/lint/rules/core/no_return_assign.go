@@ -106,7 +106,9 @@ var NoReturnAssign = rule.Rule{
 		// severity must not silently run the strict half, and a typo must not silently escalate.
 		// Same reasoning, and the same direction, as no-cond-assign.
 		always := false
-		if mode, configured := rule.OptionsAs[NoReturnAssignOptions](options); configured && mode == NoReturnAssignAlways {
+		if mode, configured := rule.OptionsAs[NoReturnAssignOptions](
+			options,
+		); configured && mode == NoReturnAssignAlways {
 			always = true
 		}
 

@@ -84,12 +84,18 @@ func DecodePreferDestructuringOptions(list []byte) (any, error) {
 	}
 
 	var enabling preferDestructuringEnablingWire
-	if preferDestructuringDecodeStrictlyError := preferDestructuringDecodeStrictly(elements[0], &enabling); preferDestructuringDecodeStrictlyError != nil {
+	if preferDestructuringDecodeStrictlyError := preferDestructuringDecodeStrictly(
+		elements[0],
+		&enabling,
+	); preferDestructuringDecodeStrictlyError != nil {
 		return options, fmt.Errorf("prefer-destructuring element 1: %w", preferDestructuringDecodeStrictlyError)
 	}
 	if len(elements) > 1 {
 		var renamed preferDestructuringRenamedWire
-		if preferDestructuringDecodeStrictlyError := preferDestructuringDecodeStrictly(elements[1], &renamed); preferDestructuringDecodeStrictlyError != nil {
+		if preferDestructuringDecodeStrictlyError := preferDestructuringDecodeStrictly(
+			elements[1],
+			&renamed,
+		); preferDestructuringDecodeStrictlyError != nil {
 			return options, fmt.Errorf("prefer-destructuring element 2: %w", preferDestructuringDecodeStrictlyError)
 		}
 		if renamed.EnforceForRenamedProperties != nil {

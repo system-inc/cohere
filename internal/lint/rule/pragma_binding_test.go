@@ -10,7 +10,11 @@ import (
 
 func pragmaParse(test *testing.T, name, text string) *ast.SourceFile {
 	test.Helper()
-	file := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: tspath.RootedFilePath(name), PathKey: tspath.PathKey(name)}, text, core.ScriptKindTS)
+	file := parser.ParseSourceFile(
+		ast.SourceFileParseOptions{FileName: tspath.RootedFilePath(name), PathKey: tspath.PathKey(name)},
+		text,
+		core.ScriptKindTS,
+	)
 	// Standalone parser fixtures need the same parent links the bound program supplies.
 	var parents func(*ast.Node)
 	parents = func(node *ast.Node) {
@@ -61,7 +65,10 @@ func TestPragmaBindingChecksEveryForeignHeaderAgainstCuts(test *testing.T) {
 			var target *ast.Node
 			var walk func(*ast.Node)
 			walk = func(node *ast.Node) {
-				if (node.Kind == ast.KindVariableDeclaration || node.Kind == ast.KindBindingElement) && node.Name() != nil && node.Name().Kind == ast.KindIdentifier && node.Name().Text() == "createElement" {
+				if (node.Kind == ast.KindVariableDeclaration || node.Kind == ast.KindBindingElement) &&
+					node.Name() != nil &&
+					node.Name().Kind == ast.KindIdentifier &&
+					node.Name().Text() == "createElement" {
 					target = node
 				}
 				node.ForEachChild(func(child *ast.Node) bool { walk(child); return false })
@@ -86,7 +93,9 @@ func TestPragmaBindingChecksEveryForeignHeaderAgainstCuts(test *testing.T) {
 			}
 			// The same syntax in the home file remains legal, including local function bindings.
 			reader.home = file
-			if !reader.declaration(target) && tc.name != "top level arrow initializer" && tc.name != "parameter header" {
+			if !reader.declaration(target) &&
+				tc.name != "top level arrow initializer" &&
+				tc.name != "parameter header" {
 				test.Error("own-file pragma finding dropped")
 			}
 		})

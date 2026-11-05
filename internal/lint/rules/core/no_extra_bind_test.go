@@ -39,10 +39,25 @@ func TestNoExtraBindFires(test *testing.T) {
 		{"var a = function() { return 1; }[`bind`](b)", 33, 39, "var a = function() { return 1; }"},
 		{"var a = (() => { return 1; }).bind(b)", 30, 34, "var a = (() => { return 1; })"},
 		{"var a = (() => { return this; }).bind(b)", 33, 37, "var a = (() => { return this; })"},
-		{"var a = function() { (function(){ this.c }) }.bind(b)", 46, 50, "var a = function() { (function(){ this.c }) }"},
-		{"var a = function() { function c(){ this.d } }.bind(b)", 46, 50, "var a = function() { function c(){ this.d } }"},
+		{
+			"var a = function() { (function(){ this.c }) }.bind(b)",
+			46,
+			50,
+			"var a = function() { (function(){ this.c }) }",
+		},
+		{
+			"var a = function() { function c(){ this.d } }.bind(b)",
+			46,
+			50,
+			"var a = function() { function c(){ this.d } }",
+		},
 		{"var a = function() { return 1; }.bind(this)", 33, 37, "var a = function() { return 1; }"},
-		{"var a = function() { (function(){ (function(){ this.d }.bind(c)) }) }.bind(b)", 70, 74, "var a = function() { (function(){ (function(){ this.d }.bind(c)) }) }"},
+		{
+			"var a = function() { (function(){ (function(){ this.d }.bind(c)) }) }.bind(b)",
+			70,
+			74,
+			"var a = function() { (function(){ (function(){ this.d }.bind(c)) }) }",
+		},
 		{"var a = (function() { return 1; }).bind(this)", 35, 39, "var a = (function() { return 1; })"},
 		{"var a = (function() { return 1; }.bind)(this)", 34, 38, "var a = (function() { return 1; })"},
 		{"var a = function() {}.bind(b++)", 22, 26, nil},
@@ -70,16 +85,36 @@ func TestNoExtraBindFires(test *testing.T) {
 		// Beyond the corpus. A method shorthand and a class method rebind `this`, so a `this` inside
 		// one says nothing about the function being judged -- the same distinction upstream's corpus
 		// makes with a nested function declaration, on shapes it never writes.
-		{"var a = function() { var o = { m() { return this; } }; }.bind(b)", 57, 61, "var a = function() { var o = { m() { return this; } }; }"},
-		{"var a = function() { class C { m() { return this; } } }.bind(b)", 56, 60, "var a = function() { class C { m() { return this; } } }"},
+		{
+			"var a = function() { var o = { m() { return this; } }; }.bind(b)",
+			57,
+			61,
+			"var a = function() { var o = { m() { return this; } }; }",
+		},
+		{
+			"var a = function() { class C { m() { return this; } } }.bind(b)",
+			56,
+			60,
+			"var a = function() { class C { m() { return this; } } }",
+		},
 
 		// A getter and a setter, which are the two accessor shapes and neither is a corpus case.
-		{"var a = function() { var o = { get x() { return this; } }; }.bind(b)", 61, 65, "var a = function() { var o = { get x() { return this; } }; }"},
+		{
+			"var a = function() { var o = { get x() { return this; } }; }.bind(b)",
+			61,
+			65,
+			"var a = function() { var o = { get x() { return this; } }; }",
+		},
 
 		// A `this` inside a nested arrow does not save the outer function, so this reports while the
 		// corpus's `function() { return () => this; }` is clean. The difference is which function the
 		// arrow is written inside: here it is a nested function, so its `this` is that function's.
-		{"var a = function() { function c() { return () => this; } }.bind(b)", 59, 63, "var a = function() { function c() { return () => this; } }"},
+		{
+			"var a = function() { function c() { return () => this; } }.bind(b)",
+			59,
+			63,
+			"var a = function() { function c() { return () => this; } }",
+		},
 
 		// An argument that is a literal rather than an identifier, which upstream's allowed set
 		// covers and its corpus never writes.

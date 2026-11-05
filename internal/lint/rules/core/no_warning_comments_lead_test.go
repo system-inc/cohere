@@ -20,11 +20,17 @@ func TestNoWarningCommentsLeadAnswersAsThePatternDoes(test *testing.T) {
 	}{
 		{"default", noWarningCommentsDefaultTerms, NoWarningCommentsStart, nil},
 		{"decorated", noWarningCommentsDefaultTerms, NoWarningCommentsStart, []string{"*", "/"}},
-		// `-` is escaped as upstream escapes it, so it is one more character and `+` between `*` and `/` is not skipped.
+		// `-` is escaped as upstream escapes it, so it is one more character and `+` between `*` and `/` is not
+		// skipped.
 		{"a range in the decoration", noWarningCommentsDefaultTerms, NoWarningCommentsStart, []string{"*", "-", "/"}},
 		// `k` folds to the Kelvin sign and `s` to the long s, so a decoration of either skips both cases.
 		{"a decoration that folds", noWarningCommentsDefaultTerms, NoWarningCommentsStart, []string{"k"}},
-		{"a term that opens with a skipped character", []string{"*todo", " fixme", "kelvin", "ſtop", "日本"}, NoWarningCommentsStart, []string{"*"}},
+		{
+			"a term that opens with a skipped character",
+			[]string{"*todo", " fixme", "kelvin", "ſtop", "日本"},
+			NoWarningCommentsStart,
+			[]string{"*"},
+		},
 		{"an empty term", []string{""}, NoWarningCommentsStart, nil},
 		{"anywhere", noWarningCommentsDefaultTerms, NoWarningCommentsAnywhere, nil},
 	}

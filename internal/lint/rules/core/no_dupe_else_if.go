@@ -52,7 +52,10 @@ var NoDupeElseIf = rule.Rule{
 				// catching the second needs the parts as well as the whole.
 				conditionsToCheck := []*ast.Node{test}
 				if isLogicalOperator(test, ast.KindAmpersandAmpersandToken) {
-					conditionsToCheck = append(conditionsToCheck, splitByOperator(test, ast.KindAmpersandAmpersandToken)...)
+					conditionsToCheck = append(
+						conditionsToCheck,
+						splitByOperator(test, ast.KindAmpersandAmpersandToken)...,
+					)
 				}
 
 				// Each condition becomes a list of `OR`-groups, each group a list of `AND`-operands.

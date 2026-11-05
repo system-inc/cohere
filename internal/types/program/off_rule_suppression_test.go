@@ -78,7 +78,9 @@ func TestADirectiveNamingAnOffRuleIsDead(test *testing.T) {
 			directory := writeProject(test, map[string]string{
 				"tsconfig.json":       minimalConfig,
 				"CohereSettings.json": settings,
-				"main.ts":             "// eslint-disable-next-line " + shape.directive + " -- the reason\nconst a = 1;\n",
+				"main.ts": "// eslint-disable-next-line " +
+					shape.directive +
+					" -- the reason\nconst a = 1;\n",
 			})
 			graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
 			if err != nil {
@@ -89,7 +91,11 @@ func TestADirectiveNamingAnOffRuleIsDead(test *testing.T) {
 				test.Fatalf("loading the config: %v", err)
 			}
 
-			result, err := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{quiet, registeredOff, prefixed})
+			result, err := graph.Walk(
+				context.Background(),
+				graph.ProjectFiles(),
+				[]rule.Rule{quiet, registeredOff, prefixed},
+			)
 			if err != nil {
 				test.Fatalf("walking: %v", err)
 			}
@@ -104,7 +110,12 @@ func TestADirectiveNamingAnOffRuleIsDead(test *testing.T) {
 			}
 			// Each dead directive is named, and only those: one for an unported rule is not dead.
 			if len(coverage.DeadSuppressions) != shape.wantDead {
-				test.Errorf("named %d dead directives, want %d: %+v", len(coverage.DeadSuppressions), shape.wantDead, coverage.DeadSuppressions)
+				test.Errorf(
+					"named %d dead directives, want %d: %+v",
+					len(coverage.DeadSuppressions),
+					shape.wantDead,
+					coverage.DeadSuppressions,
+				)
 			}
 		})
 	}

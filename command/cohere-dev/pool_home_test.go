@@ -63,7 +63,11 @@ func TestATrimRefusesACacheItsPoolDoesNotGuard(test *testing.T) {
 	}
 	// Elsewhere: not under the pool home's user cache directory.
 	cache := test.TempDir()
-	if writeError := os.WriteFile(filepath.Join(cache, "README"), []byte("This directory holds cached build artifacts from the Go build system.\n"), 0o644); writeError != nil {
+	if writeError := os.WriteFile(
+		filepath.Join(cache, "README"),
+		[]byte("This directory holds cached build artifacts from the Go build system.\n"),
+		0o644,
+	); writeError != nil {
 		test.Fatal(writeError)
 	}
 	for index := 0; index < 10; index++ {
@@ -101,7 +105,10 @@ func TestATrimRefusesACacheItsPoolDoesNotGuard(test *testing.T) {
 		test.Errorf("the trim removed entries from a cache its pool does not guard: %d of 10 left", remaining)
 	}
 	log := readMaybeMissing(test, filepath.Join(slots, "gocache-trim.log"))
-	if !strings.Contains(string(log), "not trimmed: the Go build cache "+cache+" is outside "+userCacheDirectoryIn(home)) {
+	if !strings.Contains(
+		string(log),
+		"not trimmed: the Go build cache "+cache+" is outside "+userCacheDirectoryIn(home),
+	) {
 		test.Errorf("the pool's log does not say why the cache was not trimmed:\n%s", log)
 	}
 	if _, statError := os.Stat(filepath.Join(userCacheDirectoryIn(scratch), "cohere")); !os.IsNotExist(statError) {
@@ -115,7 +122,10 @@ func TestATrimRefusesACacheItsPoolDoesNotGuard(test *testing.T) {
 func scratchHome(test *testing.T) string {
 	test.Helper()
 	home := test.TempDir()
-	for _, configuration := range []string{filepath.Join(home, "Library", "Application Support"), filepath.Join(home, ".config")} {
+	for _, configuration := range []string{
+		filepath.Join(home, "Library", "Application Support"),
+		filepath.Join(home, ".config"),
+	} {
 		telemetry := filepath.Join(configuration, "go", "telemetry")
 		if createDirectoryError := os.MkdirAll(telemetry, 0o755); createDirectoryError != nil {
 			test.Fatal(createDirectoryError)

@@ -106,18 +106,31 @@ func TestFrameworkVariantTableMatchesTheEngine(test *testing.T) {
 	for _, entry := range entries {
 		registration, isPresent := generated[entry.Name]
 		if !isPresent {
-			test.Errorf("the engine registers %q and the table does not, so `%s:` would not parse", entry.Name, entry.Name)
+			test.Errorf(
+				"the engine registers %q and the table does not, so `%s:` would not parse",
+				entry.Name,
+				entry.Name,
+			)
 			continue
 		}
 		if registration.Order != entry.Order {
-			test.Errorf("%q holds order %d in the table and %d on the engine", entry.Name, registration.Order, entry.Order)
+			test.Errorf(
+				"%q holds order %d in the table and %d on the engine",
+				entry.Name,
+				registration.Order,
+				entry.Order,
+			)
 		}
 		if registration.Kind != entry.Kind {
 			test.Errorf("%q is %q in the table and %q on the engine", entry.Name, registration.Kind, entry.Kind)
 		}
 	}
 
-	test.Logf("tailwind %s: %d framework registrations compared, names, orders and kinds", TailwindVersion, len(entries))
+	test.Logf(
+		"tailwind %s: %d framework registrations compared, names, orders and kinds",
+		TailwindVersion,
+		len(entries),
+	)
 }
 
 // TestFrameworkVariantComparisonGroupsMatchTheEngine pins which orders carry a comparison function.
@@ -170,7 +183,11 @@ func TestFrameworkVariantComparisonGroupsMatchTheEngine(test *testing.T) {
 		}
 		for _, member := range group.Members {
 			if !holders[member] {
-				test.Errorf("order %d records member %q, which does not hold that order on the engine", group.Order, member)
+				test.Errorf(
+					"order %d records member %q, which does not hold that order on the engine",
+					group.Order,
+					member,
+				)
 			}
 		}
 	}
@@ -220,7 +237,12 @@ func TestFrameworkVariantTableHasSharedOrders(test *testing.T) {
 		}
 	}
 
-	test.Logf("%d registrations over %d distinct orders, %d shared", len(FrameworkVariantRegistrations), len(byOrder), shared)
+	test.Logf(
+		"%d registrations over %d distinct orders, %d shared",
+		len(FrameworkVariantRegistrations),
+		len(byOrder),
+		shared,
+	)
 }
 
 // TestRegisterFrameworkVariantsPreservesSharedOrders pins the replay method against the sequential
@@ -341,7 +363,11 @@ func frameworkVariantStylesheet(test *testing.T, entry string) (string, string) 
   --container-lg: 32rem;
 }
 `
-	if writeError := os.WriteFile(filepath.Join(packageRoot, "index.css"), []byte(framework), 0o644); writeError != nil {
+	if writeError := os.WriteFile(
+		filepath.Join(packageRoot, "index.css"),
+		[]byte(framework),
+		0o644,
+	); writeError != nil {
 		test.Fatalf("write framework: %v", writeError)
 	}
 
@@ -387,7 +413,9 @@ func TestLoadedDesignSystemRegistersTheFrameworkVariants(test *testing.T) {
 @custom-variant dark (&:where(.dark *));
 `)
 
-	system, loadDesignSystemError := LoadDesignSystem(LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot})
+	system, loadDesignSystemError := LoadDesignSystem(
+		LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot},
+	)
 	if loadDesignSystemError != nil {
 		test.Fatalf("loading: %v", loadDesignSystemError)
 	}
@@ -412,7 +440,9 @@ func TestLoadedDesignSystemRegistersTheFrameworkVariants(test *testing.T) {
 	contributions := system.Contributions()
 	for _, name := range contributions.NewVariantNames {
 		if name == "dark" {
-			test.Error("`dark` was reported as a new repository variant; it redefines a framework registration in place")
+			test.Error(
+				"`dark` was reported as a new repository variant; it redefines a framework registration in place",
+			)
 		}
 	}
 }
@@ -430,7 +460,9 @@ func TestLoadedDesignSystemParsesVariantBearingClasses(test *testing.T) {
 @custom-variant dark (&:where(.dark *));
 `)
 
-	system, loadDesignSystemError := LoadDesignSystem(LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot})
+	system, loadDesignSystemError := LoadDesignSystem(
+		LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot},
+	)
 	if loadDesignSystemError != nil {
 		test.Fatalf("loading: %v", loadDesignSystemError)
 	}
@@ -463,7 +495,9 @@ func TestFrameworkBreakpointsOrderByResolvedWidth(test *testing.T) {
 	test.Parallel()
 	entryPoint, packageRoot := frameworkVariantStylesheet(test, `@import "tailwindcss";`)
 
-	system, loadDesignSystemError := LoadDesignSystem(LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot})
+	system, loadDesignSystemError := LoadDesignSystem(
+		LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot},
+	)
 	if loadDesignSystemError != nil {
 		test.Fatalf("loading: %v", loadDesignSystemError)
 	}
@@ -499,7 +533,9 @@ func TestBreakpointComparisonReadsTheLiveTheme(test *testing.T) {
 }
 `)
 
-	system, loadDesignSystemError := LoadDesignSystem(LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot})
+	system, loadDesignSystemError := LoadDesignSystem(
+		LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot},
+	)
 	if loadDesignSystemError != nil {
 		test.Fatalf("loading: %v", loadDesignSystemError)
 	}
@@ -533,15 +569,25 @@ func TestContainerQueriesReadTheContainerNamespace(test *testing.T) {
 }
 `)
 
-	system, loadDesignSystemError := LoadDesignSystem(LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot})
+	system, loadDesignSystemError := LoadDesignSystem(
+		LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot},
+	)
 	if loadDesignSystemError != nil {
 		test.Fatalf("loading: %v", loadDesignSystemError)
 	}
 
 	// `@sm` and `@lg` are functional variants over the `@` root, not static ones.
 	variants := []ParsedVariant{
-		{Kind: ParsedVariantKindFunctional, Root: "@", Value: &ParsedVariantValue{Kind: ParsedValueKindNamed, Value: "sm"}},
-		{Kind: ParsedVariantKindFunctional, Root: "@", Value: &ParsedVariantValue{Kind: ParsedValueKindNamed, Value: "lg"}},
+		{
+			Kind:  ParsedVariantKindFunctional,
+			Root:  "@",
+			Value: &ParsedVariantValue{Kind: ParsedValueKindNamed, Value: "sm"},
+		},
+		{
+			Kind:  ParsedVariantKindFunctional,
+			Root:  "@",
+			Value: &ParsedVariantValue{Kind: ParsedValueKindNamed, Value: "lg"},
+		},
 	}
 	order := system.Variants().BuildVariantOrder(variants)
 	smallIndex, _ := order.IndexOf(variants[0])
@@ -580,7 +626,9 @@ func TestThemeDefinedBreakpointSortsAmongTheFrameworkOnes(test *testing.T) {
 }
 `)
 
-	system, loadDesignSystemError := LoadDesignSystem(LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot})
+	system, loadDesignSystemError := LoadDesignSystem(
+		LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot},
+	)
 	if loadDesignSystemError != nil {
 		test.Fatalf("loading: %v", loadDesignSystemError)
 	}
@@ -631,13 +679,17 @@ func TestThemeContainerKeysRegisterNothing(test *testing.T) {
 }
 `)
 
-	system, loadDesignSystemError := LoadDesignSystem(LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot})
+	system, loadDesignSystemError := LoadDesignSystem(
+		LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot},
+	)
 	if loadDesignSystemError != nil {
 		test.Fatalf("loading: %v", loadDesignSystemError)
 	}
 
 	if system.HasVariant("huge") {
-		test.Error("`--container-huge` should not register a `huge` variant; the engine reaches it through the `@` root")
+		test.Error(
+			"`--container-huge` should not register a `huge` variant; the engine reaches it through the `@` root",
+		)
 	}
 	if got := len(system.Variants().Registrations()); got != len(FrameworkVariantRegistrations) {
 		test.Errorf(
@@ -661,7 +713,9 @@ func TestRedefiningAFrameworkBreakpointDoesNotRegisterAgain(test *testing.T) {
 }
 `)
 
-	system, loadDesignSystemError := LoadDesignSystem(LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot})
+	system, loadDesignSystemError := LoadDesignSystem(
+		LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot},
+	)
 	if loadDesignSystemError != nil {
 		test.Fatalf("loading: %v", loadDesignSystemError)
 	}

@@ -39,7 +39,11 @@ func TestEveryDiagnosticIsAttributed(test *testing.T) {
 		count := 0
 		for message, occurrences := range unattributed {
 			count += occurrences
-			test.Errorf("no category for %q (%d occurrences); read its emission site upstream and add it", message, occurrences)
+			test.Errorf(
+				"no category for %q (%d occurrences); read its emission site upstream and add it",
+				message,
+				occurrences,
+			)
 		}
 		test.Errorf("%d of %d diagnostics unattributed", count, total)
 	}
@@ -76,7 +80,11 @@ func TestAttributionReproducesTheGoldensOwnHeadings(test *testing.T) {
 			}
 			heading, known := HeadingForCategory(category)
 			if !known {
-				test.Errorf("%s: category %q has no heading; the transcription of upstream's printer is incomplete", fixture.Name, category)
+				test.Errorf(
+					"%s: category %q has no heading; the transcription of upstream's printer is incomplete",
+					fixture.Name,
+					category,
+				)
 				continue
 			}
 			checked++
@@ -106,7 +114,10 @@ func TestEveryCategoryMapsToARule(test *testing.T) {
 	test.Parallel()
 	for _, category := range categoryByMessage {
 		if _, found := RuleForCategory(category); !found {
-			test.Errorf("category %q has no rule name; ruleByCategory is missing an entry from getRuleForCategory", category)
+			test.Errorf(
+				"category %q has no rule name; ruleByCategory is missing an entry from getRuleForCategory",
+				category,
+			)
 		}
 		if _, found := HeadingForCategory(category); !found {
 			test.Errorf("category %q has no heading", category)
@@ -248,7 +259,10 @@ func TestRulesShippedInVerifyWithNoErrorNamedFixture(test *testing.T) {
 
 	for _, ruleName := range []string{"error-boundaries", "set-state-in-effect", "static-components", "void-use-memo"} {
 		if covered[ruleName] {
-			test.Errorf("%s now has an error-named fixture; it was measured at zero when this was written, so score it rather than leaving it declined", ruleName)
+			test.Errorf(
+				"%s now has an error-named fixture; it was measured at zero when this was written, so score it rather than leaving it declined",
+				ruleName,
+			)
 		}
 	}
 }

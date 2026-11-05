@@ -10,10 +10,16 @@ const correctnessNoUnclearedRaceTimeoutId = "unclearedRaceTimeout"
 
 // correctnessNoUnclearedRaceTimeoutText is the rule's message, whose wording lives in
 // `policy/messages/correctness-no-uncleared-race-timeout.json`.
-var correctnessNoUnclearedRaceTimeoutText = policy.MessageOf("nexus/correctness-no-uncleared-race-timeout", correctnessNoUnclearedRaceTimeoutId)
+var correctnessNoUnclearedRaceTimeoutText = policy.MessageOf(
+	"nexus/correctness-no-uncleared-race-timeout",
+	correctnessNoUnclearedRaceTimeoutId,
+)
 
 func correctnessNoUnclearedRaceTimeoutMessage() rule.Message {
-	return rule.Message{Id: correctnessNoUnclearedRaceTimeoutId, Description: correctnessNoUnclearedRaceTimeoutText.Render(nil)}
+	return rule.Message{
+		Id:          correctnessNoUnclearedRaceTimeoutId,
+		Description: correctnessNoUnclearedRaceTimeoutText.Render(nil),
+	}
 }
 
 // CorrectnessNoUnclearedRaceTimeout reports a timeout armed inside a `Promise.race` whose timer
@@ -102,7 +108,11 @@ func correctnessNoUnclearedRaceTimeoutCheckRace(ruleContext rule.Context, node *
 	if name.Kind != ast.KindIdentifier || name.Text() != "race" {
 		return
 	}
-	if !correctnessNoUnclearedRaceTimeoutIsLibraryMember(ruleContext, ruleContext.TypeChecker.GetSymbolAtLocation(name), "PromiseConstructor") {
+	if !correctnessNoUnclearedRaceTimeoutIsLibraryMember(
+		ruleContext,
+		ruleContext.TypeChecker.GetSymbolAtLocation(name),
+		"PromiseConstructor",
+	) {
 		return
 	}
 	if call.Arguments == nil || len(call.Arguments.Nodes) == 0 {
@@ -125,13 +135,20 @@ func correctnessNoUnclearedRaceTimeoutCheckRace(ruleContext rule.Context, node *
 
 // correctnessNoUnclearedRaceTimeoutIsLibraryMember says whether a symbol is a member of the named
 // interface in the default library, with every declaration there.
-func correctnessNoUnclearedRaceTimeoutIsLibraryMember(ruleContext rule.Context, symbol *ast.Symbol, interfaceName string) bool {
+func correctnessNoUnclearedRaceTimeoutIsLibraryMember(
+	ruleContext rule.Context,
+	symbol *ast.Symbol,
+	interfaceName string,
+) bool {
 	if symbol == nil || len(symbol.Declarations) == 0 {
 		return false
 	}
 	for _, declaration := range symbol.Declarations {
 		owner := declaration.Parent
-		if owner == nil || owner.Kind != ast.KindInterfaceDeclaration || owner.Name() == nil || owner.Name().Text() != interfaceName {
+		if owner == nil ||
+			owner.Kind != ast.KindInterfaceDeclaration ||
+			owner.Name() == nil ||
+			owner.Name().Text() != interfaceName {
 			return false
 		}
 		file := ast.GetSourceFileOfNode(declaration)
@@ -153,7 +170,8 @@ func correctnessNoUnclearedRaceTimeoutPromise(ruleContext rule.Context, element 
 			return nil
 		}
 		declaration := symbol.Declarations[0]
-		if declaration.Kind != ast.KindVariableDeclaration || ast.GetSourceFileOfNode(declaration) != ruleContext.SourceFile {
+		if declaration.Kind != ast.KindVariableDeclaration ||
+			ast.GetSourceFileOfNode(declaration) != ruleContext.SourceFile {
 			return nil
 		}
 		list := declaration.Parent
@@ -171,7 +189,10 @@ func correctnessNoUnclearedRaceTimeoutPromise(ruleContext rule.Context, element 
 	}
 	constructor := ast.SkipParentheses(promise.AsNewExpression().Expression)
 	if constructor.Kind != ast.KindIdentifier || constructor.Text() != "Promise" ||
-		!rule.IsSymbolFromDefaultLibrary(ruleContext.Program, ruleContext.TypeChecker.GetSymbolAtLocation(constructor)) {
+		!rule.IsSymbolFromDefaultLibrary(
+			ruleContext.Program,
+			ruleContext.TypeChecker.GetSymbolAtLocation(constructor),
+		) {
 		return nil
 	}
 	return promise
@@ -201,7 +222,8 @@ func correctnessNoUnclearedRaceTimeoutLostTimers(ruleContext rule.Context, promi
 			// executor's.
 			return false
 		}
-		if node.Kind == ast.KindCallExpression && correctnessNoUnclearedRaceTimeoutIsGlobalSetTimeout(ruleContext, node) &&
+		if node.Kind == ast.KindCallExpression &&
+			correctnessNoUnclearedRaceTimeoutIsGlobalSetTimeout(ruleContext, node) &&
 			correctnessNoUnclearedRaceTimeoutHandleIsLost(ruleContext, executor, node) {
 			lost = append(lost, node)
 		}
@@ -290,7 +312,10 @@ func correctnessNoUnclearedRaceTimeoutHandleIsLost(ruleContext rule.Context, exe
 		if name == nil || name.Kind != ast.KindIdentifier {
 			return false
 		}
-		return correctnessNoUnclearedRaceTimeoutNeverRead(ruleContext, ruleContext.TypeChecker.GetSymbolAtLocation(name))
+		return correctnessNoUnclearedRaceTimeoutNeverRead(
+			ruleContext,
+			ruleContext.TypeChecker.GetSymbolAtLocation(name),
+		)
 	case parent.Kind == ast.KindBinaryExpression:
 		binary := parent.AsBinaryExpression()
 		if binary.OperatorToken.Kind != ast.KindEqualsToken || binary.Right != outer {
@@ -308,7 +333,10 @@ func correctnessNoUnclearedRaceTimeoutHandleIsLost(ruleContext rule.Context, exe
 		if assignment.Parent == nil || assignment.Parent.Kind != ast.KindExpressionStatement {
 			return false
 		}
-		return correctnessNoUnclearedRaceTimeoutNeverRead(ruleContext, ruleContext.TypeChecker.GetSymbolAtLocation(target))
+		return correctnessNoUnclearedRaceTimeoutNeverRead(
+			ruleContext,
+			ruleContext.TypeChecker.GetSymbolAtLocation(target),
+		)
 	}
 	return false
 }
@@ -321,7 +349,8 @@ func correctnessNoUnclearedRaceTimeoutNeverRead(ruleContext rule.Context, symbol
 		return false
 	}
 	declaration := symbol.Declarations[0]
-	if declaration.Kind != ast.KindVariableDeclaration || ast.GetSourceFileOfNode(declaration) != ruleContext.SourceFile {
+	if declaration.Kind != ast.KindVariableDeclaration ||
+		ast.GetSourceFileOfNode(declaration) != ruleContext.SourceFile {
 		return false
 	}
 	declared := declaration.Name()
@@ -335,7 +364,9 @@ func correctnessNoUnclearedRaceTimeoutNeverRead(ruleContext rule.Context, symbol
 		if node.Kind == ast.KindIdentifier && node.Text() == name && node != declared {
 			resolved := ruleContext.TypeChecker.GetSymbolAtLocation(node)
 			if parent := node.Parent; parent != nil && parent.Kind == ast.KindShorthandPropertyAssignment {
-				if valueSymbol := ruleContext.TypeChecker.GetShorthandAssignmentValueSymbol(parent); valueSymbol != nil {
+				if valueSymbol := ruleContext.TypeChecker.GetShorthandAssignmentValueSymbol(
+					parent,
+				); valueSymbol != nil {
 					resolved = valueSymbol
 				}
 			}

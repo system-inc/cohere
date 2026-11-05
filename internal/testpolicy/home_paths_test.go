@@ -24,10 +24,26 @@ func TestHomePathsFindsAPlantedHomePath(test *testing.T) {
 		{"a word that ends in Users", `const root = "/AllUsers/x/y"`, 0},
 		{"a home directory alone", `const root = "/Users/"`, 0},
 		{"in a comment only", "// ahra pinned /Users/someone/Projects/ahra\nconst root = \"/repo\"", 0},
-		{"excused above", "// Not a machine path: the input whose home prefix is trimmed.\nconst root = \"/Users/someone/x\"", 0},
-		{"excused above a block", "// Not a machine path: planted cases.\nvar roots = []string{\n\t\"/Users/a/x\",\n\t\"/home/b/y\",\n}", 0},
-		{"a block after the excused one", "// Not a machine path: planted cases.\nvar roots = []string{\"/Users/a/x\"}\nvar other = \"/Users/c/z\"", 1},
-		{"excused at the line's end", "const root = \"/Users/someone/x\" // Not a machine path: trimmed by the transform.", 0},
+		{
+			"excused above",
+			"// Not a machine path: the input whose home prefix is trimmed.\nconst root = \"/Users/someone/x\"",
+			0,
+		},
+		{
+			"excused above a block",
+			"// Not a machine path: planted cases.\nvar roots = []string{\n\t\"/Users/a/x\",\n\t\"/home/b/y\",\n}",
+			0,
+		},
+		{
+			"a block after the excused one",
+			"// Not a machine path: planted cases.\nvar roots = []string{\"/Users/a/x\"}\nvar other = \"/Users/c/z\"",
+			1,
+		},
+		{
+			"excused at the line's end",
+			"const root = \"/Users/someone/x\" // Not a machine path: trimmed by the transform.",
+			0,
+		},
 		{"a marker with no reason", "// Not a machine path:\nconst root = \"/Users/someone/x\"", 1},
 	}
 	for _, testCase := range cases {
@@ -54,7 +70,10 @@ func TestNoCohereTestNamesAHomeDirectory(test *testing.T) {
 	for _, homePath := range found {
 		relative, _ := filepath.Rel(root, homePath.Position.Filename)
 		relative = filepath.ToSlash(relative)
-		lines[relative] = append(lines[relative], fmt.Sprintf("  %s:%d %q", relative, homePath.Position.Line, homePath.Value))
+		lines[relative] = append(
+			lines[relative],
+			fmt.Sprintf("  %s:%d %q", relative, homePath.Position.Line, homePath.Value),
+		)
 	}
 	files := make([]string, 0, len(lines))
 	for file := range lines {
@@ -62,7 +81,12 @@ func TestNoCohereTestNamesAHomeDirectory(test *testing.T) {
 	}
 	sort.Strings(files)
 	for _, file := range files {
-		test.Errorf("%s names a home directory. Ask for the code by name through internal/corpus, or, for a literal "+
-			"that only looks like one, say why above it with %q:\n%s", file, NotAMachinePathMarker, strings.Join(lines[file], "\n"))
+		test.Errorf(
+			"%s names a home directory. Ask for the code by name through internal/corpus, or, for a literal "+
+				"that only looks like one, say why above it with %q:\n%s",
+			file,
+			NotAMachinePathMarker,
+			strings.Join(lines[file], "\n"),
+		)
 	}
 }

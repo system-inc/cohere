@@ -20,8 +20,14 @@ const verifyDecoratorPrefix = "Verify"
 
 // The rule's messages, whose wording lives in `policy/messages/correctness-require-verify-optional-parity.json`.
 var (
-	correctnessRequireVerifyOptionalParityOptionalButTypeNotText      = policy.MessageOf("base/correctness-require-verify-optional-parity", "optionalButTypeNot")
-	correctnessRequireVerifyOptionalParityTypeOptionalButNoVerifyText = policy.MessageOf("base/correctness-require-verify-optional-parity", "typeOptionalButNoVerify")
+	correctnessRequireVerifyOptionalParityOptionalButTypeNotText = policy.MessageOf(
+		"base/correctness-require-verify-optional-parity",
+		"optionalButTypeNot",
+	)
+	correctnessRequireVerifyOptionalParityTypeOptionalButNoVerifyText = policy.MessageOf(
+		"base/correctness-require-verify-optional-parity",
+		"typeOptionalButNoVerify",
+	)
 )
 
 // CorrectnessRequireVerifyOptionalParity requires the optional sentinel and the declared type to agree.
@@ -123,8 +129,10 @@ func checkVerifyOptionalParity(ruleContext rule.Context, node *ast.Node, key *as
 
 	if hasOptionalSentinel && !typeIsNullable {
 		ruleContext.ReportNode(key, rule.Message{
-			Id:          correctnessRequireVerifyOptionalParityOptionalButTypeNotText.Id,
-			Description: correctnessRequireVerifyOptionalParityOptionalButTypeNotText.Render(map[string]string{"typeText": typeText}),
+			Id: correctnessRequireVerifyOptionalParityOptionalButTypeNotText.Id,
+			Description: correctnessRequireVerifyOptionalParityOptionalButTypeNotText.Render(
+				map[string]string{"typeText": typeText},
+			),
 		})
 		return
 	}
@@ -145,8 +153,10 @@ func checkVerifyOptionalParity(ruleContext rule.Context, node *ast.Node, key *as
 	// is what caught it.
 	if typeIsNullable && !hasOptionalSentinel && hasOtherVerifyRule {
 		ruleContext.ReportNode(key, rule.Message{
-			Id:          correctnessRequireVerifyOptionalParityTypeOptionalButNoVerifyText.Id,
-			Description: correctnessRequireVerifyOptionalParityTypeOptionalButNoVerifyText.Render(map[string]string{"typeText": typeText}),
+			Id: correctnessRequireVerifyOptionalParityTypeOptionalButNoVerifyText.Id,
+			Description: correctnessRequireVerifyOptionalParityTypeOptionalButNoVerifyText.Render(
+				map[string]string{"typeText": typeText},
+			),
 		})
 	}
 }

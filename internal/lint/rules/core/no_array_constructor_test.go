@@ -57,14 +57,30 @@ func TestNoArrayConstructorFires(test *testing.T) {
 		{"comments everywhere", "/*a*//*b*/Array/*c*//*d*/()/*e*//*f*/;/*g*//*h*/", []string{"noArrayConstructor"}},
 		{"comments as the only arguments", "Array(/*a*/ /*b*/)", []string{"noArrayConstructor"}},
 		{"comments among the arguments", "Array(/*a*/ x /*b*/, /*c*/ y /*d*/)", []string{"noArrayConstructor"}},
-		{"comments among arguments and outside", "/*a*/Array(/*b*/ x /*c*/, /*d*/ y /*e*/)/*f*/;/*g*/", []string{"noArrayConstructor"}},
+		{
+			"comments among arguments and outside",
+			"/*a*/Array(/*b*/ x /*c*/, /*d*/ y /*e*/)/*f*/;/*g*/",
+			[]string{"noArrayConstructor"},
+		},
 		{"a comment before new", "/*a*/new Array", []string{"noArrayConstructor"}},
 		{"comments around a parenless new", "/*a*/new Array/*b*/", []string{"noArrayConstructor"}},
 		{"a comment inside new", "new/*a*/Array", []string{"noArrayConstructor"}},
-		{"comments everywhere under new", "new/*a*//*b*/Array/*c*//*d*/()/*e*//*f*/;/*g*//*h*/", []string{"noArrayConstructor"}},
+		{
+			"comments everywhere under new",
+			"new/*a*//*b*/Array/*c*//*d*/()/*e*//*f*/;/*g*//*h*/",
+			[]string{"noArrayConstructor"},
+		},
 		{"new with comments as arguments", "new Array(/*a*/ /*b*/)", []string{"noArrayConstructor"}},
-		{"new with comments among arguments", "new Array(/*a*/ x /*b*/, /*c*/ y /*d*/)", []string{"noArrayConstructor"}},
-		{"new with comments throughout", "new/*a*/Array(/*b*/ x /*c*/, /*d*/ y /*e*/)/*f*/;/*g*/", []string{"noArrayConstructor"}},
+		{
+			"new with comments among arguments",
+			"new Array(/*a*/ x /*b*/, /*c*/ y /*d*/)",
+			[]string{"noArrayConstructor"},
+		},
+		{
+			"new with comments throughout",
+			"new/*a*/Array(/*b*/ x /*c*/, /*d*/ y /*e*/)/*f*/;/*g*/",
+			[]string{"noArrayConstructor"},
+		},
 
 		// The same shapes terminated by a semicolon, which upstream carries separately because the
 		// statement boundary is what the fixer has to reason about.

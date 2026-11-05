@@ -114,7 +114,8 @@ func BuildClassList(system *LoadedDesignSystem) []ClassListEntry {
 	// A repository static is listed the same way: upstream asks the root's completions, and a
 	// framework `suggest` that returns nothing still answers for a name the repository redeclares.
 	for name, kinds := range system.utilityRoots {
-		if suggested, isFramework := FrameworkStaticSuggested[name]; kinds[UtilityKindStatic] && (suggested || !isFramework) {
+		if suggested, isFramework := FrameworkStaticSuggested[name]; kinds[UtilityKindStatic] &&
+			(suggested || !isFramework) {
 			entry(name).addSource(classListSource{static: true, root: name})
 		}
 	}

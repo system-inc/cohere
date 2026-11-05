@@ -244,23 +244,82 @@ func compareShapes(path string, ours shape, theirs shape, fieldIndex map[string]
 func populatedRecords() []Record {
 	edit := Edit{Start: 30, End: 33, Text: "let"}
 	return []Record{
-		ProvenanceRecord{Contract: Version, Engine: "cohere-go", Version: "0.1.0", Commit: "dev", SourceTreeModified: true, Toolchain: "go1.27"},
-		ProjectRecord{Root: "/project", Package: "example.com/project", ElapsedMilliseconds: 4, FilesInPackage: 3, FilesOurs: 2,
-			FilesInScope: 2, ScopeDescription: "internal/a", Targets: []ProjectTarget{{Name: "example.com/project", Kind: "module", Files: 3, LanguageMode: "1.27"}},
-			Excluded: []ExcludedFile{{File: "/project/b_windows.go", Reason: "excluded by build constraints on darwin/arm64"}}},
+		ProvenanceRecord{
+			Contract:           Version,
+			Engine:             "cohere-go",
+			Version:            "0.1.0",
+			Commit:             "dev",
+			SourceTreeModified: true,
+			Toolchain:          "go1.27",
+		},
+		ProjectRecord{
+			Root:                "/project",
+			Package:             "example.com/project",
+			ElapsedMilliseconds: 4,
+			FilesInPackage:      3,
+			FilesOurs:           2,
+			FilesInScope:        2,
+			ScopeDescription:    "internal/a",
+			Targets: []ProjectTarget{
+				{Name: "example.com/project", Kind: "module", Files: 3, LanguageMode: "1.27"},
+			},
+			Excluded: []ExcludedFile{
+				{File: "/project/b_windows.go", Reason: "excluded by build constraints on darwin/arm64"},
+			},
+		},
 		UnreadableRecord{File: "/project/c.go", Error: "it could not be opened"},
-		FindingRecord{Source: SourceRule, File: "/project/a.go", Line: 2, Column: 9, EndLine: 2, EndColumn: 21, Severity: SeverityError,
-			Rule: "cohere-go/printf", MessageId: "printf", Message: "a message", Fixes: []Edit{edit},
-			Suggestions: []Suggestion{{Message: "a suggestion", Fixes: []Edit{edit}}}},
-		FixRecord{FilesConsidered: 2, FilesRewritten: 1, FixesApplied: 1, FixesRefused: 1, RefusalsByReason: map[string]int{"overlaps another fix": 1},
-			FilesReformatted: 1, FilesNotFormatted: 1, NotFormattedReasons: map[string]int{"it does not parse": 1}, FormatScope: "every file in scope",
-			ChangedFiles: []ChangedFile{{File: "/project/a.go", FixedBy: map[string]int{"cohere-go/printf": 1}, Formatted: true}}},
-		TypesRecord{Diagnostics: 1, Files: 2, ElapsedMilliseconds: 900, FilesWithoutRecord: []string{"/project/d.go"}, Build: "go list -deps -test"},
-		LintRecord{Findings: 1, RulesRun: 4, FilesWalked: 2, NodesVisited: 640, ElapsedMilliseconds: 12, ReusedFrom: "fix",
-			RulesSilent: []string{"cohere-go/copylock"}, RulesWatchedAndQuiet: 2, Crashes: []Crash{{File: "/project/a.go", Error: "a panic"}},
-			RulesScopedOff: map[string]int{"cohere-go/printf": 1}, RulesNotConfigured: []string{"cohere-go/SA4006"}, ConfigNote: "a note",
-			WithheldBySuppression: map[string]int{"cohere-go/printf": 1}, WithheldAsGenerated: map[string]int{"cohere-go/x": 2},
-			WithheldAsCopied: map[string]int{"cohere-go/y": 3}},
+		FindingRecord{
+			Source:      SourceRule,
+			File:        "/project/a.go",
+			Line:        2,
+			Column:      9,
+			EndLine:     2,
+			EndColumn:   21,
+			Severity:    SeverityError,
+			Rule:        "cohere-go/printf",
+			MessageId:   "printf",
+			Message:     "a message",
+			Fixes:       []Edit{edit},
+			Suggestions: []Suggestion{{Message: "a suggestion", Fixes: []Edit{edit}}},
+		},
+		FixRecord{
+			FilesConsidered:     2,
+			FilesRewritten:      1,
+			FixesApplied:        1,
+			FixesRefused:        1,
+			RefusalsByReason:    map[string]int{"overlaps another fix": 1},
+			FilesReformatted:    1,
+			FilesNotFormatted:   1,
+			NotFormattedReasons: map[string]int{"it does not parse": 1},
+			FormatScope:         "every file in scope",
+			ChangedFiles: []ChangedFile{
+				{File: "/project/a.go", FixedBy: map[string]int{"cohere-go/printf": 1}, Formatted: true},
+			},
+		},
+		TypesRecord{
+			Diagnostics:         1,
+			Files:               2,
+			ElapsedMilliseconds: 900,
+			FilesWithoutRecord:  []string{"/project/d.go"},
+			Build:               "go list -deps -test",
+		},
+		LintRecord{
+			Findings:              1,
+			RulesRun:              4,
+			FilesWalked:           2,
+			NodesVisited:          640,
+			ElapsedMilliseconds:   12,
+			ReusedFrom:            "fix",
+			RulesSilent:           []string{"cohere-go/copylock"},
+			RulesWatchedAndQuiet:  2,
+			Crashes:               []Crash{{File: "/project/a.go", Error: "a panic"}},
+			RulesScopedOff:        map[string]int{"cohere-go/printf": 1},
+			RulesNotConfigured:    []string{"cohere-go/SA4006"},
+			ConfigNote:            "a note",
+			WithheldBySuppression: map[string]int{"cohere-go/printf": 1},
+			WithheldAsGenerated:   map[string]int{"cohere-go/x": 2},
+			WithheldAsCopied:      map[string]int{"cohere-go/y": 3},
+		},
 		PhaseRecord{Name: PhaseLint, Outcome: OutcomeRan, ElapsedMilliseconds: 12, Detail: "a detail"},
 		RuleRecord{Name: "cohere-go/printf", Severity: "error"},
 		SummaryRecord{Findings: 1, Complete: true, ExitCode: 1},
@@ -312,7 +371,13 @@ func TestEveryRecordWritesTheContractsFields(test *testing.T) {
 			test.Errorf("%s is written and the contract shows no such record", record.kind())
 			continue
 		}
-		for _, problem := range compareShapes(string(record.kind()), ours, theirs, fieldIndex, fieldsNotWritten[record.kind()]) {
+		for _, problem := range compareShapes(
+			string(record.kind()),
+			ours,
+			theirs,
+			fieldIndex,
+			fieldsNotWritten[record.kind()],
+		) {
 			test.Error(problem)
 		}
 	}
@@ -372,7 +437,11 @@ func TestFixtureRecordsReencodeToTheSameJSON(test *testing.T) {
 			}
 			newRecordOfKind, known := newRecord[envelope.Kind]
 			if !known {
-				test.Fatalf("%s: a %q record, which this package has no type for", filepath.Base(fixture), envelope.Kind)
+				test.Fatalf(
+					"%s: a %q record, which this package has no type for",
+					filepath.Base(fixture),
+					envelope.Kind,
+				)
 			}
 			record := newRecordOfKind()
 			if decodeError := json.Unmarshal([]byte(line), record); decodeError != nil {
@@ -382,7 +451,8 @@ func TestFixtureRecordsReencodeToTheSameJSON(test *testing.T) {
 			if writeError := writer.Write(record); writeError != nil {
 				test.Fatalf("%s: %v", filepath.Base(fixture), writeError)
 			}
-			if envelope.Kind == KindProvenance || (envelope.Kind == KindFix && !strings.Contains(line, `"changedFiles"`)) {
+			if envelope.Kind == KindProvenance ||
+				(envelope.Kind == KindFix && !strings.Contains(line, `"changedFiles"`)) {
 				continue
 			}
 			compared++
@@ -390,7 +460,13 @@ func TestFixtureRecordsReencodeToTheSameJSON(test *testing.T) {
 			reencoded := map[string]any{}
 			original := map[string]any{}
 			if decodeError := json.Unmarshal(output.Bytes(), &reencoded); decodeError != nil {
-				test.Fatalf("%s: the reencoded %s record does not decode: %v\n%s", filepath.Base(fixture), envelope.Kind, decodeError, output.String())
+				test.Fatalf(
+					"%s: the reencoded %s record does not decode: %v\n%s",
+					filepath.Base(fixture),
+					envelope.Kind,
+					decodeError,
+					output.String(),
+				)
 			}
 			if decodeError := json.Unmarshal([]byte(line), &original); decodeError != nil {
 				test.Fatal(decodeError)
@@ -402,7 +478,13 @@ func TestFixtureRecordsReencodeToTheSameJSON(test *testing.T) {
 				}
 			}
 			if !reflect.DeepEqual(reencoded, original) {
-				test.Errorf("%s: a %s record reencodes differently\n got: %s want: %s", filepath.Base(fixture), envelope.Kind, output.String(), line)
+				test.Errorf(
+					"%s: a %s record reencodes differently\n got: %s want: %s",
+					filepath.Base(fixture),
+					envelope.Kind,
+					output.String(),
+					line,
+				)
 			}
 		}
 	}

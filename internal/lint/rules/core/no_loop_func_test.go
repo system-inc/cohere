@@ -568,7 +568,10 @@ func TestNoLoopFuncJudgesEveryMethodLikeShape(test *testing.T) {
 		source string
 	}{
 		{"an object shorthand method", "var u; for (var i=0;i<3;i++) { g({ m() { return u; } }); } u = 1;"},
-		{"an object function expression", "var u; for (var i=0;i<3;i++) { g({ m: function () { return u; } }); } u = 1;"},
+		{
+			"an object function expression",
+			"var u; for (var i=0;i<3;i++) { g({ m: function () { return u; } }); } u = 1;",
+		},
 		{"an object arrow", "var u; for (var i=0;i<3;i++) { g({ m: () => u }); } u = 1;"},
 		{"an object getter", "var u; for (var i=0;i<3;i++) { g({ get m() { return u; } }); } u = 1;"},
 		{"an object setter", "var u; for (var i=0;i<3;i++) { g({ set m(v) { u; } }); } u = 1;"},
@@ -609,10 +612,16 @@ func TestNoLoopFuncMethodLikeShapesStaySilentWhenSafe(test *testing.T) {
 		source string
 	}{
 		{"a shorthand method capturing a per-iteration let", "for (let i=0;i<3;i++) { g({ m() { return i; } }); }"},
-		{"a shorthand method capturing an unwritten outer binding", "var u; for (var i=0;i<3;i++) { g({ m() { return u; } }); }"},
+		{
+			"a shorthand method capturing an unwritten outer binding",
+			"var u; for (var i=0;i<3;i++) { g({ m() { return u; } }); }",
+		},
 		{"a getter capturing a const", "const u = 1; for (var i=0;i<3;i++) { g({ get m() { return u; } }); }"},
 		{"a class method capturing a per-iteration const", "for (const c of cs) { g(class { m() { return c; } }); }"},
-		{"a constructor capturing an unwritten outer binding", "var u; for (var i=0;i<3;i++) { g(class { constructor() { u; } }); }"},
+		{
+			"a constructor capturing an unwritten outer binding",
+			"var u; for (var i=0;i<3;i++) { g(class { constructor() { u; } }); }",
+		},
 		{"a method outside any loop", "var u; g({ m() { return u; } }); u = 1;"},
 	}
 

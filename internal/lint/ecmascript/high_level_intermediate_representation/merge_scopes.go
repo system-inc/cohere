@@ -178,9 +178,9 @@ const (
 	// MergeGapPrimitiveOperandSkip is upstream's skip of a primitive operand of a function
 	// expression or object method.
 	//
-	// This IR carries no type, so there is no primitive predicate to consult. Not skipping visits operands upstream skips, and a visit can only add a
-	// union, so this errs toward merging MORE than upstream rather than less. Skipping every
-	// function-expression operand, a strict superset of upstream's primitive-only skip, removes
+	// This IR carries no type, so there is no primitive predicate to consult. Not skipping visits operands upstream
+	// skips, and a visit can only add a union, so this errs toward merging MORE than upstream rather than less.
+	// Skipping every function-expression operand, a strict superset of upstream's primitive-only skip, removes
 	// three of 118 unions on the measured corpus. The real divergence is therefore at most three.
 	MergeGapPrimitiveOperandSkip MergeGap = iota
 
@@ -612,8 +612,12 @@ func (state *mergeSweepState) visitInstructionId(id static_single_assignment.Eva
 // This is the event with no counterpart in a pairwise-overlap model, and it is where most of the
 // extra unions come from. A value read while its own scope is open but buried under a scope that
 // opened later means the two genuinely interleave, even when their ranges nest perfectly.
-func (state *mergeSweepState) visitPlace(id static_single_assignment.EvaluationOrder, place Place, scopes *ReactiveScopes,
-	memberRanges *mutation_aliasing.MutableRanges) {
+func (state *mergeSweepState) visitPlace(
+	id static_single_assignment.EvaluationOrder,
+	place Place,
+	scopes *ReactiveScopes,
+	memberRanges *mutation_aliasing.MutableRanges,
+) {
 	placeScope := activeScopeOf(id, place, scopes)
 	if placeScope == 0 {
 		return

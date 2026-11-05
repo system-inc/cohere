@@ -115,7 +115,12 @@ func TestConvergenceTakesSeveralPasses(test *testing.T) {
 	// pass that finds nothing left.
 	source := "const a = 'old'; const b = 'old'; const c = 'old';\n"
 
-	result, fixTextError := FixText("converge.ts", source, proposeWhileContains("'old'", "'new'", "renamer"), DefaultMaxPasses)
+	result, fixTextError := FixText(
+		"converge.ts",
+		source,
+		proposeWhileContains("'old'", "'new'", "renamer"),
+		DefaultMaxPasses,
+	)
 	if fixTextError != nil {
 		test.Fatalf("unexpected error: %v", fixTextError)
 	}
@@ -303,7 +308,11 @@ func TestFixFileLeavesTheFileUntouchedOnRefusal(test *testing.T) {
 	}
 
 	closingBrace := strings.LastIndex(source, "}")
-	result, err := FixFile(fileName, proposeOnce(proposal("brace-eater", closingBrace, closingBrace+1, "")), DefaultMaxPasses)
+	result, err := FixFile(
+		fileName,
+		proposeOnce(proposal("brace-eater", closingBrace, closingBrace+1, "")),
+		DefaultMaxPasses,
+	)
 	if err != nil {
 		test.Fatalf("unexpected error: %v", err)
 	}
@@ -464,13 +473,23 @@ func TestARefusedPassNamesItsFileAndTheFixThatBrokeIt(test *testing.T) {
 	refused := summary.FilesRefused[0]
 	if refused.FileName != "refused.ts" || !slices.Equal(refused.Breaking, []string{"rule-that-breaks"}) ||
 		!slices.Equal(refused.Rules, []string{"rule-that-is-fine", "rule-that-breaks"}) {
-		test.Fatalf("the refusal blames %v of %v on %s, want rule-that-breaks of both on refused.ts", refused.Breaking, refused.Rules, refused.FileName)
+		test.Fatalf(
+			"the refusal blames %v of %v on %s, want rule-that-breaks of both on refused.ts",
+			refused.Breaking,
+			refused.Rules,
+			refused.FileName,
+		)
 	}
 	lines := summary.Refusals()
 	if len(lines) != 1 {
 		test.Fatalf("expected one refusal line, got %q", lines)
 	}
-	for _, want := range []string{"refused.ts", ReasonParseFailure, "nothing was written to it", "the fix from rule-that-breaks breaks it"} {
+	for _, want := range []string{
+		"refused.ts",
+		ReasonParseFailure,
+		"nothing was written to it",
+		"the fix from rule-that-breaks breaks it",
+	} {
 		if !strings.Contains(lines[0], want) {
 			test.Errorf("the refusal line lacks %q: %s", want, lines[0])
 		}
@@ -493,7 +512,8 @@ func TestARefusalNoOneFixCausedNamesThePassRules(test *testing.T) {
 		{Proposal: Proposal{RuleName: "right"}, Reason: ReasonParseFailure + " (TS1005: ';' expected.)"},
 	}}})
 	lines := summary.Refusals()
-	if len(lines) != 1 || !strings.Contains(lines[0], "no one fix breaks it alone, the fixes from left, right together do") {
+	if len(lines) != 1 ||
+		!strings.Contains(lines[0], "no one fix breaks it alone, the fixes from left, right together do") {
 		test.Fatalf("the refusal lines are %q", lines)
 	}
 }
@@ -504,8 +524,12 @@ func TestARefusalNoOneFixCausedNamesThePassRules(test *testing.T) {
 func TestTransformFailuresAreTalliedAsOneReason(test *testing.T) {
 	test.Parallel()
 	summary := Summarize([]FileResult{
-		{FileName: "a.yml", Passes: 1, Rejected: []Rejection{{Proposal: Proposal{RuleName: transformRuleName}, Reason: ReasonTransformFailed + " (resolving a.yml)"}}},
-		{FileName: "b.yml", Passes: 1, Rejected: []Rejection{{Proposal: Proposal{RuleName: transformRuleName}, Reason: ReasonTransformFailed + " (resolving b.yml)"}}},
+		{FileName: "a.yml", Passes: 1, Rejected: []Rejection{
+			{Proposal: Proposal{RuleName: transformRuleName}, Reason: ReasonTransformFailed + " (resolving a.yml)"},
+		}},
+		{FileName: "b.yml", Passes: 1, Rejected: []Rejection{
+			{Proposal: Proposal{RuleName: transformRuleName}, Reason: ReasonTransformFailed + " (resolving b.yml)"},
+		}},
 	})
 	if summary.RefusalsByReason[ReasonTransformFailed] != 2 || len(summary.RefusalsByReason) != 1 {
 		test.Fatalf("two formatter failures were tallied as %v", summary.RefusalsByReason)

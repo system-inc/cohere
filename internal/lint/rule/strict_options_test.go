@@ -51,8 +51,16 @@ func TestUnmarshalOptionsRefusesWhatUpstreamRefuses(test *testing.T) {
 	}{
 		{"unknown key at the top", `{"ignorePatern": ["a"]}`, "ignorePatern"},
 		{"unknown key inside a list element", `{"paths": [{"pattern": "x", "message": "y"}]}`, "message"},
-		{"tagged key in the wrong case", `{"enforceForTsTypes": true}`, `"enforceForTsTypes" is spelled "enforceForTSTypes"`},
-		{"tagged key in the wrong case inside a list", `{"paths": [{"Pattern": "x"}]}`, `"paths.0.Pattern" is spelled "paths.0.pattern"`},
+		{
+			"tagged key in the wrong case",
+			`{"enforceForTsTypes": true}`,
+			`"enforceForTsTypes" is spelled "enforceForTSTypes"`,
+		},
+		{
+			"tagged key in the wrong case inside a list",
+			`{"paths": [{"Pattern": "x"}]}`,
+			`"paths.0.Pattern" is spelled "paths.0.pattern"`,
+		},
 		{"promoted key in the wrong case", `{"Shared": true}`, `"Shared" is spelled "shared"`},
 	}
 	for _, testCase := range refused {

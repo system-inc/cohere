@@ -26,9 +26,15 @@ func TestNoUncheckedCastFiresOnCastsNothingCouldCheck(test *testing.T) {
 		"unknown to an interface": {shapes + `const user = load() as User;`, "load() as User"},
 		"through unknown":         {shapes + `const user = (shape as unknown) as User;`, "(shape as unknown) as User"},
 		"from any":                {shapes + `declare const raw: any; const user = raw as User;`, "raw as User"},
-		"from an any array":       {shapes + `declare const rows: any[]; const users = rows as User[];`, "rows as User[]"},
-		"an angle bracket":        {shapes + `const user = <User>load();`, "<User>load()"},
-		"members with no tag":     {`type A = { readonly a: number }; type B = { readonly b: number }; declare const either: A | B; const a = either as A;`, "either as A"},
+		"from an any array": {
+			shapes + `declare const rows: any[]; const users = rows as User[];`,
+			"rows as User[]",
+		},
+		"an angle bracket": {shapes + `const user = <User>load();`, "<User>load()"},
+		"members with no tag": {
+			`type A = { readonly a: number }; type B = { readonly b: number }; declare const either: A | B; const a = either as A;`,
+			"either as A",
+		},
 	} {
 		test.Run(name, func(test *testing.T) {
 			test.Parallel()

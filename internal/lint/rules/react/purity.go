@@ -328,7 +328,11 @@ type purityFinding struct {
 // declaration lowering did not give a local slot, so the wrapper in `const g = () => Math.random();
 // const f = () => g(); f();` sees `g` only if the enclosing values are visible to it. Measured on
 // React, that input reports, and with per-function state it did not.
-func purityReportImpureCalls(ruleContext rule.Context, function *high_level_intermediate_representation.Function, emit bool) []purityFinding {
+func purityReportImpureCalls(
+	ruleContext rule.Context,
+	function *high_level_intermediate_representation.Function,
+	emit bool,
+) []purityFinding {
 	unit := &purityUnit{
 		ctx:       ruleContext,
 		values:    map[static_single_assignment.IdentifierId]purityValue{},
@@ -540,7 +544,11 @@ func (unit *purityUnit) step(
 // reader does not go looking for the input that separates them.
 //
 // Mutates: values gives every destination the source's signature, so later instructions see it.
-func purityCopy(values map[static_single_assignment.IdentifierId]purityValue, from static_single_assignment.IdentifierId, to ...static_single_assignment.IdentifierId) bool {
+func purityCopy(
+	values map[static_single_assignment.IdentifierId]purityValue,
+	from static_single_assignment.IdentifierId,
+	to ...static_single_assignment.IdentifierId,
+) bool {
 	source, ok := values[from]
 	if !ok || source.Kind == purityValueNothing {
 		return false
@@ -586,7 +594,11 @@ func (unit *purityUnit) namesATrueGlobal(node *ast.Node) bool {
 // minted in the child, so `const g = () => Math.random(); const f = () => g(); f();` gives the `g`
 // inside `f` an identifier the parent never wrote state against, and only the name connects them.
 // Measured on React, that input reports.
-func (unit *purityUnit) loadByName(function *high_level_intermediate_representation.Function, place high_level_intermediate_representation.Place, instruction *high_level_intermediate_representation.Instruction) {
+func (unit *purityUnit) loadByName(
+	function *high_level_intermediate_representation.Function,
+	place high_level_intermediate_representation.Place,
+	instruction *high_level_intermediate_representation.Instruction,
+) {
 	if int(place.Identifier) >= len(function.Identifiers) {
 		return
 	}
@@ -800,7 +812,10 @@ func (unit *purityUnit) callbackArguments(
 }
 
 // purityCalleeName reads a method call's property name, for the hook test.
-func purityCalleeName(function *high_level_intermediate_representation.Function, property high_level_intermediate_representation.Place) string {
+func purityCalleeName(
+	function *high_level_intermediate_representation.Function,
+	property high_level_intermediate_representation.Place,
+) string {
 	name, _ := purityPropertyName(function, property)
 	return name
 }
@@ -810,7 +825,10 @@ func purityCalleeName(function *high_level_intermediate_representation.Function,
 // A hook is normally called through a bare identifier, which lowering gives a `LoadGlobal` carrying
 // the name whether it is imported or global, so this reads that instruction rather than asking the
 // checker.
-func purityCalleeIdentifierName(function *high_level_intermediate_representation.Function, callee high_level_intermediate_representation.Place) string {
+func purityCalleeIdentifierName(
+	function *high_level_intermediate_representation.Function,
+	callee high_level_intermediate_representation.Place,
+) string {
 	for _, block := range function.Blocks {
 		for _, instructionId := range block.Instructions {
 			instruction := function.Instructions[instructionId]
@@ -837,7 +855,8 @@ func purityCalleeIdentifierName(function *high_level_intermediate_representation
 //
 // It was wrong, and the real tree found it: a dry run over Kirk's 3,407 files died with
 // `fatal error: stack overflow`, and the cycle in the trace is
-// `findingsOf -> walk -> step -> callbackArguments -> findingsOf` on one `*high_level_intermediate_representation.Function` pointer.
+// `findingsOf -> walk -> step -> callbackArguments -> findingsOf` on one
+// `*high_level_intermediate_representation.Function` pointer.
 //
 // Two things made the earlier verdict false. The probes predated `callbackArguments`, so the only
 // path into `findingsOf` was a direct call, and a self-reference on that path resolves through
@@ -871,7 +890,11 @@ func (unit *purityUnit) findingsOf(function *high_level_intermediate_representat
 // Only a place carrying a source name is recorded, because the link this restores is exactly the
 // one lowering drops: a reference from a child function to a parent's binding arrives as a
 // `LoadGlobal` carrying that name and nothing else.
-func (unit *purityUnit) recordByName(function *high_level_intermediate_representation.Function, target high_level_intermediate_representation.Place, source high_level_intermediate_representation.Place) {
+func (unit *purityUnit) recordByName(
+	function *high_level_intermediate_representation.Function,
+	target high_level_intermediate_representation.Place,
+	source high_level_intermediate_representation.Place,
+) {
 	if int(target.Identifier) >= len(function.Identifiers) {
 		return
 	}
@@ -900,7 +923,10 @@ func (unit *purityUnit) recordByName(function *high_level_intermediate_represent
 // the only consumers of this name are those two lookups. So a numeric or boolean key reaches
 // silence either way. Confirmed on `(Math as any)[0]()` and `(Math as any)[true]()`, both silent
 // with the flag and without it.
-func purityPropertyName(function *high_level_intermediate_representation.Function, property high_level_intermediate_representation.Place) (string, bool) {
+func purityPropertyName(
+	function *high_level_intermediate_representation.Function,
+	property high_level_intermediate_representation.Place,
+) (string, bool) {
 	for _, block := range function.Blocks {
 		for _, instructionId := range block.Instructions {
 			instruction := function.Instructions[instructionId]

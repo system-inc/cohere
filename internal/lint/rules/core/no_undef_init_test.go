@@ -61,22 +61,50 @@ func TestNoUndefInitFires(test *testing.T) {
 		{"var a = 1, b = undefined, c = 5;"}, // errors=["unnecessaryUndefinedInit"] output=null
 		{"var [a] = undefined;"},             // errors=["unnecessaryUndefinedInit"] output=null lang={"ecmaVersion":6}
 		{"var {a} = undefined;"},             // errors=["unnecessaryUndefinedInit"] output=null lang={"ecmaVersion":6}
-		{"for(var i in [1,2,3]){var a = undefined; for(var j in [1,2,3]){}}"}, // errors=["unnecessaryUndefinedInit"] output=null
-		{"let a = undefined;"},               // errors=["unnecessaryUndefinedInit"] output="let a;" lang={"ecmaVersion":6}
-		{"let a = undefined, b = 1;"},        // errors=["unnecessaryUndefinedInit"] output="let a, b = 1;" lang={"ecmaVersion":6}
-		{"let a = 1, b = undefined, c = 5;"}, // errors=["unnecessaryUndefinedInit"] output="let a = 1, b, c = 5;" lang={"ecmaVersion":6}
-		{"let [a] = undefined;"},             // errors=["unnecessaryUndefinedInit"] output=null lang={"ecmaVersion":6}
-		{"let {a} = undefined;"},             // errors=["unnecessaryUndefinedInit"] output=null lang={"ecmaVersion":6}
-		{"for(var i in [1,2,3]){let a = undefined; for(var j in [1,2,3]){}}"}, // errors=["unnecessaryUndefinedInit"] output="for(var i in [1,2,3]){let a; for(var j in [1,2,3]){}}" lang={"ecmaVersion":6}
-		{"let /* comment */a = undefined;"},                                   // errors=["unnecessaryUndefinedInit"] output="let /* comment */a;" lang={"ecmaVersion":6}
-		{"let a/**/ = undefined;"},                                            // errors=["unnecessaryUndefinedInit"] output=null lang={"ecmaVersion":6}
-		{"let a /**/ = undefined;"},                                           // errors=["unnecessaryUndefinedInit"] output=null lang={"ecmaVersion":6}
-		{"let a//\n= undefined;"},                                             // errors=["unnecessaryUndefinedInit"] output=null lang={"ecmaVersion":6}
-		{"let a = /**/undefined;"},                                            // errors=["unnecessaryUndefinedInit"] output=null lang={"ecmaVersion":6}
-		{"let a = //\nundefined;"},                                            // errors=["unnecessaryUndefinedInit"] output=null lang={"ecmaVersion":6}
-		{"let a = undefined/* comment */;"},                                   // errors=["unnecessaryUndefinedInit"] output="let a/* comment */;" lang={"ecmaVersion":6}
-		{"let a = undefined/* comment */, b;"},                                // errors=["unnecessaryUndefinedInit"] output="let a/* comment */, b;" lang={"ecmaVersion":6}
-		{"let a = undefined//comment\n, b;"},                                  // errors=["unnecessaryUndefinedInit"] output="let a//comment\n, b;" lang={"ecmaVersion":6}
+		{
+			"for(var i in [1,2,3]){var a = undefined; for(var j in [1,2,3]){}}",
+		}, // errors=["unnecessaryUndefinedInit"] output=null
+		{
+			"let a = undefined;",
+		}, // errors=["unnecessaryUndefinedInit"] output="let a;" lang={"ecmaVersion":6}
+		{
+			"let a = undefined, b = 1;",
+		}, // errors=["unnecessaryUndefinedInit"] output="let a, b = 1;" lang={"ecmaVersion":6}
+		{
+			"let a = 1, b = undefined, c = 5;",
+		}, // errors=["unnecessaryUndefinedInit"] output="let a = 1, b, c = 5;" lang={"ecmaVersion":6}
+		{"let [a] = undefined;"}, // errors=["unnecessaryUndefinedInit"] output=null lang={"ecmaVersion":6}
+		{"let {a} = undefined;"}, // errors=["unnecessaryUndefinedInit"] output=null lang={"ecmaVersion":6}
+		{
+			"for(var i in [1,2,3]){let a = undefined; for(var j in [1,2,3]){}}",
+		}, // errors=["unnecessaryUndefinedInit"] output="for(var i in [1,2,3]){let a; for(var j in [1,2,3]){}}" lang={"ecmaVersion":6}
+		{
+			"let /* comment */a = undefined;",
+		}, // errors=["unnecessaryUndefinedInit"] output="let /* comment */a;" lang={"ecmaVersion":6}
+		{
+			"let a/**/ = undefined;",
+		}, // errors=["unnecessaryUndefinedInit"] output=null lang={"ecmaVersion":6}
+		{
+			"let a /**/ = undefined;",
+		}, // errors=["unnecessaryUndefinedInit"] output=null lang={"ecmaVersion":6}
+		{
+			"let a//\n= undefined;",
+		}, // errors=["unnecessaryUndefinedInit"] output=null lang={"ecmaVersion":6}
+		{
+			"let a = /**/undefined;",
+		}, // errors=["unnecessaryUndefinedInit"] output=null lang={"ecmaVersion":6}
+		{
+			"let a = //\nundefined;",
+		}, // errors=["unnecessaryUndefinedInit"] output=null lang={"ecmaVersion":6}
+		{
+			"let a = undefined/* comment */;",
+		}, // errors=["unnecessaryUndefinedInit"] output="let a/* comment */;" lang={"ecmaVersion":6}
+		{
+			"let a = undefined/* comment */, b;",
+		}, // errors=["unnecessaryUndefinedInit"] output="let a/* comment */, b;" lang={"ecmaVersion":6}
+		{
+			"let a = undefined//comment\n, b;",
+		}, // errors=["unnecessaryUndefinedInit"] output="let a//comment\n, b;" lang={"ecmaVersion":6}
 	}
 
 	for _, testCase := range cases {
@@ -141,7 +169,10 @@ func TestNoUndefInitFixes(test *testing.T) {
 		{"let a = undefined;", "let a;"},
 		{"let a = undefined, b = 1;", "let a, b = 1;"},
 		{"let a = 1, b = undefined, c = 5;", "let a = 1, b, c = 5;"},
-		{"for(var i in [1,2,3]){let a = undefined; for(var j in [1,2,3]){}}", "for(var i in [1,2,3]){let a; for(var j in [1,2,3]){}}"},
+		{
+			"for(var i in [1,2,3]){let a = undefined; for(var j in [1,2,3]){}}",
+			"for(var i in [1,2,3]){let a; for(var j in [1,2,3]){}}",
+		},
 		{"let /* comment */a = undefined;", "let /* comment */a;"},
 		{"let a = undefined/* comment */;", "let a/* comment */;"},
 		{"let a = undefined/* comment */, b;", "let a/* comment */, b;"},

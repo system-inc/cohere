@@ -408,15 +408,18 @@ func classOrderControls() []Control {
 			Name:   "shifted-order",
 			Detail: "every reading's first order index shifted by one, which is a wrong answer rather than no answer",
 			Corrupt: func(honest ReadingSource) ReadingSource {
-				return classOrderCorruptedSource{honest: honest, transform: func(reading Reading, answered bool) (Reading, bool) {
-					if !answered || len(reading.Order) == 0 {
-						return reading, answered
-					}
-					shifted := make([]int, len(reading.Order))
-					copy(shifted, reading.Order)
-					shifted[0]++
-					return Reading{Order: shifted, Count: reading.Count}, true
-				}}
+				return classOrderCorruptedSource{
+					honest: honest,
+					transform: func(reading Reading, answered bool) (Reading, bool) {
+						if !answered || len(reading.Order) == 0 {
+							return reading, answered
+						}
+						shifted := make([]int, len(reading.Order))
+						copy(shifted, reading.Order)
+						shifted[0]++
+						return Reading{Order: shifted, Count: reading.Count}, true
+					},
+				}
 			},
 			ExpectedOutcome:   OutcomeDisagreed,
 			MinimumDetections: 10000,
@@ -425,12 +428,15 @@ func classOrderControls() []Control {
 			Name:   "shifted-count",
 			Detail: "every reading's declaration count incremented, which is the axis an order-only comparison cannot see",
 			Corrupt: func(honest ReadingSource) ReadingSource {
-				return classOrderCorruptedSource{honest: honest, transform: func(reading Reading, answered bool) (Reading, bool) {
-					if !answered {
-						return reading, answered
-					}
-					return Reading{Order: reading.Order, Count: reading.Count + 1}, true
-				}}
+				return classOrderCorruptedSource{
+					honest: honest,
+					transform: func(reading Reading, answered bool) (Reading, bool) {
+						if !answered {
+							return reading, answered
+						}
+						return Reading{Order: reading.Order, Count: reading.Count + 1}, true
+					},
+				}
 			},
 			ExpectedOutcome:   OutcomeDisagreed,
 			MinimumDetections: 10000,
@@ -450,14 +456,17 @@ func classOrderControls() []Control {
 			Name:   "invented-reading",
 			Detail: "the Go side answers where the engine declined, which no count of agreements would surface",
 			Corrupt: func(honest ReadingSource) ReadingSource {
-				return classOrderCorruptedSource{honest: honest, transform: func(reading Reading, answered bool) (Reading, bool) {
-					if answered {
-						return reading, true
-					}
-					// A plausible-looking reading, which is the point: an invented answer does not
-					// announce itself, and the engine's silence is the only thing that contradicts it.
-					return Reading{Order: []int{1}, Count: 1}, true
-				}}
+				return classOrderCorruptedSource{
+					honest: honest,
+					transform: func(reading Reading, answered bool) (Reading, bool) {
+						if answered {
+							return reading, true
+						}
+						// A plausible-looking reading, which is the point: an invented answer does not
+						// announce itself, and the engine's silence is the only thing that contradicts it.
+						return Reading{Order: []int{1}, Count: 1}, true
+					},
+				}
 			},
 			ExpectedOutcome:   OutcomeEngineSilent,
 			MinimumDetections: 40,
@@ -572,8 +581,12 @@ func classOrderAssertReport(test *testing.T, fixture *classOrderFixture, source 
 	// `@utility` evaluator: the model has no membership test for "does this value resolve at all".
 	// A ceiling fails the moment the port starts inventing more than the mechanism accounts for.
 	if invented := grouped[OutcomeEngineSilent]; len(invented) > classOrderExpectedInventedReadings {
-		test.Errorf("%s: %d classes where Go answered and the engine declined, above the %d the known mechanism accounts for",
-			population.SystemName, len(invented), classOrderExpectedInventedReadings)
+		test.Errorf(
+			"%s: %d classes where Go answered and the engine declined, above the %d the known mechanism accounts for",
+			population.SystemName,
+			len(invented),
+			classOrderExpectedInventedReadings,
+		)
 		for _, divergence := range classOrderSample(invented, 20) {
 			test.Errorf("  %s (%s): engine declined, go %s",
 				divergence.ClassName, divergence.Population, divergence.GoReading.Format())
@@ -592,14 +605,21 @@ func classOrderAssertReport(test *testing.T, fixture *classOrderFixture, source 
 	// run and not a clean one. Trustworthy already refuses a run over the both-silent ceiling; this
 	// asserts the positive, that the run actually answered the bulk of what it was given.
 	if answered := population.Answered(); answered < population.Total()/2 {
-		test.Errorf("%s: only %d of %d classes were answered by both sides; a differential that mostly says nothing is not a clean run",
-			population.SystemName, answered, population.Total())
+		test.Errorf(
+			"%s: only %d of %d classes were answered by both sides; a differential that mostly says nothing is not a clean run",
+			population.SystemName,
+			answered,
+			population.Total(),
+		)
 	}
 
 	// The controls. Proving the check can fail is what makes the passes above mean anything, and a
 	// control that did not fire invalidates the run rather than merely noting a gap.
 	if !report.ControlsProven() {
-		test.Errorf("%s: controls were not proven in both silent directions; detection has not been demonstrated", population.SystemName)
+		test.Errorf(
+			"%s: controls were not proven in both silent directions; detection has not been demonstrated",
+			population.SystemName,
+		)
 	}
 	for _, result := range report.Controls {
 		if result.Detected {
@@ -662,7 +682,13 @@ func classOrderUntrustworthyReasons(report Report) []string {
 // That class of defect is reachable only from a class *name*. A fixture that hands the Go side a
 // pre-parsed candidate has already decided the root, so it can never disagree with the parser about
 // which root a class has. This is the seam, and this is what testing it finds.
-func classOrderAssertGoSilence(test *testing.T, system *classOrderSystem, source *classOrderLiveSource, population Population, silent []Divergence) {
+func classOrderAssertGoSilence(
+	test *testing.T,
+	system *classOrderSystem,
+	source *classOrderLiveSource,
+	population Population,
+	silent []Divergence,
+) {
 	test.Helper()
 
 	perDeclaration := make(map[string]bool, len(system.Context.PerDeclarationRoots))
@@ -670,8 +696,10 @@ func classOrderAssertGoSilence(test *testing.T, system *classOrderSystem, source
 		perDeclaration[root] = true
 	}
 	if len(perDeclaration) == 0 {
-		test.Errorf("%s: the fixture names no per-declaration roots, so every decline below is unexplained for the wrong reason",
-			population.SystemName)
+		test.Errorf(
+			"%s: the fixture names no per-declaration roots, so every decline below is unexplained for the wrong reason",
+			population.SystemName,
+		)
 	}
 
 	byRoot := map[string]int{}
@@ -726,8 +754,12 @@ func classOrderAssertGoSilence(test *testing.T, system *classOrderSystem, source
 
 	// The roots are named rather than the classes counted, because "declined 408 classes" is not
 	// actionable and "declined every class rooted at `max-w-screen`, which has no descriptor row" is.
-	test.Errorf("%s: %d classes were declined under %d roots that are not per-declaration, so the table is missing rows",
-		population.SystemName, len(silent)-declared, len(counts))
+	test.Errorf(
+		"%s: %d classes were declined under %d roots that are not per-declaration, so the table is missing rows",
+		population.SystemName,
+		len(silent)-declared,
+		len(counts),
+	)
 	for index, entry := range counts {
 		if index >= 15 {
 			break
@@ -868,12 +900,21 @@ func TestClassOrderAcknowledgementsAreStillEarned(test *testing.T) {
 		}
 	}
 	if unresolvableAlpha == 0 {
-		test.Error("no design system exercised the unresolvable-alpha mechanism; the acknowledgement no longer covers anything")
+		test.Error(
+			"no design system exercised the unresolvable-alpha mechanism; the acknowledgement no longer covers anything",
+		)
 	}
 	if invented == 0 {
-		test.Error("no design system exercised the invented-reading mechanism; the acknowledgement no longer covers anything")
+		test.Error(
+			"no design system exercised the invented-reading mechanism; the acknowledgement no longer covers anything",
+		)
 	}
 
-	test.Logf("acknowledgements exercised across %d design systems: %d unresolvable-alpha, %d invented readings, %v missing descriptor rows",
-		len(fixture.Systems), unresolvableAlpha, invented, exercised)
+	test.Logf(
+		"acknowledgements exercised across %d design systems: %d unresolvable-alpha, %d invented readings, %v missing descriptor rows",
+		len(fixture.Systems),
+		unresolvableAlpha,
+		invented,
+		exercised,
+	)
 }

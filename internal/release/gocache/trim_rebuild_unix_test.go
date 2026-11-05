@@ -30,7 +30,10 @@ func TestARebuildAfterATrimRecomputesOnlyWhatWasTrimmed(test *testing.T) {
 		"lib/helper.go":  "package lib\n\nfunc helper() int { return 2 }\n",
 		"other/other.go": "package other\n\nfunc Other() int { return 3 }\n",
 	} {
-		if createDirectoryError := os.MkdirAll(filepath.Dir(filepath.Join(module, name)), 0o755); createDirectoryError != nil {
+		if createDirectoryError := os.MkdirAll(
+			filepath.Dir(filepath.Join(module, name)),
+			0o755,
+		); createDirectoryError != nil {
 			test.Fatal(createDirectoryError)
 		}
 		if writeError := os.WriteFile(filepath.Join(module, name), []byte(contents), 0o644); writeError != nil {

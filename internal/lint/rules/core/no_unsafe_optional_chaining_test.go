@@ -143,7 +143,10 @@ func TestNoUnsafeOptionalChainingStaysSilent(test *testing.T) {
 		{"a chain that is not the sequence result", "(foo?.bar, bar)();"},
 		{"a logical or fallback before access", "(obj?.foo || bar).baz;"},
 		{"a conditional with no chain in either branch", "(foo?.bar ? baz : qux)();"},
-		{"awaited chains in safe positions", "\n        async function func() {\n          await obj?.foo();\n          await obj?.foo?.();\n          (await obj?.foo)?.();\n          (await obj?.foo)?.bar;\n          await bar?.baz;\n          await (foo ?? obj?.foo.baz);\n          (await bar?.baz ?? bar).baz;\n          (await bar?.baz ?? await bar).baz;\n          await (foo?.bar ? baz : qux);\n        }\n        "},
+		{
+			"awaited chains in safe positions",
+			"\n        async function func() {\n          await obj?.foo();\n          await obj?.foo?.();\n          (await obj?.foo)?.();\n          (await obj?.foo)?.bar;\n          await bar?.baz;\n          await (foo ?? obj?.foo.baz);\n          (await bar?.baz ?? bar).baz;\n          (await bar?.baz ?? await bar).baz;\n          await (foo?.bar ? baz : qux);\n        }\n        ",
+		},
 		{"a chain of nullish fallbacks", "(obj?.foo ?? bar?.baz ?? qux)();"},
 		{"nullish inside logical or", "((obj?.foo ?? bar?.baz) || qux)();"},
 		{"logical or inside logical or", "((obj?.foo || bar?.baz) || qux)();"},
@@ -164,7 +167,10 @@ func TestNoUnsafeOptionalChainingStaysSilent(test *testing.T) {
 		{"exponentiation assignment", "bar **= obj?.foo;"},
 		{"multiplication assignment", "bar *= obj?.boo"},
 		{"division assignment", "bar /= obj?.boo"},
-		{"awaited arithmetic", "async function func() {\n            await obj?.foo + await obj?.bar;\n            await obj?.foo - await obj?.bar;\n            await obj?.foo * await obj?.bar;\n            +await obj?.foo;\n            -await obj?.foo;\n            bar += await obj?.foo;\n            bar -= await obj?.foo;\n            bar %= await obj?.foo;\n            bar **= await obj?.foo;\n            bar *= await obj?.boo;\n            bar /= await obj?.boo;\n        }\n        "},
+		{
+			"awaited arithmetic",
+			"async function func() {\n            await obj?.foo + await obj?.bar;\n            await obj?.foo - await obj?.bar;\n            await obj?.foo * await obj?.bar;\n            +await obj?.foo;\n            -await obj?.foo;\n            bar += await obj?.foo;\n            bar -= await obj?.foo;\n            bar %= await obj?.foo;\n            bar **= await obj?.foo;\n            bar *= await obj?.boo;\n            bar /= await obj?.boo;\n        }\n        ",
+		},
 		// Type arguments on a chain link. These parse only as TypeScript and each is a chain
 		// whose result is consumed inside the chain, so none is unsafe.
 		{"a typed optional call", "x?.f<T>();"},

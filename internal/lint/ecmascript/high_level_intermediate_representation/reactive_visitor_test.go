@@ -198,7 +198,11 @@ func TestReactiveVisitorCorpus(test *testing.T) {
 
 	converted, mismatched, treeInstructions, walkedTotal := 0, 0, 0, 0
 
-	forEachCorpusFunction(test, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(test, 400, func(
+		function *Function,
+		ranges *mutation_aliasing.MutableRanges,
+		scopes *ReactiveScopes,
+	) {
 		aligned, merged := AlignThenMergeReactiveScopes(function, scopes)
 		BuildReactiveScopeTerminals(function, scopes, MergedScopeIdentity{Aligned: aligned, Merged: merged})
 

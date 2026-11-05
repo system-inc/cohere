@@ -22,7 +22,9 @@ func surfacesOf(test *testing.T, decoded any) *ClassLiteralSurfaces {
 // surfaces, and never share one when they do not.
 func TestClassLiteralSurfacesAreKeyedByTheMergedSettings(test *testing.T) {
 	test.Parallel()
-	handBuilt := ClassLiteralSurfacesFor(TailwindClassLiteralOptions{Attributes: []LegacySelector{{Name: "tw"}}}.ClassLiteralSettings())
+	handBuilt := ClassLiteralSurfacesFor(
+		TailwindClassLiteralOptions{Attributes: []LegacySelector{{Name: "tw"}}}.ClassLiteralSettings(),
+	)
 	if handBuilt == DefaultClassLiteralSurfaces() {
 		test.Fatal("settings reading the tw attribute share the defaults' surfaces")
 	}
@@ -62,7 +64,10 @@ func TestClassLiteralSurfacesAreKeyedByTheMergedSettings(test *testing.T) {
 // file reads what its decoder compiled, configured or not. Building them on every ask cost an ahra
 // cold run 41 MB in 456K objects (#y2nj5ex).
 func TestClassLiteralSurfacesAreReadWithoutAllocating(test *testing.T) {
-	decoded, err := tailwindDecoders(test)[NoDuplicateClasses.Name]([]byte(`{"attributes":["tw"]}`), settingsBase(`{"callees":["merge"]}`))
+	decoded, err := tailwindDecoders(test)[NoDuplicateClasses.Name](
+		[]byte(`{"attributes":["tw"]}`),
+		settingsBase(`{"callees":["merge"]}`),
+	)
 	if err != nil {
 		test.Fatal(err)
 	}

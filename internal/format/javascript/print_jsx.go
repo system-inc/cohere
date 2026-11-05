@@ -104,7 +104,12 @@ func printJsxAttribute(path *Path, options *Options, print PrintFunc) Doc {
 				final = strings.ReplaceAll(final, "'", "&apos;")
 			}
 			res = call(path, func(path *Path) Doc {
-				return printing.PrintComments(path, doc.ReplaceEndOfLine(doc.Text(quote+final+quote), nil), options, nil)
+				return printing.PrintComments(
+					path,
+					doc.ReplaceEndOfLine(doc.Text(quote+final+quote), nil),
+					options,
+					nil,
+				)
 			}, "value")
 		} else {
 			res = print("value", nil)
@@ -199,7 +204,8 @@ func printJsxOpeningElement(path *Path, options *Options, print PrintFunc) Doc {
 	// string literal with newlines
 	shouldBreak := false
 	for _, attribute := range attributes {
-		if isStringLiteral(attribute.Child("value")) && strings.Contains(attribute.Child("value").String("value"), "\n") {
+		if isStringLiteral(attribute.Child("value")) &&
+			strings.Contains(attribute.Child("value").String("value"), "\n") {
 			shouldBreak = true
 			break
 		}
@@ -336,7 +342,9 @@ func printJsxEmptyExpression(path *Path, options *Options) Doc {
 	if requiresHardline {
 		trailing = hardline
 	}
-	return concatIn(path, printing.PrintDanglingComments(path, options, printing.DanglingOptions[Node]{Indent: requiresHardline}),
+	return concatIn(
+		path,
+		printing.PrintDanglingComments(path, options, printing.DanglingOptions[Node]{Indent: requiresHardline}),
 		trailing,
 	)
 }
@@ -355,7 +363,9 @@ func printJsxSpreadAttributeOrChild(path *Path, options *Options, print PrintFun
 			if !hasAnyComment(node(path)) {
 				return printed
 			}
-			return concatIn(path, indentIn(path, concatIn(path, softline, printing.PrintComments(path, printed, options, nil))),
+			return concatIn(
+				path,
+				indentIn(path, concatIn(path, softline, printing.PrintComments(path, printed, options, nil))),
 				softline,
 			)
 		}, name),

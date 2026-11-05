@@ -131,7 +131,13 @@ func (options *TailwindClassLiteralOptions) compileClassLiterals() error {
 
 // ClassLiteralSettings is these options merged into one list of selectors, as upstream merges them.
 func (options TailwindClassLiteralOptions) ClassLiteralSettings() ClassLiteralSettings {
-	return ClassLiteralSettings{Selectors: mergeSelectors(options.Selectors, options.Attributes, options.Callees, options.Tags, options.Variables)}
+	return ClassLiteralSettings{Selectors: mergeSelectors(
+		options.Selectors,
+		options.Attributes,
+		options.Callees,
+		options.Tags,
+		options.Variables,
+	)}
 }
 
 // ClassLiteralReader finds class-carrying strings in a file.
@@ -214,7 +220,11 @@ func (group *selectorGroup) matching(name string, path func() string) []int {
 	if !group.hasPaths || path == nil {
 		return byName
 	}
-	byPath := group.answer(&group.byPath, path(), func(selector compiledSelector) *namePatterns { return selector.path })
+	byPath := group.answer(
+		&group.byPath,
+		path(),
+		func(selector compiledSelector) *namePatterns { return selector.path },
+	)
 	if len(byPath) == 0 {
 		return byName
 	}
@@ -461,7 +471,8 @@ func (reader *ClassLiteralReader) classValuesIn(node *ast.Node) classValues {
 	if reader.values == nil {
 		return reader.readClassValues(node)
 	}
-	if !reader.tags.hasNames && (node.Kind == ast.KindNoSubstitutionTemplateLiteral || node.Kind == ast.KindTemplateExpression) {
+	if !reader.tags.hasNames &&
+		(node.Kind == ast.KindNoSubstitutionTemplateLiteral || node.Kind == ast.KindTemplateExpression) {
 		return classValues{}
 	}
 	if remembered, isRead := reader.values[node]; isRead {
@@ -648,7 +659,8 @@ func (reader *ClassLiteralReader) calleeValues(node *ast.Node) classValues {
 		return classValues{}
 	}
 	first := node
-	for callee := skipOuter(first.AsCallExpression().Expression); callee != nil && callee.Kind == ast.KindCallExpression; callee = skipOuter(callee.AsCallExpression().Expression) {
+	for callee := skipOuter(first.AsCallExpression().Expression); callee != nil &&
+		callee.Kind == ast.KindCallExpression; callee = skipOuter(callee.AsCallExpression().Expression) {
 		first = callee
 	}
 
@@ -872,7 +884,10 @@ func classValuesOf(matched matchedNodes, origin ClassLiteralOrigin) classValues 
 		edges.Leading = edges.Leading || concatenated.Leading
 		edges.Trailing = edges.Trailing || concatenated.Trailing
 		if node.Kind == ast.KindTemplateExpression {
-			values.templates = append(values.templates, classTemplateValue{node: node, origin: origin, edges: edges, concatenated: concatenated})
+			values.templates = append(
+				values.templates,
+				classTemplateValue{node: node, origin: origin, edges: edges, concatenated: concatenated},
+			)
 			continue
 		}
 		literal := classLiteralFrom(node, origin)

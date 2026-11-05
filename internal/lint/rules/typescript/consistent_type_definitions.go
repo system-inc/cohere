@@ -287,7 +287,11 @@ func consistentTypeDefinitionsInterfaceFixes(ruleContext rule.Context, node *ast
 		last := parameters.Nodes[len(parameters.Nodes)-1]
 		// The closing `>` sits past the last parameter, so the head runs to it rather than to the
 		// parameter's own end.
-		headEnd = consistentTypeDefinitionsCloseAngleAfter(text, rule.TokenRange(ruleContext.SourceFile, last).End(), statement.End())
+		headEnd = consistentTypeDefinitionsCloseAngleAfter(
+			text,
+			rule.TokenRange(ruleContext.SourceFile, last).End(),
+			statement.End(),
+		)
 		if headEnd < 0 {
 			return nil
 		}

@@ -62,9 +62,18 @@ func TestNoShadowUpstreamCorpus(test *testing.T) {
 			invalid++
 		}
 	}
-	if valid != noShadowCorpusUpstreamValid || invalid != noShadowCorpusUpstreamInvalid || pinned != noShadowCorpusUpstreamPinned {
-		test.Fatalf("the corpus holds %d valid, %d invalid and %d pinned upstream rows, and upstream has %d, %d and %d",
-			valid, invalid, pinned, noShadowCorpusUpstreamValid, noShadowCorpusUpstreamInvalid, noShadowCorpusUpstreamPinned)
+	if valid != noShadowCorpusUpstreamValid ||
+		invalid != noShadowCorpusUpstreamInvalid ||
+		pinned != noShadowCorpusUpstreamPinned {
+		test.Fatalf(
+			"the corpus holds %d valid, %d invalid and %d pinned upstream rows, and upstream has %d, %d and %d",
+			valid,
+			invalid,
+			pinned,
+			noShadowCorpusUpstreamValid,
+			noShadowCorpusUpstreamInvalid,
+			noShadowCorpusUpstreamPinned,
+		)
 	}
 
 	for _, row := range noShadowCorpus {
@@ -79,9 +88,15 @@ func TestNoShadowUpstreamCorpus(test *testing.T) {
 				test.Fatalf("decoding %q: %v", row.options, decodeNoShadowOptionsError)
 			}
 			configuration := noShadowTsconfigFor(test, row.fileName)
-			result := rule_testing.RunTypedFilesWithSetupAndOptions(test, NoShadow, map[string]string{row.fileName: row.source}, row.fileName, options,
+			result := rule_testing.RunTypedFilesWithSetupAndOptions(test, NoShadow, map[string]string{
+				row.fileName: row.source,
+			}, row.fileName, options,
 				func(directory string) {
-					if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration), 0o644); writeError != nil {
+					if writeError := os.WriteFile(
+						filepath.Join(directory, "tsconfig.json"),
+						[]byte(configuration),
+						0o644,
+					); writeError != nil {
 						test.Fatal(writeError)
 					}
 				})

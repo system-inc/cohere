@@ -31,7 +31,10 @@ func TestNoNewWrappersFires(test *testing.T) {
 		{"new String", "var a = new String('hello');"},
 		{"new Number", "var a = new Number(10);"},
 		{"new Boolean", "var a = new Boolean(false);"},
-		{"the outer new String reports while the block-shadowed one does not", "\n            const a = new String('bar');\n            {\n                const String = CustomString;\n                const b = new String('foo');\n            }\n            "},
+		{
+			"the outer new String reports while the block-shadowed one does not",
+			"\n            const a = new String('bar');\n            {\n                const String = CustomString;\n                const b = new String('foo');\n            }\n            ",
+		},
 	}
 
 	for _, testCase := range cases {
@@ -63,9 +66,18 @@ func TestNoNewWrappersStaysSilent(test *testing.T) {
 		sourceText string
 	}{
 		{"new Object is not a wrapper", "var a = new Object();"},
-		{"String called without new, beside a static read off it", "var a = String('test'), b = String.fromCharCode(32);"},
-		{"a parameter named Number shadows the global", "\n        function test(Number) {\n            return new Number;\n        }\n        "},
-		{"a var hoisted out of the else branch shadows Boolean", "\n        if (foo) {\n            result = new Boolean(bar);\n        } else {\n            var Boolean = CustomBoolean;\n        }\n        "},
+		{
+			"String called without new, beside a static read off it",
+			"var a = String('test'), b = String.fromCharCode(32);",
+		},
+		{
+			"a parameter named Number shadows the global",
+			"\n        function test(Number) {\n            return new Number;\n        }\n        ",
+		},
+		{
+			"a var hoisted out of the else branch shadows Boolean",
+			"\n        if (foo) {\n            result = new Boolean(bar);\n        } else {\n            var Boolean = CustomBoolean;\n        }\n        ",
+		},
 	}
 
 	for _, testCase := range cases {
@@ -116,7 +128,10 @@ func TestNoNewWrappersReportsWhereUpstreamsGlobalsConfigWouldNot(test *testing.T
 		sourceText string
 	}{
 		{"globals String off", "new String()"},
-		{"a global comment turning Boolean off", "\n        /* global Boolean:off */\n        assert(new Boolean);\n        "},
+		{
+			"a global comment turning Boolean off",
+			"\n        /* global Boolean:off */\n        assert(new Boolean);\n        ",
+		},
 	}
 
 	for _, testCase := range cases {
@@ -151,7 +166,11 @@ func TestNoNewWrappersReportsTheWholeNewExpression(test *testing.T) {
 		{"new String", "var a = new String('hello');", "new String('hello')"},
 		{"new Number", "var a = new Number(10);", "new Number(10)"},
 		{"new Boolean", "var a = new Boolean(false);", "new Boolean(false)"},
-		{"the outer call in the block-shadow case", "\n            const a = new String('bar');\n            {\n                const String = CustomString;\n                const b = new String('foo');\n            }\n            ", "new String('bar')"},
+		{
+			"the outer call in the block-shadow case",
+			"\n            const a = new String('bar');\n            {\n                const String = CustomString;\n                const b = new String('foo');\n            }\n            ",
+			"new String('bar')",
+		},
 	}
 
 	for _, testCase := range cases {
@@ -211,11 +230,23 @@ func TestNoNewWrappersOnFormsUpstreamDoesNotWrite(test *testing.T) {
 		sourceText string
 		wantReport bool
 	}{
-		{"a parenthesized callee reports, because ESTree has no node for the parenthesis", "var a = new (String)('x');", true},
+		{
+			"a parenthesized callee reports, because ESTree has no node for the parenthesis",
+			"var a = new (String)('x');",
+			true,
+		},
 		{"and so does a doubly parenthesized one", "var a = new ((String))('x');", true},
 		{"a new expression with no argument list still reports", "var a = new String;", true},
-		{"a property access callee is silent, since upstream reads callee.name and finds none", "var a = new window.String('x');", false},
-		{"globalThis.String is a property access too, and equally silent", "var a = new globalThis.String('x');", false},
+		{
+			"a property access callee is silent, since upstream reads callee.name and finds none",
+			"var a = new window.String('x');",
+			false,
+		},
+		{
+			"globalThis.String is a property access too, and equally silent",
+			"var a = new globalThis.String('x');",
+			false,
+		},
 		{"parentheses around the whole expression do not change the callee", "var a = (new String('x'));", true},
 		{"a class shadowing the name declines", "class String {} new String();", false},
 		{"a function declaration shadowing the name declines", "function Boolean() {} new Boolean();", false},

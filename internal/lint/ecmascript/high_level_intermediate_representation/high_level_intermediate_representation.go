@@ -603,7 +603,11 @@ func (function *Function) NewBlock(kind BlockKind) *BasicBlock {
 //
 // Every value gets its own IdentifierId. Passing a non-zero declaration groups this value with
 // others of the same binding; passing 0 mints a fresh declaration, which is what a temporary wants.
-func (function *Function) NewIdentifier(name string, node *ast.Node, declaration static_single_assignment.DeclarationId) *Identifier {
+func (function *Function) NewIdentifier(
+	name string,
+	node *ast.Node,
+	declaration static_single_assignment.DeclarationId,
+) *Identifier {
 	id := static_single_assignment.IdentifierId(len(function.Identifiers))
 	if declaration == 0 {
 		declaration = static_single_assignment.DeclarationId(id) + 1
@@ -619,7 +623,10 @@ func (function *Function) NewIdentifier(name string, node *ast.Node, declaration
 	if len(function.identifierSlab) == cap(function.identifierSlab) {
 		function.identifierSlab = make([]Identifier, 0, min(max(4, len(function.Identifiers)), 256))
 	}
-	function.identifierSlab = append(function.identifierSlab, Identifier{Id: id, Declaration: declaration, Name: name, Node: node})
+	function.identifierSlab = append(
+		function.identifierSlab,
+		Identifier{Id: id, Declaration: declaration, Name: name, Node: node},
+	)
 	identifier := &function.identifierSlab[len(function.identifierSlab)-1]
 	function.Identifiers = append(function.Identifiers, identifier)
 	return identifier

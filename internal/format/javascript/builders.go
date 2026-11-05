@@ -192,7 +192,12 @@ func groupWithIn(path *Path, contents any, options doc.GroupOptions) Doc {
 	if memory == nil {
 		return groupWith(contents, options)
 	}
-	return memory.groups.New(doc.Group{ID: options.ID, Contents: toDoc(contents), Break: options.ShouldBreak, ExpandedStates: options.ExpandedStates})
+	return memory.groups.New(doc.Group{
+		ID:             options.ID,
+		Contents:       toDoc(contents),
+		Break:          options.ShouldBreak,
+		ExpandedStates: options.ExpandedStates,
+	})
 }
 
 // indentIn is indent with the indent from the format's docMemory. It builds what doc.NewIndent does.

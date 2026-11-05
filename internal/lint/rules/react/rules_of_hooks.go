@@ -346,7 +346,13 @@ func runRulesOfHooks(ruleContext rule.Context, options any) rule.Listeners {
 // The arms are ordered the way oxc orders them, because the order is observable: a named function
 // that is neither component nor Hook reports as `notComponent` even when it is also async, and a
 // callback inside a component reports as `callback` even when its own name would qualify.
-func reportEnclosingFunctionShape(ruleContext rule.Context, hook *ast.Node, callee *ast.Node, enclosing *ast.Node, isUse bool) bool {
+func reportEnclosingFunctionShape(
+	ruleContext rule.Context,
+	hook *ast.Node,
+	callee *ast.Node,
+	enclosing *ast.Node,
+	isUse bool,
+) bool {
 	// A function with its own name that is neither component-shaped nor Hook-shaped. This arm points
 	// at the callee rather than at the whole call, which is upstream's own choice and was measured
 	// on the release binary rather than read: for `useHook(1)` the label covers seven bytes here and

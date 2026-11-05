@@ -331,8 +331,13 @@ func TestUnifiedSignaturesValid(test *testing.T) {
 		},
 	}
 	for _, testCase := range cases {
-		result := rule_testing.RunWithOptions(test, UnifiedSignatures,
-			unifiedSignaturesFileFor(testCase.isJsx), testCase.sourceText, unifiedSignaturesOptionsAsDecoded(testCase.options))
+		result := rule_testing.RunWithOptions(
+			test,
+			UnifiedSignatures,
+			unifiedSignaturesFileFor(testCase.isJsx),
+			testCase.sourceText,
+			unifiedSignaturesOptionsAsDecoded(testCase.options),
+		)
 		rule_testing.ExpectClean(test, result)
 	}
 }
@@ -405,7 +410,9 @@ func TestUnifiedSignaturesInvalid(test *testing.T) {
 			isJsx:      false,
 			wantIds:    []string{"allParametersAreSame"},
 			wantSpans:  []string{"declare function f(a: number): void;"},
-			wantStarts: []string{"This overload and the one on line 1 can be combined into one signature with identical parameters."},
+			wantStarts: []string{
+				"This overload and the one on line 1 can be combined into one signature with identical parameters.",
+			},
 		},
 		{
 			sourceText: "function f(a: number): void;\nfunction f(a: number): void;\nfunction f(a: number): void {}\n",
@@ -461,7 +468,9 @@ func TestUnifiedSignaturesInvalid(test *testing.T) {
 			isJsx:      false,
 			wantIds:    []string{"omittingSingleParameter"},
 			wantSpans:  []string{"x: number"},
-			wantStarts: []string{"This overload and the one on line 2 can be combined into one signature with an optional parameter."},
+			wantStarts: []string{
+				"This overload and the one on line 2 can be combined into one signature with an optional parameter.",
+			},
 		},
 		{
 			sourceText: "interface I {\n  a0(): void;\n  a0(x: string): string;\n  a0(x: number): void;\n}\n",
@@ -469,7 +478,9 @@ func TestUnifiedSignaturesInvalid(test *testing.T) {
 			isJsx:      false,
 			wantIds:    []string{"omittingSingleParameter"},
 			wantSpans:  []string{"x: number"},
-			wantStarts: []string{"This overload and the one on line 2 can be combined into one signature with an optional parameter."},
+			wantStarts: []string{
+				"This overload and the one on line 2 can be combined into one signature with an optional parameter.",
+			},
 		},
 		{
 			sourceText: "interface I {\n  a1(): void;\n  a1(x: number): void;\n}\n",
@@ -549,7 +560,9 @@ func TestUnifiedSignaturesInvalid(test *testing.T) {
 			isJsx:      false,
 			wantIds:    []string{"singleParameterDifference"},
 			wantSpans:  []string{"x: string | boolean"},
-			wantStarts: []string{"These overloads can be combined into one signature taking `number | string | boolean`."},
+			wantStarts: []string{
+				"These overloads can be combined into one signature taking `number | string | boolean`.",
+			},
 		},
 		{
 			sourceText: "interface I {\n  f(x: number);\n  f(x: [string, boolean]);\n}\n",
@@ -557,7 +570,9 @@ func TestUnifiedSignaturesInvalid(test *testing.T) {
 			isJsx:      false,
 			wantIds:    []string{"singleParameterDifference"},
 			wantSpans:  []string{"x: [string, boolean]"},
-			wantStarts: []string{"These overloads can be combined into one signature taking `number | [string, boolean]`."},
+			wantStarts: []string{
+				"These overloads can be combined into one signature taking `number | [string, boolean]`.",
+			},
 		},
 		{
 			sourceText: "interface Generic<T> {\n  y(x: T[]): void;\n  y(x: T): void;\n}\n",
@@ -661,7 +676,9 @@ func TestUnifiedSignaturesInvalid(test *testing.T) {
 			isJsx:      false,
 			wantIds:    []string{"singleParameterDifference"},
 			wantSpans:  []string{"x: boolean"},
-			wantStarts: []string{"This overload and the one on line 5 can be combined into one signature taking `number | boolean`."},
+			wantStarts: []string{
+				"This overload and the one on line 5 can be combined into one signature taking `number | boolean`.",
+			},
 		},
 		{
 			sourceText: "/**\n * @deprecate\n */\ndeclare function f(x: string): void;\n/**\n * @deprecate\n */\ndeclare function f(x: number): void;\ndeclare function f(x: boolean): void;\n",
@@ -669,7 +686,9 @@ func TestUnifiedSignaturesInvalid(test *testing.T) {
 			isJsx:      false,
 			wantIds:    []string{"singleParameterDifference"},
 			wantSpans:  []string{"x: number"},
-			wantStarts: []string{"This overload and the one on line 4 can be combined into one signature taking `string | number`."},
+			wantStarts: []string{
+				"This overload and the one on line 4 can be combined into one signature taking `string | number`.",
+			},
 		},
 		{
 			sourceText: "declare function f(x: string): void;\n/**\n * @deprecate\n */\ndeclare function f(x: number): void;\n/**\n * @deprecate\n */\ndeclare function f(x: boolean): void;\n",
@@ -677,7 +696,9 @@ func TestUnifiedSignaturesInvalid(test *testing.T) {
 			isJsx:      false,
 			wantIds:    []string{"singleParameterDifference"},
 			wantSpans:  []string{"x: boolean"},
-			wantStarts: []string{"This overload and the one on line 5 can be combined into one signature taking `number | boolean`."},
+			wantStarts: []string{
+				"This overload and the one on line 5 can be combined into one signature taking `number | boolean`.",
+			},
 		},
 		{
 			sourceText: "export function f(x: string): void;\n/**\n * @deprecate\n */\nexport function f(x: number): void;\n/**\n * @deprecate\n */\nexport function f(x: boolean): void;\n",
@@ -685,7 +706,9 @@ func TestUnifiedSignaturesInvalid(test *testing.T) {
 			isJsx:      false,
 			wantIds:    []string{"singleParameterDifference"},
 			wantSpans:  []string{"x: boolean"},
-			wantStarts: []string{"This overload and the one on line 5 can be combined into one signature taking `number | boolean`."},
+			wantStarts: []string{
+				"This overload and the one on line 5 can be combined into one signature taking `number | boolean`.",
+			},
 		},
 		{
 			sourceText: "/**\n * This signature does something.\n */\n\n/**\n * This signature does something else.\n */\nfunction f(x: number): void;\n\n/**\n * This signature does something else.\n */\nfunction f(x: string): void;\n",
@@ -701,7 +724,9 @@ func TestUnifiedSignaturesInvalid(test *testing.T) {
 			isJsx:      false,
 			wantIds:    []string{"singleParameterDifference"},
 			wantSpans:  []string{"x: boolean"},
-			wantStarts: []string{"This overload and the one on line 6 can be combined into one signature taking `number | boolean`."},
+			wantStarts: []string{
+				"This overload and the one on line 6 can be combined into one signature taking `number | boolean`.",
+			},
 		},
 		{
 			sourceText: "// a line comment\ndeclare function f(x: number): unknown;\ndeclare function f(x: boolean): unknown;\n",
@@ -749,7 +774,9 @@ func TestUnifiedSignaturesInvalid(test *testing.T) {
 			isJsx:      false,
 			wantIds:    []string{"singleParameterDifference"},
 			wantSpans:  []string{"x: number | boolean"},
-			wantStarts: []string{"These overloads can be combined into one signature taking `string | number | boolean`."},
+			wantStarts: []string{
+				"These overloads can be combined into one signature taking `string | number | boolean`.",
+			},
 		},
 		{
 			sourceText: "function f(value): void;\nfunction f(value: string): void;\n",
@@ -821,7 +848,9 @@ func TestUnifiedSignaturesInvalid(test *testing.T) {
 			isJsx:      false,
 			wantIds:    []string{"singleParameterDifference"},
 			wantSpans:  []string{"x: number | string & /* brand */ { brand: true }"},
-			wantStarts: []string{"These overloads can be combined into one signature taking `string & { brand: true } | number | string & /* brand */ { brand: true }`."},
+			wantStarts: []string{
+				"These overloads can be combined into one signature taking `string & { brand: true } | number | string & /* brand */ { brand: true }`.",
+			},
 		},
 		{
 			sourceText: "function f(x: string & { brand: true }): void;\nfunction f(x: number | string & { brand: true }): void;\n",
@@ -829,7 +858,9 @@ func TestUnifiedSignaturesInvalid(test *testing.T) {
 			isJsx:      false,
 			wantIds:    []string{"singleParameterDifference"},
 			wantSpans:  []string{"x: number | string & { brand: true }"},
-			wantStarts: []string{"These overloads can be combined into one signature taking `string & { brand: true } | number`."},
+			wantStarts: []string{
+				"These overloads can be combined into one signature taking `string & { brand: true } | number`.",
+			},
 		},
 		{
 			sourceText: "function f<T, U>(x: () => void): void;\nfunction f<T, U>(x: T extends U ? string : number): void;\n",
@@ -837,7 +868,9 @@ func TestUnifiedSignaturesInvalid(test *testing.T) {
 			isJsx:      false,
 			wantIds:    []string{"singleParameterDifference"},
 			wantSpans:  []string{"x: T extends U ? string : number"},
-			wantStarts: []string{"These overloads can be combined into one signature taking `(() => void) | (T extends U ? string : number)`."},
+			wantStarts: []string{
+				"These overloads can be combined into one signature taking `(() => void) | (T extends U ? string : number)`.",
+			},
 		},
 		{
 			sourceText: "interface Value {}\nfunction f(x: new () => Value): void;\nfunction f(x: string): void;\n",
@@ -845,7 +878,9 @@ func TestUnifiedSignaturesInvalid(test *testing.T) {
 			isJsx:      false,
 			wantIds:    []string{"singleParameterDifference"},
 			wantSpans:  []string{"x: string"},
-			wantStarts: []string{"These overloads can be combined into one signature taking `(new () => Value) | string`."},
+			wantStarts: []string{
+				"These overloads can be combined into one signature taking `(new () => Value) | string`.",
+			},
 		},
 		{
 			sourceText: "interface I {\n  f(x: string | number): void;\n  f(x: number | boolean): void;\n  f(x: symbol): string;\n}\n",
@@ -853,7 +888,9 @@ func TestUnifiedSignaturesInvalid(test *testing.T) {
 			isJsx:      false,
 			wantIds:    []string{"singleParameterDifference"},
 			wantSpans:  []string{"x: number | boolean"},
-			wantStarts: []string{"This overload and the one on line 2 can be combined into one signature taking `string | number | boolean`."},
+			wantStarts: []string{
+				"This overload and the one on line 2 can be combined into one signature taking `string | number | boolean`.",
+			},
 		},
 		{
 			sourceText: "function f(x: 'a' | 'b'): void;\nfunction f(x: 'b' | 'c'): void;\n",
@@ -869,7 +906,9 @@ func TestUnifiedSignaturesInvalid(test *testing.T) {
 			isJsx:      false,
 			wantIds:    []string{"singleParameterDifference"},
 			wantSpans:  []string{"x: Array<number> | boolean"},
-			wantStarts: []string{"These overloads can be combined into one signature taking `Array<string> | boolean | Array<number>`."},
+			wantStarts: []string{
+				"These overloads can be combined into one signature taking `Array<string> | boolean | Array<number>`.",
+			},
 		},
 		{
 			sourceText: "function f(x: Promise | boolean): void;\nfunction f(x: Promise<string> | boolean): void;\n",
@@ -877,7 +916,9 @@ func TestUnifiedSignaturesInvalid(test *testing.T) {
 			isJsx:      false,
 			wantIds:    []string{"singleParameterDifference"},
 			wantSpans:  []string{"x: Promise<string> | boolean"},
-			wantStarts: []string{"These overloads can be combined into one signature taking `Promise | boolean | Promise<string>`."},
+			wantStarts: []string{
+				"These overloads can be combined into one signature taking `Promise | boolean | Promise<string>`.",
+			},
 		},
 		{
 			sourceText: "namespace Namespace {\n  export type Value = string;\n}\nfunction f(x: Namespace.Value): void;\nfunction f(x: Namespace.Value | string): void;\n",
@@ -885,12 +926,19 @@ func TestUnifiedSignaturesInvalid(test *testing.T) {
 			isJsx:      false,
 			wantIds:    []string{"singleParameterDifference"},
 			wantSpans:  []string{"x: Namespace.Value | string"},
-			wantStarts: []string{"These overloads can be combined into one signature taking `Namespace.Value | string`."},
+			wantStarts: []string{
+				"These overloads can be combined into one signature taking `Namespace.Value | string`.",
+			},
 		},
 	}
 	for _, testCase := range cases {
-		result := rule_testing.RunWithOptions(test, UnifiedSignatures,
-			unifiedSignaturesFileFor(testCase.isJsx), testCase.sourceText, unifiedSignaturesOptionsAsDecoded(testCase.options))
+		result := rule_testing.RunWithOptions(
+			test,
+			UnifiedSignatures,
+			unifiedSignaturesFileFor(testCase.isJsx),
+			testCase.sourceText,
+			unifiedSignaturesOptionsAsDecoded(testCase.options),
+		)
 		rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 
 		if len(result.Diagnostics) != len(testCase.wantSpans) {

@@ -216,7 +216,8 @@ func TestDecodeBanTsCommentOptionsReadsEveryShape(test *testing.T) {
 		// A pattern only JavaScript compiles: Go's regexp has no lookahead, and ESLint accepts it.
 		{"{\"ts-ignore\":{\"descriptionFormat\":\"^(?=: TS)\"}}",
 			func(test *testing.T, options BanTsCommentOptions) {
-				if options.TsIgnore.DescriptionFormat == nil || options.TsIgnore.DescriptionFormat.Source() != "^(?=: TS)" {
+				if options.TsIgnore.DescriptionFormat == nil ||
+					options.TsIgnore.DescriptionFormat.Source() != "^(?=: TS)" {
 					test.Fatalf("a lookahead pattern did not survive the decode: %+v", options.TsIgnore)
 				}
 			}},
@@ -251,14 +252,23 @@ func TestDecodeBanTsCommentOptionsRefusesWhatUpstreamRefuses(test *testing.T) {
 		{`{"ts-check":"Allow-with-description"}`, `ts-check: expected true, false, "allow-with-description"`},
 		{`{"ts-nocheck":3}`, `ts-nocheck: expected true, false, "allow-with-description"`},
 		{`{"ts-expect-error":[]}`, `ts-expect-error: expected true, false, "allow-with-description"`},
-		{`{"ts-ignore":{"descriptionFormat":"^(unclosed"}}`, `ts-ignore: descriptionFormat "^(unclosed" is not a pattern JavaScript can compile`},
+		{
+			`{"ts-ignore":{"descriptionFormat":"^(unclosed"}}`,
+			`ts-ignore: descriptionFormat "^(unclosed" is not a pattern JavaScript can compile`,
+		},
 	}
 	for index, testCase := range cases {
 		test.Run(banTsCommentCaseName(index), func(test *testing.T) {
 			test.Parallel()
 			_, decodeBanTsCommentOptionsError := DecodeBanTsCommentOptions([]byte(testCase.configuration))
-			if decodeBanTsCommentOptionsError == nil || !strings.Contains(decodeBanTsCommentOptionsError.Error(), testCase.want) {
-				test.Fatalf("decoding %s: error %v, want one containing %q", testCase.configuration, decodeBanTsCommentOptionsError, testCase.want)
+			if decodeBanTsCommentOptionsError == nil ||
+				!strings.Contains(decodeBanTsCommentOptionsError.Error(), testCase.want) {
+				test.Fatalf(
+					"decoding %s: error %v, want one containing %q",
+					testCase.configuration,
+					decodeBanTsCommentOptionsError,
+					testCase.want,
+				)
 			}
 		})
 	}
@@ -280,7 +290,10 @@ func TestBanTsCommentDeclinesJavaScriptFiles(test *testing.T) {
 	} {
 		test.Run(fileName, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, BanTsComment, fileName, "// @ts-ignore\n", nil))
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.RunWithOptions(test, BanTsComment, fileName, "// @ts-ignore\n", nil),
+			)
 		})
 	}
 	for _, fileName := range []string{

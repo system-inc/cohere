@@ -19,7 +19,10 @@ const concurrencyNoLostUpdateId = "lostUpdate"
 // `policy/messages/concurrency-no-lost-update.json`. Both findings share the id, and the phrase says
 // which stale read the write builds on: a variable, or an entry a read call returned.
 var (
-	concurrencyNoLostUpdateText           = policy.MessageOf("nexus/concurrency-no-lost-update", concurrencyNoLostUpdateId)
+	concurrencyNoLostUpdateText = policy.MessageOf(
+		"nexus/concurrency-no-lost-update",
+		concurrencyNoLostUpdateId,
+	)
 	concurrencyNoLostUpdateVariableRead   = concurrencyNoLostUpdateText.Option("suspendedRead", "variable")
 	concurrencyNoLostUpdateStoreEntryRead = concurrencyNoLostUpdateText.Option("suspendedRead", "storeEntry")
 )
@@ -28,16 +31,22 @@ var (
 // to work out which of several writes on a line is the one that loses an update.
 func concurrencyNoLostUpdateMessage(target string) rule.Message {
 	return rule.Message{
-		Id:          concurrencyNoLostUpdateId,
-		Description: concurrencyNoLostUpdateText.Render(map[string]string{"target": target}, concurrencyNoLostUpdateVariableRead),
+		Id: concurrencyNoLostUpdateId,
+		Description: concurrencyNoLostUpdateText.Render(
+			map[string]string{"target": target},
+			concurrencyNoLostUpdateVariableRead,
+		),
 	}
 }
 
 // concurrencyNoLostUpdateStoreMessage names the read call whose stale answer the write builds on.
 func concurrencyNoLostUpdateStoreMessage(read string) rule.Message {
 	return rule.Message{
-		Id:          concurrencyNoLostUpdateId,
-		Description: concurrencyNoLostUpdateText.Render(map[string]string{"read": read}, concurrencyNoLostUpdateStoreEntryRead),
+		Id: concurrencyNoLostUpdateId,
+		Description: concurrencyNoLostUpdateText.Render(
+			map[string]string{"read": read},
+			concurrencyNoLostUpdateStoreEntryRead,
+		),
 	}
 }
 
@@ -386,7 +395,10 @@ func analyzeConcurrencyNoLostUpdateRoot(ruleContext rule.Context, root *ast.Node
 		evaluator := concurrencyNoLostUpdateEvaluator{analysis: analysis, target: access.target, anchor: call}
 		for _, outcome := range evaluator.evaluate(access.value, false) {
 			if outcome.dependencies&concurrencyNoLostUpdateStaleModified != 0 {
-				ruleContext.ReportNode(call, concurrencyNoLostUpdateStoreMessage(analysis.storeReadText(access.target, call)))
+				ruleContext.ReportNode(
+					call,
+					concurrencyNoLostUpdateStoreMessage(analysis.storeReadText(access.target, call)),
+				)
 				break
 			}
 		}
@@ -531,7 +543,8 @@ const concurrencyNoLostUpdateComputedName = "\x00computed"
 // still. Only the root matters, for condition 4.
 func (analysis *concurrencyNoLostUpdateRoot) compoundTargetOf(node *ast.Node) (concurrencyNoLostUpdatePath, bool) {
 	current := concurrencyNoLostUpdateSkipTransparent(node)
-	if current == nil || (current.Kind != ast.KindPropertyAccessExpression && current.Kind != ast.KindElementAccessExpression) {
+	if current == nil ||
+		(current.Kind != ast.KindPropertyAccessExpression && current.Kind != ast.KindElementAccessExpression) {
 		return concurrencyNoLostUpdatePath{}, false
 	}
 	for current.Kind == ast.KindPropertyAccessExpression || current.Kind == ast.KindElementAccessExpression {
@@ -646,7 +659,10 @@ func (analysis *concurrencyNoLostUpdateRoot) nestedUsage(symbol *ast.Symbol) con
 }
 
 // losesUpdate is condition 5 and 6 for one candidate write.
-func (analysis *concurrencyNoLostUpdateRoot) losesUpdate(assignment *ast.Node, target concurrencyNoLostUpdatePath) bool {
+func (analysis *concurrencyNoLostUpdateRoot) losesUpdate(
+	assignment *ast.Node,
+	target concurrencyNoLostUpdatePath,
+) bool {
 	binary := assignment.AsBinaryExpression()
 	evaluator := concurrencyNoLostUpdateEvaluator{analysis: analysis, target: target, anchor: assignment}
 	outcomes := evaluator.evaluate(binary.Right, false)
@@ -703,7 +719,10 @@ func (evaluator concurrencyNoLostUpdateEvaluator) leaf(
 
 // sequence evaluates nodes left to right and unions their values. A suspension in a later node
 // stales what earlier nodes read.
-func (evaluator concurrencyNoLostUpdateEvaluator) sequence(nodes []*ast.Node, suspended bool) []concurrencyNoLostUpdateOutcome {
+func (evaluator concurrencyNoLostUpdateEvaluator) sequence(
+	nodes []*ast.Node,
+	suspended bool,
+) []concurrencyNoLostUpdateOutcome {
 	states := evaluator.leaf(0, suspended)
 	for _, node := range nodes {
 		if node == nil {
@@ -751,7 +770,10 @@ func (evaluator concurrencyNoLostUpdateEvaluator) then(
 }
 
 // evaluate returns every path through node, given whether a suspension already happened on the path.
-func (evaluator concurrencyNoLostUpdateEvaluator) evaluate(node *ast.Node, suspended bool) []concurrencyNoLostUpdateOutcome {
+func (evaluator concurrencyNoLostUpdateEvaluator) evaluate(
+	node *ast.Node,
+	suspended bool,
+) []concurrencyNoLostUpdateOutcome {
 	if node == nil {
 		return evaluator.leaf(0, suspended)
 	}
@@ -917,7 +939,9 @@ func (evaluator concurrencyNoLostUpdateEvaluator) evaluate(node *ast.Node, suspe
 
 // match compares a static path read against the target: the target itself is a verbatim read, a
 // longer path through it is a read of the target that something is then computed from.
-func (evaluator concurrencyNoLostUpdateEvaluator) match(path concurrencyNoLostUpdatePath) concurrencyNoLostUpdateDependencies {
+func (evaluator concurrencyNoLostUpdateEvaluator) match(
+	path concurrencyNoLostUpdatePath,
+) concurrencyNoLostUpdateDependencies {
 	// A store entry is read only through its read call, never through a path.
 	if evaluator.target.store != "" {
 		return 0
@@ -937,7 +961,10 @@ func (evaluator concurrencyNoLostUpdateEvaluator) match(path concurrencyNoLostUp
 }
 
 // identifier evaluates one identifier read: the target variable itself, or a const carrying it.
-func (evaluator concurrencyNoLostUpdateEvaluator) identifier(node *ast.Node, suspended bool) concurrencyNoLostUpdateDependencies {
+func (evaluator concurrencyNoLostUpdateEvaluator) identifier(
+	node *ast.Node,
+	suspended bool,
+) concurrencyNoLostUpdateDependencies {
 	symbol := evaluator.analysis.resolve(node)
 	if symbol == nil {
 		return 0
@@ -1012,7 +1039,12 @@ func (analysis *concurrencyNoLostUpdateRoot) suspensionBetween(
 	anchor *ast.Node,
 	target concurrencyNoLostUpdatePath,
 ) bool {
-	memoKey := concurrencyNoLostUpdateBetweenKey{symbol: symbol, anchor: anchor, targetRoot: target.root, targetPath: target.key()}
+	memoKey := concurrencyNoLostUpdateBetweenKey{
+		symbol:     symbol,
+		anchor:     anchor,
+		targetRoot: target.root,
+		targetPath: target.key(),
+	}
 	if answer, memoized := analysis.between[memoKey]; memoized {
 		return answer
 	}
@@ -1101,7 +1133,10 @@ func (analysis *concurrencyNoLostUpdateRoot) suspensionBetween(
 
 // writesTarget reports whether an assignment writes exactly the target path, or a store's write call
 // writes exactly the target entry.
-func (analysis *concurrencyNoLostUpdateRoot) writesTarget(assignment *ast.Node, target concurrencyNoLostUpdatePath) bool {
+func (analysis *concurrencyNoLostUpdateRoot) writesTarget(
+	assignment *ast.Node,
+	target concurrencyNoLostUpdatePath,
+) bool {
 	if assignment.Kind == ast.KindCallExpression {
 		access := analysis.storeAccessOf(assignment)
 		return access != nil && access.isWrite && access.target.sameStoreEntry(target)

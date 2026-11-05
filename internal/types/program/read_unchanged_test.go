@@ -52,7 +52,11 @@ func TestTheProgramsCopyIsTheFilesBytesOnlyWithoutAByteOrderMark(test *testing.T
 				}
 			}
 			configuration := `{"compilerOptions":{"strict":true,"module":"esnext","target":"esnext"},"include":["*.ts"]}`
-			if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration), 0o644); writeError != nil {
+			if writeError := os.WriteFile(
+				filepath.Join(directory, "tsconfig.json"),
+				[]byte(configuration),
+				0o644,
+			); writeError != nil {
 				test.Fatal(writeError)
 			}
 			var pack *ContentPack
@@ -61,7 +65,9 @@ func TestTheProgramsCopyIsTheFilesBytesOnlyWithoutAByteOrderMark(test *testing.T
 					test.Fatal(err)
 				}
 			}
-			graph, err := Build(Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory, ContentPack: pack})
+			graph, err := Build(
+				Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory, ContentPack: pack},
+			)
 			if err != nil {
 				test.Fatal(err)
 			}

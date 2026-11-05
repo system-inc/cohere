@@ -20,11 +20,26 @@ const correctnessRequireBlockingStandardStreamsId = "exitBeforeBlockingStandardS
 // The rule's message and the options it picks from, whose wording lives in
 // `policy/messages/correctness-require-blocking-standard-streams.json`.
 var (
-	correctnessRequireBlockingStandardStreamsText         = policy.MessageOf("nexus/correctness-require-blocking-standard-streams", correctnessRequireBlockingStandardStreamsId)
-	correctnessRequireBlockingStandardStreamsShebang      = correctnessRequireBlockingStandardStreamsText.Option("processReason", "shebang")
-	correctnessRequireBlockingStandardStreamsUnimported   = correctnessRequireBlockingStandardStreamsText.Option("processReason", "unimported")
-	correctnessRequireBlockingStandardStreamsOneExit      = correctnessRequireBlockingStandardStreamsText.Option("exitCount", "one")
-	correctnessRequireBlockingStandardStreamsSeveralExits = correctnessRequireBlockingStandardStreamsText.Option("exitCount", "several")
+	correctnessRequireBlockingStandardStreamsText = policy.MessageOf(
+		"nexus/correctness-require-blocking-standard-streams",
+		correctnessRequireBlockingStandardStreamsId,
+	)
+	correctnessRequireBlockingStandardStreamsShebang = correctnessRequireBlockingStandardStreamsText.Option(
+		"processReason",
+		"shebang",
+	)
+	correctnessRequireBlockingStandardStreamsUnimported = correctnessRequireBlockingStandardStreamsText.Option(
+		"processReason",
+		"unimported",
+	)
+	correctnessRequireBlockingStandardStreamsOneExit = correctnessRequireBlockingStandardStreamsText.Option(
+		"exitCount",
+		"one",
+	)
+	correctnessRequireBlockingStandardStreamsSeveralExits = correctnessRequireBlockingStandardStreamsText.Option(
+		"exitCount",
+		"several",
+	)
 )
 
 // CorrectnessRequireBlockingStandardStreams reports a file that runs as a process and can reach
@@ -204,10 +219,13 @@ var correctnessRequireBlockingStandardStreamsCache struct {
 	index   *correctnessRequireBlockingStandardStreamsIndex
 }
 
-func correctnessRequireBlockingStandardStreamsIndexFor(program rule.Program) *correctnessRequireBlockingStandardStreamsIndex {
+func correctnessRequireBlockingStandardStreamsIndexFor(
+	program rule.Program,
+) *correctnessRequireBlockingStandardStreamsIndex {
 	correctnessRequireBlockingStandardStreamsCache.Lock()
 	defer correctnessRequireBlockingStandardStreamsCache.Unlock()
-	if correctnessRequireBlockingStandardStreamsCache.program == program.Identity() && correctnessRequireBlockingStandardStreamsCache.index != nil {
+	if correctnessRequireBlockingStandardStreamsCache.program == program.Identity() &&
+		correctnessRequireBlockingStandardStreamsCache.index != nil {
 		return correctnessRequireBlockingStandardStreamsCache.index
 	}
 	index := correctnessRequireBlockingStandardStreamsBuildIndex(program)
@@ -248,7 +266,9 @@ func correctnessRequireBlockingStandardStreamsFingerprint(program rule.Program, 
 // correctnessRequireBlockingStandardStreamsBuildIndex resolves every import of every source file once.
 // Declaration files contribute no edges of their own (no package's types import Nexus), but may be
 // the target of one, so a Nexus consumed as compiled code still seeds the closure.
-func correctnessRequireBlockingStandardStreamsBuildIndex(program rule.Program) *correctnessRequireBlockingStandardStreamsIndex {
+func correctnessRequireBlockingStandardStreamsBuildIndex(
+	program rule.Program,
+) *correctnessRequireBlockingStandardStreamsIndex {
 	index := &correctnessRequireBlockingStandardStreamsIndex{
 		imported: map[tspath.PathKey]bool{},
 		canBlock: map[tspath.PathKey]bool{},
@@ -301,7 +321,9 @@ func correctnessRequireBlockingStandardStreamsBuildIndex(program rule.Program) *
 				}
 			case ast.KindImportEqualsDeclaration:
 				declaration := statement.AsImportEqualsDeclaration()
-				if !declaration.IsTypeOnly && declaration.ModuleReference != nil && ast.IsExternalModuleReference(declaration.ModuleReference) {
+				if !declaration.IsTypeOnly &&
+					declaration.ModuleReference != nil &&
+					ast.IsExternalModuleReference(declaration.ModuleReference) {
 					add(declaration.ModuleReference.AsExternalModuleReference().Expression)
 				}
 			}
@@ -522,7 +544,9 @@ func correctnessRequireBlockingStandardStreamsIsFunctionWithBody(node *ast.Node)
 // correctnessRequireBlockingStandardStreamsIsCallLike says whether a node runs code it names: a call,
 // a `new`, or a tagged template.
 func correctnessRequireBlockingStandardStreamsIsCallLike(node *ast.Node) bool {
-	return node.Kind == ast.KindCallExpression || node.Kind == ast.KindNewExpression || node.Kind == ast.KindTaggedTemplateExpression
+	return node.Kind == ast.KindCallExpression ||
+		node.Kind == ast.KindNewExpression ||
+		node.Kind == ast.KindTaggedTemplateExpression
 }
 
 // callMayBlock says whether running a call may call `blockStandardStreams`: through what it calls,
@@ -595,7 +619,10 @@ func (analysis *correctnessRequireBlockingStandardStreamsAnalysis) handsOnMayBlo
 
 // symbolMayBlock says whether calling what a symbol names may block. Resolved through an import alias
 // to its declaration, it may when any declaration may.
-func (analysis *correctnessRequireBlockingStandardStreamsAnalysis) symbolMayBlock(symbol *ast.Symbol, name *ast.Node) bool {
+func (analysis *correctnessRequireBlockingStandardStreamsAnalysis) symbolMayBlock(
+	symbol *ast.Symbol,
+	name *ast.Node,
+) bool {
 	resolved := symbol
 	if resolved != nil && resolved.Flags&ast.SymbolFlagsAlias != 0 {
 		resolved = analysis.ctx.TypeChecker.GetAliasedSymbol(resolved)
@@ -612,7 +639,10 @@ func (analysis *correctnessRequireBlockingStandardStreamsAnalysis) symbolMayBloc
 }
 
 // declarationMayBlock says whether calling what one declaration declares may block.
-func (analysis *correctnessRequireBlockingStandardStreamsAnalysis) declarationMayBlock(declaration *ast.Node, name *ast.Node) bool {
+func (analysis *correctnessRequireBlockingStandardStreamsAnalysis) declarationMayBlock(
+	declaration *ast.Node,
+	name *ast.Node,
+) bool {
 	file := ast.GetSourceFileOfNode(declaration)
 	if file == nil {
 		return true
@@ -650,7 +680,9 @@ func (analysis *correctnessRequireBlockingStandardStreamsAnalysis) declarationMa
 // correctnessRequireBlockingStandardStreamsIsNexusDeclaration says whether a declaration is Nexus's
 // own `blockStandardStreams`: a function of that name in Nexus's `source/system/StandardStreams`.
 func correctnessRequireBlockingStandardStreamsIsNexusDeclaration(declaration *ast.Node) bool {
-	if declaration.Kind != ast.KindFunctionDeclaration || declaration.Name() == nil || declaration.Name().Text() != "blockStandardStreams" {
+	if declaration.Kind != ast.KindFunctionDeclaration ||
+		declaration.Name() == nil ||
+		declaration.Name().Text() != "blockStandardStreams" {
 		return false
 	}
 	file := ast.GetSourceFileOfNode(declaration)
@@ -721,7 +753,10 @@ func (analysis *correctnessRequireBlockingStandardStreamsAnalysis) localFunction
 		case ast.KindVariableDeclaration:
 			list := declaration.Parent
 			initializer := declaration.Initializer()
-			if list == nil || list.Kind != ast.KindVariableDeclarationList || list.Flags&ast.NodeFlagsConst == 0 || initializer == nil {
+			if list == nil ||
+				list.Kind != ast.KindVariableDeclarationList ||
+				list.Flags&ast.NodeFlagsConst == 0 ||
+				initializer == nil {
 				continue
 			}
 			initializer = ast.SkipParentheses(initializer)
@@ -736,7 +771,9 @@ func (analysis *correctnessRequireBlockingStandardStreamsAnalysis) localFunction
 // startedFunctions are the functions of this file a call starts: the ones it runs before it returns
 // (its callee, when that is this file's function, unless a generator, whose body waits for its
 // iterator), and the ones it hands on as arguments, which may run now or on any later turn.
-func (analysis *correctnessRequireBlockingStandardStreamsAnalysis) startedFunctions(call *ast.Node) (runs []*ast.Node, handsOn []*ast.Node) {
+func (analysis *correctnessRequireBlockingStandardStreamsAnalysis) startedFunctions(
+	call *ast.Node,
+) (runs []*ast.Node, handsOn []*ast.Node) {
 	var callee *ast.Node
 	var arguments []*ast.Node
 	switch call.Kind {
@@ -790,7 +827,8 @@ func (analysis *correctnessRequireBlockingStandardStreamsAnalysis) argumentsMayB
 		if blocks || correctnessRequireBlockingStandardStreamsIsFunctionWithBody(node) {
 			return blocks
 		}
-		if node.Kind == ast.KindAwaitExpression || (correctnessRequireBlockingStandardStreamsIsCallLike(node) && analysis.callMayBlock(node)) {
+		if node.Kind == ast.KindAwaitExpression ||
+			(correctnessRequireBlockingStandardStreamsIsCallLike(node) && analysis.callMayBlock(node)) {
 			blocks = true
 			return true
 		}
@@ -832,7 +870,9 @@ func (analysis *correctnessRequireBlockingStandardStreamsAnalysis) reachedExits(
 
 // analyzeRoot builds one root's graph and walks it from its entry, unblocked. It returns the exits a
 // path reaches having written, and the functions of this file a path starts while still unblocked.
-func (analysis *correctnessRequireBlockingStandardStreamsAnalysis) analyzeRoot(root *ast.Node) ([]*ast.Node, []*ast.Node) {
+func (analysis *correctnessRequireBlockingStandardStreamsAnalysis) analyzeRoot(
+	root *ast.Node,
+) ([]*ast.Node, []*ast.Node) {
 	ruleContext := analysis.ctx
 	type event = correctnessRequireBlockingStandardStreamsEvent
 	type builder = control_flow_graph.Builder[event]
@@ -887,7 +927,8 @@ func (analysis *correctnessRequireBlockingStandardStreamsAnalysis) analyzeRoot(r
 				return
 			}
 			awaits := (node.Kind == ast.KindForOfStatement && node.AsForInOrOfStatement().AwaitModifier != nil) ||
-				(node.Kind == ast.KindVariableStatement && node.AsVariableStatement().DeclarationList.Flags&ast.NodeFlagsAwaitUsing == ast.NodeFlagsAwaitUsing)
+				(node.Kind == ast.KindVariableStatement &&
+					node.AsVariableStatement().DeclarationList.Flags&ast.NodeFlagsAwaitUsing == ast.NodeFlagsAwaitUsing)
 			if awaits {
 				graphBuilder.Emit(event{kind: correctnessRequireBlockingStandardStreamsBlock, node: node})
 			}
@@ -922,7 +963,11 @@ func (analysis *correctnessRequireBlockingStandardStreamsAnalysis) analyzeRoot(r
 		return nil, nil
 	}
 
-	walk := correctnessNoProcessExitAfterOutputWalk{root: root, chains: map[*ast.Node]string{}, tries: map[*ast.Node]int{}}
+	walk := correctnessNoProcessExitAfterOutputWalk{
+		root:   root,
+		chains: map[*ast.Node]string{},
+		tries:  map[*ast.Node]int{},
+	}
 	reported := map[*ast.Node]bool{}
 	started := map[*ast.Node]bool{}
 	var startedOrder []*ast.Node

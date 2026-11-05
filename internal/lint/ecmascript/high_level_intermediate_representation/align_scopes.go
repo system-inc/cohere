@@ -544,7 +544,11 @@ func (state *alignSweepState) visitBlock(function *Function, byId map[static_sin
 // MECHANISM FOUR, the value-block RANGE: the FIRST time a scope is seen, if it is seen inside a value
 // block, the scope is widened to that whole value block's span. `seen` is what makes this fire once
 // per scope rather than once per place, and it is upstream's.
-func (state *alignSweepState) recordPlace(id static_single_assignment.EvaluationOrder, place Place, node *valueBlockNode) {
+func (state *alignSweepState) recordPlace(
+	id static_single_assignment.EvaluationOrder,
+	place Place,
+	node *valueBlockNode,
+) {
 	scope := state.activeScopeOf(id, place)
 	if scope == 0 {
 		return
@@ -596,8 +600,14 @@ func (state *alignSweepState) activeScopeOf(id static_single_assignment.Evaluati
 //
 // Upstream returns each successor unchanged, so the call is a WALK rather than a rewrite despite the
 // name. Reproduced as a walk.
-func (state *alignSweepState) assignValueBlockNodes(function *Function, byId map[static_single_assignment.BlockId]*BasicBlock,
-	block *BasicBlock, node *valueBlockNode, fallthroughId static_single_assignment.BlockId, hasFallthrough bool) {
+func (state *alignSweepState) assignValueBlockNodes(
+	function *Function,
+	byId map[static_single_assignment.BlockId]*BasicBlock,
+	block *BasicBlock,
+	node *valueBlockNode,
+	fallthroughId static_single_assignment.BlockId,
+	hasFallthrough bool,
+) {
 	_, isTernary := block.Terminal.(*Ternary)
 	_, isLogical := block.Terminal.(*Logical)
 	_, isOptional := block.Terminal.(*Optional)

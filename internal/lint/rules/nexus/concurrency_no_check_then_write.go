@@ -16,7 +16,10 @@ const concurrencyNoCheckThenWriteId = "checkThenWrite"
 
 // concurrencyNoCheckThenWriteText is the rule's message, whose wording lives in
 // `policy/messages/concurrency-no-check-then-write.json`.
-var concurrencyNoCheckThenWriteText = policy.MessageOf("nexus/concurrency-no-check-then-write", concurrencyNoCheckThenWriteId)
+var concurrencyNoCheckThenWriteText = policy.MessageOf(
+	"nexus/concurrency-no-check-then-write",
+	concurrencyNoCheckThenWriteId,
+)
 
 // concurrencyNoCheckThenWriteMessage names the write that claims the name, so a reader of the finding
 // on the check can find the second half of the race without reading the whole function.
@@ -216,7 +219,11 @@ type concurrencyNoCheckThenWriteComparison struct {
 // concurrencyNoCheckThenWriteCheckLoop reports a loop that finds a free name and a later write that
 // creates it without exclusive create.
 func concurrencyNoCheckThenWriteCheckLoop(ruleContext rule.Context, loop *ast.Node) {
-	analysis := &concurrencyNoCheckThenWriteLoop{ctx: ruleContext, loop: loop, function: scope.EnclosingFunctionLike(loop)}
+	analysis := &concurrencyNoCheckThenWriteLoop{
+		ctx:      ruleContext,
+		loop:     loop,
+		function: scope.EnclosingFunctionLike(loop),
+	}
 	if !analysis.findCheck() {
 		return
 	}
@@ -252,7 +259,9 @@ func (analysis *concurrencyNoCheckThenWriteLoop) findCheck() bool {
 	}
 	if condition != nil {
 		call := ast.SkipParentheses(condition)
-		if name, promise, matched := analysis.nodeFileSystemFunction(call); matched && !promise && name == "existsSync" &&
+		if name, promise, matched := analysis.nodeFileSystemFunction(
+			call,
+		); matched && !promise && name == "existsSync" &&
 			concurrencyNoCheckThenWriteHasOneArgument(call) {
 			analysis.check = call
 			return true
@@ -431,7 +440,10 @@ func (analysis *concurrencyNoCheckThenWriteLoop) nodeFileSystemFunction(call *as
 // same path.
 func (analysis *concurrencyNoCheckThenWriteLoop) isPathJoin(call *ast.Node) (*ast.Symbol, bool) {
 	symbol := analysis.calleeSymbol(call)
-	if _, matched := concurrencyNoCheckThenWriteDeclaredIn(symbol, concurrencyNoCheckThenWritePathModules); !matched || symbol.Name != "join" {
+	if _, matched := concurrencyNoCheckThenWriteDeclaredIn(
+		symbol,
+		concurrencyNoCheckThenWritePathModules,
+	); !matched || symbol.Name != "join" {
 		return nil, false
 	}
 	return symbol, true
@@ -458,7 +470,8 @@ func (analysis *concurrencyNoCheckThenWriteLoop) isSharpToFile(call *ast.Node) b
 		return files
 	})
 	for _, declaration := range symbol.Declarations {
-		if declaration.Kind != ast.KindMethodSignature || !sharpFiles[ast.GetSourceFileOfNode(declaration).FileName().AsString()] {
+		if declaration.Kind != ast.KindMethodSignature ||
+			!sharpFiles[ast.GetSourceFileOfNode(declaration).FileName().AsString()] {
 			return false
 		}
 	}
@@ -601,7 +614,10 @@ func (analysis *concurrencyNoCheckThenWriteLoop) followingStatements() []*ast.No
 
 // findWrite returns the first write in a statement that creates the checked path without exclusive
 // create, with the name to show for it.
-func (analysis *concurrencyNoCheckThenWriteLoop) findWrite(statement *ast.Node, checkedPath *ast.Node) (*ast.Node, string) {
+func (analysis *concurrencyNoCheckThenWriteLoop) findWrite(
+	statement *ast.Node,
+	checkedPath *ast.Node,
+) (*ast.Node, string) {
 	var found *ast.Node
 	var name string
 	concurrencyNoCheckThenWriteForEachOwnNode(statement, func(node *ast.Node) {
@@ -715,7 +731,11 @@ func (analysis *concurrencyNoCheckThenWriteLoop) readThrough(symbol *ast.Symbol)
 }
 
 // samePathAt says whether a write's destination is proven to be the checked path when the write runs.
-func (analysis *concurrencyNoCheckThenWriteLoop) samePathAt(checkedPath *ast.Node, destination *ast.Node, write *ast.Node) bool {
+func (analysis *concurrencyNoCheckThenWriteLoop) samePathAt(
+	checkedPath *ast.Node,
+	destination *ast.Node,
+	write *ast.Node,
+) bool {
 	comparison := &concurrencyNoCheckThenWriteComparison{bodyDeclarationStart: -1, bindings: map[*ast.Symbol]bool{}}
 	if !analysis.same(comparison, checkedPath, destination) {
 		return false
@@ -733,7 +753,10 @@ func (analysis *concurrencyNoCheckThenWriteLoop) samePathAt(checkedPath *ast.Nod
 //
 // Mutates: comparison the walk lowers its bodyDeclarationStart to the earliest loop-body declaration it
 // reads through, so one comparison carries the whole proof's earliest point
-func (analysis *concurrencyNoCheckThenWriteLoop) expand(comparison *concurrencyNoCheckThenWriteComparison, node *ast.Node) *ast.Node {
+func (analysis *concurrencyNoCheckThenWriteLoop) expand(
+	comparison *concurrencyNoCheckThenWriteComparison,
+	node *ast.Node,
+) *ast.Node {
 	current := node
 	for depth := 0; depth < 16; depth++ {
 		current = ast.SkipParentheses(current)
@@ -748,7 +771,8 @@ func (analysis *concurrencyNoCheckThenWriteLoop) expand(comparison *concurrencyN
 		if initializer == nil {
 			return current
 		}
-		if bodyPosition >= 0 && (comparison.bodyDeclarationStart < 0 || bodyPosition < comparison.bodyDeclarationStart) {
+		if bodyPosition >= 0 &&
+			(comparison.bodyDeclarationStart < 0 || bodyPosition < comparison.bodyDeclarationStart) {
 			comparison.bodyDeclarationStart = bodyPosition
 		}
 		current = initializer
@@ -757,7 +781,11 @@ func (analysis *concurrencyNoCheckThenWriteLoop) expand(comparison *concurrencyN
 }
 
 // same compares two path expressions as the doc comment's "Same path, proven" describes.
-func (analysis *concurrencyNoCheckThenWriteLoop) same(comparison *concurrencyNoCheckThenWriteComparison, leftPath *ast.Node, rightPath *ast.Node) bool {
+func (analysis *concurrencyNoCheckThenWriteLoop) same(
+	comparison *concurrencyNoCheckThenWriteComparison,
+	leftPath *ast.Node,
+	rightPath *ast.Node,
+) bool {
 	left := analysis.expand(comparison, leftPath)
 	right := analysis.expand(comparison, rightPath)
 	if left.Kind != right.Kind {
@@ -785,7 +813,11 @@ func (analysis *concurrencyNoCheckThenWriteLoop) same(comparison *concurrencyNoC
 		for index, leftSpan := range leftTemplate.TemplateSpans.Nodes {
 			rightSpan := rightTemplate.TemplateSpans.Nodes[index]
 			if leftSpan.AsTemplateSpan().Literal.Text() != rightSpan.AsTemplateSpan().Literal.Text() ||
-				!analysis.same(comparison, leftSpan.AsTemplateSpan().Expression, rightSpan.AsTemplateSpan().Expression) {
+				!analysis.same(
+					comparison,
+					leftSpan.AsTemplateSpan().Expression,
+					rightSpan.AsTemplateSpan().Expression,
+				) {
 				return false
 			}
 		}
@@ -793,7 +825,8 @@ func (analysis *concurrencyNoCheckThenWriteLoop) same(comparison *concurrencyNoC
 	case ast.KindBinaryExpression:
 		leftBinary := left.AsBinaryExpression()
 		rightBinary := right.AsBinaryExpression()
-		return leftBinary.OperatorToken.Kind == ast.KindPlusToken && rightBinary.OperatorToken.Kind == ast.KindPlusToken &&
+		return leftBinary.OperatorToken.Kind == ast.KindPlusToken &&
+			rightBinary.OperatorToken.Kind == ast.KindPlusToken &&
 			analysis.same(comparison, leftBinary.Left, rightBinary.Left) &&
 			analysis.same(comparison, leftBinary.Right, rightBinary.Right)
 	case ast.KindCallExpression:
@@ -808,7 +841,8 @@ func (analysis *concurrencyNoCheckThenWriteLoop) same(comparison *concurrencyNoC
 			return false
 		}
 		for index := range leftArguments {
-			if leftArguments[index].Kind == ast.KindSpreadElement || rightArguments[index].Kind == ast.KindSpreadElement ||
+			if leftArguments[index].Kind == ast.KindSpreadElement ||
+				rightArguments[index].Kind == ast.KindSpreadElement ||
 				!analysis.same(comparison, leftArguments[index], rightArguments[index]) {
 				return false
 			}
@@ -837,9 +871,13 @@ func concurrencyNoCheckThenWriteIsConstant(symbol *ast.Symbol) bool {
 }
 
 // holdsStill says whether a `let`, `var` or parameter keeps the value the check saw until the write
-// runs: it is declared in this file, every write to it is in the loop's own function, none from a nested one, and none between the
-// end of the loop and the write, nor between a loop-body `const` read through and the check.
-func (analysis *concurrencyNoCheckThenWriteLoop) holdsStill(symbol *ast.Symbol, bodyDeclarationStart int, write *ast.Node) bool {
+// runs: it is declared in this file, every write to it is in the loop's own function, none from a nested one, and none
+// between the end of the loop and the write, nor between a loop-body `const` read through and the check.
+func (analysis *concurrencyNoCheckThenWriteLoop) holdsStill(
+	symbol *ast.Symbol,
+	bodyDeclarationStart int,
+	write *ast.Node,
+) bool {
 	declaration := symbol.ValueDeclaration
 	if declaration == nil || ast.GetSourceFileOfNode(declaration) != analysis.ctx.SourceFile {
 		// Another module's `let` can change while this function waits, and its writes are not in
@@ -874,7 +912,9 @@ func (analysis *concurrencyNoCheckThenWriteLoop) holdsStill(symbol *ast.Symbol, 
 		if written.Pos() >= analysis.loop.End() && written.Pos() < write.Pos() {
 			return false
 		}
-		if bodyDeclarationStart >= 0 && written.Pos() >= bodyDeclarationStart && written.Pos() < analysis.checkStatement.Pos() {
+		if bodyDeclarationStart >= 0 &&
+			written.Pos() >= bodyDeclarationStart &&
+			written.Pos() < analysis.checkStatement.Pos() {
 			return false
 		}
 	}

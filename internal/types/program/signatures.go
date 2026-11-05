@@ -89,18 +89,24 @@ const syntaxDefinition = "syntax2:"
 
 // Signatures returns every project file's signature, keyed by file name, and how many were computed rather
 // than carried forward from previous.
-func (graph *Graph) Signatures(ctx context.Context, previous map[string]SignatureEntry) (map[string]SignatureEntry, int) {
+func (graph *Graph) Signatures(
+	ctx context.Context,
+	previous map[string]SignatureEntry,
+) (map[string]SignatureEntry, int) {
 	projectFiles := graph.ProjectFiles()
 	signatures := make(map[string]SignatureEntry, len(projectFiles))
 	stale := []*ast.SourceFile{}
 	contentKeyed := 0
 	for _, sourceFile := range projectFiles {
 		version := FileVersion(sourceFile.Text())
-		if recorded, found := previous[sourceFile.FileName().AsString()]; found && recorded.Version == version && recorded.Signature != "" {
+		if recorded, found := previous[sourceFile.FileName().AsString()]; found &&
+			recorded.Version == version &&
+			recorded.Signature != "" {
 			// A syntax of another definition is recomputed rather than carried: kept, it would differ from the
 			// next edit's and move the shape once for nothing. A syntax that is the version stands for a file
 			// whose whole text is its shape, and stays.
-			if recorded.Syntax == "" || recorded.Syntax != recorded.Version && !strings.HasPrefix(recorded.Syntax, syntaxDefinition) {
+			if recorded.Syntax == "" ||
+				recorded.Syntax != recorded.Version && !strings.HasPrefix(recorded.Syntax, syntaxDefinition) {
 				recorded.Syntax = elidedBodiesVersion(sourceFile)
 			}
 			signatures[sourceFile.FileName().AsString()] = recorded
@@ -109,12 +115,22 @@ func (graph *Graph) Signatures(ctx context.Context, previous map[string]Signatur
 		// A declaration file or a JSON module has no declaration output of its own. The compiler uses the
 		// version for both, and so does this. Its whole text is its shape, so its syntax is its version too.
 		if sourceFile.IsDeclarationFile || ast.IsJsonSourceFile(sourceFile) {
-			signatures[sourceFile.FileName().AsString()] = SignatureEntry{Version: version, Signature: version, Syntax: version}
+			signatures[sourceFile.FileName().AsString()] = SignatureEntry{
+				Version:   version,
+				Signature: version,
+				Syntax:    version,
+			}
 			continue
 		}
 		// No real signature recorded, so none is computed: see the bound above. Its whole text is its shape.
-		if recorded, found := previous[sourceFile.FileName().AsString()]; !found || recorded.Signature == "" || recorded.Signature == recorded.Version {
-			signatures[sourceFile.FileName().AsString()] = SignatureEntry{Version: version, Signature: version, Syntax: version}
+		if recorded, found := previous[sourceFile.FileName().AsString()]; !found ||
+			recorded.Signature == "" ||
+			recorded.Signature == recorded.Version {
+			signatures[sourceFile.FileName().AsString()] = SignatureEntry{
+				Version:   version,
+				Signature: version,
+				Syntax:    version,
+			}
 			contentKeyed++
 			continue
 		}
@@ -152,7 +168,11 @@ func (graph *Graph) Signatures(ctx context.Context, previous map[string]Signatur
 	for _, sourceFile := range stale {
 		if _, found := signatures[sourceFile.FileName().AsString()]; !found {
 			version := FileVersion(sourceFile.Text())
-			signatures[sourceFile.FileName().AsString()] = SignatureEntry{Version: version, Signature: version, Syntax: version}
+			signatures[sourceFile.FileName().AsString()] = SignatureEntry{
+				Version:   version,
+				Signature: version,
+				Syntax:    version,
+			}
 		}
 	}
 	graph.ContentKeyedShapes = countContentKeyed(projectFiles, signatures)
@@ -179,14 +199,21 @@ var beforeSignatureEmit func(fileName string)
 // finishes after the deadline is dropped.
 //
 // Mutates: shapes takes each graduated entry and the abandoned one, for the caller to write to the table
-func (graph *Graph) GraduateSignatures(shapes map[string]SignatureEntry, deadline time.Time, abandonAfter time.Duration) (graduated int, abandoned string) {
+func (graph *Graph) GraduateSignatures(
+	shapes map[string]SignatureEntry,
+	deadline time.Time,
+	abandonAfter time.Duration,
+) (graduated int, abandoned string) {
 	var candidates []*ast.SourceFile
 	for _, sourceFile := range graph.ProjectFiles() {
 		if sourceFile.IsDeclarationFile || ast.IsJsonSourceFile(sourceFile) {
 			continue
 		}
 		entry, found := shapes[sourceFile.FileName().AsString()]
-		if !found || entry.Signature != entry.Version || entry.Abandoned || entry.Version != FileVersion(sourceFile.Text()) {
+		if !found ||
+			entry.Signature != entry.Version ||
+			entry.Abandoned ||
+			entry.Version != FileVersion(sourceFile.Text()) {
 			continue
 		}
 		candidates = append(candidates, sourceFile)
@@ -459,7 +486,9 @@ func (graph *Graph) SeedSignatures(previous map[string]SignatureEntry) map[strin
 		if info == nil || info.Signature() == "" || info.Signature() == info.Version() {
 			continue
 		}
-		recorded[graph.pathFor(tspath.GetNormalizedAbsolutePath(string(name), tspath.RootedDirectoryPath(directory)))] = SignatureEntry{Version: info.Version(), Signature: info.Signature()}
+		recorded[graph.pathFor(
+			tspath.GetNormalizedAbsolutePath(string(name), tspath.RootedDirectoryPath(directory)),
+		)] = SignatureEntry{Version: info.Version(), Signature: info.Signature()}
 	}
 	for _, sourceFile := range graph.ProjectFiles() {
 		if _, found := seeded[sourceFile.FileName().AsString()]; found {

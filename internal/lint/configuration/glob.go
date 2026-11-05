@@ -137,7 +137,8 @@ func matchSegment(pattern string, segment string) bool {
 
 	for segmentIndex < len(segment) {
 		switch {
-		case patternIndex < len(pattern) && (pattern[patternIndex] == '?' || pattern[patternIndex] == segment[segmentIndex]):
+		case patternIndex < len(pattern) &&
+			(pattern[patternIndex] == '?' || pattern[patternIndex] == segment[segmentIndex]):
 			patternIndex++
 			segmentIndex++
 		case patternIndex < len(pattern) && pattern[patternIndex] == '*':

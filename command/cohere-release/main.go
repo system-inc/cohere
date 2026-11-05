@@ -30,14 +30,26 @@ func main() {
 }
 
 func run() error {
-	version := flag.String("version", "", "the version to stamp and publish, like 0.1.0; anything below 0.1.0, or not semver, is refused")
+	version := flag.String(
+		"version",
+		"",
+		"the version to stamp and publish, like 0.1.0; anything below 0.1.0, or not semver, is refused",
+	)
 	outputDirectory := flag.String("output", "dist", "where to stage the packages")
 	moduleDirectory := flag.String("module", ".", "the root of the cohere module")
 	only := flag.String("only", "", "build just these platforms, comma separated, as os/arch")
 	signingIdentity := flag.String("signing-identity", "", "the macOS codesigning identity; unsigned when empty")
 	keychainProfile := flag.String("notary-profile", "", "the notarytool keychain profile; not notarized when empty")
-	notaryKeychain := flag.String("notary-keychain", "", "the path of the keychain file holding --notary-profile; the user's own keychains when empty")
-	swiftScratch := flag.String("swift-scratch", "", "where SwiftPM builds the Swift engine; the user cache directory when empty, never inside --output")
+	notaryKeychain := flag.String(
+		"notary-keychain",
+		"",
+		"the path of the keychain file holding --notary-profile; the user's own keychains when empty",
+	)
+	swiftScratch := flag.String(
+		"swift-scratch",
+		"",
+		"where SwiftPM builds the Swift engine; the user cache directory when empty, never inside --output",
+	)
 	flag.Parse()
 
 	if *version == "" {
@@ -64,7 +76,11 @@ func run() error {
 		return fmt.Errorf("printing what is being staged: %w", printError)
 	}
 
-	signing := release.Signing{Identity: *signingIdentity, KeychainProfile: *keychainProfile, NotaryKeychain: *notaryKeychain}
+	signing := release.Signing{
+		Identity:        *signingIdentity,
+		KeychainProfile: *keychainProfile,
+		NotaryKeychain:  *notaryKeychain,
+	}
 
 	result, err := release.Build(release.Options{
 		ModuleDirectory: moduleRoot,
@@ -111,7 +127,11 @@ func selectTargets(only string) ([]release.Target, error) {
 			}
 		}
 		if !found {
-			return nil, fmt.Errorf("%q is not a shipped platform; the shipped platforms are %s", requested, describeTargets(release.Targets))
+			return nil, fmt.Errorf(
+				"%q is not a shipped platform; the shipped platforms are %s",
+				requested,
+				describeTargets(release.Targets),
+			)
 		}
 	}
 

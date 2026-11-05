@@ -13,15 +13,26 @@ import (
 // The rule's messages, one handle per id, whose wording lives in
 // `policy/messages/consistency-no-multiline-arrow-function.json`.
 var (
-	consistencyNoMultilineArrowFunctionReactHookArrowText        = policy.MessageOf("nexus/consistency-no-multiline-arrow-function", "reactHookArrow")
-	consistencyNoMultilineArrowFunctionAddEventListenerArrowText = policy.MessageOf("nexus/consistency-no-multiline-arrow-function", "addEventListenerArrow")
-	consistencyNoMultilineArrowFunctionMultilineArrowText        = policy.MessageOf("nexus/consistency-no-multiline-arrow-function", "multilineArrow")
+	consistencyNoMultilineArrowFunctionReactHookArrowText = policy.MessageOf(
+		"nexus/consistency-no-multiline-arrow-function",
+		"reactHookArrow",
+	)
+	consistencyNoMultilineArrowFunctionAddEventListenerArrowText = policy.MessageOf(
+		"nexus/consistency-no-multiline-arrow-function",
+		"addEventListenerArrow",
+	)
+	consistencyNoMultilineArrowFunctionMultilineArrowText = policy.MessageOf(
+		"nexus/consistency-no-multiline-arrow-function",
+		"multilineArrow",
+	)
 )
 
 func messageReactHookArrow(hookName string) rule.Message {
 	return rule.Message{
-		Id:          "reactHookArrow",
-		Description: consistencyNoMultilineArrowFunctionReactHookArrowText.Render(map[string]string{"hookName": hookName}),
+		Id: "reactHookArrow",
+		Description: consistencyNoMultilineArrowFunctionReactHookArrowText.Render(
+			map[string]string{"hookName": hookName},
+		),
 	}
 }
 

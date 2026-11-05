@@ -329,7 +329,11 @@ func (reporter booleanCastReporter) realParent(node *ast.Node) *ast.Node {
 }
 
 // replacementText renders the unwrapped expression, parenthesised when precedence demands it.
-func (reporter booleanCastReporter) replacementText(replacement *ast.Node, target *ast.Node, expressionText string) string {
+func (reporter booleanCastReporter) replacementText(
+	replacement *ast.Node,
+	target *ast.Node,
+	expressionText string,
+) string {
 	result := expressionText
 	if reporter.needsParentheses(replacement, target) {
 		trimmed := text.TrimWhitespace(expressionText)
@@ -388,7 +392,11 @@ func (reporter booleanCastReporter) needsParentheses(replacement *ast.Node, targ
 //
 // Split out because it is the only arm that has to reason about the operator token rather than the
 // node kind, and about a mixing rule that is a syntax error rather than a precedence question.
-func (reporter booleanCastReporter) binaryNeedsParentheses(replacement *ast.Node, target *ast.Node, parent *ast.Node) bool {
+func (reporter booleanCastReporter) binaryNeedsParentheses(
+	replacement *ast.Node,
+	target *ast.Node,
+	parent *ast.Node,
+) bool {
 	binary := parent.AsBinaryExpression()
 	if binary == nil || binary.OperatorToken == nil {
 		return false

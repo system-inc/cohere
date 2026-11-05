@@ -29,7 +29,11 @@ func TestAStoppedSpeculationBeginsNoMoreFiles(test *testing.T) {
 	}
 	workers := speculationWorkers()
 	if workers == 0 || workers >= len(candidates) {
-		test.Skipf("%d speculation workers for %d files, so a stop could not leave any file unbegun", workers, len(candidates))
+		test.Skipf(
+			"%d speculation workers for %d files, so a stop could not leave any file unbegun",
+			workers,
+			len(candidates),
+		)
 	}
 
 	// A formatter that rewrites every third file, so the pass after the walk has real work as well as kept
@@ -71,13 +75,23 @@ func TestAStoppedSpeculationBeginsNoMoreFiles(test *testing.T) {
 	for index, fileName := range candidates {
 		if withStop[index].done != without[index].done || withStop[index].result.Text != without[index].result.Text ||
 			withStop[index].result.Changed != without[index].result.Changed {
-			test.Errorf("%s: after a stopped speculation %+v, without one %+v", filepath.Base(fileName), withStop[index], without[index])
+			test.Errorf(
+				"%s: after a stopped speculation %+v, without one %+v",
+				filepath.Base(fileName),
+				withStop[index],
+				without[index],
+			)
 		}
 	}
 
 	free := speculateFormat(candidates, format, 1, nil)
 	free.wait()
 	if want := len(candidates) - (len(candidates)+2)/3; len(free.attempts) != want {
-		test.Fatalf("never stopped, the speculation kept %d of %d files, want the %d it leaves unchanged", len(free.attempts), len(candidates), want)
+		test.Fatalf(
+			"never stopped, the speculation kept %d of %d files, want the %d it leaves unchanged",
+			len(free.attempts),
+			len(candidates),
+			want,
+		)
 	}
 }

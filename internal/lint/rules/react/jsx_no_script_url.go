@@ -96,8 +96,14 @@ func DecodeJsxNoScriptUrlOptions(list []byte) (any, error) {
 	// Go whitespace: raw JSON bytes of a rule's options, whose whitespace is the same in both sets.
 	if bytes.HasPrefix(bytes.TrimSpace(elements[0]), []byte("[")) {
 		var legacy []jsxNoScriptUrlWireComponent
-		if jsxNoScriptUrlDecodeStrictlyError := jsxNoScriptUrlDecodeStrictly(elements[0], &legacy); jsxNoScriptUrlDecodeStrictlyError != nil {
-			return JsxNoScriptUrlOptions{}, fmt.Errorf("jsx-no-script-url element 1: %w", jsxNoScriptUrlDecodeStrictlyError)
+		if jsxNoScriptUrlDecodeStrictlyError := jsxNoScriptUrlDecodeStrictly(
+			elements[0],
+			&legacy,
+		); jsxNoScriptUrlDecodeStrictlyError != nil {
+			return JsxNoScriptUrlOptions{}, fmt.Errorf(
+				"jsx-no-script-url element 1: %w",
+				jsxNoScriptUrlDecodeStrictlyError,
+			)
 		}
 		for _, entry := range legacy {
 			options.Legacy = append(options.Legacy, JsxNoScriptUrlComponent(entry))
@@ -113,8 +119,14 @@ func DecodeJsxNoScriptUrlOptions(list []byte) (any, error) {
 	}
 
 	var object jsxNoScriptUrlWireObject
-	if jsxNoScriptUrlDecodeStrictlyError := jsxNoScriptUrlDecodeStrictly(objectElement, &object); jsxNoScriptUrlDecodeStrictlyError != nil {
-		return JsxNoScriptUrlOptions{}, fmt.Errorf("jsx-no-script-url options object: %w", jsxNoScriptUrlDecodeStrictlyError)
+	if jsxNoScriptUrlDecodeStrictlyError := jsxNoScriptUrlDecodeStrictly(
+		objectElement,
+		&object,
+	); jsxNoScriptUrlDecodeStrictlyError != nil {
+		return JsxNoScriptUrlOptions{}, fmt.Errorf(
+			"jsx-no-script-url options object: %w",
+			jsxNoScriptUrlDecodeStrictlyError,
+		)
 	}
 	if object.IncludeFromSettings {
 		return JsxNoScriptUrlOptions{}, fmt.Errorf("jsx-no-script-url: includeFromSettings: true " +

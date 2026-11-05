@@ -68,7 +68,11 @@ func run() error {
 	}
 
 	suppliedRules := slices.Collect(maps.Keys(cohereOnlyRuleSettings(options.root)))
-	if checkControlsAreLintableError := checkControlsAreLintable(lintConfiguration, options.controls, suppliedRules); checkControlsAreLintableError != nil {
+	if checkControlsAreLintableError := checkControlsAreLintable(
+		lintConfiguration,
+		options.controls,
+		suppliedRules,
+	); checkControlsAreLintableError != nil {
 		return checkControlsAreLintableError
 	}
 
@@ -396,7 +400,11 @@ func cohereOnlyRuleSettings(root string) map[string]any {
 //
 // The check runs before either gate is launched, so a misplaced control costs a second rather than
 // two full lint runs and a misleading verdict.
-func checkControlsAreLintable(lintConfiguration *configuration.Config, controls []differential.Control, extraVerifyRules []string) error {
+func checkControlsAreLintable(
+	lintConfiguration *configuration.Config,
+	controls []differential.Control,
+	extraVerifyRules []string,
+) error {
 	// The rules supplied to cohere alone, reduced to bare names. A control naming one of these is
 	// enabled for cohere's run even though the tree's own config says nothing about it, so the
 	// check below has to know about them or it rejects exactly the directional control it should

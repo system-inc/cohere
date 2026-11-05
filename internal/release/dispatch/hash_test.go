@@ -83,7 +83,10 @@ func TestHashChangesWithEachInput(test *testing.T) {
 	}{
 		{"a different Go toolchain", func(inputs *Inputs) { inputs.GoVersion = "go1.26.0 darwin arm64" }},
 		{"a different platform", func(inputs *Inputs) { inputs.GoVersion = "go1.27.0 linux amd64" }},
-		{"a different typescript-go commit", func(inputs *Inputs) { inputs.TypeScriptGoCommit = "0000000000000000000000000000000000000000" }},
+		{
+			"a different typescript-go commit",
+			func(inputs *Inputs) { inputs.TypeScriptGoCommit = "0000000000000000000000000000000000000000" },
+		},
 		{"different build flags", func(inputs *Inputs) { inputs.BuildFlags = []string{"-trimpath"} }},
 	}
 
@@ -95,7 +98,10 @@ func TestHashChangesWithEachInput(test *testing.T) {
 			testCase.modify(&changed)
 
 			if got := compute(test, changed); got == baseHash {
-				test.Fatalf("%s did not change the hash, so the cache would serve a binary built from the other one", testCase.name)
+				test.Fatalf(
+					"%s did not change the hash, so the cache would serve a binary built from the other one",
+					testCase.name,
+				)
 			}
 		})
 	}

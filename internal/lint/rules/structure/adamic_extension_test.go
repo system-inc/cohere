@@ -11,7 +11,8 @@ import (
 // suffix and `UserRequest.a` has it (#kwt1htp).
 func TestNetworkRequireHookRequestSuffixNamesAnAdamicFileAsTypeScript(test *testing.T) {
 	test.Parallel()
-	source := requestSuffixDeclarations + "export function useUser() {\n    return networkService.useGraphQlQuery(gqlDocument);\n}\n"
+	source := requestSuffixDeclarations +
+		"export function useUser() {\n    return networkService.useGraphQlQuery(gqlDocument);\n}\n"
 	for _, fileName := range []string{plainNamedFile, requestSuffixFile} {
 		rule_testing.ExpectSameFindings(test,
 			rule_testing.Run(test, NetworkRequireHookRequestSuffix, fileName, source),

@@ -124,8 +124,16 @@ func TestNoUnsafeUnaryMinusTypeBoundary(test *testing.T) {
 		{"null reports", "declare const x: null;\n-x;", []string{"unaryMinus"}},
 		{"undefined reports", "declare const x: undefined;\n-x;", []string{"unaryMinus"}},
 		// Constraint resolution happens before the walk.
-		{"a type parameter constrained to a union reports", "<T extends number | string>(t: T) => -t;", []string{"unaryMinus"}},
-		{"a type parameter constrained to any reports because the constraint is unknown", "<T extends any>(t: T) => -t;", []string{"unaryMinus"}},
+		{
+			"a type parameter constrained to a union reports",
+			"<T extends number | string>(t: T) => -t;",
+			[]string{"unaryMinus"},
+		},
+		{
+			"a type parameter constrained to any reports because the constraint is unknown",
+			"<T extends any>(t: T) => -t;",
+			[]string{"unaryMinus"},
+		},
 		{"a type parameter constrained to unknown reports", "<T extends unknown>(t: T) => -t;", []string{"unaryMinus"}},
 		// Only the minus operator is anchored, which is the first line of the rule.
 		{"bitwise not on a string is silent", "(a: string) => ~a;", nil},
@@ -169,7 +177,10 @@ func TestNoUnsafeUnaryMinusTheErrorTypeIsAny(test *testing.T) {
 	} {
 		result := rule_testing.RunTyped(test, NoUnsafeUnaryMinus, noUnsafeUnaryMinusFile, sourceText)
 		if len(result.Diagnostics) != 0 {
-			test.Errorf("the error type stopped resolving to Any for %q, which changes what a hollow fixture looks like", sourceText)
+			test.Errorf(
+				"the error type stopped resolving to Any for %q, which changes what a hollow fixture looks like",
+				sourceText,
+			)
 		}
 	}
 
@@ -177,7 +188,10 @@ func TestNoUnsafeUnaryMinusTheErrorTypeIsAny(test *testing.T) {
 	// above would pass just as well if the rule had stopped running altogether.
 	control := rule_testing.RunTyped(test, NoUnsafeUnaryMinus, noUnsafeUnaryMinusFile, "declare const x: string;\n-x;")
 	if len(control.Diagnostics) != 1 {
-		test.Fatalf("the control found %d findings, want one, so the assertions above proved nothing", len(control.Diagnostics))
+		test.Fatalf(
+			"the control found %d findings, want one, so the assertions above proved nothing",
+			len(control.Diagnostics),
+		)
 	}
 }
 
@@ -272,7 +286,10 @@ func TestNoUnsafeUnaryMinusSpansAndText(test *testing.T) {
 			test.Fatalf("want one finding, got %d", len(result.Diagnostics))
 		}
 		if result.Diagnostics[0].Message.Description != "Argument of unary negation should be assignable to number | bigint but is false instead." {
-			test.Errorf("message text is %q, want the first union part named", result.Diagnostics[0].Message.Description)
+			test.Errorf(
+				"message text is %q, want the first union part named",
+				result.Diagnostics[0].Message.Description,
+			)
 		}
 	})
 
@@ -309,10 +326,15 @@ func TestNoUnsafeUnaryMinusRequiresTheTypedHarness(test *testing.T) {
 	test.Parallel()
 
 	if !NoUnsafeUnaryMinus.NeedsTypeChecker {
-		test.Fatal("the rule stopped declaring NeedsTypeChecker, so every typed fixture would run against a nil checker")
+		test.Fatal(
+			"the rule stopped declaring NeedsTypeChecker, so every typed fixture would run against a nil checker",
+		)
 	}
 	if NoUnsafeUnaryMinus.Name != "@typescript-eslint/no-unsafe-unary-minus" {
-		test.Errorf("the registered name is %q, and the inventory writes typescript/no-unsafe-unary-minus", NoUnsafeUnaryMinus.Name)
+		test.Errorf(
+			"the registered name is %q, and the inventory writes typescript/no-unsafe-unary-minus",
+			NoUnsafeUnaryMinus.Name,
+		)
 	}
 
 	source := "declare const a: string;\nconst negated = -a;"

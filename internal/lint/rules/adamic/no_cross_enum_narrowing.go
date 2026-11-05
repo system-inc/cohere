@@ -59,9 +59,14 @@ var NoCrossEnumNarrowing = rule.Rule{
 						if text, ok := other.value.(string); ok {
 							value = strconv.Quote(text)
 						}
-						ruleContext.ReportNode(node, rule.Message{Id: "crossEnumNarrowing", Description: crossEnumNarrowingText.Render(map[string]string{
-							"other": type_checking.StableTypeText(ruleContext.TypeChecker, other.typ), "member": type_checking.StableTypeText(ruleContext.TypeChecker, member.typ), "value": value,
-						})})
+						ruleContext.ReportNode(node, rule.Message{
+							Id: "crossEnumNarrowing",
+							Description: crossEnumNarrowingText.Render(map[string]string{
+								"other":  type_checking.StableTypeText(ruleContext.TypeChecker, other.typ),
+								"member": type_checking.StableTypeText(ruleContext.TypeChecker, member.typ),
+								"value":  value,
+							}),
+						})
 						return
 					}
 				}
@@ -80,7 +85,10 @@ var NoCrossEnumNarrowing = rule.Rule{
 			},
 			ast.KindCaseClause: func(node *ast.Node) {
 				clause := node.AsCaseOrDefaultClause()
-				if clause == nil || node.Parent == nil || node.Parent.Parent == nil || node.Parent.Parent.Kind != ast.KindSwitchStatement {
+				if clause == nil ||
+					node.Parent == nil ||
+					node.Parent.Parent == nil ||
+					node.Parent.Parent.Kind != ast.KindSwitchStatement {
 					return
 				}
 				compare(clause.Expression, clause.Expression, node.Parent.Parent.AsSwitchStatement().Expression)
@@ -104,7 +112,8 @@ func crossEnumMembers(tc *checker.Checker, typ *checker.Type) []crossEnumMember 
 		return result
 	}
 	for _, part := range type_checking.UnionTypeParts(typ) {
-		if part.Flags()&checker.TypeFlagsEnumLiteral == 0 || part.Flags()&(checker.TypeFlagsNumberLiteral|checker.TypeFlagsStringLiteral) == 0 {
+		if part.Flags()&checker.TypeFlagsEnumLiteral == 0 ||
+			part.Flags()&(checker.TypeFlagsNumberLiteral|checker.TypeFlagsStringLiteral) == 0 {
 			continue
 		}
 		owner := crossEnumOwner(tc, part)

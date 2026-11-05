@@ -100,7 +100,9 @@ func TestPreferNullishCoalescingIgnorePrimitivesBothSpellings(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, decodePreferNullishCoalescingOptionsError := DecodePreferNullishCoalescingOptions(json.RawMessage(testCase.raw))
+			decoded, decodePreferNullishCoalescingOptionsError := DecodePreferNullishCoalescingOptions(
+				json.RawMessage(testCase.raw),
+			)
 			if testCase.wantErr {
 				if decodePreferNullishCoalescingOptionsError == nil {
 					test.Fatalf("expected the decoder to refuse %s, got %#v", testCase.raw, decoded)
@@ -170,7 +172,9 @@ func TestPreferNullishCoalescingDecoderAcceptsTheShapesTheConfigLayerDelivers(te
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, decodePreferNullishCoalescingOptionsError := DecodePreferNullishCoalescingOptions(json.RawMessage(testCase.raw))
+			decoded, decodePreferNullishCoalescingOptionsError := DecodePreferNullishCoalescingOptions(
+				json.RawMessage(testCase.raw),
+			)
 			if testCase.wantErr {
 				if decodePreferNullishCoalescingOptionsError == nil {
 					test.Fatalf("expected a refusal, got %#v", decoded)
@@ -205,7 +209,9 @@ func runPreferNullishCoalescing(test *testing.T, testCase preferNullishCoalescin
 	test.Helper()
 	var options any
 	if testCase.optionsJson != "" {
-		decoded, decodePreferNullishCoalescingOptionsError := DecodePreferNullishCoalescingOptions(json.RawMessage(testCase.optionsJson))
+		decoded, decodePreferNullishCoalescingOptionsError := DecodePreferNullishCoalescingOptions(
+			json.RawMessage(testCase.optionsJson),
+		)
 		if decodePreferNullishCoalescingOptionsError != nil {
 			test.Fatalf("the decoder refused %s: %v", testCase.optionsJson, decodePreferNullishCoalescingOptionsError)
 		}
@@ -382,7 +388,9 @@ func TestPreferNullishCoalescingRenderings(test *testing.T) {
 						index, wantPosition, wantEnd,
 						asTheTypedPreferNullishHarnessWroteIt(testCase.source)[wantPosition:wantEnd],
 						diagnostic.Range.Pos(), diagnostic.Range.End(),
-						asTheTypedPreferNullishHarnessWroteIt(testCase.source)[diagnostic.Range.Pos():diagnostic.Range.End()])
+						asTheTypedPreferNullishHarnessWroteIt(
+							testCase.source,
+						)[diagnostic.Range.Pos():diagnostic.Range.End()])
 				}
 
 				// The whole upstream sentence, not a prefix. A prefix assertion cannot separate the

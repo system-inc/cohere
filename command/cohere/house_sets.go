@@ -35,7 +35,13 @@ func loadLintConfig(graph *program.Graph, location projectLocation) (*configurat
 	if err != nil {
 		return nil, err
 	}
-	detection := housesets.Detect(graph.ProjectFiles(), location.Root, graph.Program.Host().FS(), settings, settingsDirectory)
+	detection := housesets.Detect(
+		graph.ProjectFiles(),
+		location.Root,
+		graph.Program.Host().FS(),
+		settings,
+		settingsDirectory,
+	)
 	// Settings for rules the house does not apply would be read by nothing, which is the silent drop
 	// reading them exists to end (#gj5nm6e). The run says so instead, with the way out.
 	if detection.TailwindEntryPoint == "" && tailwind.WritesSettings(settings) {
@@ -86,6 +92,8 @@ func writeSetsLine(out *bufio.Writer, lintConfiguration *configuration.Config) {
 // errHouseSetsPerFile is --print-config's and --list-rules-enabled's answer under zero config. Which house
 // sets a file gets is read from the program, which those two flags do not build, so an answer without it
 // would be a guess; --explain builds it and says what ran on one file and why.
-var errHouseSetsPerFile = errors.New("this project has no CohereSettings.json that names its sets, so which house sets " +
-	"apply to a file is decided from the program per file, and --print-config does not build the program: " +
-	"run cohere --explain <file> to see what runs on it and why")
+var errHouseSetsPerFile = errors.New(
+	"this project has no CohereSettings.json that names its sets, so which house sets " +
+		"apply to a file is decided from the program per file, and --print-config does not build the program: " +
+		"run cohere --explain <file> to see what runs on it and why",
+)

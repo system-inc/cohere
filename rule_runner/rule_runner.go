@@ -62,7 +62,10 @@ type NotAllowedError struct {
 }
 
 func (notAllowedError NotAllowedError) Error() string {
-	return fmt.Sprintf("rule_runner: %q is not a rule another program may run; the allowlist in rule_runner.go decides which are", notAllowedError.Rule)
+	return fmt.Sprintf(
+		"rule_runner: %q is not a rule another program may run; the allowlist in rule_runner.go decides which are",
+		notAllowedError.Rule,
+	)
 }
 
 // RunRule runs the rule named ruleName over files, which belong to program, with typeChecker answering its
@@ -75,13 +78,23 @@ func (notAllowedError NotAllowedError) Error() string {
 //
 // typeChecker must be one the caller holds exclusively for the call, as the walk holds a file's checker. A
 // rule that panics is reported as an error naming the rule and the file, never as an empty result.
-func RunRule(program *compiler.Program, typeChecker *checker.Checker, files []*ast.SourceFile, ruleName string) (findings []Finding, err error) {
+func RunRule(
+	program *compiler.Program,
+	typeChecker *checker.Checker,
+	files []*ast.SourceFile,
+	ruleName string,
+) (findings []Finding, err error) {
 	subject, isAllowed := allowed[ruleName]
 	if !isAllowed {
 		return nil, NotAllowedError{Rule: ruleName}
 	}
 	if program == nil || typeChecker == nil {
-		return nil, fmt.Errorf("rule_runner: %s needs a program and a checker, and was given program %t and checker %t", ruleName, program != nil, typeChecker != nil)
+		return nil, fmt.Errorf(
+			"rule_runner: %s needs a program and a checker, and was given program %t and checker %t",
+			ruleName,
+			program != nil,
+			typeChecker != nil,
+		)
 	}
 	for _, sourceFile := range files {
 		diagnostics, fileErr := runOnFile(sourceFile, subject, program, typeChecker)
@@ -106,7 +119,12 @@ func RunRule(program *compiler.Program, typeChecker *checker.Checker, files []*a
 }
 
 // runOnFile runs subject on one file, turning a panic into an error that names the rule and the file.
-func runOnFile(sourceFile *ast.SourceFile, subject rule.Rule, program *compiler.Program, typeChecker *checker.Checker) (diagnostics []rule.Diagnostic, err error) {
+func runOnFile(
+	sourceFile *ast.SourceFile,
+	subject rule.Rule,
+	program *compiler.Program,
+	typeChecker *checker.Checker,
+) (diagnostics []rule.Diagnostic, err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			err = fmt.Errorf("rule_runner: %s panicked on %s: %v", subject.Name, sourceFile.FileName(), recovered)

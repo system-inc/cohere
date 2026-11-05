@@ -105,7 +105,10 @@ func (readiness *fileReadiness) record() *AdamicRecord {
 	for name, findings := range readiness.counts {
 		record.Counts = append(record.Counts, AdamicCount{Rule: name, Findings: findings})
 	}
-	sort.Slice(record.Counts, func(left, right int) bool { return record.Counts[left].Rule < record.Counts[right].Rule })
+	sort.Slice(
+		record.Counts,
+		func(left, right int) bool { return record.Counts[left].Rule < record.Counts[right].Rule },
+	)
 	record.Skipped = sortedUnique(readiness.skipped)
 	return record
 }

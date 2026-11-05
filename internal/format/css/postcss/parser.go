@@ -712,7 +712,11 @@ func (parser *parser) unexpectedClose(each token) {
 }
 
 func (parser *parser) unknownWord(tokens []token) {
-	panic(parser.input.errorBetween("Unknown word "+tokens[0].value, tokens[0].start, tokens[0].start+utf16Length(tokens[0].value)))
+	panic(parser.input.errorBetween(
+		"Unknown word "+tokens[0].value,
+		tokens[0].start,
+		tokens[0].start+utf16Length(tokens[0].value),
+	))
 }
 
 func (parser *parser) unnamedAtrule(_ *node, each token) {
@@ -723,7 +727,10 @@ func (parser *parser) unnamedAtrule(_ *node, each token) {
 func hasWordCharacter(text string) bool {
 	for index := 0; index < len(text); index++ {
 		character := text[index]
-		if (character >= 'a' && character <= 'z') || (character >= 'A' && character <= 'Z') || (character >= '0' && character <= '9') || character == '_' {
+		if (character >= 'a' && character <= 'z') ||
+			(character >= 'A' && character <= 'Z') ||
+			(character >= '0' && character <= '9') ||
+			character == '_' {
 			return true
 		}
 	}

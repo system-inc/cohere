@@ -9,7 +9,10 @@ import (
 
 // correctnessNoLoadTimeImportMetaPathText is the rule's message, whose wording lives in
 // `policy/messages/correctness-no-load-time-import-meta-path.json`.
-var correctnessNoLoadTimeImportMetaPathText = policy.MessageOf("nexus/correctness-no-load-time-import-meta-path", "loadTimeImportMetaPath")
+var correctnessNoLoadTimeImportMetaPathText = policy.MessageOf(
+	"nexus/correctness-no-load-time-import-meta-path",
+	"loadTimeImportMetaPath",
+)
 
 func messageLoadTimeImportMetaPath(name string) rule.Message {
 	return rule.Message{
@@ -49,7 +52,9 @@ var CorrectnessNoLoadTimeImportMetaPath = rule.Rule{
 					return
 				}
 				access := correctnessNoLoadTimeImportMetaPathOuterParentheses(node).Parent
-				if access == nil || correctnessNoLoadTimeImportMetaPathInnerParentheses(correctnessNoLoadTimeImportMetaPathAccessObject(access)) != node {
+				if access == nil || correctnessNoLoadTimeImportMetaPathInnerParentheses(
+					correctnessNoLoadTimeImportMetaPathAccessObject(access),
+				) != node {
 					return
 				}
 				name, ok := property.AccessedName(access, property.Textual|property.Templated)
@@ -68,7 +73,8 @@ var CorrectnessNoLoadTimeImportMetaPath = rule.Rule{
 	},
 }
 
-// correctnessNoLoadTimeImportMetaPathAccessObject is the object of a property or element access, or nil for any other node.
+// correctnessNoLoadTimeImportMetaPathAccessObject is the object of a property or element access, or nil for any other
+// node.
 func correctnessNoLoadTimeImportMetaPathAccessObject(node *ast.Node) *ast.Node {
 	switch node.Kind {
 	case ast.KindPropertyAccessExpression:

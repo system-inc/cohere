@@ -88,7 +88,10 @@ func readOverlay(path string) (map[string][]byte, error) {
 			return nil, fmt.Errorf("the overlay entry %s -> %s is relative; name both absolutely", target, replacement)
 		}
 		if replacement == "" {
-			return nil, fmt.Errorf("the overlay deletes %s, which the loader cannot express, so the guard would still read it", target)
+			return nil, fmt.Errorf(
+				"the overlay deletes %s, which the loader cannot express, so the guard would still read it",
+				target,
+			)
 		}
 		contents, readError := os.ReadFile(replacement)
 		if readError != nil {
@@ -124,7 +127,10 @@ func overlayFlagOutsideGoFlags(arguments string, goFlags string) bool {
 		return false
 	}
 	for _, argument := range strings.Fields(arguments) {
-		if argument == "-overlay" || argument == "--overlay" || strings.HasPrefix(argument, "-overlay=") || strings.HasPrefix(argument, "--overlay=") {
+		if argument == "-overlay" ||
+			argument == "--overlay" ||
+			strings.HasPrefix(argument, "-overlay=") ||
+			strings.HasPrefix(argument, "--overlay=") {
 			return true
 		}
 	}
@@ -256,7 +262,11 @@ func plantShapesClaim(source []byte) ([]byte, error) {
 	for _, element := range literal.Elts {
 		pair, ok := element.(*ast.KeyValueExpr)
 		if key, isIdentifier := pair.Key.(*ast.Ident); ok && isIdentifier && key.Name == "TypeReach" {
-			return slices.Concat(source[:offset(pair.Value.Pos())], []byte(claim), source[offset(pair.Value.End()):]), nil
+			return slices.Concat(
+				source[:offset(pair.Value.Pos())],
+				[]byte(claim),
+				source[offset(pair.Value.End()):],
+			), nil
 		}
 	}
 	first := offset(literal.Elts[0].Pos())
@@ -304,7 +314,13 @@ func TestAShapesClaimPlantsIntoEveryRuleFile(test *testing.T) {
 			continue
 		}
 		if plantedName, claims := ruleLiteralTypeReach(reparsed); plantedName != name || !claims {
-			test.Errorf("%s: planted, the rule reads as %q claiming Shapes %v, want %q claiming it", path, plantedName, claims, name)
+			test.Errorf(
+				"%s: planted, the rule reads as %q claiming Shapes %v, want %q claiming it",
+				path,
+				plantedName,
+				claims,
+				name,
+			)
 		}
 		planted++
 	}
@@ -329,7 +345,13 @@ func TestAnOverlayFlagGoFlagsDoesNotCarryIsRefused(test *testing.T) {
 		{"go test ./internal/guard", "", false},
 	} {
 		if got := overlayFlagOutsideGoFlags(testCase.arguments, testCase.goFlags); got != testCase.refused {
-			test.Errorf("%q with GOFLAGS %q: refused %v, want %v", testCase.arguments, testCase.goFlags, got, testCase.refused)
+			test.Errorf(
+				"%q with GOFLAGS %q: refused %v, want %v",
+				testCase.arguments,
+				testCase.goFlags,
+				got,
+				testCase.refused,
+			)
 		}
 	}
 }
@@ -361,10 +383,17 @@ func TestPragmaReaderTrustRequiresTheRulesOwnSourceFile(test *testing.T) {
 	for path, contents := range overlay {
 		planted[path] = contents
 	}
-	planted[target] = []byte(strings.Replace(string(original), before, "rule.IsReactPragmaBinding(ast.GetSourceFileOfNode(callee),", 1))
+	planted[target] = []byte(
+		strings.Replace(string(original), before, "rule.IsReactPragmaBinding(ast.GetSourceFileOfNode(callee),", 1),
+	)
 	baseline := scanTypeReach(test, overlay)
 	unsafe := scanTypeReach(test, planted)
-	for _, name := range []string{"react/no-adjacent-inline-elements", "react/no-multi-comp", "react/no-object-type-as-default-prop", "react/no-unstable-nested-components"} {
+	for _, name := range []string{
+		"react/no-adjacent-inline-elements",
+		"react/no-multi-comp",
+		"react/no-object-type-as-default-prop",
+		"react/no-unstable-nested-components",
+	} {
 		if baseline.mayReadImportedBodies[name] {
 			test.Errorf("%s: own-file pragma call refused", name)
 		}

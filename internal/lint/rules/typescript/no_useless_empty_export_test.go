@@ -21,12 +21,30 @@ func TestNoUselessEmptyExportFires(test *testing.T) {
 		name       string
 		sourceText string
 	}{
-		{"an export modifier before the empty export", "\n            export const _ = {};\n            export {};\n        "},
-		{"a star re-export before the empty export", "\n            export * from '_';\n            export {};\n        "},
-		{"a star re-export after the empty export", "\n            export {};\n            export * from '_';\n        "},
-		{"a default export before the empty export", "\n            const _ = {};\n            export default _;\n            export {};\n        "},
-		{"a default export after the empty export", "\n            export {};\n            const _ = {};\n            export default _;\n        "},
-		{"a named export clause with specifiers", "\n            const _ = {};\n            export { _ };\n            export {};\n        "},
+		{
+			"an export modifier before the empty export",
+			"\n            export const _ = {};\n            export {};\n        ",
+		},
+		{
+			"a star re-export before the empty export",
+			"\n            export * from '_';\n            export {};\n        ",
+		},
+		{
+			"a star re-export after the empty export",
+			"\n            export {};\n            export * from '_';\n        ",
+		},
+		{
+			"a default export before the empty export",
+			"\n            const _ = {};\n            export default _;\n            export {};\n        ",
+		},
+		{
+			"a default export after the empty export",
+			"\n            export {};\n            const _ = {};\n            export default _;\n        ",
+		},
+		{
+			"a named export clause with specifiers",
+			"\n            const _ = {};\n            export { _ };\n            export {};\n        ",
+		},
 		{"an empty import clause", "\n            import {} from '_';\n            export {};"},
 		{"a default import", "\n            import _ from '_';\n            export {};"},
 		{"a bare side-effect import", "\n            import '_';\n            export {};"},
@@ -62,7 +80,10 @@ func TestNoUselessEmptyExportStaysSilent(test *testing.T) {
 		{"an export assignment of a number", "export = 3;"},
 		{"an export modifier alone", "export const _ = {};"},
 		{"a default export alone", "\n            const _ = {};\n            export default _;\n        "},
-		{"a star re-export beside an export assignment", "\n            export * from '_';\n            export = {};\n        "},
+		{
+			"a star re-export beside an export assignment",
+			"\n            export * from '_';\n            export = {};\n        ",
+		},
 		{"the empty export alone, which is the whole point of the form", "export {};"},
 		{"an internal import-equals", "import x = ns.value; export {};"},
 		{"a nested import-equals inside a namespace", "namespace Foo { import Bar = Baz; } export {};"},
@@ -77,7 +98,10 @@ func TestNoUselessEmptyExportStaysSilent(test *testing.T) {
 		{"a non-exported namespace", "namespace N { const q = 1; }\nexport {};\n"},
 		{"an export assignment beside the empty export", "export = 3;\nexport {};\n"},
 		{"an empty re-export carrying a module specifier", "export const a = 1;\nexport type {} from './x';\n"},
-		{"an external import-equals nested inside a namespace", "namespace Foo { import Bar = require('_'); }\nexport {};\n"},
+		{
+			"an external import-equals nested inside a namespace",
+			"namespace Foo { import Bar = require('_'); }\nexport {};\n",
+		},
 		{"two empty exports and nothing else", "export {};\nexport {};\n"},
 	}
 	for _, testCase := range cases {
@@ -108,7 +132,10 @@ func TestNoUselessEmptyExportFiresOnFormsTheCorpusOmits(test *testing.T) {
 		{"a type-only import", "import type { A } from '_';\nexport {};\n"},
 		{"a star export with a namespace binding", "export * as ns from '_';\nexport {};\n"},
 		{"a type-only empty export, which is still empty", "import '_';\nexport type {};\n"},
-		{"an import beside an export assignment, which the corpus case cannot show", "import '_';\nexport = 3;\nexport {};\n"},
+		{
+			"an import beside an export assignment, which the corpus case cannot show",
+			"import '_';\nexport = 3;\nexport {};\n",
+		},
 		{"an internal import-equals beside a real export", "import x = ns.value;\nexport const a = 1;\nexport {};\n"},
 	}
 	for _, testCase := range cases {
@@ -156,7 +183,11 @@ func TestNoUselessEmptyExportFixesWriteWhatTheyClaim(test *testing.T) {
 		{"a default import", "import _ from '_';export {};", "import _ from '_';"},
 		{"a bare side-effect import", "import '_';export {};", "import '_';"},
 		{"a namespace import", "import * as all from '_';export {};", "import * as all from '_';"},
-		{"an external import-equals across lines", "import _ = require('_')\n\nexport {};", "import _ = require('_')\n\n"},
+		{
+			"an external import-equals across lines",
+			"import _ = require('_')\n\nexport {};",
+			"import _ = require('_')\n\n",
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {

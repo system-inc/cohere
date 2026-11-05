@@ -37,7 +37,11 @@ func TestAnUncommittedEditDoesNotReachTheBuiltBinaryAndCommittingItDoes(test *te
 	// Two uncommitted edits, one to a rule and one inside the compiler submodule's checkout. Neither
 	// may reach the binary, and the second is the subtle one: the pin is read from the commit, not
 	// from what the submodule has checked out.
-	writeFile(test, filepath.Join(fixture.superproject, "rules", "rules.go"), "package rules\n\nconst Value = \"uncommitted\"\n")
+	writeFile(
+		test,
+		filepath.Join(fixture.superproject, "rules", "rules.go"),
+		"package rules\n\nconst Value = \"uncommitted\"\n",
+	)
 	writeFile(test, filepath.Join(fixture.superproject, "TypeScript", "tsc", "checker", "checker.go"),
 		"package checker\n\nfunc Value() string { return \"uncommitted\" }\n")
 
@@ -46,7 +50,12 @@ func TestAnUncommittedEditDoesNotReachTheBuiltBinaryAndCommittingItDoes(test *te
 		test.Fatalf("resolving with uncommitted edits on disk: %v", err)
 	}
 	if built || again != first {
-		test.Fatalf("uncommitted edits changed the binary (built=%v, %s then %s), which is the defect", built, first, again)
+		test.Fatalf(
+			"uncommitted edits changed the binary (built=%v, %s then %s), which is the defect",
+			built,
+			first,
+			again,
+		)
 	}
 	if output := run(test, again); output != "rule=one compiler=pinned\n" {
 		test.Fatalf("with uncommitted edits on disk the binary printed %q", output)
@@ -56,9 +65,17 @@ func TestAnUncommittedEditDoesNotReachTheBuiltBinaryAndCommittingItDoes(test *te
 	// says nothing about what a fresh build reads, so this build runs with uncommitted edits on disk
 	// to both the rule and the compiler, each different from what is committed. It has to print the
 	// committed rule and the pinned compiler.
-	writeFile(test, filepath.Join(fixture.superproject, "rules", "rules.go"), "package rules\n\nconst Value = \"two\"\n")
+	writeFile(
+		test,
+		filepath.Join(fixture.superproject, "rules", "rules.go"),
+		"package rules\n\nconst Value = \"two\"\n",
+	)
 	fixture.commit(test, "rules/rules.go")
-	writeFile(test, filepath.Join(fixture.superproject, "rules", "rules.go"), "package rules\n\nconst Value = \"uncommitted\"\n")
+	writeFile(
+		test,
+		filepath.Join(fixture.superproject, "rules", "rules.go"),
+		"package rules\n\nconst Value = \"uncommitted\"\n",
+	)
 
 	second, secondCommit, built, err := ResolveCommitted(fixture.paths, "./command/cohere")
 	if err != nil {
@@ -92,7 +109,13 @@ func TestCheckCommittedVersionReadsWhatARealBinaryPrints(test *testing.T) {
 	// The text comes from packaging itself rather than being typed here, so a change to how the
 	// commit line is printed breaks this test instead of every committed build.
 	commit := "508863131ed19b76776da9cd08862e4ef39d00b0"
-	provenance := release.Provenance{Version: "dev", SelfCommit: commit, CompilerCommit: "1f70213d4922", GoToolchain: "go1.27.0", Platform: "darwin/arm64"}
+	provenance := release.Provenance{
+		Version:        "dev",
+		SelfCommit:     commit,
+		CompilerCommit: "1f70213d4922",
+		GoToolchain:    "go1.27.0",
+		Platform:       "darwin/arm64",
+	}
 	clean := provenance.String() + "\n"
 
 	if checkCommittedVersionError := checkCommittedVersion(clean, commit); checkCommittedVersionError != nil {
@@ -164,7 +187,11 @@ func newCommittedFixture(test *testing.T) committedFixture {
 	superproject := filepath.Join(root, "cohere")
 
 	writeFile(test, filepath.Join(compilerSource, "tsc", "go.mod"), "module example.com/tsc\n\ngo 1.27\n")
-	writeFile(test, filepath.Join(compilerSource, "tsc", "checker", "checker.go"), "package checker\n\nfunc Value() string { return \"pinned\" }\n")
+	writeFile(
+		test,
+		filepath.Join(compilerSource, "tsc", "checker", "checker.go"),
+		"package checker\n\nfunc Value() string { return \"pinned\" }\n",
+	)
 	gitCommand(test, compilerSource, "init", "-q")
 	gitCommand(test, compilerSource, "add", "tsc")
 	gitCommand(test, compilerSource, "commit", "-q", "-m", "pinned compiler")
@@ -261,12 +288,19 @@ func TestALaunchedBuildUsesTheCallersGoCache(test *testing.T) {
 	fixture := newCommittedFixture(test)
 	shared := test.TempDir()
 	test.Setenv("GOCACHE", shared)
-	if _, _, built, resolveCommittedError := ResolveCommitted(fixture.paths, "./command/cohere"); resolveCommittedError != nil || !built {
+	if _, _, built, resolveCommittedError := ResolveCommitted(
+		fixture.paths,
+		"./command/cohere",
+	); resolveCommittedError != nil || !built {
 		test.Fatalf("building: built=%v, %v", built, resolveCommittedError)
 	}
 	entries, readDirectoryError := os.ReadDir(shared)
 	if readDirectoryError != nil || len(entries) < 2 {
-		test.Fatalf("the caller's Go cache holds %d entries after a build, so the build compiled somewhere else: %v", len(entries), readDirectoryError)
+		test.Fatalf(
+			"the caller's Go cache holds %d entries after a build, so the build compiled somewhere else: %v",
+			len(entries),
+			readDirectoryError,
+		)
 	}
 	if _, statError := os.Stat(filepath.Join(fixture.paths.CacheDirectory, "gocache")); !os.IsNotExist(statError) {
 		test.Fatalf("the launcher made a Go cache of its own: %v", statError)

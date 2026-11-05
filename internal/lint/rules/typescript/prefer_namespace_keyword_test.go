@@ -25,8 +25,16 @@ func TestPreferNamespaceKeywordFires(test *testing.T) {
 		{"a bare module declaration", "module foo {}", 1},
 		{"a dotted module declaration reports once for the whole chain", "module A.B {}", 1},
 		{"an ambient module declaration with an identifier name", "declare module foo {}", 1},
-		{"a module nested in a module block reports for each", "\n        declare module foo {\n          module bar {}\n        }\n        ", 2},
-		{"a module inside a global augmentation", "\n        declare global {\n            module foo {}\n        }\n        ", 1},
+		{
+			"a module nested in a module block reports for each",
+			"\n        declare module foo {\n          module bar {}\n        }\n        ",
+			2,
+		},
+		{
+			"a module inside a global augmentation",
+			"\n        declare global {\n            module foo {}\n        }\n        ",
+			1,
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -82,7 +90,10 @@ func TestPreferNamespaceKeywordStaysSilent(test *testing.T) {
 
 		// `global` is a keyword form here, not a name. `module global {}` reports upstream, so
 		// the exemption cannot be keyed on the identifier text.
-		{"a global augmentation with statements inside", "declare global {\n  interface Window {\n    x: string;\n  }\n}"},
+		{
+			"a global augmentation with statements inside",
+			"declare global {\n  interface Window {\n    x: string;\n  }\n}",
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -116,11 +127,31 @@ func TestPreferNamespaceKeywordFixesWriteWhatTheyClaim(test *testing.T) {
 	}{
 		{"a bare module declaration", "module foo {}", "namespace foo {}"},
 		{"a dotted module declaration rewrites only the leading keyword", "module A.B {}", "namespace A.B {}"},
-		{"nested module blocks each get their own keyword rewritten", "\n            module A {\n              module B {}\n            }\n            ", "\n            namespace A {\n              namespace B {}\n            }\n            "},
-		{"an ambient module declaration keeps its declare modifier", "declare module foo {}", "declare namespace foo {}"},
-		{"an ambient module with a nested module", "\n            declare module foo {\n              module bar {}\n            }\n            ", "\n            declare namespace foo {\n              namespace bar {}\n            }\n            "},
-		{"a comment holding the word module ahead of the keyword", "declare /* module */ module foo {}", "declare /* module */ namespace foo {}"},
-		{"a name segment and a string both holding the word module", "declare module X.Y.module { let x: 'module'; }", "declare namespace X.Y.module { let x: 'module'; }"},
+		{
+			"nested module blocks each get their own keyword rewritten",
+			"\n            module A {\n              module B {}\n            }\n            ",
+			"\n            namespace A {\n              namespace B {}\n            }\n            ",
+		},
+		{
+			"an ambient module declaration keeps its declare modifier",
+			"declare module foo {}",
+			"declare namespace foo {}",
+		},
+		{
+			"an ambient module with a nested module",
+			"\n            declare module foo {\n              module bar {}\n            }\n            ",
+			"\n            declare namespace foo {\n              namespace bar {}\n            }\n            ",
+		},
+		{
+			"a comment holding the word module ahead of the keyword",
+			"declare /* module */ module foo {}",
+			"declare /* module */ namespace foo {}",
+		},
+		{
+			"a name segment and a string both holding the word module",
+			"declare module X.Y.module { let x: 'module'; }",
+			"declare namespace X.Y.module { let x: 'module'; }",
+		},
 
 		// Ours. The export modifier is outside the reported span (measured on the release
 		// binary: `export module foo {}` reports at column 8, not column 1), but the fix still
@@ -167,7 +198,11 @@ func TestPreferNamespaceKeywordReportsTheRightSpanAndText(test *testing.T) {
 		{"the export modifier is outside the span", "export module foo {}", []string{"module foo {}"}},
 		{"export is skipped and declare is kept", "export declare module foo {}", []string{"declare module foo {}"}},
 		{"a dotted declaration spans the whole chain once", "module A.B {}", []string{"module A.B {}"}},
-		{"a nested declaration points at the inner module", "declare module foo {\n  module bar {}\n}", []string{"declare module foo {\n  module bar {}\n}", "module bar {}"}},
+		{
+			"a nested declaration points at the inner module",
+			"declare module foo {\n  module bar {}\n}",
+			[]string{"declare module foo {\n  module bar {}\n}", "module bar {}"},
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {

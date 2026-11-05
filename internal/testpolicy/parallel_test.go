@@ -31,14 +31,34 @@ func TestSerialTestsFindsAPlantedSerialTest(test *testing.T) {
 		{"a serial test", "func TestA(t *testing.T) { work() }", "TestA"},
 		{"its parallel control", "func TestA(t *testing.T) { t.Parallel(); work() }", ""},
 		{"excused with a reason", "// Not parallel: it sets GOFLAGS.\nfunc TestA(t *testing.T) { work() }", ""},
-		{"excused under other prose", "// TestA checks a thing.\n//\n// Not parallel: it sets GOFLAGS.\nfunc TestA(t *testing.T) { work() }", ""},
+		{
+			"excused under other prose",
+			"// TestA checks a thing.\n//\n// Not parallel: it sets GOFLAGS.\nfunc TestA(t *testing.T) { work() }",
+			"",
+		},
 		{"a marker with no reason", "// Not parallel:\nfunc TestA(t *testing.T) { work() }", "TestA"},
 		{"Parallel in a closure marks nothing", "func TestA(t *testing.T) { func() { t.Parallel() }() }", "TestA"},
 		{"another receiver's Parallel", "func TestA(t *testing.T) { other.Parallel() }", "TestA"},
-		{"a serial subtest", "func TestA(t *testing.T) { t.Parallel(); t.Run(\"sub\", func(t *testing.T) { work() }) }", "TestA/sub"},
-		{"its parallel control", "func TestA(t *testing.T) { t.Parallel(); t.Run(\"sub\", func(t *testing.T) { t.Parallel() }) }", ""},
-		{"an excused subtest", "func TestA(t *testing.T) {\n\tt.Parallel()\n\t// Not parallel: the subtests share one fixture in order.\n\tt.Run(\"sub\", func(t *testing.T) { work() })\n}", ""},
-		{"not a test", "func helper(t *testing.T) { work() }\nfunc Testable(t *testing.T) { work() }\nfunc TestMain(m *testing.M) { m.Run() }", ""},
+		{
+			"a serial subtest",
+			"func TestA(t *testing.T) { t.Parallel(); t.Run(\"sub\", func(t *testing.T) { work() }) }",
+			"TestA/sub",
+		},
+		{
+			"its parallel control",
+			"func TestA(t *testing.T) { t.Parallel(); t.Run(\"sub\", func(t *testing.T) { t.Parallel() }) }",
+			"",
+		},
+		{
+			"an excused subtest",
+			"func TestA(t *testing.T) {\n\tt.Parallel()\n\t// Not parallel: the subtests share one fixture in order.\n\tt.Run(\"sub\", func(t *testing.T) { work() })\n}",
+			"",
+		},
+		{
+			"not a test",
+			"func helper(t *testing.T) { work() }\nfunc Testable(t *testing.T) { work() }\nfunc TestMain(m *testing.M) { m.Run() }",
+			"",
+		},
 		{"a benchmark is not a test", "func BenchmarkA(b *testing.B) { work() }", ""},
 	}
 	for _, testCase := range cases {

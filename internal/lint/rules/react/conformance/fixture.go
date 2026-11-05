@@ -217,7 +217,11 @@ func Load(root string) ([]Fixture, error) {
 		expectPath := strings.TrimSuffix(inputPath, filepath.Ext(inputPath)) + ".expect.md"
 		expectBytes, err := os.ReadFile(expectPath)
 		if err != nil {
-			return nil, fmt.Errorf("%s: expectation missing; upstream pairs these 1:1 and a fixture without one cannot be scored: %w", name, err)
+			return nil, fmt.Errorf(
+				"%s: expectation missing; upstream pairs these 1:1 and a fixture without one cannot be scored: %w",
+				name,
+				err,
+			)
 		}
 
 		// The `## Error` invariant is conditional on the fixture being error-named, rather than
@@ -266,7 +270,10 @@ func Load(root string) ([]Fixture, error) {
 func ParseExpectation(text string) (Expectation, error) {
 	_, after, found := strings.Cut(text, "\n## Error\n")
 	if !found {
-		return Expectation{}, fmt.Errorf("no `## Error` section; error-named fixtures always have one at sha %s", UpstreamSha)
+		return Expectation{}, fmt.Errorf(
+			"no `## Error` section; error-named fixtures always have one at sha %s",
+			UpstreamSha,
+		)
 	}
 
 	block, found := fencedBlock(after)

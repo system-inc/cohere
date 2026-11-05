@@ -25,7 +25,11 @@ func TestConsistencyNoScreamingSnakeCaseFires(test *testing.T) {
 		// the case that separates "rooted at process" from "reads the environment": it is a plain
 		// property access, so it reaches the env check rather than exiting early the way
 		// process.argv[2] does as an element access.
-		{"process.platform is not an env read", "const SOME_PLATFORM = process.platform;\n", "noScreamingSnakeCaseLocal"},
+		{
+			"process.platform is not an env read",
+			"const SOME_PLATFORM = process.platform;\n",
+			"noScreamingSnakeCaseLocal",
+		},
 		{"process.argv is not an env read", "const SOME_ARGUMENT = process.argv[2];\n", "noScreamingSnakeCaseLocal"},
 		// An env-shaped name whose value comes from somewhere else is still ours to name.
 		{"env-looking name from a literal", "const DATABASE_URL = 'postgres://local';\n", "noScreamingSnakeCaseLocal"},
@@ -102,7 +106,12 @@ func TestConsistencyNoScreamingSnakeCaseSuggestsTheRightCasing(test *testing.T) 
 		test.Fatalf("expected a camelCase suggestion, got: %s", local.Diagnostics[0].Message.Description)
 	}
 
-	exported := rule_testing.Run(test, ConsistencyNoScreamingSnakeCase, screamingFile, "export const MAX_RETRY_COUNT = 3;\n")
+	exported := rule_testing.Run(
+		test,
+		ConsistencyNoScreamingSnakeCase,
+		screamingFile,
+		"export const MAX_RETRY_COUNT = 3;\n",
+	)
 	rule_testing.ExpectFindings(test, exported, "noScreamingSnakeCaseExported")
 	if !strings.Contains(exported.Diagnostics[0].Message.Description, `"MaxRetryCount"`) {
 		test.Fatalf("expected a PascalCase suggestion, got: %s", exported.Diagnostics[0].Message.Description)

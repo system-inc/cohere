@@ -78,7 +78,9 @@ func runRequireDescriptionCases(test *testing.T, cases []requireDescriptionCase)
 func TestRequireDescriptionStaysSilentOnUpstreamPassCases(test *testing.T) {
 	test.Parallel()
 	runRequireDescriptionCases(test, []requireDescriptionCase{
-		{sourceText: `/* eslint eqeqeq: "off", curly: "error" -- Here's a description about why this configuration is necessary. */`},
+		{
+			sourceText: `/* eslint eqeqeq: "off", curly: "error" -- Here's a description about why this configuration is necessary. */`,
+		},
 		{sourceText: "/* eslint-disable -- description */"},
 		{sourceText: "/* eslint-enable -- description */"},
 		{sourceText: "/* exported -- description */"},
@@ -155,8 +157,14 @@ func TestRequireDescriptionReadsTheSeparatorAsEsLintDoes(test *testing.T) {
 		// Reports: no reason.
 		{sourceText: "// eslint-disable-next-line foo -- ", wantSpans: []string{"// eslint-disable-next-line foo -- "}},
 		{sourceText: "// eslint-disable-next-line foo --", wantSpans: []string{"// eslint-disable-next-line foo --"}},
-		{sourceText: "// eslint-disable-next-line foo --\t", wantSpans: []string{"// eslint-disable-next-line foo --\t"}},
-		{sourceText: "// eslint-disable-next-line foo--bar", wantSpans: []string{"// eslint-disable-next-line foo--bar"}},
+		{
+			sourceText: "// eslint-disable-next-line foo --\t",
+			wantSpans:  []string{"// eslint-disable-next-line foo --\t"},
+		},
+		{
+			sourceText: "// eslint-disable-next-line foo--bar",
+			wantSpans:  []string{"// eslint-disable-next-line foo--bar"},
+		},
 		{sourceText: "/* eslint-disable -- \t */", wantSpans: []string{"/* eslint-disable -- \t */"}},
 		// Clean: a reason, however it is spaced.
 		{sourceText: "// eslint-disable-next-line foo -- bar"},
@@ -176,8 +184,14 @@ func TestRequireDescriptionMatchesUpstreamOnCommentShapes(test *testing.T) {
 	runRequireDescriptionCases(test, []requireDescriptionCase{
 		// A trailing directive: upstream reports from column -1, here the comment alone.
 		{sourceText: "x; // eslint-disable-line foo", wantSpans: []string{"// eslint-disable-line foo"}},
-		{sourceText: "const a = 1;\n    /* eslint-disable */\nconst b = 2;", wantSpans: []string{"/* eslint-disable */"}},
-		{sourceText: "const a = <div>{/* eslint-disable-line */}</div>;", wantSpans: []string{"/* eslint-disable-line */"}},
+		{
+			sourceText: "const a = 1;\n    /* eslint-disable */\nconst b = 2;",
+			wantSpans:  []string{"/* eslint-disable */"},
+		},
+		{
+			sourceText: "const a = <div>{/* eslint-disable-line */}</div>;",
+			wantSpans:  []string{"/* eslint-disable-line */"},
+		},
 		{sourceText: "/*eslint-disable*/", wantSpans: []string{"/*eslint-disable*/"}},
 		{sourceText: "//eslint-disable-line", wantSpans: []string{"//eslint-disable-line"}},
 		// A multi-line block without star continuations is still a directive to ESLint.
@@ -196,16 +210,32 @@ func TestRequireDescriptionMatchesUpstreamOnCommentShapes(test *testing.T) {
 		{sourceText: "// global foo"},
 		{sourceText: "// a note about eslint-disable"},
 		// additionalDirectives: a named word is a directive in a line comment too, and only as a whole word.
-		{sourceText: "// c8 ignore next", options: `{"additionalDirectives":["c8"]}`, wantSpans: []string{"// c8 ignore next"}},
+		{
+			sourceText: "// c8 ignore next",
+			options:    `{"additionalDirectives":["c8"]}`,
+			wantSpans:  []string{"// c8 ignore next"},
+		},
 		{sourceText: "// c8 ignore next -- covered elsewhere", options: `{"additionalDirectives":["c8"]}`},
 		{sourceText: "// c8 ignore next"},
-		{sourceText: "/* istanbul ignore next */", options: `{"additionalDirectives":["c8","istanbul"]}`, wantSpans: []string{"/* istanbul ignore next */"}},
+		{
+			sourceText: "/* istanbul ignore next */",
+			options:    `{"additionalDirectives":["c8","istanbul"]}`,
+			wantSpans:  []string{"/* istanbul ignore next */"},
+		},
 		{sourceText: "/* c8x ignore */", options: `{"additionalDirectives":["c8"]}`},
 		// An unterminated block is a parse error to ESLint, which then reports nothing at all.
 		{sourceText: "x;\n/* eslint-disable"},
 		// An ignore naming a different kind ignores nothing else.
-		{sourceText: "/* eslint-disable */", options: `{"ignore":["eslint-disable-line"]}`, wantSpans: []string{"/* eslint-disable */"}},
-		{sourceText: "/* eslint-enable */", options: `{"ignore":["eslint-disable"]}`, wantSpans: []string{"/* eslint-enable */"}},
+		{
+			sourceText: "/* eslint-disable */",
+			options:    `{"ignore":["eslint-disable-line"]}`,
+			wantSpans:  []string{"/* eslint-disable */"},
+		},
+		{
+			sourceText: "/* eslint-enable */",
+			options:    `{"ignore":["eslint-disable"]}`,
+			wantSpans:  []string{"/* eslint-enable */"},
+		},
 		{sourceText: "/* eslint-disable */", options: `{}`, wantSpans: []string{"/* eslint-disable */"}},
 	})
 }
@@ -220,7 +250,10 @@ func TestRequireDescriptionCoversWhatCohereHonors(test *testing.T) {
 	test.Parallel()
 	runRequireDescriptionCases(test, []requireDescriptionCase{
 		// cohere's own spellings, every scope, and the enable.
-		{sourceText: "// cohere-disable-next-line no-alert", wantSpans: []string{"// cohere-disable-next-line no-alert"}},
+		{
+			sourceText: "// cohere-disable-next-line no-alert",
+			wantSpans:  []string{"// cohere-disable-next-line no-alert"},
+		},
 		{sourceText: "x; // cohere-disable-line", wantSpans: []string{"// cohere-disable-line"}},
 		{sourceText: "/* cohere-disable */", wantSpans: []string{"/* cohere-disable */"}},
 		{sourceText: "/* cohere-enable */", wantSpans: []string{"/* cohere-enable */"}},
@@ -230,7 +263,10 @@ func TestRequireDescriptionCoversWhatCohereHonors(test *testing.T) {
 		{sourceText: "{/* cohere-disable-next-line */}", wantSpans: []string{"/* cohere-disable-next-line */"}},
 		// The same separator grammar as the eslint spelling, not cohere's laxer one.
 		{sourceText: "// cohere-disable-next-line foo -- ", wantSpans: []string{"// cohere-disable-next-line foo -- "}},
-		{sourceText: "// cohere-disable-next-line foo--bar", wantSpans: []string{"// cohere-disable-next-line foo--bar"}},
+		{
+			sourceText: "// cohere-disable-next-line foo--bar",
+			wantSpans:  []string{"// cohere-disable-next-line foo--bar"},
+		},
 		{sourceText: "// cohere-disable-next-line no-alert -- the kiosk build has no other channel"},
 		{sourceText: "/* cohere-disable -- generated */"},
 		{sourceText: "/* cohere-enable -- generated */"},
@@ -240,7 +276,11 @@ func TestRequireDescriptionCoversWhatCohereHonors(test *testing.T) {
 		// The ignore option reaches a cohere spelling through its shared kind.
 		{sourceText: "// cohere-disable-next-line foo", options: `{"ignore":["eslint-disable-next-line"]}`},
 		{sourceText: "/* cohere-enable */", options: `{"ignore":["eslint-enable"]}`},
-		{sourceText: "/* cohere-disable */", options: `{"ignore":["eslint-disable-line"]}`, wantSpans: []string{"/* cohere-disable */"}},
+		{
+			sourceText: "/* cohere-disable */",
+			options:    `{"ignore":["eslint-disable-line"]}`,
+			wantSpans:  []string{"/* cohere-disable */"},
+		},
 		// A file-scope disable and an enable written as `//` are prose to ESLint, and since Kirk's
 		// ruling of 2026-10-01 to cohere too, so there is no directive to describe.
 		{sourceText: "// eslint-disable"},
@@ -269,7 +309,9 @@ func TestRequireDescriptionIsRegisteredAsADirectiveSubject(test *testing.T) {
 		test.Fatal("control: a blanket same-line directive should silence an ordinary rule on its line")
 	}
 	if suppression.Build(source).Suppresses(RequireDescription.Name, 3) {
-		test.Fatal("a same-line directive silenced the finding about itself; the rule is not registered as a directive subject")
+		test.Fatal(
+			"a same-line directive silenced the finding about itself; the rule is not registered as a directive subject",
+		)
 	}
 }
 
@@ -303,8 +345,14 @@ func TestRequireDescriptionDecoderRefusesWhatTheSchemaRefuses(test *testing.T) {
 	}
 	for raw, wantFragment := range refused {
 		_, decodeRequireDescriptionOptionsError := DecodeRequireDescriptionOptions([]byte(raw))
-		if decodeRequireDescriptionOptionsError == nil || !strings.Contains(decodeRequireDescriptionOptionsError.Error(), wantFragment) {
-			test.Errorf("decoding %s: got %v, want an error containing %q", raw, decodeRequireDescriptionOptionsError, wantFragment)
+		if decodeRequireDescriptionOptionsError == nil ||
+			!strings.Contains(decodeRequireDescriptionOptionsError.Error(), wantFragment) {
+			test.Errorf(
+				"decoding %s: got %v, want an error containing %q",
+				raw,
+				decodeRequireDescriptionOptionsError,
+				wantFragment,
+			)
 		}
 	}
 
@@ -313,7 +361,9 @@ func TestRequireDescriptionDecoderRefusesWhatTheSchemaRefuses(test *testing.T) {
 	if err != nil || !ok || len(options.Ignore) != 0 {
 		test.Errorf("a bare severity should decode to the zero options, got %#v, %v", decoded, err)
 	}
-	decoded, err = DecodeRequireDescriptionOptions([]byte(`{"ignore":["eslint-disable","eslint-enable"],"additionalDirectives":["c8"]}`))
+	decoded, err = DecodeRequireDescriptionOptions(
+		[]byte(`{"ignore":["eslint-disable","eslint-enable"],"additionalDirectives":["c8"]}`),
+	)
 	options, ok = decoded.(RequireDescriptionOptions)
 	if err != nil || !ok || len(options.Ignore) != 2 || len(options.AdditionalDirectives) != 1 {
 		test.Errorf("a valid object should decode whole, got %#v, %v", decoded, err)

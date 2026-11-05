@@ -85,7 +85,11 @@ func FromMarkdown(source string, original string, nodes *arena.Arena[Node]) (roo
 	units := memory.units
 	memory.offsets = byteOffsets(original, memory.offsets[:0])
 	if len(memory.offsets) != len(units)+1 {
-		return nil, fmt.Errorf("markdown: the parsed text and the original differ in length (%d and %d UTF-16 units)", len(units), len(memory.offsets)-1)
+		return nil, fmt.Errorf(
+			"markdown: the parsed text and the original differ in length (%d and %d UTF-16 units)",
+			len(units),
+			len(memory.offsets)-1,
+		)
 	}
 	events := micromark.Parse(units, micromark.MarkdownConstructs(), memory.parse)
 	return compile(events, compileConfig(), memory.offsets, nodes), nil
@@ -263,7 +267,8 @@ func compile(events []micromark.Event, configuration *config, offsets []int, nod
 	for index := 0; index < len(events); index++ {
 		// We preprocess lists to add `listItem` tokens, and to infer whether items the list itself are
 		// spread out.
-		if events[index].Token.Type == micromark.TypeListOrdered || events[index].Token.Type == micromark.TypeListUnordered {
+		if events[index].Token.Type == micromark.TypeListOrdered ||
+			events[index].Token.Type == micromark.TypeListUnordered {
 			if events[index].Enter {
 				listStack = append(listStack, index)
 			} else {
@@ -362,7 +367,8 @@ func prepareList(eventsPointer *[]micromark.Event, start int, length int) int {
 					tailIndex--
 					tailEvent := events[tailIndex]
 
-					if tailEvent.Token.Type == micromark.TypeLineEnding || tailEvent.Token.Type == micromark.TypeLineEndingBlank {
+					if tailEvent.Token.Type == micromark.TypeLineEnding ||
+						tailEvent.Token.Type == micromark.TypeLineEndingBlank {
 						if !tailEvent.Enter {
 							continue
 						}
@@ -400,7 +406,11 @@ func prepareList(eventsPointer *[]micromark.Event, start int, length int) int {
 				if lineIndex != 0 {
 					at = lineIndex
 				}
-				events = slices.Insert(events, at, micromark.Event{Enter: false, Token: listItem, Context: event.Context})
+				events = slices.Insert(
+					events,
+					at,
+					micromark.Event{Enter: false, Token: listItem, Context: event.Context},
+				)
 				index++
 				length++
 			}
@@ -435,10 +445,17 @@ func opener(create func(token *micromark.Token) Node, and handle) handle {
 
 // buffer pushes a fragment to collect text into.
 func buffer(context *compileContext, _ *micromark.Token) {
-	context.stack = append(context.stack, context.nodes.New(Node{NodeType: "fragment", IsParent: true, Children: []*Node{}}))
+	context.stack = append(
+		context.stack,
+		context.nodes.New(Node{NodeType: "fragment", IsParent: true, Children: []*Node{}}),
+	)
 }
 
-func (context *compileContext) enter(node *Node, token *micromark.Token, errorHandler func(*compileContext, *micromark.Token, *micromark.Token)) {
+func (context *compileContext) enter(
+	node *Node,
+	token *micromark.Token,
+	errorHandler func(*compileContext, *micromark.Token, *micromark.Token),
+) {
 	parent := context.top()
 	parent.Children = append(parent.Children, node)
 	context.stack = append(context.stack, node)
@@ -456,7 +473,10 @@ func closer(and handle) handle {
 	}
 }
 
-func (context *compileContext) exit(token *micromark.Token, onExitError func(*compileContext, *micromark.Token, *micromark.Token)) {
+func (context *compileContext) exit(
+	token *micromark.Token,
+	onExitError func(*compileContext, *micromark.Token, *micromark.Token),
+) {
 	node := context.stack[len(context.stack)-1]
 	context.stack = context.stack[:len(context.stack)-1]
 
@@ -809,7 +829,13 @@ func newLink(*micromark.Token) Node {
 }
 
 func newList(token *micromark.Token) Node {
-	return Node{NodeType: "list", Ordered: token.Type == "listOrdered", Spread: token.Spread, IsParent: true, Children: []*Node{}}
+	return Node{
+		NodeType: "list",
+		Ordered:  token.Type == "listOrdered",
+		Spread:   token.Spread,
+		IsParent: true,
+		Children: []*Node{},
+	}
 }
 
 func newListItem(token *micromark.Token) Node {

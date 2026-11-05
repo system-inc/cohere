@@ -92,7 +92,12 @@ func TestReactHookNoPropertiesInDependenciesFires(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.Run(test, ReactHookNoPropertiesInDependencies, propertiesInDependenciesFile, testCase.sourceText)
+			result := rule_testing.Run(
+				test,
+				ReactHookNoPropertiesInDependencies,
+				propertiesInDependenciesFile,
+				testCase.sourceText,
+			)
 			expected := make([]string, testCase.count)
 			for index := range expected {
 				expected[index] = "extractPropertiesFirst"

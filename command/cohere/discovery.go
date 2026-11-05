@@ -154,7 +154,9 @@ func discoveryRoot(location projectLocation, locateError error, workingDirectory
 func enclosingRepository(start string) string {
 	directory := filepath.Clean(start)
 	for {
-		if information, statError := os.Stat(filepath.Join(directory, ".git")); statError == nil && information.IsDir() {
+		if information, statError := os.Stat(
+			filepath.Join(directory, ".git"),
+		); statError == nil && information.IsDir() {
 			return directory
 		}
 		parent := filepath.Dir(directory)

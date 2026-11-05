@@ -235,7 +235,11 @@ func (gate *Gate) computeGroupKey(className string) string {
 		return staticKeyPrefix + gate.declaredValuesKey(className)
 
 	default:
-		return variantsKey(candidate.Variants) + "|" + importanceKey(candidate.Important) + "|" + valueKey(candidate.Value)
+		return variantsKey(candidate.Variants) +
+			"|" +
+			importanceKey(candidate.Important) +
+			"|" +
+			valueKey(candidate.Value)
 	}
 }
 

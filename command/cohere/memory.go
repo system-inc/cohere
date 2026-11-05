@@ -93,9 +93,16 @@ func (policy memoryPolicy) line() string {
 	case policy.environment != "":
 		return "memory: the environment sets the collector (" + policy.environment + ")"
 	case policy.unreadable != nil:
-		return fmt.Sprintf("memory: the collector runs at Go's default, since available memory could not be read (%v)", policy.unreadable)
+		return fmt.Sprintf(
+			"memory: the collector runs at Go's default, since available memory could not be read (%v)",
+			policy.unreadable,
+		)
 	}
-	return fmt.Sprintf("memory: collector off, ceiling %s (half of %s available)", gigabytes(policy.ceiling), gigabytes(policy.available))
+	return fmt.Sprintf(
+		"memory: collector off, ceiling %s (half of %s available)",
+		gigabytes(policy.ceiling),
+		gigabytes(policy.available),
+	)
 }
 
 // darwinAvailableMemory is free pages, plus file-backed pages (the cache the kernel drops before anything
@@ -124,7 +131,11 @@ func linuxAvailableMemory(meminfo []byte, cgroup linuxCgroupMemory) (uint64, err
 		if !ok {
 			continue
 		}
-		kilobytes, parseError := strconv.ParseUint(strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(rest), "kB")), 10, 64)
+		kilobytes, parseError := strconv.ParseUint(
+			strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(rest), "kB")),
+			10,
+			64,
+		)
 		if parseError != nil {
 			return 0, fmt.Errorf("reading MemAvailable from /proc/meminfo: %w", parseError)
 		}

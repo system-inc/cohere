@@ -38,15 +38,45 @@ type preferNullishCoalescingReplayedCase struct {
 // names only null that way is fixable whatever the type; read as strict, `string | null | undefined`
 // would make it unfixable. These rows, both arms of the join and the if path, are what kill it.
 var preferNullishCoalescingBeyondTheCorpusCases = []preferNullishCoalescingReplayedCase{
-	{name: "replayed: === and == joined by || read loose, so null alone is enough", source: "declare let x: string | null | undefined;\ndeclare const y: string;\nconst r = x === null || x == null ? y : x;\n", findings: []preferNullishCoalescingReplayed{
-		{id: "preferNullishOverTernary", line: 3, column: 11, reported: `x === null || x == null ? y : x`, suggested: "declare let x: string | null | undefined;\ndeclare const y: string;\nconst r = x ?? y;\n"},
-	}},
-	{name: "replayed: !== and != joined by && read loose", source: "declare let x: string | null | undefined;\ndeclare const y: string;\nconst r = x !== null && x != null ? x : y;\n", findings: []preferNullishCoalescingReplayed{
-		{id: "preferNullishOverTernary", line: 3, column: 11, reported: `x !== null && x != null ? x : y`, suggested: "declare let x: string | null | undefined;\ndeclare const y: string;\nconst r = x ?? y;\n"},
-	}},
-	{name: "replayed: the if path reads the same join loose", source: "declare let x: string | null | undefined;\ndeclare const y: string;\nif (x === null || x == null) { x = y; }\n", findings: []preferNullishCoalescingReplayed{
-		{id: "preferNullishOverAssignment", line: 3, column: 1, reported: `if (x === null || x == null) { x = y; }`, suggested: "declare let x: string | null | undefined;\ndeclare const y: string;\nx ??= y;\n"},
-	}},
+	{
+		name:   "replayed: === and == joined by || read loose, so null alone is enough",
+		source: "declare let x: string | null | undefined;\ndeclare const y: string;\nconst r = x === null || x == null ? y : x;\n",
+		findings: []preferNullishCoalescingReplayed{
+			{
+				id:        "preferNullishOverTernary",
+				line:      3,
+				column:    11,
+				reported:  `x === null || x == null ? y : x`,
+				suggested: "declare let x: string | null | undefined;\ndeclare const y: string;\nconst r = x ?? y;\n",
+			},
+		},
+	},
+	{
+		name:   "replayed: !== and != joined by && read loose",
+		source: "declare let x: string | null | undefined;\ndeclare const y: string;\nconst r = x !== null && x != null ? x : y;\n",
+		findings: []preferNullishCoalescingReplayed{
+			{
+				id:        "preferNullishOverTernary",
+				line:      3,
+				column:    11,
+				reported:  `x !== null && x != null ? x : y`,
+				suggested: "declare let x: string | null | undefined;\ndeclare const y: string;\nconst r = x ?? y;\n",
+			},
+		},
+	},
+	{
+		name:   "replayed: the if path reads the same join loose",
+		source: "declare let x: string | null | undefined;\ndeclare const y: string;\nif (x === null || x == null) { x = y; }\n",
+		findings: []preferNullishCoalescingReplayed{
+			{
+				id:        "preferNullishOverAssignment",
+				line:      3,
+				column:    1,
+				reported:  `if (x === null || x == null) { x = y; }`,
+				suggested: "declare let x: string | null | undefined;\ndeclare const y: string;\nx ??= y;\n",
+			},
+		},
+	},
 }
 
 // TestPreferNullishCoalescingTernaryAndIfStaySilentBeyondTheCorpus is the other survivor's control.
@@ -65,7 +95,10 @@ func TestPreferNullishCoalescingTernaryAndIfStaySilentBeyondTheCorpus(test *test
 	} {
 		test.Run(source, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, runPreferNullishCoalescing(test, preferNullishCoalescingCase{source: source}))
+			rule_testing.ExpectClean(
+				test,
+				runPreferNullishCoalescing(test, preferNullishCoalescingCase{source: source}),
+			)
 		})
 	}
 }
@@ -231,12 +264,16 @@ export function use2Things(initial: number | null) {
     return Inner;
 }
 `, true},
-	{"a component that takes a ref second", `export function Field(properties: { label: string | null }, forwardedRef: unknown) {
+	{
+		"a component that takes a ref second",
+		`export function Field(properties: { label: string | null }, forwardedRef: unknown) {
     let label = properties.label;
     if(label === null) label = 'none';
     return <span ref={forwardedRef}>{label}</span>;
 }
-`, true},
+`,
+		true,
+	},
 	{"a helper outside any component", `export function normalize(stored: string | null) {
     let label = stored;
     if(label === null) label = 'none';
@@ -249,12 +286,16 @@ export function use2Things(initial: number | null) {
     return label;
 }
 `, false},
-	{"a component-named function with no JSX and no hooks", `export function Defaults(properties: { label: string | null }) {
+	{
+		"a component-named function with no JSX and no hooks",
+		`export function Defaults(properties: { label: string | null }) {
     let label = properties.label;
     if(label === null) label = 'none';
     return label;
 }
-`, false},
+`,
+		false,
+	},
 	{"a component inside a bare block", `{
     function Badge(properties: { label: string | null }) {
         let label = properties.label;
@@ -292,12 +333,16 @@ export const Badge = memo(function(properties: { label: string | null }) {
     return <span>{label}</span>;
 }
 `, false},
-	{"a component whose second parameter is not a ref", `export function Badge(properties: { label: string | null }, other: unknown) {
+	{
+		"a component whose second parameter is not a ref",
+		`export function Badge(properties: { label: string | null }, other: unknown) {
     let label = properties.label;
     if(label === null) label = 'none';
     return <span>{label}{String(other)}</span>;
 }
-`, false},
+`,
+		false,
+	},
 	{"a component whose only JSX is inside a closure", `export function Badge(properties: { label: string | null }) {
     let label = properties.label;
     if(label === null) label = 'none';
@@ -340,9 +385,21 @@ func TestPreferNullishCoalescingIfIsSilentInsideReactCompiledFunctions(test *tes
 	for _, testCase := range preferNullishCoalescingCompiledRows {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			off := rule_testing.RunTypedWithOptions(test, PreferNullishCoalescing, "Compiled.tsx", testCase.sourceText, compilerOff)
+			off := rule_testing.RunTypedWithOptions(
+				test,
+				PreferNullishCoalescing,
+				"Compiled.tsx",
+				testCase.sourceText,
+				compilerOff,
+			)
 			rule_testing.ExpectFindings(test, off, "preferNullishOverAssignment")
-			on := rule_testing.RunTypedWithOptions(test, PreferNullishCoalescing, "Compiled.tsx", testCase.sourceText, compilerOn)
+			on := rule_testing.RunTypedWithOptions(
+				test,
+				PreferNullishCoalescing,
+				"Compiled.tsx",
+				testCase.sourceText,
+				compilerOn,
+			)
 			if testCase.compiled {
 				rule_testing.ExpectClean(test, on)
 				return

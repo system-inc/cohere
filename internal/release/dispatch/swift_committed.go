@@ -83,7 +83,11 @@ func resolveCommittedSwiftEngine(paths Paths, commit string, toolchain string, c
 	}
 
 	worktree := paths.SwiftSourceWorktree()
-	if checkOutWorktreeError := checkOutWorktree(paths.ModuleDirectory, worktree, commit); checkOutWorktreeError != nil {
+	if checkOutWorktreeError := checkOutWorktree(
+		paths.ModuleDirectory,
+		worktree,
+		commit,
+	); checkOutWorktreeError != nil {
 		return "", false, checkOutWorktreeError
 	}
 
@@ -92,10 +96,18 @@ func resolveCommittedSwiftEngine(paths Paths, commit string, toolchain string, c
 	temporary := binaryPath + fmt.Sprintf(".partial-%d", os.Getpid())
 	defer os.Remove(temporary)
 
-	if err := buildSwiftProduct(filepath.Join(worktree, "swift"), paths.SwiftCommittedBuildDirectory(), temporary); err != nil {
+	if err := buildSwiftProduct(
+		filepath.Join(worktree, "swift"),
+		paths.SwiftCommittedBuildDirectory(),
+		temporary,
+	); err != nil {
 		return "", false, err
 	}
-	if proveCommittedSwiftEngineError := proveCommittedSwiftEngine(temporary, commit, contract); proveCommittedSwiftEngineError != nil {
+	if proveCommittedSwiftEngineError := proveCommittedSwiftEngine(
+		temporary,
+		commit,
+		contract,
+	); proveCommittedSwiftEngineError != nil {
 		return "", false, proveCommittedSwiftEngineError
 	}
 	if renameError := os.Rename(temporary, binaryPath); renameError != nil {
@@ -154,11 +166,21 @@ func swiftEngineInputObjects(paths Paths, commit string) ([]string, error) {
 	if gitOutputError != nil {
 		// rev-parse with several arguments stops at the first it cannot resolve, so the message names
 		// what was asked rather than guessing which one was missing.
-		return nil, fmt.Errorf("reading the Swift engine's inputs at %s (%s): %w", release.ShortCommit(commit), strings.Join(swiftEngineInputs, ", "), gitOutputError)
+		return nil, fmt.Errorf(
+			"reading the Swift engine's inputs at %s (%s): %w",
+			release.ShortCommit(commit),
+			strings.Join(swiftEngineInputs, ", "),
+			gitOutputError,
+		)
 	}
 	objects := strings.Fields(output)
 	if len(objects) != len(swiftEngineInputs) {
-		return nil, fmt.Errorf("asked git for %d Swift engine inputs at %s and got %d answers", len(swiftEngineInputs), release.ShortCommit(commit), len(objects))
+		return nil, fmt.Errorf(
+			"asked git for %d Swift engine inputs at %s and got %d answers",
+			len(swiftEngineInputs),
+			release.ShortCommit(commit),
+			len(objects),
+		)
 	}
 
 	// Kept through a temporary and a rename, so a concurrent run reads a whole answer or none. Failing to
@@ -178,7 +200,14 @@ func swiftEngineInputObjects(paths Paths, commit string) ([]string, error) {
 // checkOutWorktree puts the worktree at commit, creating it the first time.
 func checkOutWorktree(moduleDirectory string, worktree string, commit string) error {
 	if _, statError := os.Stat(worktree); errors.Is(statError, os.ErrNotExist) {
-		if _, gitOutputError := gitOutput(moduleDirectory, "worktree", "add", "--detach", worktree, commit); gitOutputError != nil {
+		if _, gitOutputError := gitOutput(
+			moduleDirectory,
+			"worktree",
+			"add",
+			"--detach",
+			worktree,
+			commit,
+		); gitOutputError != nil {
 			return fmt.Errorf("creating the Swift engine's worktree at %s: %w", worktree, gitOutputError)
 		}
 		return requireWorktreeAt(worktree, commit)
@@ -199,11 +228,18 @@ func checkOutWorktree(moduleDirectory string, worktree string, commit string) er
 func requireCleanWorktree(worktree string) error {
 	status, gitOutputError := gitOutput(worktree, "status", "--porcelain")
 	if gitOutputError != nil {
-		return fmt.Errorf("%s is not a usable git worktree, so the Swift engine was not built (remove it by name and it will be recreated): %w", worktree, gitOutputError)
+		return fmt.Errorf(
+			"%s is not a usable git worktree, so the Swift engine was not built (remove it by name and it will be recreated): %w",
+			worktree,
+			gitOutputError,
+		)
 	}
 	if strings.TrimSpace(status) != "" {
-		return fmt.Errorf("the Swift engine's worktree %s has changes nobody should have made there, so it was not moved or built:\n%s",
-			worktree, strings.TrimRight(status, "\n"))
+		return fmt.Errorf(
+			"the Swift engine's worktree %s has changes nobody should have made there, so it was not moved or built:\n%s",
+			worktree,
+			strings.TrimRight(status, "\n"),
+		)
 	}
 	return nil
 }
@@ -216,7 +252,11 @@ func requireWorktreeAt(worktree string, commit string) error {
 		return fmt.Errorf("reading the Swift engine's worktree: %w", gitOutputError)
 	}
 	if strings.TrimSpace(head) != commit {
-		return fmt.Errorf("the Swift engine's worktree is at %s after checking out %s", release.ShortCommit(strings.TrimSpace(head)), release.ShortCommit(commit))
+		return fmt.Errorf(
+			"the Swift engine's worktree is at %s after checking out %s",
+			release.ShortCommit(strings.TrimSpace(head)),
+			release.ShortCommit(commit),
+		)
 	}
 	return requireCleanWorktree(worktree)
 }
@@ -247,13 +287,22 @@ func proveCommittedSwiftEngine(binaryPath string, commit string, contract int) e
 			continue
 		}
 		if record.SourceTreeModified == nil {
-			return fmt.Errorf("the Swift engine built from %s reported provenance without sourceTreeModified, so it was not cached", release.ShortCommit(commit))
+			return fmt.Errorf(
+				"the Swift engine built from %s reported provenance without sourceTreeModified, so it was not cached",
+				release.ShortCommit(commit),
+			)
 		}
 		if *record.SourceTreeModified {
-			return fmt.Errorf("the Swift engine built from %s reports a modified source tree, which a build from a clean worktree at that commit cannot have, so it was not cached",
-				release.ShortCommit(commit))
+			return fmt.Errorf(
+				"the Swift engine built from %s reports a modified source tree, which a build from a clean worktree at that commit cannot have, so it was not cached",
+				release.ShortCommit(commit),
+			)
 		}
 		return nil
 	}
-	return fmt.Errorf("the Swift engine built from %s printed no provenance record for --version, so it was not cached:\n%s", release.ShortCommit(commit), output)
+	return fmt.Errorf(
+		"the Swift engine built from %s printed no provenance record for --version, so it was not cached:\n%s",
+		release.ShortCommit(commit),
+		output,
+	)
 }

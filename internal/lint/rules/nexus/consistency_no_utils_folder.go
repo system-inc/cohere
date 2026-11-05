@@ -16,7 +16,10 @@ var (
 )
 
 func messageNoUnderscoreUtils() rule.Message {
-	return rule.Message{Id: consistencyNoUtilsFolderUnderscoreText.Id, Description: consistencyNoUtilsFolderUnderscoreText.Render(nil)}
+	return rule.Message{
+		Id:          consistencyNoUtilsFolderUnderscoreText.Id,
+		Description: consistencyNoUtilsFolderUnderscoreText.Render(nil),
+	}
 }
 
 func messageNoUtils() rule.Message {

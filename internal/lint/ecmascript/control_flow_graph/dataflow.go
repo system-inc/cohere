@@ -189,7 +189,9 @@ func Solve[V any, E any](graph *Graph[E], direction Direction, lattice LatticeOf
 		changed = false
 		solution.rounds++
 		if solution.rounds > maximumRounds {
-			panic("controlflow: dataflow did not converge — the lattice's Meet is probably not idempotent, or Equal disagrees with it")
+			panic(
+				"controlflow: dataflow did not converge — the lattice's Meet is probably not idempotent, or Equal disagrees with it",
+			)
 		}
 		for _, block := range order {
 			index := block.Index()

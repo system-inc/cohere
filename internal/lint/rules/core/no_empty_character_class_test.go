@@ -36,8 +36,11 @@ func TestNoEmptyCharacterClassFires(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectFindings(test, rule_testing.Run(test, NoEmptyCharacterClass, emptyCharacterClassFile, testCase.sourceText),
-				"unexpectedEmptyCharacterClass")
+			rule_testing.ExpectFindings(
+				test,
+				rule_testing.Run(test, NoEmptyCharacterClass, emptyCharacterClassFile, testCase.sourceText),
+				"unexpectedEmptyCharacterClass",
+			)
 		})
 	}
 }
@@ -64,8 +67,11 @@ func TestNoEmptyCharacterClassFiresInsideNestedClasses(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectFindings(test, rule_testing.Run(test, NoEmptyCharacterClass, emptyCharacterClassFile, testCase.sourceText),
-				"unexpectedEmptyCharacterClass")
+			rule_testing.ExpectFindings(
+				test,
+				rule_testing.Run(test, NoEmptyCharacterClass, emptyCharacterClassFile, testCase.sourceText),
+				"unexpectedEmptyCharacterClass",
+			)
 		})
 	}
 }
@@ -92,7 +98,10 @@ func TestNoEmptyCharacterClassStaysSilent(test *testing.T) {
 		{"a class holding a range and a bracket", "export const Pattern = /[a-zA-Z\\[]/;\n"},
 		{"a raw open bracket inside a class", "export const Pattern = /[[]/;\n"},
 		{"a class opened and closed around an escape", "export const Pattern = /[\\[a-z[]]/;\n"},
-		{"a class of escaped punctuation", "export const Pattern = /[\\-\\[\\]\\/\\{\\}\\(\\)\\*\\+\\?\\.\\\\^\\$\\|]/g;\n"},
+		{
+			"a class of escaped punctuation",
+			"export const Pattern = /[\\-\\[\\]\\/\\{\\}\\(\\)\\*\\+\\?\\.\\\\^\\$\\|]/g;\n",
+		},
 		{"a pattern with no brackets at all", "export const Pattern = /\\s*:\\s*/gim;\n"},
 		// `\[]` escapes the opening bracket, so this pattern contains the literal characters `[`
 		// and `]` and opens no class whatsoever. This is the case a substring search cannot get
@@ -104,7 +113,10 @@ func TestNoEmptyCharacterClassStaysSilent(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.Run(test, NoEmptyCharacterClass, emptyCharacterClassFile, testCase.sourceText))
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.Run(test, NoEmptyCharacterClass, emptyCharacterClassFile, testCase.sourceText),
+			)
 		})
 	}
 }
@@ -133,7 +145,10 @@ func TestNoEmptyCharacterClassStaysSilentInsideNestedClasses(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.Run(test, NoEmptyCharacterClass, emptyCharacterClassFile, testCase.sourceText))
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.Run(test, NoEmptyCharacterClass, emptyCharacterClassFile, testCase.sourceText),
+			)
 		})
 	}
 }

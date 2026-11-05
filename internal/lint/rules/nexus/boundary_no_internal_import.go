@@ -13,8 +13,14 @@ import (
 // boundaryNoInternalImportAliasedInternalText and boundaryNoInternalImportOutsideInternalText are the
 // rule's messages, whose wording lives in `policy/messages/boundary-no-internal-import.json`.
 var (
-	boundaryNoInternalImportAliasedInternalText = policy.MessageOf("nexus/boundary-no-internal-import", "aliasedInternal")
-	boundaryNoInternalImportOutsideInternalText = policy.MessageOf("nexus/boundary-no-internal-import", "outsideInternal")
+	boundaryNoInternalImportAliasedInternalText = policy.MessageOf(
+		"nexus/boundary-no-internal-import",
+		"aliasedInternal",
+	)
+	boundaryNoInternalImportOutsideInternalText = policy.MessageOf(
+		"nexus/boundary-no-internal-import",
+		"outsideInternal",
+	)
 )
 
 func messageAliasedInternal() rule.Message {

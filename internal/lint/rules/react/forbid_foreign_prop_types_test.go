@@ -335,7 +335,11 @@ func TestForbidForeignPropTypesUnwrapsParentheses(test *testing.T) {
 		{"a doubly parenthesized target is exempt", `((Foo.propTypes)) = {};`, nil},
 		{"a parenthesized receiver still reports", `const x = (Foo).propTypes;`, []string{"forbiddenPropType"}},
 		{"a parenthesized read still reports", `const x = (Foo.propTypes);`, []string{"forbiddenPropType"}},
-		{"a doubly parenthesized receiver still reports", `const x = ((Foo)).propTypes;`, []string{"forbiddenPropType"}},
+		{
+			"a doubly parenthesized receiver still reports",
+			`const x = ((Foo)).propTypes;`,
+			[]string{"forbiddenPropType"},
+		},
 	}
 
 	for _, testCase := range cases {
@@ -375,8 +379,16 @@ func TestForbidForeignPropTypesReadsOnlyLiteralKeys(test *testing.T) {
 		{"a rest only pattern declines", `const { ...rest } = Foo;`, nil},
 		// Upstream uses `properties.find`, so a pattern naming the key twice reports once. A loop
 		// that did not stop would report twice, and nothing in the corpus writes the shape.
-		{"a pattern naming it twice reports once", `const { propTypes, propTypes: q } = Foo;`, []string{"forbiddenPropType"}},
-		{"any object pattern counts, including a parameter", `function f({ propTypes }) {}`, []string{"forbiddenPropType"}},
+		{
+			"a pattern naming it twice reports once",
+			`const { propTypes, propTypes: q } = Foo;`,
+			[]string{"forbiddenPropType"},
+		},
+		{
+			"any object pattern counts, including a parameter",
+			`function f({ propTypes }) {}`,
+			[]string{"forbiddenPropType"},
+		},
 		{"a nested pattern counts", `const { a: { propTypes } } = Foo;`, []string{"forbiddenPropType"}},
 	}
 
@@ -410,11 +422,19 @@ func TestForbidForeignPropTypesAllowInPropTypesReachesUpward(test *testing.T) {
 		{"a class field exempts through a closure", `class C { static propTypes = { a: () => Q.propTypes.c }; }`, nil},
 		// The assignment walk tests the left's property name, so assigning into anything else does
 		// not exempt. This is the case that makes the walk a discrimination rather than a blanket.
-		{"assigning into another property does not exempt", `Foo.other = Bar.propTypes;`, []string{"forbiddenPropType"}},
+		{
+			"assigning into another property does not exempt",
+			`Foo.other = Bar.propTypes;`,
+			[]string{"forbiddenPropType"},
+		},
 		// Upstream does not test `static`, measured, so an instance field exempts too.
 		{"a non static class field exempts", `class C { propTypes = { a: Q.propTypes.b }; }`, nil},
 		// Upstream reads `classProperty.key.name`, which a computed key does not have.
-		{"a computed class key does not exempt", `class C { static ["propTypes"] = { a: Q.propTypes.b }; }`, []string{"forbiddenPropType"}},
+		{
+			"a computed class key does not exempt",
+			`class C { static ["propTypes"] = { a: Q.propTypes.b }; }`,
+			[]string{"forbiddenPropType"},
+		},
 	}
 
 	for _, testCase := range cases {

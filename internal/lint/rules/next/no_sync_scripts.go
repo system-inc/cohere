@@ -44,7 +44,8 @@ var NoSyncScripts = rule.Rule{
 			if !jsx.HasAttributeNamed(attributes, "src", jsx.MatchExactly) {
 				return
 			}
-			if jsx.HasAttributeNamed(attributes, "async", jsx.MatchExactly) || jsx.HasAttributeNamed(attributes, "defer", jsx.MatchExactly) {
+			if jsx.HasAttributeNamed(attributes, "async", jsx.MatchExactly) ||
+				jsx.HasAttributeNamed(attributes, "defer", jsx.MatchExactly) {
 				return
 			}
 			ruleContext.ReportNode(node, messageNoSyncScripts)

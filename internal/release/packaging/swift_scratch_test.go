@@ -33,9 +33,17 @@ func TestTheSwiftScratchIsNeverInsideTheOutput(test *testing.T) {
 		{filepath.Join(root, "elsewhere"), true},
 		{root, true},
 	} {
-		_, swiftScratchDirectoryError := swiftScratchDirectory(Options{OutputDirectory: output, SwiftScratchDirectory: testCase.scratch})
+		_, swiftScratchDirectoryError := swiftScratchDirectory(
+			Options{OutputDirectory: output, SwiftScratchDirectory: testCase.scratch},
+		)
 		if (swiftScratchDirectoryError == nil) != testCase.allowed {
-			test.Errorf("%s: allowed %v, want %v (%v)", testCase.scratch, swiftScratchDirectoryError == nil, testCase.allowed, swiftScratchDirectoryError)
+			test.Errorf(
+				"%s: allowed %v, want %v (%v)",
+				testCase.scratch,
+				swiftScratchDirectoryError == nil,
+				testCase.allowed,
+				swiftScratchDirectoryError,
+			)
 		}
 	}
 }

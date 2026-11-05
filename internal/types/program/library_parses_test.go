@@ -18,12 +18,18 @@ func libraryParsesConfig(target string, libs string) string {
 	if libs != "" {
 		lib = fmt.Sprintf(`, "lib": [%s]`, libs)
 	}
-	return fmt.Sprintf(`{"compilerOptions": {"target": %q, "module": "esnext", "moduleResolution": "bundler", "strict": true, "noEmit": true%s}, "include": ["./*.ts"]}`, target, lib)
+	return fmt.Sprintf(
+		`{"compilerOptions": {"target": %q, "module": "esnext", "moduleResolution": "bundler", "strict": true, "noEmit": true%s}, "include": ["./*.ts"]}`,
+		target,
+		lib,
+	)
 }
 
 func buildWithLibraryParses(test testing.TB, directory string, parses *program.LibraryParses) *program.Graph {
 	test.Helper()
-	graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory, LibraryParses: parses})
+	graph, buildError := program.Build(
+		program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory, LibraryParses: parses},
+	)
 	if buildError != nil {
 		test.Fatalf("building: %v", buildError)
 	}
@@ -100,9 +106,21 @@ func TestLibraryParsesNeverChangeWhatAProgramLoadsOrReports(test *testing.T) {
 		errors bool
 	}{
 		{"lib es5 has no Symbol", "ES2015", `"es5"`, "export const unique = Symbol('unique');\n", true},
-		{"ES2015 has no Array.prototype.includes", "ES2015", `"es2015"`, "export const found = [1].includes(1);\n", true},
+		{
+			"ES2015 has no Array.prototype.includes",
+			"ES2015",
+			`"es2015"`,
+			"export const found = [1].includes(1);\n",
+			true,
+		},
 		{"no dom means no document", "ES2022", `"es2022"`, "export const body = document.body;\n", true},
-		{"ES2022 with dom has both", "ES2022", `"es2022", "dom"`, "export const both = [1].at(0) ?? document.title;\n", false},
+		{
+			"ES2022 with dom has both",
+			"ES2022",
+			`"es2022", "dom"`,
+			"export const both = [1].at(0) ?? document.title;\n",
+			false,
+		},
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
@@ -122,7 +140,11 @@ func TestLibraryParsesNeverChangeWhatAProgramLoadsOrReports(test *testing.T) {
 				return fileNames
 			}
 			if !slices.Equal(names(unshared), names(shared)) {
-				test.Fatalf("the shared build loads different files:\nunshared %v\nshared   %v", names(unshared), names(shared))
+				test.Fatalf(
+					"the shared build loads different files:\nunshared %v\nshared   %v",
+					names(unshared),
+					names(shared),
+				)
 			}
 
 			messages := func(graph *program.Graph) []string {
@@ -134,10 +156,17 @@ func TestLibraryParsesNeverChangeWhatAProgramLoadsOrReports(test *testing.T) {
 				return texts
 			}
 			if reported := len(messages(unshared)) > 0; reported != testCase.errors {
-				test.Fatalf("control: the unshared build reports %v, so this case cannot tell a leaked lib file apart", messages(unshared))
+				test.Fatalf(
+					"control: the unshared build reports %v, so this case cannot tell a leaked lib file apart",
+					messages(unshared),
+				)
 			}
 			if !slices.Equal(messages(unshared), messages(shared)) {
-				test.Fatalf("the shared build reports differently:\nunshared %v\nshared   %v", messages(unshared), messages(shared))
+				test.Fatalf(
+					"the shared build reports differently:\nunshared %v\nshared   %v",
+					messages(unshared),
+					messages(shared),
+				)
 			}
 		})
 	}
@@ -157,7 +186,9 @@ func TestLibraryParsesAreSafeAcrossConcurrentPrograms(test *testing.T) {
 		group.Add(1)
 		go func() {
 			defer group.Done()
-			graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory, LibraryParses: parses})
+			graph, buildError := program.Build(
+				program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory, LibraryParses: parses},
+			)
 			if buildError != nil {
 				test.Errorf("building: %v", buildError)
 				return

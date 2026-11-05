@@ -16,7 +16,11 @@ package tailwind
 // replacement already in place. A one-node replacement keeps every sibling's index, so assigning
 // into the slice is that splice. Upstream descends into any node with a non-empty `nodes`, which in
 // a value tree is a function with arguments.
-func walkValueExit(nodes []ValueNode, parent *ValueNode, exit func(node *ValueNode, parent *ValueNode) (ValueNode, bool)) {
+func walkValueExit(
+	nodes []ValueNode,
+	parent *ValueNode,
+	exit func(node *ValueNode, parent *ValueNode) (ValueNode, bool),
+) {
 	for index := range nodes {
 		if len(nodes[index].Nodes) > 0 {
 			walkValueExit(nodes[index].Nodes, &nodes[index], exit)

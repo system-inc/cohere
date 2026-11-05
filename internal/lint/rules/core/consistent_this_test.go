@@ -50,17 +50,57 @@ func TestConsistentThisFires(test *testing.T) {
 		messages   []string
 	}{
 		{"a capture under an undesignated name", []string{"that"}, "var context = this", []string{"unexpectedAlias"}},
-		{"the default alias when another is designated", []string{"self"}, "var that = this", []string{"unexpectedAlias"}},
-		{"a second declarator capturing under the wrong name", []string{"that"}, "var foo = 42, self = this", []string{"unexpectedAlias"}},
+		{
+			"the default alias when another is designated",
+			[]string{"self"},
+			"var that = this",
+			[]string{"unexpectedAlias"},
+		},
+		{
+			"a second declarator capturing under the wrong name",
+			[]string{"that"},
+			"var foo = 42, self = this",
+			[]string{"unexpectedAlias"},
+		},
 		{"the alias holding a number", []string{"self"}, "var self = 42", []string{"aliasNotAssignedToThis"}},
 		{"the alias declared and never assigned", []string{"self"}, "var self", []string{"aliasNotAssignedToThis"}},
-		{"the alias declared then given a number, reporting twice", []string{"self"}, "var self; self = 42", []string{"aliasNotAssignedToThis", "aliasNotAssignedToThis"}},
-		{"a bare assignment capture under the wrong name", []string{"that"}, "context = this", []string{"unexpectedAlias"}},
-		{"the default alias when another is designated, assigned", []string{"self"}, "that = this", []string{"unexpectedAlias"}},
-		{"the designated alias assigned outside its declaration", []string{"that"}, "self = this", []string{"unexpectedAlias"}},
+		{
+			"the alias declared then given a number, reporting twice",
+			[]string{"self"},
+			"var self; self = 42",
+			[]string{"aliasNotAssignedToThis", "aliasNotAssignedToThis"},
+		},
+		{
+			"a bare assignment capture under the wrong name",
+			[]string{"that"},
+			"context = this",
+			[]string{"unexpectedAlias"},
+		},
+		{
+			"the default alias when another is designated, assigned",
+			[]string{"self"},
+			"that = this",
+			[]string{"unexpectedAlias"},
+		},
+		{
+			"the designated alias assigned outside its declaration",
+			[]string{"that"},
+			"self = this",
+			[]string{"unexpectedAlias"},
+		},
 		{"a compound assignment to the alias", []string{"self"}, "self += this", []string{"aliasNotAssignedToThis"}},
-		{"the alias assigned only from an inner function", []string{"self"}, "var self; (function() { self = this; }())", []string{"aliasNotAssignedToThis"}},
-		{"the alias assigned only from an inner function, again", []string{"self"}, "var self; (function() { self = this; }())", []string{"aliasNotAssignedToThis"}},
+		{
+			"the alias assigned only from an inner function",
+			[]string{"self"},
+			"var self; (function() { self = this; }())",
+			[]string{"aliasNotAssignedToThis"},
+		},
+		{
+			"the alias assigned only from an inner function, again",
+			[]string{"self"},
+			"var self; (function() { self = this; }())",
+			[]string{"aliasNotAssignedToThis"},
+		},
 	}
 
 	for _, testCase := range cases {
@@ -148,7 +188,11 @@ func TestConsistentThisScopeModel(test *testing.T) {
 		{"parenthesized, which is invisible", "var self; (self = this);", nil},
 		{"a sequence expression", "var self; a, self = this;", nil},
 		{"a conditional expression", "var self; a ? self = this : 0;", nil},
-		{"a nested function declaring its own alias", "var self; function f() { var self; self = this; }", []string{"aliasNotAssignedToThis"}},
+		{
+			"a nested function declaring its own alias",
+			"var self; function f() { var self; self = this; }",
+			[]string{"aliasNotAssignedToThis"},
+		},
 	}
 
 	for _, testCase := range cases {
@@ -179,11 +223,27 @@ func TestConsistentThisOtherDeclarationForms(test *testing.T) {
 		{"a const capture of this", "const self = this;", nil},
 		{"a redeclaration carrying the capture", "var self; var self = this;", nil},
 		{"an assignment with no declaration at all", "self = this;", nil},
-		{"a second declarator capturing under another name", "var self = this, other = this;", []string{"unexpectedAlias"}},
+		{
+			"a second declarator capturing under another name",
+			"var self = this, other = this;",
+			[]string{"unexpectedAlias"},
+		},
 		{"a later write of something else", "var self; self = this; self = 42;", []string{"aliasNotAssignedToThis"}},
-		{"a logical assignment of this", "var self; self ||= this;", []string{"aliasNotAssignedToThis", "aliasNotAssignedToThis"}},
-		{"a method body declaring an unassigned alias", "class C { m() { var self; } }", []string{"aliasNotAssignedToThis"}},
-		{"a function body declaring an unassigned alias", "function f() { var self; }", []string{"aliasNotAssignedToThis"}},
+		{
+			"a logical assignment of this",
+			"var self; self ||= this;",
+			[]string{"aliasNotAssignedToThis", "aliasNotAssignedToThis"},
+		},
+		{
+			"a method body declaring an unassigned alias",
+			"class C { m() { var self; } }",
+			[]string{"aliasNotAssignedToThis"},
+		},
+		{
+			"a function body declaring an unassigned alias",
+			"function f() { var self; }",
+			[]string{"aliasNotAssignedToThis"},
+		},
 	}
 
 	for _, testCase := range cases {
@@ -263,17 +323,23 @@ func TestDecodeConsistentThisOptions(test *testing.T) {
 
 	test.Run("the nested-array workaround is refused rather than read", func(test *testing.T) {
 		test.Parallel()
-		if _, decodeConsistentThisOptionsError := DecodeConsistentThisOptions(json.RawMessage(`[["self","vm"]]`)); decodeConsistentThisOptionsError == nil {
+		if _, decodeConsistentThisOptionsError := DecodeConsistentThisOptions(
+			json.RawMessage(`[["self","vm"]]`),
+		); decodeConsistentThisOptionsError == nil {
 			test.Error("an element that is not a string decoded; upstream's schema refuses it")
 		}
 	})
 
 	test.Run("an empty name is refused", func(test *testing.T) {
 		test.Parallel()
-		if _, decodeConsistentThisOptionsError := DecodeConsistentThisOptions(json.RawMessage(`[""]`)); decodeConsistentThisOptionsError == nil {
+		if _, decodeConsistentThisOptionsError := DecodeConsistentThisOptions(
+			json.RawMessage(`[""]`),
+		); decodeConsistentThisOptionsError == nil {
 			test.Error("expected the decoder to refuse an empty alias")
 		}
-		if _, decodeConsistentThisOptionsError := DecodeConsistentThisOptions(json.RawMessage(`["self",""]`)); decodeConsistentThisOptionsError == nil {
+		if _, decodeConsistentThisOptionsError := DecodeConsistentThisOptions(
+			json.RawMessage(`["self",""]`),
+		); decodeConsistentThisOptionsError == nil {
 			test.Error("expected the decoder to refuse an empty alias in a list")
 		}
 	})
@@ -348,11 +414,27 @@ func TestConsistentThisTreatsAnArrowAsNeitherScopeNorTransparent(test *testing.T
 		{"an unassigned alias in an arrow is exempt", "var f = () => { var self; };", nil},
 		{"even when a later write would have rescued it", "var f = () => { var self; self = this; };", nil},
 		{"a top level arrow, same exemption", "() => { var self; };", nil},
-		{"but a bad initializer still reports", "var f = () => { var self = 42; };", []string{"aliasNotAssignedToThis"}},
-		{"and a capture under the wrong name still reports", "var f = () => { var context = this; };", []string{"unexpectedAlias"}},
+		{
+			"but a bad initializer still reports",
+			"var f = () => { var self = 42; };",
+			[]string{"aliasNotAssignedToThis"},
+		},
+		{
+			"and a capture under the wrong name still reports",
+			"var f = () => { var context = this; };",
+			[]string{"unexpectedAlias"},
+		},
 		{"a correct capture in an arrow is clean", "var f = () => { var self = this; };", nil},
-		{"an arrow writing an outer alias does not rescue it", "var self; var f = () => { self = this; };", []string{"aliasNotAssignedToThis"}},
-		{"a function nested in an arrow is a scope again", "var f = () => { function g() { var self; } };", []string{"aliasNotAssignedToThis"}},
+		{
+			"an arrow writing an outer alias does not rescue it",
+			"var self; var f = () => { self = this; };",
+			[]string{"aliasNotAssignedToThis"},
+		},
+		{
+			"a function nested in an arrow is a scope again",
+			"var f = () => { function g() { var self; } };",
+			[]string{"aliasNotAssignedToThis"},
+		},
 	}
 
 	for _, testCase := range cases {
@@ -382,8 +464,16 @@ func TestConsistentThisJudgesAFunctionExpressionAsItsOwnScope(test *testing.T) {
 		{"a function expression rescues its own alias", "var f = function() { var self; self = this; };", nil},
 		{"and reports one it never assigns", "var f = function() { var self; };", []string{"aliasNotAssignedToThis"}},
 		{"a bad initializer inside one", "var f = function() { var self = 42; };", []string{"aliasNotAssignedToThis"}},
-		{"an object method is a function expression too", "var o = { m: function() { var self; } };", []string{"aliasNotAssignedToThis"}},
-		{"an inner write does not rescue an outer alias", "var self; var f = function() { self = this; };", []string{"aliasNotAssignedToThis"}},
+		{
+			"an object method is a function expression too",
+			"var o = { m: function() { var self; } };",
+			[]string{"aliasNotAssignedToThis"},
+		},
+		{
+			"an inner write does not rescue an outer alias",
+			"var self; var f = function() { self = this; };",
+			[]string{"aliasNotAssignedToThis"},
+		},
 	}
 
 	for _, testCase := range cases {

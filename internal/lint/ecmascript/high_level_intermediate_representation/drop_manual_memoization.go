@@ -579,7 +579,8 @@ func collectManualMemoTemporaries(function *Function, instruction *Instruction, 
 		// written as `[propA.x, x]`. Without the guard the written `x` resolved to `propB.x.y`
 		// while the inferred side kept `x`, so the two never matched and the rule fired on a
 		// fixture upstream compiles cleanly.
-		if source, ok := sidemap.deps[value.Value.Identifier]; ok && !isNamedBinding(function, value.LValue.Identifier) {
+		if source, ok := sidemap.deps[value.Value.Identifier]; ok &&
+			!isNamedBinding(function, value.LValue.Identifier) {
 			sidemap.deps[value.LValue.Identifier] = source
 		}
 	}
@@ -696,7 +697,12 @@ func isNamedBinding(function *Function, id static_single_assignment.IdentifierId
 // fresh path rooted there, which is what makes `props` in `[props.items]` a root at all. An unnamed
 // temporary with no path is neither and is left absent, which is what makes `[a + b]` unextractable
 // rather than silently rooted at a meaningless place.
-func propagateManualMemoDependency(function *Function, sidemap *manualMemoSidemap, target static_single_assignment.IdentifierId, source Place) {
+func propagateManualMemoDependency(
+	function *Function,
+	sidemap *manualMemoSidemap,
+	target static_single_assignment.IdentifierId,
+	source Place,
+) {
 	if existing, ok := sidemap.deps[source.Identifier]; ok {
 		sidemap.deps[target] = existing
 		return

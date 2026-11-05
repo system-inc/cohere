@@ -28,11 +28,16 @@ func TestOneWorkerHandsEveryFileItsOwnRuleState(test *testing.T) {
 	directory := writeProject(test, map[string]string{
 		"tsconfig.json":       minimalConfig,
 		"CohereSettings.json": `{"rules": {"test-run-crashes-on-a": "error", "test-listener-crashes-on-a": "error", "test-functions-only-in-a": "error", "test-notes": "error"}}`,
-		"a.ts":                "// cohere-disable-next-line test-run-crashes-on-a -- covers a.ts alone\n" + declarations,
-		"b.ts":                "// a plain comment, the length of a.ts's directive, nothing else at all\n" + declarations,
-		"c.ts":                "// a plain comment, the length of a.ts's directive, nothing else at all\n" + declarations,
+		"a.ts": "// cohere-disable-next-line test-run-crashes-on-a -- covers a.ts alone\n" +
+			declarations,
+		"b.ts": "// a plain comment, the length of a.ts's directive, nothing else at all\n" +
+			declarations,
+		"c.ts": "// a plain comment, the length of a.ts's directive, nothing else at all\n" +
+			declarations,
 	})
-	graph, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory, SingleThreaded: true})
+	graph, err := program.Build(
+		program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory, SingleThreaded: true},
+	)
 	if err != nil {
 		test.Fatalf("building: %v", err)
 	}
@@ -79,7 +84,10 @@ func TestOneWorkerHandsEveryFileItsOwnRuleState(test *testing.T) {
 				return nil
 			}
 			return rule.Listeners{ast.KindFunctionDeclaration: func(node *ast.Node) {
-				ruleContext.ReportNode(node, rule.Message{Id: "sawFunction", Description: "saw a function in " + filepath.Base(ruleContext.SourceFile.FileName().AsString())})
+				ruleContext.ReportNode(node, rule.Message{
+					Id:          "sawFunction",
+					Description: "saw a function in " + filepath.Base(ruleContext.SourceFile.FileName().AsString()),
+				})
 			}}
 		},
 	}
@@ -90,7 +98,11 @@ func TestOneWorkerHandsEveryFileItsOwnRuleState(test *testing.T) {
 		},
 	}
 
-	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{runCrashes, listenerCrashes, functionsOnlyInA, notes})
+	result, err := graph.Walk(
+		context.Background(),
+		graph.ProjectFiles(),
+		[]rule.Rule{runCrashes, listenerCrashes, functionsOnlyInA, notes},
+	)
 	if err != nil {
 		test.Fatalf("walking: %v", err)
 	}
@@ -113,7 +125,10 @@ func TestOneWorkerHandsEveryFileItsOwnRuleState(test *testing.T) {
 	for _, crash := range result.Coverage.RulesCrashed {
 		crashed = append(crashed, crash.RuleName+" on "+filepath.Base(crash.FileName))
 	}
-	if want := []string{"test-run-crashes-on-a on a.ts", "test-listener-crashes-on-a on a.ts"}; !sameMembers(crashed, want) {
+	if want := []string{
+		"test-run-crashes-on-a on a.ts",
+		"test-listener-crashes-on-a on a.ts",
+	}; !sameMembers(crashed, want) {
 		test.Errorf("the crashes are %v, want %v", crashed, want)
 	}
 

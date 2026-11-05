@@ -141,7 +141,10 @@ func TestNoProtoDeclinesShapesTheCorpusOmits(test *testing.T) {
 		name       string
 		sourceText string
 	}{
-		{"a substituting template subscript", "declare const part: string;\nexport const a = test[`__proto${part}__`];\n"},
+		{
+			"a substituting template subscript",
+			"declare const part: string;\nexport const a = test[`__proto${part}__`];\n",
+		},
 		{"an object-literal key", "export const a = { __proto__: 1 };\n"},
 		{"a class field", "export class C { __proto__ = 1; }\n"},
 	}

@@ -15,14 +15,26 @@ func TestNoUselessCatchReportsBareRethrows(test *testing.T) {
 		wantId string
 	}{
 		{"plain rethrow", `try { foo(); } catch (err) { throw err; }`, "unnecessaryCatch"},
-		{"rethrow with a finally", `try { foo(); } catch (err) { throw err; } finally { cleanUp(); }`, "unnecessaryCatchClause"},
+		{
+			"rethrow with a finally",
+			`try { foo(); } catch (err) { throw err; } finally { cleanUp(); }`,
+			"unnecessaryCatchClause",
+		},
 		{"comment before the rethrow", `try { foo(); } catch (err) { /* comment */ throw err; }`, "unnecessaryCatch"},
 		{"typed catch binding", `try { foo(); } catch (err: unknown) { throw err; }`, "unnecessaryCatch"},
 		{"parenthesized rethrow", `try { foo(); } catch (err) { throw (err); }`, "unnecessaryCatch"},
 		{"non-null assertion is erased", `try { foo(); } catch (err) { throw err!; }`, "unnecessaryCatch"},
 		{"as expression is erased", `try { foo(); } catch (err) { throw err as Error; }`, "unnecessaryCatch"},
-		{"statements after the rethrow are unreachable", `try { foo(); } catch (err) { throw err; unreachable(); }`, "unnecessaryCatch"},
-		{"nested inside another try", `try { try { foo(); } catch (err) { throw err; } } catch (outer) { log(outer); }`, "unnecessaryCatch"},
+		{
+			"statements after the rethrow are unreachable",
+			`try { foo(); } catch (err) { throw err; unreachable(); }`,
+			"unnecessaryCatch",
+		},
+		{
+			"nested inside another try",
+			`try { try { foo(); } catch (err) { throw err; } } catch (outer) { log(outer); }`,
+			"unnecessaryCatch",
+		},
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()

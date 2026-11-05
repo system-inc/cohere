@@ -46,7 +46,10 @@ func TestNoDuplicateEnumValuesStaysSilent(test *testing.T) {
 	for index, sourceText := range cases {
 		test.Run(fmt.Sprintf("upstream pass %d", index), func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.Run(test, NoDuplicateEnumValues, duplicateEnumValuesFile, sourceText))
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.Run(test, NoDuplicateEnumValues, duplicateEnumValuesFile, sourceText),
+			)
 		})
 	}
 }
@@ -61,7 +64,10 @@ func TestNoDuplicateEnumValuesFires(test *testing.T) {
 		{"\n            enum E {\n              A = 1,\n              B = 1,\n            }\n        ", 1},
 		{"\n            enum E {\n              A = 0x10,\n              B = 16,\n            }\n        ", 1},
 		{"\n            enum E {\n              A = 'A',\n              B = 'A',\n            }\n        ", 1},
-		{"\n            enum E {\n              A = 'A',\n              B = 'A',\n              C = 1,\n              D = 1,\n            }\n        ", 2},
+		{
+			"\n            enum E {\n              A = 'A',\n              B = 'A',\n              C = 1,\n              D = 1,\n            }\n        ",
+			2,
+		},
 	}
 	for index, testCase := range cases {
 		test.Run(fmt.Sprintf("upstream fail %d", index), func(test *testing.T) {
@@ -70,7 +76,11 @@ func TestNoDuplicateEnumValuesFires(test *testing.T) {
 			for i := range wantIds {
 				wantIds[i] = "noDuplicateEnumValues"
 			}
-			rule_testing.ExpectFindings(test, rule_testing.Run(test, NoDuplicateEnumValues, duplicateEnumValuesFile, testCase.sourceText), wantIds...)
+			rule_testing.ExpectFindings(
+				test,
+				rule_testing.Run(test, NoDuplicateEnumValues, duplicateEnumValuesFile, testCase.sourceText),
+				wantIds...,
+			)
 		})
 	}
 }
@@ -95,11 +105,21 @@ func TestNoDuplicateEnumValuesReportsOncePerExtraCopy(test *testing.T) {
 		"noDuplicateEnumValues", "noDuplicateEnumValues")
 
 	rule_testing.ExpectFindings(test,
-		rule_testing.Run(test, NoDuplicateEnumValues, duplicateEnumValuesFile, "enum E { A = 1, B = 1, C = 1, D = 1 }\n"),
+		rule_testing.Run(
+			test,
+			NoDuplicateEnumValues,
+			duplicateEnumValuesFile,
+			"enum E { A = 1, B = 1, C = 1, D = 1 }\n",
+		),
 		"noDuplicateEnumValues", "noDuplicateEnumValues", "noDuplicateEnumValues")
 
 	rule_testing.ExpectFindings(test,
-		rule_testing.Run(test, NoDuplicateEnumValues, duplicateEnumValuesFile, "enum E { A = 'x', B = 'x', C = 'x' }\n"),
+		rule_testing.Run(
+			test,
+			NoDuplicateEnumValues,
+			duplicateEnumValuesFile,
+			"enum E { A = 'x', B = 'x', C = 'x' }\n",
+		),
 		"noDuplicateEnumValues", "noDuplicateEnumValues")
 }
 
@@ -144,7 +164,8 @@ func TestNoDuplicateEnumValuesAnchorsNumbersAtTheFirstAndStringsAtThePrevious(te
 	numericResult := rule_testing.Run(test, NoDuplicateEnumValues, duplicateEnumValuesFile, numeric)
 	rule_testing.ExpectFindings(test, numericResult, "noDuplicateEnumValues", "noDuplicateEnumValues")
 	// Both findings anchor on `A`'s initializer. Line two starts at 9 and its `1` sits at 15.
-	if first, second := numericResult.Diagnostics[0].Range.Pos(), numericResult.Diagnostics[1].Range.Pos(); first != 15 || second != 15 {
+	if first, second := numericResult.Diagnostics[0].Range.Pos(), numericResult.Diagnostics[1].Range.Pos(); first != 15 ||
+		second != 15 {
 		test.Fatalf("expected both numeric findings anchored at offset 15, got %d and %d", first, second)
 	}
 

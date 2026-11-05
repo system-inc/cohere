@@ -300,7 +300,10 @@ var StaticPropertyPlacement = rule.Rule{
 				if !named {
 					return
 				}
-				if !staticPropertyPlacementReceiverIsReactClass(ruleContext, target.AsPropertyAccessExpression().Expression) {
+				if !staticPropertyPlacementReceiverIsReactClass(
+					ruleContext,
+					target.AsPropertyAccessExpression().Expression,
+				) {
 					return
 				}
 				// An assignment is never `static`, and upstream passes `node.static` as undefined

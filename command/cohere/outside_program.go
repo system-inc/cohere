@@ -38,7 +38,10 @@ func errNamedPathsOutsideProgram(location projectLocation, names []string) error
 func explainNamedPathsOutsideProgram(location projectLocation, names []string) string {
 	sentences := make([]string, 0, len(names))
 	configurationName := location.ConfigFileName
-	if relative, relativePathError := filepath.Rel(location.Root, configurationName); relativePathError == nil && !strings.HasPrefix(relative, "..") {
+	if relative, relativePathError := filepath.Rel(
+		location.Root,
+		configurationName,
+	); relativePathError == nil && !strings.HasPrefix(relative, "..") {
 		configurationName = relative
 	}
 

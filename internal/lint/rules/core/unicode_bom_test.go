@@ -56,7 +56,13 @@ func TestUnicodeBomFires(test *testing.T) {
 		wantFixed  string
 	}{
 		{"an unmarked file under always", "var a = 123;", "\"always\"", "expected", "\ufeffvar a = 123;"},
-		{"an unmarked file opening with a comment under always", " // here's a comment \nvar a = 123;", "\"always\"", "expected", "\ufeff // here's a comment \nvar a = 123;"},
+		{
+			"an unmarked file opening with a comment under always",
+			" // here's a comment \nvar a = 123;",
+			"\"always\"",
+			"expected",
+			"\ufeff // here's a comment \nvar a = 123;",
+		},
 		// Upstream writes this case with no options at all, which is the default-`never` path and
 		// the one the live config produces. It is the case a zero-valued options struct gets wrong.
 		{"a marked file with no options at all", "\ufeff var a = 123;", "", "unexpected", " var a = 123;"},
@@ -147,7 +153,10 @@ func TestUnicodeBomMessages(test *testing.T) {
 	if messageUnicodeBomUnexpected.Id != "unexpected" {
 		test.Fatalf("expected id %q, got %q", "unexpected", messageUnicodeBomUnexpected.Id)
 	}
-	if !strings.HasPrefix(messageUnicodeBomExpected.Description, "This file is configured to start with a byte order mark and does not.") {
+	if !strings.HasPrefix(
+		messageUnicodeBomExpected.Description,
+		"This file is configured to start with a byte order mark and does not.",
+	) {
 		test.Fatalf("the expected-arm description was reworded: %q", messageUnicodeBomExpected.Description)
 	}
 	if !strings.HasPrefix(messageUnicodeBomUnexpected.Description, "This file starts with a byte order mark.") {
@@ -217,7 +226,9 @@ func TestDecodeUnicodeBomOptions(test *testing.T) {
 		// Upstream's own spelling is `["always"]`. cohere strips the tuple, so an array arriving
 		// here means the config layer's contract changed, and that should fail loudly rather than
 		// quietly enforcing the default.
-		if _, decodeUnicodeBomOptionsError := DecodeUnicodeBomOptions(json.RawMessage(`["always"]`)); decodeUnicodeBomOptionsError == nil {
+		if _, decodeUnicodeBomOptionsError := DecodeUnicodeBomOptions(
+			json.RawMessage(`["always"]`),
+		); decodeUnicodeBomOptionsError == nil {
 			test.Fatalf("expected an array to be refused")
 		}
 	})
@@ -295,13 +306,21 @@ func TestUnicodeBomCannotSeeAMarkThroughTheRealReadPath(test *testing.T) {
 	middle := filepath.Join(directory, "Middle.ts")
 
 	markBytes := []byte{0xef, 0xbb, 0xbf}
-	if writeError := os.WriteFile(marked, append(append([]byte{}, markBytes...), []byte("export const a = 1;\n")...), 0o644); writeError != nil {
+	if writeError := os.WriteFile(
+		marked,
+		append(append([]byte{}, markBytes...), []byte("export const a = 1;\n")...),
+		0o644,
+	); writeError != nil {
 		test.Fatal(writeError)
 	}
 	if writeError := os.WriteFile(unmarked, []byte("export const b = 2;\n"), 0o644); writeError != nil {
 		test.Fatal(writeError)
 	}
-	if writeError := os.WriteFile(middle, append([]byte("export const c = 3;"), append(append([]byte{}, markBytes...), '\n')...), 0o644); writeError != nil {
+	if writeError := os.WriteFile(
+		middle,
+		append([]byte("export const c = 3;"), append(append([]byte{}, markBytes...), '\n')...),
+		0o644,
+	); writeError != nil {
 		test.Fatal(writeError)
 	}
 
@@ -321,7 +340,10 @@ func TestUnicodeBomCannotSeeAMarkThroughTheRealReadPath(test *testing.T) {
 
 	// The controls. Without these, the assertion above is satisfied by any broken read at all.
 	if got := read(unmarked); got != "export const b = 2;\n" {
-		test.Fatalf("the unmarked control came back changed, so the probe above is not measuring what it claims: %q", got)
+		test.Fatalf(
+			"the unmarked control came back changed, so the probe above is not measuring what it claims: %q",
+			got,
+		)
 	}
 	if got := read(middle); !strings.Contains(got, unicodeBomMark) {
 		test.Fatalf("a mark in the MIDDLE of a file was stripped too, so the removal is not specific to "+

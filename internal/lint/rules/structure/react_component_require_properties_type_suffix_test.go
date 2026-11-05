@@ -443,8 +443,11 @@ func TestReactComponentRequirePropertiesTypeSuffixStillFixesOurOwnTypeBesideDepe
 // Without a checker no declaration can be established, so no rename is offered.
 func TestReactComponentRequirePropertiesTypeSuffixWithoutACheckerIsSilent(test *testing.T) {
 	test.Parallel()
-	rule_testing.ExpectClean(test, rule_testing.Run(test, ReactComponentRequirePropertiesTypeSuffix, "/repository/app/x/page.tsx",
-		"export default function Page(properties: PageProps<'/x'>) { return null; }"))
+	rule_testing.ExpectClean(
+		test,
+		rule_testing.Run(test, ReactComponentRequirePropertiesTypeSuffix, "/repository/app/x/page.tsx",
+			"export default function Page(properties: PageProps<'/x'>) { return null; }"),
+	)
 }
 
 // Missing generated types are compiler errors, not names this rule may invent.
@@ -455,11 +458,29 @@ func TestReactComponentRequirePropertiesTypeSuffixRequiresADeclaration(test *tes
 		findings                        int
 	}{
 		{name: "unresolved global", source: "export function Page(properties: PageProps) { return null; }"},
-		{name: "unresolved import", source: "import type { PageProps } from './missing'; export function Page(properties: PageProps) { return null; }"},
-		{name: "unresolved qualified name", source: "export function Page(properties: Missing.PageProps) { return null; }"},
-		{name: "unresolved name must not collect a different declaration", source: "export function Page(properties: PageProps) { return null; } function helper() { interface PageProps { label: string } }"},
-		{name: "our declaration", source: "interface PageProps { label: string } export function Page(properties: PageProps) { return null; }", fixed: "interface PageProperties { label: string } export function Page(properties: PageProperties) { return null; }", findings: 2},
-		{name: "dependency declaration", source: "export function Page(properties: PageProps) { return null; }", dependency: "interface PageProps { label: string }"},
+		{
+			name:   "unresolved import",
+			source: "import type { PageProps } from './missing'; export function Page(properties: PageProps) { return null; }",
+		},
+		{
+			name:   "unresolved qualified name",
+			source: "export function Page(properties: Missing.PageProps) { return null; }",
+		},
+		{
+			name:   "unresolved name must not collect a different declaration",
+			source: "export function Page(properties: PageProps) { return null; } function helper() { interface PageProps { label: string } }",
+		},
+		{
+			name:     "our declaration",
+			source:   "interface PageProps { label: string } export function Page(properties: PageProps) { return null; }",
+			fixed:    "interface PageProperties { label: string } export function Page(properties: PageProperties) { return null; }",
+			findings: 2,
+		},
+		{
+			name:       "dependency declaration",
+			source:     "export function Page(properties: PageProps) { return null; }",
+			dependency: "interface PageProps { label: string }",
+		},
 	}
 	for _, tc := range cases {
 		test.Run(tc.name, func(test *testing.T) {

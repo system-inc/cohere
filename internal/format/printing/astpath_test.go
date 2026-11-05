@@ -25,7 +25,14 @@ func TestFindAncestorAgreesWithAncestors(test *testing.T) {
 			expected, expectedFound := searchAncestors(path, predicate)
 			actual, actualFound := path.FindAncestor(predicate)
 			if actual != expected || actualFound != expectedFound {
-				test.Fatalf("%s: FindAncestor found %v (%t), a search of Ancestors %v (%t)", name, actual, actualFound, expected, expectedFound)
+				test.Fatalf(
+					"%s: FindAncestor found %v (%t), a search of Ancestors %v (%t)",
+					name,
+					actual,
+					actualFound,
+					expected,
+					expectedFound,
+				)
 			}
 			if expectedFound {
 				matched[name]++
@@ -46,7 +53,11 @@ func TestFindAncestorAgreesWithAncestors(test *testing.T) {
 	}
 
 	if matched["list"] == 0 || matched["program"] == 0 || matched["none"] != 0 {
-		test.Fatalf("over %d nodes the predicates matched %v; the walk did not reach both a match and none", checked, matched)
+		test.Fatalf(
+			"over %d nodes the predicates matched %v; the walk did not reach both a match and none",
+			checked,
+			matched,
+		)
 	}
 }
 

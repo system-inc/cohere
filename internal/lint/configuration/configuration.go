@@ -492,7 +492,11 @@ func loadLayers(layers []configLayer, root string, registeredNames []string) (*C
 				delete(loaded.OffReasons, name)
 			// Go whitespace: a reason in cohere's own lint config, which no JavaScript tool reads.
 			case strings.TrimSpace(layer.raw.Reasons[name]) != "":
-				loaded.OffReasons[name] = OffReason{File: layer.path, Reason: strings.TrimSpace(layer.raw.Reasons[name])} // Go whitespace: a reason in cohere's own lint config, which no JavaScript tool reads.
+				loaded.OffReasons[name] = OffReason{
+					File: layer.path,
+					// Go whitespace: a reason in cohere's own lint config, which no JavaScript tool reads.
+					Reason: strings.TrimSpace(layer.raw.Reasons[name]),
+				}
 			case departed[name]:
 				loaded.OffReasons[name] = OffReason{File: layer.path, Reason: loaded.Departures[name].Reason}
 			case isInherited && inheritedIsReasoned:
@@ -514,16 +518,23 @@ func loadLayers(layers []configLayer, root string, registeredNames []string) (*C
 
 		for overrideIndex, rawOverride := range layer.raw.Overrides {
 			override := Override{
-				Files:  rawOverride.Files,
-				Rules:  map[string]RuleSetting{},
-				Reason: strings.TrimSpace(rawOverride.Reason), // Go whitespace: a reason in cohere's own lint config, which no JavaScript tool reads.
+				Files: rawOverride.Files,
+				Rules: map[string]RuleSetting{},
+				// Go whitespace: a reason in cohere's own lint config, which no JavaScript tool reads.
+				Reason: strings.TrimSpace(rawOverride.Reason),
 				File:   layer.path,
 			}
 			coversEverything := coversEveryFileOfItsKind(rawOverride.Files)
 			for name, value := range rawOverride.Rules {
 				setting, parseRuleSettingError := parseRuleSetting(value)
 				if parseRuleSettingError != nil {
-					return nil, fmt.Errorf("override %d, rule %q in %s: %w", overrideIndex, name, layer.path, parseRuleSettingError)
+					return nil, fmt.Errorf(
+						"override %d, rule %q in %s: %w",
+						overrideIndex,
+						name,
+						layer.path,
+						parseRuleSettingError,
+					)
 				}
 				override.Rules[name] = setting
 
@@ -572,7 +583,11 @@ func loadLayers(layers []configLayer, root string, registeredNames []string) (*C
 		}
 	}
 
-	if refuseUnreasonedOffsError := refuseUnreasonedOffs(loaded, writtenBy, inOurTiers); refuseUnreasonedOffsError != nil {
+	if refuseUnreasonedOffsError := refuseUnreasonedOffs(
+		loaded,
+		writtenBy,
+		inOurTiers,
+	); refuseUnreasonedOffsError != nil {
 		return nil, refuseUnreasonedOffsError
 	}
 
@@ -717,7 +732,11 @@ func readConfigLayers(path string, chain []string) ([]configLayer, error) {
 		base := extended
 		if !IsSet(base) {
 			if IsSet(absolute) {
-				return nil, fmt.Errorf("rule set %s extends %s, which is a path: a set may extend only other sets", absolute, extended)
+				return nil, fmt.Errorf(
+					"rule set %s extends %s, which is a path: a set may extend only other sets",
+					absolute,
+					extended,
+				)
 			}
 			if !filepath.IsAbs(base) {
 				base = filepath.Join(filepath.Dir(absolute), base)
@@ -767,7 +786,11 @@ func ancestorsByLayer(layers []configLayer) map[string]map[string]bool {
 // The same key is always the same ruling. A different spelling is the same ruling when the two keys
 // reach a registered rule in common (see sameRuling), so a project cannot step around a house ruling
 // by spelling the key differently. Without registered names only the same key matches.
-func inheritedRuleSetting(rules map[string]RuleSetting, name string, reach *ruleReach) (string, RuleSetting, bool, bool) {
+func inheritedRuleSetting(
+	rules map[string]RuleSetting,
+	name string,
+	reach *ruleReach,
+) (string, RuleSetting, bool, bool) {
 	if setting, found := rules[name]; found {
 		return name, setting, true, true
 	}
@@ -1139,7 +1162,10 @@ func parseRuleSetting(value json.RawMessage) (RuleSetting, error) {
 
 	var tuple []json.RawMessage
 	if decodeError := json.Unmarshal(value, &tuple); decodeError != nil {
-		return RuleSetting{}, fmt.Errorf("expected a severity string or a [severity, ...options] array, got %s", truncate(string(value)))
+		return RuleSetting{}, fmt.Errorf(
+			"expected a severity string or a [severity, ...options] array, got %s",
+			truncate(string(value)),
+		)
 	}
 	if len(tuple) == 0 {
 		return RuleSetting{}, fmt.Errorf("empty rule configuration array")

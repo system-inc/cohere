@@ -11,32 +11,50 @@ import (
 
 // messageHookResultNamingGenericText is the rule's `hookResultNamingGeneric` message, whose wording
 // lives in `policy/messages/react-hook-require-result-naming.json`.
-var messageHookResultNamingGenericText = policy.MessageOf("structure/react-hook-require-result-naming", "hookResultNamingGeneric")
+var messageHookResultNamingGenericText = policy.MessageOf(
+	"structure/react-hook-require-result-naming",
+	"hookResultNamingGeneric",
+)
 
 // messageHookResultNamingGeneric is the finding, rendered when it is reported so the text comes
 // from the current catalog.
 func messageHookResultNamingGeneric() rule.Message {
-	return rule.Message{Id: messageHookResultNamingGenericText.Id, Description: messageHookResultNamingGenericText.Render(nil)}
+	return rule.Message{
+		Id:          messageHookResultNamingGenericText.Id,
+		Description: messageHookResultNamingGenericText.Render(nil),
+	}
 }
 
 // messageHookResultNamingBadSuffixText is the rule's `hookResultNamingBadSuffix` message, whose
 // wording lives in `policy/messages/react-hook-require-result-naming.json`.
-var messageHookResultNamingBadSuffixText = policy.MessageOf("structure/react-hook-require-result-naming", "hookResultNamingBadSuffix")
+var messageHookResultNamingBadSuffixText = policy.MessageOf(
+	"structure/react-hook-require-result-naming",
+	"hookResultNamingBadSuffix",
+)
 
 // messageHookResultNamingBadSuffix is the finding, rendered when it is reported so the text comes
 // from the current catalog.
 func messageHookResultNamingBadSuffix() rule.Message {
-	return rule.Message{Id: messageHookResultNamingBadSuffixText.Id, Description: messageHookResultNamingBadSuffixText.Render(nil)}
+	return rule.Message{
+		Id:          messageHookResultNamingBadSuffixText.Id,
+		Description: messageHookResultNamingBadSuffixText.Render(nil),
+	}
 }
 
 // messageHookResultNamingMismatchText is the rule's `hookResultNamingMismatch` message, whose
 // wording lives in `policy/messages/react-hook-require-result-naming.json`.
-var messageHookResultNamingMismatchText = policy.MessageOf("structure/react-hook-require-result-naming", "hookResultNamingMismatch")
+var messageHookResultNamingMismatchText = policy.MessageOf(
+	"structure/react-hook-require-result-naming",
+	"hookResultNamingMismatch",
+)
 
 // messageHookResultNamingMismatch is the finding, rendered when it is reported so the text comes
 // from the current catalog.
 func messageHookResultNamingMismatch() rule.Message {
-	return rule.Message{Id: messageHookResultNamingMismatchText.Id, Description: messageHookResultNamingMismatchText.Render(nil)}
+	return rule.Message{
+		Id:          messageHookResultNamingMismatchText.Id,
+		Description: messageHookResultNamingMismatchText.Render(nil),
+	}
 }
 
 // emptySuffixes are the endings that describe a variable rather than its contents.

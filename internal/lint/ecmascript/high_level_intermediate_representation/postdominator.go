@@ -8,10 +8,10 @@
 //
 // `controlflow` has both pieces and neither is reachable. `AnalyzeDominators` is generic over
 // `control_flow_graph.Graph[E]` and `control_flow_graph.Block[E]`, whose `index`, `final` and `thrown` fields are
-// unexported and set only by `control_flow_graph.Build`, so a caller holding a `high_level_intermediate_representation.Function` cannot
-// construct one. `PathAnalysis.IsOnEveryFinalPath` computes semantically the right thing over the
-// right kind of graph, and is likewise only obtainable from a graph this package does not produce.
-// `ssa.go`'s header states the general form of this: nothing in that package applies to this graph
+// unexported and set only by `control_flow_graph.Build`, so a caller holding a
+// `high_level_intermediate_representation.Function` cannot construct one. `PathAnalysis.IsOnEveryFinalPath` computes
+// semantically the right thing over the right kind of graph, and is likewise only obtainable from a graph this package
+// does not produce. `ssa.go`'s header states the general form of this: nothing in that package applies to this graph
 // without a conversion that does not exist.
 //
 // It is also NOT the same question `ssa_verify.go`'s `computeDominance` answers, and the difference
@@ -121,7 +121,10 @@ type postDominanceTree struct {
 func computePostDominance(function *Function) *postDominanceTree {
 	// Successors in the reversed graph are predecessors in the forward one, and vice versa. The
 	// exit is a successor of every returning block.
-	reverseSuccessors := make(map[static_single_assignment.BlockId][]static_single_assignment.BlockId, len(function.Blocks)+1)
+	reverseSuccessors := make(
+		map[static_single_assignment.BlockId][]static_single_assignment.BlockId,
+		len(function.Blocks)+1,
+	)
 	for _, block := range function.Blocks {
 		if _, isReturn := block.Terminal.(*Return); isReturn {
 			reverseSuccessors[postDominatorExit] = append(reverseSuccessors[postDominatorExit], block.Id)
@@ -141,7 +144,9 @@ func computePostDominance(function *Function) *postDominanceTree {
 	for index := range immediate {
 		immediate[index] = -1
 	}
-	tree := &postDominanceTree{immediate: make(map[static_single_assignment.BlockId]static_single_assignment.BlockId, len(order))}
+	tree := &postDominanceTree{
+		immediate: make(map[static_single_assignment.BlockId]static_single_assignment.BlockId, len(order)),
+	}
 	if len(order) == 0 {
 		return tree
 	}
@@ -210,7 +215,10 @@ func computePostDominance(function *Function) *postDominanceTree {
 //
 // Iterative rather than recursive for the same reason `ReversePostorder` is: the depth is whatever
 // the source contains, and a linter must not be bounded by the goroutine stack.
-func reversePostorderFrom(root static_single_assignment.BlockId, successors map[static_single_assignment.BlockId][]static_single_assignment.BlockId) []static_single_assignment.BlockId {
+func reversePostorderFrom(
+	root static_single_assignment.BlockId,
+	successors map[static_single_assignment.BlockId][]static_single_assignment.BlockId,
+) []static_single_assignment.BlockId {
 	visited := make(map[static_single_assignment.BlockId]bool, len(successors))
 	postorder := make([]static_single_assignment.BlockId, 0, len(successors))
 
@@ -262,7 +270,10 @@ func reversePostorderFrom(root static_single_assignment.BlockId, successors map[
 //
 // Nil-safe: a nil function yields a predicate that answers false, which is the correct answer for a
 // function with no blocks rather than a special case.
-func ControlDominators(function *Function, isControlValue func(place Place) bool) func(block static_single_assignment.BlockId) bool {
+func ControlDominators(
+	function *Function,
+	isControlValue func(place Place) bool,
+) func(block static_single_assignment.BlockId) bool {
 	if function == nil || isControlValue == nil {
 		return func(static_single_assignment.BlockId) bool { return false }
 	}
@@ -328,7 +339,11 @@ func terminalTestSatisfies(terminal Terminal, isControlValue func(place Place) b
 // The walk covers target itself as well as its post-dominated set, because a branch immediately
 // above target is a frontier block and target does not post-dominate itself in `postDominatorsOf`'s
 // result.
-func postDominatorFrontier(function *Function, tree *postDominanceTree, target static_single_assignment.BlockId) map[static_single_assignment.BlockId]bool {
+func postDominatorFrontier(
+	function *Function,
+	tree *postDominanceTree,
+	target static_single_assignment.BlockId,
+) map[static_single_assignment.BlockId]bool {
 	postDominated := postDominatorsOf(function, tree, target)
 
 	frontier := map[static_single_assignment.BlockId]bool{}
@@ -366,7 +381,11 @@ func postDominatorFrontier(function *Function, tree *postDominanceTree, target s
 // entry in the tree reaches no return, and upstream falls back to the block itself there, which this
 // reproduces rather than skipping: the fallback makes such a block its own post-dominator, so it
 // joins the set only if it IS the target.
-func postDominatorsOf(function *Function, tree *postDominanceTree, target static_single_assignment.BlockId) map[static_single_assignment.BlockId]bool {
+func postDominatorsOf(
+	function *Function,
+	tree *postDominanceTree,
+	target static_single_assignment.BlockId,
+) map[static_single_assignment.BlockId]bool {
 	result := map[static_single_assignment.BlockId]bool{}
 	visited := map[static_single_assignment.BlockId]bool{}
 

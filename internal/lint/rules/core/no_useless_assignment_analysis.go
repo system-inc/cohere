@@ -130,7 +130,10 @@ type symbolFacts struct {
 //
 // The second result is the roots an eligible binding's occurrence runs in, by RootOf. They are the
 // only roots whose graph can hold an event, since an event is an occurrence of an eligible binding.
-func collectSymbolFacts(ruleContext rule.Context, sourceFile *ast.Node) (map[*ast.Symbol]*symbolFacts, map[*ast.Node]bool) {
+func collectSymbolFacts(
+	ruleContext rule.Context,
+	sourceFile *ast.Node,
+) (map[*ast.Symbol]*symbolFacts, map[*ast.Node]bool) {
 	var identifiers []*ast.Node
 	interesting := map[string]bool{}
 
@@ -231,7 +234,12 @@ func collectSymbolFacts(ruleContext rule.Context, sourceFile *ast.Node) (map[*as
 // machinery, because a fixed point is what those caches are approximating. The cost is bounded:
 // liveness is a monotone union over a finite symbol set, so each round either adds a bit somewhere
 // or ends, and the block count bounds the rounds.
-func analyzeRootLiveness(ruleContext rule.Context, root *ast.Node, exported map[string]bool, symbols map[*ast.Symbol]*symbolFacts) {
+func analyzeRootLiveness(
+	ruleContext rule.Context,
+	root *ast.Node,
+	exported map[string]bool,
+	symbols map[*ast.Symbol]*symbolFacts,
+) {
 	if len(symbols) == 0 {
 		return
 	}
@@ -370,7 +378,11 @@ func analyzeRootLiveness(ruleContext rule.Context, root *ast.Node, exported map[
 }
 
 // deadStoreGraph builds one root's graph with an event for each occurrence of an eligible binding.
-func deadStoreGraph(ruleContext rule.Context, root *ast.Node, symbols map[*ast.Symbol]*symbolFacts) *control_flow_graph.Graph[deadStoreEvent] {
+func deadStoreGraph(
+	ruleContext rule.Context,
+	root *ast.Node,
+	symbols map[*ast.Symbol]*symbolFacts,
+) *control_flow_graph.Graph[deadStoreEvent] {
 	return control_flow_graph.Build(root, control_flow_graph.Hooks[deadStoreEvent]{
 		Read: func(builder *control_flow_graph.Builder[deadStoreEvent], node *ast.Node) {
 			// The Read hook fires for plain write targets too, so what this occurrence is comes

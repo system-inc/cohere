@@ -101,11 +101,15 @@ func heldOutputReport(stack string, waited time.Duration) string {
 	case pipeHoldersError != nil:
 		fmt.Fprintf(&report, "the holders could not be listed: %v\n", pipeHoldersError)
 	case len(holders) == 0:
-		report.WriteString("no other process holds the other end of any pipe this process reads, so the read end was most " +
-			"likely closed out from under the poller: look for a second *os.File made on one descriptor (os.NewFile on a " +
-			"descriptor something else owns), whose finalizer closes it again after its number was reused\n")
+		report.WriteString(
+			"no other process holds the other end of any pipe this process reads, so the read end was most " +
+				"likely closed out from under the poller: look for a second *os.File made on one descriptor (os.NewFile on a " +
+				"descriptor something else owns), whose finalizer closes it again after its number was reused\n",
+		)
 	default:
-		report.WriteString("processes, other than this one's running children, holding the other end of a pipe this process reads:\n")
+		report.WriteString(
+			"processes, other than this one's running children, holding the other end of a pipe this process reads:\n",
+		)
 		for _, holder := range holders {
 			fmt.Fprintf(&report, "  %s\n", holder)
 		}
@@ -114,8 +118,8 @@ func heldOutputReport(stack string, waited time.Duration) string {
 }
 
 // pipeHolders lists, as "pid <pid> <command>: <parent, start and command line>", every process holding the
-// far end of a pipe this process has open past its standard streams, leaving out this process's own running children: a command
-// another test is still running holds its pipe as it should, and so does the lsof asking.
+// far end of a pipe this process has open past its standard streams, leaving out this process's own running children: a
+// command another test is still running holds its pipe as it should, and so does the lsof asking.
 func pipeHolders() ([]string, error) {
 	own, err := exec.Command("lsof", "-n", "-P", "-F", "pftdn", "-p", strconv.Itoa(os.Getpid())).Output()
 	if err != nil {
@@ -152,7 +156,10 @@ func pipeHolders() ([]string, error) {
 		if fields := strings.Fields(string(started)); len(fields) == 0 || fields[0] == self {
 			continue
 		}
-		holders = append(holders, fmt.Sprintf("pid %s %s: %s", open.pid, open.command, strings.TrimSpace(string(started))))
+		holders = append(
+			holders,
+			fmt.Sprintf("pid %s %s: %s", open.pid, open.command, strings.TrimSpace(string(started))),
+		)
 	}
 	return holders, nil
 }

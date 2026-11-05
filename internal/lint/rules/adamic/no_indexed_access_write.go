@@ -91,14 +91,22 @@ func readsIndexedAccess(typeChecker *checker.Checker, node *ast.Node, target *ch
 		receiver = property.Expression
 	case ast.KindElementAccessExpression:
 		element := unwrapped.AsElementAccessExpression()
-		if !checker.Checker_isTypeIdenticalTo(typeChecker, typeChecker.GetTypeAtLocation(element.ArgumentExpression), access.IndexType()) {
+		if !checker.Checker_isTypeIdenticalTo(
+			typeChecker,
+			typeChecker.GetTypeAtLocation(element.ArgumentExpression),
+			access.IndexType(),
+		) {
 			return false
 		}
 		receiver = element.Expression
 	default:
 		return false
 	}
-	return checker.Checker_isTypeIdenticalTo(typeChecker, typeChecker.GetTypeAtLocation(receiver), access.ObjectType()) ||
+	return checker.Checker_isTypeIdenticalTo(
+		typeChecker,
+		typeChecker.GetTypeAtLocation(receiver),
+		access.ObjectType(),
+	) ||
 		readsIndexedAccess(typeChecker, receiver, access.ObjectType())
 }
 
@@ -156,7 +164,8 @@ func returnsIndexedAccess(typeChecker *checker.Checker, source, target *checker.
 		}
 		own := typeChecker.GetTypeAtLocation(expression)
 		return own != nil && (own.Flags()&checker.TypeFlagsNever != 0 ||
-			checker.Checker_isTypeIdenticalTo(typeChecker, own, target) || readsIndexedAccess(typeChecker, expression, target))
+			checker.Checker_isTypeIdenticalTo(typeChecker, own, target) ||
+			readsIndexedAccess(typeChecker, expression, target))
 	}
 	// An expression-bodied arrow has exactly one return: its body expression.
 	if !ast.IsBlock(declaration.Body()) {

@@ -47,7 +47,15 @@ func buildFixture(test *testing.T) (*program.Graph, string) {
 }
 
 // planFor builds a plan against a position in the fixture, named the way the command line names one.
-func planFor(test *testing.T, graph *program.Graph, root string, relative string, line int, column int, newName string) *Plan {
+func planFor(
+	test *testing.T,
+	graph *program.Graph,
+	root string,
+	relative string,
+	line int,
+	column int,
+	newName string,
+) *Plan {
 	test.Helper()
 	plan, buildError := Build(context.Background(), graph, Position{
 		FileName: filepath.Join(root, relative),
@@ -144,10 +152,17 @@ func TestRenameExpandsShorthandRatherThanReplacingIt(test *testing.T) {
 		}
 	}
 	if expansion == nil {
-		test.Fatalf("no shorthand expansion in the plan, so `{ punned }` would be left binding to a name that no longer exists.\n%s", describeEdits(plan, root))
+		test.Fatalf(
+			"no shorthand expansion in the plan, so `{ punned }` would be left binding to a name that no longer exists.\n%s",
+			describeEdits(plan, root),
+		)
 	}
 	if expansion.Text != "punned: renamedValue" {
-		test.Fatalf("the shorthand writes %q, want %q — the collapsed form silently rewrites the object's contract", expansion.Text, "punned: renamedValue")
+		test.Fatalf(
+			"the shorthand writes %q, want %q — the collapsed form silently rewrites the object's contract",
+			expansion.Text,
+			"punned: renamedValue",
+		)
 	}
 }
 
@@ -162,7 +177,10 @@ func TestRenameDeclinesAShadowedBinding(test *testing.T) {
 
 	for _, edit := range plan.Edits {
 		if strings.HasSuffix(edit.FileName, "consumer.ts") && (edit.Line == 6 || edit.Line == 7) {
-			test.Fatalf("the rename captured the shadowed inner binding at line %d, which is a different symbol", edit.Line)
+			test.Fatalf(
+				"the rename captured the shadowed inner binding at line %d, which is a different symbol",
+				edit.Line,
+			)
 		}
 	}
 }
@@ -178,7 +196,11 @@ func TestRenameOfTheShadowedBindingTouchesOnlyItsOwnScope(test *testing.T) {
 		test.Fatalf("the plan was refused, which it must not be: %v", plan.Refusals)
 	}
 	if len(plan.Edits) != 2 {
-		test.Fatalf("the inner rename produced %d edits, want 2 (its declaration and its one use).\n%s", len(plan.Edits), describeEdits(plan, root))
+		test.Fatalf(
+			"the inner rename produced %d edits, want 2 (its declaration and its one use).\n%s",
+			len(plan.Edits),
+			describeEdits(plan, root),
+		)
 	}
 	for _, edit := range plan.Edits {
 		if edit.Line != 6 && edit.Line != 7 {
@@ -199,7 +221,10 @@ func TestRenameRefusesADeclarationOutsideTheProject(test *testing.T) {
 	plan := planFor(test, graph, root, "src/consumer.ts", 22, 18, "toUpper")
 
 	if len(plan.Refusals) == 0 {
-		test.Fatalf("renaming a declaration outside the project was allowed, which would break every other consumer of that package.\n%s", describeEdits(plan, root))
+		test.Fatalf(
+			"renaming a declaration outside the project was allowed, which would break every other consumer of that package.\n%s",
+			describeEdits(plan, root),
+		)
 	}
 	if !strings.Contains(plan.Refusals[0], "declared outside this project") {
 		test.Fatalf("the refusal does not name the cause: %q", plan.Refusals[0])
@@ -219,7 +244,9 @@ func TestRenameRefusesACollision(test *testing.T) {
 	plan := planFor(test, graph, root, "src/origin.ts", 5, 14, "err")
 
 	if len(plan.Refusals) == 0 {
-		test.Fatalf("renaming into a name that is already declared was allowed, which produces a duplicate binding or a silent shadow")
+		test.Fatalf(
+			"renaming into a name that is already declared was allowed, which produces a duplicate binding or a silent shadow",
+		)
 	}
 	if !strings.Contains(plan.Refusals[0], "already declared") {
 		test.Fatalf("the refusal does not name the cause: %q", plan.Refusals[0])
@@ -237,7 +264,9 @@ func TestRenameReportsWhatItCouldNotSee(test *testing.T) {
 	plan := planFor(test, graph, root, "src/origin.ts", 1, 17, "reportError")
 
 	if len(plan.Blind) == 0 {
-		test.Fatalf("the plan reported no blind spots, but the fixture holds `table['err']`, which the checker cannot see")
+		test.Fatalf(
+			"the plan reported no blind spots, but the fixture holds `table['err']`, which the checker cannot see",
+		)
 	}
 	found := false
 	for _, blind := range plan.Blind {
@@ -284,10 +313,17 @@ func TestBareNameRefusesWhenAmbiguous(test *testing.T) {
 		test.Fatalf("resolving the bare name: %v", resolveBareNameError)
 	}
 	if len(symbols) < 2 {
-		test.Fatalf("`err` resolved to %d symbols, want at least 2 — the fixture declares it more than once, so a single answer means the search is not seeing them all", len(symbols))
+		test.Fatalf(
+			"`err` resolved to %d symbols, want at least 2 — the fixture declares it more than once, so a single answer means the search is not seeing them all",
+			len(symbols),
+		)
 	}
 	if len(candidates) != len(symbols) {
-		test.Fatalf("%d candidates against %d symbols, and the two must correspond one for one", len(candidates), len(symbols))
+		test.Fatalf(
+			"%d candidates against %d symbols, and the two must correspond one for one",
+			len(candidates),
+			len(symbols),
+		)
 	}
 }
 
@@ -361,7 +397,10 @@ func TestApplyProducesATreeThatStillTypechecks(test *testing.T) {
 	// The baseline has to be clean, or "still typechecks" afterwards proves nothing. A fixture that
 	// was already broken would satisfy this test with a rename that broke it further.
 	if before := len(typeDiagnostics(test, graph)); before != 0 {
-		test.Fatalf("the fixture does not typecheck before the rename (%d diagnostics), so this test cannot measure anything", before)
+		test.Fatalf(
+			"the fixture does not typecheck before the rename (%d diagnostics), so this test cannot measure anything",
+			before,
+		)
 	}
 
 	plan, err := Build(context.Background(), graph, Position{
@@ -636,7 +675,11 @@ func TestRenamingFromAnImportSiteRenamesTheExport(test *testing.T) {
 		test.Fatalf("renaming from an import site was refused: %v", fromImport.Refusals)
 	}
 	if got, want := describeEdits(fromImport, root), describeEdits(fromDeclaration, root); got != want {
-		test.Fatalf("anchoring on the import produced a different plan than anchoring on the declaration.\ngot:\n%s\n\nwant:\n%s", got, want)
+		test.Fatalf(
+			"anchoring on the import produced a different plan than anchoring on the declaration.\ngot:\n%s\n\nwant:\n%s",
+			got,
+			want,
+		)
 	}
 	if fromImport.OldName != "err" {
 		test.Fatalf("the import anchor resolved to %q, want `err`", fromImport.OldName)
@@ -675,6 +718,9 @@ func TestPositionResolvesTheIdentifierUnderTheCursor(test *testing.T) {
 		test.Fatalf("resolving the inner identifier: %v", buildError)
 	}
 	if plan.OldName != "toUpperCase" {
-		test.Fatalf("the position resolved to %q, want `toUpperCase` — a column selects the identifier it points at", plan.OldName)
+		test.Fatalf(
+			"the position resolved to %q, want `toUpperCase` — a column selects the identifier it points at",
+			plan.OldName,
+		)
 	}
 }

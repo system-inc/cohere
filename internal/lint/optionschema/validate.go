@@ -217,7 +217,10 @@ func (compiler *compiler) compile(value any, pointer string) (*node, error) {
 		for _, definitions := range []string{"$defs", "definitions"} {
 			if entries, isObject := typed[definitions].(map[string]any); isObject {
 				for name, entry := range entries {
-					if _, compileError := compiler.compile(entry, pointer+"/"+definitions+"/"+escapePointer(name)); compileError != nil {
+					if _, compileError := compiler.compile(
+						entry,
+						pointer+"/"+definitions+"/"+escapePointer(name),
+					); compileError != nil {
 						return nil, compileError
 					}
 				}
@@ -290,7 +293,10 @@ func (compiler *compiler) keyword(compiled *node, key string, value any, pointer
 		}
 		compiled.properties = make(map[string]*node, len(entries))
 		for name, entry := range entries {
-			if compiled.properties[name], err = compiler.compile(entry, pointer+"/properties/"+escapePointer(name)); err != nil {
+			if compiled.properties[name], err = compiler.compile(
+				entry,
+				pointer+"/properties/"+escapePointer(name),
+			); err != nil {
 				return err
 			}
 		}
@@ -313,7 +319,10 @@ func (compiler *compiler) keyword(compiled *node, key string, value any, pointer
 			if compileErr != nil {
 				return compileErr
 			}
-			compiled.patternProperties = append(compiled.patternProperties, patternProperty{source: source, pattern: pattern, schema: schema})
+			compiled.patternProperties = append(
+				compiled.patternProperties,
+				patternProperty{source: source, pattern: pattern, schema: schema},
+			)
 		}
 	case "additionalProperties":
 		if allowed, isBool := value.(bool); isBool {

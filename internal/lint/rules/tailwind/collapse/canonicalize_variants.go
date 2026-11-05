@@ -48,7 +48,8 @@ func (canonicalizer *Canonicalizer) modernizeOne(
 	// Forward a modifier from `has`, `not` or `in` to the variant it wraps, when that variant can carry
 	// one. Upstream tests `'modifier' in variant.variant`, which holds for a functional or compound
 	// variant and not for a static or arbitrary one.
-	if variant.Kind == ParsedVariantKindCompound && (variant.Root == "has" || variant.Root == "not" || variant.Root == "in") {
+	if variant.Kind == ParsedVariantKindCompound &&
+		(variant.Root == "has" || variant.Root == "not" || variant.Root == "in") {
 		if variant.Modifier != nil && variant.Variant != nil &&
 			(variant.Variant.Kind == ParsedVariantKindFunctional || variant.Variant.Kind == ParsedVariantKindCompound) {
 			variant.Variant.Modifier = variant.Modifier
@@ -86,7 +87,11 @@ func (canonicalizer *Canonicalizer) modernizeOne(
 	}
 
 	// `[&>*]` is `*`, and `[&_*]` is `**`. Only at the top, so `has-[&>*]` is left to another pass.
-	if topLevel && len(ast) == 3 && isNesting(ast[0]) && ast[2].Kind == SelectorNodeKindSelector && ast[2].Value == "*" {
+	if topLevel &&
+		len(ast) == 3 &&
+		isNesting(ast[0]) &&
+		ast[2].Kind == SelectorNodeKindSelector &&
+		ast[2].Value == "*" {
 		if isCombinator(ast[1], ">") {
 			replaceWith("*")
 			return nil, false
@@ -108,7 +113,11 @@ func (canonicalizer *Canonicalizer) modernizeOne(
 
 	// A selector ending in ` &` is an `in-*` variant: `[[data-visible]_&]` is `in-[[data-visible]]`,
 	// which the walk then reaches as a compound and modernizes further.
-	if topLevel && len(ast) == 3 && ast[0].Kind == SelectorNodeKindSelector && isCombinator(ast[1], " ") && isNesting(ast[2]) {
+	if topLevel &&
+		len(ast) == 3 &&
+		ast[0].Kind == SelectorNodeKindSelector &&
+		isCombinator(ast[1], " ") &&
+		isNesting(ast[2]) {
 		replaceWith("in-[" + SelectorToCss(ast[:1], true) + "]")
 		return nil, false
 	}
@@ -151,7 +160,8 @@ func (canonicalizer *Canonicalizer) modernizeOne(
 	}
 
 	switch {
-	case (target.Kind == SelectorNodeKindFunction || target.Kind == SelectorNodeKindSelector) && startsWithColon(target.Value):
+	case (target.Kind == SelectorNodeKindFunction || target.Kind == SelectorNodeKindSelector) &&
+		startsWithColon(target.Value):
 		targetNode := target
 		compoundNot := false
 		if targetNode.Kind == SelectorNodeKindFunction && targetNode.Value == ":not" {
@@ -213,7 +223,10 @@ func pseudoClassVariant(targetNode SelectorNode, compoundNot *bool) (string, boo
 		argumentIsValue = targetNode.Nodes[0].Kind == SelectorNodeKindValue
 	}
 
-	if targetNode.Value == ":nth-child" && isFunctionOfOne && argumentIsValue && (argument == "odd" || argument == "even") {
+	if targetNode.Value == ":nth-child" &&
+		isFunctionOfOne &&
+		argumentIsValue &&
+		(argument == "odd" || argument == "even") {
 		if *compoundNot {
 			*compoundNot = false
 			if argument == "odd" {
@@ -259,19 +272,39 @@ func attributeVariant(attribute AttributeSelector, written string) ParsedVariant
 
 	if name, isData := strings.CutPrefix(attribute.Attribute, "data-"); isData {
 		if attribute.Value == nil {
-			return ParsedVariant{Kind: ParsedVariantKindFunctional, Root: "data", Value: &ParsedVariantValue{Kind: ParsedValueKindNamed, Value: name}}
+			return ParsedVariant{
+				Kind:  ParsedVariantKindFunctional,
+				Root:  "data",
+				Value: &ParsedVariantValue{Kind: ParsedValueKindNamed, Value: name},
+			}
 		}
-		return ParsedVariant{Kind: ParsedVariantKindFunctional, Root: "data", Value: &ParsedVariantValue{Kind: ParsedValueKindArbitrary, Value: name + tail()}}
+		return ParsedVariant{
+			Kind:  ParsedVariantKindFunctional,
+			Root:  "data",
+			Value: &ParsedVariantValue{Kind: ParsedValueKindArbitrary, Value: name + tail()},
+		}
 	}
 
 	if name, isAria := strings.CutPrefix(attribute.Attribute, "aria-"); isAria {
 		switch {
 		case attribute.Value == nil:
-			return ParsedVariant{Kind: ParsedVariantKindFunctional, Root: "aria", Value: &ParsedVariantValue{Kind: ParsedValueKindArbitrary, Value: name}}
+			return ParsedVariant{
+				Kind:  ParsedVariantKindFunctional,
+				Root:  "aria",
+				Value: &ParsedVariantValue{Kind: ParsedValueKindArbitrary, Value: name},
+			}
 		case attribute.Operator == "=" && *attribute.Value == "true" && attribute.Sensitivity == "":
-			return ParsedVariant{Kind: ParsedVariantKindFunctional, Root: "aria", Value: &ParsedVariantValue{Kind: ParsedValueKindNamed, Value: name}}
+			return ParsedVariant{
+				Kind:  ParsedVariantKindFunctional,
+				Root:  "aria",
+				Value: &ParsedVariantValue{Kind: ParsedValueKindNamed, Value: name},
+			}
 		default:
-			return ParsedVariant{Kind: ParsedVariantKindFunctional, Root: "aria", Value: &ParsedVariantValue{Kind: ParsedValueKindArbitrary, Value: attribute.Attribute + tail()}}
+			return ParsedVariant{
+				Kind:  ParsedVariantKindFunctional,
+				Root:  "aria",
+				Value: &ParsedVariantValue{Kind: ParsedValueKindArbitrary, Value: attribute.Attribute + tail()},
+			}
 		}
 	}
 

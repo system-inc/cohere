@@ -30,23 +30,43 @@ func TestParseTree(test *testing.T) {
 	}
 	declaration := first.List("nodes")[0]
 	raws := objectOf(test, declaration.Get("raws"), "declaration raws")
-	if declaration.String("prop") != "b" || declaration.String("value") != "c" || !declaration.Bool("important") || raws["important"] != " ! important" || raws["between"] != ":" {
+	if declaration.String("prop") != "b" ||
+		declaration.String("value") != "c" ||
+		!declaration.Bool("important") ||
+		raws["important"] != " ! important" ||
+		raws["between"] != ":" {
 		test.Errorf("declaration %v %v", declaration.Keys(), raws)
 	}
-	if keys := declaration.Keys(); len(keys) != 5 || keys[0] != "raws" || keys[1] != "source" || keys[2] != "prop" || keys[3] != "important" || keys[4] != "value" {
+	if keys := declaration.Keys(); len(keys) != 5 ||
+		keys[0] != "raws" ||
+		keys[1] != "source" ||
+		keys[2] != "prop" ||
+		keys[3] != "important" ||
+		keys[4] != "value" {
 		test.Errorf("declaration keys %v", keys)
 	}
 
 	second := rules[1]
-	start := objectOf(test, objectOf(test, second.Get("source"), "second rule source")["start"], "second rule source start")
+	start := objectOf(
+		test,
+		objectOf(test, second.Get("source"), "second rule source")["start"],
+		"second rule source start",
+	)
 	if start["offset"] != 20 || start["line"] != 2 || start["column"] != 1 {
 		test.Errorf("second rule starts at %v", start)
 	}
 	children := second.List("nodes")
 	comment := children[0]
-	commentStart := objectOf(test, objectOf(test, comment.Get("source"), "comment source")["start"], "comment source start")
+	commentStart := objectOf(
+		test,
+		objectOf(test, comment.Get("source"), "comment source")["start"],
+		"comment source start",
+	)
 	// The comment starts at column 5 of line 2 (the emoji is two units), 26 bytes into the text.
-	if comment.Type() != "comment" || comment.String("text") != "x" || commentStart["column"] != 5 || commentStart["offset"] != 26 {
+	if comment.Type() != "comment" ||
+		comment.String("text") != "x" ||
+		commentStart["column"] != 5 ||
+		commentStart["offset"] != 26 {
 		test.Errorf("comment %q at %v", comment.String("text"), commentStart)
 	}
 	custom := children[1]
@@ -100,7 +120,10 @@ func TestParseErrors(test *testing.T) {
 			test.Errorf("%q: %v is not a marked CssSyntaxError", each.text, parseError)
 			continue
 		}
-		if syntaxError.Reason != each.reason || syntaxError.Line != each.line || syntaxError.Column != each.column || syntaxError.EndColumn != each.endColumn {
+		if syntaxError.Reason != each.reason ||
+			syntaxError.Line != each.line ||
+			syntaxError.Column != each.column ||
+			syntaxError.EndColumn != each.endColumn {
 			test.Errorf("%q: %+v", each.text, *syntaxError)
 		}
 	}

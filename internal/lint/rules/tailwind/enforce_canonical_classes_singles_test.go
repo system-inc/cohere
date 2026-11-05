@@ -143,12 +143,21 @@ func TestCanonicalSinglesStaySilent(test *testing.T) {
 		source string
 	}{
 		{name: "already the current inset", source: `const element = <div className="inset-e-0 inset-s-4" />;`},
-		{name: "end that is not an inset", source: `const element = <div className="justify-end self-end items-end" />;`},
+		{
+			name:   "end that is not an inset",
+			source: `const element = <div className="justify-end self-end items-end" />;`,
+		},
 		{name: "rounded logical edge", source: `const element = <div className="rounded-e-md" />;`},
 		{name: "child variant already named", source: `const element = <div className="*:flex **:flex" />;`},
-		{name: "child selector that is more than the child", source: `const element = <div className="[&>*_p]:flex [&>*:hover]:flex" />;`},
+		{
+			name:   "child selector that is more than the child",
+			source: `const element = <div className="[&>*_p]:flex [&>*:hover]:flex" />;`,
+		},
 		{name: "descendant element selector", source: `const element = <div className="[&_p]:flex" />;`},
-		{name: "arbitrary value that is no variable", source: `const element = <div className="bg-[#123456] w-[17px]" />;`},
+		{
+			name:   "arbitrary value that is no variable",
+			source: `const element = <div className="bg-[#123456] w-[17px]" />;`,
+		},
 		{name: "a class nothing rewrites", source: `const element = <div className="px-4 bg-red-500" />;`},
 		{
 			// Tailwind would rewrite it, through themeToVarUtility, which is not ported. Silent rather than
@@ -268,7 +277,13 @@ func TestCanonicalSingleNeverNamesAShortReplacement(test *testing.T) {
 	for _, testCase := range testCases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := runCanonicalFixtureWithStylesheet(test, "Component.tsx", testCase.source, testCase.stylesheet, nil)
+			result := runCanonicalFixtureWithStylesheet(
+				test,
+				"Component.tsx",
+				testCase.source,
+				testCase.stylesheet,
+				nil,
+			)
 			for _, diagnostic := range result.Diagnostics {
 				if got := diagnostic.Message.Description; got != testCase.upstream {
 					test.Errorf("reported %q; the only report allowed is upstream's, %q", got, testCase.upstream)

@@ -42,8 +42,15 @@ func findingsReuseRules(test *testing.T) []rule.Rule {
 func diagnosticKeys(diagnostics []rule.Diagnostic) []string {
 	keys := make([]string, len(diagnostics))
 	for index, diagnostic := range diagnostics {
-		keys[index] = fmt.Sprintf("%s|%s|%d-%d|%s|%s", filepath.Base(diagnostic.SourceFile.FileName().AsString()), diagnostic.RuleName,
-			diagnostic.Range.Pos(), diagnostic.Range.End(), diagnostic.Message.Id, diagnostic.Message.Description)
+		keys[index] = fmt.Sprintf(
+			"%s|%s|%d-%d|%s|%s",
+			filepath.Base(diagnostic.SourceFile.FileName().AsString()),
+			diagnostic.RuleName,
+			diagnostic.Range.Pos(),
+			diagnostic.Range.End(),
+			diagnostic.Message.Id,
+			diagnostic.Message.Description,
+		)
 	}
 	return keys
 }
@@ -55,8 +62,8 @@ func diagnosticKeys(diagnostics []rule.Diagnostic) []string {
 // The fixture is built so each path is exercised. a.ts has findings with no fix, so it is cached with
 // those findings and replayed; b.ts is clean; c.ts carries a suppression directive that silences a finding,
 // so it is cached with the finding its directive withheld, and its replay counts the directive applied, as the
-// coverage comparison below proves (#kdee854); d.ts has a finding with a fix and must never be cached. Each premise is checked rather than
-// assumed, since a fixture whose rules happened not to fire would pass everything here for nothing.
+// coverage comparison below proves (#kdee854); d.ts has a finding with a fix and must never be cached. Each premise is
+// checked rather than assumed, since a fixture whose rules happened not to fire would pass everything here for nothing.
 func TestAReplayingWalkReportsWhatAPlainWalkReports(test *testing.T) {
 	test.Parallel()
 	root := writeProject(test, map[string]string{
@@ -101,7 +108,10 @@ func TestAReplayingWalkReportsWhatAPlainWalkReports(test *testing.T) {
 		test.Fatal("a.ts was not recorded with findings, so findings replay is untested here")
 	}
 	if entry, cached := byFile["c.ts"]; !cached || !entry.Directives || len(entry.Withheld) != 1 {
-		test.Errorf("c.ts's directive silenced one finding, so it should be cached with that finding withheld: %+v", entry)
+		test.Errorf(
+			"c.ts's directive silenced one finding, so it should be cached with that finding withheld: %+v",
+			entry,
+		)
 	}
 	fixable := false
 	for _, diagnostic := range plain.Diagnostics {
@@ -120,7 +130,11 @@ func TestAReplayingWalkReportsWhatAPlainWalkReports(test *testing.T) {
 		test.Fatal("nothing was replayed, so the equality below would hold for nothing")
 	}
 	if !reflect.DeepEqual(diagnosticKeys(plain.Diagnostics), diagnosticKeys(replayed.Diagnostics)) {
-		test.Errorf("findings differ:\n plain    %v\n replayed %v", diagnosticKeys(plain.Diagnostics), diagnosticKeys(replayed.Diagnostics))
+		test.Errorf(
+			"findings differ:\n plain    %v\n replayed %v",
+			diagnosticKeys(plain.Diagnostics),
+			diagnosticKeys(replayed.Diagnostics),
+		)
 	}
 	if !reflect.DeepEqual(foldedCoverage(plain.Coverage), foldedCoverage(replayed.Coverage)) {
 		test.Errorf("coverage differs:\n plain    %+v\n replayed %+v", plain.Coverage, replayed.Coverage)
@@ -159,7 +173,11 @@ func TestAnEditedFileIsWalkedNotReplayed(test *testing.T) {
 	}
 
 	// The edit removes the finding. A cache keyed on path would replay it; keyed on bytes it cannot.
-	if writeError := os.WriteFile(filepath.Join(root, "a.ts"), []byte("export function f(x: number): boolean {\n  return x === 1;\n}\n"), 0o644); writeError != nil {
+	if writeError := os.WriteFile(
+		filepath.Join(root, "a.ts"),
+		[]byte("export function f(x: number): boolean {\n  return x === 1;\n}\n"),
+		0o644,
+	); writeError != nil {
 		test.Fatal(writeError)
 	}
 	second := build()
@@ -194,7 +212,11 @@ func TestAFindingsCacheUnderAnotherKeyServesNothing(test *testing.T) {
 	if len(recording.Recorded().Entries) == 0 {
 		test.Fatal("nothing was recorded, so a miss below would prove nothing")
 	}
-	graph.FindingsReuse = program.NewFindingsReuse(program.HashRuleSet([]string{"new"}), recording.Recorded(), program.PathAnchor{})
+	graph.FindingsReuse = program.NewFindingsReuse(
+		program.HashRuleSet([]string{"new"}),
+		recording.Recorded(),
+		program.PathAnchor{},
+	)
 	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), rules)
 	if err != nil {
 		test.Fatal(err)
@@ -252,7 +274,11 @@ func TestAFileWithNothingLeftToWalkKeepsItsCoverage(test *testing.T) {
 		test.Fatal(err)
 	}
 	if replayed.FilesReplayed != len(files) {
-		test.Fatalf("replayed %d of %d files, so the nothing-left-to-walk path is not what ran", replayed.FilesReplayed, len(files))
+		test.Fatalf(
+			"replayed %d of %d files, so the nothing-left-to-walk path is not what ran",
+			replayed.FilesReplayed,
+			len(files),
+		)
 	}
 	if plain.Coverage.NodesVisited == 0 {
 		test.Fatal("the plain walk visited no nodes, so a zero below would match for nothing")
@@ -264,10 +290,18 @@ func TestAFileWithNothingLeftToWalkKeepsItsCoverage(test *testing.T) {
 			replayed.Coverage.NodesVisited, replayed.Coverage.NodesReplayed, plain.Coverage.NodesVisited)
 	}
 	if !reflect.DeepEqual(foldedCoverage(plain.Coverage), foldedCoverage(replayed.Coverage)) {
-		test.Errorf("coverage differs beyond the node split:\n plain    %+v\n replayed %+v", plain.Coverage, replayed.Coverage)
+		test.Errorf(
+			"coverage differs beyond the node split:\n plain    %+v\n replayed %+v",
+			plain.Coverage,
+			replayed.Coverage,
+		)
 	}
 	if !reflect.DeepEqual(diagnosticKeys(plain.Diagnostics), diagnosticKeys(replayed.Diagnostics)) {
-		test.Errorf("findings differ:\n plain    %v\n replayed %v", diagnosticKeys(plain.Diagnostics), diagnosticKeys(replayed.Diagnostics))
+		test.Errorf(
+			"findings differ:\n plain    %v\n replayed %v",
+			diagnosticKeys(plain.Diagnostics),
+			diagnosticKeys(replayed.Diagnostics),
+		)
 	}
 }
 
@@ -292,11 +326,18 @@ func TestAFileARuleCrashedOnIsWalkedAgainNotReplayed(test *testing.T) {
 
 	first, recorded := walkAndRecord(test, root, rules, nil)
 	if len(first.Coverage.RulesCrashed) != 1 {
-		test.Fatalf("the first run named %d rule crashes, want 1, so the replay below proves nothing", len(first.Coverage.RulesCrashed))
+		test.Fatalf(
+			"the first run named %d rule crashes, want 1, so the replay below proves nothing",
+			len(first.Coverage.RulesCrashed),
+		)
 	}
 	second, _ := walkAndRecord(test, root, rules, recorded)
 	if second.FilesReplayed != 0 || len(second.Coverage.RulesCrashed) != 1 {
-		test.Errorf("the second run replayed %d files and named %d rule crashes, want 0 and 1", second.FilesReplayed, len(second.Coverage.RulesCrashed))
+		test.Errorf(
+			"the second run replayed %d files and named %d rule crashes, want 0 and 1",
+			second.FilesReplayed,
+			len(second.Coverage.RulesCrashed),
+		)
 	}
 }
 
@@ -307,7 +348,10 @@ func typeAwareRule(test *testing.T) rule.Rule {
 	for _, registered := range registry.All() {
 		if registered.Name == "@typescript-eslint/no-unsafe-unary-minus" {
 			if !registered.NeedsTypeChecker || registered.ProgramReads&rule.ReadsOtherFiles != 0 {
-				test.Fatalf("%s is not a cacheable type-aware rule any more, so this test proves nothing", registered.Name)
+				test.Fatalf(
+					"%s is not a cacheable type-aware rule any more, so this test proves nothing",
+					registered.Name,
+				)
 			}
 			return registered
 		}
@@ -318,7 +362,12 @@ func typeAwareRule(test *testing.T) rule.Rule {
 
 // walkAndRecord walks a freshly built graph with the given previous cache and returns the result and
 // what it recorded.
-func walkAndRecord(test *testing.T, root string, rules []rule.Rule, previous *program.LintCache) (program.Result, *program.LintCache) {
+func walkAndRecord(
+	test *testing.T,
+	root string,
+	rules []rule.Rule,
+	previous *program.LintCache,
+) (program.Result, *program.LintCache) {
 	test.Helper()
 	graph, err := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json")})
 	if err != nil {
@@ -377,14 +426,21 @@ func TestAnEditToADependencyReachesItsImportersTypeAwareFindings(test *testing.T
 		test.Fatal("consumer.ts was not recorded with a type-aware finding, so its replay is untested here")
 	}
 
-	if writeError := os.WriteFile(filepath.Join(root, "lib.ts"), []byte("export const value: number = 1;\n"), 0o644); writeError != nil {
+	if writeError := os.WriteFile(
+		filepath.Join(root, "lib.ts"),
+		[]byte("export const value: number = 1;\n"),
+		0o644,
+	); writeError != nil {
 		test.Fatal(writeError)
 	}
 	after, refreshed := walkAndRecord(test, root, rules, recorded)
 	truth := plainWalk(test, root, rules)
 
 	if len(truth.Diagnostics) != 0 {
-		test.Fatalf("the edit did not remove the finding even uncached, so the fixture proves nothing: %v", diagnosticKeys(truth.Diagnostics))
+		test.Fatalf(
+			"the edit did not remove the finding even uncached, so the fixture proves nothing: %v",
+			diagnosticKeys(truth.Diagnostics),
+		)
 	}
 
 	// The walk after that, with nothing changed, reads the entry the post-edit walk refreshed. A refresh
@@ -403,7 +459,11 @@ func TestAnEditToADependencyReachesItsImportersTypeAwareFindings(test *testing.T
 			diagnosticKeys(after.Diagnostics), diagnosticKeys(truth.Diagnostics))
 	}
 	if !reflect.DeepEqual(foldedCoverage(after.Coverage), foldedCoverage(truth.Coverage)) {
-		test.Errorf("coverage differs from an uncached walk after the edit:\n cached %+v\n truth  %+v", after.Coverage, truth.Coverage)
+		test.Errorf(
+			"coverage differs from an uncached walk after the edit:\n cached %+v\n truth  %+v",
+			after.Coverage,
+			truth.Coverage,
+		)
 	}
 	if after.FilesReplayed == 0 {
 		test.Error("consumer.ts's pure rules were not replayed, so an importer of an edited file lost its whole saving")
@@ -428,13 +488,20 @@ func TestAnEditToAGlobalDeclarationReachesEveryTypeAwareFinding(test *testing.T)
 	if len(before.Diagnostics) == 0 {
 		test.Fatal("consumer.ts produced no finding before the edit, so this proves nothing")
 	}
-	if writeError := os.WriteFile(filepath.Join(root, "globals.d.ts"), []byte("declare const ambient: number;\n"), 0o644); writeError != nil {
+	if writeError := os.WriteFile(
+		filepath.Join(root, "globals.d.ts"),
+		[]byte("declare const ambient: number;\n"),
+		0o644,
+	); writeError != nil {
 		test.Fatal(writeError)
 	}
 	after, _ := walkAndRecord(test, root, rules, recorded)
 	truth := plainWalk(test, root, rules)
 	if len(truth.Diagnostics) != 0 {
-		test.Fatalf("the edit did not remove the finding even uncached, so the fixture proves nothing: %v", diagnosticKeys(truth.Diagnostics))
+		test.Fatalf(
+			"the edit did not remove the finding even uncached, so the fixture proves nothing: %v",
+			diagnosticKeys(truth.Diagnostics),
+		)
 	}
 	if !reflect.DeepEqual(diagnosticKeys(after.Diagnostics), diagnosticKeys(truth.Diagnostics)) {
 		test.Errorf("a type-aware finding was replayed over an edit to a global declaration:\n cached %v\n truth  %v",
@@ -457,7 +524,11 @@ func TestCacheClassesSplitsFiveWays(test *testing.T) {
 		{Name: "pure"},
 		{Name: "options", ProgramReads: rule.ReadsCompilerOptions},
 		{Name: "typed", NeedsTypeChecker: true},
-		{Name: "typed-library", NeedsTypeChecker: true, ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary},
+		{
+			Name:             "typed-library",
+			NeedsTypeChecker: true,
+			ProgramReads:     rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
+		},
 		{Name: "resolution", ProgramReads: rule.ReadsModuleResolution},
 		{Name: "program", ProgramReads: rule.ReadsOtherFiles},
 		{Name: "design-system", ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDesignSystem},
@@ -465,9 +536,17 @@ func TestCacheClassesSplitsFiveWays(test *testing.T) {
 		{Name: "design-and-types", ProgramReads: rule.ReadsDesignSystem, NeedsTypeChecker: true},
 		{Name: "design-and-program", ProgramReads: rule.ReadsDesignSystem | rule.ReadsOtherFiles},
 		{Name: "program-fingerprinted", ProgramReads: rule.ReadsOtherFiles, ProgramFingerprint: fingerprint},
-		{Name: "typed-program-fingerprinted", ProgramReads: rule.ReadsOtherFiles | rule.ReadsModuleResolution, NeedsTypeChecker: true,
-			ProgramFingerprint: fingerprint},
-		{Name: "design-program-fingerprinted", ProgramReads: rule.ReadsDesignSystem | rule.ReadsOtherFiles, ProgramFingerprint: fingerprint},
+		{
+			Name:               "typed-program-fingerprinted",
+			ProgramReads:       rule.ReadsOtherFiles | rule.ReadsModuleResolution,
+			NeedsTypeChecker:   true,
+			ProgramFingerprint: fingerprint,
+		},
+		{
+			Name:               "design-program-fingerprinted",
+			ProgramReads:       rule.ReadsDesignSystem | rule.ReadsOtherFiles,
+			ProgramFingerprint: fingerprint,
+		},
 		{Name: "fingerprint-alone", ProgramFingerprint: fingerprint},
 	})
 	names := func(rules []rule.Rule) string {
@@ -480,7 +559,14 @@ func TestCacheClassesSplitsFiveWays(test *testing.T) {
 	if names(pure) != "pure options fingerprint-alone " || names(typeAware) != "typed typed-library resolution " ||
 		names(design) != "design-system " || names(derived) != "program-fingerprinted typed-program-fingerprinted " ||
 		names(never) != "program both design-and-types design-and-program design-program-fingerprinted " {
-		test.Errorf("pure [%s] typed [%s] design [%s] derived [%s] never [%s]", names(pure), names(typeAware), names(design), names(derived), names(never))
+		test.Errorf(
+			"pure [%s] typed [%s] design [%s] derived [%s] never [%s]",
+			names(pure),
+			names(typeAware),
+			names(design),
+			names(derived),
+			names(never),
+		)
 	}
 }
 
@@ -494,7 +580,12 @@ func TestCacheClassesSplitsFiveWays(test *testing.T) {
 // the old pure notes and no typed ones, and the run after that replays the refreshed entry.
 func TestAReplayingWalkCountsTheNotesAPlainWalkCounts(test *testing.T) {
 	test.Parallel()
-	noting := func(name string, needsTypeChecker bool, reads rule.ProgramRead, key func(ruleContext rule.Context, declaration *ast.Node) string) rule.Rule {
+	noting := func(
+		name string,
+		needsTypeChecker bool,
+		reads rule.ProgramRead,
+		key func(ruleContext rule.Context, declaration *ast.Node) string,
+	) rule.Rule {
 		return rule.Rule{
 			Name:             name,
 			NeedsTypeChecker: needsTypeChecker,
@@ -511,18 +602,36 @@ func TestAReplayingWalkCountsTheNotesAPlainWalkCounts(test *testing.T) {
 	// The type-aware rule notes only strings, so after lib.ts turns its value into a number it notes nothing
 	// in consumer.ts, and a refresh that kept its old notes would show.
 	rules := []rule.Rule{
-		noting("test-notes-pure", false, 0, func(ruleContext rule.Context, declaration *ast.Node) string { return "declared" }),
+		noting(
+			"test-notes-pure",
+			false,
+			0,
+			func(ruleContext rule.Context, declaration *ast.Node) string { return "declared" },
+		),
 		noting("test-notes-typed", true, 0, func(ruleContext rule.Context, declaration *ast.Node) string {
-			if rendered := ruleContext.TypeChecker.TypeToString(ruleContext.TypeChecker.GetTypeAtLocation(declaration.Name())); rendered == "string" {
+			if rendered := ruleContext.TypeChecker.TypeToString(
+				ruleContext.TypeChecker.GetTypeAtLocation(declaration.Name()),
+			); rendered == "string" {
 				return "a string"
 			}
 			return ""
 		}),
-		noting("test-notes-uncacheable", false, rule.ReadsOtherFiles, func(ruleContext rule.Context, declaration *ast.Node) string { return "walked" }),
+		noting(
+			"test-notes-uncacheable",
+			false,
+			rule.ReadsOtherFiles,
+			func(ruleContext rule.Context, declaration *ast.Node) string { return "walked" },
+		),
 	}
-	if pure, typeAware, _, _, uncacheable := program.CacheClasses(rules); len(pure) != 1 || len(typeAware) != 1 || len(uncacheable) != 1 {
-		test.Fatalf("the noting rules are not one per class (%d pure, %d type-aware, %d uncacheable), so this proves nothing",
-			len(pure), len(typeAware), len(uncacheable))
+	if pure, typeAware, _, _, uncacheable := program.CacheClasses(
+		rules,
+	); len(pure) != 1 || len(typeAware) != 1 || len(uncacheable) != 1 {
+		test.Fatalf(
+			"the noting rules are not one per class (%d pure, %d type-aware, %d uncacheable), so this proves nothing",
+			len(pure),
+			len(typeAware),
+			len(uncacheable),
+		)
 	}
 	root := writeProject(test, map[string]string{
 		"tsconfig.json": minimalConfig,
@@ -534,10 +643,21 @@ func TestAReplayingWalkCountsTheNotesAPlainWalkCounts(test *testing.T) {
 		table := program.NewCacheTable()
 		table.Findings = cache
 		directory := test.TempDir()
-		if writeCacheTableError := program.WriteCacheTable(directory, table, testIdentity, program.CacheTableSections{Findings: true}, program.PathAnchor{}); writeCacheTableError != nil {
+		if writeCacheTableError := program.WriteCacheTable(
+			directory,
+			table,
+			testIdentity,
+			program.CacheTableSections{Findings: true},
+			program.PathAnchor{},
+		); writeCacheTableError != nil {
 			test.Fatalf("writing: %v", writeCacheTableError)
 		}
-		read, readCacheTableError := program.ReadCacheTable(directory, testIdentity, program.CacheTableSections{Findings: true}, program.PathAnchor{})
+		read, readCacheTableError := program.ReadCacheTable(
+			directory,
+			testIdentity,
+			program.CacheTableSections{Findings: true},
+			program.PathAnchor{},
+		)
 		if readCacheTableError != nil {
 			test.Fatalf("reading: %v", readCacheTableError)
 		}
@@ -553,7 +673,12 @@ func TestAReplayingWalkCountsTheNotesAPlainWalkCounts(test *testing.T) {
 			test.Fatalf("%s: nothing replayed, so the equality below holds for nothing", when)
 		}
 		if !reflect.DeepEqual(cached.Notes, truth.Notes) {
-			test.Errorf("%s: a replaying walk counted other notes than an uncached one:\n cached %v\n truth  %v", when, cached.Notes, truth.Notes)
+			test.Errorf(
+				"%s: a replaying walk counted other notes than an uncached one:\n cached %v\n truth  %v",
+				when,
+				cached.Notes,
+				truth.Notes,
+			)
 		}
 	}
 
@@ -561,7 +686,11 @@ func TestAReplayingWalkCountsTheNotesAPlainWalkCounts(test *testing.T) {
 	warm, recorded := walkAndRecord(test, root, rules, throughTheTable(recorded))
 	sameNotes("unchanged", warm)
 
-	if writeError := os.WriteFile(filepath.Join(root, "lib.ts"), []byte("export const value: number = 1;\n"), 0o644); writeError != nil {
+	if writeError := os.WriteFile(
+		filepath.Join(root, "lib.ts"),
+		[]byte("export const value: number = 1;\n"),
+		0o644,
+	); writeError != nil {
 		test.Fatal(writeError)
 	}
 	refreshing, recorded := walkAndRecord(test, root, rules, throughTheTable(recorded))

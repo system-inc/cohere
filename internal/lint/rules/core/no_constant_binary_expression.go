@@ -84,7 +84,8 @@ var NoConstantBinaryExpression = rule.Rule{
 
 	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		judge := constantJudge{isGlobal: func(identifier *ast.Node) bool {
-			return ruleContext.TypeChecker == nil || !rule.IsDeclaredInASourceFile(ruleContext.TypeChecker.GetSymbolAtLocation(identifier))
+			return ruleContext.TypeChecker == nil ||
+				!rule.IsDeclaredInASourceFile(ruleContext.TypeChecker.GetSymbolAtLocation(identifier))
 		}}
 		checkRelationalComparisons := false
 		if parsed, ok := rule.OptionsAs[NoConstantBinaryExpressionOptions](options); ok {

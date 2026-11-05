@@ -18,7 +18,9 @@ func gfmStrikethroughExtension() *Extension {
 			index++
 
 			// Find a token that can close.
-			if events[index].Enter && events[index].Token.Type == typeStrikethroughSequenceTemporary && events[index].Token.close {
+			if events[index].Enter &&
+				events[index].Token.Type == typeStrikethroughSequenceTemporary &&
+				events[index].Token.close {
 				open := index
 
 				// Now walk back to find an opener. Upstream's `while (open--)` tests, then decrements.
@@ -26,16 +28,26 @@ func gfmStrikethroughExtension() *Extension {
 					open--
 
 					// Find a token that can open the closer.
-					if !events[open].Enter && events[open].Token.Type == typeStrikethroughSequenceTemporary && events[open].Token.open &&
+					if !events[open].Enter &&
+						events[open].Token.Type == typeStrikethroughSequenceTemporary &&
+						events[open].Token.open &&
 						// If the sizes are the same:
 						events[index].Token.End.Offset-events[index].Token.Start.Offset == events[open].Token.End.Offset-events[open].Token.Start.Offset {
 						events[index].Token.Type = typeStrikethroughSequence
 						events[open].Token.Type = typeStrikethroughSequence
 
 						// Points are values here, so upstream's `Object.assign({}, point)` copies are assignments.
-						strikethrough := &Token{Type: typeStrikethrough, Start: events[open].Token.Start, End: events[index].Token.End}
+						strikethrough := &Token{
+							Type:  typeStrikethrough,
+							Start: events[open].Token.Start,
+							End:   events[index].Token.End,
+						}
 
-						text := &Token{Type: typeStrikethroughText, Start: events[open].Token.End, End: events[index].Token.Start}
+						text := &Token{
+							Type:  typeStrikethroughText,
+							Start: events[open].Token.End,
+							End:   events[index].Token.Start,
+						}
 
 						// Opening.
 						nextEvents := []Event{
@@ -51,7 +63,12 @@ func gfmStrikethroughExtension() *Extension {
 						// leaves at least the defaults here, so nil never happens.
 						if insideSpan != nil {
 							// Between. Upstream's `events.slice` is a copy, and the inner resolvers splice it in place.
-							nextEvents = splice(nextEvents, len(nextEvents), 0, resolveAll(insideSpan, slices.Clone(events[open+1:index]), context))
+							nextEvents = splice(
+								nextEvents,
+								len(nextEvents),
+								0,
+								resolveAll(insideSpan, slices.Clone(events[open+1:index]), context),
+							)
 						}
 
 						// Closing.

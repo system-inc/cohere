@@ -318,7 +318,11 @@ func TestNoDuplicateHeadPointsAtTheFirstOccurrence(test *testing.T) {
 				test.Errorf("reported text = %q, want %q", reported, testCase.want)
 			}
 			if diagnostic.Range.Pos() != testCase.offset {
-				test.Errorf("reported at offset %d, want %d (the FIRST occurrence)", diagnostic.Range.Pos(), testCase.offset)
+				test.Errorf(
+					"reported at offset %d, want %d (the FIRST occurrence)",
+					diagnostic.Range.Pos(),
+					testCase.offset,
+				)
 			}
 		})
 	}
@@ -340,7 +344,10 @@ func TestNoDuplicateHeadMessageText(test *testing.T) {
 	if got := result.Diagnostics[0].Message.Description; got != messageNoDuplicateHead.Description {
 		test.Errorf("description = %q, want %q", got, messageNoDuplicateHead.Description)
 	}
-	if !strings.HasPrefix(messageNoDuplicateHead.Description, "This file renders the imported `Head` component more than once.") {
+	if !strings.HasPrefix(
+		messageNoDuplicateHead.Description,
+		"This file renders the imported `Head` component more than once.",
+	) {
 		test.Errorf("description no longer opens by saying what is wrong: %q", messageNoDuplicateHead.Description)
 	}
 }

@@ -39,15 +39,27 @@ func TestTsconfigPathsResolveStylesheetImports(test *testing.T) {
 		options := NoUnknownClassesOptions{TailwindLocationOptions: TailwindLocationOptions{
 			EntryPoint: "app/globals.css", Tsconfig: tsconfig,
 		}}
-		return rule_testing.RunTypedFilesWithSetupAndOptions(test, NoUnknownClasses, files, "Component.tsx", options, func(root string) {
-			modules := filepath.Join(root, "node_modules")
-			if createDirectoryError := os.MkdirAll(modules, 0o755); createDirectoryError != nil {
-				test.Fatalf("creating node_modules: %v", createDirectoryError)
-			}
-			if symlinkError := os.Symlink(unknownFixturePackageRoot(), filepath.Join(modules, "tailwindcss")); symlinkError != nil {
-				test.Fatalf("linking tailwindcss: %v", symlinkError)
-			}
-		})
+		return rule_testing.RunTypedFilesWithSetupAndOptions(
+			test,
+			NoUnknownClasses,
+			files,
+			"Component.tsx",
+			options,
+			func(
+				root string,
+			) {
+				modules := filepath.Join(root, "node_modules")
+				if createDirectoryError := os.MkdirAll(modules, 0o755); createDirectoryError != nil {
+					test.Fatalf("creating node_modules: %v", createDirectoryError)
+				}
+				if symlinkError := os.Symlink(
+					unknownFixturePackageRoot(),
+					filepath.Join(modules, "tailwindcss"),
+				); symlinkError != nil {
+					test.Fatalf("linking tailwindcss: %v", symlinkError)
+				}
+			},
+		)
 	}
 
 	for name, testCase := range map[string]struct {
@@ -56,9 +68,18 @@ func TestTsconfigPathsResolveStylesheetImports(test *testing.T) {
 	}{
 		"no option, and the project's tsconfig maps nothing": {tsconfig: "", reported: "brand-glow not-a-class"},
 		"paths, read through comments and a trailing comma":  {tsconfig: "config/paths.json", reported: "not-a-class"},
-		"paths and baseUrl from an extended file":            {tsconfig: "config/extends.json", reported: "not-a-class"},
-		"paths onto nothing that exists":                     {tsconfig: "config/elsewhere.json", reported: "brand-glow not-a-class"},
-		"an option naming no file falls back to the default": {tsconfig: "config/absent.json", reported: "brand-glow not-a-class"},
+		"paths and baseUrl from an extended file": {
+			tsconfig: "config/extends.json",
+			reported: "not-a-class",
+		},
+		"paths onto nothing that exists": {
+			tsconfig: "config/elsewhere.json",
+			reported: "brand-glow not-a-class",
+		},
+		"an option naming no file falls back to the default": {
+			tsconfig: "config/absent.json",
+			reported: "brand-glow not-a-class",
+		},
 	} {
 		test.Run(name, func(test *testing.T) {
 			test.Parallel()
@@ -83,13 +104,27 @@ func TestTsconfigPathsResolveStylesheetImports(test *testing.T) {
 // where it was asked for before any is tried a directory up, and none climbs past cwd.
 func TestFindFirstPathRecursiveIsUpstreamsQueue(test *testing.T) {
 	test.Parallel()
-	present := map[string]bool{"/repo/tsconfig.json": true, "/repo/app/jsconfig.json": true, "/repo/configs/custom.json": false}
+	present := map[string]bool{
+		"/repo/tsconfig.json":       true,
+		"/repo/app/jsconfig.json":   true,
+		"/repo/configs/custom.json": false,
+	}
 	fileExists := func(path string) bool { return present[path] }
 
-	if got := findFirstPathRecursive("/repo/app", "/repo/app", []string{"tsconfig.json", "jsconfig.json"}, fileExists); got != "/repo/app/jsconfig.json" {
+	if got := findFirstPathRecursive(
+		"/repo/app",
+		"/repo/app",
+		[]string{"tsconfig.json", "jsconfig.json"},
+		fileExists,
+	); got != "/repo/app/jsconfig.json" {
 		test.Errorf("from /repo/app found %q, want the jsconfig.json in cwd before any tsconfig.json above it", got)
 	}
-	if got := findFirstPathRecursive("/repo", "/repo", []string{"configs/custom.json", "tsconfig.json"}, fileExists); got != "/repo/tsconfig.json" {
+	if got := findFirstPathRecursive(
+		"/repo",
+		"/repo",
+		[]string{"configs/custom.json", "tsconfig.json"},
+		fileExists,
+	); got != "/repo/tsconfig.json" {
 		test.Errorf("found %q, want /repo/tsconfig.json once configs/custom.json is not there", got)
 	}
 	if got := findFirstPathRecursive("/repo/app", "/repo/app", []string{"tsconfig.json"}, fileExists); got != "" {

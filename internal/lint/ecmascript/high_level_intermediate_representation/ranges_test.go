@@ -551,25 +551,130 @@ func TestAliasingRefinementMatchesAbstractKinds(test *testing.T) {
 		intoKind    mutation_aliasing.EffectValueKind
 		wantWidened bool
 	}{
-		{name: "alias frozen source", edge: mutation_aliasing.AliasingEffectAlias, fromKind: mutation_aliasing.EffectValueFrozen, intoKind: mutation_aliasing.EffectValueMutable},
-		{name: "alias primitive source", edge: mutation_aliasing.AliasingEffectAlias, fromKind: mutation_aliasing.EffectValuePrimitive, intoKind: mutation_aliasing.EffectValueMutable},
-		{name: "alias frozen destination", edge: mutation_aliasing.AliasingEffectAlias, fromKind: mutation_aliasing.EffectValueMutable, intoKind: mutation_aliasing.EffectValueFrozen},
-		{name: "alias mutable values", edge: mutation_aliasing.AliasingEffectAlias, fromKind: mutation_aliasing.EffectValueMutable, intoKind: mutation_aliasing.EffectValueMutable, wantWidened: true},
-		{name: "maybe-alias frozen source", edge: mutation_aliasing.AliasingEffectMaybeAlias, fromKind: mutation_aliasing.EffectValueFrozen, intoKind: mutation_aliasing.EffectValueMutable},
-		{name: "maybe-alias primitive source", edge: mutation_aliasing.AliasingEffectMaybeAlias, fromKind: mutation_aliasing.EffectValuePrimitive, intoKind: mutation_aliasing.EffectValueMutable, wantWidened: true},
-		{name: "maybe-alias global source", edge: mutation_aliasing.AliasingEffectMaybeAlias, fromKind: mutation_aliasing.EffectValueGlobal, intoKind: mutation_aliasing.EffectValueMutable, wantWidened: true},
-		{name: "maybe-alias mixed source", edge: mutation_aliasing.AliasingEffectMaybeAlias, fromKind: mutation_aliasing.EffectValueMaybeFrozen, intoKind: mutation_aliasing.EffectValueMutable, wantWidened: true},
-		{name: "alias mixed source", edge: mutation_aliasing.AliasingEffectAlias, fromKind: mutation_aliasing.EffectValueMaybeFrozen, intoKind: mutation_aliasing.EffectValueMutable, wantWidened: true},
-		{name: "capture mixed source", edge: mutation_aliasing.AliasingEffectCapture, fromKind: mutation_aliasing.EffectValueMaybeFrozen, intoKind: mutation_aliasing.EffectValueMutable, wantWidened: true},
-		{name: "capture global source", edge: mutation_aliasing.AliasingEffectCapture, fromKind: mutation_aliasing.EffectValueGlobal, intoKind: mutation_aliasing.EffectValueMutable},
-		{name: "create-from mixed source", edge: mutation_aliasing.AliasingEffectCreateFrom, fromKind: mutation_aliasing.EffectValueMaybeFrozen, intoKind: mutation_aliasing.EffectValueMutable, wantWidened: true},
-		{name: "assign mixed source", edge: mutation_aliasing.AliasingEffectAssign, fromKind: mutation_aliasing.EffectValueMaybeFrozen, intoKind: mutation_aliasing.EffectValueMutable, wantWidened: true},
-		{name: "create-from frozen source", edge: mutation_aliasing.AliasingEffectCreateFrom, fromKind: mutation_aliasing.EffectValueFrozen, intoKind: mutation_aliasing.EffectValueMutable},
-		{name: "create-from primitive source", edge: mutation_aliasing.AliasingEffectCreateFrom, fromKind: mutation_aliasing.EffectValuePrimitive, intoKind: mutation_aliasing.EffectValueMutable},
-		{name: "create-from mutable source", edge: mutation_aliasing.AliasingEffectCreateFrom, fromKind: mutation_aliasing.EffectValueMutable, intoKind: mutation_aliasing.EffectValueMutable, wantWidened: true},
-		{name: "assign frozen source", edge: mutation_aliasing.AliasingEffectAssign, fromKind: mutation_aliasing.EffectValueFrozen, intoKind: mutation_aliasing.EffectValueMutable},
-		{name: "assign primitive source", edge: mutation_aliasing.AliasingEffectAssign, fromKind: mutation_aliasing.EffectValuePrimitive, intoKind: mutation_aliasing.EffectValueMutable},
-		{name: "assign mutable source", edge: mutation_aliasing.AliasingEffectAssign, fromKind: mutation_aliasing.EffectValueMutable, intoKind: mutation_aliasing.EffectValueMutable, wantWidened: true},
+		{
+			name:     "alias frozen source",
+			edge:     mutation_aliasing.AliasingEffectAlias,
+			fromKind: mutation_aliasing.EffectValueFrozen,
+			intoKind: mutation_aliasing.EffectValueMutable,
+		},
+		{
+			name:     "alias primitive source",
+			edge:     mutation_aliasing.AliasingEffectAlias,
+			fromKind: mutation_aliasing.EffectValuePrimitive,
+			intoKind: mutation_aliasing.EffectValueMutable,
+		},
+		{
+			name:     "alias frozen destination",
+			edge:     mutation_aliasing.AliasingEffectAlias,
+			fromKind: mutation_aliasing.EffectValueMutable,
+			intoKind: mutation_aliasing.EffectValueFrozen,
+		},
+		{
+			name:        "alias mutable values",
+			edge:        mutation_aliasing.AliasingEffectAlias,
+			fromKind:    mutation_aliasing.EffectValueMutable,
+			intoKind:    mutation_aliasing.EffectValueMutable,
+			wantWidened: true,
+		},
+		{
+			name:     "maybe-alias frozen source",
+			edge:     mutation_aliasing.AliasingEffectMaybeAlias,
+			fromKind: mutation_aliasing.EffectValueFrozen,
+			intoKind: mutation_aliasing.EffectValueMutable,
+		},
+		{
+			name:        "maybe-alias primitive source",
+			edge:        mutation_aliasing.AliasingEffectMaybeAlias,
+			fromKind:    mutation_aliasing.EffectValuePrimitive,
+			intoKind:    mutation_aliasing.EffectValueMutable,
+			wantWidened: true,
+		},
+		{
+			name:        "maybe-alias global source",
+			edge:        mutation_aliasing.AliasingEffectMaybeAlias,
+			fromKind:    mutation_aliasing.EffectValueGlobal,
+			intoKind:    mutation_aliasing.EffectValueMutable,
+			wantWidened: true,
+		},
+		{
+			name:        "maybe-alias mixed source",
+			edge:        mutation_aliasing.AliasingEffectMaybeAlias,
+			fromKind:    mutation_aliasing.EffectValueMaybeFrozen,
+			intoKind:    mutation_aliasing.EffectValueMutable,
+			wantWidened: true,
+		},
+		{
+			name:        "alias mixed source",
+			edge:        mutation_aliasing.AliasingEffectAlias,
+			fromKind:    mutation_aliasing.EffectValueMaybeFrozen,
+			intoKind:    mutation_aliasing.EffectValueMutable,
+			wantWidened: true,
+		},
+		{
+			name:        "capture mixed source",
+			edge:        mutation_aliasing.AliasingEffectCapture,
+			fromKind:    mutation_aliasing.EffectValueMaybeFrozen,
+			intoKind:    mutation_aliasing.EffectValueMutable,
+			wantWidened: true,
+		},
+		{
+			name:     "capture global source",
+			edge:     mutation_aliasing.AliasingEffectCapture,
+			fromKind: mutation_aliasing.EffectValueGlobal,
+			intoKind: mutation_aliasing.EffectValueMutable,
+		},
+		{
+			name:        "create-from mixed source",
+			edge:        mutation_aliasing.AliasingEffectCreateFrom,
+			fromKind:    mutation_aliasing.EffectValueMaybeFrozen,
+			intoKind:    mutation_aliasing.EffectValueMutable,
+			wantWidened: true,
+		},
+		{
+			name:        "assign mixed source",
+			edge:        mutation_aliasing.AliasingEffectAssign,
+			fromKind:    mutation_aliasing.EffectValueMaybeFrozen,
+			intoKind:    mutation_aliasing.EffectValueMutable,
+			wantWidened: true,
+		},
+		{
+			name:     "create-from frozen source",
+			edge:     mutation_aliasing.AliasingEffectCreateFrom,
+			fromKind: mutation_aliasing.EffectValueFrozen,
+			intoKind: mutation_aliasing.EffectValueMutable,
+		},
+		{
+			name:     "create-from primitive source",
+			edge:     mutation_aliasing.AliasingEffectCreateFrom,
+			fromKind: mutation_aliasing.EffectValuePrimitive,
+			intoKind: mutation_aliasing.EffectValueMutable,
+		},
+		{
+			name:        "create-from mutable source",
+			edge:        mutation_aliasing.AliasingEffectCreateFrom,
+			fromKind:    mutation_aliasing.EffectValueMutable,
+			intoKind:    mutation_aliasing.EffectValueMutable,
+			wantWidened: true,
+		},
+		{
+			name:     "assign frozen source",
+			edge:     mutation_aliasing.AliasingEffectAssign,
+			fromKind: mutation_aliasing.EffectValueFrozen,
+			intoKind: mutation_aliasing.EffectValueMutable,
+		},
+		{
+			name:     "assign primitive source",
+			edge:     mutation_aliasing.AliasingEffectAssign,
+			fromKind: mutation_aliasing.EffectValuePrimitive,
+			intoKind: mutation_aliasing.EffectValueMutable,
+		},
+		{
+			name:        "assign mutable source",
+			edge:        mutation_aliasing.AliasingEffectAssign,
+			fromKind:    mutation_aliasing.EffectValueMutable,
+			intoKind:    mutation_aliasing.EffectValueMutable,
+			wantWidened: true,
+		},
 	}
 
 	for _, testCase := range tests {
@@ -600,9 +705,15 @@ func TestAliasingRefinementMatchesAbstractKinds(test *testing.T) {
 				mutationKind = mutation_aliasing.AliasingEffectMutateTransitive
 			}
 			effects := &AliasingEffects{byInstruction: map[InstructionId][]AliasingEffect{
-				fromInstruction.Id:     {mutation_aliasing.CreateEffect(from, testCase.fromKind)},
-				edgeInstruction.Id:     {mutation_aliasing.CreateEffect(into, testCase.intoKind), mutation_aliasing.FlowEffect(testCase.edge, from, into)},
-				mutationInstruction.Id: {mutation_aliasing.CreateEffect(result, mutation_aliasing.EffectValuePrimitive), mutation_aliasing.MutationEffect(mutationKind, into)},
+				fromInstruction.Id: {mutation_aliasing.CreateEffect(from, testCase.fromKind)},
+				edgeInstruction.Id: {
+					mutation_aliasing.CreateEffect(into, testCase.intoKind),
+					mutation_aliasing.FlowEffect(testCase.edge, from, into),
+				},
+				mutationInstruction.Id: {
+					mutation_aliasing.CreateEffect(result, mutation_aliasing.EffectValuePrimitive),
+					mutation_aliasing.MutationEffect(mutationKind, into),
+				},
 			}}
 			ranges := InferMutableRangesWithEffects(function, effects)
 
@@ -764,10 +875,18 @@ func TestCreateFromMutationPropagatesTransitively(test *testing.T) {
 	Finalize(function)
 
 	effects := &AliasingEffects{byInstruction: map[InstructionId][]AliasingEffect{
-		leafInstruction.Id:     {mutation_aliasing.CreateEffect(leaf, mutation_aliasing.EffectValueMutable)},
-		sourceInstruction.Id:   {mutation_aliasing.CreateEffect(source, mutation_aliasing.EffectValueMutable), mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectCapture, leaf, source)},
-		derivedInstruction.Id:  {mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectCreateFrom, source, derived)},
-		mutationInstruction.Id: {mutation_aliasing.CreateEffect(result, mutation_aliasing.EffectValuePrimitive), mutation_aliasing.MutationEffect(mutation_aliasing.AliasingEffectMutate, derived)},
+		leafInstruction.Id: {mutation_aliasing.CreateEffect(leaf, mutation_aliasing.EffectValueMutable)},
+		sourceInstruction.Id: {
+			mutation_aliasing.CreateEffect(source, mutation_aliasing.EffectValueMutable),
+			mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectCapture, leaf, source),
+		},
+		derivedInstruction.Id: {
+			mutation_aliasing.FlowEffect(mutation_aliasing.AliasingEffectCreateFrom, source, derived),
+		},
+		mutationInstruction.Id: {
+			mutation_aliasing.CreateEffect(result, mutation_aliasing.EffectValuePrimitive),
+			mutation_aliasing.MutationEffect(mutation_aliasing.AliasingEffectMutate, derived),
+		},
 	}}
 	ranges := InferMutableRangesWithEffects(function, effects)
 
@@ -1280,7 +1399,9 @@ export function f() {
 `)
 	effects := InferAliasingEffects(function)
 	widened := &mutation_aliasing.MutableRanges{}
-	mutation_aliasing.BuildAliasingGraph(newRangeGraph(function, effects), function, mutation_aliasing.Options{}).Widen(widened)
+	mutation_aliasing.BuildAliasingGraph(newRangeGraph(function, effects), function, mutation_aliasing.Options{}).Widen(
+		widened,
+	)
 
 	// The count is what separates the faithful walk from one that ignores the index. It is asserted
 	// exactly rather than as a bound, because a bound would be satisfied by a walk that widened

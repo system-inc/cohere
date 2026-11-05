@@ -84,7 +84,10 @@ func TestPurityFixturesMatchTheVendoredCorpusByte(test *testing.T) {
 		fileName string
 	}{
 		{purityImpureFunctionsInRender, "error.invalid-impure-functions-in-render.js"},
-		{purityImpureFunctionsInRenderNewMutability, filepath.Join("new-mutability", "error.invalid-impure-functions-in-render.js")},
+		{
+			purityImpureFunctionsInRenderNewMutability,
+			filepath.Join("new-mutability", "error.invalid-impure-functions-in-render.js"),
+		},
 	}
 
 	directory := filepath.Join("conformance", "testdata", "fixtures")
@@ -587,7 +590,10 @@ func TestPurityMessageNamesEachBuiltinSeparately(test *testing.T) {
 func TestPurityMergesAConditionalAlias(test *testing.T) {
 	test.Parallel()
 
-	result := runPurityFixture(test, "function Component(props: {c: boolean}) {\n  let r = Math.random;\n  if (props.c) { r = Date.now; }\n  const x = r();\n  return <div>{x}</div>;\n}\n")
+	result := runPurityFixture(
+		test,
+		"function Component(props: {c: boolean}) {\n  let r = Math.random;\n  if (props.c) { r = Date.now; }\n  const x = r();\n  return <div>{x}</div>;\n}\n",
+	)
 	if len(result.Diagnostics) != 1 {
 		test.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 	}

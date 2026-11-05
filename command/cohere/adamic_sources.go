@@ -68,8 +68,12 @@ func reportIgnoredAdamic(out *bufio.Writer, root string, held map[string]struct{
 		if relative, relativePathError := filepath.Rel(root, fileName); relativePathError == nil {
 			shown = relative
 		}
-		fmt.Fprintf(out, "⚠ %s is in the program, but git's ignore rules leave it out of the format walk (%s): checked, not formatted\n",
-			shown, ignoredBy)
+		fmt.Fprintf(
+			out,
+			"⚠ %s is in the program, but git's ignore rules leave it out of the format walk (%s): checked, not formatted\n",
+			shown,
+			ignoredBy,
+		)
 	}
 	return ignored
 }

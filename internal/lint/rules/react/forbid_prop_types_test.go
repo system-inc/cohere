@@ -1261,8 +1261,18 @@ func TestForbidPropTypesForbidList(test *testing.T) {
 		{"string is allowed by default", "PropTypes.string", nil, 0},
 
 		// A custom list replaces the defaults rather than adding to them.
-		{"a custom list refuses what it names", "PropTypes.string", &ForbidPropTypesOptions{Forbid: &[]string{"string"}}, 1},
-		{"a custom list allows what it omits", "PropTypes.any", &ForbidPropTypesOptions{Forbid: &[]string{"string"}}, 0},
+		{
+			"a custom list refuses what it names",
+			"PropTypes.string",
+			&ForbidPropTypesOptions{Forbid: &[]string{"string"}},
+			1,
+		},
+		{
+			"a custom list allows what it omits",
+			"PropTypes.any",
+			&ForbidPropTypesOptions{Forbid: &[]string{"string"}},
+			0,
+		},
 
 		// The distinction the pointer exists for.
 		{"an explicitly empty list forbids nothing", "PropTypes.any", &ForbidPropTypesOptions{Forbid: &[]string{}}, 0},
@@ -1294,11 +1304,26 @@ func TestForbidPropTypesContextOptions(test *testing.T) {
 		{"contextTypes is off by default", "contextTypes", nil, 0},
 		{"childContextTypes is off by default", "childContextTypes", nil, 0},
 		{"contextTypes when asked for", "contextTypes", &ForbidPropTypesOptions{CheckContextTypes: true}, 1},
-		{"childContextTypes when asked for", "childContextTypes", &ForbidPropTypesOptions{CheckChildContextTypes: true}, 1},
+		{
+			"childContextTypes when asked for",
+			"childContextTypes",
+			&ForbidPropTypesOptions{CheckChildContextTypes: true},
+			1,
+		},
 
 		// Each option governs only its own name.
-		{"childContextTypes stays off under the other option", "childContextTypes", &ForbidPropTypesOptions{CheckContextTypes: true}, 0},
-		{"contextTypes stays off under the other option", "contextTypes", &ForbidPropTypesOptions{CheckChildContextTypes: true}, 0},
+		{
+			"childContextTypes stays off under the other option",
+			"childContextTypes",
+			&ForbidPropTypesOptions{CheckContextTypes: true},
+			0,
+		},
+		{
+			"contextTypes stays off under the other option",
+			"contextTypes",
+			&ForbidPropTypesOptions{CheckChildContextTypes: true},
+			0,
+		},
 	}
 
 	for _, testCase := range cases {
@@ -1629,7 +1654,9 @@ func TestDecodeForbidPropTypesOptions(test *testing.T) {
 
 	test.Run("the two context flags decode", func(test *testing.T) {
 		test.Parallel()
-		decoded, decodeForbidPropertyTypesOptionsError := DecodeForbidPropTypesOptions([]byte(`{"checkContextTypes":true,"checkChildContextTypes":true}`))
+		decoded, decodeForbidPropertyTypesOptionsError := DecodeForbidPropTypesOptions(
+			[]byte(`{"checkContextTypes":true,"checkChildContextTypes":true}`),
+		)
 		if decodeForbidPropertyTypesOptionsError != nil {
 			test.Fatalf("unexpected error: %v", decodeForbidPropertyTypesOptionsError)
 		}

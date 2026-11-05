@@ -59,40 +59,121 @@ func TestNoImpliedEvalStaysSilent(test *testing.T) {
 		{"upstream valid case 15", "execScript(() => {});"},
 		{"upstream valid case 16", "window.execScript(() => {});"},
 		{"upstream valid case 17", "window['execScript'](() => {});"},
-		{"upstream valid case 18", "\nconst foo = () => {};\n\nsetTimeout(foo, 0);\nsetInterval(foo, 0);\nsetImmediate(foo);\nexecScript(foo);\n    "},
-		{"upstream valid case 19", "\nconst foo = function () {};\n\nsetTimeout(foo, 0);\nsetInterval(foo, 0);\nsetImmediate(foo);\nexecScript(foo);\n    "},
-		{"upstream valid case 20", "\nfunction foo() {}\n\nsetTimeout(foo, 0);\nsetInterval(foo, 0);\nsetImmediate(foo);\nexecScript(foo);\n    "},
-		{"upstream valid case 21", "\nconst foo = {\n  fn: () => {},\n};\n\nsetTimeout(foo.fn, 0);\nsetInterval(foo.fn, 0);\nsetImmediate(foo.fn);\nexecScript(foo.fn);\n    "},
-		{"upstream valid case 22", "\nconst foo = {\n  fn: function () {},\n};\n\nsetTimeout(foo.fn, 0);\nsetInterval(foo.fn, 0);\nsetImmediate(foo.fn);\nexecScript(foo.fn);\n    "},
-		{"upstream valid case 23", "\nconst foo = {\n  fn: function foo() {},\n};\n\nsetTimeout(foo.fn, 0);\nsetInterval(foo.fn, 0);\nsetImmediate(foo.fn);\nexecScript(foo.fn);\n    "},
-		{"upstream valid case 24", "\nconst foo = {\n  fn() {},\n};\n\nsetTimeout(foo.fn, 0);\nsetInterval(foo.fn, 0);\nsetImmediate(foo.fn);\nexecScript(foo.fn);\n    "},
-		{"upstream valid case 25", "\nconst foo = {\n  fn: () => {},\n};\nconst fn = 'fn';\n\nsetTimeout(foo[fn], 0);\nsetInterval(foo[fn], 0);\nsetImmediate(foo[fn]);\nexecScript(foo[fn]);\n    "},
-		{"upstream valid case 26", "\nconst foo = {\n  fn: () => {},\n};\n\nsetTimeout(foo['fn'], 0);\nsetInterval(foo['fn'], 0);\nsetImmediate(foo['fn']);\nexecScript(foo['fn']);\n    "},
-		{"upstream valid case 27", "\nconst foo: () => void = () => {};\n\nsetTimeout(foo, 0);\nsetInterval(foo, 0);\nsetImmediate(foo);\nexecScript(foo);\n    "},
-		{"upstream valid case 28", "\nconst foo: () => () => void = () => {\n  return () => {};\n};\n\nsetTimeout(foo(), 0);\nsetInterval(foo(), 0);\nsetImmediate(foo());\nexecScript(foo());\n    "},
-		{"upstream valid case 29", "\nconst foo: () => () => void = () => () => {};\n\nsetTimeout(foo(), 0);\nsetInterval(foo(), 0);\nsetImmediate(foo());\nexecScript(foo());\n    "},
-		{"upstream valid case 30", "\nconst foo = () => () => {};\n\nsetTimeout(foo(), 0);\nsetInterval(foo(), 0);\nsetImmediate(foo());\nexecScript(foo());\n    "},
-		{"upstream valid case 31", "\nconst foo = function foo() {\n  return function foo() {};\n};\n\nsetTimeout(foo(), 0);\nsetInterval(foo(), 0);\nsetImmediate(foo());\nexecScript(foo());\n    "},
-		{"upstream valid case 32", "\nconst foo = function () {\n  return function () {\n    return '';\n  };\n};\n\nsetTimeout(foo(), 0);\nsetInterval(foo(), 0);\nsetImmediate(foo());\nexecScript(foo());\n    "},
-		{"upstream valid case 33", "\nconst foo: () => () => void = function foo() {\n  return function foo() {};\n};\n\nsetTimeout(foo(), 0);\nsetInterval(foo(), 0);\nsetImmediate(foo());\nexecScript(foo());\n    "},
-		{"upstream valid case 34", "\nfunction foo() {\n  return function foo() {\n    return () => {};\n  };\n}\n\nsetTimeout(foo()(), 0);\nsetInterval(foo()(), 0);\nsetImmediate(foo()());\nexecScript(foo()());\n    "},
-		{"upstream valid case 35", "\nclass Foo {\n  static fn = () => {};\n}\n\nsetTimeout(Foo.fn, 0);\nsetInterval(Foo.fn, 0);\nsetImmediate(Foo.fn);\nexecScript(Foo.fn);\n    "},
-		{"upstream valid case 36", "\nclass Foo {\n  fn() {}\n}\n\nconst foo = new Foo();\n\nsetTimeout(foo.fn, 0);\nsetInterval(foo.fn, 0);\nsetImmediate(foo.fn);\nexecScript(foo.fn);\n    "},
-		{"upstream valid case 37", "\nclass Foo {\n  fn() {}\n}\nconst foo = new Foo();\nconst fn = foo.fn;\n\nsetTimeout(fn.bind(null), 0);\nsetInterval(fn.bind(null), 0);\nsetImmediate(fn.bind(null));\nexecScript(fn.bind(null));\n    "},
-		{"upstream valid case 38", "\nconst fn = (foo: () => void) => {\n  setTimeout(foo, 0);\n  setInterval(foo, 0);\n  setImmediate(foo);\n  execScript(foo);\n};\n    "},
+		{
+			"upstream valid case 18",
+			"\nconst foo = () => {};\n\nsetTimeout(foo, 0);\nsetInterval(foo, 0);\nsetImmediate(foo);\nexecScript(foo);\n    ",
+		},
+		{
+			"upstream valid case 19",
+			"\nconst foo = function () {};\n\nsetTimeout(foo, 0);\nsetInterval(foo, 0);\nsetImmediate(foo);\nexecScript(foo);\n    ",
+		},
+		{
+			"upstream valid case 20",
+			"\nfunction foo() {}\n\nsetTimeout(foo, 0);\nsetInterval(foo, 0);\nsetImmediate(foo);\nexecScript(foo);\n    ",
+		},
+		{
+			"upstream valid case 21",
+			"\nconst foo = {\n  fn: () => {},\n};\n\nsetTimeout(foo.fn, 0);\nsetInterval(foo.fn, 0);\nsetImmediate(foo.fn);\nexecScript(foo.fn);\n    ",
+		},
+		{
+			"upstream valid case 22",
+			"\nconst foo = {\n  fn: function () {},\n};\n\nsetTimeout(foo.fn, 0);\nsetInterval(foo.fn, 0);\nsetImmediate(foo.fn);\nexecScript(foo.fn);\n    ",
+		},
+		{
+			"upstream valid case 23",
+			"\nconst foo = {\n  fn: function foo() {},\n};\n\nsetTimeout(foo.fn, 0);\nsetInterval(foo.fn, 0);\nsetImmediate(foo.fn);\nexecScript(foo.fn);\n    ",
+		},
+		{
+			"upstream valid case 24",
+			"\nconst foo = {\n  fn() {},\n};\n\nsetTimeout(foo.fn, 0);\nsetInterval(foo.fn, 0);\nsetImmediate(foo.fn);\nexecScript(foo.fn);\n    ",
+		},
+		{
+			"upstream valid case 25",
+			"\nconst foo = {\n  fn: () => {},\n};\nconst fn = 'fn';\n\nsetTimeout(foo[fn], 0);\nsetInterval(foo[fn], 0);\nsetImmediate(foo[fn]);\nexecScript(foo[fn]);\n    ",
+		},
+		{
+			"upstream valid case 26",
+			"\nconst foo = {\n  fn: () => {},\n};\n\nsetTimeout(foo['fn'], 0);\nsetInterval(foo['fn'], 0);\nsetImmediate(foo['fn']);\nexecScript(foo['fn']);\n    ",
+		},
+		{
+			"upstream valid case 27",
+			"\nconst foo: () => void = () => {};\n\nsetTimeout(foo, 0);\nsetInterval(foo, 0);\nsetImmediate(foo);\nexecScript(foo);\n    ",
+		},
+		{
+			"upstream valid case 28",
+			"\nconst foo: () => () => void = () => {\n  return () => {};\n};\n\nsetTimeout(foo(), 0);\nsetInterval(foo(), 0);\nsetImmediate(foo());\nexecScript(foo());\n    ",
+		},
+		{
+			"upstream valid case 29",
+			"\nconst foo: () => () => void = () => () => {};\n\nsetTimeout(foo(), 0);\nsetInterval(foo(), 0);\nsetImmediate(foo());\nexecScript(foo());\n    ",
+		},
+		{
+			"upstream valid case 30",
+			"\nconst foo = () => () => {};\n\nsetTimeout(foo(), 0);\nsetInterval(foo(), 0);\nsetImmediate(foo());\nexecScript(foo());\n    ",
+		},
+		{
+			"upstream valid case 31",
+			"\nconst foo = function foo() {\n  return function foo() {};\n};\n\nsetTimeout(foo(), 0);\nsetInterval(foo(), 0);\nsetImmediate(foo());\nexecScript(foo());\n    ",
+		},
+		{
+			"upstream valid case 32",
+			"\nconst foo = function () {\n  return function () {\n    return '';\n  };\n};\n\nsetTimeout(foo(), 0);\nsetInterval(foo(), 0);\nsetImmediate(foo());\nexecScript(foo());\n    ",
+		},
+		{
+			"upstream valid case 33",
+			"\nconst foo: () => () => void = function foo() {\n  return function foo() {};\n};\n\nsetTimeout(foo(), 0);\nsetInterval(foo(), 0);\nsetImmediate(foo());\nexecScript(foo());\n    ",
+		},
+		{
+			"upstream valid case 34",
+			"\nfunction foo() {\n  return function foo() {\n    return () => {};\n  };\n}\n\nsetTimeout(foo()(), 0);\nsetInterval(foo()(), 0);\nsetImmediate(foo()());\nexecScript(foo()());\n    ",
+		},
+		{
+			"upstream valid case 35",
+			"\nclass Foo {\n  static fn = () => {};\n}\n\nsetTimeout(Foo.fn, 0);\nsetInterval(Foo.fn, 0);\nsetImmediate(Foo.fn);\nexecScript(Foo.fn);\n    ",
+		},
+		{
+			"upstream valid case 36",
+			"\nclass Foo {\n  fn() {}\n}\n\nconst foo = new Foo();\n\nsetTimeout(foo.fn, 0);\nsetInterval(foo.fn, 0);\nsetImmediate(foo.fn);\nexecScript(foo.fn);\n    ",
+		},
+		{
+			"upstream valid case 37",
+			"\nclass Foo {\n  fn() {}\n}\nconst foo = new Foo();\nconst fn = foo.fn;\n\nsetTimeout(fn.bind(null), 0);\nsetInterval(fn.bind(null), 0);\nsetImmediate(fn.bind(null));\nexecScript(fn.bind(null));\n    ",
+		},
+		{
+			"upstream valid case 38",
+			"\nconst fn = (foo: () => void) => {\n  setTimeout(foo, 0);\n  setInterval(foo, 0);\n  setImmediate(foo);\n  execScript(foo);\n};\n    ",
+		},
 		{"upstream valid case 40", "\nconst foo = (callback: Function) => {\n  setTimeout(callback, 0);\n};\n    "},
-		{"upstream valid case 41", "\nconst foo = () => {};\nconst bar = () => {};\n\nsetTimeout(Math.radom() > 0.5 ? foo : bar, 0);\nsetTimeout(foo || bar, 500);\n    "},
-		{"upstream valid case 42", "\nclass Foo {\n  func1() {}\n  func2(): void {\n    setTimeout(this.func1.bind(this), 1);\n  }\n}\n    "},
-		{"upstream valid case 43", "\nclass Foo {\n  private a = {\n    b: {\n      c: function () {},\n    },\n  };\n  funcw(): void {\n    setTimeout(this.a.b.c.bind(this), 1);\n  }\n}\n    "},
-		{"upstream valid case 44", "\nfunction setTimeout(input: string, value: number) {}\n\nsetTimeout('', 0);\n    "},
-		{"upstream valid case 45", "\ndeclare module 'my-timers-promises' {\n  export function setTimeout(ms: number): void;\n}\n\nimport { setTimeout } from 'my-timers-promises';\n\nsetTimeout(1000);\n    "},
+		{
+			"upstream valid case 41",
+			"\nconst foo = () => {};\nconst bar = () => {};\n\nsetTimeout(Math.radom() > 0.5 ? foo : bar, 0);\nsetTimeout(foo || bar, 500);\n    ",
+		},
+		{
+			"upstream valid case 42",
+			"\nclass Foo {\n  func1() {}\n  func2(): void {\n    setTimeout(this.func1.bind(this), 1);\n  }\n}\n    ",
+		},
+		{
+			"upstream valid case 43",
+			"\nclass Foo {\n  private a = {\n    b: {\n      c: function () {},\n    },\n  };\n  funcw(): void {\n    setTimeout(this.a.b.c.bind(this), 1);\n  }\n}\n    ",
+		},
+		{
+			"upstream valid case 44",
+			"\nfunction setTimeout(input: string, value: number) {}\n\nsetTimeout('', 0);\n    ",
+		},
+		{
+			"upstream valid case 45",
+			"\ndeclare module 'my-timers-promises' {\n  export function setTimeout(ms: number): void;\n}\n\nimport { setTimeout } from 'my-timers-promises';\n\nsetTimeout(1000);\n    ",
+		},
 		{"upstream valid case 46", "\nfunction setTimeout() {}\n\n{\n  setTimeout(100);\n}\n    "},
 		{"upstream valid case 47", "\nfunction setTimeout() {}\n\n{\n  setTimeout(\"alert('evil!')\");\n}\n    "},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoImpliedEval, noImpliedEvalFile, testCase.sourceText))
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.RunTyped(test, NoImpliedEval, noImpliedEvalFile, testCase.sourceText),
+			)
 		})
 	}
 }
@@ -115,24 +196,119 @@ func TestNoImpliedEvalFires(test *testing.T) {
 		sourceText  string
 		expectedIds []string
 	}{
-		{"upstream invalid case 0", "\nsetTimeout('x = 1', 0);\nsetInterval('x = 1', 0);\nsetImmediate('x = 1');\nexecScript('x = 1');\n      ", []string{"noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError"}},
-		{"upstream invalid case 1", "\nsetTimeout(undefined, 0);\nsetInterval(undefined, 0);\nsetImmediate(undefined);\nexecScript(undefined);\n      ", []string{"noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError"}},
-		{"upstream invalid case 2", "\nsetTimeout(1 + '' + (() => {}), 0);\nsetInterval(1 + '' + (() => {}), 0);\nsetImmediate(1 + '' + (() => {}));\nexecScript(1 + '' + (() => {}));\n      ", []string{"noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError"}},
-		{"upstream invalid case 3", "\nconst foo = 'x = 1';\n\nsetTimeout(foo, 0);\nsetInterval(foo, 0);\nsetImmediate(foo);\nexecScript(foo);\n      ", []string{"noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError"}},
-		{"upstream invalid case 4", "\nconst foo = function () {\n  return 'x + 1';\n};\n\nsetTimeout(foo(), 0);\nsetInterval(foo(), 0);\nsetImmediate(foo());\nexecScript(foo());\n      ", []string{"noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError"}},
-		{"upstream invalid case 5", "\nconst foo = function () {\n  return () => 'x + 1';\n};\n\nsetTimeout(foo()(), 0);\nsetInterval(foo()(), 0);\nsetImmediate(foo()());\nexecScript(foo()());\n      ", []string{"noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError"}},
-		{"upstream invalid case 6", "\nconst fn = function () {};\n\nsetTimeout(fn + '', 0);\nsetInterval(fn + '', 0);\nsetImmediate(fn + '');\nexecScript(fn + '');\n      ", []string{"noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError"}},
-		{"upstream invalid case 7", "\nconst foo: string = 'x + 1';\n\nsetTimeout(foo, 0);\nsetInterval(foo, 0);\nsetImmediate(foo);\nexecScript(foo);\n      ", []string{"noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError"}},
-		{"upstream invalid case 8", "\nconst foo = new String('x + 1');\n\nsetTimeout(foo, 0);\nsetInterval(foo, 0);\nsetImmediate(foo);\nexecScript(foo);\n      ", []string{"noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError"}},
-		{"upstream invalid case 9", "\nconst foo = 'x + 1';\n\nsetTimeout(foo as any, 0);\nsetInterval(foo as any, 0);\nsetImmediate(foo as any);\nexecScript(foo as any);\n      ", []string{"noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError"}},
-		{"upstream invalid case 10", "\nconst fn = (foo: string | any) => {\n  setTimeout(foo, 0);\n  setInterval(foo, 0);\n  setImmediate(foo);\n  execScript(foo);\n};\n      ", []string{"noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError"}},
-		{"upstream invalid case 11", "\nconst foo = 'foo';\nconst bar = () => {};\n\nsetTimeout(Math.radom() > 0.5 ? foo : bar, 0);\n      ", []string{"noImpliedEvalError"}},
-		{"upstream invalid case 12", "\nwindow.setTimeout(``, 0);\nwindow['setTimeout'](``, 0);\n\nwindow.setInterval(``, 0);\nwindow['setInterval'](``, 0);\n\nwindow.setImmediate(``);\nwindow['setImmediate'](``);\n\nwindow.execScript(``);\nwindow['execScript'](``);\n      ", []string{"noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError"}},
-		{"upstream invalid case 13", "\nglobal.setTimeout(``, 0);\nglobal['setTimeout'](``, 0);\n\nglobal.setInterval(``, 0);\nglobal['setInterval'](``, 0);\n\nglobal.setImmediate(``);\nglobal['setImmediate'](``);\n\nglobal.execScript(``);\nglobal['execScript'](``);\n      ", []string{"noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError"}},
-		{"upstream invalid case 14", "\nglobalThis.setTimeout(``, 0);\nglobalThis['setTimeout'](``, 0);\n\nglobalThis.setInterval(``, 0);\nglobalThis['setInterval'](``, 0);\n\nglobalThis.setImmediate(``);\nglobalThis['setImmediate'](``);\n\nglobalThis.execScript(``);\nglobalThis['execScript'](``);\n      ", []string{"noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError"}},
-		{"upstream invalid case 15", "\nconst foo: string | undefined = 'hello';\nconst bar = () => {};\n\nsetTimeout(foo || bar, 500);\n      ", []string{"noImpliedEvalError"}},
+		{
+			"upstream invalid case 0",
+			"\nsetTimeout('x = 1', 0);\nsetInterval('x = 1', 0);\nsetImmediate('x = 1');\nexecScript('x = 1');\n      ",
+			[]string{"noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError"},
+		},
+		{
+			"upstream invalid case 1",
+			"\nsetTimeout(undefined, 0);\nsetInterval(undefined, 0);\nsetImmediate(undefined);\nexecScript(undefined);\n      ",
+			[]string{"noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError"},
+		},
+		{
+			"upstream invalid case 2",
+			"\nsetTimeout(1 + '' + (() => {}), 0);\nsetInterval(1 + '' + (() => {}), 0);\nsetImmediate(1 + '' + (() => {}));\nexecScript(1 + '' + (() => {}));\n      ",
+			[]string{"noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError"},
+		},
+		{
+			"upstream invalid case 3",
+			"\nconst foo = 'x = 1';\n\nsetTimeout(foo, 0);\nsetInterval(foo, 0);\nsetImmediate(foo);\nexecScript(foo);\n      ",
+			[]string{"noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError"},
+		},
+		{
+			"upstream invalid case 4",
+			"\nconst foo = function () {\n  return 'x + 1';\n};\n\nsetTimeout(foo(), 0);\nsetInterval(foo(), 0);\nsetImmediate(foo());\nexecScript(foo());\n      ",
+			[]string{"noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError"},
+		},
+		{
+			"upstream invalid case 5",
+			"\nconst foo = function () {\n  return () => 'x + 1';\n};\n\nsetTimeout(foo()(), 0);\nsetInterval(foo()(), 0);\nsetImmediate(foo()());\nexecScript(foo()());\n      ",
+			[]string{"noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError"},
+		},
+		{
+			"upstream invalid case 6",
+			"\nconst fn = function () {};\n\nsetTimeout(fn + '', 0);\nsetInterval(fn + '', 0);\nsetImmediate(fn + '');\nexecScript(fn + '');\n      ",
+			[]string{"noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError"},
+		},
+		{
+			"upstream invalid case 7",
+			"\nconst foo: string = 'x + 1';\n\nsetTimeout(foo, 0);\nsetInterval(foo, 0);\nsetImmediate(foo);\nexecScript(foo);\n      ",
+			[]string{"noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError"},
+		},
+		{
+			"upstream invalid case 8",
+			"\nconst foo = new String('x + 1');\n\nsetTimeout(foo, 0);\nsetInterval(foo, 0);\nsetImmediate(foo);\nexecScript(foo);\n      ",
+			[]string{"noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError"},
+		},
+		{
+			"upstream invalid case 9",
+			"\nconst foo = 'x + 1';\n\nsetTimeout(foo as any, 0);\nsetInterval(foo as any, 0);\nsetImmediate(foo as any);\nexecScript(foo as any);\n      ",
+			[]string{"noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError"},
+		},
+		{
+			"upstream invalid case 10",
+			"\nconst fn = (foo: string | any) => {\n  setTimeout(foo, 0);\n  setInterval(foo, 0);\n  setImmediate(foo);\n  execScript(foo);\n};\n      ",
+			[]string{"noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError", "noImpliedEvalError"},
+		},
+		{
+			"upstream invalid case 11",
+			"\nconst foo = 'foo';\nconst bar = () => {};\n\nsetTimeout(Math.radom() > 0.5 ? foo : bar, 0);\n      ",
+			[]string{"noImpliedEvalError"},
+		},
+		{
+			"upstream invalid case 12",
+			"\nwindow.setTimeout(``, 0);\nwindow['setTimeout'](``, 0);\n\nwindow.setInterval(``, 0);\nwindow['setInterval'](``, 0);\n\nwindow.setImmediate(``);\nwindow['setImmediate'](``);\n\nwindow.execScript(``);\nwindow['execScript'](``);\n      ",
+			[]string{
+				"noImpliedEvalError",
+				"noImpliedEvalError",
+				"noImpliedEvalError",
+				"noImpliedEvalError",
+				"noImpliedEvalError",
+				"noImpliedEvalError",
+				"noImpliedEvalError",
+				"noImpliedEvalError",
+			},
+		},
+		{
+			"upstream invalid case 13",
+			"\nglobal.setTimeout(``, 0);\nglobal['setTimeout'](``, 0);\n\nglobal.setInterval(``, 0);\nglobal['setInterval'](``, 0);\n\nglobal.setImmediate(``);\nglobal['setImmediate'](``);\n\nglobal.execScript(``);\nglobal['execScript'](``);\n      ",
+			[]string{
+				"noImpliedEvalError",
+				"noImpliedEvalError",
+				"noImpliedEvalError",
+				"noImpliedEvalError",
+				"noImpliedEvalError",
+				"noImpliedEvalError",
+				"noImpliedEvalError",
+				"noImpliedEvalError",
+			},
+		},
+		{
+			"upstream invalid case 14",
+			"\nglobalThis.setTimeout(``, 0);\nglobalThis['setTimeout'](``, 0);\n\nglobalThis.setInterval(``, 0);\nglobalThis['setInterval'](``, 0);\n\nglobalThis.setImmediate(``);\nglobalThis['setImmediate'](``);\n\nglobalThis.execScript(``);\nglobalThis['execScript'](``);\n      ",
+			[]string{
+				"noImpliedEvalError",
+				"noImpliedEvalError",
+				"noImpliedEvalError",
+				"noImpliedEvalError",
+				"noImpliedEvalError",
+				"noImpliedEvalError",
+				"noImpliedEvalError",
+				"noImpliedEvalError",
+			},
+		},
+		{
+			"upstream invalid case 15",
+			"\nconst foo: string | undefined = 'hello';\nconst bar = () => {};\n\nsetTimeout(foo || bar, 500);\n      ",
+			[]string{"noImpliedEvalError"},
+		},
 		{"upstream invalid case 16", "const fn = Function();", []string{"noFunctionConstructor"}},
-		{"upstream invalid case 17", "const fn = new Function('a', 'b', 'return a + b');", []string{"noFunctionConstructor"}},
+		{
+			"upstream invalid case 17",
+			"const fn = new Function('a', 'b', 'return a + b');",
+			[]string{"noFunctionConstructor"},
+		},
 		{"upstream invalid case 18", "const fn = window.Function();", []string{"noFunctionConstructor"}},
 		{"upstream invalid case 19", "const fn = new window.Function();", []string{"noFunctionConstructor"}},
 		{"upstream invalid case 20", "const fn = window['Function']();", []string{"noFunctionConstructor"}},
@@ -209,7 +385,11 @@ func TestNoImpliedEvalRecognizesTheCalleeByNameRatherThanByResolution(test *test
 	for _, testCase := range reporting {
 		test.Run("reports/"+testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoImpliedEval, noImpliedEvalFile, testCase.sourceText), "noImpliedEvalError")
+			rule_testing.ExpectFindings(
+				test,
+				rule_testing.RunTyped(test, NoImpliedEval, noImpliedEvalFile, testCase.sourceText),
+				"noImpliedEvalError",
+			)
 		})
 	}
 
@@ -225,7 +405,10 @@ func TestNoImpliedEvalRecognizesTheCalleeByNameRatherThanByResolution(test *test
 		// Resolution as the negative filter: a declaration anywhere in this file exempts.
 		{"a local function declaration", "function setTimeout(x: string) {}\nsetTimeout('x=1');"},
 		{"a local const", "const setTimeout = (x: string) => {};\nsetTimeout('x=1');"},
-		{"a declare function in this file", "declare function setTimeout(h: any, t: number): void;\nsetTimeout('x=1', 0);"},
+		{
+			"a declare function in this file",
+			"declare function setTimeout(h: any, t: number): void;\nsetTimeout('x=1', 0);",
+		},
 		{"an import declaration in this file", "import { setTimeout } from './timers';\nsetTimeout('x=1');"},
 		// An alias carries the type but not the name, and names are all this rule reads.
 		{"an alias to the global under a different name", "const st = setTimeout;\nst('x=1', 0);"},
@@ -233,7 +416,10 @@ func TestNoImpliedEvalRecognizesTheCalleeByNameRatherThanByResolution(test *test
 	for _, testCase := range silent {
 		test.Run("silent/"+testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoImpliedEval, noImpliedEvalFile, testCase.sourceText))
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.RunTyped(test, NoImpliedEval, noImpliedEvalFile, testCase.sourceText),
+			)
 		})
 	}
 }
@@ -262,7 +448,11 @@ func TestNoImpliedEvalTestsForANonFunctionRatherThanForAString(test *testing.T) 
 	for _, testCase := range reporting {
 		test.Run("reports/"+testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoImpliedEval, noImpliedEvalFile, testCase.sourceText), "noImpliedEvalError")
+			rule_testing.ExpectFindings(
+				test,
+				rule_testing.RunTyped(test, NoImpliedEval, noImpliedEvalFile, testCase.sourceText),
+				"noImpliedEvalError",
+			)
 		})
 	}
 
@@ -270,7 +460,10 @@ func TestNoImpliedEvalTestsForANonFunctionRatherThanForAString(test *testing.T) 
 		{"a bind call", "declare function f(): void;\nsetTimeout(f.bind(null), 0);"},
 		// `isBind` keys on the name `bind` and never checks the receiver, so any method called
 		// `bind` exempts regardless of what it returns. Upstream behavior, reproduced.
-		{"a method merely NAMED bind returning a string", "declare const o: { bind(): string };\nsetTimeout(o.bind(), 0);"},
+		{
+			"a method merely NAMED bind returning a string",
+			"declare const o: { bind(): string };\nsetTimeout(o.bind(), 0);",
+		},
 		{"a call returning a function", "declare function make(): () => void;\nsetTimeout(make(), 0);"},
 		{"a Function-typed variable", "declare const f: Function;\nsetTimeout(f, 0);"},
 		// No first argument means nothing to judge.
@@ -279,7 +472,10 @@ func TestNoImpliedEvalTestsForANonFunctionRatherThanForAString(test *testing.T) 
 	for _, testCase := range silent {
 		test.Run("silent/"+testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoImpliedEval, noImpliedEvalFile, testCase.sourceText))
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.RunTyped(test, NoImpliedEval, noImpliedEvalFile, testCase.sourceText),
+			)
 		})
 	}
 }
@@ -314,7 +510,10 @@ func TestNoImpliedEvalDoesNotSkipParenthesesOnTheCallee(test *testing.T) {
 	for _, testCase := range silent {
 		test.Run("silent/"+testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoImpliedEval, noImpliedEvalFile, testCase.sourceText))
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.RunTyped(test, NoImpliedEval, noImpliedEvalFile, testCase.sourceText),
+			)
 		})
 	}
 
@@ -381,7 +580,9 @@ func TestNoImpliedEvalPointsAtTheRightNodeAndCarriesTheRightText(test *testing.T
 			test.Fatalf("want 1 finding, got %d", len(result.Diagnostics))
 		}
 		finding := result.Diagnostics[0]
-		if reported := strings.TrimSpace(sourceText)[finding.Range.Pos():finding.Range.End()]; reported != "new Function('a', 'return a')" {
+		if reported := strings.TrimSpace(
+			sourceText,
+		)[finding.Range.Pos():finding.Range.End()]; reported != "new Function('a', 'return a')" {
 			test.Errorf("span: want %q, got %q", "new Function('a', 'return a')", reported)
 		}
 		if finding.Message.Id != "noFunctionConstructor" {
@@ -433,7 +634,10 @@ func TestNoImpliedEvalDeclaresItNeedsTheTypeChecker(test *testing.T) {
 		test.Error("NoImpliedEval must declare NeedsTypeChecker: every listener reads ctx.TypeChecker")
 	}
 	if NoImpliedEval.ProgramReads != rule.ReadsCompilerOptions|rule.ReadsDefaultLibrary {
-		test.Errorf("NoImpliedEval must declare what IsBuiltinSymbolLike reads, the compiler options and the default library; declares %s", NoImpliedEval.ProgramReads)
+		test.Errorf(
+			"NoImpliedEval must declare what IsBuiltinSymbolLike reads, the compiler options and the default library; declares %s",
+			NoImpliedEval.ProgramReads,
+		)
 	}
 	if NoImpliedEval.Name != "@typescript-eslint/no-implied-eval" {
 		test.Errorf("registered name: want %q, got %q", "no-implied-eval", NoImpliedEval.Name)

@@ -58,22 +58,67 @@ func TestNoForInArrayFires(test *testing.T) {
 	}{
 		{"array literal subject", "\nfor (const x in [3, 4, 5]) {\n  console.log(x);\n}\n      "},
 		{"array through a const binding", "\nconst z = [3, 4, 5];\nfor (const x in z) {\n  console.log(x);\n}\n      "},
-		{"array parameter", "\nconst fn = (arr: number[]) => {\n  for (const x in arr) {\n    console.log(x);\n  }\n};\n      "},
-		{"union of two array types", "\nconst fn = (arr: number[] | string[]) => {\n  for (const x in arr) {\n    console.log(x);\n  }\n};\n      "},
-		{"type parameter constrained to an array", "\nconst fn = <T extends any[]>(arr: T) => {\n  for (const x in arr) {\n    console.log(x);\n  }\n};\n      "},
-		{"head spanning nested parentheses with a block body", "\nfor (const x\n  in\n    (\n      (\n        (\n          [3, 4, 5]\n        )\n      )\n    )\n  )\n  // weird\n  /* spot for a */\n  // comment\n  /* ) */\n  /* ( */\n  {\n  console.log(x);\n}\n      "},
-		{"head spanning nested parentheses with an unbraced body", "\nfor (const x\n  in\n    (\n      (\n        (\n          [3, 4, 5]\n        )\n      )\n    )\n  )\n  // weird\n  /* spot for a */\n  // comment\n  /* ) */\n  /* ( */\n\n  ((((console.log('body without braces ')))));\n\n      "},
-		{"array or null", "\ndeclare const array: string[] | null;\n\nfor (const key in array) {\n  console.log(key);\n}\n      "},
-		{"array or undefined", "\ndeclare const array: number[] | undefined;\n\nfor (const key in array) {\n  console.log(key);\n}\n      "},
-		{"array or a plain object", "\ndeclare const array: boolean[] | { a: 1; b: 2; c: 3 };\n\nfor (const key in array) {\n  console.log(key);\n}\n      "},
-		{"tuple subject", "\ndeclare const array: [number, string];\n\nfor (const key in array) {\n  console.log(key);\n}\n      "},
-		{"tuple or a plain object", "\ndeclare const array: [number, string] | { a: 1; b: 2; c: 3 };\n\nfor (const key in array) {\n  console.log(key);\n}\n      "},
-		{"array or a numeric record", "\ndeclare const array: string[] | Record<number, string>;\n\nfor (const key in array) {\n  console.log(key);\n}\n      "},
-		{"regular expression match result", "\nconst arrayLike = /fe/.exec('foo');\n\nfor (const x in arrayLike) {\n  console.log(x);\n}\n      "},
+		{
+			"array parameter",
+			"\nconst fn = (arr: number[]) => {\n  for (const x in arr) {\n    console.log(x);\n  }\n};\n      ",
+		},
+		{
+			"union of two array types",
+			"\nconst fn = (arr: number[] | string[]) => {\n  for (const x in arr) {\n    console.log(x);\n  }\n};\n      ",
+		},
+		{
+			"type parameter constrained to an array",
+			"\nconst fn = <T extends any[]>(arr: T) => {\n  for (const x in arr) {\n    console.log(x);\n  }\n};\n      ",
+		},
+		{
+			"head spanning nested parentheses with a block body",
+			"\nfor (const x\n  in\n    (\n      (\n        (\n          [3, 4, 5]\n        )\n      )\n    )\n  )\n  // weird\n  /* spot for a */\n  // comment\n  /* ) */\n  /* ( */\n  {\n  console.log(x);\n}\n      ",
+		},
+		{
+			"head spanning nested parentheses with an unbraced body",
+			"\nfor (const x\n  in\n    (\n      (\n        (\n          [3, 4, 5]\n        )\n      )\n    )\n  )\n  // weird\n  /* spot for a */\n  // comment\n  /* ) */\n  /* ( */\n\n  ((((console.log('body without braces ')))));\n\n      ",
+		},
+		{
+			"array or null",
+			"\ndeclare const array: string[] | null;\n\nfor (const key in array) {\n  console.log(key);\n}\n      ",
+		},
+		{
+			"array or undefined",
+			"\ndeclare const array: number[] | undefined;\n\nfor (const key in array) {\n  console.log(key);\n}\n      ",
+		},
+		{
+			"array or a plain object",
+			"\ndeclare const array: boolean[] | { a: 1; b: 2; c: 3 };\n\nfor (const key in array) {\n  console.log(key);\n}\n      ",
+		},
+		{
+			"tuple subject",
+			"\ndeclare const array: [number, string];\n\nfor (const key in array) {\n  console.log(key);\n}\n      ",
+		},
+		{
+			"tuple or a plain object",
+			"\ndeclare const array: [number, string] | { a: 1; b: 2; c: 3 };\n\nfor (const key in array) {\n  console.log(key);\n}\n      ",
+		},
+		{
+			"array or a numeric record",
+			"\ndeclare const array: string[] | Record<number, string>;\n\nfor (const key in array) {\n  console.log(key);\n}\n      ",
+		},
+		{
+			"regular expression match result",
+			"\nconst arrayLike = /fe/.exec('foo');\n\nfor (const x in arrayLike) {\n  console.log(x);\n}\n      ",
+		},
 		{"arguments object", "\nfunction foo() {\n  for (const a in arguments) {\n    console.log(a);\n  }\n}\n      "},
-		{"intersection of an object and an array inside a union", "\ndeclare const array:\n  | (({ a: string } & string[]) | Record<string, boolean>)\n  | Record<number, string>;\n\nfor (const key in array) {\n  console.log(key);\n}\n      "},
-		{"intersection of an object and a match result inside a union", "\ndeclare const array:\n  | (({ a: string } & RegExpExecArray) | Record<string, boolean>)\n  | Record<number, string>;\n\nfor (const key in array) {\n  console.log(k);\n}\n      "},
-		{"object with a number index and a numeric length", "\ndeclare const obj: {\n  [key: number]: number;\n  length: 1;\n};\n\nfor (const key in obj) {\n  console.log(key);\n}\n      "},
+		{
+			"intersection of an object and an array inside a union",
+			"\ndeclare const array:\n  | (({ a: string } & string[]) | Record<string, boolean>)\n  | Record<number, string>;\n\nfor (const key in array) {\n  console.log(key);\n}\n      ",
+		},
+		{
+			"intersection of an object and a match result inside a union",
+			"\ndeclare const array:\n  | (({ a: string } & RegExpExecArray) | Record<string, boolean>)\n  | Record<number, string>;\n\nfor (const key in array) {\n  console.log(k);\n}\n      ",
+		},
+		{
+			"object with a number index and a numeric length",
+			"\ndeclare const obj: {\n  [key: number]: number;\n  length: 1;\n};\n\nfor (const key in obj) {\n  console.log(key);\n}\n      ",
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -99,8 +144,14 @@ func TestNoForInArrayStaysSilent(test *testing.T) {
 	}{
 		{"for-of over an array", "\nfor (const x of [3, 4, 5]) {\n  console.log(x);\n}\n    "},
 		{"for-in over a plain object", "\nfor (const x in { a: 1, b: 2, c: 3 }) {\n  console.log(x);\n}\n    "},
-		{"for-in over a nullish value", "\ndeclare const nullish: null | undefined;\n// @ts-expect-error\nfor (const k in nullish) {\n}\n    "},
-		{"object with a number index and no length", "\ndeclare const obj: {\n  [key: number]: number;\n};\n\nfor (const key in obj) {\n  console.log(key);\n}\n    "},
+		{
+			"for-in over a nullish value",
+			"\ndeclare const nullish: null | undefined;\n// @ts-expect-error\nfor (const k in nullish) {\n}\n    ",
+		},
+		{
+			"object with a number index and no length",
+			"\ndeclare const obj: {\n  [key: number]: number;\n};\n\nfor (const key in obj) {\n  console.log(key);\n}\n    ",
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -137,14 +188,32 @@ func TestNoForInArrayNeedsBothHalvesOfThePredicate(test *testing.T) {
 		sourceText string
 	}{
 		// A numeric length with no number index. Silent, because half the predicate fails.
-		{"numeric length and no index signature", "declare const o: { length: number };\nfor (const k in o) {\n  console.log(k);\n}"},
-		{"a function, which has a numeric length", "declare const f: (a: number) => void;\nfor (const k in f) {\n  console.log(k);\n}"},
-		{"string index signature with a numeric length", "declare const o: { [k: string]: unknown; length: number };\nfor (const k in o) {\n  console.log(k);\n}"},
+		{
+			"numeric length and no index signature",
+			"declare const o: { length: number };\nfor (const k in o) {\n  console.log(k);\n}",
+		},
+		{
+			"a function, which has a numeric length",
+			"declare const f: (a: number) => void;\nfor (const k in f) {\n  console.log(k);\n}",
+		},
+		{
+			"string index signature with a numeric length",
+			"declare const o: { [k: string]: unknown; length: number };\nfor (const k in o) {\n  console.log(k);\n}",
+		},
 
 		// A number index whose length is not number-like. Silent, because the other half fails.
-		{"number index with a string length", "declare const o: { [k: number]: string; length: string };\nfor (const k in o) {\n  console.log(k);\n}"},
-		{"number index with a boolean length", "declare const o: { [k: number]: string; length: boolean };\nfor (const k in o) {\n  console.log(k);\n}"},
-		{"number index with a length method", "declare const o: { [k: number]: string; length(): number };\nfor (const k in o) {\n  console.log(k);\n}"},
+		{
+			"number index with a string length",
+			"declare const o: { [k: number]: string; length: string };\nfor (const k in o) {\n  console.log(k);\n}",
+		},
+		{
+			"number index with a boolean length",
+			"declare const o: { [k: number]: string; length: boolean };\nfor (const k in o) {\n  console.log(k);\n}",
+		},
+		{
+			"number index with a length method",
+			"declare const o: { [k: number]: string; length(): number };\nfor (const k in o) {\n  console.log(k);\n}",
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -168,8 +237,14 @@ func TestNoForInArrayDomCollections(test *testing.T) {
 		name       string
 		sourceText string
 	}{
-		{"html collection", "\ndeclare const arrayLike: HTMLCollection;\n\nfor (const x in arrayLike) {\n  console.log(x);\n}\n      "},
-		{"node list", "\ndeclare const arrayLike: NodeList;\n\nfor (const x in arrayLike) {\n  console.log(x);\n}\n      "},
+		{
+			"html collection",
+			"\ndeclare const arrayLike: HTMLCollection;\n\nfor (const x in arrayLike) {\n  console.log(x);\n}\n      ",
+		},
+		{
+			"node list",
+			"\ndeclare const arrayLike: NodeList;\n\nfor (const x in arrayLike) {\n  console.log(x);\n}\n      ",
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -206,23 +281,142 @@ func TestNoForInArrayReportsTheLoopHead(test *testing.T) {
 		line, column, endLine, endColumn int
 	}{
 		{"array literal subject", "\nfor (const x in [3, 4, 5]) {\n  console.log(x);\n}\n      ", 1, 1, 1, 27},
-		{"array through a const binding", "\nconst z = [3, 4, 5];\nfor (const x in z) {\n  console.log(x);\n}\n      ", 2, 1, 2, 19},
-		{"array parameter", "\nconst fn = (arr: number[]) => {\n  for (const x in arr) {\n    console.log(x);\n  }\n};\n      ", 2, 3, 2, 23},
-		{"union of two array types", "\nconst fn = (arr: number[] | string[]) => {\n  for (const x in arr) {\n    console.log(x);\n  }\n};\n      ", 2, 3, 2, 23},
-		{"type parameter constrained to an array", "\nconst fn = <T extends any[]>(arr: T) => {\n  for (const x in arr) {\n    console.log(x);\n  }\n};\n      ", 2, 3, 2, 23},
-		{"head spanning nested parentheses with a block body", "\nfor (const x\n  in\n    (\n      (\n        (\n          [3, 4, 5]\n        )\n      )\n    )\n  )\n  // weird\n  /* spot for a */\n  // comment\n  /* ) */\n  /* ( */\n  {\n  console.log(x);\n}\n      ", 1, 1, 10, 4},
-		{"head spanning nested parentheses with an unbraced body", "\nfor (const x\n  in\n    (\n      (\n        (\n          [3, 4, 5]\n        )\n      )\n    )\n  )\n  // weird\n  /* spot for a */\n  // comment\n  /* ) */\n  /* ( */\n\n  ((((console.log('body without braces ')))));\n\n      ", 1, 1, 10, 4},
-		{"array or null", "\ndeclare const array: string[] | null;\n\nfor (const key in array) {\n  console.log(key);\n}\n      ", 3, 1, 3, 25},
-		{"array or undefined", "\ndeclare const array: number[] | undefined;\n\nfor (const key in array) {\n  console.log(key);\n}\n      ", 3, 1, 3, 25},
-		{"array or a plain object", "\ndeclare const array: boolean[] | { a: 1; b: 2; c: 3 };\n\nfor (const key in array) {\n  console.log(key);\n}\n      ", 3, 1, 3, 25},
-		{"tuple subject", "\ndeclare const array: [number, string];\n\nfor (const key in array) {\n  console.log(key);\n}\n      ", 3, 1, 3, 25},
-		{"tuple or a plain object", "\ndeclare const array: [number, string] | { a: 1; b: 2; c: 3 };\n\nfor (const key in array) {\n  console.log(key);\n}\n      ", 3, 1, 3, 25},
-		{"array or a numeric record", "\ndeclare const array: string[] | Record<number, string>;\n\nfor (const key in array) {\n  console.log(key);\n}\n      ", 3, 1, 3, 25},
-		{"regular expression match result", "\nconst arrayLike = /fe/.exec('foo');\n\nfor (const x in arrayLike) {\n  console.log(x);\n}\n      ", 3, 1, 3, 27},
-		{"arguments object", "\nfunction foo() {\n  for (const a in arguments) {\n    console.log(a);\n  }\n}\n      ", 2, 3, 2, 29},
-		{"intersection of an object and an array inside a union", "\ndeclare const array:\n  | (({ a: string } & string[]) | Record<string, boolean>)\n  | Record<number, string>;\n\nfor (const key in array) {\n  console.log(key);\n}\n      ", 5, 1, 5, 25},
-		{"intersection of an object and a match result inside a union", "\ndeclare const array:\n  | (({ a: string } & RegExpExecArray) | Record<string, boolean>)\n  | Record<number, string>;\n\nfor (const key in array) {\n  console.log(k);\n}\n      ", 5, 1, 5, 25},
-		{"object with a number index and a numeric length", "\ndeclare const obj: {\n  [key: number]: number;\n  length: 1;\n};\n\nfor (const key in obj) {\n  console.log(key);\n}\n      ", 6, 1, 6, 23},
+		{
+			"array through a const binding",
+			"\nconst z = [3, 4, 5];\nfor (const x in z) {\n  console.log(x);\n}\n      ",
+			2,
+			1,
+			2,
+			19,
+		},
+		{
+			"array parameter",
+			"\nconst fn = (arr: number[]) => {\n  for (const x in arr) {\n    console.log(x);\n  }\n};\n      ",
+			2,
+			3,
+			2,
+			23,
+		},
+		{
+			"union of two array types",
+			"\nconst fn = (arr: number[] | string[]) => {\n  for (const x in arr) {\n    console.log(x);\n  }\n};\n      ",
+			2,
+			3,
+			2,
+			23,
+		},
+		{
+			"type parameter constrained to an array",
+			"\nconst fn = <T extends any[]>(arr: T) => {\n  for (const x in arr) {\n    console.log(x);\n  }\n};\n      ",
+			2,
+			3,
+			2,
+			23,
+		},
+		{
+			"head spanning nested parentheses with a block body",
+			"\nfor (const x\n  in\n    (\n      (\n        (\n          [3, 4, 5]\n        )\n      )\n    )\n  )\n  // weird\n  /* spot for a */\n  // comment\n  /* ) */\n  /* ( */\n  {\n  console.log(x);\n}\n      ",
+			1,
+			1,
+			10,
+			4,
+		},
+		{
+			"head spanning nested parentheses with an unbraced body",
+			"\nfor (const x\n  in\n    (\n      (\n        (\n          [3, 4, 5]\n        )\n      )\n    )\n  )\n  // weird\n  /* spot for a */\n  // comment\n  /* ) */\n  /* ( */\n\n  ((((console.log('body without braces ')))));\n\n      ",
+			1,
+			1,
+			10,
+			4,
+		},
+		{
+			"array or null",
+			"\ndeclare const array: string[] | null;\n\nfor (const key in array) {\n  console.log(key);\n}\n      ",
+			3,
+			1,
+			3,
+			25,
+		},
+		{
+			"array or undefined",
+			"\ndeclare const array: number[] | undefined;\n\nfor (const key in array) {\n  console.log(key);\n}\n      ",
+			3,
+			1,
+			3,
+			25,
+		},
+		{
+			"array or a plain object",
+			"\ndeclare const array: boolean[] | { a: 1; b: 2; c: 3 };\n\nfor (const key in array) {\n  console.log(key);\n}\n      ",
+			3,
+			1,
+			3,
+			25,
+		},
+		{
+			"tuple subject",
+			"\ndeclare const array: [number, string];\n\nfor (const key in array) {\n  console.log(key);\n}\n      ",
+			3,
+			1,
+			3,
+			25,
+		},
+		{
+			"tuple or a plain object",
+			"\ndeclare const array: [number, string] | { a: 1; b: 2; c: 3 };\n\nfor (const key in array) {\n  console.log(key);\n}\n      ",
+			3,
+			1,
+			3,
+			25,
+		},
+		{
+			"array or a numeric record",
+			"\ndeclare const array: string[] | Record<number, string>;\n\nfor (const key in array) {\n  console.log(key);\n}\n      ",
+			3,
+			1,
+			3,
+			25,
+		},
+		{
+			"regular expression match result",
+			"\nconst arrayLike = /fe/.exec('foo');\n\nfor (const x in arrayLike) {\n  console.log(x);\n}\n      ",
+			3,
+			1,
+			3,
+			27,
+		},
+		{
+			"arguments object",
+			"\nfunction foo() {\n  for (const a in arguments) {\n    console.log(a);\n  }\n}\n      ",
+			2,
+			3,
+			2,
+			29,
+		},
+		{
+			"intersection of an object and an array inside a union",
+			"\ndeclare const array:\n  | (({ a: string } & string[]) | Record<string, boolean>)\n  | Record<number, string>;\n\nfor (const key in array) {\n  console.log(key);\n}\n      ",
+			5,
+			1,
+			5,
+			25,
+		},
+		{
+			"intersection of an object and a match result inside a union",
+			"\ndeclare const array:\n  | (({ a: string } & RegExpExecArray) | Record<string, boolean>)\n  | Record<number, string>;\n\nfor (const key in array) {\n  console.log(k);\n}\n      ",
+			5,
+			1,
+			5,
+			25,
+		},
+		{
+			"object with a number index and a numeric length",
+			"\ndeclare const obj: {\n  [key: number]: number;\n  length: 1;\n};\n\nfor (const key in obj) {\n  console.log(key);\n}\n      ",
+			6,
+			1,
+			6,
+			23,
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -348,7 +542,12 @@ func TestNoForInArrayRequiresTheTypedHarness(test *testing.T) {
 
 	// Drive the listener with a checker-less Context. It must return rather than reach the checker,
 	// and this is the only path that reaches that branch, since registration always supplies one.
-	typed := rule_testing.RunTyped(test, NoForInArray, noForInArrayFile, "declare const arr: number[];\nfor (const key in arr) {\n}\n")
+	typed := rule_testing.RunTyped(
+		test,
+		NoForInArray,
+		noForInArrayFile,
+		"declare const arr: number[];\nfor (const key in arr) {\n}\n",
+	)
 	if len(typed.Diagnostics) != 1 {
 		test.Fatalf("the typed harness found %d findings, want one", len(typed.Diagnostics))
 	}

@@ -43,7 +43,9 @@ func TestTheLibFilesAreNotCheckedAndTheProjectsFilesAre(test *testing.T) {
 
 	found := false
 	for _, diagnostic := range graph.AllDiagnostics(context.Background()) {
-		if diagnostic.Code() == 2717 && diagnostic.File() != nil && strings.HasSuffix(diagnostic.File().FileName().AsString(), "globals.ts") {
+		if diagnostic.Code() == 2717 &&
+			diagnostic.File() != nil &&
+			strings.HasSuffix(diagnostic.File().FileName().AsString(), "globals.ts") {
 			found = true
 		}
 	}

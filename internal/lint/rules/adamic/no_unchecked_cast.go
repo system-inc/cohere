@@ -77,7 +77,8 @@ var NoUncheckedCast = rule.Rule{
 					ruleContext.Note(CheckedDowncastNote)
 					return
 				}
-			} else if target.Flags()&(checker.TypeFlagsAny|checker.TypeFlagsUnknown) != 0 || type_checking.IsTypeUnknownArrayType(target, typeChecker) {
+			} else if target.Flags()&(checker.TypeFlagsAny|checker.TypeFlagsUnknown) != 0 ||
+				type_checking.IsTypeUnknownArrayType(target, typeChecker) {
 				return
 			}
 			ruleContext.ReportNode(node, rule.Message{
@@ -146,7 +147,8 @@ func distinguishable(typeChecker *checker.Checker, left *checker.Type, right *ch
 		// Two members of one primitive class: literals of it, told apart by ===.
 		return isUnitLiteral(left) && isUnitLiteral(right)
 	}
-	if flow.IsClassInstance(left) && !flow.IsClassInstance(right) || !flow.IsClassInstance(left) && flow.IsClassInstance(right) {
+	if flow.IsClassInstance(left) && !flow.IsClassInstance(right) ||
+		!flow.IsClassInstance(left) && flow.IsClassInstance(right) {
 		return true
 	}
 	if flow.IsClassInstance(left) && flow.IsClassInstance(right) && classSymbol(left) != classSymbol(right) &&

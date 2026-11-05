@@ -83,7 +83,10 @@ const (
 )
 
 // ClassSignature is the signature of one class without variants or importance, under the given features.
-func (compiler *SignatureCompiler) ClassSignature(className string, features SignatureFeatures) (string, SignatureState) {
+func (compiler *SignatureCompiler) ClassSignature(
+	className string,
+	features SignatureFeatures,
+) (string, SignatureState) {
 	system := compiler.system
 	nodes, state := compiler.signatureNodes(className)
 	if state != SignatureExact {
@@ -292,7 +295,9 @@ func (compiler *SignatureCompiler) readingNodes(candidate *ParsedCandidate) ([]*
 	// supports fractions reads the fraction before it reads a modifier, so for one of those it is not a
 	// modifier at all; the parser fills the fraction for any named modifier, `black/10` included, and on
 	// every other root it is the modifier it looks like.
-	isFraction := candidate.Value != nil && candidate.Value.Fraction != "" && suggestsFractions(strings.TrimPrefix(candidate.Root, "-"))
+	isFraction := candidate.Value != nil &&
+		candidate.Value.Fraction != "" &&
+		suggestsFractions(strings.TrimPrefix(candidate.Root, "-"))
 	if candidate.Modifier != nil && !isFraction {
 		return nil, SignatureUnknown
 	}
@@ -372,7 +377,9 @@ func (compiler *SignatureCompiler) functionalReadingNodes(candidate *ParsedCandi
 	// The three colour keywords are answered by resolveThemeColor before any theme lookup, which the
 	// two slices' descriptions do not carry. A colour root, one whose `suggest` offers them, takes the
 	// keyword's colour through its emitter; any other root resolves it as an ordinary name.
-	if candidate.Value.Kind == ParsedValueKindNamed && isColourKeyword(candidate.Value.Value) && suggestsColourKeywords(root) {
+	if candidate.Value.Kind == ParsedValueKindNamed &&
+		isColourKeyword(candidate.Value.Value) &&
+		suggestsColourKeywords(root) {
 		resolved := ResolvedUtilityValue{Value: colourKeywordValue(candidate.Value.Value)}
 		if utility, known := FrameworkFunctionalUtilities[root]; known {
 			return utility.Emit(root, resolved), SignatureExact
@@ -432,7 +439,12 @@ func colourArmNodes(candidate *ParsedCandidate, root string, theme *Theme) ([]*N
 		if !resolved {
 			// Another arm may take the value, and this port does not compile those. Whether any arm
 			// takes it at all is what existence asks, so a value no arm resolves compiles to nothing.
-			if _, produced := ResolveFunctionalUtilityValue(candidate, description, theme, strings.HasPrefix(candidate.Root, "-")); !produced {
+			if _, produced := ResolveFunctionalUtilityValue(
+				candidate,
+				description,
+				theme,
+				strings.HasPrefix(candidate.Root, "-"),
+			); !produced {
 				return nil, SignatureNone
 			}
 			return nil, SignatureUnknown

@@ -324,7 +324,12 @@ func ParseRegexCharacterClassWithEnd(pattern string, start, end int, flags Regex
 
 const maxRegexCharacterClassPreallocation = 16 << 10
 
-func parseRegexCharacterClass(pattern string, start int, flags RegexFlags, elementCapacity int) ([]RegexCharElement, int, bool) {
+func parseRegexCharacterClass(
+	pattern string,
+	start int,
+	flags RegexFlags,
+	elementCapacity int,
+) ([]RegexCharElement, int, bool) {
 	if start >= len(pattern) || pattern[start] != '[' {
 		return nil, start, false
 	}

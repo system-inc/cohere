@@ -64,8 +64,11 @@ func creatingGetterCalls(test *testing.T, overlay map[string][]byte) []string {
 				}
 				if creatingGetters[function.Name()] {
 					position := pkg.Fset.Position(selector.Pos())
-					calls = append(calls, filepath.Base(filepath.Dir(position.Filename))+"/"+filepath.Base(position.Filename)+
-						":"+strconv.Itoa(position.Line)+" calls "+function.Name())
+					calls = append(
+						calls,
+						filepath.Base(filepath.Dir(position.Filename))+"/"+filepath.Base(position.Filename)+
+							":"+strconv.Itoa(position.Line)+" calls "+function.Name(),
+					)
 				}
 				found[function.Pkg().Path()] = true
 				return true

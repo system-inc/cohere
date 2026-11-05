@@ -34,20 +34,50 @@ func TestJsxFragmentsStaysSilent(test *testing.T) {
 		options          JsxFragmentsOptions
 	}{
 		{"upstream valid 0", "<><Foo /></>", JsxFragmentsOptions{Mode: JsxFragmentsSyntax}},
-		{"upstream valid 1", "<React.Fragment><Foo /></React.Fragment>", JsxFragmentsOptions{Mode: JsxFragmentsElement}},
+		{
+			"upstream valid 1",
+			"<React.Fragment><Foo /></React.Fragment>",
+			JsxFragmentsOptions{Mode: JsxFragmentsElement},
+		},
 		{"upstream valid 2", "<React.Fragment />", JsxFragmentsOptions{Mode: JsxFragmentsElement}},
-		{"upstream valid 3", "\n        import React, { Fragment as F } from 'react';\n        <F><Foo /></F>;\n      ", JsxFragmentsOptions{Mode: JsxFragmentsElement}},
-		{"upstream valid 4", "\n        const F = React.Fragment;\n        <F><Foo /></F>;\n      ", JsxFragmentsOptions{Mode: JsxFragmentsElement}},
-		{"upstream valid 5", "\n        const { Fragment } = React;\n        <Fragment><Foo /></Fragment>;\n      ", JsxFragmentsOptions{Mode: JsxFragmentsElement}},
-		{"upstream valid 6", "\n        const { Fragment } = require('react');\n        <Fragment><Foo /></Fragment>;\n      ", JsxFragmentsOptions{Mode: JsxFragmentsElement}},
-		{"upstream valid 7", "<React.Fragment key=\"key\"><Foo /></React.Fragment>", JsxFragmentsOptions{Mode: JsxFragmentsSyntax}},
+		{
+			"upstream valid 3",
+			"\n        import React, { Fragment as F } from 'react';\n        <F><Foo /></F>;\n      ",
+			JsxFragmentsOptions{Mode: JsxFragmentsElement},
+		},
+		{
+			"upstream valid 4",
+			"\n        const F = React.Fragment;\n        <F><Foo /></F>;\n      ",
+			JsxFragmentsOptions{Mode: JsxFragmentsElement},
+		},
+		{
+			"upstream valid 5",
+			"\n        const { Fragment } = React;\n        <Fragment><Foo /></Fragment>;\n      ",
+			JsxFragmentsOptions{Mode: JsxFragmentsElement},
+		},
+		{
+			"upstream valid 6",
+			"\n        const { Fragment } = require('react');\n        <Fragment><Foo /></Fragment>;\n      ",
+			JsxFragmentsOptions{Mode: JsxFragmentsElement},
+		},
+		{
+			"upstream valid 7",
+			"<React.Fragment key=\"key\"><Foo /></React.Fragment>",
+			JsxFragmentsOptions{Mode: JsxFragmentsSyntax},
+		},
 		{"upstream valid 8", "<React.Fragment key=\"key\" />", JsxFragmentsOptions{Mode: JsxFragmentsSyntax}},
 		{"upstream invalid 0", "<><Foo /></>", JsxFragmentsOptions{Mode: JsxFragmentsSyntax}},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(test, JsxFragments, jsxFragmentsFile, testCase.sourceText, testCase.options)
+			result := rule_testing.RunTypedWithOptions(
+				test,
+				JsxFragments,
+				jsxFragmentsFile,
+				testCase.sourceText,
+				testCase.options,
+			)
 			rule_testing.ExpectClean(test, result)
 		})
 	}
@@ -61,23 +91,89 @@ func TestJsxFragmentsFires(test *testing.T) {
 		options          JsxFragmentsOptions
 		messageIds       []string
 	}{
-		{"upstream invalid 1", "<React.Fragment><Foo /></React.Fragment>", JsxFragmentsOptions{Mode: JsxFragmentsSyntax}, []string{"preferFragment"}},
-		{"upstream invalid 2", "<React.Fragment />", JsxFragmentsOptions{Mode: JsxFragmentsSyntax}, []string{"preferFragment"}},
-		{"upstream invalid 3", "<><Foo /></>", JsxFragmentsOptions{Mode: JsxFragmentsElement}, []string{"preferPragma"}},
-		{"upstream invalid 4", "<><Foo /></>", JsxFragmentsOptions{Mode: JsxFragmentsElement}, []string{"preferPragma"}},
-		{"upstream invalid 5", "<React.Fragment><Foo /></React.Fragment>", JsxFragmentsOptions{Mode: JsxFragmentsSyntax}, []string{"preferFragment"}},
-		{"upstream invalid 6", "<React.Fragment />", JsxFragmentsOptions{Mode: JsxFragmentsSyntax}, []string{"preferFragment"}},
-		{"upstream invalid 7", "\n        import React, { Fragment as F } from 'react';\n        <F />;\n      ", JsxFragmentsOptions{Mode: JsxFragmentsSyntax}, []string{"preferFragment"}},
-		{"upstream invalid 8", "\n        import React, { Fragment as F } from 'react';\n        <F><Foo /></F>;\n      ", JsxFragmentsOptions{Mode: JsxFragmentsSyntax}, []string{"preferFragment"}},
-		{"upstream invalid 9", "\n        import React, { Fragment } from 'react';\n        <Fragment><Foo /></Fragment>;\n      ", JsxFragmentsOptions{Mode: JsxFragmentsSyntax}, []string{"preferFragment"}},
-		{"upstream invalid 10", "\n        const F = React.Fragment;\n        <F><Foo /></F>;\n      ", JsxFragmentsOptions{Mode: JsxFragmentsSyntax}, []string{"preferFragment"}},
-		{"upstream invalid 11", "\n        const { Fragment } = React;\n        <Fragment><Foo /></Fragment>;\n      ", JsxFragmentsOptions{Mode: JsxFragmentsSyntax}, []string{"preferFragment"}},
-		{"upstream invalid 12", "\n        const { Fragment } = require('react');\n        <Fragment><Foo /></Fragment>;\n      ", JsxFragmentsOptions{Mode: JsxFragmentsSyntax}, []string{"preferFragment"}},
+		{
+			"upstream invalid 1",
+			"<React.Fragment><Foo /></React.Fragment>",
+			JsxFragmentsOptions{Mode: JsxFragmentsSyntax},
+			[]string{"preferFragment"},
+		},
+		{
+			"upstream invalid 2",
+			"<React.Fragment />",
+			JsxFragmentsOptions{Mode: JsxFragmentsSyntax},
+			[]string{"preferFragment"},
+		},
+		{
+			"upstream invalid 3",
+			"<><Foo /></>",
+			JsxFragmentsOptions{Mode: JsxFragmentsElement},
+			[]string{"preferPragma"},
+		},
+		{
+			"upstream invalid 4",
+			"<><Foo /></>",
+			JsxFragmentsOptions{Mode: JsxFragmentsElement},
+			[]string{"preferPragma"},
+		},
+		{
+			"upstream invalid 5",
+			"<React.Fragment><Foo /></React.Fragment>",
+			JsxFragmentsOptions{Mode: JsxFragmentsSyntax},
+			[]string{"preferFragment"},
+		},
+		{
+			"upstream invalid 6",
+			"<React.Fragment />",
+			JsxFragmentsOptions{Mode: JsxFragmentsSyntax},
+			[]string{"preferFragment"},
+		},
+		{
+			"upstream invalid 7",
+			"\n        import React, { Fragment as F } from 'react';\n        <F />;\n      ",
+			JsxFragmentsOptions{Mode: JsxFragmentsSyntax},
+			[]string{"preferFragment"},
+		},
+		{
+			"upstream invalid 8",
+			"\n        import React, { Fragment as F } from 'react';\n        <F><Foo /></F>;\n      ",
+			JsxFragmentsOptions{Mode: JsxFragmentsSyntax},
+			[]string{"preferFragment"},
+		},
+		{
+			"upstream invalid 9",
+			"\n        import React, { Fragment } from 'react';\n        <Fragment><Foo /></Fragment>;\n      ",
+			JsxFragmentsOptions{Mode: JsxFragmentsSyntax},
+			[]string{"preferFragment"},
+		},
+		{
+			"upstream invalid 10",
+			"\n        const F = React.Fragment;\n        <F><Foo /></F>;\n      ",
+			JsxFragmentsOptions{Mode: JsxFragmentsSyntax},
+			[]string{"preferFragment"},
+		},
+		{
+			"upstream invalid 11",
+			"\n        const { Fragment } = React;\n        <Fragment><Foo /></Fragment>;\n      ",
+			JsxFragmentsOptions{Mode: JsxFragmentsSyntax},
+			[]string{"preferFragment"},
+		},
+		{
+			"upstream invalid 12",
+			"\n        const { Fragment } = require('react');\n        <Fragment><Foo /></Fragment>;\n      ",
+			JsxFragmentsOptions{Mode: JsxFragmentsSyntax},
+			[]string{"preferFragment"},
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(test, JsxFragments, jsxFragmentsFile, testCase.sourceText, testCase.options)
+			result := rule_testing.RunTypedWithOptions(
+				test,
+				JsxFragments,
+				jsxFragmentsFile,
+				testCase.sourceText,
+				testCase.options,
+			)
 			rule_testing.ExpectFindings(test, result, testCase.messageIds...)
 		})
 	}
@@ -573,7 +669,12 @@ func TestJsxFragmentsDecoderRefusesWhatUpstreamRefuses(test *testing.T) {
 			continue
 		}
 		if !strings.Contains(decodeJsxFragmentsOptionsError.Error(), refused.named) {
-			test.Errorf("%s was refused without naming %s: %v", refused.wire, refused.named, decodeJsxFragmentsOptionsError)
+			test.Errorf(
+				"%s was refused without naming %s: %v",
+				refused.wire,
+				refused.named,
+				decodeJsxFragmentsOptionsError,
+			)
 		}
 	}
 }

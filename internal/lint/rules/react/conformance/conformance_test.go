@@ -151,7 +151,9 @@ func TestEveryFixtureHasAParsedExpectation(test *testing.T) {
 	}
 
 	if totalErrors == 0 {
-		test.Fatal("parsed zero individual errors across the whole corpus, which is what a broken parser looks like from a passing suite")
+		test.Fatal(
+			"parsed zero individual errors across the whole corpus, which is what a broken parser looks like from a passing suite",
+		)
 	}
 
 	// 429 diagnostics, 398 with a primary location. Both pinned, because both are load-bearing and
@@ -165,7 +167,12 @@ func TestEveryFixtureHasAParsedExpectation(test *testing.T) {
 	if withLocation != 398 {
 		test.Errorf("errors carrying a primary location = %d, want 398", withLocation)
 	}
-	test.Logf("parsed %d individual errors, %d carrying a location, across %d fixtures", totalErrors, withLocation, len(fixtures))
+	test.Logf(
+		"parsed %d individual errors, %d carrying a location, across %d fixtures",
+		totalErrors,
+		withLocation,
+		len(fixtures),
+	)
 }
 
 // TestDeclaredCountMatchesParsedErrors cross-checks the parser against the goldens' own arithmetic.
@@ -339,7 +346,13 @@ func TestPragmaParserReproducesUpstreamsSplit(test *testing.T) {
 		}
 		for index := range got {
 			if got[index] != testCase.want[index] {
-				test.Errorf("%q: pragma %d = %+v, want %+v", testCase.firstLine, index, got[index], testCase.want[index])
+				test.Errorf(
+					"%q: pragma %d = %+v, want %+v",
+					testCase.firstLine,
+					index,
+					got[index],
+					testCase.want[index],
+				)
 			}
 		}
 	}
@@ -365,7 +378,11 @@ func TestExpectationParserReadsARealGolden(test *testing.T) {
 	}
 
 	if !subject.Expected.HasDeclaredCount || subject.Expected.DeclaredCount != 1 {
-		test.Errorf("declared count = %d (present %v), want 1", subject.Expected.DeclaredCount, subject.Expected.HasDeclaredCount)
+		test.Errorf(
+			"declared count = %d (present %v), want 1",
+			subject.Expected.DeclaredCount,
+			subject.Expected.HasDeclaredCount,
+		)
 	}
 	if len(subject.Expected.Errors) != 1 {
 		test.Fatalf("parsed %d errors, want 1", len(subject.Expected.Errors))
@@ -379,7 +396,12 @@ func TestExpectationParserReadsARealGolden(test *testing.T) {
 		test.Errorf("message = %q, want %q", parsed.Message, want)
 	}
 	if parsed.File != "error.assign-global-in-jsx-children.ts" || parsed.Line != 3 || parsed.Column != 4 {
-		test.Errorf("location = %s:%d:%d, want error.assign-global-in-jsx-children.ts:3:4", parsed.File, parsed.Line, parsed.Column)
+		test.Errorf(
+			"location = %s:%d:%d, want error.assign-global-in-jsx-children.ts:3:4",
+			parsed.File,
+			parsed.Line,
+			parsed.Column,
+		)
 	}
 }
 
@@ -422,7 +444,11 @@ func TestRunnerCanDetectAPass(test *testing.T) {
 	}
 
 	if score.Passed != len(fixtures) {
-		test.Errorf("a correct implementation scored %d / %d; the comparison cannot recognise a right answer", score.Passed, score.Considered)
+		test.Errorf(
+			"a correct implementation scored %d / %d; the comparison cannot recognise a right answer",
+			score.Passed,
+			score.Considered,
+		)
 		for _, fixtureScore := range score.Fixtures {
 			if fixtureScore.Outcome != OutcomePassed {
 				test.Logf("  %s: %s \u2014 %s", fixtureScore.Name, fixtureScore.Outcome, fixtureScore.Detail)
@@ -446,23 +472,35 @@ func TestRunnerCanDetectAFailure(test *testing.T) {
 		Errors: []ExpectedError{{Heading: "Error", Message: "Cannot reassign variables", Line: 3}},
 	}
 
-	if verdict := Compare(expectation, Result{Errors: []ReportedError{{Heading: "Error", Message: "Cannot reassign variables", Line: 3}}}); verdict.Outcome != OutcomePassed {
+	if verdict := Compare(
+		expectation,
+		Result{Errors: []ReportedError{{Heading: "Error", Message: "Cannot reassign variables", Line: 3}}},
+	); verdict.Outcome != OutcomePassed {
 		test.Errorf("an exactly-right result scored %s", verdict.Outcome)
 	}
 
 	// Right message, wrong line.
-	if verdict := Compare(expectation, Result{Errors: []ReportedError{{Heading: "Error", Message: "Cannot reassign variables", Line: 9}}}); verdict.Outcome != OutcomeFailed {
+	if verdict := Compare(
+		expectation,
+		Result{Errors: []ReportedError{{Heading: "Error", Message: "Cannot reassign variables", Line: 9}}},
+	); verdict.Outcome != OutcomeFailed {
 		test.Errorf("a result on the wrong line scored %s", verdict.Outcome)
 	}
 
 	// Right line, wrong message.
-	if verdict := Compare(expectation, Result{Errors: []ReportedError{{Heading: "Error", Message: "Something else", Line: 3}}}); verdict.Outcome != OutcomeFailed {
+	if verdict := Compare(
+		expectation,
+		Result{Errors: []ReportedError{{Heading: "Error", Message: "Something else", Line: 3}}},
+	); verdict.Outcome != OutcomeFailed {
 		test.Errorf("a result with the wrong message scored %s", verdict.Outcome)
 	}
 
 	// Right message and line, wrong heading. `Compilation Skipped` and `Error` are different
 	// verdicts about the same source and a port that confuses them has got a real thing wrong.
-	if verdict := Compare(expectation, Result{Errors: []ReportedError{{Heading: "Todo", Message: "Cannot reassign variables", Line: 3}}}); verdict.Outcome != OutcomeFailed {
+	if verdict := Compare(
+		expectation,
+		Result{Errors: []ReportedError{{Heading: "Todo", Message: "Cannot reassign variables", Line: 3}}},
+	); verdict.Outcome != OutcomeFailed {
 		test.Errorf("a result under the wrong heading scored %s", verdict.Outcome)
 	}
 
@@ -477,8 +515,13 @@ func TestRunnerCanDetectAFailure(test *testing.T) {
 		{Heading: "Error", Message: "Same message", Line: 4},
 		{Heading: "Error", Message: "Same message", Line: 4},
 	}}
-	if verdict := Compare(twoOfTheSame, Result{Errors: []ReportedError{{Heading: "Error", Message: "Same message", Line: 4}}}); verdict.Outcome != OutcomeFailed {
-		test.Errorf("one finding satisfied two identical expectations, so the comparison is a set rather than a multiset")
+	if verdict := Compare(
+		twoOfTheSame,
+		Result{Errors: []ReportedError{{Heading: "Error", Message: "Same message", Line: 4}}},
+	); verdict.Outcome != OutcomeFailed {
+		test.Errorf(
+			"one finding satisfied two identical expectations, so the comparison is a set rather than a multiset",
+		)
 	}
 }
 
@@ -511,7 +554,10 @@ func TestFirstHonestScoreIsZeroOfThreeHundredTwentyFive(test *testing.T) {
 		test.Errorf("declined %d, want %d", score.Declined, ExpectedFixtureCount)
 	}
 	if score.Refused != 0 {
-		test.Errorf("refused %d, want 0; a non-zero refusal count is a defect in this package, not a score", score.Refused)
+		test.Errorf(
+			"refused %d, want 0; a non-zero refusal count is a defect in this package, not a score",
+			score.Refused,
+		)
 	}
 
 	test.Logf("first honest score: %s", score.Summary())
@@ -553,8 +599,8 @@ func TestFlowExclusionIsCountedNotDropped(test *testing.T) {
 //
 // It checks structure rather than content: every input has its expectation, every expectation has
 // its input, and nothing else is in the directory. Content is guaranteed by `Load` parsing each
-// golden, and against upstream by re-running `internal/lint/rules/react/tools/vendor_fixtures` and diffing, which is how
-// the current tree was verified byte-for-byte when it was written.
+// golden, and against upstream by re-running `internal/lint/rules/react/tools/vendor_fixtures` and diffing, which is
+// how the current tree was verified byte-for-byte when it was written.
 func TestVendoredCorpusPairsAreComplete(test *testing.T) {
 	test.Parallel()
 	var inputs []string

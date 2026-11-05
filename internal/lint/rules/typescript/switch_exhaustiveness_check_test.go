@@ -256,7 +256,10 @@ switch (value) {
     return -1;
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true), RequireDefaultForNonUnion: type_checking.Ref(true)}},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true),
+				RequireDefaultForNonUnion:           type_checking.Ref(true),
+			}},
 		{"upstream valid 11 [allowDefault=false, requireDefault=false]",
 			`
 declare const value: string;
@@ -269,7 +272,10 @@ switch (value) {
     return -1;
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false), RequireDefaultForNonUnion: type_checking.Ref(false)}},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
+				RequireDefaultForNonUnion:           type_checking.Ref(false),
+			}},
 		{"upstream valid 12 [allowDefault=false, requireDefault=false]",
 			`
 declare const value: number;
@@ -282,7 +288,10 @@ switch (value) {
     return -1;
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false), RequireDefaultForNonUnion: type_checking.Ref(false)}},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
+				RequireDefaultForNonUnion:           type_checking.Ref(false),
+			}},
 		{"upstream valid 13 [allowDefault=false, requireDefault=false]",
 			`
 declare const value: bigint;
@@ -295,7 +304,10 @@ switch (value) {
     return -1;
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false), RequireDefaultForNonUnion: type_checking.Ref(false)}},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
+				RequireDefaultForNonUnion:           type_checking.Ref(false),
+			}},
 		{"upstream valid 14 [allowDefault=false, requireDefault=false]",
 			`
 declare const value: symbol;
@@ -307,7 +319,10 @@ switch (value) {
     return -1;
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false), RequireDefaultForNonUnion: type_checking.Ref(false)}},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
+				RequireDefaultForNonUnion:           type_checking.Ref(false),
+			}},
 		{"upstream valid 15 [allowDefault=false, requireDefault=false]",
 			`
 declare const value: 0 | 1 | number;
@@ -320,7 +335,10 @@ switch (value) {
     return -1;
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false), RequireDefaultForNonUnion: type_checking.Ref(false)}},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
+				RequireDefaultForNonUnion:           type_checking.Ref(false),
+			}},
 		{"upstream valid 16 [allowDefault=false, requireDefault=true]",
 			`
 declare const value: 'literal';
@@ -329,7 +347,10 @@ switch (value) {
     return 0;
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false), RequireDefaultForNonUnion: type_checking.Ref(true)}},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
+				RequireDefaultForNonUnion:           type_checking.Ref(true),
+			}},
 		{"upstream valid 17 [allowDefault=false, requireDefault=true]",
 			`
 declare const value: null;
@@ -338,7 +359,10 @@ switch (value) {
     return 0;
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false), RequireDefaultForNonUnion: type_checking.Ref(true)}},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
+				RequireDefaultForNonUnion:           type_checking.Ref(true),
+			}},
 		{"upstream valid 18 [allowDefault=false, requireDefault=true]",
 			`
 declare const value: undefined;
@@ -347,7 +371,10 @@ switch (value) {
     return 0;
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false), RequireDefaultForNonUnion: type_checking.Ref(true)}},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
+				RequireDefaultForNonUnion:           type_checking.Ref(true),
+			}},
 		{"upstream valid 19 [allowDefault=false, requireDefault=true]",
 			`
 declare const value: null | undefined;
@@ -358,7 +385,10 @@ switch (value) {
     return 0;
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false), RequireDefaultForNonUnion: type_checking.Ref(true)}},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
+				RequireDefaultForNonUnion:           type_checking.Ref(true),
+			}},
 		{"upstream valid 20 [allowDefault=false, requireDefault=true]",
 			`
 declare const value: 'literal' & { _brand: true };
@@ -367,7 +397,10 @@ switch (value) {
     break;
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false), RequireDefaultForNonUnion: type_checking.Ref(true)}},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
+				RequireDefaultForNonUnion:           type_checking.Ref(true),
+			}},
 		{"upstream valid 21 [allowDefault=false, requireDefault=true]",
 			`
 declare const value: ('literal' & { _brand: true }) | 1;
@@ -378,7 +411,10 @@ switch (value) {
     break;
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false), RequireDefaultForNonUnion: type_checking.Ref(true)}},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
+				RequireDefaultForNonUnion:           type_checking.Ref(true),
+			}},
 		{"upstream valid 22 [allowDefault=false, requireDefault=true]",
 			`
 declare const value: (1 & { _brand: true }) | 'literal' | null;
@@ -391,7 +427,10 @@ switch (value) {
     break;
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false), RequireDefaultForNonUnion: type_checking.Ref(true)}},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
+				RequireDefaultForNonUnion:           type_checking.Ref(true),
+			}},
 		{"upstream valid 23 [allowDefault=true, requireDefault=false]",
 			`
 declare const value: '1' | '2' | number;
@@ -402,7 +441,10 @@ switch (value) {
     break;
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true), RequireDefaultForNonUnion: type_checking.Ref(false)}},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true),
+				RequireDefaultForNonUnion:           type_checking.Ref(false),
+			}},
 		{"upstream valid 24 [allowDefault=true, requireDefault=false]",
 			`
 declare const value: '1' | '2' | number;
@@ -415,7 +457,10 @@ switch (value) {
     break;
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true), RequireDefaultForNonUnion: type_checking.Ref(false)}},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true),
+				RequireDefaultForNonUnion:           type_checking.Ref(false),
+			}},
 		{"upstream valid 25 [allowDefault=false, requireDefault=false]",
 			`
 declare const value: '1' | '2' | number;
@@ -428,7 +473,10 @@ switch (value) {
     break;
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false), RequireDefaultForNonUnion: type_checking.Ref(false)}},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
+				RequireDefaultForNonUnion:           type_checking.Ref(false),
+			}},
 		{"upstream valid 26 [allowDefault=true, requireDefault=false]",
 			`
 declare const value: '1' | '2' | (number & { foo: 'bar' });
@@ -441,7 +489,10 @@ switch (value) {
     break;
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true), RequireDefaultForNonUnion: type_checking.Ref(false)}},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true),
+				RequireDefaultForNonUnion:           type_checking.Ref(false),
+			}},
 		{"upstream valid 27 [allowDefault=true, requireDefault=true]",
 			`
 declare const value: '1' | '2' | number;
@@ -454,7 +505,10 @@ switch (value) {
     break;
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true), RequireDefaultForNonUnion: type_checking.Ref(true)}},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true),
+				RequireDefaultForNonUnion:           type_checking.Ref(true),
+			}},
 		{"upstream valid 28 [allowDefault=true, considerDefault=true, requireDefault=false]",
 			`
 declare const value: number | null | undefined;
@@ -465,7 +519,11 @@ switch (value) {
     break;
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true), ConsiderDefaultExhaustiveForUnions: type_checking.Ref(true), RequireDefaultForNonUnion: type_checking.Ref(false)}},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true),
+				ConsiderDefaultExhaustiveForUnions:  type_checking.Ref(true),
+				RequireDefaultForNonUnion:           type_checking.Ref(false),
+			}},
 		{"upstream valid 29 [allowDefault=false, considerDefault=true, requireDefault=false]",
 			`
 declare const value: '1' | '2' | number;
@@ -476,7 +534,11 @@ switch (value) {
     break;
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false), ConsiderDefaultExhaustiveForUnions: type_checking.Ref(true), RequireDefaultForNonUnion: type_checking.Ref(false)}},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
+				ConsiderDefaultExhaustiveForUnions:  type_checking.Ref(true),
+				RequireDefaultForNonUnion:           type_checking.Ref(false),
+			}},
 		{"upstream valid 30 [allowDefault=true, requireDefault=false]",
 			`
 declare const value: (string & { foo: 'bar' }) | '1';
@@ -485,7 +547,10 @@ switch (value) {
     break;
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true), RequireDefaultForNonUnion: type_checking.Ref(false)}},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true),
+				RequireDefaultForNonUnion:           type_checking.Ref(false),
+			}},
 		{"upstream valid 31 [allowDefault=false, requireDefault=true]",
 			`
 const a = Symbol('a');
@@ -497,7 +562,10 @@ switch (value) {
     break;
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false), RequireDefaultForNonUnion: type_checking.Ref(true)}},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
+				RequireDefaultForNonUnion:           type_checking.Ref(true),
+			}},
 		{"upstream valid 32 [allowDefault=false, requireDefault=false]",
 			`
 declare const value: string | number;
@@ -506,14 +574,20 @@ switch (value) {
     break;
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false), RequireDefaultForNonUnion: type_checking.Ref(false)}},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
+				RequireDefaultForNonUnion:           type_checking.Ref(false),
+			}},
 		{"upstream valid 33 [allowDefault=true, requireDefault=false]",
 			`
 declare const value: string | number;
 switch (value) {
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true), RequireDefaultForNonUnion: type_checking.Ref(false)}},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true),
+				RequireDefaultForNonUnion:           type_checking.Ref(false),
+			}},
 		{"upstream valid 34 [allowDefault=false, requireDefault=true]",
 			`
 declare const value: string | number;
@@ -522,7 +596,10 @@ switch (value) {
     break;
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false), RequireDefaultForNonUnion: type_checking.Ref(true)}},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
+				RequireDefaultForNonUnion:           type_checking.Ref(true),
+			}},
 		{"upstream valid 35 [allowDefault=false, requireDefault=false]",
 			`
 declare const value: number;
@@ -532,7 +609,10 @@ switch (value) {
     break;
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false), RequireDefaultForNonUnion: type_checking.Ref(false)}},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
+				RequireDefaultForNonUnion:           type_checking.Ref(false),
+			}},
 		{"upstream valid 36 [allowDefault=true, requireDefault=false]",
 			`
 declare const value: bigint;
@@ -541,7 +621,10 @@ switch (value) {
     break;
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true), RequireDefaultForNonUnion: type_checking.Ref(false)}},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true),
+				RequireDefaultForNonUnion:           type_checking.Ref(false),
+			}},
 		{"upstream valid 37 [allowDefault=true, requireDefault=false]",
 			`
 declare const value: symbol;
@@ -551,7 +634,10 @@ switch (value) {
     break;
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true), RequireDefaultForNonUnion: type_checking.Ref(false)}},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true),
+				RequireDefaultForNonUnion:           type_checking.Ref(false),
+			}},
 		{"upstream valid 38 [allowDefault=true, requireDefault=true]",
 			`
 declare const value: symbol;
@@ -563,7 +649,10 @@ switch (value) {
     break;
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true), RequireDefaultForNonUnion: type_checking.Ref(true)}},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true),
+				RequireDefaultForNonUnion:           type_checking.Ref(true),
+			}},
 		{"upstream valid 39 [allowDefault=true, requireDefault=true]",
 			`
 const a = Symbol('a');
@@ -575,7 +664,10 @@ switch (value) {
     break;
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true), RequireDefaultForNonUnion: type_checking.Ref(true)}},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true),
+				RequireDefaultForNonUnion:           type_checking.Ref(true),
+			}},
 		{"upstream valid 40 [allowDefault=true, considerDefault=true, requireDefault=true]",
 			`
 const a = Symbol('a');
@@ -585,7 +677,11 @@ switch (value) {
     break;
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true), ConsiderDefaultExhaustiveForUnions: type_checking.Ref(true), RequireDefaultForNonUnion: type_checking.Ref(true)}},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true),
+				ConsiderDefaultExhaustiveForUnions:  type_checking.Ref(true),
+				RequireDefaultForNonUnion:           type_checking.Ref(true),
+			}},
 		{"upstream valid 41 [allowDefault=false, considerDefault=true, requireDefault=true]",
 			`
 declare const value: boolean | 1;
@@ -596,7 +692,11 @@ switch (value) {
     break;
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false), ConsiderDefaultExhaustiveForUnions: type_checking.Ref(true), RequireDefaultForNonUnion: type_checking.Ref(true)}},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
+				ConsiderDefaultExhaustiveForUnions:  type_checking.Ref(true),
+				RequireDefaultForNonUnion:           type_checking.Ref(true),
+			}},
 		{"upstream valid 42 [allowDefault=true, requireDefault=false]",
 			`
 declare const value: boolean | 1;
@@ -611,7 +711,10 @@ switch (value) {
     break;
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true), RequireDefaultForNonUnion: type_checking.Ref(false)}},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true),
+				RequireDefaultForNonUnion:           type_checking.Ref(false),
+			}},
 		{"upstream valid 43 [allowDefault=true, requireDefault=false]",
 			`
 enum Aaa {
@@ -628,7 +731,10 @@ switch (value) {
     break;
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true), RequireDefaultForNonUnion: type_checking.Ref(false)}},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true),
+				RequireDefaultForNonUnion:           type_checking.Ref(false),
+			}},
 		{"upstream valid 44 [considerDefault=true, requireDefault=true]",
 			`
 declare const literal: 'a' | 'b';
@@ -639,7 +745,10 @@ switch (literal) {
     break;
 }
       `,
-			SwitchExhaustivenessCheckOptions{ConsiderDefaultExhaustiveForUnions: type_checking.Ref(true), RequireDefaultForNonUnion: type_checking.Ref(true)}},
+			SwitchExhaustivenessCheckOptions{
+				ConsiderDefaultExhaustiveForUnions: type_checking.Ref(true),
+				RequireDefaultForNonUnion:          type_checking.Ref(true),
+			}},
 		{"upstream valid 45 [considerDefault=true]",
 			`
 declare const literal: 'a' | 'b';
@@ -741,7 +850,10 @@ declare const value: 'literal';
 switch (value) {
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false), RequireDefaultForNonUnion: type_checking.Ref(true)},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
+				RequireDefaultForNonUnion:           type_checking.Ref(true),
+			},
 			[]string{"switchIsNotExhaustive"}},
 		{"upstream invalid 1 [allowDefault=false, requireDefault=true]",
 			`
@@ -749,7 +861,10 @@ declare const value: 'literal' & { _brand: true };
 switch (value) {
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false), RequireDefaultForNonUnion: type_checking.Ref(true)},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
+				RequireDefaultForNonUnion:           type_checking.Ref(true),
+			},
 			[]string{"switchIsNotExhaustive"}},
 		{"upstream invalid 2 [allowDefault=false, requireDefault=true]",
 			`
@@ -759,7 +874,10 @@ switch (value) {
     break;
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false), RequireDefaultForNonUnion: type_checking.Ref(true)},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
+				RequireDefaultForNonUnion:           type_checking.Ref(true),
+			},
 			[]string{"switchIsNotExhaustive"}},
 		{"upstream invalid 3 [allowDefault=true, requireDefault=false]",
 			`
@@ -769,7 +887,10 @@ switch (value) {
     break;
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true), RequireDefaultForNonUnion: type_checking.Ref(false)},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true),
+				RequireDefaultForNonUnion:           type_checking.Ref(false),
+			},
 			[]string{"switchIsNotExhaustive"}},
 		{"upstream invalid 4 [allowDefault=true, requireDefault=true]",
 			`
@@ -779,7 +900,10 @@ switch (value) {
     break;
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true), RequireDefaultForNonUnion: type_checking.Ref(true)},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true),
+				RequireDefaultForNonUnion:           type_checking.Ref(true),
+			},
 			[]string{"switchIsNotExhaustive", "switchIsNotExhaustive"}},
 		{"upstream invalid 5 [allowDefault=true, requireDefault=true]",
 			`
@@ -789,7 +913,10 @@ switch (value) {
     break;
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true), RequireDefaultForNonUnion: type_checking.Ref(true)},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true),
+				RequireDefaultForNonUnion:           type_checking.Ref(true),
+			},
 			[]string{"switchIsNotExhaustive"}},
 		{"upstream invalid 6 [allowDefault=false, requireDefault=true]",
 			`
@@ -797,7 +924,10 @@ declare const value: (string & { foo: 'bar' }) | '1' | 1 | null | undefined;
 switch (value) {
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false), RequireDefaultForNonUnion: type_checking.Ref(true)},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
+				RequireDefaultForNonUnion:           type_checking.Ref(true),
+			},
 			[]string{"switchIsNotExhaustive", "switchIsNotExhaustive"}},
 		{"upstream invalid 7 [allowDefault=false, requireDefault=true]",
 			`
@@ -807,7 +937,10 @@ switch (value) {
     break;
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false), RequireDefaultForNonUnion: type_checking.Ref(true)},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
+				RequireDefaultForNonUnion:           type_checking.Ref(true),
+			},
 			[]string{"switchIsNotExhaustive"}},
 		{"upstream invalid 8 [allowDefault=false, requireDefault=true]",
 			`
@@ -818,7 +951,10 @@ switch (value) {
     break;
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false), RequireDefaultForNonUnion: type_checking.Ref(true)},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
+				RequireDefaultForNonUnion:           type_checking.Ref(true),
+			},
 			[]string{"switchIsNotExhaustive"}},
 		{"upstream invalid 9 [allowDefault=false, requireDefault=true]",
 			`
@@ -828,7 +964,10 @@ switch (value) {
     break;
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false), RequireDefaultForNonUnion: type_checking.Ref(true)},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
+				RequireDefaultForNonUnion:           type_checking.Ref(true),
+			},
 			[]string{"switchIsNotExhaustive"}},
 		{"upstream invalid 10 [allowDefault=false, requireDefault=true]",
 			`
@@ -839,7 +978,10 @@ switch (value) {
     break;
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false), RequireDefaultForNonUnion: type_checking.Ref(true)},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
+				RequireDefaultForNonUnion:           type_checking.Ref(true),
+			},
 			[]string{"switchIsNotExhaustive"}},
 		{"upstream invalid 11 [allowDefault=false, requireDefault=true]",
 			`
@@ -851,7 +993,10 @@ switch (value) {
     break;
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false), RequireDefaultForNonUnion: type_checking.Ref(true)},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
+				RequireDefaultForNonUnion:           type_checking.Ref(true),
+			},
 			[]string{"switchIsNotExhaustive"}},
 		{"upstream invalid 12 [allowDefault=false, requireDefault=true]",
 			`
@@ -862,7 +1007,10 @@ switch (value) {
     break;
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false), RequireDefaultForNonUnion: type_checking.Ref(true)},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
+				RequireDefaultForNonUnion:           type_checking.Ref(true),
+			},
 			[]string{"switchIsNotExhaustive"}},
 		{"upstream invalid 13 [allowDefault=false, requireDefault=false]",
 			`
@@ -870,7 +1018,10 @@ declare const value: boolean;
 switch (value) {
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false), RequireDefaultForNonUnion: type_checking.Ref(false)},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
+				RequireDefaultForNonUnion:           type_checking.Ref(false),
+			},
 			[]string{"switchIsNotExhaustive"}},
 		{"upstream invalid 14 [allowDefault=false, requireDefault=true]",
 			`
@@ -880,7 +1031,10 @@ switch (value) {
     break;
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false), RequireDefaultForNonUnion: type_checking.Ref(true)},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
+				RequireDefaultForNonUnion:           type_checking.Ref(true),
+			},
 			[]string{"switchIsNotExhaustive"}},
 		{"upstream invalid 15 [allowDefault=false, requireDefault=true]",
 			`
@@ -890,7 +1044,10 @@ switch (value) {
     break;
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false), RequireDefaultForNonUnion: type_checking.Ref(true)},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
+				RequireDefaultForNonUnion:           type_checking.Ref(true),
+			},
 			[]string{"switchIsNotExhaustive", "switchIsNotExhaustive"}},
 		{"upstream invalid 16 [allowDefault=false, requireDefault=true]",
 			`
@@ -900,7 +1057,10 @@ switch (value) {
     break;
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false), RequireDefaultForNonUnion: type_checking.Ref(true)},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
+				RequireDefaultForNonUnion:           type_checking.Ref(true),
+			},
 			[]string{"switchIsNotExhaustive"}},
 		{"upstream invalid 17 [allowDefault=true, requireDefault=true]",
 			`
@@ -916,7 +1076,10 @@ switch (value) {
     break;
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true), RequireDefaultForNonUnion: type_checking.Ref(true)},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true),
+				RequireDefaultForNonUnion:           type_checking.Ref(true),
+			},
 			[]string{"switchIsNotExhaustive", "switchIsNotExhaustive"}},
 		{"upstream invalid 18 [defaults]",
 			`
@@ -1114,7 +1277,10 @@ switch (value) {
     return 1;
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true), RequireDefaultForNonUnion: type_checking.Ref(true)},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(true),
+				RequireDefaultForNonUnion:           type_checking.Ref(true),
+			},
 			[]string{"switchIsNotExhaustive"}},
 		{"upstream invalid 31 [defaults]",
 			"\n        enum Enum {\n          'a' = 1,\n          [`key-with\n\n          new-line`] = 2,\n        }\n\n        declare const a: Enum;\n\n        switch (a) {\n        }\n      ",
@@ -1141,7 +1307,10 @@ switch (myUnion) {
   }
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false), RequireDefaultForNonUnion: type_checking.Ref(false)},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
+				RequireDefaultForNonUnion:           type_checking.Ref(false),
+			},
 			[]string{"dangerousDefaultCase"}},
 		{"upstream invalid 34 [allowDefault=false, requireDefault=false]",
 			`
@@ -1164,7 +1333,10 @@ switch (myEnum) {
   }
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false), RequireDefaultForNonUnion: type_checking.Ref(false)},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
+				RequireDefaultForNonUnion:           type_checking.Ref(false),
+			},
 			[]string{"dangerousDefaultCase"}},
 		{"upstream invalid 35 [allowDefault=false, requireDefault=false]",
 			`
@@ -1187,7 +1359,10 @@ switch (myEnum) {
   }
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false), RequireDefaultForNonUnion: type_checking.Ref(false)},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
+				RequireDefaultForNonUnion:           type_checking.Ref(false),
+			},
 			[]string{"dangerousDefaultCase"}},
 		{"upstream invalid 36 [allowDefault=false, requireDefault=false]",
 			`
@@ -1203,7 +1378,10 @@ switch (myBoolean) {
   }
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false), RequireDefaultForNonUnion: type_checking.Ref(false)},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
+				RequireDefaultForNonUnion:           type_checking.Ref(false),
+			},
 			[]string{"dangerousDefaultCase"}},
 		{"upstream invalid 37 [allowDefault=false, requireDefault=false]",
 			`
@@ -1219,7 +1397,10 @@ switch (myValue) {
   }
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false), RequireDefaultForNonUnion: type_checking.Ref(false)},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
+				RequireDefaultForNonUnion:           type_checking.Ref(false),
+			},
 			[]string{"dangerousDefaultCase"}},
 		{"upstream invalid 38 [allowDefault=false, requireDefault=false]",
 			`
@@ -1235,7 +1416,10 @@ switch (myValue) {
   }
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false), RequireDefaultForNonUnion: type_checking.Ref(false)},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
+				RequireDefaultForNonUnion:           type_checking.Ref(false),
+			},
 			[]string{"dangerousDefaultCase"}},
 		{"upstream invalid 39 [allowDefault=false, requireDefault=false]",
 			`
@@ -1255,7 +1439,10 @@ switch (myValue) {
   }
 }
       `,
-			SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false), RequireDefaultForNonUnion: type_checking.Ref(false)},
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
+				RequireDefaultForNonUnion:           type_checking.Ref(false),
+			},
 			[]string{"dangerousDefaultCase"}},
 		{"upstream invalid 40 [considerDefault=false]",
 			`
@@ -1421,53 +1608,196 @@ func TestSwitchExhaustivenessCheckReadsTheDefaultCaseComment(test *testing.T) {
 		code    string
 		want    []string
 	}{
-		{"{\"requireDefaultForNonUnion\":true}", "\ndeclare const value: number;\nswitch (value) {\n  case 0:\n    break;\n  case 1:\n    break;\n  // no default\n}\n      ", nil},
-		{"{\"considerDefaultExhaustiveForUnions\":true}", "\ndeclare const value: 'a' | 'b';\nswitch (value) {\n  case 'a':\n    break;\n  // no default\n}\n      ", nil},
-		{"{\"considerDefaultExhaustiveForUnions\":true,\"defaultCaseCommentPattern\":\"^skip\\\\sdefault\"}", "\ndeclare const value: 'a' | 'b';\nswitch (value) {\n  case 'a':\n    break;\n  // skip default\n}\n      ", nil},
-		{"{\"allowDefaultCaseForExhaustiveSwitch\":false}", "\ndeclare const myValue: 'a' | 'b';\nswitch (myValue) {\n  case 'a':\n    return 'a';\n  case 'b':\n    return 'b';\n  // no default\n}\n      ", []string{"dangerousDefaultCase // no default"}},
-		{"{\"considerDefaultExhaustiveForUnions\":false}", "\ndeclare const literal: 'a' | 'b' | 'c';\n\nswitch (literal) {\n  case 'a':\n    break;\n  // no default\n}\n      ", []string{"switchIsNotExhaustive literal"}},
-		{"{\"considerDefaultExhaustiveForUnions\":false,\"defaultCaseCommentPattern\":\"^skip\\\\sdefault\"}", "\ndeclare const literal: 'a' | 'b' | 'c';\n\nswitch (literal) {\n  case 'a':\n    break;\n  // skip default\n}\n      ", []string{"switchIsNotExhaustive literal"}},
-		{"{\"requireDefaultForNonUnion\":true}", "declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n  // no default\n}", nil},
-		{"{\"requireDefaultForNonUnion\":true}", "declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n  // No Default\n}", nil},
-		{"{\"requireDefaultForNonUnion\":true}", "declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n  /* no default */\n}", nil},
-		{"{\"requireDefaultForNonUnion\":true}", "declare const v: number;\nswitch (v) {\n  case 0:\n    break; // no default\n}", nil},
-		{"{\"requireDefaultForNonUnion\":true}", "declare const v: number;\nswitch (v) {\n  case 0: {\n    break;\n    // no default\n  }\n}", []string{"switchIsNotExhaustive v"}},
-		{"{\"requireDefaultForNonUnion\":true}", "declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n  // no default\n  // something else\n}", []string{"switchIsNotExhaustive v"}},
-		{"{\"requireDefaultForNonUnion\":true}", "declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n  // something else\n  // no default\n}", nil},
-		{"{\"requireDefaultForNonUnion\":true}", "declare const v: number;\nswitch (v) {\n  // no default\n}", []string{"switchIsNotExhaustive v"}},
-		{"{\"requireDefaultForNonUnion\":true}", "declare const v: number;\nswitch (v) {\n  // no default\n  case 0:\n    break;\n}", []string{"switchIsNotExhaustive v"}},
-		{"{\"requireDefaultForNonUnion\":true}", "declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n  // no default here\n}", []string{"switchIsNotExhaustive v"}},
-		{"{\"requireDefaultForNonUnion\":true,\"defaultCaseCommentPattern\":\"^skip\\\\sdefault\"}", "declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n  // skip default\n}", nil},
-		{"{\"requireDefaultForNonUnion\":true,\"defaultCaseCommentPattern\":\"^skip\\\\sdefault\"}", "declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n  // no default\n}", []string{"switchIsNotExhaustive v"}},
-		{"{\"requireDefaultForNonUnion\":true,\"defaultCaseCommentPattern\":\"^skip\\\\sdefault\"}", "declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n  // SKIP default\n}", []string{"switchIsNotExhaustive v"}},
-		{"{\"considerDefaultExhaustiveForUnions\":true}", "declare const literal: 'a' | 'b';\nswitch (literal) {\n  case 'a':\n    break;\n  // no default\n}", nil},
-		{"{}", "declare const literal: 'a' | 'b';\nswitch (literal) {\n  case 'a':\n    break;\n  // no default\n}", []string{"switchIsNotExhaustive literal"}},
-		{"{\"allowDefaultCaseForExhaustiveSwitch\":false}", "declare const literal: 'a' | 'b';\nswitch (literal) {\n  case 'a':\n    break;\n  case 'b':\n    break;\n  // no default\n}", []string{"dangerousDefaultCase // no default"}},
-		{"{\"allowDefaultCaseForExhaustiveSwitch\":false}", "declare const literal: 'a' | 'b';\nswitch (literal) {\n  case 'a':\n    break;\n  case 'b':\n    break;\n  default:\n    break;\n  // no default\n}", []string{"dangerousDefaultCase default:\n    break;"}},
-		{"{\"allowDefaultCaseForExhaustiveSwitch\":false}", "declare const literal: 'a' | 'b';\nswitch (literal) {\n  case 'a':\n    break;\n  case 'b':\n    break;\n  /* no default */\n}", []string{"dangerousDefaultCase /* no default */"}},
-		{"{\"requireDefaultForNonUnion\":true}", "declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n  //no default\n}", nil},
-		{"{\"requireDefaultForNonUnion\":true}", "declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n  /**\n   * no default\n   */\n}", []string{"switchIsNotExhaustive v"}},
-		{"{\"requireDefaultForNonUnion\":true}", "declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n  /*\n    no default\n  */\n}", nil},
-		{"{\"requireDefaultForNonUnion\":true}", "declare const v: number;\nswitch (v) {\n  case 0:\n  // no default\n}", nil},
-		{"{\"requireDefaultForNonUnion\":true,\"defaultCaseCommentPattern\":\"\"}", "declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n  // skip\n}", nil},
-		{"{\"requireDefaultForNonUnion\":true}", "declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n}\n// no default", []string{"switchIsNotExhaustive v"}},
-		{"{\"requireDefaultForNonUnion\":true}", "declare const v: number;\ndeclare const w: number;\nswitch (v) {\n  case 0:\n    switch (w) {\n      case 1:\n        break;\n      // no default\n    }\n}", []string{"switchIsNotExhaustive v"}},
+		{
+			"{\"requireDefaultForNonUnion\":true}",
+			"\ndeclare const value: number;\nswitch (value) {\n  case 0:\n    break;\n  case 1:\n    break;\n  // no default\n}\n      ",
+			nil,
+		},
+		{
+			"{\"considerDefaultExhaustiveForUnions\":true}",
+			"\ndeclare const value: 'a' | 'b';\nswitch (value) {\n  case 'a':\n    break;\n  // no default\n}\n      ",
+			nil,
+		},
+		{
+			"{\"considerDefaultExhaustiveForUnions\":true,\"defaultCaseCommentPattern\":\"^skip\\\\sdefault\"}",
+			"\ndeclare const value: 'a' | 'b';\nswitch (value) {\n  case 'a':\n    break;\n  // skip default\n}\n      ",
+			nil,
+		},
+		{
+			"{\"allowDefaultCaseForExhaustiveSwitch\":false}",
+			"\ndeclare const myValue: 'a' | 'b';\nswitch (myValue) {\n  case 'a':\n    return 'a';\n  case 'b':\n    return 'b';\n  // no default\n}\n      ",
+			[]string{"dangerousDefaultCase // no default"},
+		},
+		{
+			"{\"considerDefaultExhaustiveForUnions\":false}",
+			"\ndeclare const literal: 'a' | 'b' | 'c';\n\nswitch (literal) {\n  case 'a':\n    break;\n  // no default\n}\n      ",
+			[]string{"switchIsNotExhaustive literal"},
+		},
+		{
+			"{\"considerDefaultExhaustiveForUnions\":false,\"defaultCaseCommentPattern\":\"^skip\\\\sdefault\"}",
+			"\ndeclare const literal: 'a' | 'b' | 'c';\n\nswitch (literal) {\n  case 'a':\n    break;\n  // skip default\n}\n      ",
+			[]string{"switchIsNotExhaustive literal"},
+		},
+		{
+			"{\"requireDefaultForNonUnion\":true}",
+			"declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n  // no default\n}",
+			nil,
+		},
+		{
+			"{\"requireDefaultForNonUnion\":true}",
+			"declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n  // No Default\n}",
+			nil,
+		},
+		{
+			"{\"requireDefaultForNonUnion\":true}",
+			"declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n  /* no default */\n}",
+			nil,
+		},
+		{
+			"{\"requireDefaultForNonUnion\":true}",
+			"declare const v: number;\nswitch (v) {\n  case 0:\n    break; // no default\n}",
+			nil,
+		},
+		{
+			"{\"requireDefaultForNonUnion\":true}",
+			"declare const v: number;\nswitch (v) {\n  case 0: {\n    break;\n    // no default\n  }\n}",
+			[]string{"switchIsNotExhaustive v"},
+		},
+		{
+			"{\"requireDefaultForNonUnion\":true}",
+			"declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n  // no default\n  // something else\n}",
+			[]string{"switchIsNotExhaustive v"},
+		},
+		{
+			"{\"requireDefaultForNonUnion\":true}",
+			"declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n  // something else\n  // no default\n}",
+			nil,
+		},
+		{
+			"{\"requireDefaultForNonUnion\":true}",
+			"declare const v: number;\nswitch (v) {\n  // no default\n}",
+			[]string{"switchIsNotExhaustive v"},
+		},
+		{
+			"{\"requireDefaultForNonUnion\":true}",
+			"declare const v: number;\nswitch (v) {\n  // no default\n  case 0:\n    break;\n}",
+			[]string{"switchIsNotExhaustive v"},
+		},
+		{
+			"{\"requireDefaultForNonUnion\":true}",
+			"declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n  // no default here\n}",
+			[]string{"switchIsNotExhaustive v"},
+		},
+		{
+			"{\"requireDefaultForNonUnion\":true,\"defaultCaseCommentPattern\":\"^skip\\\\sdefault\"}",
+			"declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n  // skip default\n}",
+			nil,
+		},
+		{
+			"{\"requireDefaultForNonUnion\":true,\"defaultCaseCommentPattern\":\"^skip\\\\sdefault\"}",
+			"declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n  // no default\n}",
+			[]string{"switchIsNotExhaustive v"},
+		},
+		{
+			"{\"requireDefaultForNonUnion\":true,\"defaultCaseCommentPattern\":\"^skip\\\\sdefault\"}",
+			"declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n  // SKIP default\n}",
+			[]string{"switchIsNotExhaustive v"},
+		},
+		{
+			"{\"considerDefaultExhaustiveForUnions\":true}",
+			"declare const literal: 'a' | 'b';\nswitch (literal) {\n  case 'a':\n    break;\n  // no default\n}",
+			nil,
+		},
+		{
+			"{}",
+			"declare const literal: 'a' | 'b';\nswitch (literal) {\n  case 'a':\n    break;\n  // no default\n}",
+			[]string{"switchIsNotExhaustive literal"},
+		},
+		{
+			"{\"allowDefaultCaseForExhaustiveSwitch\":false}",
+			"declare const literal: 'a' | 'b';\nswitch (literal) {\n  case 'a':\n    break;\n  case 'b':\n    break;\n  // no default\n}",
+			[]string{"dangerousDefaultCase // no default"},
+		},
+		{
+			"{\"allowDefaultCaseForExhaustiveSwitch\":false}",
+			"declare const literal: 'a' | 'b';\nswitch (literal) {\n  case 'a':\n    break;\n  case 'b':\n    break;\n  default:\n    break;\n  // no default\n}",
+			[]string{"dangerousDefaultCase default:\n    break;"},
+		},
+		{
+			"{\"allowDefaultCaseForExhaustiveSwitch\":false}",
+			"declare const literal: 'a' | 'b';\nswitch (literal) {\n  case 'a':\n    break;\n  case 'b':\n    break;\n  /* no default */\n}",
+			[]string{"dangerousDefaultCase /* no default */"},
+		},
+		{
+			"{\"requireDefaultForNonUnion\":true}",
+			"declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n  //no default\n}",
+			nil,
+		},
+		{
+			"{\"requireDefaultForNonUnion\":true}",
+			"declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n  /**\n   * no default\n   */\n}",
+			[]string{"switchIsNotExhaustive v"},
+		},
+		{
+			"{\"requireDefaultForNonUnion\":true}",
+			"declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n  /*\n    no default\n  */\n}",
+			nil,
+		},
+		{
+			"{\"requireDefaultForNonUnion\":true}",
+			"declare const v: number;\nswitch (v) {\n  case 0:\n  // no default\n}",
+			nil,
+		},
+		{
+			"{\"requireDefaultForNonUnion\":true,\"defaultCaseCommentPattern\":\"\"}",
+			"declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n  // skip\n}",
+			nil,
+		},
+		{
+			"{\"requireDefaultForNonUnion\":true}",
+			"declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n}\n// no default",
+			[]string{"switchIsNotExhaustive v"},
+		},
+		{
+			"{\"requireDefaultForNonUnion\":true}",
+			"declare const v: number;\ndeclare const w: number;\nswitch (v) {\n  case 0:\n    switch (w) {\n      case 1:\n        break;\n      // no default\n    }\n}",
+			[]string{"switchIsNotExhaustive v"},
+		},
 		// #7mztrdd: the pattern is read as JavaScript reads it, `new RegExp(pattern, 'u')`. RE2 refuses a
 		// lookahead, so this pattern compiled to nothing and the comment never counted. In Node,
 		// new RegExp("^no default(?= because)", "u") tests true on "no default because exhaustive".
-		{"{\"requireDefaultForNonUnion\":true,\"defaultCaseCommentPattern\":\"^no default(?= because)\"}", "declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n  // no default because exhaustive\n}", nil},
+		{
+			"{\"requireDefaultForNonUnion\":true,\"defaultCaseCommentPattern\":\"^no default(?= because)\"}",
+			"declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n  // no default because exhaustive\n}",
+			nil,
+		},
 		// #7mztrdd: the control for the row above. In Node the same pattern tests false on
 		// "no default since exhaustive", so the switch still reports.
-		{"{\"requireDefaultForNonUnion\":true,\"defaultCaseCommentPattern\":\"^no default(?= because)\"}", "declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n  // no default since exhaustive\n}", []string{"switchIsNotExhaustive v"}},
+		{
+			"{\"requireDefaultForNonUnion\":true,\"defaultCaseCommentPattern\":\"^no default(?= because)\"}",
+			"declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n  // no default since exhaustive\n}",
+			[]string{"switchIsNotExhaustive v"},
+		},
 		// #7mztrdd: a lookbehind, which RE2 refuses too. In Node, new RegExp("(?<=^intentionally )no default$", "u")
 		// tests true on "intentionally no default".
-		{"{\"requireDefaultForNonUnion\":true,\"defaultCaseCommentPattern\":\"(?<=^intentionally )no default$\"}", "declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n  // intentionally no default\n}", nil},
+		{
+			"{\"requireDefaultForNonUnion\":true,\"defaultCaseCommentPattern\":\"(?<=^intentionally )no default$\"}",
+			"declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n  // intentionally no default\n}",
+			nil,
+		},
 		// #7mztrdd: JavaScript's `\s` takes U+00A0. In Node, new RegExp("^skip\\sdefault", "u") tests true on
 		// "skip\u00a0default".
-		{"{\"requireDefaultForNonUnion\":true,\"defaultCaseCommentPattern\":\"^skip\\\\sdefault\"}", "declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n  // skip\u00a0default\n}", nil},
+		{
+			"{\"requireDefaultForNonUnion\":true,\"defaultCaseCommentPattern\":\"^skip\\\\sdefault\"}",
+			"declare const v: number;\nswitch (v) {\n  case 0:\n    break;\n  // skip\u00a0default\n}",
+			nil,
+		},
 	}
 	if len(cases) != 35 {
-		test.Fatalf("%d rows, and 35 were written: 31 replayed through 8.71.0 and 4 pattern rows checked in Node", len(cases))
+		test.Fatalf(
+			"%d rows, and 35 were written: 31 replayed through 8.71.0 and 4 pattern rows checked in Node",
+			len(cases),
+		)
 	}
 
 	for _, testCase := range cases {
@@ -1475,12 +1805,21 @@ func TestSwitchExhaustivenessCheckReadsTheDefaultCaseComment(test *testing.T) {
 			test.Parallel()
 
 			var options SwitchExhaustivenessCheckOptions
-			if unmarshalOptionsError := rule.UnmarshalOptions([]byte(testCase.options), &options); unmarshalOptionsError != nil {
+			if unmarshalOptionsError := rule.UnmarshalOptions(
+				[]byte(testCase.options),
+				&options,
+			); unmarshalOptionsError != nil {
 				test.Fatalf("decoding %s: %v", testCase.options, unmarshalOptionsError)
 			}
 			// The harness writes the file trimmed, so positions are in the trimmed text.
 			source := strings.TrimSpace(testCase.code) + "\n"
-			result := rule_testing.RunTypedWithOptions(test, SwitchExhaustivenessCheck, switchExhaustivenessFile, source, options)
+			result := rule_testing.RunTypedWithOptions(
+				test,
+				SwitchExhaustivenessCheck,
+				switchExhaustivenessFile,
+				source,
+				options,
+			)
 			var got []string
 			for _, diagnostic := range result.Diagnostics {
 				got = append(got, diagnostic.Message.Id+" "+source[diagnostic.Range.Pos():diagnostic.Range.End()])
@@ -1521,10 +1860,18 @@ switch (literal) {
 
 	for _, diagnostic := range result.Diagnostics {
 		if len(diagnostic.Fixes) != 0 {
-			test.Fatalf("tsgolint ships no fixes for this rule, but %q proposed %d", diagnostic.Message.Id, len(diagnostic.Fixes))
+			test.Fatalf(
+				"tsgolint ships no fixes for this rule, but %q proposed %d",
+				diagnostic.Message.Id,
+				len(diagnostic.Fixes),
+			)
 		}
 		if len(diagnostic.Suggestions) != 0 {
-			test.Fatalf("tsgolint ships no suggestions for this rule, but %q proposed %d", diagnostic.Message.Id, len(diagnostic.Suggestions))
+			test.Fatalf(
+				"tsgolint ships no suggestions for this rule, but %q proposed %d",
+				diagnostic.Message.Id,
+				len(diagnostic.Suggestions),
+			)
 		}
 	}
 }
@@ -1554,7 +1901,13 @@ function run() {
 }
 `
 
-	result := rule_testing.RunTypedWithOptions(test, SwitchExhaustivenessCheck, switchExhaustivenessFile, sourceText, nil)
+	result := rule_testing.RunTypedWithOptions(
+		test,
+		SwitchExhaustivenessCheck,
+		switchExhaustivenessFile,
+		sourceText,
+		nil,
+	)
 	rule_testing.ExpectFindings(test, result, "switchIsNotExhaustive")
 
 	// The harness trims the source before writing it, so offsets are against the trimmed text.
@@ -1625,7 +1978,9 @@ func TestSwitchExhaustivenessCheckDeclaresItNeedsTheChecker(test *testing.T) {
 	test.Parallel()
 
 	if !SwitchExhaustivenessCheck.NeedsTypeChecker {
-		test.Fatal("the rule must declare NeedsTypeChecker: without a checker it reports nothing rather than failing, so every clean fixture would pass vacuously")
+		test.Fatal(
+			"the rule must declare NeedsTypeChecker: without a checker it reports nothing rather than failing, so every clean fixture would pass vacuously",
+		)
 	}
 
 	// The guard the absorption made possible. Driving the listener with a checker-less Context must
@@ -1808,10 +2163,26 @@ func TestSwitchExhaustivenessCheckNamesTheMissingBranches(test *testing.T) {
 		{"string literals", "declare const day: 'a' | 'b' | 'c';\nswitch (day) { case 'a': break; }\n", `"b" | "c"`},
 		{"number literals", "declare const count: 1 | 2 | 3;\nswitch (count) { case 1: break; }\n", `2 | 3`},
 		{"a boolean", "declare const flag: boolean;\nswitch (flag) { case true: break; }\n", `false`},
-		{"enum members", "enum Color { Red, Green, Blue }\ndeclare const color: Color;\nswitch (color) { case Color.Red: break; }\n", `Color.Green | Color.Blue`},
-		{"null and undefined", "declare const maybe: 'x' | null | undefined;\nswitch (maybe) { case 'x': break; }\n", `undefined | null`},
-		{"a unique symbol", "const first: unique symbol = Symbol('first');\nconst second: unique symbol = Symbol('second');\ndeclare const token: typeof first | typeof second;\nswitch (token) { case first: break; }\n", `typeof second`},
-		{"an optional property", "declare const optional: { kind?: 'p' | 'q' };\nswitch (optional.kind) { case 'p': break; }\n", `undefined | "q"`},
+		{
+			"enum members",
+			"enum Color { Red, Green, Blue }\ndeclare const color: Color;\nswitch (color) { case Color.Red: break; }\n",
+			`Color.Green | Color.Blue`,
+		},
+		{
+			"null and undefined",
+			"declare const maybe: 'x' | null | undefined;\nswitch (maybe) { case 'x': break; }\n",
+			`undefined | null`,
+		},
+		{
+			"a unique symbol",
+			"const first: unique symbol = Symbol('first');\nconst second: unique symbol = Symbol('second');\ndeclare const token: typeof first | typeof second;\nswitch (token) { case first: break; }\n",
+			`typeof second`,
+		},
+		{
+			"an optional property",
+			"declare const optional: { kind?: 'p' | 'q' };\nswitch (optional.kind) { case 'p': break; }\n",
+			`undefined | "q"`,
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -1842,10 +2213,13 @@ switch (myBoolean) {
   // ` + strings.Repeat("a", 64) + `b
 }
 `
-	rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, SwitchExhaustivenessCheck, switchExhaustivenessFile, source,
-		SwitchExhaustivenessCheckOptions{
-			AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
-			RequireDefaultForNonUnion:           type_checking.Ref(false),
-			DefaultCaseCommentPattern:           type_checking.Ref("(a|aa)+$"),
-		}))
+	rule_testing.ExpectClean(
+		test,
+		rule_testing.RunTypedWithOptions(test, SwitchExhaustivenessCheck, switchExhaustivenessFile, source,
+			SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: type_checking.Ref(false),
+				RequireDefaultForNonUnion:           type_checking.Ref(false),
+				DefaultCaseCommentPattern:           type_checking.Ref("(a|aa)+$"),
+			}),
+	)
 }

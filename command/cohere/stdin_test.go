@@ -11,7 +11,13 @@ import (
 // runCohereWithStdin runs the binary from a directory with text on stdin, and returns stdout, stderr
 // and the exit code separately: stdout is the file's text in this mode, and mixing a note into it would
 // corrupt the save.
-func runCohereWithStdin(test *testing.T, binary string, directory string, stdin string, arguments ...string) (string, string, int) {
+func runCohereWithStdin(
+	test *testing.T,
+	binary string,
+	directory string,
+	stdin string,
+	arguments ...string,
+) (string, string, int) {
 	test.Helper()
 	command := exec.Command(binary, arguments...)
 	command.Dir = directory
@@ -123,7 +129,13 @@ func TestStdinNeedsFix(test *testing.T) {
 		{"--fix", "--no-fix", "--stdin-filepath", "Producer.ts"},
 		{"--fix", "--stdin-filepath", "Producer.ts", "Sibling.ts"},
 	} {
-		if saved, stderr, code := runCohereWithStdin(test, binary, root, "", arguments...); code == 0 || saved != "" || stderr == "" {
+		if saved, stderr, code := runCohereWithStdin(
+			test,
+			binary,
+			root,
+			"",
+			arguments...,
+		); code == 0 || saved != "" || stderr == "" {
 			test.Errorf("%v: exit %d, wanted a refusal on stderr and nothing on stdout:\n%s", arguments, code, stderr)
 		}
 	}

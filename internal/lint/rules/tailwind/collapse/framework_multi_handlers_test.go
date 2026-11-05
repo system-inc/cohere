@@ -45,11 +45,20 @@ func TestMultiDeclarationEmittersAgreeWithTheMeasuredReading(test *testing.T) {
 	sort.Strings(disagreements)
 	sort.Strings(unported)
 
-	test.Logf("ported multi-declaration handles: %d roots in the table, %d compared, %d agreed, %d unported, %d disagreed",
-		len(FrameworkMultiDeclarationUtilities), agreed+len(disagreements), agreed, len(unported), len(disagreements))
+	test.Logf(
+		"ported multi-declaration handles: %d roots in the table, %d compared, %d agreed, %d unported, %d disagreed",
+		len(FrameworkMultiDeclarationUtilities),
+		agreed+len(disagreements),
+		agreed,
+		len(unported),
+		len(disagreements),
+	)
 
 	if len(FrameworkMultiDeclarationUtilities) != 152 {
-		test.Errorf("the table holds %d roots and this comparison was written against 152; the population moved and the assertions below were sized for the old one", len(FrameworkMultiDeclarationUtilities))
+		test.Errorf(
+			"the table holds %d roots and this comparison was written against 152; the population moved and the assertions below were sized for the old one",
+			len(FrameworkMultiDeclarationUtilities),
+		)
 	}
 	if agreed != 152 {
 		test.Errorf("%d of 152 roots agreed; the acceptance condition is every root, not a rate", agreed)
@@ -83,7 +92,10 @@ func TestMultiDeclarationLiteralsAgreeWithTheirMeasuredReading(test *testing.T) 
 		for literal, measured := range utility.LiteralReadings {
 			emitted := utility.Emit(root, literal, ResolvedUtilityValue{Value: sentinel})
 			if len(emitted) == 0 {
-				disagreements = append(disagreements, root+"-"+literal+": emits nothing, measured "+formatReading(measured))
+				disagreements = append(
+					disagreements,
+					root+"-"+literal+": emits nothing, measured "+formatReading(measured),
+				)
 				continue
 			}
 			if !measured.Equal(utility.Reading) {
@@ -106,12 +118,18 @@ func TestMultiDeclarationLiteralsAgreeWithTheirMeasuredReading(test *testing.T) 
 		agreed+len(disagreements), agreed, divergent, len(disagreements))
 
 	if agreed+len(disagreements) < 60 {
-		test.Errorf("only %d literals were compared; the table declares far more, so this measured the wrong population", agreed+len(disagreements))
+		test.Errorf(
+			"only %d literals were compared; the table declares far more, so this measured the wrong population",
+			agreed+len(disagreements),
+		)
 	}
 	// Named rather than left implicit: these four are the whole reason literal emitters exist, and a
 	// count that drops to zero means the divergence stopped being exercised.
 	if divergent != 4 {
-		test.Errorf("%d literals read differently from their root; four do at 4.3.3 (divide-none, ease-initial, transition-none, translate-none), so the branch coverage moved", divergent)
+		test.Errorf(
+			"%d literals read differently from their root; four do at 4.3.3 (divide-none, ease-initial, transition-none, translate-none), so the branch coverage moved",
+			divergent,
+		)
 	}
 	for _, disagreement := range disagreements {
 		test.Error(disagreement)
@@ -139,7 +157,11 @@ func TestMultiDeclarationLiteralsAreOnlyListedWhenTheyDiffer(test *testing.T) {
 			ordinary := PropertySort(utility.Emit(root, "", ResolvedUtilityValue{Value: sentinel}))
 			override := PropertySort(emitter(ResolvedUtilityValue{Value: sentinel}))
 			if readingsEqual(Reading(ordinary), Reading(override)) {
-				test.Errorf("%s-%s is listed as an override and reads the same as its root, so the entry restates a fact rather than correcting one", root, literal)
+				test.Errorf(
+					"%s-%s is listed as an override and reads the same as its root, so the entry restates a fact rather than correcting one",
+					root,
+					literal,
+				)
 			}
 			if _, measured := utility.LiteralReadings[literal]; !measured {
 				test.Errorf("%s-%s has an override and no measured reading, so nothing checks it", root, literal)
@@ -187,7 +209,12 @@ func TestSortLatchIsObservableInTheMultiTable(test *testing.T) {
 			test.Errorf("%s reads %d positions; the latch should hold it to one", root, len(sorted.Order))
 		}
 		if sorted.Count <= len(sorted.Order) {
-			test.Errorf("%s reads %d positions at count %d; a latched root counts more declarations than it positions", root, len(sorted.Order), sorted.Count)
+			test.Errorf(
+				"%s reads %d positions at count %d; a latched root counts more declarations than it positions",
+				root,
+				len(sorted.Order),
+				sorted.Count,
+			)
 		}
 	}
 
@@ -197,7 +224,10 @@ func TestSortLatchIsObservableInTheMultiTable(test *testing.T) {
 	emitted := size.Emit("size", "", ResolvedUtilityValue{Value: "zzsentinel"})
 	sorted := PropertySort(emitted)
 	if len(sorted.Order) != 2 {
-		test.Errorf("size reads %d positions; its --tw-sort names `size`, which PropertyOrder does not know, so it does not latch and width and height both contribute", len(sorted.Order))
+		test.Errorf(
+			"size reads %d positions; its --tw-sort names `size`, which PropertyOrder does not know, so it does not latch and width and height both contribute",
+			len(sorted.Order),
+		)
 	}
 }
 
@@ -224,7 +254,11 @@ func TestMultiDeclarationCountsExceedOrderWhereMeasured(test *testing.T) {
 
 	test.Logf("roots reading fewer positions than declarations: %d measured, %d emitted", measuredGap, emittedGap)
 	if measuredGap != emittedGap {
-		test.Errorf("%d roots are measured with a count above their order length and %d emit that way; the ported handles disagree with the table about which roots have invisible declarations", measuredGap, emittedGap)
+		test.Errorf(
+			"%d roots are measured with a count above their order length and %d emit that way; the ported handles disagree with the table about which roots have invisible declarations",
+			measuredGap,
+			emittedGap,
+		)
 	}
 	if measuredGap < 25 {
 		test.Errorf("only %d roots show the gap; 30 do at 4.3.3, so this measured the wrong population", measuredGap)

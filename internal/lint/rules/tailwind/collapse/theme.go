@@ -94,9 +94,16 @@ const (
 // prefixes is carried here as a reminder that the list is a fact about Tailwind's own namespace
 // choices, not a general rule that can be derived.
 var ignoredThemeKeys = map[string][]string{
-	"--font":        {"--font-weight", "--font-size"},
-	"--inset":       {"--inset-shadow", "--inset-ring"},
-	"--text":        {"--text-color", "--text-decoration-color", "--text-decoration-thickness", "--text-indent", "--text-shadow", "--text-underline-offset"},
+	"--font":  {"--font-weight", "--font-size"},
+	"--inset": {"--inset-shadow", "--inset-ring"},
+	"--text": {
+		"--text-color",
+		"--text-decoration-color",
+		"--text-decoration-thickness",
+		"--text-indent",
+		"--text-shadow",
+		"--text-underline-offset",
+	},
 	"--grid-column": {"--grid-column-start", "--grid-column-end"},
 	"--grid-row":    {"--grid-row-start", "--grid-row-end"},
 }
@@ -522,7 +529,12 @@ func (theme *Theme) MarkUsedVariable(themeKey string) bool {
 // so a caller passing inline gets the literal even for an entry that did not declare it.
 //
 // candidateValuePresent has the meaning documented on resolveKey.
-func (theme *Theme) Resolve(candidateValue string, candidateValuePresent bool, themeKeys []string, options ThemeOptions) (string, bool) {
+func (theme *Theme) Resolve(
+	candidateValue string,
+	candidateValuePresent bool,
+	themeKeys []string,
+	options ThemeOptions,
+) (string, bool) {
 	themeKey, ok := theme.resolveKey(candidateValue, candidateValuePresent, themeKeys)
 	if !ok {
 		return "", false
@@ -562,7 +574,11 @@ func (theme *Theme) ResolveValue(candidateValue string, candidateValuePresent bo
 //
 // Each nested value independently honours ThemeOptionInline, so a theme can inline a line-height
 // while leaving the size a `var()`.
-func (theme *Theme) ResolveWith(candidateValue string, themeKeys []string, nestedKeys []string) (string, map[string]string, bool) {
+func (theme *Theme) ResolveWith(
+	candidateValue string,
+	themeKeys []string,
+	nestedKeys []string,
+) (string, map[string]string, bool) {
 	themeKey, ok := theme.resolveKey(candidateValue, true, themeKeys)
 	if !ok {
 		return "", nil, false

@@ -26,8 +26,15 @@ func trackedIn(test *testing.T, code string, traceMap map[string]*reference.Trac
 					source := ruleContext.SourceFile.Text()
 					for _, tracked := range tracker.GlobalReferences(traceMap) {
 						span := rule.TokenRange(ruleContext.SourceFile, tracked.Node)
-						usage := map[reference.Usage]string{reference.Read: "Read", reference.Call: "Call", reference.Construct: "Construct"}[tracked.Usage]
-						rendered = append(rendered, usage+" "+strings.Join(tracked.Path, ".")+" "+source[span.Pos():span.End()])
+						usage := map[reference.Usage]string{
+							reference.Read:      "Read",
+							reference.Call:      "Call",
+							reference.Construct: "Construct",
+						}[tracked.Usage]
+						rendered = append(
+							rendered,
+							usage+" "+strings.Join(tracked.Path, ".")+" "+source[span.Pos():span.End()],
+						)
 					}
 				},
 			}
@@ -107,13 +114,25 @@ func TestTrackerAgreesWithEslintUtils(test *testing.T) {
 			description: "should iterate the member references of a given global variable, with MemberExpression",
 			code:        "Object.a; Object.a(); new Object.a();\nObject.b; Object.b(); new Object.b();\nObject.c; Object.c(); new Object.c();",
 			traceMap:    "{\"Object\":{\"a\":{\"$read\":true},\"b\":{\"$call\":true},\"c\":{\"$construct\":true}}}",
-			want:        []string{"Read Object.a Object.a", "Read Object.a Object.a", "Read Object.a Object.a", "Call Object.b Object.b()", "Construct Object.c new Object.c()"},
+			want: []string{
+				"Read Object.a Object.a",
+				"Read Object.a Object.a",
+				"Read Object.a Object.a",
+				"Call Object.b Object.b()",
+				"Construct Object.c new Object.c()",
+			},
 		},
 		{
 			description: "should iterate the member references of a given global variable, with VariableDeclarator",
 			code:        "var x = Object;\nx.a; x.a(); new x.a();\nx.b; x.b(); new x.b();\nx.c; x.c(); new x.c();",
 			traceMap:    "{\"Object\":{\"a\":{\"$read\":true},\"b\":{\"$call\":true},\"c\":{\"$construct\":true}}}",
-			want:        []string{"Read Object.a x.a", "Read Object.a x.a", "Read Object.a x.a", "Call Object.b x.b()", "Construct Object.c new x.c()"},
+			want: []string{
+				"Read Object.a x.a",
+				"Read Object.a x.a",
+				"Read Object.a x.a",
+				"Call Object.b x.b()",
+				"Construct Object.c new x.c()",
+			},
 		},
 		{
 			description: "should iterate the member references of a given global variable, with VariableDeclarator 2",
@@ -149,25 +168,41 @@ func TestTrackerAgreesWithEslintUtils(test *testing.T) {
 			description: "should iterate the member references of a given global variable, with 'global'.",
 			code:        "/*global global */\nglobal.Object.a;\nglobal.Object.b; global.Object.b(); new global.Object.b();\nglobal.Object.c; global.Object.c(); new global.Object.c();",
 			traceMap:    "{\"Object\":{\"a\":{\"$read\":true},\"b\":{\"$call\":true},\"c\":{\"$construct\":true}}}",
-			want:        []string{"Read Object.a global.Object.a", "Call Object.b global.Object.b()", "Construct Object.c new global.Object.c()"},
+			want: []string{
+				"Read Object.a global.Object.a",
+				"Call Object.b global.Object.b()",
+				"Construct Object.c new global.Object.c()",
+			},
 		},
 		{
 			description: "should iterate the member references of a given global variable, with 'globalThis'.",
 			code:        "/*global globalThis */\nglobalThis.Object.a;\nglobalThis.Object.b; globalThis.Object.b(); new globalThis.Object.b();\nglobalThis.Object.c; globalThis.Object.c(); new globalThis.Object.c();",
 			traceMap:    "{\"Object\":{\"a\":{\"$read\":true},\"b\":{\"$call\":true},\"c\":{\"$construct\":true}}}",
-			want:        []string{"Read Object.a globalThis.Object.a", "Call Object.b globalThis.Object.b()", "Construct Object.c new globalThis.Object.c()"},
+			want: []string{
+				"Read Object.a globalThis.Object.a",
+				"Call Object.b globalThis.Object.b()",
+				"Construct Object.c new globalThis.Object.c()",
+			},
 		},
 		{
 			description: "should iterate the member references of a given global variable, with 'self'.",
 			code:        "/*global self */\nself.Object.a;\nself.Object.b; self.Object.b(); new self.Object.b();\nself.Object.c; self.Object.c(); new self.Object.c();",
 			traceMap:    "{\"Object\":{\"a\":{\"$read\":true},\"b\":{\"$call\":true},\"c\":{\"$construct\":true}}}",
-			want:        []string{"Read Object.a self.Object.a", "Call Object.b self.Object.b()", "Construct Object.c new self.Object.c()"},
+			want: []string{
+				"Read Object.a self.Object.a",
+				"Call Object.b self.Object.b()",
+				"Construct Object.c new self.Object.c()",
+			},
 		},
 		{
 			description: "should iterate the member references of a given global variable, with 'window'.",
 			code:        "/*global window */\nwindow.Object.a;\nwindow.Object.b; window.Object.b(); new window.Object.b();\nwindow.Object.c; window.Object.c(); new window.Object.c();",
 			traceMap:    "{\"Object\":{\"a\":{\"$read\":true},\"b\":{\"$call\":true},\"c\":{\"$construct\":true}}}",
-			want:        []string{"Read Object.a window.Object.a", "Call Object.b window.Object.b()", "Construct Object.c new window.Object.c()"},
+			want: []string{
+				"Read Object.a window.Object.a",
+				"Call Object.b window.Object.b()",
+				"Construct Object.c new window.Object.c()",
+			},
 		},
 		{
 			description: "should not iterate the references of a given global variable if it's modified.",
@@ -210,7 +245,12 @@ func TestTrackerFollowsOnlyAssignmentsThatKeepTheValue(test *testing.T) {
 			test.Errorf("%s: an arithmetic assignment does not make x hold JSON, got %q", code, got)
 		}
 	}
-	for _, code := range []string{"let x; x = JSON; x();", "let x; x ||= JSON; x();", "let x; x ??= JSON; x();", "let x; x &&= JSON; x();"} {
+	for _, code := range []string{
+		"let x; x = JSON; x();",
+		"let x; x ||= JSON; x();",
+		"let x; x ??= JSON; x();",
+		"let x; x &&= JSON; x();",
+	} {
 		if got := trackedIn(test, code, traceMap); len(got) != 1 {
 			test.Errorf("%s: x may hold JSON, so its call is one, got %q", code, got)
 		}
@@ -347,7 +387,14 @@ func TestConstantStringIn(test *testing.T) {
 			},
 		}, "input.ts", testCase.code)
 		if constant != testCase.constant || got != testCase.want {
-			test.Errorf("%s evaluated to %q (%v), want %q (%v)", testCase.code, got, constant, testCase.want, testCase.constant)
+			test.Errorf(
+				"%s evaluated to %q (%v), want %q (%v)",
+				testCase.code,
+				got,
+				constant,
+				testCase.want,
+				testCase.constant,
+			)
 		}
 	}
 }

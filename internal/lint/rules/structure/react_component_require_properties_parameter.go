@@ -8,17 +8,26 @@ import (
 
 // messageUsePropertiesNotPropsText is the rule's `usePropertiesNotProps` message, whose wording
 // lives in `policy/messages/react-component-require-properties-parameter.json`.
-var messageUsePropertiesNotPropsText = policy.MessageOf("structure/react-component-require-properties-parameter", "usePropertiesNotProps")
+var messageUsePropertiesNotPropsText = policy.MessageOf(
+	"structure/react-component-require-properties-parameter",
+	"usePropertiesNotProps",
+)
 
 // messageUsePropertiesNotProps is the finding, rendered when it is reported so the text comes from
 // the current catalog.
 func messageUsePropertiesNotProps() rule.Message {
-	return rule.Message{Id: messageUsePropertiesNotPropsText.Id, Description: messageUsePropertiesNotPropsText.Render(nil)}
+	return rule.Message{
+		Id:          messageUsePropertiesNotPropsText.Id,
+		Description: messageUsePropertiesNotPropsText.Render(nil),
+	}
 }
 
 // messageRenameToPropertiesText is the rule's `renameToProperties` message, whose wording lives in
 // `policy/messages/react-component-require-properties-parameter.json`.
-var messageRenameToPropertiesText = policy.MessageOf("structure/react-component-require-properties-parameter", "renameToProperties")
+var messageRenameToPropertiesText = policy.MessageOf(
+	"structure/react-component-require-properties-parameter",
+	"renameToProperties",
+)
 
 // messageRenameToProperties is the suggestion, rendered when it is reported so the text comes from
 // the current catalog.

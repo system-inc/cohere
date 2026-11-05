@@ -60,7 +60,9 @@ func embed(path *Path, options *Options) embedPrint {
 	}
 
 	// Special case: whitespace-only template literals
-	if quasis := current.List("quasis"); len(quasis) == 1 && estree.TrimJavaScript(templateElementRaw(quasis[0])) == "" {
+	if quasis := current.List(
+		"quasis",
+	); len(quasis) == 1 && estree.TrimJavaScript(templateElementRaw(quasis[0])) == "" {
 		return func(printing.TextToDoc, PrintFunc, *Path, *Options) (Doc, error) { return doc.Text("``"), nil }
 	}
 
@@ -294,10 +296,15 @@ func isStyledJsx(path *Path) bool {
 	) ||
 		path.Match(
 			nil,
-			predicate(func(node Node, key string) bool { return key == "expression" && node.Is("JSXExpressionContainer") }),
+			predicate(
+				func(node Node, key string) bool { return key == "expression" && node.Is("JSXExpressionContainer") },
+			),
 			predicate(func(node Node, key string) bool {
 				name := node.Child("openingElement").Child("name")
-				if key != "children" || !node.Is("JSXElement") || !name.Is("JSXIdentifier") || name.String("name") != "style" {
+				if key != "children" ||
+					!node.Is("JSXElement") ||
+					!name.Is("JSXIdentifier") ||
+					name.String("name") != "style" {
 					return false
 				}
 				for _, attribute := range node.Child("openingElement").List("attributes") {
@@ -318,7 +325,8 @@ func isStyledIdentifier(node Node) bool {
 var leadingUppercase = regexp.MustCompile(`^[A-Z]`)
 
 func isStyledExtend(node Node) bool {
-	return leadingUppercase.MatchString(node.Child("object").String("name")) && node.Child("property").String("name") == "extend"
+	return leadingUppercase.MatchString(node.Child("object").String("name")) &&
+		node.Child("property").String("name") == "extend"
 }
 
 // isStyledComponents is upstream's isStyledComponents: styled-components template literals.
@@ -341,9 +349,11 @@ func isStyledComponents(path *Path) bool {
 			callee.Is("MemberExpression") &&
 				(callee.Child("object").Is("MemberExpression") &&
 					// styled.foo.attrs({})`` or Component.extend.attrs({})``
-					(isStyledIdentifier(callee.Child("object").Child("object")) || isStyledExtend(callee.Child("object"))) ||
+					(isStyledIdentifier(callee.Child("object").Child("object")) ||
+						isStyledExtend(callee.Child("object"))) ||
 					// styled(Component).attrs({})``
-					callee.Child("object").Is("CallExpression") && isStyledIdentifier(callee.Child("object").Child("callee")))
+					callee.Child("object").Is("CallExpression") &&
+						isStyledIdentifier(callee.Child("object").Child("callee")))
 	case "Identifier":
 		// css``
 		return tag.String("name") == "css"
@@ -401,7 +411,11 @@ func printEmbedGraphQL(textToDoc printing.TextToDoc, print PrintFunc, path *Path
 		if !isTemplateValue || value == nil || value.Cooked == nil {
 			// embed sends no template here whose hasInvalidCookedValue holds, so a miss is a tree that broke
 			// that; failing the embed prints the template as written.
-			return nil, fmt.Errorf("reading quasi %d of a graphql template: its value is a %T with no cooked text", index, templateElement.Get("value"))
+			return nil, fmt.Errorf(
+				"reading quasi %d of a graphql template: its value is a %T with no cooked text",
+				index,
+				templateElement.Get("value"),
+			)
 		}
 		text := *value.Cooked
 
@@ -413,7 +427,9 @@ func printEmbedGraphQL(textToDoc printing.TextToDoc, print PrintFunc, path *Path
 			return nil, nil
 		}
 
-		startsWithBlankLine := lineCount > 2 && estree.TrimJavaScript(lines[0]) == "" && estree.TrimJavaScript(lines[1]) == ""
+		startsWithBlankLine := lineCount > 2 &&
+			estree.TrimJavaScript(lines[0]) == "" &&
+			estree.TrimJavaScript(lines[1]) == ""
 		endsWithBlankLine := lineCount > 2 && estree.TrimJavaScript(lines[lineCount-1]) == "" &&
 			estree.TrimJavaScript(lines[lineCount-2]) == ""
 

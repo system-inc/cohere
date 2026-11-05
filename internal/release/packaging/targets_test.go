@@ -49,7 +49,11 @@ func TestTargetsCoverTheThreeOperatingSystemsWeClaimToShip(test *testing.T) {
 
 	for operatingSystem, count := range required {
 		if count < 2 {
-			test.Errorf("%s has %d targets; both amd64 and arm64 are needed to cover the machines people run", operatingSystem, count)
+			test.Errorf(
+				"%s has %d targets; both amd64 and arm64 are needed to cover the machines people run",
+				operatingSystem,
+				count,
+			)
 		}
 	}
 }

@@ -22,9 +22,13 @@ var graphQlQueryMethods = map[string]bool{
 
 // networkNoStringLiteralQueryText is the rule's message, whose wording lives in
 // `policy/messages/network-no-string-literal-query.json`.
-var networkNoStringLiteralQueryText = policy.MessageOf("structure/network-no-string-literal-query", "noStringLiteralGraphQlQuery")
+var networkNoStringLiteralQueryText = policy.MessageOf(
+	"structure/network-no-string-literal-query",
+	"noStringLiteralGraphQlQuery",
+)
 
-// messageNoStringLiteralGraphQlQuery is the finding, rendered when it is reported so the text comes from the current catalog.
+// messageNoStringLiteralGraphQlQuery is the finding, rendered when it is reported so the text comes from the current
+// catalog.
 func messageNoStringLiteralGraphQlQuery() rule.Message {
 	return rule.Message{
 		Id:          networkNoStringLiteralQueryText.Id,

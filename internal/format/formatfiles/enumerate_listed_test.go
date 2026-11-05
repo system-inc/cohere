@@ -133,7 +133,12 @@ func TestAWalkReadFromListingsIsTheWalkOfTheDisk(test *testing.T) {
 			test.Fatalf("%s: %v", name, enumerateListedError)
 		}
 		if !reflect.DeepEqual(listed, disk) {
-			test.Errorf("%s: the listed walk differs from the walk of the disk\nlisted: %+v\ndisk:   %+v", name, listed, disk)
+			test.Errorf(
+				"%s: the listed walk differs from the walk of the disk\nlisted: %+v\ndisk:   %+v",
+				name,
+				listed,
+				disk,
+			)
 		}
 	}
 

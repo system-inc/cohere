@@ -41,7 +41,12 @@ func composeDoc(options Options, directives *Directives, token *cst.Token, onErr
 	if properties.found != nil {
 		doc.Directives.DocStart = true
 		if value != nil && (value.Type == "block-map" || value.Type == "block-seq") && !properties.hasNewline {
-			onError(properties.end, "MISSING_CHAR", "Block collection cannot start on same line with directives-end marker", false)
+			onError(
+				properties.end,
+				"MISSING_CHAR",
+				"Block collection cannot start on same line with directives-end marker",
+				false,
+			)
 		}
 	}
 	if value != nil {
@@ -121,7 +126,12 @@ func composeNode(composition *composeContext, token *cst.Token, properties props
 // Go's stack grows instead of overflowing at V8's depth, so the port composes what upstream would have
 // given up on. The one exception the port does raise is the TypeError resolveFlowCollection meets on a
 // comment that belongs to a previous item that was never composed.
-func composeCollectionCatching(composition *composeContext, token *cst.Token, properties props, onError onErrorFunc) (node *Node) {
+func composeCollectionCatching(
+	composition *composeContext,
+	token *cst.Token,
+	properties props,
+	onError onErrorFunc,
+) (node *Node) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			message, isTypeError := recovered.(typeError)
@@ -146,7 +156,13 @@ func isString(value any) bool {
 
 // composeEmptyNode composes the empty scalar where a node is missing. before is nil for upstream's
 // undefined; upstream's pos argument is always null, so it is left out.
-func composeEmptyNode(composition *composeContext, offset int, before []*cst.Token, properties props, onError onErrorFunc) *Node {
+func composeEmptyNode(
+	composition *composeContext,
+	offset int,
+	before []*cst.Token,
+	properties props,
+	onError onErrorFunc,
+) *Node {
 	token := &cst.Token{
 		Type:   "scalar",
 		Offset: emptyScalarPosition(offset, before),

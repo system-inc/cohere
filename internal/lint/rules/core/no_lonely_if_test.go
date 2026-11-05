@@ -31,19 +31,79 @@ func TestNoLonelyIfFires(test *testing.T) {
 		fixable    bool
 	}{
 		{"the simplest lonely if", "if (a) {;} else { if (b) {;} }", "if (a) {;} else if (b) {;}", true},
-		{"a lonely if across lines", "if (a) {\n  foo();\n} else {\n  if (b) {\n    bar();\n  }\n}", "if (a) {\n  foo();\n} else if (b) {\n    bar();\n  }", true},
-		{"a comment between else and the brace, which is outside the rewrite", "if (a) {\n  foo();\n} else /* comment */ {\n  if (b) {\n    bar();\n  }\n}", "if (a) {\n  foo();\n} else /* comment */ if (b) {\n    bar();\n  }", true},
-		{"a comment before the inner if, which the rewrite would drop", "if (a) {\n  foo();\n} else {\n  /* otherwise, do the other thing */ if (b) {\n    bar();\n  }\n}", "", false},
-		{"a comment inside the inner if, which the rewrite carries along", "if (a) {\n  foo();\n} else {\n  if /* this comment is ok */ (b) {\n    bar();\n  }\n}", "if (a) {\n  foo();\n} else if /* this comment is ok */ (b) {\n    bar();\n  }", true},
-		{"a comment after the inner if, which the rewrite would drop", "if (a) {\n  foo();\n} else {\n  if (b) {\n    bar();\n  } /* this comment will prevent this test case from being autofixed. */\n}", "", false},
-		{"an unbraced consequent with a semicolon", "if (foo) {} else { if (bar) baz(); }", "if (foo) {} else if (bar) baz();", true},
-		{"an unbraced consequent with no semicolon, followed on the same line", "if (foo) {} else { if (bar) baz() } qux();", "", false},
-		{"the same with a semicolon, which is fixable", "if (foo) {} else { if (bar) baz(); } qux();", "if (foo) {} else if (bar) baz(); qux();", true},
-		{"a following line opening with a bracket", "if (foo) {\n} else {\n  if (bar) baz()\n}\n[1, 2, 3].forEach(foo);", "", false},
+		{
+			"a lonely if across lines",
+			"if (a) {\n  foo();\n} else {\n  if (b) {\n    bar();\n  }\n}",
+			"if (a) {\n  foo();\n} else if (b) {\n    bar();\n  }",
+			true,
+		},
+		{
+			"a comment between else and the brace, which is outside the rewrite",
+			"if (a) {\n  foo();\n} else /* comment */ {\n  if (b) {\n    bar();\n  }\n}",
+			"if (a) {\n  foo();\n} else /* comment */ if (b) {\n    bar();\n  }",
+			true,
+		},
+		{
+			"a comment before the inner if, which the rewrite would drop",
+			"if (a) {\n  foo();\n} else {\n  /* otherwise, do the other thing */ if (b) {\n    bar();\n  }\n}",
+			"",
+			false,
+		},
+		{
+			"a comment inside the inner if, which the rewrite carries along",
+			"if (a) {\n  foo();\n} else {\n  if /* this comment is ok */ (b) {\n    bar();\n  }\n}",
+			"if (a) {\n  foo();\n} else if /* this comment is ok */ (b) {\n    bar();\n  }",
+			true,
+		},
+		{
+			"a comment after the inner if, which the rewrite would drop",
+			"if (a) {\n  foo();\n} else {\n  if (b) {\n    bar();\n  } /* this comment will prevent this test case from being autofixed. */\n}",
+			"",
+			false,
+		},
+		{
+			"an unbraced consequent with a semicolon",
+			"if (foo) {} else { if (bar) baz(); }",
+			"if (foo) {} else if (bar) baz();",
+			true,
+		},
+		{
+			"an unbraced consequent with no semicolon, followed on the same line",
+			"if (foo) {} else { if (bar) baz() } qux();",
+			"",
+			false,
+		},
+		{
+			"the same with a semicolon, which is fixable",
+			"if (foo) {} else { if (bar) baz(); } qux();",
+			"if (foo) {} else if (bar) baz(); qux();",
+			true,
+		},
+		{
+			"a following line opening with a bracket",
+			"if (foo) {\n} else {\n  if (bar) baz()\n}\n[1, 2, 3].forEach(foo);",
+			"",
+			false,
+		},
 		{"a consequent ending in an increment", "if (foo) {\n} else {\n  if (bar) baz++\n}\nfoo;", "", false},
-		{"the same with a semicolon, which is fixable", "if (foo) {\n} else {\n  if (bar) baz++;\n}\nfoo;", "if (foo) {\n} else if (bar) baz++;\nfoo;", true},
-		{"a following line opening with a template literal", "if (a) {\n  foo();\n} else {\n  if (b) bar()\n}\n`template literal`;", "", false},
-		{"a whole else if chain inside the block", "if (a) {\n  foo();\n} else {\n  if (b) {\n    bar();\n  } else if (c) {\n    baz();\n  } else {\n    qux();\n  }\n}", "if (a) {\n  foo();\n} else if (b) {\n    bar();\n  } else if (c) {\n    baz();\n  } else {\n    qux();\n  }", true},
+		{
+			"the same with a semicolon, which is fixable",
+			"if (foo) {\n} else {\n  if (bar) baz++;\n}\nfoo;",
+			"if (foo) {\n} else if (bar) baz++;\nfoo;",
+			true,
+		},
+		{
+			"a following line opening with a template literal",
+			"if (a) {\n  foo();\n} else {\n  if (b) bar()\n}\n`template literal`;",
+			"",
+			false,
+		},
+		{
+			"a whole else if chain inside the block",
+			"if (a) {\n  foo();\n} else {\n  if (b) {\n    bar();\n  } else if (c) {\n    baz();\n  } else {\n    qux();\n  }\n}",
+			"if (a) {\n  foo();\n} else if (b) {\n    bar();\n  } else if (c) {\n    baz();\n  } else {\n    qux();\n  }",
+			true,
+		},
 	}
 
 	for _, testCase := range cases {
@@ -147,9 +207,21 @@ func TestNoLonelyIfBracedConsequentIsExemptFromTheSemicolonInsertionTest(test *t
 		sourceText string
 		wantFixed  string
 	}{
-		{"a braced consequent followed on the same line", "if (foo) {} else { if (bar) { baz() } } qux();", "if (foo) {} else if (bar) { baz() } qux();"},
-		{"a braced consequent followed by a line opening with a bracket", "if (foo) {\n} else {\n  if (bar) { baz() }\n}\n[1,2,3].forEach(foo);", "if (foo) {\n} else if (bar) { baz() }\n[1,2,3].forEach(foo);"},
-		{"a braced consequent followed by a parenthesis", "if (a) {;} else { if (b) {;} } (x);", "if (a) {;} else if (b) {;} (x);"},
+		{
+			"a braced consequent followed on the same line",
+			"if (foo) {} else { if (bar) { baz() } } qux();",
+			"if (foo) {} else if (bar) { baz() } qux();",
+		},
+		{
+			"a braced consequent followed by a line opening with a bracket",
+			"if (foo) {\n} else {\n  if (bar) { baz() }\n}\n[1,2,3].forEach(foo);",
+			"if (foo) {\n} else if (bar) { baz() }\n[1,2,3].forEach(foo);",
+		},
+		{
+			"a braced consequent followed by a parenthesis",
+			"if (a) {;} else { if (b) {;} } (x);",
+			"if (a) {;} else if (b) {;} (x);",
+		},
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
@@ -182,7 +254,11 @@ func TestNoLonelyIfDanglingElse(test *testing.T) {
 		{"an alternate-less inner if followed by else", "if (a) if (a) {} else { if (b) {} } else {}", false},
 		{"the same with nothing following", "if (a) if (a) {} else { if (b) {} }", true},
 		{"an inner if whose chain ends in an else", "if (a) if (a) {} else { if (b) {} else {} } else {}", true},
-		{"an inner if whose chain ends without one", "if (a) if (a) {} else { if (b) {} else if (c) {} } else {}", false},
+		{
+			"an inner if whose chain ends without one",
+			"if (a) if (a) {} else { if (b) {} else if (c) {} } else {}",
+			false,
+		},
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()

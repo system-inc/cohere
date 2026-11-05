@@ -36,7 +36,10 @@ func printFlowMapping(path *astPath, options *options, print printing.PrintFunc)
 		contents = append(contents, doc.NewIfBreak(doc.Text(","), nil, nil))
 	}
 	if hasEndComments(node) {
-		contents = append(contents, doc.Concat{doc.Hardline, doc.Join(doc.Hardline, mapPrint(path, print, "endComments"))})
+		contents = append(
+			contents,
+			doc.Concat{doc.Hardline, doc.Join(doc.Hardline, mapPrint(path, print, "endComments"))},
+		)
 	} else {
 		contents = append(contents, doc.Text(""))
 	}

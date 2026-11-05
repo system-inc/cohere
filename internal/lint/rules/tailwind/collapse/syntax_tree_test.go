@@ -159,7 +159,9 @@ func TestPropertySortMatchesEngine(test *testing.T) {
 		corpus.TailwindVersion, len(corpus.Cases), corpus.DistinctSignatures, withAtRoot, withTwSort,
 	)
 	if withAtRoot == 0 {
-		test.Error("no case in the corpus carries an at-root subtree, so the exclusion that removes @property from the count is untested")
+		test.Error(
+			"no case in the corpus carries an at-root subtree, so the exclusion that removes @property from the count is untested",
+		)
 	}
 	if withTwSort == 0 {
 		test.Error("no case in the corpus carries a --tw-sort declaration, so the latch is untested")
@@ -184,7 +186,12 @@ func TestPropertySortIsBreadthFirst(test *testing.T) {
 		_, got := propertySort(seedFor(node))
 
 		if !equalStrings(got, testCase.BreadthFirst) {
-			test.Errorf("%s: visit order = %v, engine's queue visits %v", testCase.ClassName, got, testCase.BreadthFirst)
+			test.Errorf(
+				"%s: visit order = %v, engine's queue visits %v",
+				testCase.ClassName,
+				got,
+				testCase.BreadthFirst,
+			)
 		}
 		if equalStrings(testCase.BreadthFirst, testCase.DepthFirst) {
 			test.Errorf("%s: fixture claims divergence but breadth-first and depth-first agree", testCase.ClassName)
@@ -192,7 +199,11 @@ func TestPropertySortIsBreadthFirst(test *testing.T) {
 		// Guard the guard: if the port were depth-first, this is the answer it would give, and the
 		// assertion above must be the thing that rejects it.
 		if equalStrings(got, testCase.DepthFirst) {
-			test.Errorf("%s: visit order matches depth-first %v, so the traversal is not the engine's", testCase.ClassName, testCase.DepthFirst)
+			test.Errorf(
+				"%s: visit order matches depth-first %v, so the traversal is not the engine's",
+				testCase.ClassName,
+				testCase.DepthFirst,
+			)
 		}
 	}
 
@@ -228,12 +239,18 @@ func TestShadowArbitraryVariableReading(test *testing.T) {
 			test.Errorf("shadow-[--x] reads {order:%v count:%d}, want {order:[315 316] count:2}", got.Order, got.Count)
 		}
 		if !treeHasKind(node, KindAtRoot) {
-			test.Error("shadow-[--x] no longer compiles to a tree containing an at-root subtree; the exclusion this case exists to prove is no longer exercised by it")
+			test.Error(
+				"shadow-[--x] no longer compiles to a tree containing an at-root subtree; the exclusion this case exists to prove is no longer exercised by it",
+			)
 		}
 
 		declarations := treeCountKind(node, KindDeclaration)
 		if declarations <= got.Count {
-			test.Errorf("shadow-[--x] holds %d declarations and reads a count of %d; the case is only meaningful while the tree holds many more declarations than the reading counts", declarations, got.Count)
+			test.Errorf(
+				"shadow-[--x] holds %d declarations and reads a count of %d; the case is only meaningful while the tree holds many more declarations than the reading counts",
+				declarations,
+				got.Count,
+			)
 		}
 		test.Logf("shadow-[--x]: %d declarations in the tree, reading counts %d", declarations, got.Count)
 	}
@@ -394,9 +411,15 @@ func TestVariantsDoNotChangeTheReading(test *testing.T) {
 		test.Fatal("no case in the corpus carries a variant, so variant-invariance is untested")
 	}
 	if whereEmittedDiffers == 0 {
-		test.Error("no variant case emits a different declaration count than it reads, so this test cannot distinguish the pre-variant body from the emitted tree")
+		test.Error(
+			"no variant case emits a different declaration count than it reads, so this test cannot distinguish the pre-variant body from the emitted tree",
+		)
 	}
-	test.Logf("%d variant-carrying cases, %d of which emit a different declaration count than their reading counts", withVariants, whereEmittedDiffers)
+	test.Logf(
+		"%d variant-carrying cases, %d of which emit a different declaration count than their reading counts",
+		withVariants,
+		whereEmittedDiffers,
+	)
 }
 
 // TestPropertySortDoesNotMutateItsInput pins that the traversal leaves the caller's slice alone.
@@ -426,7 +449,10 @@ func TestPropertySortDoesNotMutateItsInput(test *testing.T) {
 
 	for index := range backing {
 		if backing[index] != before[index] {
-			test.Fatalf("PropertySort overwrote the caller's backing array at index %d; it must seed its queue with a copy", index)
+			test.Fatalf(
+				"PropertySort overwrote the caller's backing array at index %d; it must seed its queue with a copy",
+				index,
+			)
 		}
 	}
 	if len(seed) != 1 {

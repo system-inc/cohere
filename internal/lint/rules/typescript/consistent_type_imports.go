@@ -462,18 +462,33 @@ func reportImportsUsedOnlyAsTypes(
 			// than proposing something that cannot be written. Probed: an import with an `assert`
 			// clause is silent even when every name is type-only.
 			if declaration.Attributes == nil {
-				reportConsistentTypeImportsWithFix(ruleContext, statement, messageConsistentTypeImportsTypeOverValue, fix)
+				reportConsistentTypeImportsWithFix(
+					ruleContext,
+					statement,
+					messageConsistentTypeImportsTypeOverValue,
+					fix,
+				)
 			}
 			continue
 		}
 
-		reportConsistentTypeImportsWithFix(ruleContext, statement, consistentTypeImportsSomeAreOnlyTypes(typeOnlyNames), fix)
+		reportConsistentTypeImportsWithFix(
+			ruleContext,
+			statement,
+			consistentTypeImportsSomeAreOnlyTypes(typeOnlyNames),
+			fix,
+		)
 	}
 }
 
 // reportConsistentTypeImportsWithFix reports with the repair when one can be built, and bare when the
 // fixer declines, so a declaration it cannot rewrite safely is still named.
-func reportConsistentTypeImportsWithFix(ruleContext rule.Context, node *ast.Node, message rule.Message, fix func() (rule.Fix, bool)) {
+func reportConsistentTypeImportsWithFix(
+	ruleContext rule.Context,
+	node *ast.Node,
+	message rule.Message,
+	fix func() (rule.Fix, bool),
+) {
 	if proposed, ok := fix(); ok {
 		ruleContext.ReportNodeWithFixes(node, message, proposed)
 		return

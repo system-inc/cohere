@@ -413,7 +413,11 @@ func DecodeTripleSlashReferenceOptions(raw []byte) (any, error) {
 // allowPreferImport is what encodes the asymmetry: `types` takes three values and the other two
 // take two. Reproducing that matters because `path: prefer-import` would otherwise silently behave
 // like a fourth state the rule never checks for, where upstream refuses the config outright.
-func settingOrDefault(wire *string, fallback TripleSlashReferenceSetting, allowPreferImport bool) TripleSlashReferenceSetting {
+func settingOrDefault(
+	wire *string,
+	fallback TripleSlashReferenceSetting,
+	allowPreferImport bool,
+) TripleSlashReferenceSetting {
 	if wire == nil {
 		return fallback
 	}

@@ -50,34 +50,78 @@ func TestNoRequireImportsFires(test *testing.T) {
 	cases := []requireImportsCase{
 		{sourceText: "var lib = require('lib');", options: "", findings: 1},
 		{sourceText: "let lib2 = require('lib2');", options: "", findings: 1},
-		{sourceText: "\n            var lib5 = require('lib5'),\n              lib6 = require('lib6');\n                  ", options: "", findings: 2},
+		{
+			sourceText: "\n            var lib5 = require('lib5'),\n              lib6 = require('lib6');\n                  ",
+			options:    "",
+			findings:   2,
+		},
 		{sourceText: "import lib8 = require('lib8');", options: "", findings: 1},
 		{sourceText: "var lib = require?.('lib');", options: "", findings: 1},
 		{sourceText: "let lib2 = require?.('lib2');", options: "", findings: 1},
-		{sourceText: "\n            var lib5 = require?.('lib5'),\n              lib6 = require?.('lib6');\n                  ", options: "", findings: 2},
+		{
+			sourceText: "\n            var lib5 = require?.('lib5'),\n              lib6 = require?.('lib6');\n                  ",
+			options:    "",
+			findings:   2,
+		},
 		{sourceText: "const pkg = require('./package.json');", options: "", findings: 1},
-		{sourceText: "const pkg = require('./package.jsonc');", options: "{ \"allow\": [\"/package\\\\.json$\"] }", findings: 1},
-		{sourceText: "const pkg = require(`./package.jsonc`);", options: "{ \"allow\": [\"/package\\\\.json$\"] }", findings: 1},
+		{
+			sourceText: "const pkg = require('./package.jsonc');",
+			options:    "{ \"allow\": [\"/package\\\\.json$\"] }",
+			findings:   1,
+		},
+		{
+			sourceText: "const pkg = require(`./package.jsonc`);",
+			options:    "{ \"allow\": [\"/package\\\\.json$\"] }",
+			findings:   1,
+		},
 		{sourceText: "import pkg = require('./package.json');", options: "", findings: 1},
-		{sourceText: "import pkg = require('./package.jsonc');", options: "{ \"allow\": [\"/package\\\\.json$\"] }", findings: 1},
-		{sourceText: "import pkg = require('./package.json');", options: "{ \"allow\": [\"^some-package$\"] }", findings: 1},
+		{
+			sourceText: "import pkg = require('./package.jsonc');",
+			options:    "{ \"allow\": [\"/package\\\\.json$\"] }",
+			findings:   1,
+		},
+		{
+			sourceText: "import pkg = require('./package.json');",
+			options:    "{ \"allow\": [\"^some-package$\"] }",
+			findings:   1,
+		},
 		{sourceText: "var foo = require?.('foo');", options: "{ \"allowAsImport\": true }", findings: 1},
 		{sourceText: "let foo = trick(require?.('foo'));", options: "{ \"allowAsImport\": true }", findings: 1},
 		{sourceText: "trick(require('foo'));", options: "{ \"allowAsImport\": true }", findings: 1},
 		{sourceText: "const foo = require('./foo.json') as Foo;", options: "{ \"allowAsImport\": true }", findings: 1},
-		{sourceText: "const foo: Foo = require('./foo.json').default;", options: "{ \"allowAsImport\": true }", findings: 1},
+		{
+			sourceText: "const foo: Foo = require('./foo.json').default;",
+			options:    "{ \"allowAsImport\": true }",
+			findings:   1,
+		},
 		{sourceText: "const foo = <Foo>require('./foo.json');", options: "{ \"allowAsImport\": true }", findings: 1},
-		{sourceText: "\n            const configValidator = new Validator(require('./a.json'));\n            configValidator.addSchema(require('./a.json'));\n                  ", options: "{ \"allowAsImport\": true }", findings: 2},
+		{
+			sourceText: "\n            const configValidator = new Validator(require('./a.json'));\n            configValidator.addSchema(require('./a.json'));\n                  ",
+			options:    "{ \"allowAsImport\": true }",
+			findings:   2,
+		},
 		{sourceText: "require('foo');", options: "{ \"allowAsImport\": true }", findings: 1},
 		{sourceText: "require?.('foo');", options: "{ \"allowAsImport\": true }", findings: 1},
 		{sourceText: "function foo() {\n            require('foo')\n            }", options: "", findings: 1},
 		{sourceText: "const m = require(someVariable);", options: "", findings: 1},
 		{sourceText: "const m = require(path.join(dir, file));", options: "", findings: 1},
-		{sourceText: "class Foo {\n            require(module: string) {\n                return require(module);\n            }\n            }", options: "", findings: 1},
-		{sourceText: "class Foo {\n            require(module: string) {\n                return require('foo');\n            }\n            }", options: "", findings: 1},
+		{
+			sourceText: "class Foo {\n            require(module: string) {\n                return require(module);\n            }\n            }",
+			options:    "",
+			findings:   1,
+		},
+		{
+			sourceText: "class Foo {\n            require(module: string) {\n                return require('foo');\n            }\n            }",
+			options:    "",
+			findings:   1,
+		},
 		// #7mztrdd: the control for the lookbehind rows in TestNoRequireImportsStaysSilent. In Node,
 		// new RegExp("(?<=/)package\\.json$", "u") tests false on "package.json", so the require still reports.
-		{sourceText: "const pkg = require('package.json');", options: "{ \"allow\": [\"(?<=/)package\\\\.json$\"] }", findings: 1},
+		{
+			sourceText: "const pkg = require('package.json');",
+			options:    "{ \"allow\": [\"(?<=/)package\\\\.json$\"] }",
+			findings:   1,
+		},
 	}
 
 	for _, testCase := range cases {
@@ -110,30 +154,72 @@ func TestNoRequireImportsStaysSilent(test *testing.T) {
 		{sourceText: "import lib9 = lib2.anotherSubImport;", options: ""},
 		{sourceText: "import lib10 from 'lib10';", options: ""},
 		{sourceText: "var lib3 = load?.('not_an_import');", options: ""},
-		{sourceText: "\n            import { createRequire } from 'module';\n            const require = createRequire();\n            require(someModule);\n                ", options: ""},
-		{sourceText: "\n            function foo() {\n                let require = bazz;\n                require(someModule);\n            }\n                ", options: ""},
-		{sourceText: "\n            import { createRequire } from 'module';\n            const require = createRequire();\n            require('remark-preset-prettier');\n                ", options: ""},
+		{
+			sourceText: "\n            import { createRequire } from 'module';\n            const require = createRequire();\n            require(someModule);\n                ",
+			options:    "",
+		},
+		{
+			sourceText: "\n            function foo() {\n                let require = bazz;\n                require(someModule);\n            }\n                ",
+			options:    "",
+		},
+		{
+			sourceText: "\n            import { createRequire } from 'module';\n            const require = createRequire();\n            require('remark-preset-prettier');\n                ",
+			options:    "",
+		},
 		{sourceText: "const pkg = require('./package.json');", options: "{ \"allow\": [\"/package\\\\.json$\"] }"},
 		{sourceText: "const pkg = require('../package.json');", options: "{ \"allow\": [\"/package\\\\.json$\"] }"},
 		{sourceText: "const pkg = require(`./package.json`);", options: "{ \"allow\": [\"/package\\\\.json$\"] }"},
-		{sourceText: "const pkg = require('../packages/package.json');", options: "{ \"allow\": [\"/package\\\\.json$\"] }"},
-		{sourceText: "import pkg = require('../packages/package.json');", options: "{ \"allow\": [\"/package\\\\.json$\"] }"},
+		{
+			sourceText: "const pkg = require('../packages/package.json');",
+			options:    "{ \"allow\": [\"/package\\\\.json$\"] }",
+		},
+		{
+			sourceText: "import pkg = require('../packages/package.json');",
+			options:    "{ \"allow\": [\"/package\\\\.json$\"] }",
+		},
 		{sourceText: "import pkg = require('data.json');", options: "{ \"allow\": [\"\\\\.json$\"] }"},
 		{sourceText: "import pkg = require('some-package');", options: "{ \"allow\": [\"^some-package$\"] }"},
 		{sourceText: "import foo = require('foo');", options: "{ \"allowAsImport\": true }"},
-		{sourceText: "\n            let require = bazz;\n            trick(require('foo'));\n                  ", options: "{ \"allowAsImport\": true }"},
-		{sourceText: "\n            let require = bazz;\n            const foo = require('./foo.json') as Foo;\n                  ", options: "{ \"allowAsImport\": true }"},
-		{sourceText: "\n            let require = bazz;\n            const foo: Foo = require('./foo.json').default;\n                  ", options: "{ \"allowAsImport\": true }"},
-		{sourceText: "\n            let require = bazz;\n            const foo = <Foo>require('./foo.json');\n                  ", options: "{ \"allowAsImport\": true }"},
-		{sourceText: "\n            let require = bazz;\n            const configValidator = new Validator(require('./a.json'));\n            configValidator.addSchema(require('./a.json'));\n                  ", options: "{ \"allowAsImport\": true }"},
-		{sourceText: "\n            let require = bazz;\n            require('foo');\n                  ", options: "{ \"allowAsImport\": true }"},
-		{sourceText: "\n            let require = bazz;\n            require?.('foo');\n                  ", options: "{ \"allowAsImport\": true }"},
-		{sourceText: "\n            import { createRequire } from 'module';\n            const require = createRequire();\n            require('remark-preset-prettier');\n                  ", options: "{ \"allowAsImport\": true }"},
+		{
+			sourceText: "\n            let require = bazz;\n            trick(require('foo'));\n                  ",
+			options:    "{ \"allowAsImport\": true }",
+		},
+		{
+			sourceText: "\n            let require = bazz;\n            const foo = require('./foo.json') as Foo;\n                  ",
+			options:    "{ \"allowAsImport\": true }",
+		},
+		{
+			sourceText: "\n            let require = bazz;\n            const foo: Foo = require('./foo.json').default;\n                  ",
+			options:    "{ \"allowAsImport\": true }",
+		},
+		{
+			sourceText: "\n            let require = bazz;\n            const foo = <Foo>require('./foo.json');\n                  ",
+			options:    "{ \"allowAsImport\": true }",
+		},
+		{
+			sourceText: "\n            let require = bazz;\n            const configValidator = new Validator(require('./a.json'));\n            configValidator.addSchema(require('./a.json'));\n                  ",
+			options:    "{ \"allowAsImport\": true }",
+		},
+		{
+			sourceText: "\n            let require = bazz;\n            require('foo');\n                  ",
+			options:    "{ \"allowAsImport\": true }",
+		},
+		{
+			sourceText: "\n            let require = bazz;\n            require?.('foo');\n                  ",
+			options:    "{ \"allowAsImport\": true }",
+		},
+		{
+			sourceText: "\n            import { createRequire } from 'module';\n            const require = createRequire();\n            require('remark-preset-prettier');\n                  ",
+			options:    "{ \"allowAsImport\": true }",
+		},
 		// #7mztrdd: an allow pattern is read as JavaScript reads it, `new RegExp(pattern, 'u')`. RE2 refuses a
 		// lookbehind, so this pattern was dropped and permitted nothing. In Node,
 		// new RegExp("(?<=/)package\\.json$", "u") tests true on "./package.json".
 		{sourceText: "const pkg = require('./package.json');", options: "{ \"allow\": [\"(?<=/)package\\\\.json$\"] }"},
-		{sourceText: "import pkg = require('./package.json');", options: "{ \"allow\": [\"(?<=/)package\\\\.json$\"] }"},
+		{
+			sourceText: "import pkg = require('./package.json');",
+			options:    "{ \"allow\": [\"(?<=/)package\\\\.json$\"] }",
+		},
 		// #7mztrdd: JavaScript's `\s` takes U+00A0. In Node, new RegExp("^my\\smodule$", "u") tests true on
 		// "my\u00a0module".
 		{sourceText: "const m = require('my\u00a0module');", options: "{ \"allow\": [\"^my\\\\smodule$\"] }"},

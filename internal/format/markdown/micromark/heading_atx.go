@@ -1,7 +1,11 @@
 package micromark
 
 // headingAtx is micromark-core-commonmark/lib/heading-atx.js.
-var headingAtx = &Construct{Name: "headingAtx", Resolve: &Resolver{Resolve: resolveHeadingAtx}, Tokenize: tokenizeHeadingAtx}
+var headingAtx = &Construct{
+	Name:     "headingAtx",
+	Resolve:  &Resolver{Resolve: resolveHeadingAtx},
+	Tokenize: tokenizeHeadingAtx,
+}
 
 func resolveHeadingAtx(events []Event, context *TokenizeContext) []Event {
 	contentEnd := len(events) - 2

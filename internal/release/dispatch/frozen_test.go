@@ -28,7 +28,10 @@ func TestResolveFrozenRefusesWhenTheCacheIsEmpty(test *testing.T) {
 		test.Fatalf("freezing an empty cache succeeded and selected %q", frozen.Path)
 	}
 	if !strings.Contains(resolveFrozenError.Error(), "nothing was run") {
-		test.Errorf("the error does not say that nothing ran, so a reader could take it for a warning: %v", resolveFrozenError)
+		test.Errorf(
+			"the error does not say that nothing ran, so a reader could take it for a warning: %v",
+			resolveFrozenError,
+		)
 	}
 }
 
@@ -145,7 +148,11 @@ func setModificationTimes(test *testing.T, paths Paths, oldestFirst []string) {
 	base := time.Date(2026, time.August, 23, 1, 0, 0, 0, time.UTC)
 	for index, name := range oldestFirst {
 		stamp := base.Add(time.Duration(index) * time.Second)
-		if changeTimesError := os.Chtimes(filepath.Join(paths.BinaryDirectory(), name), stamp, stamp); changeTimesError != nil {
+		if changeTimesError := os.Chtimes(
+			filepath.Join(paths.BinaryDirectory(), name),
+			stamp,
+			stamp,
+		); changeTimesError != nil {
 			test.Fatalf("stamping %s: %v", name, changeTimesError)
 		}
 	}

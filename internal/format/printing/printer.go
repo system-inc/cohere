@@ -38,7 +38,10 @@ type CommentHandlers[N Node[N]] struct {
 // Embed is upstream's printer.embed result, made synchronous: given the path, a printer either returns
 // nil (nothing embedded here) or a function that produces the embedded doc. The function receives
 // TextToDoc to format another language's text.
-type Embed[N Node[N]] func(path *AstPath[N], options *Options[N]) func(textToDoc TextToDoc, print PrintFunc, path *AstPath[N], options *Options[N]) (doc.Doc, error)
+type Embed[N Node[N]] func(
+	path *AstPath[N],
+	options *Options[N],
+) func(textToDoc TextToDoc, print PrintFunc, path *AstPath[N], options *Options[N]) (doc.Doc, error)
 
 // TextToDoc formats text in another language and returns its doc, upstream's textToDoc. The parser
 // name is upstream's (typescript, babel, json, graphql, css, markdown). Supplied by whoever knows every
@@ -212,7 +215,13 @@ func PrintAstToDoc[N Node[N]](ast N, comments []N, options *Options[N]) (doc.Doc
 }
 
 // callPluginPrintFunction is upstream's callPluginPrintFunction, without cursor labels.
-func callPluginPrintFunction[N Node[N]](path *AstPath[N], options *Options[N], print PrintFunc, args any, embeds map[N]doc.Doc) doc.Doc {
+func callPluginPrintFunction[N Node[N]](
+	path *AstPath[N],
+	options *Options[N],
+	print PrintFunc,
+	args any,
+	embeds map[N]doc.Doc,
+) doc.Doc {
 	node, _ := path.Node()
 	printer := options.Printer
 

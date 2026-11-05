@@ -98,7 +98,9 @@ func startCacheTrim(poolDirectory string) {
 // trim between them.
 func claimCacheLook(poolDirectory string, now time.Time) bool {
 	stamp := filepath.Join(poolDirectory, "gocache.checked")
-	if information, statError := os.Stat(stamp); statError == nil && now.Sub(information.ModTime()) < cacheTrimInterval {
+	if information, statError := os.Stat(
+		stamp,
+	); statError == nil && now.Sub(information.ModTime()) < cacheTrimInterval {
 		return false
 	}
 	if os.WriteFile(stamp, nil, 0o644) != nil || os.Chtimes(stamp, now, now) != nil {
@@ -190,19 +192,38 @@ func trimCache() int {
 	// A window opened while the trim waited for an empty pool holds too: the wait can be minutes.
 	if holds, quietLine := quietHolds(directory, time.Now()); holds {
 		release()
-		recordCacheLook(directory, fmt.Sprintf("%s over the %s cap, not trimmed: %s", gigabytes(measured.Before), gigabytes(capBytes), quietLine))
+		recordCacheLook(directory, fmt.Sprintf(
+			"%s over the %s cap, not trimmed: %s",
+			gigabytes(measured.Before),
+			gigabytes(capBytes),
+			quietLine,
+		))
 		return 0
 	}
 	started := time.Now()
-	trimmed, err := gocache.Trim(cache, gocache.Limit{Cap: capBytes, Target: capBytes / 4 * 3, Spare: cacheTrimSpare}, started)
+	trimmed, err := gocache.Trim(
+		cache,
+		gocache.Limit{Cap: capBytes, Target: capBytes / 4 * 3, Spare: cacheTrimSpare},
+		started,
+	)
 	release()
 	if err != nil {
 		recordCacheLook(directory, err.Error())
 		return 1
 	}
-	recordCacheLook(directory, fmt.Sprintf("trimmed from %s to %s, %d entries removed, %s written in the last %s kept; "+
-		"the pool was held %s", gigabytes(trimmed.Before), gigabytes(trimmed.After), trimmed.Removed, gigabytes(trimmed.InUse),
-		cacheTrimSpare, time.Since(started).Round(time.Millisecond)))
+	recordCacheLook(
+		directory,
+		fmt.Sprintf(
+			"trimmed from %s to %s, %d entries removed, %s written in the last %s kept; "+
+				"the pool was held %s",
+			gigabytes(trimmed.Before),
+			gigabytes(trimmed.After),
+			trimmed.Removed,
+			gigabytes(trimmed.InUse),
+			cacheTrimSpare,
+			time.Since(started).Round(time.Millisecond),
+		),
+	)
 	return 0
 }
 
@@ -281,13 +302,20 @@ func poolGuards(cache string) error {
 	resolvedRoot, rootErr := filepath.EvalSymlinks(root)
 	resolvedCache, cacheErr := filepath.EvalSymlinks(cache)
 	if rootErr == nil && cacheErr == nil {
-		if relative, relativePathError := filepath.Rel(resolvedRoot, resolvedCache); relativePathError == nil && relative != ".." &&
+		if relative, relativePathError := filepath.Rel(
+			resolvedRoot,
+			resolvedCache,
+		); relativePathError == nil && relative != ".." &&
 			!strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
 			return nil
 		}
 	}
-	return fmt.Errorf("not trimmed: the Go build cache %s is outside %s, the user cache directory this pool lives in, "+
-		"so holding this pool would not keep out the builds reading that cache; trim it from a run whose home holds it", cache, root)
+	return fmt.Errorf(
+		"not trimmed: the Go build cache %s is outside %s, the user cache directory this pool lives in, "+
+			"so holding this pool would not keep out the builds reading that cache; trim it from a run whose home holds it",
+		cache,
+		root,
+	)
 }
 
 // goCacheDirectory is the cache a plain go command here uses: `GOCACHE` when it is set, Go's default
@@ -315,7 +343,11 @@ func recordCacheLook(directory string, what string) {
 	if os.WriteFile(temporary, []byte(line+"\n"), 0o644) == nil {
 		_ = os.Rename(temporary, filepath.Join(directory, "gocache.status")) // Ignored: no one to tell, as above.
 	}
-	if log, openError := os.OpenFile(filepath.Join(directory, "gocache-trim.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644); openError == nil {
+	if log, openError := os.OpenFile(
+		filepath.Join(directory, "gocache-trim.log"),
+		os.O_CREATE|os.O_APPEND|os.O_WRONLY,
+		0o644,
+	); openError == nil {
 		_, _ = fmt.Fprintln(log, line) // Ignored: no one to tell, as above.
 		_ = log.Close()                // Ignored: no one to tell, as above.
 	}
@@ -331,7 +363,12 @@ func cacheStatus(directory string) string {
 	if contents, readError := os.ReadFile(filepath.Join(directory, "gocache.status")); readError == nil {
 		last = "last look " + strings.TrimSpace(string(contents))
 	}
-	return fmt.Sprintf("Go build cache: cap %s, looked at every %s at most; %s", gigabytes(capBytes), cacheTrimInterval, last)
+	return fmt.Sprintf(
+		"Go build cache: cap %s, looked at every %s at most; %s",
+		gigabytes(capBytes),
+		cacheTrimInterval,
+		last,
+	)
 }
 
 func gigabytes(bytes int64) string {

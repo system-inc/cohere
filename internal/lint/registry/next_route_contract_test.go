@@ -118,7 +118,10 @@ func TestNoRuleRewritesANextRouteContractExport(test *testing.T) {
 	for filePath, sourceText := range nextRouteContractFixtures {
 		contract := nextjs.RouteContractExports(filePath)
 		if len(contract) == 0 {
-			test.Fatalf("%s is not a route file by nextjs.RouteContractExports, so its fixture proves nothing", filePath)
+			test.Fatalf(
+				"%s is not a route file by nextjs.RouteContractExports, so its fixture proves nothing",
+				filePath,
+			)
 		}
 
 		test.Run(filePath, func(test *testing.T) {
@@ -135,16 +138,26 @@ func TestNoRuleRewritesANextRouteContractExport(test *testing.T) {
 				for _, diagnostic := range result.Diagnostics {
 					for _, fix := range diagnostic.Fixes {
 						if name, touches := touchedContractName(fix.Range, contractRanges); touches {
-							test.Errorf("%s: a fix rewrites the Next contract export %q (%q over %s): %s",
-								subject.Name, name, fix.Text, describeRange(result.SourceFile, fix.Range), diagnostic.Message.Description)
+							test.Errorf(
+								"%s: a fix rewrites the Next contract export %q (%q over %s): %s",
+								subject.Name,
+								name,
+								fix.Text,
+								describeRange(result.SourceFile, fix.Range),
+								diagnostic.Message.Description,
+							)
 						}
 					}
 					if !isNamingRule(subject.Name) {
 						continue
 					}
 					if name, touches := touchedContractName(diagnostic.Range, contractRanges); touches {
-						test.Errorf("%s: reports on the Next contract export %q, advising a change Next would silently ignore: %s",
-							subject.Name, name, diagnostic.Message.Description)
+						test.Errorf(
+							"%s: reports on the Next contract export %q, advising a change Next would silently ignore: %s",
+							subject.Name,
+							name,
+							diagnostic.Message.Description,
+						)
 					}
 				}
 			}
@@ -152,7 +165,11 @@ func TestNoRuleRewritesANextRouteContractExport(test *testing.T) {
 			// Every contract name in the fixture must have been found, or the ranges the assertions
 			// compare against were empty and every rule passed by seeing nothing.
 			if want := countFixtureContractNames(sourceText, contract); sawContractNames != want {
-				test.Fatalf("found %d contract export names in the parsed file, the fixture writes %d", sawContractNames, want)
+				test.Fatalf(
+					"found %d contract export names in the parsed file, the fixture writes %d",
+					sawContractNames,
+					want,
+				)
 			}
 		})
 	}

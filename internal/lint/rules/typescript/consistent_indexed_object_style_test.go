@@ -35,7 +35,9 @@ func consistentIndexedObjectStyleOptionsFor(test *testing.T, optionsJson string)
 	if optionsJson == "" {
 		return DefaultConsistentIndexedObjectStyleSettings()
 	}
-	decoded, decodeConsistentIndexedObjectStyleOptionsError := DecodeConsistentIndexedObjectStyleOptions(json.RawMessage(optionsJson))
+	decoded, decodeConsistentIndexedObjectStyleOptionsError := DecodeConsistentIndexedObjectStyleOptions(
+		json.RawMessage(optionsJson),
+	)
 	if decodeConsistentIndexedObjectStyleOptionsError != nil {
 		test.Fatalf("decoding %s: %v", optionsJson, decodeConsistentIndexedObjectStyleOptionsError)
 	}
@@ -92,15 +94,39 @@ func TestConsistentIndexedObjectStyleStaysSilentOnUpstreamPassCases(test *testin
 		{sourceText: "\ninterface Foo<T> {\n  [s: string]: T extends true ? string : Foo;\n}\n    ", optionsJson: ""},
 		{sourceText: "\ninterface Foo {\n  [s: string]: Foo[number];\n}\n    ", optionsJson: ""},
 		{sourceText: "\ninterface Foo {\n  [s: string]: {}[Foo];\n}\n    ", optionsJson: ""},
-		{sourceText: "\ninterface Foo1 {\n  [key: string]: Foo2;\n}\n\ninterface Foo2 {\n  [key: string]: Foo1;\n}\n    ", optionsJson: ""},
-		{sourceText: "\ninterface Foo1 {\n  [key: string]: Foo2;\n}\n\ninterface Foo2 {\n  [key: string]: Foo3;\n}\n\ninterface Foo3 {\n  [key: string]: Foo1;\n}\n    ", optionsJson: ""},
-		{sourceText: "\ninterface Foo1 {\n  [key: string]: Foo2;\n}\n\ninterface Foo2 {\n  [key: string]: Foo3;\n}\n\ninterface Foo3 {\n  [key: string]: Record<string, Foo1>;\n}\n    ", optionsJson: ""},
-		{sourceText: "\ntype Foo1 = {\n  [key: string]: Foo2;\n};\n\ntype Foo2 = {\n  [key: string]: Foo3;\n};\n\ntype Foo3 = {\n  [key: string]: Foo1;\n};\n    ", optionsJson: ""},
-		{sourceText: "\ninterface Foo1 {\n  [key: string]: Foo2;\n}\n\ntype Foo2 = {\n  [key: string]: Foo3;\n};\n\ninterface Foo3 {\n  [key: string]: Foo1;\n}\n    ", optionsJson: ""},
-		{sourceText: "\ntype Foo1 = {\n  [key: string]: Foo2;\n};\n\ninterface Foo2 {\n  [key: string]: Foo3;\n}\n\ninterface Foo3 {\n  [key: string]: Foo1;\n}\n    ", optionsJson: ""},
-		{sourceText: "\ntype ExampleUnion = boolean | number;\n\ntype ExampleRoot = ExampleUnion | ExampleObject;\n\ninterface ExampleObject {\n  [key: string]: ExampleRoot;\n}\n    ", optionsJson: ""},
+		{
+			sourceText:  "\ninterface Foo1 {\n  [key: string]: Foo2;\n}\n\ninterface Foo2 {\n  [key: string]: Foo1;\n}\n    ",
+			optionsJson: "",
+		},
+		{
+			sourceText:  "\ninterface Foo1 {\n  [key: string]: Foo2;\n}\n\ninterface Foo2 {\n  [key: string]: Foo3;\n}\n\ninterface Foo3 {\n  [key: string]: Foo1;\n}\n    ",
+			optionsJson: "",
+		},
+		{
+			sourceText:  "\ninterface Foo1 {\n  [key: string]: Foo2;\n}\n\ninterface Foo2 {\n  [key: string]: Foo3;\n}\n\ninterface Foo3 {\n  [key: string]: Record<string, Foo1>;\n}\n    ",
+			optionsJson: "",
+		},
+		{
+			sourceText:  "\ntype Foo1 = {\n  [key: string]: Foo2;\n};\n\ntype Foo2 = {\n  [key: string]: Foo3;\n};\n\ntype Foo3 = {\n  [key: string]: Foo1;\n};\n    ",
+			optionsJson: "",
+		},
+		{
+			sourceText:  "\ninterface Foo1 {\n  [key: string]: Foo2;\n}\n\ntype Foo2 = {\n  [key: string]: Foo3;\n};\n\ninterface Foo3 {\n  [key: string]: Foo1;\n}\n    ",
+			optionsJson: "",
+		},
+		{
+			sourceText:  "\ntype Foo1 = {\n  [key: string]: Foo2;\n};\n\ninterface Foo2 {\n  [key: string]: Foo3;\n}\n\ninterface Foo3 {\n  [key: string]: Foo1;\n}\n    ",
+			optionsJson: "",
+		},
+		{
+			sourceText:  "\ntype ExampleUnion = boolean | number;\n\ntype ExampleRoot = ExampleUnion | ExampleObject;\n\ninterface ExampleObject {\n  [key: string]: ExampleRoot;\n}\n    ",
+			optionsJson: "",
+		},
 		{sourceText: "\ntype Bar<K extends string = never> = {\n  [k in K]: Bar;\n};\n    ", optionsJson: ""},
-		{sourceText: "\ntype Bar<K extends string = never> = {\n  [k in K]: Foo;\n};\n\ntype Foo = Bar;\n    ", optionsJson: ""},
+		{
+			sourceText:  "\ntype Bar<K extends string = never> = {\n  [k in K]: Foo;\n};\n\ntype Foo = Bar;\n    ",
+			optionsJson: "",
+		},
 		{sourceText: "type Foo = {};", optionsJson: ""},
 		{sourceText: "\ntype Foo = {\n  bar: string;\n  [key: string]: any;\n};\n    ", optionsJson: ""},
 		{sourceText: "\ntype Foo = {\n  bar: string;\n};\n    ", optionsJson: ""},
@@ -123,7 +149,10 @@ func TestConsistentIndexedObjectStyleStaysSilentOnUpstreamPassCases(test *testin
 		{sourceText: "type T = A.B;", optionsJson: "\"index-signature\""},
 		{sourceText: "type T = { [key in Foo]: key | number };", optionsJson: ""},
 		{sourceText: "\nfunction foo(e: { readonly [key in PropertyKey]-?: key }) {}\n      ", optionsJson: ""},
-		{sourceText: "\nfunction f(): {\n  // intentionally not using a Record to preserve optionals\n  [k in keyof ParseResult]: unknown;\n} {\n  return {};\n}\n      ", optionsJson: ""},
+		{
+			sourceText:  "\nfunction f(): {\n  // intentionally not using a Record to preserve optionals\n  [k in keyof ParseResult]: unknown;\n} {\n  return {};\n}\n      ",
+			optionsJson: "",
+		},
 	}
 	for index, testCase := range cases {
 		test.Run(consistentIndexedObjectStyleCaseName(index), func(test *testing.T) {
@@ -159,7 +188,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type Foo = Record<string, any>;\n",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferRecord", wantSpan: "interface Foo {\n  [key: string]: any;\n}", wantMessage: "A record is preferred over an index signature.", wantSuggestion: ""},
+				{
+					wantId:         "preferRecord",
+					wantSpan:       "interface Foo {\n  [key: string]: any;\n}",
+					wantMessage:    "A record is preferred over an index signature.",
+					wantSuggestion: "",
+				},
 			},
 		},
 		{
@@ -167,7 +201,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type Foo = Readonly<Record<string, any>>;\n",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferRecord", wantSpan: "interface Foo {\n  readonly [key: string]: any;\n}", wantMessage: "A record is preferred over an index signature.", wantSuggestion: ""},
+				{
+					wantId:         "preferRecord",
+					wantSpan:       "interface Foo {\n  readonly [key: string]: any;\n}",
+					wantMessage:    "A record is preferred over an index signature.",
+					wantSuggestion: "",
+				},
 			},
 		},
 		{
@@ -175,7 +214,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type Foo<A> = Record<string, A>;\n",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferRecord", wantSpan: "interface Foo<A> {\n  [key: string]: A;\n}", wantMessage: "A record is preferred over an index signature.", wantSuggestion: ""},
+				{
+					wantId:         "preferRecord",
+					wantSpan:       "interface Foo<A> {\n  [key: string]: A;\n}",
+					wantMessage:    "A record is preferred over an index signature.",
+					wantSuggestion: "",
+				},
 			},
 		},
 		{
@@ -183,7 +227,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type Foo<A = any> = Record<string, A>;\n",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferRecord", wantSpan: "interface Foo<A = any> {\n  [key: string]: A;\n}", wantMessage: "A record is preferred over an index signature.", wantSuggestion: ""},
+				{
+					wantId:         "preferRecord",
+					wantSpan:       "interface Foo<A = any> {\n  [key: string]: A;\n}",
+					wantMessage:    "A record is preferred over an index signature.",
+					wantSuggestion: "",
+				},
 			},
 		},
 		{
@@ -191,7 +240,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferRecord", wantSpan: "interface B extends A {\n  [index: number]: unknown;\n}", wantMessage: "A record is preferred over an index signature.", wantSuggestion: ""},
+				{
+					wantId:         "preferRecord",
+					wantSpan:       "interface B extends A {\n  [index: number]: unknown;\n}",
+					wantMessage:    "A record is preferred over an index signature.",
+					wantSuggestion: "",
+				},
 			},
 		},
 		{
@@ -199,7 +253,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferRecord", wantSpan: "interface Foo {\n  [key: string]: unknown;\n}", wantMessage: "A record is preferred over an index signature.", wantSuggestion: ""},
+				{
+					wantId:         "preferRecord",
+					wantSpan:       "interface Foo {\n  [key: string]: unknown;\n}",
+					wantMessage:    "A record is preferred over an index signature.",
+					wantSuggestion: "",
+				},
 			},
 		},
 		{
@@ -207,7 +266,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type Foo<A> = Readonly<Record<string, A>>;\n",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferRecord", wantSpan: "interface Foo<A> {\n  readonly [key: string]: A;\n}", wantMessage: "A record is preferred over an index signature.", wantSuggestion: ""},
+				{
+					wantId:         "preferRecord",
+					wantSpan:       "interface Foo<A> {\n  readonly [key: string]: A;\n}",
+					wantMessage:    "A record is preferred over an index signature.",
+					wantSuggestion: "",
+				},
 			},
 		},
 		{
@@ -215,7 +279,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type Foo<A, B> = Record<A, B>;\n",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferRecord", wantSpan: "interface Foo<A, B> {\n  [key: A]: B;\n}", wantMessage: "A record is preferred over an index signature.", wantSuggestion: ""},
+				{
+					wantId:         "preferRecord",
+					wantSpan:       "interface Foo<A, B> {\n  [key: A]: B;\n}",
+					wantMessage:    "A record is preferred over an index signature.",
+					wantSuggestion: "",
+				},
 			},
 		},
 		{
@@ -223,7 +292,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type Foo<A, B> = Readonly<Record<A, B>>;\n",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferRecord", wantSpan: "interface Foo<A, B> {\n  readonly [key: A]: B;\n}", wantMessage: "A record is preferred over an index signature.", wantSuggestion: ""},
+				{
+					wantId:         "preferRecord",
+					wantSpan:       "interface Foo<A, B> {\n  readonly [key: A]: B;\n}",
+					wantMessage:    "A record is preferred over an index signature.",
+					wantSuggestion: "",
+				},
 			},
 		},
 		{
@@ -231,7 +305,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type Foo = Record<string, any>;\n",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferRecord", wantSpan: "{ [key: string]: any }", wantMessage: "A record is preferred over an index signature.", wantSuggestion: ""},
+				{
+					wantId:         "preferRecord",
+					wantSpan:       "{ [key: string]: any }",
+					wantMessage:    "A record is preferred over an index signature.",
+					wantSuggestion: "",
+				},
 			},
 		},
 		{
@@ -239,7 +318,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type Foo = Readonly<Record<string, any>>;\n",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferRecord", wantSpan: "{ readonly [key: string]: any }", wantMessage: "A record is preferred over an index signature.", wantSuggestion: ""},
+				{
+					wantId:         "preferRecord",
+					wantSpan:       "{ readonly [key: string]: any }",
+					wantMessage:    "A record is preferred over an index signature.",
+					wantSuggestion: "",
+				},
 			},
 		},
 		{
@@ -247,7 +331,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type Foo = Generic<Record<string, any>>;\n",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferRecord", wantSpan: "{ [key: string]: any }", wantMessage: "A record is preferred over an index signature.", wantSuggestion: ""},
+				{
+					wantId:         "preferRecord",
+					wantSpan:       "{ [key: string]: any }",
+					wantMessage:    "A record is preferred over an index signature.",
+					wantSuggestion: "",
+				},
 			},
 		},
 		{
@@ -255,7 +344,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type Foo = Generic<Readonly<Record<string, any>>>;\n",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferRecord", wantSpan: "{ readonly [key: string]: any }", wantMessage: "A record is preferred over an index signature.", wantSuggestion: ""},
+				{
+					wantId:         "preferRecord",
+					wantSpan:       "{ readonly [key: string]: any }",
+					wantMessage:    "A record is preferred over an index signature.",
+					wantSuggestion: "",
+				},
 			},
 		},
 		{
@@ -263,7 +357,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "function foo(arg: Record<string, any>) {}\n",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferRecord", wantSpan: "{ [key: string]: any }", wantMessage: "A record is preferred over an index signature.", wantSuggestion: ""},
+				{
+					wantId:         "preferRecord",
+					wantSpan:       "{ [key: string]: any }",
+					wantMessage:    "A record is preferred over an index signature.",
+					wantSuggestion: "",
+				},
 			},
 		},
 		{
@@ -271,7 +370,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "function foo(): Record<string, any> {}\n",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferRecord", wantSpan: "{ [key: string]: any }", wantMessage: "A record is preferred over an index signature.", wantSuggestion: ""},
+				{
+					wantId:         "preferRecord",
+					wantSpan:       "{ [key: string]: any }",
+					wantMessage:    "A record is preferred over an index signature.",
+					wantSuggestion: "",
+				},
 			},
 		},
 		{
@@ -279,7 +383,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "function foo(arg: Readonly<Record<string, any>>) {}\n",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferRecord", wantSpan: "{ readonly [key: string]: any }", wantMessage: "A record is preferred over an index signature.", wantSuggestion: ""},
+				{
+					wantId:         "preferRecord",
+					wantSpan:       "{ readonly [key: string]: any }",
+					wantMessage:    "A record is preferred over an index signature.",
+					wantSuggestion: "",
+				},
 			},
 		},
 		{
@@ -287,7 +396,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "function foo(): Readonly<Record<string, any>> {}\n",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferRecord", wantSpan: "{ readonly [key: string]: any }", wantMessage: "A record is preferred over an index signature.", wantSuggestion: ""},
+				{
+					wantId:         "preferRecord",
+					wantSpan:       "{ readonly [key: string]: any }",
+					wantMessage:    "A record is preferred over an index signature.",
+					wantSuggestion: "",
+				},
 			},
 		},
 		{
@@ -295,7 +409,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "\"index-signature\"",
 			wantFixed:   "type Foo = { [key: string]: any };\n",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferIndexSignature", wantSpan: "Record<string, any>", wantMessage: "An index signature is preferred over a record.", wantSuggestion: ""},
+				{
+					wantId:         "preferIndexSignature",
+					wantSpan:       "Record<string, any>",
+					wantMessage:    "An index signature is preferred over a record.",
+					wantSuggestion: "",
+				},
 			},
 		},
 		{
@@ -303,7 +422,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "\"index-signature\"",
 			wantFixed:   "type Foo<T> = { [key: string]: T };\n",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferIndexSignature", wantSpan: "Record<string, T>", wantMessage: "An index signature is preferred over a record.", wantSuggestion: ""},
+				{
+					wantId:         "preferIndexSignature",
+					wantSpan:       "Record<string, T>",
+					wantMessage:    "An index signature is preferred over a record.",
+					wantSuggestion: "",
+				},
 			},
 		},
 		{
@@ -311,7 +435,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type Foo = Record<string, A.Foo>;\n",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferRecord", wantSpan: "{ [k: string]: A.Foo }", wantMessage: "A record is preferred over an index signature.", wantSuggestion: ""},
+				{
+					wantId:         "preferRecord",
+					wantSpan:       "{ [k: string]: A.Foo }",
+					wantMessage:    "A record is preferred over an index signature.",
+					wantSuggestion: "",
+				},
 			},
 		},
 		{
@@ -319,7 +448,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type Foo = Record<string, AnotherFoo>;\n",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferRecord", wantSpan: "{ [key: string]: AnotherFoo }", wantMessage: "A record is preferred over an index signature.", wantSuggestion: ""},
+				{
+					wantId:         "preferRecord",
+					wantSpan:       "{ [key: string]: AnotherFoo }",
+					wantMessage:    "A record is preferred over an index signature.",
+					wantSuggestion: "",
+				},
 			},
 		},
 		{
@@ -327,7 +461,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type Foo = { [key: string]: Record<string, Foo> };\n",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferRecord", wantSpan: "{ [key: string]: Foo }", wantMessage: "A record is preferred over an index signature.", wantSuggestion: ""},
+				{
+					wantId:         "preferRecord",
+					wantSpan:       "{ [key: string]: Foo }",
+					wantMessage:    "A record is preferred over an index signature.",
+					wantSuggestion: "",
+				},
 			},
 		},
 		{
@@ -335,7 +474,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type Foo = Record<string, string> | Foo;\n",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferRecord", wantSpan: "{ [key: string]: string }", wantMessage: "A record is preferred over an index signature.", wantSuggestion: ""},
+				{
+					wantId:         "preferRecord",
+					wantSpan:       "{ [key: string]: string }",
+					wantMessage:    "A record is preferred over an index signature.",
+					wantSuggestion: "",
+				},
 			},
 		},
 		{
@@ -343,7 +487,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type Foo<T> = Record<string, T>;\n",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferRecord", wantSpan: "interface Foo<T> {\n  [k: string]: T;\n}", wantMessage: "A record is preferred over an index signature.", wantSuggestion: ""},
+				{
+					wantId:         "preferRecord",
+					wantSpan:       "interface Foo<T> {\n  [k: string]: T;\n}",
+					wantMessage:    "A record is preferred over an index signature.",
+					wantSuggestion: "",
+				},
 			},
 		},
 		{
@@ -351,7 +500,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type Foo = Record<string, A.Foo>;\n",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferRecord", wantSpan: "interface Foo {\n  [k: string]: A.Foo;\n}", wantMessage: "A record is preferred over an index signature.", wantSuggestion: ""},
+				{
+					wantId:         "preferRecord",
+					wantSpan:       "interface Foo {\n  [k: string]: A.Foo;\n}",
+					wantMessage:    "A record is preferred over an index signature.",
+					wantSuggestion: "",
+				},
 			},
 		},
 		{
@@ -359,7 +513,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "interface Foo {\n  [k: string]: Record<string, Foo>;\n}\n",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferRecord", wantSpan: "{ [key: string]: Foo }", wantMessage: "A record is preferred over an index signature.", wantSuggestion: ""},
+				{
+					wantId:         "preferRecord",
+					wantSpan:       "{ [key: string]: Foo }",
+					wantMessage:    "A record is preferred over an index signature.",
+					wantSuggestion: "",
+				},
 			},
 		},
 		{
@@ -367,7 +526,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type Foo = Record<string, { foo: Foo }>;\n",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferRecord", wantSpan: "interface Foo {\n  [key: string]: { foo: Foo };\n}", wantMessage: "A record is preferred over an index signature.", wantSuggestion: ""},
+				{
+					wantId:         "preferRecord",
+					wantSpan:       "interface Foo {\n  [key: string]: { foo: Foo };\n}",
+					wantMessage:    "A record is preferred over an index signature.",
+					wantSuggestion: "",
+				},
 			},
 		},
 		{
@@ -375,7 +539,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type Foo = Record<string, Foo[]>;\n",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferRecord", wantSpan: "interface Foo {\n  [key: string]: Foo[];\n}", wantMessage: "A record is preferred over an index signature.", wantSuggestion: ""},
+				{
+					wantId:         "preferRecord",
+					wantSpan:       "interface Foo {\n  [key: string]: Foo[];\n}",
+					wantMessage:    "A record is preferred over an index signature.",
+					wantSuggestion: "",
+				},
 			},
 		},
 		{
@@ -383,7 +552,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type Foo = Record<string, () => Foo>;\n",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferRecord", wantSpan: "interface Foo {\n  [key: string]: () => Foo;\n}", wantMessage: "A record is preferred over an index signature.", wantSuggestion: ""},
+				{
+					wantId:         "preferRecord",
+					wantSpan:       "interface Foo {\n  [key: string]: () => Foo;\n}",
+					wantMessage:    "A record is preferred over an index signature.",
+					wantSuggestion: "",
+				},
 			},
 		},
 		{
@@ -391,7 +565,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type Foo = Record<string, [Foo]>;\n",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferRecord", wantSpan: "interface Foo {\n  [s: string]: [Foo];\n}", wantMessage: "A record is preferred over an index signature.", wantSuggestion: ""},
+				{
+					wantId:         "preferRecord",
+					wantSpan:       "interface Foo {\n  [s: string]: [Foo];\n}",
+					wantMessage:    "A record is preferred over an index signature.",
+					wantSuggestion: "",
+				},
 			},
 		},
 		{
@@ -399,7 +578,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type Foo1 = Record<string, Foo2>;\n\ninterface Foo2 {\n  [key: string]: Foo3;\n}\n\ninterface Foo3 {\n  [key: string]: Foo2;\n}\n",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferRecord", wantSpan: "interface Foo1 {\n  [key: string]: Foo2;\n}", wantMessage: "A record is preferred over an index signature.", wantSuggestion: ""},
+				{
+					wantId:         "preferRecord",
+					wantSpan:       "interface Foo1 {\n  [key: string]: Foo2;\n}",
+					wantMessage:    "A record is preferred over an index signature.",
+					wantSuggestion: "",
+				},
 			},
 		},
 		{
@@ -407,7 +591,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type Foo1 = Record<string, Record<string, Foo2>>;\n\ninterface Foo2 {\n  [key: string]: Foo3;\n}\n\ninterface Foo3 {\n  [key: string]: Foo2;\n}\n",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferRecord", wantSpan: "interface Foo1 {\n  [key: string]: Record<string, Foo2>;\n}", wantMessage: "A record is preferred over an index signature.", wantSuggestion: ""},
+				{
+					wantId:         "preferRecord",
+					wantSpan:       "interface Foo1 {\n  [key: string]: Record<string, Foo2>;\n}",
+					wantMessage:    "A record is preferred over an index signature.",
+					wantSuggestion: "",
+				},
 			},
 		},
 		{
@@ -415,9 +604,24 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type Foo1 = Record<string, { foo2: Foo2 }>;\n\ntype Foo2 = Record<string, Foo3>;\n\ntype Foo3 = Record<string, Record<string, Foo1>>;\n",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferRecord", wantSpan: "{\n  [key: string]: { foo2: Foo2 };\n}", wantMessage: "A record is preferred over an index signature.", wantSuggestion: ""},
-				{wantId: "preferRecord", wantSpan: "{\n  [key: string]: Foo3;\n}", wantMessage: "A record is preferred over an index signature.", wantSuggestion: ""},
-				{wantId: "preferRecord", wantSpan: "{\n  [key: string]: Record<string, Foo1>;\n}", wantMessage: "A record is preferred over an index signature.", wantSuggestion: ""},
+				{
+					wantId:         "preferRecord",
+					wantSpan:       "{\n  [key: string]: { foo2: Foo2 };\n}",
+					wantMessage:    "A record is preferred over an index signature.",
+					wantSuggestion: "",
+				},
+				{
+					wantId:         "preferRecord",
+					wantSpan:       "{\n  [key: string]: Foo3;\n}",
+					wantMessage:    "A record is preferred over an index signature.",
+					wantSuggestion: "",
+				},
+				{
+					wantId:         "preferRecord",
+					wantSpan:       "{\n  [key: string]: Record<string, Foo1>;\n}",
+					wantMessage:    "A record is preferred over an index signature.",
+					wantSuggestion: "",
+				},
 			},
 		},
 		{
@@ -425,7 +629,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type Foos<K extends string = never> = Record<K, { foo: Foo }>;\n\ntype Foo = Foos;\n",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferRecord", wantSpan: "{\n  [k in K]: { foo: Foo };\n}", wantMessage: "A record is preferred over an index signature.", wantSuggestion: ""},
+				{
+					wantId:         "preferRecord",
+					wantSpan:       "{\n  [k in K]: { foo: Foo };\n}",
+					wantMessage:    "A record is preferred over an index signature.",
+					wantSuggestion: "",
+				},
 			},
 		},
 		{
@@ -433,7 +642,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type Foos<K extends string = never> = Record<K, Foo[]>;\n\ntype Foo = Foos;\n",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferRecord", wantSpan: "{\n  [k in K]: Foo[];\n}", wantMessage: "A record is preferred over an index signature.", wantSuggestion: ""},
+				{
+					wantId:         "preferRecord",
+					wantSpan:       "{\n  [k in K]: Foo[];\n}",
+					wantMessage:    "A record is preferred over an index signature.",
+					wantSuggestion: "",
+				},
 			},
 		},
 		{
@@ -441,7 +655,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "\"index-signature\"",
 			wantFixed:   "type Foo = Generic<{ [key: string]: any }>;\n",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferIndexSignature", wantSpan: "Record<string, any>", wantMessage: "An index signature is preferred over a record.", wantSuggestion: ""},
+				{
+					wantId:         "preferIndexSignature",
+					wantSpan:       "Record<string, any>",
+					wantMessage:    "An index signature is preferred over a record.",
+					wantSuggestion: "",
+				},
 			},
 		},
 		{
@@ -449,7 +668,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "\"index-signature\"",
 			wantFixed:   "",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferIndexSignature", wantSpan: "Record<string | number, any>", wantMessage: "An index signature is preferred over a record.", wantSuggestion: "type Foo = { [key: string | number]: any };\n"},
+				{
+					wantId:         "preferIndexSignature",
+					wantSpan:       "Record<string | number, any>",
+					wantMessage:    "An index signature is preferred over a record.",
+					wantSuggestion: "type Foo = { [key: string | number]: any };\n",
+				},
 			},
 		},
 		{
@@ -457,7 +681,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "\"index-signature\"",
 			wantFixed:   "",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferIndexSignature", wantSpan: "Record<Exclude<'a' | 'b' | 'c', 'a'>, any>", wantMessage: "An index signature is preferred over a record.", wantSuggestion: "type Foo = { [key: Exclude<'a' | 'b' | 'c', 'a'>]: any };\n"},
+				{
+					wantId:         "preferIndexSignature",
+					wantSpan:       "Record<Exclude<'a' | 'b' | 'c', 'a'>, any>",
+					wantMessage:    "An index signature is preferred over a record.",
+					wantSuggestion: "type Foo = { [key: Exclude<'a' | 'b' | 'c', 'a'>]: any };\n",
+				},
 			},
 		},
 		{
@@ -465,7 +694,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "\"index-signature\"",
 			wantFixed:   "type Foo = { [key: number]: any };\n",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferIndexSignature", wantSpan: "Record<number, any>", wantMessage: "An index signature is preferred over a record.", wantSuggestion: ""},
+				{
+					wantId:         "preferIndexSignature",
+					wantSpan:       "Record<number, any>",
+					wantMessage:    "An index signature is preferred over a record.",
+					wantSuggestion: "",
+				},
 			},
 		},
 		{
@@ -473,7 +707,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "\"index-signature\"",
 			wantFixed:   "type Foo = { [key: symbol]: any };\n",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferIndexSignature", wantSpan: "Record<symbol, any>", wantMessage: "An index signature is preferred over a record.", wantSuggestion: ""},
+				{
+					wantId:         "preferIndexSignature",
+					wantSpan:       "Record<symbol, any>",
+					wantMessage:    "An index signature is preferred over a record.",
+					wantSuggestion: "",
+				},
 			},
 		},
 		{
@@ -481,7 +720,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "\"index-signature\"",
 			wantFixed:   "function foo(arg: { [key: string]: any }) {}\n",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferIndexSignature", wantSpan: "Record<string, any>", wantMessage: "An index signature is preferred over a record.", wantSuggestion: ""},
+				{
+					wantId:         "preferIndexSignature",
+					wantSpan:       "Record<string, any>",
+					wantMessage:    "An index signature is preferred over a record.",
+					wantSuggestion: "",
+				},
 			},
 		},
 		{
@@ -489,7 +733,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "\"index-signature\"",
 			wantFixed:   "function foo(): { [key: string]: any } {}\n",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferIndexSignature", wantSpan: "Record<string, any>", wantMessage: "An index signature is preferred over a record.", wantSuggestion: ""},
+				{
+					wantId:         "preferIndexSignature",
+					wantSpan:       "Record<string, any>",
+					wantMessage:    "An index signature is preferred over a record.",
+					wantSuggestion: "",
+				},
 			},
 		},
 		{
@@ -497,7 +746,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type T = Readonly<Record<string, number>>;\n",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferRecord", wantSpan: "{ readonly [key in string]: number }", wantMessage: "A record is preferred over an index signature.", wantSuggestion: ""},
+				{
+					wantId:         "preferRecord",
+					wantSpan:       "{ readonly [key in string]: number }",
+					wantMessage:    "A record is preferred over an index signature.",
+					wantSuggestion: "",
+				},
 			},
 		},
 		{
@@ -505,7 +759,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type T = Readonly<Record<string, number>>;\n",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferRecord", wantSpan: "{ +readonly [key in string]: number }", wantMessage: "A record is preferred over an index signature.", wantSuggestion: ""},
+				{
+					wantId:         "preferRecord",
+					wantSpan:       "{ +readonly [key in string]: number }",
+					wantMessage:    "A record is preferred over an index signature.",
+					wantSuggestion: "",
+				},
 			},
 		},
 		{
@@ -513,7 +772,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferRecord", wantSpan: "{ -readonly [key in string]: number }", wantMessage: "A record is preferred over an index signature.", wantSuggestion: ""},
+				{
+					wantId:         "preferRecord",
+					wantSpan:       "{ -readonly [key in string]: number }",
+					wantMessage:    "A record is preferred over an index signature.",
+					wantSuggestion: "",
+				},
 			},
 		},
 		{
@@ -521,7 +785,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type T = Record<string, number>;\n",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferRecord", wantSpan: "{ [key in string]: number }", wantMessage: "A record is preferred over an index signature.", wantSuggestion: ""},
+				{
+					wantId:         "preferRecord",
+					wantSpan:       "{ [key in string]: number }",
+					wantMessage:    "A record is preferred over an index signature.",
+					wantSuggestion: "",
+				},
 			},
 		},
 		{
@@ -529,7 +798,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "function foo(e: Partial<Record<PropertyKey, string>>) {}\n",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferRecord", wantSpan: "{ [key in PropertyKey]?: string }", wantMessage: "A record is preferred over an index signature.", wantSuggestion: ""},
+				{
+					wantId:         "preferRecord",
+					wantSpan:       "{ [key in PropertyKey]?: string }",
+					wantMessage:    "A record is preferred over an index signature.",
+					wantSuggestion: "",
+				},
 			},
 		},
 		{
@@ -537,7 +811,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "function foo(e: Partial<Record<PropertyKey, string>>) {}\n",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferRecord", wantSpan: "{ [key in PropertyKey]+?: string }", wantMessage: "A record is preferred over an index signature.", wantSuggestion: ""},
+				{
+					wantId:         "preferRecord",
+					wantSpan:       "{ [key in PropertyKey]+?: string }",
+					wantMessage:    "A record is preferred over an index signature.",
+					wantSuggestion: "",
+				},
 			},
 		},
 		{
@@ -545,7 +824,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "function foo(e: Required<Record<PropertyKey, string>>) {}\n",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferRecord", wantSpan: "{ [key in PropertyKey]-?: string }", wantMessage: "A record is preferred over an index signature.", wantSuggestion: ""},
+				{
+					wantId:         "preferRecord",
+					wantSpan:       "{ [key in PropertyKey]-?: string }",
+					wantMessage:    "A record is preferred over an index signature.",
+					wantSuggestion: "",
+				},
 			},
 		},
 		{
@@ -553,7 +837,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "function foo(e: Readonly<Required<Record<PropertyKey, string>>>) {}\n",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferRecord", wantSpan: "{ readonly [key in PropertyKey]-?: string }", wantMessage: "A record is preferred over an index signature.", wantSuggestion: ""},
+				{
+					wantId:         "preferRecord",
+					wantSpan:       "{ readonly [key in PropertyKey]-?: string }",
+					wantMessage:    "A record is preferred over an index signature.",
+					wantSuggestion: "",
+				},
 			},
 		},
 		{
@@ -561,7 +850,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type Options = [\n  Partial<Record<(typeof optionTesters)[number]['option'], boolean>> & {\n    allow?: TypeOrValueSpecifier[];\n  },\n];\n",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferRecord", wantSpan: "{ [Type in (typeof optionTesters)[number]['option']]?: boolean }", wantMessage: "A record is preferred over an index signature.", wantSuggestion: ""},
+				{
+					wantId:         "preferRecord",
+					wantSpan:       "{ [Type in (typeof optionTesters)[number]['option']]?: boolean }",
+					wantMessage:    "A record is preferred over an index signature.",
+					wantSuggestion: "",
+				},
 			},
 		},
 		{
@@ -569,7 +863,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "export type MakeRequired<Base, Key extends keyof Base> = Required<Record<Key, NonNullable<Base[Key]>>> & Omit<Base, Key>;\n",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferRecord", wantSpan: "{\n  [K in Key]-?: NonNullable<Base[Key]>;\n}", wantMessage: "A record is preferred over an index signature.", wantSuggestion: ""},
+				{
+					wantId:         "preferRecord",
+					wantSpan:       "{\n  [K in Key]-?: NonNullable<Base[Key]>;\n}",
+					wantMessage:    "A record is preferred over an index signature.",
+					wantSuggestion: "",
+				},
 			},
 		},
 		{
@@ -577,7 +876,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "function f(): Record<keyof ParseResult, unknown> {\n  return {};\n}\n",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferRecord", wantSpan: "{\n  [k in (keyof ParseResult)]: unknown;\n}", wantMessage: "A record is preferred over an index signature.", wantSuggestion: ""},
+				{
+					wantId:         "preferRecord",
+					wantSpan:       "{\n  [k in (keyof ParseResult)]: unknown;\n}",
+					wantMessage:    "A record is preferred over an index signature.",
+					wantSuggestion: "",
+				},
 			},
 		},
 		{
@@ -585,7 +889,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type Foo = Record<string, Bar>;\n\ninterface Bar {\n  [key: string];\n}\n",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferRecord", wantSpan: "interface Foo {\n  [key: string]: Bar;\n}", wantMessage: "A record is preferred over an index signature.", wantSuggestion: ""},
+				{
+					wantId:         "preferRecord",
+					wantSpan:       "interface Foo {\n  [key: string]: Bar;\n}",
+					wantMessage:    "A record is preferred over an index signature.",
+					wantSuggestion: "",
+				},
 			},
 		},
 		{
@@ -593,7 +902,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type Foo = Record<string, any>;\n",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferRecord", wantSpan: "{\n  [k in string];\n}", wantMessage: "A record is preferred over an index signature.", wantSuggestion: ""},
+				{
+					wantId:         "preferRecord",
+					wantSpan:       "{\n  [k in string];\n}",
+					wantMessage:    "A record is preferred over an index signature.",
+					wantSuggestion: "",
+				},
 			},
 		},
 		{
@@ -601,7 +915,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferRecord", wantSpan: "{ [key: string]: /* preserve me */ number }", wantMessage: "A record is preferred over an index signature.", wantSuggestion: "type Foo = Record<string, number>;\n"},
+				{
+					wantId:         "preferRecord",
+					wantSpan:       "{ [key: string]: /* preserve me */ number }",
+					wantMessage:    "A record is preferred over an index signature.",
+					wantSuggestion: "type Foo = Record<string, number>;\n",
+				},
 			},
 		},
 		{
@@ -609,7 +928,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferRecord", wantSpan: "interface Foo {\n  // preserve me\n  [key: string]: number;\n}", wantMessage: "A record is preferred over an index signature.", wantSuggestion: "type Foo = Record<string, number>;\n"},
+				{
+					wantId:         "preferRecord",
+					wantSpan:       "interface Foo {\n  // preserve me\n  [key: string]: number;\n}",
+					wantMessage:    "A record is preferred over an index signature.",
+					wantSuggestion: "type Foo = Record<string, number>;\n",
+				},
 			},
 		},
 		{
@@ -617,7 +941,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferRecord", wantSpan: "{\n  // preserve me\n  [Key in 'a' | 'b']: number;\n}", wantMessage: "A record is preferred over an index signature.", wantSuggestion: "type Foo = Record<'a' | 'b', number>;\n"},
+				{
+					wantId:         "preferRecord",
+					wantSpan:       "{\n  // preserve me\n  [Key in 'a' | 'b']: number;\n}",
+					wantMessage:    "A record is preferred over an index signature.",
+					wantSuggestion: "type Foo = Record<'a' | 'b', number>;\n",
+				},
 			},
 		},
 		{
@@ -625,7 +954,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferRecord", wantSpan: "{\n  // 1\n  [Key in // 2\n    | 'a' // 3\n    | 'b' // 4\n    | 'c' // 5\n    | 'd' // 6\n  ]: string; // 7\n  // 8\n}", wantMessage: "A record is preferred over an index signature.", wantSuggestion: "type Test = Record<| 'a' // 3\n    | 'b' // 4\n    | 'c' // 5\n    | 'd', string>;\n"},
+				{
+					wantId:         "preferRecord",
+					wantSpan:       "{\n  // 1\n  [Key in // 2\n    | 'a' // 3\n    | 'b' // 4\n    | 'c' // 5\n    | 'd' // 6\n  ]: string; // 7\n  // 8\n}",
+					wantMessage:    "A record is preferred over an index signature.",
+					wantSuggestion: "type Test = Record<| 'a' // 3\n    | 'b' // 4\n    | 'c' // 5\n    | 'd', string>;\n",
+				},
 			},
 		},
 		{
@@ -633,7 +967,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "\"index-signature\"",
 			wantFixed:   "",
 			wantFindings: []consistentIndexedObjectStyleFinding{
-				{wantId: "preferIndexSignature", wantSpan: "Record<string, /* preserve me */ number>", wantMessage: "An index signature is preferred over a record.", wantSuggestion: "type Foo = { [key: string]: number };\n"},
+				{
+					wantId:         "preferIndexSignature",
+					wantSpan:       "Record<string, /* preserve me */ number>",
+					wantMessage:    "An index signature is preferred over a record.",
+					wantSuggestion: "type Foo = { [key: string]: number };\n",
+				},
 			},
 		},
 	}
@@ -659,7 +998,12 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 					test.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
 				}
 				if diagnostic.Message.Description != want.wantMessage {
-					test.Fatalf("finding %d message: expected %q, got %q", position, want.wantMessage, diagnostic.Message.Description)
+					test.Fatalf(
+						"finding %d message: expected %q, got %q",
+						position,
+						want.wantMessage,
+						diagnostic.Message.Description,
+					)
 				}
 
 				if want.wantSuggestion == "" && testCase.wantFixed == "" {
@@ -682,11 +1026,20 @@ func TestConsistentIndexedObjectStyleFiresOnUpstreamFailCases(test *testing.T) {
 						test.Fatalf("finding %d: expected a suggestion, got %d fixes", position, len(diagnostic.Fixes))
 					}
 					if len(diagnostic.Suggestions) != 1 {
-						test.Fatalf("finding %d: expected one suggestion, got %d", position, len(diagnostic.Suggestions))
+						test.Fatalf(
+							"finding %d: expected one suggestion, got %d",
+							position,
+							len(diagnostic.Suggestions),
+						)
 					}
 					applied := applyConsistentIndexedObjectStyleSuggestion(test, onDisk, diagnostic.Suggestions[0])
 					if applied != want.wantSuggestion {
-						test.Fatalf("finding %d suggestion applied: expected %q, got %q", position, want.wantSuggestion, applied)
+						test.Fatalf(
+							"finding %d suggestion applied: expected %q, got %q",
+							position,
+							want.wantSuggestion,
+							applied,
+						)
 					}
 				}
 			}
@@ -814,7 +1167,9 @@ func TestDecodeConsistentIndexedObjectStyleOptions(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, decodeConsistentIndexedObjectStyleOptionsError := DecodeConsistentIndexedObjectStyleOptions(json.RawMessage(testCase.raw))
+			decoded, decodeConsistentIndexedObjectStyleOptionsError := DecodeConsistentIndexedObjectStyleOptions(
+				json.RawMessage(testCase.raw),
+			)
 			if decodeConsistentIndexedObjectStyleOptionsError != nil {
 				test.Fatalf("decoding %q: %v", testCase.raw, decodeConsistentIndexedObjectStyleOptionsError)
 			}
@@ -870,12 +1225,19 @@ func TestDecodeConsistentIndexedObjectStyleOptionsRefusesAValueUpstreamRefuses(t
 	} {
 		test.Run(testCase.raw, func(test *testing.T) {
 			test.Parallel()
-			_, decodeConsistentIndexedObjectStyleOptionsError := DecodeConsistentIndexedObjectStyleOptions(json.RawMessage(testCase.raw))
+			_, decodeConsistentIndexedObjectStyleOptionsError := DecodeConsistentIndexedObjectStyleOptions(
+				json.RawMessage(testCase.raw),
+			)
 			if decodeConsistentIndexedObjectStyleOptionsError == nil {
 				test.Fatalf("%s decoded, so the configured mode is silently not the one written", testCase.raw)
 			}
 			if !strings.Contains(decodeConsistentIndexedObjectStyleOptionsError.Error(), testCase.named) {
-				test.Fatalf("%s was refused without naming %q: %v", testCase.raw, testCase.named, decodeConsistentIndexedObjectStyleOptionsError)
+				test.Fatalf(
+					"%s was refused without naming %q: %v",
+					testCase.raw,
+					testCase.named,
+					decodeConsistentIndexedObjectStyleOptionsError,
+				)
 			}
 		})
 	}

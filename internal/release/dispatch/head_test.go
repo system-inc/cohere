@@ -91,7 +91,9 @@ func TestReadHeadRefusesWhatIsNotACommit(test *testing.T) {
 	repository := test.TempDir()
 	writeFile(test, filepath.Join(repository, ".git", "HEAD"), "ref: refs/heads/main\n")
 	writeFile(test, filepath.Join(repository, ".git", "refs", "heads", "main"), "abc123\n")
-	if _, readHeadError := readHead(repository); readHeadError == nil || !strings.Contains(readHeadError.Error(), "not a commit") {
+	if _, readHeadError := readHead(
+		repository,
+	); readHeadError == nil || !strings.Contains(readHeadError.Error(), "not a commit") {
 		test.Fatalf("an abbreviated object name was accepted: %v", readHeadError)
 	}
 
@@ -102,7 +104,9 @@ func TestReadHeadRefusesWhatIsNotACommit(test *testing.T) {
 
 	writeFile(test, filepath.Join(repository, ".git", "HEAD"), "ref: refs/heads/.invalid\n")
 	writeFile(test, filepath.Join(repository, ".git", "config"), "[extensions]\n\trefStorage = reftable\n")
-	if _, readHeadError := readHead(repository); readHeadError == nil || !strings.Contains(readHeadError.Error(), "reftable") {
+	if _, readHeadError := readHead(
+		repository,
+	); readHeadError == nil || !strings.Contains(readHeadError.Error(), "reftable") {
 		test.Fatalf("a reftable repository was read as though its files held the refs: %v", readHeadError)
 	}
 }
@@ -181,10 +185,21 @@ func TestTheCompilerRepositoryIsReadFromTheCommittedGitmodules(test *testing.T) 
 			"[submodule \"libraries/other\"]\n\tpath = libraries/other\n\turl = https://github.com/someone/other.git\n" +
 				"[submodule \"compiler\"]\n\tpath = TypeScript\n\turl = git@github.com:system-inc/TypeScript.git\n",
 			"system-inc/TypeScript"},
-		{"over https, quoted", "[submodule \"TypeScript\"]\n\tpath = \"TypeScript\"\n\turl = \"https://github.com/system-inc/TypeScript.git\"\n\tbranch = adamic\n",
-			"system-inc/TypeScript"},
-		{"no entry for the compiler", "[submodule \"other\"]\n\tpath = other\n\turl = https://github.com/someone/other.git\n", ""},
-		{"a url that names no repository", "[submodule \"TypeScript\"]\n\tpath = TypeScript\n\turl = https://github.com/\n", ""},
+		{
+			"over https, quoted",
+			"[submodule \"TypeScript\"]\n\tpath = \"TypeScript\"\n\turl = \"https://github.com/system-inc/TypeScript.git\"\n\tbranch = adamic\n",
+			"system-inc/TypeScript",
+		},
+		{
+			"no entry for the compiler",
+			"[submodule \"other\"]\n\tpath = other\n\turl = https://github.com/someone/other.git\n",
+			"",
+		},
+		{
+			"a url that names no repository",
+			"[submodule \"TypeScript\"]\n\tpath = TypeScript\n\turl = https://github.com/\n",
+			"",
+		},
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()

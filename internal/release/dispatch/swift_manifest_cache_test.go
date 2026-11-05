@@ -54,7 +54,11 @@ let package = Package(name: "Stand", products: [.executable(name: "cohere-swift"
 	says := func() string {
 		test.Helper()
 		binaryPath := filepath.Join(test.TempDir(), "cohere-swift")
-		if buildSwiftProductWithSwiftPMError := buildSwiftProductWithSwiftPM(packageDirectory, scratch, binaryPath); buildSwiftProductWithSwiftPMError != nil {
+		if buildSwiftProductWithSwiftPMError := buildSwiftProductWithSwiftPM(
+			packageDirectory,
+			scratch,
+			binaryPath,
+		); buildSwiftProductWithSwiftPMError != nil {
 			test.Fatal(buildSwiftProductWithSwiftPMError)
 		}
 		output, outputError := exec.Command(binaryPath).Output()
@@ -69,6 +73,9 @@ let package = Package(name: "Stand", products: [.executable(name: "cohere-swift"
 	}
 	writeFile(test, source, "#if TREE_MODIFIED\nprint(\"modified\")\n#else\nprint(\"clean\")\n#endif\n// edited\n")
 	if got := says(); got != "modified" {
-		test.Fatalf("an engine rebuilt after a tracked file was edited says %q, so its provenance would call the tree clean", got)
+		test.Fatalf(
+			"an engine rebuilt after a tracked file was edited says %q, so its provenance would call the tree clean",
+			got,
+		)
 	}
 }

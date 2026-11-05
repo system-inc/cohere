@@ -141,7 +141,9 @@ func printArrowFunction(path *Path, options *Options, print PrintFunc, args *pri
 	if shouldPrintAsChain && isCallee {
 		trailing = ifBreakWithGroup(softline, "", chainGroupID)
 	}
-	return groupIn(path, concatIn(path, groupWithIn(path, signatures, doc.GroupOptions{ShouldBreak: shouldBreakSignatures, ID: chainGroupID}),
+	return groupIn(path, concatIn(
+		path,
+		groupWithIn(path, signatures, doc.GroupOptions{ShouldBreak: shouldBreakSignatures, ID: chainGroupID}),
 		" =>",
 		body,
 		trailing,
@@ -234,10 +236,18 @@ func printArrowFunctionSignatures(
 	if (key == "callee" && isCallLikeExpression(parent)) ||
 		// isAssignmentRhs
 		args.assignmentLayout != "" {
-		return groupWithIn(path, join(concatIn(path, " =>", line), signatureDocs), doc.GroupOptions{ShouldBreak: shouldBreak})
+		return groupWithIn(
+			path,
+			join(concatIn(path, " =>", line), signatureDocs),
+			doc.GroupOptions{ShouldBreak: shouldBreak},
+		)
 	}
 
-	return groupWithIn(path, indentIn(path, join(concatIn(path, " =>", line), signatureDocs)), doc.GroupOptions{ShouldBreak: shouldBreak})
+	return groupWithIn(
+		path,
+		indentIn(path, join(concatIn(path, " =>", line), signatureDocs)),
+		doc.GroupOptions{ShouldBreak: shouldBreak},
+	)
 }
 
 // printArrowFunctionBody is upstream's printArrowFunctionBody. Upstream's options object { bodyDoc,

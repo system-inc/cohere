@@ -269,7 +269,9 @@ func getImportAttributesKeyword(node Node, options *Options) string {
 	if len(attributes) > 0 && attributes[0] != nil {
 		end = locStart(attributes[0])
 	}
-	textBetweenSourceAndAttributes := estree.TrimStartJavaScript(stripComments(options)[locEnd(node.Child("source")):end])
+	textBetweenSourceAndAttributes := estree.TrimStartJavaScript(
+		stripComments(options)[locEnd(node.Child("source")):end],
+	)
 
 	if strings.HasPrefix(textBetweenSourceAndAttributes, "assert") {
 		return "assert"

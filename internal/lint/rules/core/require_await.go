@@ -711,7 +711,10 @@ func requireAwaitSatisfiesPromiseContract(ruleContext rule.Context, node *ast.No
 	// A position inside a generic call is judged by what the call declares, not by what it inferred.
 	// See requireAwaitDeclaredGenericDemand for why the inferred answer is the function grading its
 	// own homework.
-	if declared, substitutions, throughGenericCall := requireAwaitDeclaredGenericDemand(ruleContext, node); throughGenericCall {
+	if declared, substitutions, throughGenericCall := requireAwaitDeclaredGenericDemand(
+		ruleContext,
+		node,
+	); throughGenericCall {
 		return requireAwaitTypesDemandPromise(ruleContext, node, declared, substitutions)
 	}
 
@@ -737,7 +740,12 @@ func requireAwaitSatisfiesPromiseContract(ruleContext rule.Context, node *ast.No
 // value, the author had a choice and the keyword is not required of them. A type parameter with a
 // substitution is read as the types standing in for it, and one without is read through its
 // apparent type, which is its constraint: an unconstrained `U` offers no signature and no `then`.
-func requireAwaitTypesDemandPromise(ruleContext rule.Context, node *ast.Node, types []*checker.Type, substitutions map[*checker.Type][]*checker.Type) bool {
+func requireAwaitTypesDemandPromise(
+	ruleContext rule.Context,
+	node *ast.Node,
+	types []*checker.Type,
+	substitutions map[*checker.Type][]*checker.Type,
+) bool {
 	sawSignature := false
 	for _, part := range requireAwaitExpandTypes(types, substitutions) {
 		for _, signature := range type_checking.GetCallSignatures(ruleContext.TypeChecker, part) {
@@ -842,7 +850,10 @@ type requireAwaitContextStep struct {
 // The third result is false when the position does not come from a generic call, or when the walk
 // meets a shape it does not model; the caller then asks for the ordinary contextual type, which is
 // what this rule did before the walk existed.
-func requireAwaitDeclaredGenericDemand(ruleContext rule.Context, node *ast.Node) ([]*checker.Type, map[*checker.Type][]*checker.Type, bool) {
+func requireAwaitDeclaredGenericDemand(
+	ruleContext rule.Context,
+	node *ast.Node,
+) ([]*checker.Type, map[*checker.Type][]*checker.Type, bool) {
 	var steps []requireAwaitContextStep
 	current := node
 
@@ -964,7 +975,12 @@ func requireAwaitReturnTakesContextualType(function *ast.Node) bool {
 
 // requireAwaitDemandFromGenericCall replays the recorded steps over the parameter type a generic
 // call declares at the argument's position.
-func requireAwaitDemandFromGenericCall(ruleContext rule.Context, call *ast.Node, argument *ast.Node, steps []requireAwaitContextStep) ([]*checker.Type, map[*checker.Type][]*checker.Type, bool) {
+func requireAwaitDemandFromGenericCall(
+	ruleContext rule.Context,
+	call *ast.Node,
+	argument *ast.Node,
+	steps []requireAwaitContextStep,
+) ([]*checker.Type, map[*checker.Type][]*checker.Type, bool) {
 	// Explicit type arguments are written by the author, so nothing was inferred from this function.
 	if len(call.TypeArguments()) != 0 {
 		return nil, nil, false
@@ -1006,7 +1022,11 @@ func requireAwaitDemandFromGenericCall(ruleContext rule.Context, call *ast.Node,
 
 	types := []*checker.Type{parameterType}
 	for stepIndex := len(steps) - 1; stepIndex >= 0; stepIndex-- {
-		types = requireAwaitApplyContextStep(ruleContext, requireAwaitExpandTypes(types, substitutions), steps[stepIndex])
+		types = requireAwaitApplyContextStep(
+			ruleContext,
+			requireAwaitExpandTypes(types, substitutions),
+			steps[stepIndex],
+		)
 	}
 	return types, substitutions, true
 }
@@ -1017,7 +1037,11 @@ func requireAwaitParameterTypeAt(ruleContext rule.Context, signature *checker.Si
 	parameters := signature.Parameters()
 	if signature.HasRestParameter() && index >= len(parameters)-1 {
 		restType := checker.Checker_getTypeOfSymbol(ruleContext.TypeChecker, parameters[len(parameters)-1])
-		return checker.Checker_getIndexTypeOfType(ruleContext.TypeChecker, restType, checker.Checker_numberType(ruleContext.TypeChecker))
+		return checker.Checker_getIndexTypeOfType(
+			ruleContext.TypeChecker,
+			restType,
+			checker.Checker_numberType(ruleContext.TypeChecker),
+		)
 	}
 	if index >= len(parameters) {
 		return nil
@@ -1027,7 +1051,13 @@ func requireAwaitParameterTypeAt(ruleContext rule.Context, signature *checker.Si
 
 // requireAwaitTypeParameterStandIns finds, for each of the declared signature's type parameters,
 // the types that fix it independently of the argument being judged.
-func requireAwaitTypeParameterStandIns(ruleContext rule.Context, call *ast.Node, resolved *checker.Signature, declared *checker.Signature, argumentIndex int) map[*checker.Type][]*checker.Type {
+func requireAwaitTypeParameterStandIns(
+	ruleContext rule.Context,
+	call *ast.Node,
+	resolved *checker.Signature,
+	declared *checker.Signature,
+	argumentIndex int,
+) map[*checker.Type][]*checker.Type {
 	substitutions := map[*checker.Type][]*checker.Type{}
 	typeParameters := declared.TypeParameters()
 	isTypeParameter := func(candidateType *checker.Type) bool {
@@ -1058,7 +1088,11 @@ func requireAwaitTypeParameterStandIns(ruleContext rule.Context, call *ast.Node,
 
 	declaredReturn := checker.Checker_getReturnTypeOfSignature(ruleContext.TypeChecker, declared)
 	if isTypeParameter(declaredReturn) {
-		if positionType := checker.Checker_getContextualType(ruleContext.TypeChecker, call, checker.ContextFlagsNone); positionType != nil {
+		if positionType := checker.Checker_getContextualType(
+			ruleContext.TypeChecker,
+			call,
+			checker.ContextFlagsNone,
+		); positionType != nil {
 			substitutions[declaredReturn] = append(substitutions[declaredReturn], positionType)
 		}
 	}
@@ -1070,27 +1104,44 @@ func requireAwaitTypeParameterStandIns(ruleContext rule.Context, call *ast.Node,
 //
 // Property and signature lookups read a type parameter through its apparent type, so an
 // unconstrained one yields nothing here, which is the point: nothing is demanded of the child.
-func requireAwaitApplyContextStep(ruleContext rule.Context, types []*checker.Type, step requireAwaitContextStep) []*checker.Type {
+func requireAwaitApplyContextStep(
+	ruleContext rule.Context,
+	types []*checker.Type,
+	step requireAwaitContextStep,
+) []*checker.Type {
 	var next []*checker.Type
 	for _, part := range types {
 		switch step.kind {
 		case requireAwaitStepProperty:
-			if property := checker.Checker_getPropertyOfType(ruleContext.TypeChecker, part, step.name); property != nil {
+			if property := checker.Checker_getPropertyOfType(
+				ruleContext.TypeChecker,
+				part,
+				step.name,
+			); property != nil {
 				next = append(next, checker.Checker_getTypeOfSymbol(ruleContext.TypeChecker, property))
 				continue
 			}
-			if indexed := checker.Checker_getIndexTypeOfType(ruleContext.TypeChecker, part, checker.Checker_stringType(ruleContext.TypeChecker)); indexed != nil {
+			if indexed := checker.Checker_getIndexTypeOfType(
+				ruleContext.TypeChecker,
+				part,
+				checker.Checker_stringType(ruleContext.TypeChecker),
+			); indexed != nil {
 				next = append(next, indexed)
 			}
 		case requireAwaitStepElement:
-			if checker.Checker_isArrayOrTupleType(ruleContext.TypeChecker, part) && !checker.Checker_isArrayType(ruleContext.TypeChecker, part) {
+			if checker.Checker_isArrayOrTupleType(ruleContext.TypeChecker, part) &&
+				!checker.Checker_isArrayType(ruleContext.TypeChecker, part) {
 				elements := checker.Checker_getTypeArguments(ruleContext.TypeChecker, part)
 				if step.index < len(elements) {
 					next = append(next, elements[step.index])
 				}
 				continue
 			}
-			if indexed := checker.Checker_getIndexTypeOfType(ruleContext.TypeChecker, part, checker.Checker_numberType(ruleContext.TypeChecker)); indexed != nil {
+			if indexed := checker.Checker_getIndexTypeOfType(
+				ruleContext.TypeChecker,
+				part,
+				checker.Checker_numberType(ruleContext.TypeChecker),
+			); indexed != nil {
 				next = append(next, indexed)
 			}
 		case requireAwaitStepReturn:

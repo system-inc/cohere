@@ -34,8 +34,16 @@ import (
 )
 
 func main() {
-	packageRoot := flag.String("package-root", "", "path to the tailwindcss package root (the directory holding package.json)")
-	output := flag.String("output", filepath.Join("internal", "tailwind", "testdata", "valueparser_fixtures.json"), "where to write the fixture")
+	packageRoot := flag.String(
+		"package-root",
+		"",
+		"path to the tailwindcss package root (the directory holding package.json)",
+	)
+	output := flag.String(
+		"output",
+		filepath.Join("internal", "tailwind", "testdata", "valueparser_fixtures.json"),
+		"where to write the fixture",
+	)
 	check := flag.Bool("check", false, "regenerate and fail if the committed fixture disagrees")
 	flag.Parse()
 
@@ -62,7 +70,11 @@ func main() {
 		// Go whitespace: this tool comparing its own committed fixture with its own output.
 		if !bytes.Equal(bytes.TrimSpace(committed), bytes.TrimSpace(generated)) {
 			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
-			fmt.Fprintf(os.Stderr, "%s is stale: the engine now parses differently. Re-run without -check and read the diff.\n", *output)
+			fmt.Fprintf(
+				os.Stderr,
+				"%s is stale: the engine now parses differently. Re-run without -check and read the diff.\n",
+				*output,
+			)
 			os.Exit(1)
 		}
 		// Ignored: the check has passed, and the exit code says so whether or not this lands.
@@ -113,7 +125,10 @@ func enumerate(packageRoot string) ([]byte, error) {
 		return nil, fmt.Errorf("enumeration did not report which bundle symbol it extracted")
 	}
 	if len(parsed.Cases) < 250 {
-		return nil, fmt.Errorf("enumeration produced only %d cases; the corpus is meant to be several hundred shapes", len(parsed.Cases))
+		return nil, fmt.Errorf(
+			"enumeration produced only %d cases; the corpus is meant to be several hundred shapes",
+			len(parsed.Cases),
+		)
 	}
 	return out, nil
 }

@@ -62,21 +62,87 @@ func TestDeadDisableFindingsAndFixes(test *testing.T) {
 		filtered            bool
 		want                int
 	}{
-		{"dead full run", "// eslint-disable-next-line test-quiet -- stale\nconst a = 1;\n", "\nconst a = 1;\n", false, 1},
-		{"same directive filtered run", "// eslint-disable-next-line test-quiet -- stale\nconst a = 1;\n", "// eslint-disable-next-line test-quiet -- stale\nconst a = 1;\n", true, 0},
-		{"live", "// eslint-disable-next-line test-live -- needed\ndebugger;\n", "// eslint-disable-next-line test-live -- needed\ndebugger;\n", false, 0},
-		{"dead beside live", "// eslint-disable-next-line test-quiet, test-live -- needed\ndebugger;\n", "// eslint-disable-next-line test-live -- needed\ndebugger;\n", false, 1},
-		{"live beside dead", "// eslint-disable-next-line test-live, test-quiet -- needed\ndebugger;\n", "// eslint-disable-next-line test-live -- needed\ndebugger;\n", false, 1},
-		{"dead beside unselected", "// eslint-disable-next-line test-quiet, plugin/not-selected -- keep\nconst a = 1;\n", "// eslint-disable-next-line plugin/not-selected -- keep\nconst a = 1;\n", false, 1},
-		{"unselected beside dead", "/* cohere-disable plugin/not-selected, test-quiet -- keep */\nconst a = 1;\n", "/* cohere-disable plugin/not-selected -- keep */\nconst a = 1;\n", false, 1},
-		{"all names dead", "// cohere-disable-next-line test-live, test-quiet\nconst a = 1;\n", "\nconst a = 1;\n", false, 1},
+		{
+			"dead full run",
+			"// eslint-disable-next-line test-quiet -- stale\nconst a = 1;\n",
+			"\nconst a = 1;\n",
+			false,
+			1,
+		},
+		{
+			"same directive filtered run",
+			"// eslint-disable-next-line test-quiet -- stale\nconst a = 1;\n",
+			"// eslint-disable-next-line test-quiet -- stale\nconst a = 1;\n",
+			true,
+			0,
+		},
+		{
+			"live",
+			"// eslint-disable-next-line test-live -- needed\ndebugger;\n",
+			"// eslint-disable-next-line test-live -- needed\ndebugger;\n",
+			false,
+			0,
+		},
+		{
+			"dead beside live",
+			"// eslint-disable-next-line test-quiet, test-live -- needed\ndebugger;\n",
+			"// eslint-disable-next-line test-live -- needed\ndebugger;\n",
+			false,
+			1,
+		},
+		{
+			"live beside dead",
+			"// eslint-disable-next-line test-live, test-quiet -- needed\ndebugger;\n",
+			"// eslint-disable-next-line test-live -- needed\ndebugger;\n",
+			false,
+			1,
+		},
+		{
+			"dead beside unselected",
+			"// eslint-disable-next-line test-quiet, plugin/not-selected -- keep\nconst a = 1;\n",
+			"// eslint-disable-next-line plugin/not-selected -- keep\nconst a = 1;\n",
+			false,
+			1,
+		},
+		{
+			"unselected beside dead",
+			"/* cohere-disable plugin/not-selected, test-quiet -- keep */\nconst a = 1;\n",
+			"/* cohere-disable plugin/not-selected -- keep */\nconst a = 1;\n",
+			false,
+			1,
+		},
+		{
+			"all names dead",
+			"// cohere-disable-next-line test-live, test-quiet\nconst a = 1;\n",
+			"\nconst a = 1;\n",
+			false,
+			1,
+		},
 		{"same line", "const a = 1; // cohere-disable-line test-quiet\n", "const a = 1; \n", false, 1},
 		{"block between tokens", "const/* cohere-disable test-quiet */a = 1;\n", "const a = 1;\n", false, 1},
-		{"multiline block keeps line breaks", "/* eslint-disable\n test-quiet\n -- stale */\nconst a = 1;\n", "\n\n\nconst a = 1;\n", false, 1},
-		{"multiline partial keeps line breaks", "/* cohere-disable test-quiet,\n plugin/not-selected\n -- keep */\nconst a = 1;\n", "/* cohere-disable plugin/not-selected\n\n -- keep */\nconst a = 1;\n", false, 1},
+		{
+			"multiline block keeps line breaks",
+			"/* eslint-disable\n test-quiet\n -- stale */\nconst a = 1;\n",
+			"\n\n\nconst a = 1;\n",
+			false,
+			1,
+		},
+		{
+			"multiline partial keeps line breaks",
+			"/* cohere-disable test-quiet,\n plugin/not-selected\n -- keep */\nconst a = 1;\n",
+			"/* cohere-disable plugin/not-selected\n\n -- keep */\nconst a = 1;\n",
+			false,
+			1,
+		},
 		{"blanket dead", "/* eslint-disable */\nconst a = 1;\n", " \nconst a = 1;\n", false, 1},
 		{"blanket live", "/* eslint-disable */\ndebugger;\n", "/* eslint-disable */\ndebugger;\n", false, 0},
-		{"unicode whitespace", "/* cohere-disable\u00a0test-quiet,\uFEFFplugin/not-selected -- keep */\nconst a = 1;\n", "/* cohere-disable\u00a0plugin/not-selected -- keep */\nconst a = 1;\n", false, 1},
+		{
+			"unicode whitespace",
+			"/* cohere-disable\u00a0test-quiet,\uFEFFplugin/not-selected -- keep */\nconst a = 1;\n",
+			"/* cohere-disable\u00a0plugin/not-selected -- keep */\nconst a = 1;\n",
+			false,
+			1,
+		},
 	} {
 		test.Run(fixture.name, func(test *testing.T) {
 			test.Parallel()
@@ -93,7 +159,9 @@ func TestDeadDisableFindingsAndFixes(test *testing.T) {
 				test.Fatalf("got %d findings, want %d: %v", len(findings), fixture.want, diagnosticKeys(findings))
 			}
 			for _, finding := range findings {
-				if finding.RuleName != "unused-disable" || finding.Message.Id != "unusedDisable" || len(finding.Fixes) != 1 {
+				if finding.RuleName != "unused-disable" ||
+					finding.Message.Id != "unusedDisable" ||
+					len(finding.Fixes) != 1 {
 					test.Fatalf("want one fixable unused-disable finding, got %+v", finding)
 				}
 				comment := fixture.source[finding.Range.Pos():finding.Range.End()]
@@ -101,9 +169,14 @@ func TestDeadDisableFindingsAndFixes(test *testing.T) {
 					test.Fatalf("range is not the comment: %q", comment)
 				}
 			}
-			fixed, fixTextError := edit.FixText(filepath.Join(root, "main.ts"), fixture.source, func(fileName, text string) ([]edit.Proposal, error) {
-				return edit.ProposalsFrom(lint(text)), nil
-			}, 2)
+			fixed, fixTextError := edit.FixText(
+				filepath.Join(root, "main.ts"),
+				fixture.source,
+				func(fileName, text string) ([]edit.Proposal, error) {
+					return edit.ProposalsFrom(lint(text)), nil
+				},
+				2,
+			)
 			if fixTextError != nil {
 				test.Fatal(fixTextError)
 			}
@@ -142,12 +215,17 @@ func TestDeadDisableFindingsSurviveReplay(test *testing.T) {
 		if result.Coverage.Suppressed != 1 || len(result.Diagnostics) != 1 {
 			test.Fatalf("want 1 withheld and 1 dead finding, got %+v", result)
 		}
-		fixed, fixTextError := edit.FixText(filepath.Join(root, "main.ts"), source, func(fileName, text string) ([]edit.Proposal, error) {
-			if text != source {
-				return nil, nil
-			}
-			return edit.ProposalsFrom(result.Diagnostics), nil
-		}, 2)
+		fixed, fixTextError := edit.FixText(
+			filepath.Join(root, "main.ts"),
+			source,
+			func(fileName, text string) ([]edit.Proposal, error) {
+				if text != source {
+					return nil, nil
+				}
+				return edit.ProposalsFrom(result.Diagnostics), nil
+			},
+			2,
+		)
 		if fixTextError != nil {
 			test.Fatal(fixTextError)
 		}
@@ -176,7 +254,11 @@ func TestDeadDisableWireKeysUseTheRealAbbreviationRule(test *testing.T) {
 	subject := nexus.ConsistencyNoAbbreviatedIdentifier
 	full := walkDeadDirectiveFixture(test, deadDirectiveGraph(test, root, source), []rule.Rule{subject})
 	if len(full.Diagnostics) != 3 || full.Coverage.Suppressed != 2 {
-		test.Fatalf("got %d wire-key findings and %d withheld, want 3 dead at the literal and 2 live at the interface", len(full.Diagnostics), full.Coverage.Suppressed)
+		test.Fatalf(
+			"got %d wire-key findings and %d withheld, want 3 dead at the literal and 2 live at the interface",
+			len(full.Diagnostics),
+			full.Coverage.Suppressed,
+		)
 	}
 	for _, finding := range full.Diagnostics {
 		if finding.RuleName != "unused-disable" || len(finding.Fixes) != 1 {
@@ -190,7 +272,11 @@ func TestDeadDisableWireKeysUseTheRealAbbreviationRule(test *testing.T) {
 	live := "// cohere-disable-next-line nexus/consistency-no-abbreviated-identifier -- needed\nconst max = 1;\n"
 	suppressed := walkDeadDirectiveFixture(test, deadDirectiveGraph(test, root, live), []rule.Rule{subject})
 	if len(suppressed.Diagnostics) != 0 || suppressed.Coverage.Suppressed != 1 {
-		test.Fatalf("live directive: %d findings, %d withheld; want 0 and 1", len(suppressed.Diagnostics), suppressed.Coverage.Suppressed)
+		test.Fatalf(
+			"live directive: %d findings, %d withheld; want 0 and 1",
+			len(suppressed.Diagnostics),
+			suppressed.Coverage.Suppressed,
+		)
 	}
 	control := walkDeadDirectiveFixture(test, deadDirectiveGraph(test, root, "const max = 1;\n"), []rule.Rule{subject})
 	if len(control.Diagnostics) != 1 || control.Diagnostics[0].RuleName != subject.Name {

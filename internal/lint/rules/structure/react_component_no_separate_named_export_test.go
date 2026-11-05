@@ -239,7 +239,12 @@ func TestReactComponentNoSeparateNamedExportFixMovesTheExportOntoTheDeclaration(
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.Run(test, ReactComponentNoSeparateNamedExport, separateExportFile, testCase.sourceText)
+			result := rule_testing.Run(
+				test,
+				ReactComponentNoSeparateNamedExport,
+				separateExportFile,
+				testCase.sourceText,
+			)
 			rule_testing.ExpectFindings(test, result, "noSeparateNamedExport")
 			if len(result.Diagnostics[0].Fixes) != 1 {
 				// One edit, not a deletion plus insertions. The engine applies a diagnostic's fixes
@@ -284,7 +289,12 @@ func TestReactComponentNoSeparateNamedExportDeclinesWhereTheExportCannotMove(tes
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.Run(test, ReactComponentNoSeparateNamedExport, separateExportFile, testCase.sourceText)
+			result := rule_testing.Run(
+				test,
+				ReactComponentNoSeparateNamedExport,
+				separateExportFile,
+				testCase.sourceText,
+			)
 			rule_testing.ExpectFindings(test, result, "noSeparateNamedExport")
 			diagnostic := result.Diagnostics[0]
 			if len(diagnostic.Fixes) != 0 || len(diagnostic.Suggestions) != 0 {

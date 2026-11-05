@@ -27,7 +27,14 @@ func newNode(after any, before any, nodeType string, value string, sourceIndex a
 }
 
 // newContainer is `new Container(opts)`: a node that contains other nodes.
-func newContainer(after any, before any, nodeType string, value string, sourceIndex any, nodes []*estree.Node) *estree.Node {
+func newContainer(
+	after any,
+	before any,
+	nodeType string,
+	value string,
+	sourceIndex any,
+	nodes []*estree.Node,
+) *estree.Node {
 	container := newNode(after, before, nodeType, value, sourceIndex)
 
 	container.Set("nodes", nodes)

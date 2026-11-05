@@ -101,7 +101,11 @@ func redundantPhiValue[G Graph[F, B, P], F any, B comparable, P any](graph G, ph
 }
 
 // applyRewrites rewrites every place in the function through resolve.
-func applyRewrites[G Graph[F, B, P], F any, B comparable, P any](graph G, function F, resolve func(IdentifierId) IdentifierId) {
+func applyRewrites[G Graph[F, B, P], F any, B comparable, P any](
+	graph G,
+	function F,
+	resolve func(IdentifierId) IdentifierId,
+) {
 	rewrite := func(place *P, role Role) {
 		*place = graph.WithIdentifier(*place, resolve(graph.IdentifierOf(*place)))
 	}

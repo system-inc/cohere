@@ -20,7 +20,9 @@ func treeSnapshot(test *testing.T, root string) map[string]string {
 		// cohere's to keep, and `--no-cache` is the flag that writes none of it. So is a nested
 		// repository's, where the drift check keeps that repository's format record.
 		if walkError == nil && entry.IsDir() && filepath.Base(filepath.Dir(path)) == ".cache" {
-			if owner := filepath.Dir(filepath.Dir(path)); path == cacheDirectory(owner) && (owner == root || formatfiles.HasOwnRepository(owner)) {
+			if owner := filepath.Dir(
+				filepath.Dir(path),
+			); path == cacheDirectory(owner) && (owner == root || formatfiles.HasOwnRepository(owner)) {
 				return filepath.SkipDir
 			}
 		}
@@ -45,7 +47,13 @@ func assertTreeUnchanged(test *testing.T, root string, before map[string]string,
 	after := treeSnapshot(test, root)
 	for path, contents := range before {
 		if after[path] != contents {
-			test.Errorf("--no-fix changed %s:\nbefore:\n%s\nafter:\n%s\noutput:\n%s", path, contents, after[path], output)
+			test.Errorf(
+				"--no-fix changed %s:\nbefore:\n%s\nafter:\n%s\noutput:\n%s",
+				path,
+				contents,
+				after[path],
+				output,
+			)
 		}
 	}
 	for path := range after {
@@ -137,7 +145,10 @@ func TestNoFixReportsWhatFixAndFormatWouldChange(test *testing.T) {
 		if code == 0 {
 			test.Fatalf("a fixable finding passed %v:\n%s", testCase.arguments, output)
 		}
-		want = filepath.Join(root, "Debugger.ts") + ":1:1 - --fix would rewrite this file: " + testCase.changers + " [fix/would-change]"
+		want = filepath.Join(root, "Debugger.ts") +
+			":1:1 - --fix would rewrite this file: " +
+			testCase.changers +
+			" [fix/would-change]"
 		if !strings.Contains(output, want) {
 			test.Errorf("%v: want %q in:\n%s", testCase.arguments, want, output)
 		}

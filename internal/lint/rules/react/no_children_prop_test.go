@@ -399,10 +399,17 @@ func TestNoChildrenPropAllowFunctions(test *testing.T) {
 		for _, sourceText := range clean {
 			test.Run(sourceText, func(test *testing.T) {
 				test.Parallel()
-				rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoChildrenProp, childrenPropFile, sourceText, allowed))
+				rule_testing.ExpectClean(
+					test,
+					rule_testing.RunWithOptions(test, NoChildrenProp, childrenPropFile, sourceText, allowed),
+				)
 				// The control: without the option the same source reports, so the option is what
 				// made it clean.
-				rule_testing.ExpectFindings(test, rule_testing.Run(test, NoChildrenProp, childrenPropFile, sourceText), "noChildrenProp")
+				rule_testing.ExpectFindings(
+					test,
+					rule_testing.Run(test, NoChildrenProp, childrenPropFile, sourceText),
+					"noChildrenProp",
+				)
 			})
 		}
 
@@ -411,20 +418,37 @@ func TestNoChildrenPropAllowFunctions(test *testing.T) {
 			wantId     string
 			wantSpan   string
 		}{
-			{"<MyComponent>{" + function + "}</MyComponent>;", "nestFunction", "<MyComponent>{" + function + "}</MyComponent>"},
-			{"React.createElement(MyComponent, {}, " + function + ");", "passFunctionAsArgs", "React.createElement(MyComponent, {}, " + function + ")"},
+			{
+				"<MyComponent>{" + function + "}</MyComponent>;",
+				"nestFunction",
+				"<MyComponent>{" + function + "}</MyComponent>",
+			},
+			{
+				"React.createElement(MyComponent, {}, " + function + ");",
+				"passFunctionAsArgs",
+				"React.createElement(MyComponent, {}, " + function + ")",
+			},
 		}
 		for _, testCase := range reporting {
 			test.Run(testCase.sourceText, func(test *testing.T) {
 				test.Parallel()
-				result := rule_testing.RunWithOptions(test, NoChildrenProp, childrenPropFile, testCase.sourceText, allowed)
+				result := rule_testing.RunWithOptions(
+					test,
+					NoChildrenProp,
+					childrenPropFile,
+					testCase.sourceText,
+					allowed,
+				)
 				rule_testing.ExpectFindings(test, result, testCase.wantId)
 				diagnostic := result.Diagnostics[0]
 				if got := result.SourceFile.Text()[diagnostic.Range.Pos():diagnostic.Range.End()]; got != testCase.wantSpan {
 					test.Errorf("the finding points at %q, want %q", got, testCase.wantSpan)
 				}
 				// Without the option, a function passed this way is ordinary children.
-				rule_testing.ExpectClean(test, rule_testing.Run(test, NoChildrenProp, childrenPropFile, testCase.sourceText))
+				rule_testing.ExpectClean(
+					test,
+					rule_testing.Run(test, NoChildrenProp, childrenPropFile, testCase.sourceText),
+				)
 			})
 		}
 	}
@@ -438,7 +462,11 @@ func TestNoChildrenPropAllowFunctions(test *testing.T) {
 	for _, sourceText := range stillReporting {
 		test.Run(sourceText+" under allowFunctions", func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoChildrenProp, childrenPropFile, sourceText, allowed), "noChildrenProp")
+			rule_testing.ExpectFindings(
+				test,
+				rule_testing.RunWithOptions(test, NoChildrenProp, childrenPropFile, sourceText, allowed),
+				"noChildrenProp",
+			)
 		})
 	}
 	// Measured against the installed build under the option, beyond upstream's rows: parentheses,
@@ -458,7 +486,10 @@ func TestNoChildrenPropAllowFunctions(test *testing.T) {
 	} {
 		test.Run(sourceText+" under allowFunctions", func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoChildrenProp, childrenPropFile, sourceText, allowed))
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.RunWithOptions(test, NoChildrenProp, childrenPropFile, sourceText, allowed),
+			)
 		})
 	}
 }

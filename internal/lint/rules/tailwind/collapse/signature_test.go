@@ -85,15 +85,25 @@ func TestSignatureAgreesWithTailwind(test *testing.T) {
 								for _, property := range strings.Fields(entry.properties) {
 									properties[property] = true
 								}
-								if bound := compiler.ClassSignatureBound(entry.className, side.features); !bound.Admits(properties) {
+								if bound := compiler.ClassSignatureBound(
+									entry.className,
+									side.features,
+								); !bound.Admits(properties) {
 									outOfBoundByRoot[signatureRootOf(entry.className)]++
-									outOfBound = append(outOfBound, entry.className+": upstream declares ["+entry.properties+"], bound "+describeBound(bound))
+									outOfBound = append(outOfBound, entry.className+
+										": upstream declares ["+
+										entry.properties+
+										"], bound "+
+										describeBound(bound))
 								}
 							}
 						}
 					case SignatureNone:
 						if side.expected != "-" {
-							disagreements = append(disagreements, entry.className+" ("+side.name+"): compiles here to nothing, upstream to a signature")
+							disagreements = append(
+								disagreements,
+								entry.className+" ("+side.name+"): compiles here to nothing, upstream to a signature",
+							)
 						}
 					case SignatureExact:
 						if side.name == "collapsed" {
@@ -103,7 +113,10 @@ func TestSignatureAgreesWithTailwind(test *testing.T) {
 							if side.name == "collapsed" {
 								disagreeByRoot[signatureRootOf(entry.className)]++
 							}
-							disagreements = append(disagreements, entry.className+" ("+side.name+"): "+strings.ReplaceAll(signature, "\n", " "))
+							disagreements = append(
+								disagreements,
+								entry.className+" ("+side.name+"): "+strings.ReplaceAll(signature, "\n", " "),
+							)
 						}
 					}
 				}
@@ -114,7 +127,11 @@ func TestSignatureAgreesWithTailwind(test *testing.T) {
 				if len(shown) > 40 {
 					shown = shown[:40]
 				}
-				test.Errorf("%d signatures called exact disagree with upstream's, starting with:\n  %s", len(disagreements), strings.Join(shown, "\n  "))
+				test.Errorf(
+					"%d signatures called exact disagree with upstream's, starting with:\n  %s",
+					len(disagreements),
+					strings.Join(shown, "\n  "),
+				)
 			}
 			sort.Strings(outOfBound)
 			if len(outOfBound) > 0 {
@@ -122,9 +139,19 @@ func TestSignatureAgreesWithTailwind(test *testing.T) {
 				if len(shown) > 40 {
 					shown = shown[:40]
 				}
-				test.Errorf("%d unknown signatures fall outside their bound, so the bail would miss them, starting with:\n  %s", len(outOfBound), strings.Join(shown, "\n  "))
+				test.Errorf(
+					"%d unknown signatures fall outside their bound, so the bail would miss them, starting with:\n  %s",
+					len(outOfBound),
+					strings.Join(shown, "\n  "),
+				)
 			}
-			test.Logf("%d classes: %d exact, %d unknown; unknown by root: %s", len(entries), exact, unknown, topCounts(unknownByRoot, 25))
+			test.Logf(
+				"%d classes: %d exact, %d unknown; unknown by root: %s",
+				len(entries),
+				exact,
+				unknown,
+				topCounts(unknownByRoot, 25),
+			)
 			test.Logf("disagreements by root: %s", topCounts(disagreeByRoot, 200))
 			test.Logf("out of bound by root: %s", topCounts(outOfBoundByRoot, 200))
 		})

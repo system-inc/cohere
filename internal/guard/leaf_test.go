@@ -74,8 +74,8 @@ var allowedRuleImports = map[string]bool{
 // ~1.9s band it was in before the import existed. Editing the parser itself costs 3.24s, which is
 // the real depth cost and is paid by whoever edits the parser rather than by rule authors.
 //
-// `internal/lint/rules/tailwind/collapse/` is the generated collapse table and its gate. It is regenerated when Tailwind
-// releases and at no other time, which is the movement property this list is about rather than an
+// `internal/lint/rules/tailwind/collapse/` is the generated collapse table and its gate. It is regenerated when
+// Tailwind releases and at no other time, which is the movement property this list is about rather than an
 // exception to it. Measured on 2026-08-23, three warm rounds each: editing a tailwind rule that
 // imports it rebuilds in 0.06s against 0.07s for a rule that imports nothing, which is noise. Editing
 // the table itself costs 1.34s for a full binary rebuild, and that is paid by whoever regenerates it

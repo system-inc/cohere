@@ -4,7 +4,13 @@ package compose
 
 import "github.com/system-inc/cohere/internal/format/yaml/cst"
 
-func resolveCollection(composition *composeContext, token *cst.Token, onError onErrorFunc, tagName string, tag *Tag) *Node {
+func resolveCollection(
+	composition *composeContext,
+	token *cst.Token,
+	onError onErrorFunc,
+	tagName string,
+	tag *Tag,
+) *Node {
 	var coll *Node
 	switch token.Type {
 	case "block-map":
@@ -209,7 +215,13 @@ func composeScalar(composition *composeContext, token *cst.Token, tagToken *cst.
 	return scalar
 }
 
-func findScalarTagByName(schema *Schema, value []uint16, tagName string, tagToken *cst.Token, onError onErrorFunc) *Tag {
+func findScalarTagByName(
+	schema *Schema,
+	value []uint16,
+	tagName string,
+	tagToken *cst.Token,
+	onError onErrorFunc,
+) *Tag {
 	if tagName == "!" {
 		return schema.scalarTag() // non-specific tag
 	}

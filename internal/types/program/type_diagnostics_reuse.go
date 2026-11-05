@@ -184,7 +184,11 @@ func (parts TypeDiagnosticParts) All() []*ast.Diagnostic {
 // Mutates: reuse records what was replayed and the section to save for the next run, unless the graph was retired
 func (graph *Graph) CheckReusing(ctx context.Context, reuse *TypeDiagnosticsReuse) (TypeDiagnosticParts, bool) {
 	stored := reuse.stored
-	if stored == nil || stored.Version != typesSectionVersion || stored.Key != reuse.key || !stored.GlobalsClean || graph.Shapes == nil {
+	if stored == nil ||
+		stored.Version != typesSectionVersion ||
+		stored.Key != reuse.key ||
+		!stored.GlobalsClean ||
+		graph.Shapes == nil {
 		return TypeDiagnosticParts{}, false
 	}
 	syntactic := graph.Program.GetSyntacticDiagnostics(ctx, nil)
@@ -257,7 +261,11 @@ func (graph *Graph) RecordFull(ctx context.Context, reuse *TypeDiagnosticsReuse,
 	}
 	entries := make(map[string]TypesEntry, len(graph.ProjectFiles()))
 	for _, sourceFile := range graph.ProjectFiles() {
-		if entry, keepable := typesEntryFor(sourceFile, fingerprints[sourceFile.PathKey()], byFile[sourceFile]); keepable {
+		if entry, keepable := typesEntryFor(
+			sourceFile,
+			fingerprints[sourceFile.PathKey()],
+			byFile[sourceFile],
+		); keepable {
 			entries[sourceFile.FileName().AsString()] = entry
 		}
 	}
@@ -295,7 +303,11 @@ func (graph *Graph) semanticDiagnosticsOf(ctx context.Context, files []*ast.Sour
 
 // typesEntryFor stores a file's semantic diagnostics, or reports false when any of them cannot be replayed
 // faithfully: located in another file, or repopulated from program state.
-func typesEntryFor(sourceFile *ast.SourceFile, fingerprint [sha256.Size]byte, diagnostics []*ast.Diagnostic) (TypesEntry, bool) {
+func typesEntryFor(
+	sourceFile *ast.SourceFile,
+	fingerprint [sha256.Size]byte,
+	diagnostics []*ast.Diagnostic,
+) (TypesEntry, bool) {
 	entry := TypesEntry{Fingerprint: fingerprint, Diagnostics: make([]StoredDiagnostic, 0, len(diagnostics))}
 	for _, diagnostic := range diagnostics {
 		stored, keepable := storeDiagnostic(diagnostic, sourceFile)
@@ -366,8 +378,19 @@ func (stored StoredDiagnostic) diagnostic(sourceFile *ast.SourceFile) *ast.Diagn
 	key, category := zero.MessageKey(), zero.Category()
 	reflect.ValueOf(&key).Elem().SetString(stored.MessageKey)
 	reflect.ValueOf(&category).Elem().SetInt(stored.Category)
-	diagnostic := ast.NewDiagnosticFromSerialized(file, core.NewTextRange(stored.Pos, stored.End), stored.Code, category, key,
-		stored.MessageArgs, chain, related, stored.ReportsUnnecessary, stored.ReportsDeprecated, stored.SkippedOnNoEmit)
+	diagnostic := ast.NewDiagnosticFromSerialized(
+		file,
+		core.NewTextRange(stored.Pos, stored.End),
+		stored.Code,
+		category,
+		key,
+		stored.MessageArgs,
+		chain,
+		related,
+		stored.ReportsUnnecessary,
+		stored.ReportsDeprecated,
+		stored.SkippedOnNoEmit,
+	)
 	if stored.Source != "" || stored.MessageText != "" {
 		diagnostic.SetExternalData(stored.Source, stored.MessageText)
 	}

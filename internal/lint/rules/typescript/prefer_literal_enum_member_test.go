@@ -94,8 +94,13 @@ func TestPreferLiteralEnumMemberStaysSilentWhenBitwiseExpressionsAreAllowed(test
 	for index, sourceText := range cases {
 		test.Run(preferLiteralEnumMemberCaseName(index), func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, PreferLiteralEnumMember,
-				preferLiteralEnumMemberFile, sourceText, decodePreferLiteralEnumMemberOptionsForTest(test, `{"allowBitwiseExpressions": true}`)))
+			rule_testing.ExpectClean(test, rule_testing.RunWithOptions(
+				test,
+				PreferLiteralEnumMember,
+				preferLiteralEnumMemberFile,
+				sourceText,
+				decodePreferLiteralEnumMemberOptionsForTest(test, `{"allowBitwiseExpressions": true}`),
+			))
 		})
 	}
 }
@@ -215,8 +220,16 @@ func TestPreferLiteralEnumMemberFiresWhenBitwiseExpressionsAreAllowed(test *test
 	}{
 		{
 			sourceText: "\nconst x = 1;\nenum Foo {\n  A = x << 0,\n  B = x >> 0,\n  C = x >>> 0,\n  D = x | 0,\n  E = x & 0,\n  F = x ^ 0,\n  G = ~x,\n}\n      ",
-			wantIds:    []string{"notLiteralOrBitwiseExpression", "notLiteralOrBitwiseExpression", "notLiteralOrBitwiseExpression", "notLiteralOrBitwiseExpression", "notLiteralOrBitwiseExpression", "notLiteralOrBitwiseExpression", "notLiteralOrBitwiseExpression"},
-			wantSpans:  []string{"A", "B", "C", "D", "E", "F", "G"},
+			wantIds: []string{
+				"notLiteralOrBitwiseExpression",
+				"notLiteralOrBitwiseExpression",
+				"notLiteralOrBitwiseExpression",
+				"notLiteralOrBitwiseExpression",
+				"notLiteralOrBitwiseExpression",
+				"notLiteralOrBitwiseExpression",
+				"notLiteralOrBitwiseExpression",
+			},
+			wantSpans: []string{"A", "B", "C", "D", "E", "F", "G"},
 		},
 		{
 			sourceText: "\nconst x = 1;\nenum Foo {\n  A = 1 << 0,\n  B = x >> Foo.A,\n  C = x >> A,\n}\n      ",
@@ -227,8 +240,13 @@ func TestPreferLiteralEnumMemberFiresWhenBitwiseExpressionsAreAllowed(test *test
 	for index, testCase := range cases {
 		test.Run(preferLiteralEnumMemberCaseName(index), func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, PreferLiteralEnumMember,
-				preferLiteralEnumMemberFile, testCase.sourceText, decodePreferLiteralEnumMemberOptionsForTest(test, `{"allowBitwiseExpressions": true}`))
+			result := rule_testing.RunWithOptions(
+				test,
+				PreferLiteralEnumMember,
+				preferLiteralEnumMemberFile,
+				testCase.sourceText,
+				decodePreferLiteralEnumMemberOptionsForTest(test, `{"allowBitwiseExpressions": true}`),
+			)
 			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
 				test.Fatalf("wanted %d findings, got %d", len(testCase.wantSpans), len(result.Diagnostics))
@@ -261,15 +279,28 @@ func TestPreferLiteralEnumMemberFiresWhenBitwiseExpressionsAreExplicitlyDisallow
 	}{
 		{
 			sourceText: "\nenum Foo {\n  A = 1 << 0,\n  B = 1 >> 0,\n  C = 1 >>> 0,\n  D = 1 | 0,\n  E = 1 & 0,\n  F = 1 ^ 0,\n  G = ~1,\n}\n      ",
-			wantIds:    []string{"notLiteral", "notLiteral", "notLiteral", "notLiteral", "notLiteral", "notLiteral", "notLiteral"},
-			wantSpans:  []string{"A", "B", "C", "D", "E", "F", "G"},
+			wantIds: []string{
+				"notLiteral",
+				"notLiteral",
+				"notLiteral",
+				"notLiteral",
+				"notLiteral",
+				"notLiteral",
+				"notLiteral",
+			},
+			wantSpans: []string{"A", "B", "C", "D", "E", "F", "G"},
 		},
 	}
 	for index, testCase := range cases {
 		test.Run(preferLiteralEnumMemberCaseName(index), func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, PreferLiteralEnumMember,
-				preferLiteralEnumMemberFile, testCase.sourceText, decodePreferLiteralEnumMemberOptionsForTest(test, `{"allowBitwiseExpressions": false}`))
+			result := rule_testing.RunWithOptions(
+				test,
+				PreferLiteralEnumMember,
+				preferLiteralEnumMemberFile,
+				testCase.sourceText,
+				decodePreferLiteralEnumMemberOptionsForTest(test, `{"allowBitwiseExpressions": false}`),
+			)
 			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
 				test.Fatalf("wanted %d findings, got %d", len(testCase.wantSpans), len(result.Diagnostics))
@@ -444,8 +475,12 @@ func TestPreferLiteralEnumMemberOnShapesUpstreamsCorpusDoesNotWrite(test *testin
 			why:        "a binary operator that is not bitwise still reports with the option on; upstream's corpus writes only bitwise operators under this option, so nothing in it can tell the operator set from a set that accepts everything",
 			sourceText: "enum Foo {\n  A = 1 + 1,\n  B = 1 * 2,\n  C = 1 - 1,\n}\n",
 			options:    "{\"allowBitwiseExpressions\": true}",
-			wantIds:    []string{"notLiteralOrBitwiseExpression", "notLiteralOrBitwiseExpression", "notLiteralOrBitwiseExpression"},
-			wantSpans:  []string{"A", "B", "C"},
+			wantIds: []string{
+				"notLiteralOrBitwiseExpression",
+				"notLiteralOrBitwiseExpression",
+				"notLiteralOrBitwiseExpression",
+			},
+			wantSpans: []string{"A", "B", "C"},
 		},
 		{
 			name:       "bad-right-operand",

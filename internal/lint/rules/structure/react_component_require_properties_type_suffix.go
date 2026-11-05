@@ -13,17 +13,26 @@ import (
 
 // messageUseComponentPropertyTypeSuffixText is the rule's `useComponentPropertyTypeSuffix` message,
 // whose wording lives in `policy/messages/react-component-require-properties-type-suffix.json`.
-var messageUseComponentPropertyTypeSuffixText = policy.MessageOf("structure/react-component-require-properties-type-suffix", "useComponentPropertyTypeSuffix")
+var messageUseComponentPropertyTypeSuffixText = policy.MessageOf(
+	"structure/react-component-require-properties-type-suffix",
+	"useComponentPropertyTypeSuffix",
+)
 
 // messageUseComponentPropertyTypeSuffix is the finding, rendered when it is reported so the text
 // comes from the current catalog.
 func messageUseComponentPropertyTypeSuffix() rule.Message {
-	return rule.Message{Id: messageUseComponentPropertyTypeSuffixText.Id, Description: messageUseComponentPropertyTypeSuffixText.Render(nil)}
+	return rule.Message{
+		Id:          messageUseComponentPropertyTypeSuffixText.Id,
+		Description: messageUseComponentPropertyTypeSuffixText.Render(nil),
+	}
 }
 
 // messageUseInterfaceSuffixText is the rule's `useInterfaceSuffix` message, whose wording lives in
 // `policy/messages/react-component-require-properties-type-suffix.json`.
-var messageUseInterfaceSuffixText = policy.MessageOf("structure/react-component-require-properties-type-suffix", "useInterfaceSuffix")
+var messageUseInterfaceSuffixText = policy.MessageOf(
+	"structure/react-component-require-properties-type-suffix",
+	"useInterfaceSuffix",
+)
 
 // messageUseInterfaceSuffix is the finding, rendered when it is reported so the text comes from the
 // current catalog.
@@ -33,7 +42,10 @@ func messageUseInterfaceSuffix() rule.Message {
 
 // messageUseTypeAliasSuffixText is the rule's `useTypeAliasSuffix` message, whose wording lives in
 // `policy/messages/react-component-require-properties-type-suffix.json`.
-var messageUseTypeAliasSuffixText = policy.MessageOf("structure/react-component-require-properties-type-suffix", "useTypeAliasSuffix")
+var messageUseTypeAliasSuffixText = policy.MessageOf(
+	"structure/react-component-require-properties-type-suffix",
+	"useTypeAliasSuffix",
+)
 
 // messageUseTypeAliasSuffix is the finding, rendered when it is reported so the text comes from the
 // current catalog.
@@ -140,7 +152,11 @@ var ReactComponentRequirePropertiesTypeSuffix = rule.Rule{
 				ruleContext.ReportNode(name, message)
 				return
 			}
-			ruleContext.ReportNodeWithFixes(name, message, ruleContext.ReplaceNode(name, propertiesTypeNameFor(name.Text())))
+			ruleContext.ReportNodeWithFixes(
+				name,
+				message,
+				ruleContext.ReplaceNode(name, propertiesTypeNameFor(name.Text())),
+			)
 		}
 
 		return rule.Listeners{
@@ -260,7 +276,8 @@ func collectComponentPropertyTypeNames(ruleContext rule.Context, sourceFile *ast
 		if name != nil && name.Kind == ast.KindIdentifier &&
 			react.IsLikelyComponentName(name.Text()) && len(parameters) == 1 {
 			if typeName := typeReferenceName(parameterTypeNode(parameters[0])); typeName != "" &&
-				!strings.HasSuffix(typeName, "Properties") && !isUnownedPropertyType(ruleContext, parameterTypeNode(parameters[0])) {
+				!strings.HasSuffix(typeName, "Properties") &&
+				!isUnownedPropertyType(ruleContext, parameterTypeNode(parameters[0])) {
 				into[typeName] = true
 			}
 		}

@@ -38,13 +38,41 @@ func TestNoArrayIndexKeyFires(test *testing.T) {
 		sourceText string
 		wantIds    []string
 	}{
-		{"invalid 0 foo.map((bar, i) => <Foo key={i} />)", `foo.map((bar, i) => <Foo key={i} />)`, []string{"noArrayIndex"}},
-		{"invalid 1 [{}, {}].map((bar, i) => <Foo key={i} />)", `[{}, {}].map((bar, i) => <Foo key={i} />)`, []string{"noArrayIndex"}},
-		{"invalid 2 foo.map((bar, anything) => <Foo key={anything} />)", `foo.map((bar, anything) => <Foo key={anything} />)`, []string{"noArrayIndex"}},
-		{"invalid 3 foo.map((bar, i) => <Foo key={`foo-${i}`} />)", "foo.map((bar, i) => <Foo key={`foo-${i}`} />)", []string{"noArrayIndex"}},
-		{"invalid 4 foo.map((bar, i) => <Foo key={'foo-' + i} />)", `foo.map((bar, i) => <Foo key={'foo-' + i} />)`, []string{"noArrayIndex"}},
-		{"invalid 5 foo.map((bar, i) => <Foo key={'foo-' + i + '-bar'} />)", `foo.map((bar, i) => <Foo key={'foo-' + i + '-bar'} />)`, []string{"noArrayIndex"}},
-		{"invalid 6 foo.map((baz, i) => React.cloneElement(someChild, { ...someChi", `foo.map((baz, i) => React.cloneElement(someChild, { ...someChild.props, key: i }))`, []string{"noArrayIndex"}},
+		{
+			"invalid 0 foo.map((bar, i) => <Foo key={i} />)",
+			`foo.map((bar, i) => <Foo key={i} />)`,
+			[]string{"noArrayIndex"},
+		},
+		{
+			"invalid 1 [{}, {}].map((bar, i) => <Foo key={i} />)",
+			`[{}, {}].map((bar, i) => <Foo key={i} />)`,
+			[]string{"noArrayIndex"},
+		},
+		{
+			"invalid 2 foo.map((bar, anything) => <Foo key={anything} />)",
+			`foo.map((bar, anything) => <Foo key={anything} />)`,
+			[]string{"noArrayIndex"},
+		},
+		{
+			"invalid 3 foo.map((bar, i) => <Foo key={`foo-${i}`} />)",
+			"foo.map((bar, i) => <Foo key={`foo-${i}`} />)",
+			[]string{"noArrayIndex"},
+		},
+		{
+			"invalid 4 foo.map((bar, i) => <Foo key={'foo-' + i} />)",
+			`foo.map((bar, i) => <Foo key={'foo-' + i} />)`,
+			[]string{"noArrayIndex"},
+		},
+		{
+			"invalid 5 foo.map((bar, i) => <Foo key={'foo-' + i + '-bar'} />)",
+			`foo.map((bar, i) => <Foo key={'foo-' + i + '-bar'} />)`,
+			[]string{"noArrayIndex"},
+		},
+		{
+			"invalid 6 foo.map((baz, i) => React.cloneElement(someChild, { ...someChi",
+			`foo.map((baz, i) => React.cloneElement(someChild, { ...someChild.props, key: i }))`,
+			[]string{"noArrayIndex"},
+		},
 		{"invalid 7 import { cloneElement } from 'react'; foo.map((baz, i) => clon", `
         import { cloneElement } from 'react';
 
@@ -66,25 +94,101 @@ func TestNoArrayIndexKeyFires(test *testing.T) {
           })
         })
       `, []string{"noArrayIndex"}},
-		{"invalid 10 foo.forEach((bar, i) => { baz.push(<Foo key={i} />); })", `foo.forEach((bar, i) => { baz.push(<Foo key={i} />); })`, []string{"noArrayIndex"}},
-		{"invalid 11 foo.filter((bar, i) => { baz.push(<Foo key={i} />); })", `foo.filter((bar, i) => { baz.push(<Foo key={i} />); })`, []string{"noArrayIndex"}},
-		{"invalid 12 foo.some((bar, i) => { baz.push(<Foo key={i} />); })", `foo.some((bar, i) => { baz.push(<Foo key={i} />); })`, []string{"noArrayIndex"}},
-		{"invalid 13 foo.every((bar, i) => { baz.push(<Foo key={i} />); })", `foo.every((bar, i) => { baz.push(<Foo key={i} />); })`, []string{"noArrayIndex"}},
-		{"invalid 14 foo.find((bar, i) => { baz.push(<Foo key={i} />); })", `foo.find((bar, i) => { baz.push(<Foo key={i} />); })`, []string{"noArrayIndex"}},
-		{"invalid 15 foo.findIndex((bar, i) => { baz.push(<Foo key={i} />); })", `foo.findIndex((bar, i) => { baz.push(<Foo key={i} />); })`, []string{"noArrayIndex"}},
-		{"invalid 16 foo.reduce((a, b, i) => a.concat(<Foo key={i} />), [])", `foo.reduce((a, b, i) => a.concat(<Foo key={i} />), [])`, []string{"noArrayIndex"}},
-		{"invalid 17 foo.flatMap((a, i) => <Foo key={i} />)", `foo.flatMap((a, i) => <Foo key={i} />)`, []string{"noArrayIndex"}},
-		{"invalid 18 foo.reduceRight((a, b, i) => a.concat(<Foo key={i} />), [])", `foo.reduceRight((a, b, i) => a.concat(<Foo key={i} />), [])`, []string{"noArrayIndex"}},
-		{"invalid 19 foo.map((bar, i) => React.createElement('Foo', { key: i }))", `foo.map((bar, i) => React.createElement('Foo', { key: i }))`, []string{"noArrayIndex"}},
-		{"invalid 20 foo.map((bar, i) => React.createElement('Foo', { key: `foo-${i", "foo.map((bar, i) => React.createElement('Foo', { key: `foo-${i}` }))", []string{"noArrayIndex"}},
-		{"invalid 21 foo.map((bar, i) => React.createElement('Foo', { key: 'foo-' +", `foo.map((bar, i) => React.createElement('Foo', { key: 'foo-' + i }))`, []string{"noArrayIndex"}},
-		{"invalid 22 foo.map((bar, i) => React.createElement('Foo', { key: 'foo-' +", `foo.map((bar, i) => React.createElement('Foo', { key: 'foo-' + i + '-bar' }))`, []string{"noArrayIndex"}},
-		{"invalid 23 foo.forEach((bar, i) => { baz.push(React.createElement('Foo', ", `foo.forEach((bar, i) => { baz.push(React.createElement('Foo', { key: i })); })`, []string{"noArrayIndex"}},
-		{"invalid 24 foo.filter((bar, i) => { baz.push(React.createElement('Foo', {", `foo.filter((bar, i) => { baz.push(React.createElement('Foo', { key: i })); })`, []string{"noArrayIndex"}},
-		{"invalid 25 foo.some((bar, i) => { baz.push(React.createElement('Foo', { k", `foo.some((bar, i) => { baz.push(React.createElement('Foo', { key: i })); })`, []string{"noArrayIndex"}},
-		{"invalid 26 foo.every((bar, i) => { baz.push(React.createElement('Foo', { ", `foo.every((bar, i) => { baz.push(React.createElement('Foo', { key: i })); })`, []string{"noArrayIndex"}},
-		{"invalid 27 foo.find((bar, i) => { baz.push(React.createElement('Foo', { k", `foo.find((bar, i) => { baz.push(React.createElement('Foo', { key: i })); })`, []string{"noArrayIndex"}},
-		{"invalid 28 foo.findIndex((bar, i) => { baz.push(React.createElement('Foo'", `foo.findIndex((bar, i) => { baz.push(React.createElement('Foo', { key: i })); })`, []string{"noArrayIndex"}},
+		{
+			"invalid 10 foo.forEach((bar, i) => { baz.push(<Foo key={i} />); })",
+			`foo.forEach((bar, i) => { baz.push(<Foo key={i} />); })`,
+			[]string{"noArrayIndex"},
+		},
+		{
+			"invalid 11 foo.filter((bar, i) => { baz.push(<Foo key={i} />); })",
+			`foo.filter((bar, i) => { baz.push(<Foo key={i} />); })`,
+			[]string{"noArrayIndex"},
+		},
+		{
+			"invalid 12 foo.some((bar, i) => { baz.push(<Foo key={i} />); })",
+			`foo.some((bar, i) => { baz.push(<Foo key={i} />); })`,
+			[]string{"noArrayIndex"},
+		},
+		{
+			"invalid 13 foo.every((bar, i) => { baz.push(<Foo key={i} />); })",
+			`foo.every((bar, i) => { baz.push(<Foo key={i} />); })`,
+			[]string{"noArrayIndex"},
+		},
+		{
+			"invalid 14 foo.find((bar, i) => { baz.push(<Foo key={i} />); })",
+			`foo.find((bar, i) => { baz.push(<Foo key={i} />); })`,
+			[]string{"noArrayIndex"},
+		},
+		{
+			"invalid 15 foo.findIndex((bar, i) => { baz.push(<Foo key={i} />); })",
+			`foo.findIndex((bar, i) => { baz.push(<Foo key={i} />); })`,
+			[]string{"noArrayIndex"},
+		},
+		{
+			"invalid 16 foo.reduce((a, b, i) => a.concat(<Foo key={i} />), [])",
+			`foo.reduce((a, b, i) => a.concat(<Foo key={i} />), [])`,
+			[]string{"noArrayIndex"},
+		},
+		{
+			"invalid 17 foo.flatMap((a, i) => <Foo key={i} />)",
+			`foo.flatMap((a, i) => <Foo key={i} />)`,
+			[]string{"noArrayIndex"},
+		},
+		{
+			"invalid 18 foo.reduceRight((a, b, i) => a.concat(<Foo key={i} />), [])",
+			`foo.reduceRight((a, b, i) => a.concat(<Foo key={i} />), [])`,
+			[]string{"noArrayIndex"},
+		},
+		{
+			"invalid 19 foo.map((bar, i) => React.createElement('Foo', { key: i }))",
+			`foo.map((bar, i) => React.createElement('Foo', { key: i }))`,
+			[]string{"noArrayIndex"},
+		},
+		{
+			"invalid 20 foo.map((bar, i) => React.createElement('Foo', { key: `foo-${i",
+			"foo.map((bar, i) => React.createElement('Foo', { key: `foo-${i}` }))",
+			[]string{"noArrayIndex"},
+		},
+		{
+			"invalid 21 foo.map((bar, i) => React.createElement('Foo', { key: 'foo-' +",
+			`foo.map((bar, i) => React.createElement('Foo', { key: 'foo-' + i }))`,
+			[]string{"noArrayIndex"},
+		},
+		{
+			"invalid 22 foo.map((bar, i) => React.createElement('Foo', { key: 'foo-' +",
+			`foo.map((bar, i) => React.createElement('Foo', { key: 'foo-' + i + '-bar' }))`,
+			[]string{"noArrayIndex"},
+		},
+		{
+			"invalid 23 foo.forEach((bar, i) => { baz.push(React.createElement('Foo', ",
+			`foo.forEach((bar, i) => { baz.push(React.createElement('Foo', { key: i })); })`,
+			[]string{"noArrayIndex"},
+		},
+		{
+			"invalid 24 foo.filter((bar, i) => { baz.push(React.createElement('Foo', {",
+			`foo.filter((bar, i) => { baz.push(React.createElement('Foo', { key: i })); })`,
+			[]string{"noArrayIndex"},
+		},
+		{
+			"invalid 25 foo.some((bar, i) => { baz.push(React.createElement('Foo', { k",
+			`foo.some((bar, i) => { baz.push(React.createElement('Foo', { key: i })); })`,
+			[]string{"noArrayIndex"},
+		},
+		{
+			"invalid 26 foo.every((bar, i) => { baz.push(React.createElement('Foo', { ",
+			`foo.every((bar, i) => { baz.push(React.createElement('Foo', { key: i })); })`,
+			[]string{"noArrayIndex"},
+		},
+		{
+			"invalid 27 foo.find((bar, i) => { baz.push(React.createElement('Foo', { k",
+			`foo.find((bar, i) => { baz.push(React.createElement('Foo', { key: i })); })`,
+			[]string{"noArrayIndex"},
+		},
+		{
+			"invalid 28 foo.findIndex((bar, i) => { baz.push(React.createElement('Foo'",
+			`foo.findIndex((bar, i) => { baz.push(React.createElement('Foo', { key: i })); })`,
+			[]string{"noArrayIndex"},
+		},
 		{"invalid 29 Children.map(this.props.children, (child, index) => { return R", `
         Children.map(this.props.children, (child, index) => {
           return React.cloneElement(child, { key: index });
@@ -133,7 +237,11 @@ func TestNoArrayIndexKeyFires(test *testing.T) {
           return cloneElement(child, { key: index });
         })
       `, []string{"noArrayIndex"}},
-		{"invalid 37 foo?.map((child, i) => <Foo key={i} />)", `foo?.map((child, i) => <Foo key={i} />)`, []string{"noArrayIndex"}},
+		{
+			"invalid 37 foo?.map((child, i) => <Foo key={i} />)",
+			`foo?.map((child, i) => <Foo key={i} />)`,
+			[]string{"noArrayIndex"},
+		},
 		{"invalid 38 foo.map((bar, index) => ( <Element key={index.toString()} bar=", `
         foo.map((bar, index) => (
           <Element key={index.toString()} bar={bar} />
@@ -182,9 +290,18 @@ func TestNoArrayIndexKeyStaysSilent(test *testing.T) {
 		{"valid 7 foo.bar((bar, i) => <Foo key={'foo-' + i} />)", `foo.bar((bar, i) => <Foo key={'foo-' + i} />)`},
 		{"valid 8 foo.map((baz) => <Foo key={baz.id} />)", `foo.map((baz) => <Foo key={baz.id} />)`},
 		{"valid 9 foo.map((baz, i) => <Foo key={baz.id} />)", `foo.map((baz, i) => <Foo key={baz.id} />)`},
-		{"valid 10 foo.map((baz, i) => <Foo key={'foo' + baz.id} />)", `foo.map((baz, i) => <Foo key={'foo' + baz.id} />)`},
-		{"valid 11 foo.map((baz, i) => React.cloneElement(someChild, { ...someChi", `foo.map((baz, i) => React.cloneElement(someChild, { ...someChild.props }))`},
-		{"valid 12 foo.map((baz, i) => cloneElement(someChild, { ...someChild.pro", `foo.map((baz, i) => cloneElement(someChild, { ...someChild.props }))`},
+		{
+			"valid 10 foo.map((baz, i) => <Foo key={'foo' + baz.id} />)",
+			`foo.map((baz, i) => <Foo key={'foo' + baz.id} />)`,
+		},
+		{
+			"valid 11 foo.map((baz, i) => React.cloneElement(someChild, { ...someChi",
+			`foo.map((baz, i) => React.cloneElement(someChild, { ...someChild.props }))`,
+		},
+		{
+			"valid 12 foo.map((baz, i) => cloneElement(someChild, { ...someChild.pro",
+			`foo.map((baz, i) => cloneElement(someChild, { ...someChild.props }))`,
+		},
 		{"valid 13 foo.map((item, i) => { return React.cloneElement(someChild, { ", `
         foo.map((item, i) => {
           return React.cloneElement(someChild, {
@@ -200,15 +317,30 @@ func TestNoArrayIndexKeyStaysSilent(test *testing.T) {
         })
       `},
 		{"valid 15 foo.map((baz, i) => <Foo key />)", `foo.map((baz, i) => <Foo key />)`},
-		{"valid 16 foo.reduce((a, b) => a.concat(<Foo key={b.id} />), [])", `foo.reduce((a, b) => a.concat(<Foo key={b.id} />), [])`},
-		{"valid 17 foo.map((bar, i) => <Foo key={i.baz.toString()} />)", `foo.map((bar, i) => <Foo key={i.baz.toString()} />)`},
+		{
+			"valid 16 foo.reduce((a, b) => a.concat(<Foo key={b.id} />), [])",
+			`foo.reduce((a, b) => a.concat(<Foo key={b.id} />), [])`,
+		},
+		{
+			"valid 17 foo.map((bar, i) => <Foo key={i.baz.toString()} />)",
+			`foo.map((bar, i) => <Foo key={i.baz.toString()} />)`,
+		},
 		{"valid 18 foo.map((bar, i) => <Foo key={i.toString} />)", `foo.map((bar, i) => <Foo key={i.toString} />)`},
 		{"valid 19 foo.map((bar, i) => <Foo key={String()} />)", `foo.map((bar, i) => <Foo key={String()} />)`},
 		{"valid 20 foo.map((bar, i) => <Foo key={String(baz)} />)", `foo.map((bar, i) => <Foo key={String(baz)} />)`},
 		{"valid 21 foo.flatMap((a) => <Foo key={a} />)", `foo.flatMap((a) => <Foo key={a} />)`},
-		{"valid 22 foo.reduce((a, b, i) => a.concat(<Foo key={b.id} />), [])", `foo.reduce((a, b, i) => a.concat(<Foo key={b.id} />), [])`},
-		{"valid 23 foo.reduceRight((a, b) => a.concat(<Foo key={b.id} />), [])", `foo.reduceRight((a, b) => a.concat(<Foo key={b.id} />), [])`},
-		{"valid 24 foo.reduceRight((a, b, i) => a.concat(<Foo key={b.id} />), [])", `foo.reduceRight((a, b, i) => a.concat(<Foo key={b.id} />), [])`},
+		{
+			"valid 22 foo.reduce((a, b, i) => a.concat(<Foo key={b.id} />), [])",
+			`foo.reduce((a, b, i) => a.concat(<Foo key={b.id} />), [])`,
+		},
+		{
+			"valid 23 foo.reduceRight((a, b) => a.concat(<Foo key={b.id} />), [])",
+			`foo.reduceRight((a, b) => a.concat(<Foo key={b.id} />), [])`,
+		},
+		{
+			"valid 24 foo.reduceRight((a, b, i) => a.concat(<Foo key={b.id} />), [])",
+			`foo.reduceRight((a, b, i) => a.concat(<Foo key={b.id} />), [])`,
+		},
 		{"valid 25 React.Children.map(this.props.children, (child, index, arr) =>", `
         React.Children.map(this.props.children, (child, index, arr) => {
           return React.cloneElement(child, { key: child.id });
@@ -303,7 +435,11 @@ func TestNoArrayIndexKeyIteratorMethods(test *testing.T) {
 
 		// The folds take the accumulator first, so their index is at position two.
 		{"reduce at position two", "foo.reduce((acc, bar, i) => <Foo key={i} />)\n", []string{"noArrayIndex"}},
-		{"reduceRight at position two", "foo.reduceRight((acc, bar, i) => <Foo key={i} />)\n", []string{"noArrayIndex"}},
+		{
+			"reduceRight at position two",
+			"foo.reduceRight((acc, bar, i) => <Foo key={i} />)\n",
+			[]string{"noArrayIndex"},
+		},
 
 		// The row that separates a table from a constant: a two-parameter fold's second parameter
 		// is the item, not an index, so nothing is pushed.
@@ -527,7 +663,11 @@ func TestNoArrayIndexKeyReactChildren(test *testing.T) {
 	}{
 		{"Children.map", "Children.map(c, (child, i) => <Foo key={i} />)\n", []string{"noArrayIndex"}},
 		{"React.Children.map", "React.Children.map(c, (child, i) => <Foo key={i} />)\n", []string{"noArrayIndex"}},
-		{"React.Children.forEach", "React.Children.forEach(c, (child, i) => <Foo key={i} />)\n", []string{"noArrayIndex"}},
+		{
+			"React.Children.forEach",
+			"React.Children.forEach(c, (child, i) => <Foo key={i} />)\n",
+			[]string{"noArrayIndex"},
+		},
 
 		// The callback in argument zero is not read for a Children call.
 		{"Children.map with the callback first", "Children.map((child, i) => <Foo key={i} />)\n", nil},
@@ -651,7 +791,11 @@ func TestNoArrayIndexKeySpans(test *testing.T) {
 	}{
 		{"the index itself", "foo.map((bar, i) => <Foo key={i} />)\n", "i"},
 		{"a template underlines the whole template", "foo.map((bar, i) => <Foo key={`x-${i}`} />)\n", "`x-${i}`"},
-		{"a binary expression underlines the whole expression", "foo.map((bar, i) => <Foo key={'x-' + i} />)\n", "'x-' + i"},
+		{
+			"a binary expression underlines the whole expression",
+			"foo.map((bar, i) => <Foo key={'x-' + i} />)\n",
+			"'x-' + i",
+		},
 		{"toString underlines the whole call", "foo.map((bar, i) => <Foo key={i.toString()} />)\n", "i.toString()"},
 
 		// The one site that differs: the argument rather than the call.

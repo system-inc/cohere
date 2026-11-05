@@ -320,7 +320,19 @@ func handleUnionTypeLeadingComments(context *commentContext) bool {
 
 // isRealFunctionLikeNode is upstream's createTypeCheckFunction of that name.
 func isRealFunctionLikeNode(node Node) bool {
-	return node.Is("ArrowFunctionExpression", "FunctionExpression", "FunctionDeclaration", "ObjectMethod", "ClassMethod",
-		"TSDeclareFunction", "TSCallSignatureDeclaration", "TSConstructSignatureDeclaration", "TSMethodSignature",
-		"TSConstructorType", "TSFunctionType", "TSDeclareMethod", "HookDeclaration")
+	return node.Is(
+		"ArrowFunctionExpression",
+		"FunctionExpression",
+		"FunctionDeclaration",
+		"ObjectMethod",
+		"ClassMethod",
+		"TSDeclareFunction",
+		"TSCallSignatureDeclaration",
+		"TSConstructSignatureDeclaration",
+		"TSMethodSignature",
+		"TSConstructorType",
+		"TSFunctionType",
+		"TSDeclareMethod",
+		"HookDeclaration",
+	)
 }

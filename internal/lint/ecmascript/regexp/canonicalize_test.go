@@ -91,7 +91,13 @@ func TestCaseEquivalents(test *testing.T) {
 			test.Parallel()
 			got := CaseEquivalents(testCase.r, testCase.unicodeMode)
 			if !slices.Equal(got, testCase.want) {
-				test.Errorf("CaseEquivalents(%U, %v) = %U, want %U", testCase.r, testCase.unicodeMode, got, testCase.want)
+				test.Errorf(
+					"CaseEquivalents(%U, %v) = %U, want %U",
+					testCase.r,
+					testCase.unicodeMode,
+					got,
+					testCase.want,
+				)
 			}
 		})
 	}

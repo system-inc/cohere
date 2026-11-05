@@ -51,7 +51,13 @@ func TestASwiftGapSaysItself(test *testing.T) {
 		{0, 0, ""},
 	} {
 		if got := engineUncheckedFiles(testCase.withoutRecord, testCase.unreadable); got != testCase.want {
-			test.Errorf("engineUncheckedFiles(%d, %d) = %q, want %q", testCase.withoutRecord, testCase.unreadable, got, testCase.want)
+			test.Errorf(
+				"engineUncheckedFiles(%d, %d) = %q, want %q",
+				testCase.withoutRecord,
+				testCase.unreadable,
+				got,
+				testCase.want,
+			)
 		}
 	}
 }

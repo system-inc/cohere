@@ -56,7 +56,13 @@ func TestTheGuardsTreeIsTheTreeTheFormatterWouldParse(test *testing.T) {
 			return given, nil
 		}
 		noProposals := func(string, string) ([]edit.Proposal, error) { return nil, nil }
-		if _, fixAndTransformTextError := edit.FixAndTransformText(fileName, text, noProposals, capture, 1); fixAndTransformTextError != nil {
+		if _, fixAndTransformTextError := edit.FixAndTransformText(
+			fileName,
+			text,
+			noProposals,
+			capture,
+			1,
+		); fixAndTransformTextError != nil {
 			test.Fatalf("%s: %v", fileName, fixAndTransformTextError)
 		}
 		if guards == nil {
@@ -83,14 +89,22 @@ func TestTheGuardsTreeIsTheTreeTheFormatterWouldParse(test *testing.T) {
 			mutantsCaught++
 		}
 	}
-	test.Logf("%d TypeScript files compared, %d with a hashbang left to their own parse, %d that do not parse, %d mutants caught",
-		compared, hashbangs, unparseable, mutantsCaught)
+	test.Logf(
+		"%d TypeScript files compared, %d with a hashbang left to their own parse, %d that do not parse, %d mutants caught",
+		compared,
+		hashbangs,
+		unparseable,
+		mutantsCaught,
+	)
 	if compared < 50 {
 		test.Fatalf("only %d files were compared", compared)
 	}
 	if mutantsCaught != compared {
-		test.Errorf("a tree of other bytes converted to the same ESTree on %d of %d files, so the comparison could not fail there",
-			compared-mutantsCaught, compared)
+		test.Errorf(
+			"a tree of other bytes converted to the same ESTree on %d of %d files, so the comparison could not fail there",
+			compared-mutantsCaught,
+			compared,
+		)
 	}
 }
 
@@ -142,7 +156,14 @@ func moduleRoot(test *testing.T) string {
 // directories and the TypeScript checkout.
 func typeScriptFiles(roots []string) []string {
 	extensions := map[string]bool{".ts": true, ".tsx": true, ".mts": true, ".cts": true}
-	skipped := map[string]bool{"node_modules": true, ".git": true, ".cache": true, ".next": true, "dist": true, "TypeScript": true}
+	skipped := map[string]bool{
+		"node_modules": true,
+		".git":         true,
+		".cache":       true,
+		".next":        true,
+		"dist":         true,
+		"TypeScript":   true,
+	}
 	var files []string
 	for _, root := range roots {
 		filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {

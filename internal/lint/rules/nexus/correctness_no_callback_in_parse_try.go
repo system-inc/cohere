@@ -14,7 +14,10 @@ const correctnessNoCallbackInParseTryId = "callbackInParseTry"
 
 // correctnessNoCallbackInParseTryText is the rule's message, whose wording lives in
 // `policy/messages/correctness-no-callback-in-parse-try.json`.
-var correctnessNoCallbackInParseTryText = policy.MessageOf("nexus/correctness-no-callback-in-parse-try", correctnessNoCallbackInParseTryId)
+var correctnessNoCallbackInParseTryText = policy.MessageOf(
+	"nexus/correctness-no-callback-in-parse-try",
+	correctnessNoCallbackInParseTryId,
+)
 
 func correctnessNoCallbackInParseTryMessage() rule.Message {
 	return rule.Message{
@@ -112,7 +115,8 @@ const correctnessNoCallbackInParseTryJsonFileSuffix = "/source/structured-text/j
 
 func correctnessNoCallbackInParseTryCheck(ruleContext rule.Context, node *ast.Node) {
 	tryStatement := node.AsTryStatement()
-	if tryStatement.CatchClause == nil || !correctnessNoCallbackInParseTryCatchDiscards(ruleContext, tryStatement.CatchClause) {
+	if tryStatement.CatchClause == nil ||
+		!correctnessNoCallbackInParseTryCatchDiscards(ruleContext, tryStatement.CatchClause) {
 		return
 	}
 	parses := false
@@ -207,10 +211,14 @@ func correctnessNoCallbackInParseTryIsParse(ruleContext rule.Context, call *ast.
 	case ast.KindIdentifier:
 		// Resolved whatever it is spelled, so an aliased import of nexus's parser counts and a local
 		// function that happens to share its name does not.
-		return correctnessNoCallbackInParseTryIsParseJsonOrThrow(ruleContext, ruleContext.TypeChecker.GetSymbolAtLocation(callee))
+		return correctnessNoCallbackInParseTryIsParseJsonOrThrow(
+			ruleContext,
+			ruleContext.TypeChecker.GetSymbolAtLocation(callee),
+		)
 	case ast.KindPropertyAccessExpression:
 		name := callee.AsPropertyAccessExpression().Name()
-		return name.Kind == ast.KindIdentifier && correctnessNoCallbackInParseTryIsJsonParse(ruleContext.TypeChecker.GetSymbolAtLocation(name))
+		return name.Kind == ast.KindIdentifier &&
+			correctnessNoCallbackInParseTryIsJsonParse(ruleContext.TypeChecker.GetSymbolAtLocation(name))
 	}
 	return false
 }
@@ -223,11 +231,16 @@ func correctnessNoCallbackInParseTryIsJsonParse(symbol *ast.Symbol) bool {
 		return false
 	}
 	for _, declaration := range symbol.Declarations {
-		if declaration.Kind != ast.KindMethodSignature || declaration.Name() == nil || declaration.Name().Text() != "parse" {
+		if declaration.Kind != ast.KindMethodSignature ||
+			declaration.Name() == nil ||
+			declaration.Name().Text() != "parse" {
 			return false
 		}
 		owner := declaration.Parent
-		if owner == nil || owner.Kind != ast.KindInterfaceDeclaration || owner.Name() == nil || owner.Name().Text() != "JSON" {
+		if owner == nil ||
+			owner.Kind != ast.KindInterfaceDeclaration ||
+			owner.Name() == nil ||
+			owner.Name().Text() != "JSON" {
 			return false
 		}
 		if !correctnessNoCallbackInParseTryIsGlobalDeclaration(owner) {
@@ -256,7 +269,8 @@ func correctnessNoCallbackInParseTryIsParseJsonOrThrow(ruleContext rule.Context,
 			return false
 		}
 		file := ast.GetSourceFileOfNode(declaration)
-		if file == nil || !strings.HasSuffix(file.FileName().AsString(), correctnessNoCallbackInParseTryJsonFileSuffix) {
+		if file == nil ||
+			!strings.HasSuffix(file.FileName().AsString(), correctnessNoCallbackInParseTryJsonFileSuffix) {
 			return false
 		}
 	}
@@ -308,7 +322,10 @@ func correctnessNoCallbackInParseTryIsCallback(ruleContext rule.Context, call *a
 	if calleeType == nil {
 		return false
 	}
-	return len(ruleContext.TypeChecker.GetSignaturesOfType(ruleContext.TypeChecker.GetNonNullableType(calleeType), checker.SignatureKindCall)) > 0
+	return len(ruleContext.TypeChecker.GetSignaturesOfType(
+		ruleContext.TypeChecker.GetNonNullableType(calleeType),
+		checker.SignatureKindCall,
+	)) > 0
 }
 
 // correctnessNoCallbackInParseTryOwningParameter is the parameter a declaration belongs to: the
@@ -351,7 +368,9 @@ func correctnessNoCallbackInParseTryIsPromiseExecutorParameter(ruleContext rule.
 		return false
 	}
 	newExpression := outer.AsNewExpression()
-	if newExpression.Arguments == nil || len(newExpression.Arguments.Nodes) == 0 || newExpression.Arguments.Nodes[0] != argument {
+	if newExpression.Arguments == nil ||
+		len(newExpression.Arguments.Nodes) == 0 ||
+		newExpression.Arguments.Nodes[0] != argument {
 		return false
 	}
 	constructor := ast.SkipParentheses(newExpression.Expression)

@@ -84,7 +84,10 @@ type listingOnce struct {
 // list runs go list once per directory, environment and patterns in this process: the tree does not change
 // while a test binary runs, and the guards ask for the same listing for each overlay they read.
 func list(directory string, environment []string, patterns []string) (*listing, error) {
-	request := strings.Join([]string{directory, strings.Join(environment, "\x00"), strings.Join(patterns, "\x00")}, "\x01")
+	request := strings.Join(
+		[]string{directory, strings.Join(environment, "\x00"), strings.Join(patterns, "\x00")},
+		"\x01",
+	)
 	listings.Lock()
 	entry := listings.byRequest[request]
 	if entry == nil {
@@ -98,7 +101,11 @@ func list(directory string, environment []string, patterns []string) (*listing, 
 
 func runList(directory string, environment []string, patterns []string) (*listing, error) {
 	// No "--" before the patterns: a runner's stand-in go refuses any flag it does not know, that one too.
-	output, goCommandError := goCommand(directory, environment, append([]string{"list", "-e", "-deps", "-json=" + listedFields}, patterns...)...)
+	output, goCommandError := goCommand(
+		directory,
+		environment,
+		append([]string{"list", "-e", "-deps", "-json=" + listedFields}, patterns...)...,
+	)
 	if goCommandError != nil {
 		return nil, goCommandError
 	}
@@ -168,7 +175,16 @@ func goCommand(directory string, environment []string, arguments ...string) ([]b
 
 // goEnvironmentValues is what go env says of the values that change a package's types, under environment.
 func goEnvironmentValues(directory string, environment []string) (map[string]string, error) {
-	output, goCommandError := goCommand(directory, environment, "env", "-json", "GOVERSION", "GOOS", "GOARCH", "GOEXPERIMENT")
+	output, goCommandError := goCommand(
+		directory,
+		environment,
+		"env",
+		"-json",
+		"GOVERSION",
+		"GOOS",
+		"GOARCH",
+		"GOEXPERIMENT",
+	)
 	if goCommandError != nil {
 		return nil, goCommandError
 	}

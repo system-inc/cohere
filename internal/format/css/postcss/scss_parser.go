@@ -271,7 +271,11 @@ func startsLikeAProperty(value string) bool {
 		return false
 	}
 	first := value[0]
-	return first == '#' || first == ':' || first == '-' || (first >= 'A' && first <= 'Z') || (first >= 'a' && first <= 'z')
+	return first == '#' ||
+		first == ':' ||
+		first == '-' ||
+		(first >= 'A' && first <= 'Z') ||
+		(first >= 'a' && first <= 'z')
 }
 
 // replaceCommentDelimiters is text.replace(/(\*\/|\/\*)/g, '*//*'): every "*/" and "/*", found left to
@@ -279,7 +283,8 @@ func startsLikeAProperty(value string) bool {
 func replaceCommentDelimiters(text string) string {
 	var result strings.Builder
 	for index := 0; index < len(text); index++ {
-		if index+1 < len(text) && ((text[index] == '*' && text[index+1] == '/') || (text[index] == '/' && text[index+1] == '*')) {
+		if index+1 < len(text) &&
+			((text[index] == '*' && text[index+1] == '/') || (text[index] == '/' && text[index+1] == '*')) {
 			result.WriteString("*//*")
 			index++
 			continue

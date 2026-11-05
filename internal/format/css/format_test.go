@@ -35,7 +35,12 @@ var formatCases = []formatCase{
 		source: "a>b~c+d   e{x:y}\nA:HOVER::BEFORE,.Class:not(.b,.c):nth-child(2N+1){x:y}\n" +
 			"[data-foo=bar],[data-foo='bar' i],[ data-x ],svg|a,*|*,|b,*{x:y}\na:is(.b , .c) > d:where(.e){x:y}\n" +
 			".a.b#c::after,ul li:first-child{x:y}\n:root{x:y}\na >>> b{x:y}\n.a\n.b{x:y}",
-		contains: []string{"a > b ~ c + d e", "A:hover::before,\n", ".Class:not(.b, .c):nth-child(2n + 1)", "[data-foo='bar' i]"},
+		contains: []string{
+			"a > b ~ c + d e",
+			"A:hover::before,\n",
+			".Class:not(.b, .c):nth-child(2n + 1)",
+			"[data-foo='bar' i]",
+		},
 	},
 	{
 		name: "a long selector list and a long compound selector break",
@@ -50,12 +55,21 @@ var formatCases = []formatCase{
 			"@media (min-width:640PX) and (max-width:1023.50px){a{x:y}}\n@media not all and (monochrome){a{x:y}}\n" +
 			"@media only screen   and (max-width : 100px){a{x:y}}\n@media (width>=600px){a{x:y}}\n@MEDIA print{a{x:y}}\n" +
 			"@media tv2.50,(min-resolution:2.00DPPX){a{x:y}}",
-		contains: []string{"@media screen and (min-width: 100px), print and (orientation: LANDSCAPE) {", "@media print {", "tv2.50,", "2dppx"},
+		contains: []string{
+			"@media screen and (min-width: 100px), print and (orientation: LANDSCAPE) {",
+			"@media print {",
+			"tv2.50,",
+			"2dppx",
+		},
 	},
 	{
-		name:     "@supports, @layer, @container and nesting",
-		source:   "@supports (display:grid) and (not (display:inline-grid)){a{x:y}}\n@supports (-webkit-touch-callout:none){a{x:y}}\n@layer base,components,utilities;\n@layer base{a{x:y}@media (min-width:1px){b{x:y}}}\n@container sidebar (min-width:400px){a{x:y}}",
-		contains: []string{"@supports (display: grid) and (not (display: inline-grid)) {", "@layer base,components,utilities;", "@layer base {\n"},
+		name:   "@supports, @layer, @container and nesting",
+		source: "@supports (display:grid) and (not (display:inline-grid)){a{x:y}}\n@supports (-webkit-touch-callout:none){a{x:y}}\n@layer base,components,utilities;\n@layer base{a{x:y}@media (min-width:1px){b{x:y}}}\n@container sidebar (min-width:400px){a{x:y}}",
+		contains: []string{
+			"@supports (display: grid) and (not (display: inline-grid)) {",
+			"@layer base,components,utilities;",
+			"@layer base {\n",
+		},
 	},
 	{
 		name: "Tailwind v4: @theme, @utility, @apply, @custom-variant, @config, @source, @import with source()",
@@ -84,7 +98,12 @@ var formatCases = []formatCase{
 		source: "/* top */\n/* second */a{/* first */color:red;/* between */\nbackground:blue; /* trailing */\n}\n" +
 			"a /* in selector */ b{x:y}\nb{margin:1px /* in value */ 2px}\n\n/* before at-rule */@media print{/* inside */}\n" +
 			"c{x:y}/* after rule */\n/* last */",
-		contains: []string{"/* top */\n/* second */\na {", "/* between */", "background: blue; /* trailing */", "/* last */\n"},
+		contains: []string{
+			"/* top */\n/* second */\na {",
+			"/* between */",
+			"background: blue; /* trailing */",
+			"/* last */\n",
+		},
 	},
 	{
 		name:     "prettier-ignore keeps the next node as written",
@@ -104,7 +123,9 @@ var formatCases = []formatCase{
 		name: "a long space-separated value fills its lines",
 		source: "a{mask:linear-gradient(black,transparent) center center / contain no-repeat border-box content-box alpha luminance add subtract intersect exclude;" +
 			"margin:var(--a-long-custom-property-name) var(--another-long-custom-property) var(--yet-another-long-property) var(--and-the-last-one-here)}",
-		contains: []string{"mask: linear-gradient(black, transparent) center center / contain no-repeat border-box content-box alpha luminance\n"},
+		contains: []string{
+			"mask: linear-gradient(black, transparent) center center / contain no-repeat border-box content-box alpha luminance\n",
+		},
 	},
 	{
 		name: "grid templates keep their rows on their lines",
@@ -188,12 +209,22 @@ func TestFormatMatchesTheFork(test *testing.T) {
 				test.Fatalf("%s (%s): the oracle failed: %v", testCase.name, optionsName, err)
 			}
 			if expected == testCase.source {
-				test.Fatalf("%s (%s): the oracle left the snippet unchanged, so an identity printer would pass", testCase.name, optionsName)
+				test.Fatalf(
+					"%s (%s): the oracle left the snippet unchanged, so an identity printer would pass",
+					testCase.name,
+					optionsName,
+				)
 			}
 			if optionsName == "defaults" {
 				for _, substring := range testCase.contains {
 					if !strings.Contains(expected, substring) {
-						test.Errorf("%s (%s): the fork's output lacks %q:\n%s", testCase.name, optionsName, substring, expected)
+						test.Errorf(
+							"%s (%s): the fork's output lacks %q:\n%s",
+							testCase.name,
+							optionsName,
+							substring,
+							expected,
+						)
 					}
 				}
 			}
@@ -259,7 +290,10 @@ func TestPrintToDocIsFormatWithoutTheTrailingHardline(test *testing.T) {
 		if err != nil {
 			test.Fatalf("%s: %v", testCase.name, err)
 		}
-		printed := doc.Print(document, doc.Options{PrintWidth: options.PrintWidth, TabWidth: options.TabWidth, UseTabs: options.UseTabs})
+		printed := doc.Print(
+			document,
+			doc.Options{PrintWidth: options.PrintWidth, TabWidth: options.TabWidth, UseTabs: options.UseTabs},
+		)
 		if printed != strings.TrimSuffix(formatted, "\n") {
 			test.Errorf("%s:\n--- Format\n%s--- PrintToDoc\n%s", testCase.name, formatted, printed)
 		}
@@ -283,11 +317,14 @@ func TestCorpusMatchesTheFork(test *testing.T) {
 			if err != nil {
 				return nil
 			}
-			if entry.IsDir() && (entry.Name() == "node_modules" || entry.Name() == ".git" || entry.Name() == "conversations") {
+			if entry.IsDir() &&
+				(entry.Name() == "node_modules" || entry.Name() == ".git" || entry.Name() == "conversations") {
 				return filepath.SkipDir
 			}
 			if !entry.IsDir() && strings.HasSuffix(path, ".css") &&
-				(strings.Contains(path, "theme/styles") || strings.HasSuffix(path, "OsKingdomGraph.css") || strings.HasSuffix(path, "fonts/inter/inter.css")) {
+				(strings.Contains(path, "theme/styles") ||
+					strings.HasSuffix(path, "OsKingdomGraph.css") ||
+					strings.HasSuffix(path, "fonts/inter/inter.css")) {
 				files = append(files, path)
 			}
 			return nil
@@ -323,15 +360,29 @@ func TestCorpusMatchesTheFork(test *testing.T) {
 					continue
 				}
 				if actual != expected {
-					test.Errorf("%s (%s): differs from the fork\n%s", file, optionsName, firstDifference(expected, actual))
+					test.Errorf(
+						"%s (%s): differs from the fork\n%s",
+						file,
+						optionsName,
+						firstDifference(expected, actual),
+					)
 				}
 			}
 		}
 	}
 	if rewritten < len(files)*len(formatOptionSets()) {
-		test.Errorf("the oracle rewrote only %d of %d inputs, so the corpus barely tests the printer", rewritten, 2*len(files)*len(formatOptionSets()))
+		test.Errorf(
+			"the oracle rewrote only %d of %d inputs, so the corpus barely tests the printer",
+			rewritten,
+			2*len(files)*len(formatOptionSets()),
+		)
 	}
-	test.Logf("%d corpus files, two variants each, under %d option sets; the oracle rewrote %d", len(files), len(formatOptionSets()), rewritten)
+	test.Logf(
+		"%d corpus files, two variants each, under %d option sets; the oracle rewrote %d",
+		len(files),
+		len(formatOptionSets()),
+		rewritten,
+	)
 }
 
 // stripIndentation removes every line's leading spaces and tabs.
@@ -398,7 +449,12 @@ func TestPrettierFixturesMatchTheFork(test *testing.T) {
 			default:
 				compared++
 				if actual != expected {
-					test.Errorf("%s (%s): differs from the fork\n%s", file, optionsName, firstDifference(expected, actual))
+					test.Errorf(
+						"%s (%s): differs from the fork\n%s",
+						file,
+						optionsName,
+						firstDifference(expected, actual),
+					)
 				}
 			}
 		}
@@ -467,7 +523,11 @@ var scssFormatCases = []formatCase{
 		source: "@mixin m($a,$b:10px,$args...){width:$a;height:$b}\n@mixin bare{x:y}\n" +
 			"a{@include m(1px,$b:2px);@include bare;@include m(1px, $list...);@include breakpoint(md){color:red}}\n" +
 			"@mixin rtl($property,$ltr-value,$rtl-value){#{$property}:$ltr-value;[dir=rtl] &{#{$property}:$rtl-value}}",
-		contains: []string{"@mixin m($a, $b: 10px, $args...) {", "@include m(1px, $b: 2px);", "@include breakpoint(md) {"},
+		contains: []string{
+			"@mixin m($a, $b: 10px, $args...) {",
+			"@include m(1px, $b: 2px);",
+			"@include breakpoint(md) {",
+		},
 	},
 	{
 		name: "@if, @else if and @else, at the top and in a rule, with comparison and boolean operators",
@@ -530,12 +590,22 @@ func TestFormatSCSSMatchesTheFork(test *testing.T) {
 				test.Fatalf("%s (%s): the oracle failed: %v", testCase.name, optionsName, err)
 			}
 			if expected == testCase.source {
-				test.Fatalf("%s (%s): the oracle left the snippet unchanged, so an identity printer would pass", testCase.name, optionsName)
+				test.Fatalf(
+					"%s (%s): the oracle left the snippet unchanged, so an identity printer would pass",
+					testCase.name,
+					optionsName,
+				)
 			}
 			if optionsName == "defaults" {
 				for _, substring := range testCase.contains {
 					if !strings.Contains(expected, substring) {
-						test.Errorf("%s (%s): the fork's output lacks %q:\n%s", testCase.name, optionsName, substring, expected)
+						test.Errorf(
+							"%s (%s): the fork's output lacks %q:\n%s",
+							testCase.name,
+							optionsName,
+							substring,
+							expected,
+						)
 					}
 				}
 			}
@@ -568,7 +638,10 @@ func TestFormatSCSSIsNotFormat(test *testing.T) {
 			test.Fatalf("%q: the oracle refused it as scss: %v", source, scssErr)
 		}
 		if cssErr == nil && asCSS == asSCSS {
-			test.Fatalf("%q: the oracle prints it the same as css and as scss, so it tells the parsers apart for nothing", source)
+			test.Fatalf(
+				"%q: the oracle prints it the same as css and as scss, so it tells the parsers apart for nothing",
+				source,
+			)
 		}
 		actualSCSS, err := FormatSCSS(source, formatoptions.Default())
 		if err != nil || actualSCSS != asSCSS {
@@ -594,7 +667,10 @@ func TestPrintToDocSCSSIsFormatSCSSWithoutTheTrailingHardline(test *testing.T) {
 		if err != nil {
 			test.Fatalf("%s: %v", testCase.name, err)
 		}
-		printed := doc.Print(document, doc.Options{PrintWidth: options.PrintWidth, TabWidth: options.TabWidth, UseTabs: options.UseTabs})
+		printed := doc.Print(
+			document,
+			doc.Options{PrintWidth: options.PrintWidth, TabWidth: options.TabWidth, UseTabs: options.UseTabs},
+		)
 		if printed != strings.TrimSuffix(formatted, "\n") {
 			test.Errorf("%s:\n--- FormatSCSS\n%s--- PrintToDocSCSS\n%s", testCase.name, formatted, printed)
 		}
@@ -659,17 +735,35 @@ func TestPrettierSCSSFixturesMatchTheFork(test *testing.T) {
 				if actual == expected {
 					matched++
 				} else {
-					test.Errorf("%s (%s): differs from the fork\n%s", file, optionsName, firstDifference(expected, actual))
+					test.Errorf(
+						"%s (%s): differs from the fork\n%s",
+						file,
+						optionsName,
+						firstDifference(expected, actual),
+					)
 				}
 			}
 		}
 		// The refusal threshold: an oracle or a printer that refuses everything cannot read as agreement,
 		// and fixtures the oracle leaves as written would let an identity printer through.
 		if compared < 80 || rewritten < 60 {
-			test.Errorf("%s: only %d fixtures were compared, %d rewritten by the fork (%d refused by both, %d set aside)",
-				optionsName, compared, rewritten, refusedByBoth, skipped)
+			test.Errorf(
+				"%s: only %d fixtures were compared, %d rewritten by the fork (%d refused by both, %d set aside)",
+				optionsName,
+				compared,
+				rewritten,
+				refusedByBoth,
+				skipped,
+			)
 		}
-		test.Logf("%s: %d of %d fixtures compared match the fork, %d of them rewritten (%d refused by both, %d set aside for yaml front matter)",
-			optionsName, matched, compared, rewritten, refusedByBoth, skipped)
+		test.Logf(
+			"%s: %d of %d fixtures compared match the fork, %d of them rewritten (%d refused by both, %d set aside for yaml front matter)",
+			optionsName,
+			matched,
+			compared,
+			rewritten,
+			refusedByBoth,
+			skipped,
+		)
 	}
 }

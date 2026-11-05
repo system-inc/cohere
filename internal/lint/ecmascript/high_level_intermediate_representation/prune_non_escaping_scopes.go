@@ -148,7 +148,9 @@ type memoizationCollector struct {
 }
 
 // resolve follows a `LoadLocal` indirection to the binding a value really names.
-func (collector *memoizationCollector) resolve(declaration static_single_assignment.DeclarationId) static_single_assignment.DeclarationId {
+func (collector *memoizationCollector) resolve(
+	declaration static_single_assignment.DeclarationId,
+) static_single_assignment.DeclarationId {
 	if target, found := collector.definitions[declaration]; found {
 		return target
 	}
@@ -256,13 +258,17 @@ func (collector *memoizationCollector) visitInstruction(instruction *ReactiveIns
 	case *CallExpression:
 		if IsHookCallee(collector.function, call.Callee.Identifier) {
 			for _, argument := range call.Args {
-				collector.graph.MarkEscaping(collector.resolve(declarationOf(collector.function, argument.Place.Identifier)))
+				collector.graph.MarkEscaping(
+					collector.resolve(declarationOf(collector.function, argument.Place.Identifier)),
+				)
 			}
 		}
 	case *MethodCall:
 		if IsHookCallee(collector.function, call.Property.Identifier) {
 			for _, argument := range call.Args {
-				collector.graph.MarkEscaping(collector.resolve(declarationOf(collector.function, argument.Place.Identifier)))
+				collector.graph.MarkEscaping(
+					collector.resolve(declarationOf(collector.function, argument.Place.Identifier)),
+				)
 			}
 		}
 	}
@@ -292,7 +298,10 @@ func (collector *memoizationCollector) associateChain(declaration static_single_
 }
 
 // associateScope records that a declaration belongs to one named scope.
-func (collector *memoizationCollector) associateScope(declaration static_single_assignment.DeclarationId, scope ScopeId) {
+func (collector *memoizationCollector) associateScope(
+	declaration static_single_assignment.DeclarationId,
+	scope ScopeId,
+) {
 	var scopeDependencies []static_single_assignment.DeclarationId
 	for _, dependency := range collector.dependencies.DependenciesOf(scope) {
 		scopeDependencies = append(scopeDependencies,
@@ -452,9 +461,14 @@ func (collector *memoizationCollector) eachMemoizationOperand(value ReactiveValu
 // early-return value: the memoized value is returned from inside it and `propagateEarlyReturns`
 // needs the scope standing. We have no early-return representation, so only the first half applies
 // and the second is why `PropagateEarlyReturns` is still open rather than declined.
-func prunePassOverScopes(tree *ReactiveFunction, function *Function,
-	dependencies *ScopeDependencies, memoized map[static_single_assignment.DeclarationId]bool,
-	prunedScopes map[ScopeId]bool, resolve func(static_single_assignment.DeclarationId) static_single_assignment.DeclarationId) int {
+func prunePassOverScopes(
+	tree *ReactiveFunction,
+	function *Function,
+	dependencies *ScopeDependencies,
+	memoized map[static_single_assignment.DeclarationId]bool,
+	prunedScopes map[ScopeId]bool,
+	resolve func(static_single_assignment.DeclarationId) static_single_assignment.DeclarationId,
+) int {
 	pruned := 0
 	TransformReactiveFunction(tree, ReactiveTransformer{
 		Scope: func(scope *ReactiveScopeBlock, traverse func()) ReactiveTransformed {

@@ -95,7 +95,11 @@ func parseTrees(test testing.TB, texts []string) []parsed {
 		test.Skip("node is not installed; the parser oracle needs it")
 	}
 	script := filepath.Join(test.TempDir(), "parse.mjs")
-	if writeError := os.WriteFile(script, []byte(strings.ReplaceAll(parseScript, "FORK", forkRoot(test))), 0o644); writeError != nil {
+	if writeError := os.WriteFile(
+		script,
+		[]byte(strings.ReplaceAll(parseScript, "FORK", forkRoot(test))),
+		0o644,
+	); writeError != nil {
 		test.Fatal(writeError)
 	}
 
@@ -182,8 +186,16 @@ func loadTree(node *jsonNode, offsets unitOffsets, parent *unist.Node) *unist.No
 	loaded := &unist.Node{
 		NodeType: node.Type,
 		Position: unist.Position{
-			Start: unist.Point{Line: node.Position.Start.Line, Column: node.Position.Start.Column, Offset: offsets.byteOffset(node.Position.Start.Offset)},
-			End:   unist.Point{Line: node.Position.End.Line, Column: node.Position.End.Column, Offset: offsets.byteOffset(node.Position.End.Offset)},
+			Start: unist.Point{
+				Line:   node.Position.Start.Line,
+				Column: node.Position.Start.Column,
+				Offset: offsets.byteOffset(node.Position.Start.Offset),
+			},
+			End: unist.Point{
+				Line:   node.Position.End.Line,
+				Column: node.Position.End.Column,
+				Offset: offsets.byteOffset(node.Position.End.Offset),
+			},
 		},
 		Parent:              parent,
 		Value:               node.Value,

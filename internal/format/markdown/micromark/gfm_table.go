@@ -607,7 +607,14 @@ func resolveGfmTable(events []Event, context *TokenizeContext) []Event {
 }
 
 // flushGfmTableCell is upstream's flushCell: generate a cell. A rowEnd of -1 is upstream's undefined.
-func flushGfmTableCell(editMap *gfmTableEditMap, context *TokenizeContext, cellRange gfmTableRange, rowKind gfmTableRowKind, rowEnd int, previousCell *Token) *Token {
+func flushGfmTableCell(
+	editMap *gfmTableEditMap,
+	context *TokenizeContext,
+	cellRange gfmTableRange,
+	rowKind gfmTableRowKind,
+	rowEnd int,
+	previousCell *Token,
+) *Token {
 	// `markdown-rs` uses:
 	// rowKind === 2 ? 'tableDelimiterCell' : 'tableCell'
 	groupName := typeTableData

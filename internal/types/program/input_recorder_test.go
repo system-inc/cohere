@@ -29,12 +29,20 @@ func TestInputRecorderRecordsAFileProbedAsADirectoryAsPresent(test *testing.T) {
 			test.Fatal(writeError)
 		}
 	}
-	write(filepath.Join(root, "tsconfig.json"), `{"compilerOptions":{"strict":true,"noEmit":true,"module":"esnext","moduleResolution":"bundler"},"include":["source"]}`)
-	write(filepath.Join(root, "source", "index.ts"), "import './style.css';\nimport { a } from './missing';\nexport const b = a;\n")
+	write(
+		filepath.Join(root, "tsconfig.json"),
+		`{"compilerOptions":{"strict":true,"noEmit":true,"module":"esnext","moduleResolution":"bundler"},"include":["source"]}`,
+	)
+	write(
+		filepath.Join(root, "source", "index.ts"),
+		"import './style.css';\nimport { a } from './missing';\nexport const b = a;\n",
+	)
 	write(filepath.Join(root, "source", "style.css"), "body {}\n")
 
 	recorder := program.NewInputRecorder()
-	if _, buildError := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json"), CurrentDirectory: root, Inputs: recorder}); buildError != nil {
+	if _, buildError := program.Build(
+		program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json"), CurrentDirectory: root, Inputs: recorder},
+	); buildError != nil {
 		test.Fatalf("build: %v", buildError)
 	}
 	present, absent, probed := recorder.Inputs()
@@ -51,7 +59,9 @@ func TestInputRecorderRecordsAFileProbedAsADirectoryAsPresent(test *testing.T) {
 
 	// The control: the recorder does record absence, or the loop above passes on an empty list.
 	if len(absent) == 0 {
-		test.Fatal("nothing was recorded absent, though ./missing was looked for and does not exist: the check above proved nothing")
+		test.Fatal(
+			"nothing was recorded absent, though ./missing was looked for and does not exist: the check above proved nothing",
+		)
 	}
 	if !slices.Contains(present, filepath.Join(root, "source", "index.ts")) {
 		test.Error("the source file the program read was not recorded present")
@@ -89,7 +99,10 @@ func TestADirectoryOnlyProbedIsRecordedForItsExistence(test *testing.T) {
 			test.Fatal(writeError)
 		}
 	}
-	write(filepath.Join(root, "tsconfig.json"), `{"compilerOptions":{"strict":true,"noEmit":true},"include":["**/*.ts"]}`)
+	write(
+		filepath.Join(root, "tsconfig.json"),
+		`{"compilerOptions":{"strict":true,"noEmit":true},"include":["**/*.ts"]}`,
+	)
 	write(filepath.Join(root, "index.ts"), "export const a: number = 1;\n")
 	if createDirectoryError := os.Mkdir(filepath.Join(root, "empty"), 0o755); createDirectoryError != nil {
 		test.Fatal(createDirectoryError)
@@ -97,7 +110,11 @@ func TestADirectoryOnlyProbedIsRecordedForItsExistence(test *testing.T) {
 	record := func() *program.RunCache {
 		test.Helper()
 		recorder := program.NewInputRecorder()
-		if _, buildError := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json"), CurrentDirectory: root, Inputs: recorder}); buildError != nil {
+		if _, buildError := program.Build(program.Options{
+			ConfigFileName:   filepath.Join(root, "tsconfig.json"),
+			CurrentDirectory: root,
+			Inputs:           recorder,
+		}); buildError != nil {
 			test.Fatalf("build: %v", buildError)
 		}
 		present, absent, probed := recorder.Inputs()
@@ -168,13 +185,21 @@ func TestRemovingAPackageWhoseProbeWasLeftOutStillMisses(test *testing.T) {
 			test.Fatal(writeError)
 		}
 	}
-	write(filepath.Join(root, "tsconfig.json"), `{"compilerOptions":{"strict":true,"noEmit":true,"module":"esnext","moduleResolution":"bundler"},"include":["source"]}`)
-	write(filepath.Join(root, "source", "index.ts"), "import { value } from 'pkg';\nexport const doubled: number = value * 2;\n")
+	write(
+		filepath.Join(root, "tsconfig.json"),
+		`{"compilerOptions":{"strict":true,"noEmit":true,"module":"esnext","moduleResolution":"bundler"},"include":["source"]}`,
+	)
+	write(
+		filepath.Join(root, "source", "index.ts"),
+		"import { value } from 'pkg';\nexport const doubled: number = value * 2;\n",
+	)
 	write(filepath.Join(root, "node_modules", "pkg", "package.json"), `{"name":"pkg","types":"index.d.ts"}`)
 	write(filepath.Join(root, "node_modules", "pkg", "index.d.ts"), "export declare const value: number;\n")
 
 	recorder := program.NewInputRecorder()
-	if _, buildError := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json"), CurrentDirectory: root, Inputs: recorder}); buildError != nil {
+	if _, buildError := program.Build(
+		program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json"), CurrentDirectory: root, Inputs: recorder},
+	); buildError != nil {
 		test.Fatalf("build: %v", buildError)
 	}
 	present, absent, probed := recorder.Inputs()

@@ -111,7 +111,11 @@ func TestTheContentPackNeverServesChangedBytes(test *testing.T) {
 				f.t.Fatal(statError)
 			}
 			f.write("a.ts", "export const a = 9;\n")
-			if changeTimesError := os.Chtimes(f.path("a.ts"), information.ModTime(), information.ModTime()); changeTimesError != nil {
+			if changeTimesError := os.Chtimes(
+				f.path("a.ts"),
+				information.ModTime(),
+				information.ModTime(),
+			); changeTimesError != nil {
 				f.t.Fatal(changeTimesError)
 			}
 			after, statAfterError := os.Stat(f.path("a.ts"))
@@ -128,7 +132,11 @@ func TestTheContentPackNeverServesChangedBytes(test *testing.T) {
 				f.t.Fatal(statError)
 			}
 			f.write("replacement.ts", "export const a = 9;\n")
-			if changeTimesError := os.Chtimes(f.path("replacement.ts"), information.ModTime(), information.ModTime()); changeTimesError != nil {
+			if changeTimesError := os.Chtimes(
+				f.path("replacement.ts"),
+				information.ModTime(),
+				information.ModTime(),
+			); changeTimesError != nil {
 				f.t.Fatal(changeTimesError)
 			}
 			if renameError := os.Rename(f.path("replacement.ts"), f.path("a.ts")); renameError != nil {
@@ -151,11 +159,22 @@ func TestTheContentPackNeverServesChangedBytes(test *testing.T) {
 				test.Fatal(readError)
 			}
 			if read["a.ts"] != string(want) || hits != 0 {
-				test.Fatalf("after %s the pack served %q (%d hits), and the disk holds %q", change.name, read["a.ts"], hits, want)
+				test.Fatalf(
+					"after %s the pack served %q (%d hits), and the disk holds %q",
+					change.name,
+					read["a.ts"],
+					hits,
+					want,
+				)
 			}
 			// And the new bytes are what the next run is served.
 			if read, hits, _, _ := fixture.run("a.ts"); read["a.ts"] != string(want) || hits != 1 {
-				test.Fatalf("the run after the change was served %q (%d hits), want %q from the pack", read["a.ts"], hits, want)
+				test.Fatalf(
+					"the run after the change was served %q (%d hits), want %q from the pack",
+					read["a.ts"],
+					hits,
+					want,
+				)
 			}
 		})
 	}
@@ -220,8 +239,15 @@ func TestADamagedContentPackIsReadAround(test *testing.T) {
 			if damage.damagedRead && damaged == 0 {
 				test.Errorf("the damage was read around without being counted, so the pack would not be rewritten")
 			}
-			if read, hits, _, damaged := fixture.run("a.ts", "b.ts"); hits+damaged == 0 || damaged != 0 || read["b.ts"] != "export const b = 2;\n" {
-				test.Fatalf("the run after the damage was served %d, found %d damaged: the pack was not rewritten sound", hits, damaged)
+			if read, hits, _, damaged := fixture.run(
+				"a.ts",
+				"b.ts",
+			); hits+damaged == 0 || damaged != 0 || read["b.ts"] != "export const b = 2;\n" {
+				test.Fatalf(
+					"the run after the damage was served %d, found %d damaged: the pack was not rewritten sound",
+					hits,
+					damaged,
+				)
 			}
 			_ = hits
 		})
@@ -316,6 +342,9 @@ func TestAServedFileIsAViewOfTheMappingThatOutlivesThePack(test *testing.T) {
 	runtime.GC()
 	runtime.GC()
 	if served != want {
-		test.Fatalf("a served file read after its pack was collected holds %d bytes that differ from the file's", len(served))
+		test.Fatalf(
+			"a served file read after its pack was collected holds %d bytes that differ from the file's",
+			len(served),
+		)
 	}
 }

@@ -482,13 +482,16 @@ func reportClassLiteralFieldsShouldBeGetters(ruleContext rule.Context, members [
 		replacement := classLiteralPrintModifiers(member, "get") + nameText +
 			"() { return " + valueText + "; }"
 
-		ruleContext.ReportNodeWithSuggestions(classLiteralReportedKey(name), messageClassLiteralPropertyStylePreferGetter(),
+		ruleContext.ReportNodeWithSuggestions(
+			classLiteralReportedKey(name),
+			messageClassLiteralPropertyStylePreferGetter(),
 			rule.Suggestion{
 				Message: messageClassLiteralPropertyStylePreferGetterSuggestion(),
 				Fixes: []rule.Fix{
 					rule.ReplaceRange(rule.TokenRange(ruleContext.SourceFile, member), replacement),
 				},
-			})
+			},
+		)
 	}
 }
 
@@ -501,7 +504,11 @@ func reportClassLiteralFieldsShouldBeGetters(ruleContext rule.Context, members [
 // the same set without the upward walk.
 //
 // Mutates: excluded the caller builds one exclusion set across every constructor of the class
-func classLiteralCollectConstructorAssignments(ruleContext rule.Context, constructor *ast.Node, excluded map[string]bool) {
+func classLiteralCollectConstructorAssignments(
+	ruleContext rule.Context,
+	constructor *ast.Node,
+	excluded map[string]bool,
+) {
 	body := constructor.AsConstructorDeclaration().Body
 	if body == nil {
 		return
@@ -598,7 +605,10 @@ func classLiteralHasMatchingSetter(ruleContext rule.Context, getter *ast.Node, n
 		if memberName == nil {
 			continue
 		}
-		if otherKey, otherKeyed := classLiteralStaticMemberAccessValue(ruleContext, memberName); otherKeyed && otherKey == key {
+		if otherKey, otherKeyed := classLiteralStaticMemberAccessValue(
+			ruleContext,
+			memberName,
+		); otherKeyed && otherKey == key {
 			return true
 		}
 	}
@@ -774,9 +784,9 @@ func classLiteralIsSupportedLiteral(node *ast.Node) bool {
 //
 // Upstream concatenates the accessibility keyword, then `static` when present, then the final
 // keyword, and trims the leading space that a missing accessibility leaves behind. So a member with
-// neither modifier produces `readonly ` and one with both produces `public static readonly `. Only accessibility and `static` are carried: `abstract`, `declare` and
-// `override` are all excluded by a guard before this is reached, and `readonly` on a field is being
-// replaced rather than preserved.
+// neither modifier produces `readonly ` and one with both produces `public static readonly `. Only accessibility and
+// `static` are carried: `abstract`, `declare` and `override` are all excluded by a guard before this is reached, and
+// `readonly` on a field is being replaced rather than preserved.
 func classLiteralPrintModifiers(node *ast.Node, final string) string {
 	var builder strings.Builder
 

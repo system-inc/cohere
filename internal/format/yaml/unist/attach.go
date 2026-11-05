@@ -25,7 +25,8 @@ func (context *context) attachComments(root *Node) {
 		}
 	}
 	for _, comment := range unattached {
-		for len(restDocuments) > 1 && context.position(comment).start.line > context.position(restDocuments[0]).end.line {
+		for len(restDocuments) > 1 &&
+			context.position(comment).start.line > context.position(restDocuments[0]).end.line {
 			restDocuments = restDocuments[1:]
 		}
 		context.attachComment(comment, nodeTable, restDocuments[0])
@@ -280,7 +281,12 @@ func (context *context) updatePositions(node *Node) {
 
 // createUpdater is utils/create-updater.mjs: reduced is read from the host once, when the updater is
 // made.
-func createUpdater(host *position, getter func(*position) *point, setter func(*position, *point), shouldUpdate func(reduced *point, value *point) bool) func(value *point) {
+func createUpdater(
+	host *position,
+	getter func(*position) *point,
+	setter func(*position, *point),
+	shouldUpdate func(reduced *point, value *point) bool,
+) func(value *point) {
 	reduced := getter(host)
 	return func(value *point) {
 		if shouldUpdate(reduced, value) {

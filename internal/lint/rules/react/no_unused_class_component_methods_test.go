@@ -42,28 +42,141 @@ func TestNoUnusedClassComponentMethodsFires(test *testing.T) {
 		wantIds    []string
 		wantTexts  []string
 	}{
-		{"upstream invalid-0", "\n        class Foo extends React.Component {\n          getDerivedStateFromProps() {}\n          render() {\n            return <div>Example</div>;\n          }\n        }\n      ", []string{"unusedWithClass"}, []string{"Unused method or property \"getDerivedStateFromProps\" of class \"Foo\""}},
-		{"upstream invalid-1", "\n        class Foo extends React.Component {\n          property = {}\n          render() {\n            return <div>Example</div>;\n          }\n        }\n      ", []string{"unusedWithClass"}, []string{"Unused method or property \"property\" of class \"Foo\""}},
-		{"upstream invalid-2", "\n        class Foo extends React.Component {\n          handleClick() {}\n          render() {\n            return null;\n          }\n        }\n      ", []string{"unusedWithClass"}, []string{"Unused method or property \"handleClick\" of class \"Foo\""}},
-		{"upstream invalid-3", "\n        var Foo = createReactClass({\n          handleClick() {},\n          render() {\n            return null;\n          },\n        })\n      ", []string{"unused"}, []string{"Unused method or property \"handleClick\""}},
-		{"upstream invalid-4", "\n        var Foo = createReactClass({\n          a: 3,\n          render() {\n            return null;\n          },\n        })\n      ", []string{"unused"}, []string{"Unused method or property \"a\""}},
-		{"upstream invalid-5", "\n        class Foo extends React.Component {\n          handleScroll() {}\n          handleClick() {}\n          render() {\n            return null;\n          }\n        }\n      ", []string{"unusedWithClass", "unusedWithClass"}, []string{"Unused method or property \"handleScroll\" of class \"Foo\"", "Unused method or property \"handleClick\" of class \"Foo\""}},
-		{"upstream invalid-6", "\n        class Foo extends React.Component {\n          handleClick = () => {}\n          render() {\n            return null;\n          }\n        }\n      ", []string{"unusedWithClass"}, []string{"Unused method or property \"handleClick\" of class \"Foo\""}},
-		{"upstream invalid-7", "\n        class Foo extends React.Component {\n          action = async () => {}\n          render() {\n            return null;\n          }\n        }\n      ", []string{"unusedWithClass"}, []string{"Unused method or property \"action\" of class \"Foo\""}},
-		{"upstream invalid-8", "\n        class Foo extends React.Component {\n          async action() {\n            console.log('error');\n          }\n          render() {\n            return null;\n          }\n        }\n      ", []string{"unusedWithClass"}, []string{"Unused method or property \"action\" of class \"Foo\""}},
-		{"upstream invalid-9", "\n        class Foo extends React.Component {\n          * action() {\n            console.log('error');\n          }\n          render() {\n            return null;\n          }\n        }\n      ", []string{"unusedWithClass"}, []string{"Unused method or property \"action\" of class \"Foo\""}},
-		{"upstream invalid-10", "\n        class Foo extends React.Component {\n          async * action() {\n            console.log('error');\n          }\n          render() {\n            return null;\n          }\n        }\n      ", []string{"unusedWithClass"}, []string{"Unused method or property \"action\" of class \"Foo\""}},
-		{"upstream invalid-11", "\n        class Foo extends React.Component {\n          getInitialState() {}\n          render() {\n            return null;\n          }\n        }\n      ", []string{"unusedWithClass"}, []string{"Unused method or property \"getInitialState\" of class \"Foo\""}},
-		{"upstream invalid-12", "\n        class Foo extends React.Component {\n          action = function() {\n            console.log('error');\n          }\n          render() {\n            return null;\n          }\n        }\n      ", []string{"unusedWithClass"}, []string{"Unused method or property \"action\" of class \"Foo\""}},
-		{"upstream invalid-13", "\n         class ClassAssignPropertyInMethodTest extends React.Component {\n           constructor() {\n             this.foo = 3;\n           }\n           render() {\n             return <SomeComponent />;\n           }\n         }\n       ", []string{"unusedWithClass"}, []string{"Unused method or property \"foo\" of class \"ClassAssignPropertyInMethodTest\""}},
-		{"upstream invalid-14", "\n         class Foo extends React.Component {\n           foo;\n           render() {\n             return <SomeComponent />;\n           }\n         }\n       ", []string{"unusedWithClass"}, []string{"Unused method or property \"foo\" of class \"Foo\""}},
-		{"upstream invalid-15", "\n         class Foo extends React.Component {\n           foo = a;\n           render() {\n             return <SomeComponent />;\n           }\n         }\n       ", []string{"unusedWithClass"}, []string{"Unused method or property \"foo\" of class \"Foo\""}},
-		{"upstream invalid-16", "\n         class Foo extends React.Component {\n           ['foo'];\n           render() {\n             return <SomeComponent />;\n           }\n         }\n       ", []string{"unusedWithClass"}, []string{"Unused method or property \"foo\" of class \"Foo\""}},
-		{"upstream invalid-17", "\n         class Foo extends React.Component {\n           ['foo'] = a;\n           render() {\n             return <SomeComponent />;\n           }\n         }\n       ", []string{"unusedWithClass"}, []string{"Unused method or property \"foo\" of class \"Foo\""}},
-		{"upstream invalid-18", "\n         class Foo extends React.Component {\n           foo = a;\n           render() {\n             return <SomeComponent foo={this[foo]} />;\n           }\n         }\n       ", []string{"unusedWithClass"}, []string{"Unused method or property \"foo\" of class \"Foo\""}},
-		{"upstream invalid-19", "\n         class Foo extends React.Component {\n           private foo;\n           render() {\n             return <SomeComponent />;\n           }\n         }\n       ", []string{"unusedWithClass"}, []string{"Unused method or property \"foo\" of class \"Foo\""}},
-		{"upstream invalid-20", "\n         class Foo extends React.Component {\n           private foo() {}\n           render() {\n             return <SomeComponent />;\n           }\n         }\n       ", []string{"unusedWithClass"}, []string{"Unused method or property \"foo\" of class \"Foo\""}},
-		{"upstream invalid-21", "\n         class Foo extends React.Component {\n           private foo = 3;\n           render() {\n             return <SomeComponent />;\n           }\n         }\n       ", []string{"unusedWithClass"}, []string{"Unused method or property \"foo\" of class \"Foo\""}},
+		{
+			"upstream invalid-0",
+			"\n        class Foo extends React.Component {\n          getDerivedStateFromProps() {}\n          render() {\n            return <div>Example</div>;\n          }\n        }\n      ",
+			[]string{"unusedWithClass"},
+			[]string{"Unused method or property \"getDerivedStateFromProps\" of class \"Foo\""},
+		},
+		{
+			"upstream invalid-1",
+			"\n        class Foo extends React.Component {\n          property = {}\n          render() {\n            return <div>Example</div>;\n          }\n        }\n      ",
+			[]string{"unusedWithClass"},
+			[]string{"Unused method or property \"property\" of class \"Foo\""},
+		},
+		{
+			"upstream invalid-2",
+			"\n        class Foo extends React.Component {\n          handleClick() {}\n          render() {\n            return null;\n          }\n        }\n      ",
+			[]string{"unusedWithClass"},
+			[]string{"Unused method or property \"handleClick\" of class \"Foo\""},
+		},
+		{
+			"upstream invalid-3",
+			"\n        var Foo = createReactClass({\n          handleClick() {},\n          render() {\n            return null;\n          },\n        })\n      ",
+			[]string{"unused"},
+			[]string{"Unused method or property \"handleClick\""},
+		},
+		{
+			"upstream invalid-4",
+			"\n        var Foo = createReactClass({\n          a: 3,\n          render() {\n            return null;\n          },\n        })\n      ",
+			[]string{"unused"},
+			[]string{"Unused method or property \"a\""},
+		},
+		{
+			"upstream invalid-5",
+			"\n        class Foo extends React.Component {\n          handleScroll() {}\n          handleClick() {}\n          render() {\n            return null;\n          }\n        }\n      ",
+			[]string{"unusedWithClass", "unusedWithClass"},
+			[]string{
+				"Unused method or property \"handleScroll\" of class \"Foo\"",
+				"Unused method or property \"handleClick\" of class \"Foo\"",
+			},
+		},
+		{
+			"upstream invalid-6",
+			"\n        class Foo extends React.Component {\n          handleClick = () => {}\n          render() {\n            return null;\n          }\n        }\n      ",
+			[]string{"unusedWithClass"},
+			[]string{"Unused method or property \"handleClick\" of class \"Foo\""},
+		},
+		{
+			"upstream invalid-7",
+			"\n        class Foo extends React.Component {\n          action = async () => {}\n          render() {\n            return null;\n          }\n        }\n      ",
+			[]string{"unusedWithClass"},
+			[]string{"Unused method or property \"action\" of class \"Foo\""},
+		},
+		{
+			"upstream invalid-8",
+			"\n        class Foo extends React.Component {\n          async action() {\n            console.log('error');\n          }\n          render() {\n            return null;\n          }\n        }\n      ",
+			[]string{"unusedWithClass"},
+			[]string{"Unused method or property \"action\" of class \"Foo\""},
+		},
+		{
+			"upstream invalid-9",
+			"\n        class Foo extends React.Component {\n          * action() {\n            console.log('error');\n          }\n          render() {\n            return null;\n          }\n        }\n      ",
+			[]string{"unusedWithClass"},
+			[]string{"Unused method or property \"action\" of class \"Foo\""},
+		},
+		{
+			"upstream invalid-10",
+			"\n        class Foo extends React.Component {\n          async * action() {\n            console.log('error');\n          }\n          render() {\n            return null;\n          }\n        }\n      ",
+			[]string{"unusedWithClass"},
+			[]string{"Unused method or property \"action\" of class \"Foo\""},
+		},
+		{
+			"upstream invalid-11",
+			"\n        class Foo extends React.Component {\n          getInitialState() {}\n          render() {\n            return null;\n          }\n        }\n      ",
+			[]string{"unusedWithClass"},
+			[]string{"Unused method or property \"getInitialState\" of class \"Foo\""},
+		},
+		{
+			"upstream invalid-12",
+			"\n        class Foo extends React.Component {\n          action = function() {\n            console.log('error');\n          }\n          render() {\n            return null;\n          }\n        }\n      ",
+			[]string{"unusedWithClass"},
+			[]string{"Unused method or property \"action\" of class \"Foo\""},
+		},
+		{
+			"upstream invalid-13",
+			"\n         class ClassAssignPropertyInMethodTest extends React.Component {\n           constructor() {\n             this.foo = 3;\n           }\n           render() {\n             return <SomeComponent />;\n           }\n         }\n       ",
+			[]string{"unusedWithClass"},
+			[]string{"Unused method or property \"foo\" of class \"ClassAssignPropertyInMethodTest\""},
+		},
+		{
+			"upstream invalid-14",
+			"\n         class Foo extends React.Component {\n           foo;\n           render() {\n             return <SomeComponent />;\n           }\n         }\n       ",
+			[]string{"unusedWithClass"},
+			[]string{"Unused method or property \"foo\" of class \"Foo\""},
+		},
+		{
+			"upstream invalid-15",
+			"\n         class Foo extends React.Component {\n           foo = a;\n           render() {\n             return <SomeComponent />;\n           }\n         }\n       ",
+			[]string{"unusedWithClass"},
+			[]string{"Unused method or property \"foo\" of class \"Foo\""},
+		},
+		{
+			"upstream invalid-16",
+			"\n         class Foo extends React.Component {\n           ['foo'];\n           render() {\n             return <SomeComponent />;\n           }\n         }\n       ",
+			[]string{"unusedWithClass"},
+			[]string{"Unused method or property \"foo\" of class \"Foo\""},
+		},
+		{
+			"upstream invalid-17",
+			"\n         class Foo extends React.Component {\n           ['foo'] = a;\n           render() {\n             return <SomeComponent />;\n           }\n         }\n       ",
+			[]string{"unusedWithClass"},
+			[]string{"Unused method or property \"foo\" of class \"Foo\""},
+		},
+		{
+			"upstream invalid-18",
+			"\n         class Foo extends React.Component {\n           foo = a;\n           render() {\n             return <SomeComponent foo={this[foo]} />;\n           }\n         }\n       ",
+			[]string{"unusedWithClass"},
+			[]string{"Unused method or property \"foo\" of class \"Foo\""},
+		},
+		{
+			"upstream invalid-19",
+			"\n         class Foo extends React.Component {\n           private foo;\n           render() {\n             return <SomeComponent />;\n           }\n         }\n       ",
+			[]string{"unusedWithClass"},
+			[]string{"Unused method or property \"foo\" of class \"Foo\""},
+		},
+		{
+			"upstream invalid-20",
+			"\n         class Foo extends React.Component {\n           private foo() {}\n           render() {\n             return <SomeComponent />;\n           }\n         }\n       ",
+			[]string{"unusedWithClass"},
+			[]string{"Unused method or property \"foo\" of class \"Foo\""},
+		},
+		{
+			"upstream invalid-21",
+			"\n         class Foo extends React.Component {\n           private foo = 3;\n           render() {\n             return <SomeComponent />;\n           }\n         }\n       ",
+			[]string{"unusedWithClass"},
+			[]string{"Unused method or property \"foo\" of class \"Foo\""},
+		},
 	}
 
 	for _, testCase := range cases {
@@ -92,42 +205,150 @@ func TestNoUnusedClassComponentMethodsStaysSilent(test *testing.T) {
 		name       string
 		sourceText string
 	}{
-		{"upstream valid-0", "\n        class SmockTestForTypeOfNullError extends React.Component {\n          handleClick() {}\n          foo;\n          render() {\n            let a;\n            return <button disabled onClick={this.handleClick} foo={this.foo}>Text</button>;\n          }\n        }\n      "},
-		{"upstream valid-1", "\n        class Foo extends React.Component {\n          handleClick() {}\n          render() {\n            return <button onClick={this.handleClick}>Text</button>;\n          }\n        }\n      "},
-		{"upstream valid-2", "\n        var Foo = createReactClass({\n          handleClick() {},\n          render() {\n            return <button onClick={this.handleClick}>Text</button>;\n          },\n        })\n      "},
-		{"upstream valid-3", "\n        class Foo extends React.Component {\n          action() {}\n          componentDidMount() {\n            this.action();\n          }\n          render() {\n            return null;\n          }\n        }\n      "},
-		{"upstream valid-4", "\n        var Foo = createReactClass({\n          action() {},\n          componentDidMount() {\n            this.action();\n          },\n          render() {\n            return null;\n          },\n        })\n      "},
-		{"upstream valid-5", "\n        class Foo extends React.Component {\n          action() {}\n          componentDidMount() {\n            const action = this.action;\n            action();\n          }\n          render() {\n            return null;\n          }\n        }\n      "},
-		{"upstream valid-6", "\n        class Foo extends React.Component {\n          getValue() {}\n          componentDidMount() {\n            const action = this.getValue();\n          }\n          render() {\n            return null;\n          }\n        }\n      "},
-		{"upstream valid-7", "\n        class Foo extends React.Component {\n          handleClick = () => {}\n          render() {\n            return <button onClick={this.handleClick}>Button</button>;\n          }\n        }\n      "},
-		{"upstream valid-8", "\n        class Foo extends React.Component {\n          renderContent() {}\n          render() {\n            return <div>{this.renderContent()}</div>;\n          }\n        }\n      "},
-		{"upstream valid-9", "\n        class Foo extends React.Component {\n          renderContent() {}\n          render() {\n            return (\n              <div>\n                <div>{this.renderContent()}</div>;\n              </div>\n            );\n          }\n        }\n      "},
-		{"upstream valid-10", "\n        class Foo extends React.Component {\n          property = {}\n          render() {\n            return <div property={this.property}>Example</div>;\n          }\n        }\n      "},
-		{"upstream valid-11", "\n        class Foo extends React.Component {\n          action = () => {}\n          anotherAction = () => {\n            this.action();\n          }\n          render() {\n            return <button onClick={this.anotherAction}>Example</button>;\n          }\n        }\n      "},
-		{"upstream valid-12", "\n        class Foo extends React.Component {\n          action = () => {}\n          anotherAction = () => this.action()\n          render() {\n            return <button onClick={this.anotherAction}>Example</button>;\n          }\n        }\n      "},
-		{"upstream valid-13", "\n        class Foo extends React.Component {\n          getValue = () => {}\n          value = this.getValue()\n          render() {\n            return this.value;\n          }\n        }\n      "},
-		{"upstream valid-14", "\n        class Foo {\n          action = () => {}\n          anotherAction = () => this.action()\n        }\n      "},
-		{"upstream valid-15", "\n        class Foo extends React.Component {\n          action = async () => {}\n          render() {\n            return <button onClick={this.action}>Click</button>;\n          }\n        }\n      "},
-		{"upstream valid-16", "\n        class Foo extends React.Component {\n          async action() {\n            console.log('error');\n          }\n          render() {\n            return <button onClick={() => this.action()}>Click</button>;\n          }\n        }\n      "},
-		{"upstream valid-17", "\n        class Foo extends React.Component {\n          * action() {\n            console.log('error');\n          }\n          render() {\n            return <button onClick={() => this.action()}>Click</button>;\n          }\n        }\n      "},
-		{"upstream valid-18", "\n        class Foo extends React.Component {\n          async * action() {\n            console.log('error');\n          }\n          render() {\n            return <button onClick={() => this.action()}>Click</button>;\n          }\n        }\n      "},
-		{"upstream valid-19", "\n        class Foo extends React.Component {\n          action = function() {\n            console.log('error');\n          }\n          render() {\n            return <button onClick={() => this.action()}>Click</button>;\n          }\n        }\n      "},
-		{"upstream valid-20", "\n        class ClassAssignPropertyInMethodTest extends React.Component {\n          constructor() {\n            this.foo = 3;;\n          }\n          render() {\n            return <SomeComponent foo={this.foo} />;\n          }\n        }\n      "},
-		{"upstream valid-21", "\n        class ClassPropertyTest extends React.Component {\n          foo;\n          render() {\n            return <SomeComponent foo={this.foo} />;\n          }\n        }\n      "},
-		{"upstream valid-22", "\n        class ClassPropertyTest extends React.Component {\n          foo = a;\n          render() {\n            return <SomeComponent foo={this.foo} />;\n          }\n        }\n      "},
-		{"upstream valid-23", "\n        class Foo extends React.Component {\n          ['foo'] = a;\n          render() {\n            return <SomeComponent foo={this['foo']} />;\n          }\n        }\n      "},
-		{"upstream valid-24", "\n        class Foo extends React.Component {\n          ['foo'];\n          render() {\n            return <SomeComponent foo={this['foo']} />;\n          }\n        }\n      "},
-		{"upstream valid-25", "\n        class ClassComputedTemplatePropertyTest extends React.Component {\n          [`foo`] = a;\n          render() {\n            return <SomeComponent foo={this[`foo`]} />;\n          }\n        }\n      "},
-		{"upstream valid-26", "\n        class ClassComputedTemplatePropertyTest extends React.Component {\n          state = {}\n          render() {\n            return <div />;\n          }\n        }\n      "},
-		{"upstream valid-27", "\n        class ClassLiteralComputedMemberTest extends React.Component {\n          ['foo']() {}\n          render() {\n            return <SomeComponent foo={this.foo} />;\n          }\n        }\n      "},
-		{"upstream valid-28", "\n        class ClassComputedTemplateMemberTest extends React.Component {\n          [`foo`]() {}\n          render() {\n            return <SomeComponent foo={this.foo} />;\n          }\n        }\n      "},
-		{"upstream valid-29", "\n        class ClassUseAssignTest extends React.Component {\n          foo() {}\n          render() {\n            this.foo;\n            return <SomeComponent />;\n          }\n        }\n      "},
-		{"upstream valid-30", "\n        class ClassUseAssignTest extends React.Component {\n          foo() {}\n          render() {\n            const { foo } = this;\n            return <SomeComponent />;\n          }\n        }\n      "},
-		{"upstream valid-31", "\n        class ClassUseDestructuringTest extends React.Component {\n          foo() {}\n          render() {\n            const { foo } = this;\n            return <SomeComponent />;\n          }\n        }\n      "},
-		{"upstream valid-32", "\n        class ClassUseDestructuringTest extends React.Component {\n          ['foo']() {}\n          render() {\n            const { 'foo': bar } = this;\n            return <SomeComponent />;\n          }\n        }\n      "},
-		{"upstream valid-33", "\n        class ClassComputedMemberTest extends React.Component {\n          [foo]() {}\n          render() {\n            return <SomeComponent />;\n          }\n        }\n      "},
-		{"upstream valid-34", "\n        class ClassWithLifecyleTest extends React.Component {\n          constructor(props) {\n            super(props);\n          }\n          static getDerivedStateFromProps() {}\n          componentWillMount() {}\n          UNSAFE_componentWillMount() {}\n          componentDidMount() {}\n          componentWillReceiveProps() {}\n          UNSAFE_componentWillReceiveProps() {}\n          shouldComponentUpdate() {}\n          componentWillUpdate() {}\n          UNSAFE_componentWillUpdate() {}\n          static getSnapshotBeforeUpdate() {}\n          componentDidUpdate() {}\n          componentDidCatch() {}\n          componentWillUnmount() {}\n          getChildContext() {}\n          render() {\n            return <SomeComponent />;\n          }\n        }\n      "},
-		{"upstream valid-35", "\n        var ClassWithLifecyleTest = createReactClass({\n          mixins: [],\n          constructor(props) {\n          },\n          getDefaultProps() {\n            return {}\n          },\n          getInitialState: function() {\n            return {x: 0};\n          },\n          componentWillMount() {},\n          UNSAFE_componentWillMount() {},\n          componentDidMount() {},\n          componentWillReceiveProps() {},\n          UNSAFE_componentWillReceiveProps() {},\n          shouldComponentUpdate() {},\n          componentWillUpdate() {},\n          UNSAFE_componentWillUpdate() {},\n          componentDidUpdate() {},\n          componentDidCatch() {},\n          componentWillUnmount() {},\n          getChildContext() {},\n          render() {\n            return <SomeComponent />;\n          },\n        })\n      "},
+		{
+			"upstream valid-0",
+			"\n        class SmockTestForTypeOfNullError extends React.Component {\n          handleClick() {}\n          foo;\n          render() {\n            let a;\n            return <button disabled onClick={this.handleClick} foo={this.foo}>Text</button>;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid-1",
+			"\n        class Foo extends React.Component {\n          handleClick() {}\n          render() {\n            return <button onClick={this.handleClick}>Text</button>;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid-2",
+			"\n        var Foo = createReactClass({\n          handleClick() {},\n          render() {\n            return <button onClick={this.handleClick}>Text</button>;\n          },\n        })\n      ",
+		},
+		{
+			"upstream valid-3",
+			"\n        class Foo extends React.Component {\n          action() {}\n          componentDidMount() {\n            this.action();\n          }\n          render() {\n            return null;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid-4",
+			"\n        var Foo = createReactClass({\n          action() {},\n          componentDidMount() {\n            this.action();\n          },\n          render() {\n            return null;\n          },\n        })\n      ",
+		},
+		{
+			"upstream valid-5",
+			"\n        class Foo extends React.Component {\n          action() {}\n          componentDidMount() {\n            const action = this.action;\n            action();\n          }\n          render() {\n            return null;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid-6",
+			"\n        class Foo extends React.Component {\n          getValue() {}\n          componentDidMount() {\n            const action = this.getValue();\n          }\n          render() {\n            return null;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid-7",
+			"\n        class Foo extends React.Component {\n          handleClick = () => {}\n          render() {\n            return <button onClick={this.handleClick}>Button</button>;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid-8",
+			"\n        class Foo extends React.Component {\n          renderContent() {}\n          render() {\n            return <div>{this.renderContent()}</div>;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid-9",
+			"\n        class Foo extends React.Component {\n          renderContent() {}\n          render() {\n            return (\n              <div>\n                <div>{this.renderContent()}</div>;\n              </div>\n            );\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid-10",
+			"\n        class Foo extends React.Component {\n          property = {}\n          render() {\n            return <div property={this.property}>Example</div>;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid-11",
+			"\n        class Foo extends React.Component {\n          action = () => {}\n          anotherAction = () => {\n            this.action();\n          }\n          render() {\n            return <button onClick={this.anotherAction}>Example</button>;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid-12",
+			"\n        class Foo extends React.Component {\n          action = () => {}\n          anotherAction = () => this.action()\n          render() {\n            return <button onClick={this.anotherAction}>Example</button>;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid-13",
+			"\n        class Foo extends React.Component {\n          getValue = () => {}\n          value = this.getValue()\n          render() {\n            return this.value;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid-14",
+			"\n        class Foo {\n          action = () => {}\n          anotherAction = () => this.action()\n        }\n      ",
+		},
+		{
+			"upstream valid-15",
+			"\n        class Foo extends React.Component {\n          action = async () => {}\n          render() {\n            return <button onClick={this.action}>Click</button>;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid-16",
+			"\n        class Foo extends React.Component {\n          async action() {\n            console.log('error');\n          }\n          render() {\n            return <button onClick={() => this.action()}>Click</button>;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid-17",
+			"\n        class Foo extends React.Component {\n          * action() {\n            console.log('error');\n          }\n          render() {\n            return <button onClick={() => this.action()}>Click</button>;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid-18",
+			"\n        class Foo extends React.Component {\n          async * action() {\n            console.log('error');\n          }\n          render() {\n            return <button onClick={() => this.action()}>Click</button>;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid-19",
+			"\n        class Foo extends React.Component {\n          action = function() {\n            console.log('error');\n          }\n          render() {\n            return <button onClick={() => this.action()}>Click</button>;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid-20",
+			"\n        class ClassAssignPropertyInMethodTest extends React.Component {\n          constructor() {\n            this.foo = 3;;\n          }\n          render() {\n            return <SomeComponent foo={this.foo} />;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid-21",
+			"\n        class ClassPropertyTest extends React.Component {\n          foo;\n          render() {\n            return <SomeComponent foo={this.foo} />;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid-22",
+			"\n        class ClassPropertyTest extends React.Component {\n          foo = a;\n          render() {\n            return <SomeComponent foo={this.foo} />;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid-23",
+			"\n        class Foo extends React.Component {\n          ['foo'] = a;\n          render() {\n            return <SomeComponent foo={this['foo']} />;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid-24",
+			"\n        class Foo extends React.Component {\n          ['foo'];\n          render() {\n            return <SomeComponent foo={this['foo']} />;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid-25",
+			"\n        class ClassComputedTemplatePropertyTest extends React.Component {\n          [`foo`] = a;\n          render() {\n            return <SomeComponent foo={this[`foo`]} />;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid-26",
+			"\n        class ClassComputedTemplatePropertyTest extends React.Component {\n          state = {}\n          render() {\n            return <div />;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid-27",
+			"\n        class ClassLiteralComputedMemberTest extends React.Component {\n          ['foo']() {}\n          render() {\n            return <SomeComponent foo={this.foo} />;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid-28",
+			"\n        class ClassComputedTemplateMemberTest extends React.Component {\n          [`foo`]() {}\n          render() {\n            return <SomeComponent foo={this.foo} />;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid-29",
+			"\n        class ClassUseAssignTest extends React.Component {\n          foo() {}\n          render() {\n            this.foo;\n            return <SomeComponent />;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid-30",
+			"\n        class ClassUseAssignTest extends React.Component {\n          foo() {}\n          render() {\n            const { foo } = this;\n            return <SomeComponent />;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid-31",
+			"\n        class ClassUseDestructuringTest extends React.Component {\n          foo() {}\n          render() {\n            const { foo } = this;\n            return <SomeComponent />;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid-32",
+			"\n        class ClassUseDestructuringTest extends React.Component {\n          ['foo']() {}\n          render() {\n            const { 'foo': bar } = this;\n            return <SomeComponent />;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid-33",
+			"\n        class ClassComputedMemberTest extends React.Component {\n          [foo]() {}\n          render() {\n            return <SomeComponent />;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid-34",
+			"\n        class ClassWithLifecyleTest extends React.Component {\n          constructor(props) {\n            super(props);\n          }\n          static getDerivedStateFromProps() {}\n          componentWillMount() {}\n          UNSAFE_componentWillMount() {}\n          componentDidMount() {}\n          componentWillReceiveProps() {}\n          UNSAFE_componentWillReceiveProps() {}\n          shouldComponentUpdate() {}\n          componentWillUpdate() {}\n          UNSAFE_componentWillUpdate() {}\n          static getSnapshotBeforeUpdate() {}\n          componentDidUpdate() {}\n          componentDidCatch() {}\n          componentWillUnmount() {}\n          getChildContext() {}\n          render() {\n            return <SomeComponent />;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid-35",
+			"\n        var ClassWithLifecyleTest = createReactClass({\n          mixins: [],\n          constructor(props) {\n          },\n          getDefaultProps() {\n            return {}\n          },\n          getInitialState: function() {\n            return {x: 0};\n          },\n          componentWillMount() {},\n          UNSAFE_componentWillMount() {},\n          componentDidMount() {},\n          componentWillReceiveProps() {},\n          UNSAFE_componentWillReceiveProps() {},\n          shouldComponentUpdate() {},\n          componentWillUpdate() {},\n          UNSAFE_componentWillUpdate() {},\n          componentDidUpdate() {},\n          componentDidCatch() {},\n          componentWillUnmount() {},\n          getChildContext() {},\n          render() {\n            return <SomeComponent />;\n          },\n        })\n      ",
+		},
 	}
 
 	for _, testCase := range cases {
@@ -164,35 +385,95 @@ func TestNoUnusedClassComponentMethodsDefinitionVersusUse(test *testing.T) {
 		sourceText string
 		wantIds    []string
 	}{
-		{"a lone assignment is a definition and reports", head + "componentDidMount() { this.foo = 1; } }\n", []string{"unusedWithClass"}},
-		{"a compound assignment is also a definition", head + "componentDidMount() { this.foo += 1; } }\n", []string{"unusedWithClass"}},
+		{
+			"a lone assignment is a definition and reports",
+			head + "componentDidMount() { this.foo = 1; } }\n",
+			[]string{"unusedWithClass"},
+		},
+		{
+			"a compound assignment is also a definition",
+			head + "componentDidMount() { this.foo += 1; } }\n",
+			[]string{"unusedWithClass"},
+		},
 		{"an increment is a USE, so nothing reports", head + "componentDidMount() { this.foo++; } }\n", nil},
 		{"a delete is a use", head + "componentDidMount() { delete this.foo; } }\n", nil},
-		{"assigning through a member is a use of the outer name", head + "componentDidMount() { this.foo.bar = 1; } }\n", nil},
+		{
+			"assigning through a member is a use of the outer name",
+			head + "componentDidMount() { this.foo.bar = 1; } }\n",
+			nil,
+		},
 		{"defining then reading is clean", head + "componentDidMount() { this.foo = 1; return this.foo; } }\n", nil},
-		{"a method and an assignment of the same name report twice", head + "foo() {} componentDidMount() { this.foo = 1; } }\n", []string{"unusedWithClass", "unusedWithClass"}},
-		{"an assignment in the constructor still reports", head + "constructor() { super(); this.foo = 1; } }\n", []string{"unusedWithClass"}},
-		{"a nested assignment still reports", head + "componentDidMount() { if (true) { this.foo = 1; } } }\n", []string{"unusedWithClass"}},
-		{"a use inside a nested arrow counts", head + "handleClick() {} componentDidMount() { const f = () => this.handleClick(); } }\n", nil},
-		{"an optional-chained use counts", head + "handleClick() {} componentDidMount() { this?.handleClick(); } }\n", nil},
+		{
+			"a method and an assignment of the same name report twice",
+			head + "foo() {} componentDidMount() { this.foo = 1; } }\n",
+			[]string{"unusedWithClass", "unusedWithClass"},
+		},
+		{
+			"an assignment in the constructor still reports",
+			head + "constructor() { super(); this.foo = 1; } }\n",
+			[]string{"unusedWithClass"},
+		},
+		{
+			"a nested assignment still reports",
+			head + "componentDidMount() { if (true) { this.foo = 1; } } }\n",
+			[]string{"unusedWithClass"},
+		},
+		{
+			"a use inside a nested arrow counts",
+			head + "handleClick() {} componentDidMount() { const f = () => this.handleClick(); } }\n",
+			nil,
+		},
+		{
+			"an optional-chained use counts",
+			head + "handleClick() {} componentDidMount() { this?.handleClick(); } }\n",
+			nil,
+		},
 		// The six below pin the two halves of the assignment test, each of which survived the rest
 		// of this suite as its own mutant. The left-side test is what keeps a member on the right of
 		// an assignment a use, and the operator test is what keeps a member inside an ordinary
 		// binary expression a use. The corpus writes neither shape. Every verdict measured on the
 		// installed build, and the last row is the sharpest: one statement where the left side is a
 		// definition and the right side is a use, so only `bar` reports.
-		{"a member on the RIGHT of an assignment is a use", head + "handleClick() {} componentDidMount() { const x = this.handleClick; } }\n", nil},
-		{"a member in a comparison is a use", head + "handleClick() {} componentDidMount() { if (this.handleClick === 1) {} } }\n", nil},
-		{"a member in a logical is a use", head + "handleClick() {} componentDidMount() { const x = this.handleClick || 1; } }\n", nil},
-		{"a member in an addition is a use", head + "handleClick() {} componentDidMount() { const x = this.handleClick + 1; } }\n", nil},
-		{"a member as a comma operand is a use", head + "handleClick() {} componentDidMount() { (this.handleClick, 1); } }\n", nil},
-		{"one statement, a definition on the left and a use on the right", head + "foo() {} componentDidMount() { this.bar = this.foo; } }\n", []string{"unusedWithClass"}},
+		{
+			"a member on the RIGHT of an assignment is a use",
+			head + "handleClick() {} componentDidMount() { const x = this.handleClick; } }\n",
+			nil,
+		},
+		{
+			"a member in a comparison is a use",
+			head + "handleClick() {} componentDidMount() { if (this.handleClick === 1) {} } }\n",
+			nil,
+		},
+		{
+			"a member in a logical is a use",
+			head + "handleClick() {} componentDidMount() { const x = this.handleClick || 1; } }\n",
+			nil,
+		},
+		{
+			"a member in an addition is a use",
+			head + "handleClick() {} componentDidMount() { const x = this.handleClick + 1; } }\n",
+			nil,
+		},
+		{
+			"a member as a comma operand is a use",
+			head + "handleClick() {} componentDidMount() { (this.handleClick, 1); } }\n",
+			nil,
+		},
+		{
+			"one statement, a definition on the left and a use on the right",
+			head + "foo() {} componentDidMount() { this.bar = this.foo; } }\n",
+			[]string{"unusedWithClass"},
+		},
 	}
 
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectFindings(test, runNoUnusedClassComponentMethods(test, testCase.sourceText), testCase.wantIds...)
+			rule_testing.ExpectFindings(
+				test,
+				runNoUnusedClassComponentMethods(test, testCase.sourceText),
+				testCase.wantIds...,
+			)
 		})
 	}
 }
@@ -214,14 +495,26 @@ func TestNoUnusedClassComponentMethodsStaticIsInvisible(test *testing.T) {
 	}{
 		{"a static method is never reported", head + "static helper() {} }\n", nil},
 		{"a static property is never reported", head + "static defaultProps = {}; }\n", nil},
-		{"a use inside a static method does NOT count", head + "handleClick() {} static x() { this.handleClick(); } }\n", []string{"unusedWithClass"}},
-		{"an assignment inside a static method is not a definition either", head + "static x() { this.foo = 1; } }\n", nil},
+		{
+			"a use inside a static method does NOT count",
+			head + "handleClick() {} static x() { this.handleClick(); } }\n",
+			[]string{"unusedWithClass"},
+		},
+		{
+			"an assignment inside a static method is not a definition either",
+			head + "static x() { this.foo = 1; } }\n",
+			nil,
+		},
 	}
 
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectFindings(test, runNoUnusedClassComponentMethods(test, testCase.sourceText), testCase.wantIds...)
+			rule_testing.ExpectFindings(
+				test,
+				runNoUnusedClassComponentMethods(test, testCase.sourceText),
+				testCase.wantIds...,
+			)
 		})
 	}
 }
@@ -249,23 +542,45 @@ func TestNoUnusedClassComponentMethodsKeyShapes(test *testing.T) {
 		{"a private name is invisible", head + "#secret() {} }\n", nil},
 		{"a getter reports", head + "get value() { return 1; } }\n", []string{"unusedWithClass"}},
 		{"a setter reports", head + "set value(v: number) {} }\n", []string{"unusedWithClass"}},
-		{"a string key used through a dot is clean", head + "'handleClick'() {} componentDidMount() { this.handleClick(); } }\n", nil},
-		{"a string key used through a subscript is clean", head + "'handleClick'() {} componentDidMount() { this['handleClick'](); } }\n", nil},
-		{"a computed key used through a dot is clean", head + "['handleClick']() {} componentDidMount() { this.handleClick(); } }\n", nil},
-		{"a variable subscript names nothing and does not count as a use", head + "handleClick() {} componentDidMount() { const k = 'handleClick'; this[k](); } }\n", []string{"unusedWithClass"}},
+		{
+			"a string key used through a dot is clean",
+			head + "'handleClick'() {} componentDidMount() { this.handleClick(); } }\n",
+			nil,
+		},
+		{
+			"a string key used through a subscript is clean",
+			head + "'handleClick'() {} componentDidMount() { this['handleClick'](); } }\n",
+			nil,
+		},
+		{
+			"a computed key used through a dot is clean",
+			head + "['handleClick']() {} componentDidMount() { this.handleClick(); } }\n",
+			nil,
+		},
+		{
+			"a variable subscript names nothing and does not count as a use",
+			head + "handleClick() {} componentDidMount() { const k = 'handleClick'; this[k](); } }\n",
+			[]string{"unusedWithClass"},
+		},
 		// A computed identifier key names something known only at run time and contributes nothing.
 		// Upstream's `isKeyLiteralLike` requires `computed === false` for its identifier arm, so
 		// this and the computed-literal row above fall on opposite sides of the same test. This port
 		// accepted both at first and upstream's own clean case
 		// `class ClassComputedMemberTest ... { [foo]() {} }` is what caught it, which is the whole
 		// argument for importing the clean cases rather than only the reporting ones.
-		{"a computed identifier key is invisible", "declare const React: any;\ndeclare const foo: string;\n" + head[len("declare const React: any;\n"):] + "[foo]() {} }\n", nil},
+		{"a computed identifier key is invisible", "declare const React: any;\ndeclare const foo: string;\n" +
+			head[len("declare const React: any;\n"):] +
+			"[foo]() {} }\n", nil},
 	}
 
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectFindings(test, runNoUnusedClassComponentMethods(test, testCase.sourceText), testCase.wantIds...)
+			rule_testing.ExpectFindings(
+				test,
+				runNoUnusedClassComponentMethods(test, testCase.sourceText),
+				testCase.wantIds...,
+			)
 		})
 	}
 }
@@ -331,13 +646,21 @@ func TestNoUnusedClassComponentMethodsLifecycleSets(test *testing.T) {
 		{"mixins is exempt in an object", objectHead + "mixins: [] });\n", nil},
 		{"componentDidMount is exempt in both", classHead + "componentDidMount() {} }\n", nil},
 		{"an UNSAFE lifecycle name is exempt", classHead + "UNSAFE_componentWillMount() {} }\n", nil},
-		{"getDerivedStateFromProps is NOT a listed lifecycle name", classHead + "getDerivedStateFromProps() {} }\n", []string{"unusedWithClass"}},
+		{
+			"getDerivedStateFromProps is NOT a listed lifecycle name",
+			classHead + "getDerivedStateFromProps() {} }\n",
+			[]string{"unusedWithClass"},
+		},
 	}
 
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectFindings(test, runNoUnusedClassComponentMethods(test, testCase.sourceText), testCase.wantIds...)
+			rule_testing.ExpectFindings(
+				test,
+				runNoUnusedClassComponentMethods(test, testCase.sourceText),
+				testCase.wantIds...,
+			)
 		})
 	}
 }
@@ -357,15 +680,31 @@ func TestNoUnusedClassComponentMethodsDestructuringCountsAsUse(test *testing.T) 
 		wantIds    []string
 	}{
 		{"a plain destructure counts", head + "componentDidMount() { const { handleClick } = this; } }\n", nil},
-		{"a renamed destructure counts the source name", head + "componentDidMount() { const { handleClick: h } = this; } }\n", nil},
-		{"destructuring a different name does not count", head + "componentDidMount() { const { somethingElse } = this; } }\n", []string{"unusedWithClass"}},
-		{"destructuring from something other than this does not count", head + "componentDidMount() { const other = { handleClick: 1 }; const { handleClick } = other; } }\n", []string{"unusedWithClass"}},
+		{
+			"a renamed destructure counts the source name",
+			head + "componentDidMount() { const { handleClick: h } = this; } }\n",
+			nil,
+		},
+		{
+			"destructuring a different name does not count",
+			head + "componentDidMount() { const { somethingElse } = this; } }\n",
+			[]string{"unusedWithClass"},
+		},
+		{
+			"destructuring from something other than this does not count",
+			head + "componentDidMount() { const other = { handleClick: 1 }; const { handleClick } = other; } }\n",
+			[]string{"unusedWithClass"},
+		},
 	}
 
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectFindings(test, runNoUnusedClassComponentMethods(test, testCase.sourceText), testCase.wantIds...)
+			rule_testing.ExpectFindings(
+				test,
+				runNoUnusedClassComponentMethods(test, testCase.sourceText),
+				testCase.wantIds...,
+			)
 		})
 	}
 }
@@ -386,7 +725,11 @@ func TestNoUnusedClassComponentMethodsSpans(test *testing.T) {
 	}{
 		{"a method points at its name", head + "handleClick() { return 1; } }", []string{"handleClick"}},
 		{"a property points at its name", head + "handleClick = () => {}; }", []string{"handleClick"}},
-		{"an assignment points at the property name", head + "componentDidMount() { this.foo = 1; } }", []string{"foo"}},
+		{
+			"an assignment points at the property name",
+			head + "componentDidMount() { this.foo = 1; } }",
+			[]string{"foo"},
+		},
 		{"a string key points at the literal", head + "'handleClick'() {} }", []string{"'handleClick'"}},
 		{"a computed key points INSIDE the brackets", head + "['handleClick']() {} }", []string{"'handleClick'"}},
 		{"a getter points at its name", head + "get value() { return 1; } }", []string{"value"}},
@@ -423,27 +766,71 @@ func TestNoUnusedClassComponentMethodsComponentGate(test *testing.T) {
 		sourceText string
 		wantIds    []string
 	}{
-		{"a class with no heritage is not a component", "class Foo { render() { return null; } handleClick() {} }\n", nil},
-		{"a foreign base is not a component", "declare const Foo: any;\nclass Bar extends Foo.Component { render() { return null; } handleClick() {} }\n", nil},
-		{"a class EXPRESSION is not listened for", "declare const React: any;\nconst Foo = class extends React.Component { render() { return null; } handleClick() {} };\n", nil},
-		{"createReactClass counts", "declare function createReactClass(spec: any): any;\ncreateReactClass({ render() { return null; }, handleClick() {} });\n", []string{"unused"}},
-		{"a bare createClass does not", "declare function createClass(spec: any): any;\ncreateClass({ render() { return null; }, handleClick() {} });\n", nil},
-		{"React.createClass does not", "declare const React: any;\nReact.createClass({ render() { return null; }, handleClick() {} });\n", nil},
-		{"an unrelated call does not", "declare function other(spec: any): any;\nother({ render() { return null; }, handleClick() {} });\n", nil},
-		{"a bare object literal is not a component", "const x = { render() { return null; }, handleClick() {} };\n", nil},
+		{
+			"a class with no heritage is not a component",
+			"class Foo { render() { return null; } handleClick() {} }\n",
+			nil,
+		},
+		{
+			"a foreign base is not a component",
+			"declare const Foo: any;\nclass Bar extends Foo.Component { render() { return null; } handleClick() {} }\n",
+			nil,
+		},
+		{
+			"a class EXPRESSION is not listened for",
+			"declare const React: any;\nconst Foo = class extends React.Component { render() { return null; } handleClick() {} };\n",
+			nil,
+		},
+		{
+			"createReactClass counts",
+			"declare function createReactClass(spec: any): any;\ncreateReactClass({ render() { return null; }, handleClick() {} });\n",
+			[]string{"unused"},
+		},
+		{
+			"a bare createClass does not",
+			"declare function createClass(spec: any): any;\ncreateClass({ render() { return null; }, handleClick() {} });\n",
+			nil,
+		},
+		{
+			"React.createClass does not",
+			"declare const React: any;\nReact.createClass({ render() { return null; }, handleClick() {} });\n",
+			nil,
+		},
+		{
+			"an unrelated call does not",
+			"declare function other(spec: any): any;\nother({ render() { return null; }, handleClick() {} });\n",
+			nil,
+		},
+		{
+			"a bare object literal is not a component",
+			"const x = { render() { return null; }, handleClick() {} };\n",
+			nil,
+		},
 		// Upstream checks the parent callee and nothing else, so an object in any argument slot
 		// counts. This port checked the first slot at first and a mutant dropping that check
 		// survived every fixture; probing the installed build showed the mutant was right and the
 		// rule was wrong. A nested object is still not a component, because its parent is a property
 		// assignment rather than the call.
-		{"an object in the SECOND argument slot still counts", "declare function createReactClass(a: any, b: any): any;\ndeclare const other: any;\ncreateReactClass(other, { render() { return null; }, handleClick() {} });\n", []string{"unused"}},
-		{"a nested object inside the specification is not a component", "declare function createReactClass(spec: any): any;\ncreateReactClass({ render() { return null; }, config: { handleClick() {} } });\n", []string{"unused"}},
+		{
+			"an object in the SECOND argument slot still counts",
+			"declare function createReactClass(a: any, b: any): any;\ndeclare const other: any;\ncreateReactClass(other, { render() { return null; }, handleClick() {} });\n",
+			[]string{"unused"},
+		},
+		{
+			"a nested object inside the specification is not a component",
+			"declare function createReactClass(spec: any): any;\ncreateReactClass({ render() { return null; }, config: { handleClick() {} } });\n",
+			[]string{"unused"},
+		},
 	}
 
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectFindings(test, runNoUnusedClassComponentMethods(test, testCase.sourceText), testCase.wantIds...)
+			rule_testing.ExpectFindings(
+				test,
+				runNoUnusedClassComponentMethods(test, testCase.sourceText),
+				testCase.wantIds...,
+			)
 		})
 	}
 }

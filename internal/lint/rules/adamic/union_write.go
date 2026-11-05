@@ -53,12 +53,15 @@ var UnionWrite = rule.Rule{
 						if name != nil {
 							slotName += "." + *name
 						}
-						ruleContext.ReportNode(target, rule.Message{Id: "unionWrite", Description: unionWriteText.Render(map[string]string{
-							"slot":   slotName,
-							"source": type_checking.StableTypeText(typeChecker, value),
-							"member": type_checking.StableTypeText(typeChecker, member),
-							"target": type_checking.StableTypeText(typeChecker, slot),
-						})})
+						ruleContext.ReportNode(
+							target,
+							rule.Message{Id: "unionWrite", Description: unionWriteText.Render(map[string]string{
+								"slot":   slotName,
+								"source": type_checking.StableTypeText(typeChecker, value),
+								"member": type_checking.StableTypeText(typeChecker, member),
+								"target": type_checking.StableTypeText(typeChecker, slot),
+							})},
+						)
 						return
 					}
 				}
@@ -93,7 +96,10 @@ var UnionWrite = rule.Rule{
 			}
 			// Most rest targets are identifiers or non-union slots. Do not ask
 			// the checker to project a remainder until there is a union to judge.
-			receiver := unionWriteConstraint(ruleContext.TypeChecker, ruleContext.TypeChecker.GetTypeAtLocation(target.Expression()))
+			receiver := unionWriteConstraint(
+				ruleContext.TypeChecker,
+				ruleContext.TypeChecker.GetTypeAtLocation(target.Expression()),
+			)
 			if receiver == nil || receiver.Flags()&checker.TypeFlagsUnion == 0 {
 				return
 			}
@@ -116,13 +122,21 @@ var UnionWrite = rule.Rule{
 					return
 				}
 				access := callee.AsPropertyAccessExpression()
-				if access.Name().Text() != "assign" || access.Expression.Kind != ast.KindIdentifier || access.Expression.Text() != "Object" ||
-					!rule.IsSymbolFromDefaultLibrary(ruleContext.Program, ruleContext.TypeChecker.GetSymbolAtLocation(access.Name())) {
+				if access.Name().Text() != "assign" ||
+					access.Expression.Kind != ast.KindIdentifier ||
+					access.Expression.Text() != "Object" ||
+					!rule.IsSymbolFromDefaultLibrary(
+						ruleContext.Program,
+						ruleContext.TypeChecker.GetSymbolAtLocation(access.Name()),
+					) {
 					return
 				}
 				target := node.Arguments()[0]
 				for _, source := range node.Arguments()[1:] {
-					sourceType := unionWriteConstraint(ruleContext.TypeChecker, ruleContext.TypeChecker.GetTypeAtLocation(source))
+					sourceType := unionWriteConstraint(
+						ruleContext.TypeChecker,
+						ruleContext.TypeChecker.GetTypeAtLocation(source),
+					)
 					sources := []*checker.Type{sourceType}
 					if sourceType.Flags()&checker.TypeFlagsUnion != 0 {
 						sources = sourceType.AsUnionType().Types()
@@ -132,7 +146,12 @@ var UnionWrite = rule.Rule{
 							name := property.Name
 							// An absent optional property is not copied. Preserve real undefined,
 							// but remove the compiler's missing-property marker.
-							checkSlot(target, target, checker.Checker_getNonMissingTypeOfSymbol(ruleContext.TypeChecker, property), &name)
+							checkSlot(
+								target,
+								target,
+								checker.Checker_getNonMissingTypeOfSymbol(ruleContext.TypeChecker, property),
+								&name,
+							)
 						}
 					}
 				}
@@ -198,7 +217,10 @@ func unionWriteSlots(typeChecker *checker.Checker, member *checker.Type, target 
 	if target.Kind != ast.KindElementAccessExpression {
 		return nil
 	}
-	key := unionWriteConstraint(typeChecker, typeChecker.GetTypeAtLocation(target.AsElementAccessExpression().ArgumentExpression))
+	key := unionWriteConstraint(
+		typeChecker,
+		typeChecker.GetTypeAtLocation(target.AsElementAccessExpression().ArgumentExpression),
+	)
 	keys := []*checker.Type{key}
 	if key.Flags()&checker.TypeFlagsUnion != 0 {
 		keys = key.AsUnionType().Types()
@@ -206,7 +228,11 @@ func unionWriteSlots(typeChecker *checker.Checker, member *checker.Type, target 
 	slots := make([]*checker.Type, 0, len(keys))
 	for _, key := range keys {
 		if key.Flags()&checker.TypeFlagsStringOrNumberLiteralOrUnique != 0 {
-			if property := checker.Checker_getPropertyOfType(typeChecker, member, checker.GetPropertyNameFromType(key)); property != nil {
+			if property := checker.Checker_getPropertyOfType(
+				typeChecker,
+				member,
+				checker.GetPropertyNameFromType(key),
+			); property != nil {
 				slots = append(slots, checker.Checker_getWriteTypeOfSymbol(typeChecker, property))
 				continue
 			}

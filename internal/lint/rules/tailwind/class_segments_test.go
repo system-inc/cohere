@@ -57,7 +57,12 @@ func TestClassSegmentRangesCoverExactlyTheirText(test *testing.T) {
 			segments, source := segmentsOf(test, testCase.source)
 
 			if len(segments) != len(testCase.wantSegments) {
-				test.Fatalf("expected %d segments %q, got %d", len(testCase.wantSegments), testCase.wantSegments, len(segments))
+				test.Fatalf(
+					"expected %d segments %q, got %d",
+					len(testCase.wantSegments),
+					testCase.wantSegments,
+					len(segments),
+				)
 			}
 
 			for index, segment := range segments {

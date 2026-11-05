@@ -23,9 +23,17 @@ func TestShimSurfaceIsReachable(test *testing.T) {
 	// the point. A nil check would not have worked: these are package-level funcs, so the
 	// compiler rejects `== nil` as always false, and a test that cannot fail proves nothing.
 	var (
-		_ func(compiler.CompilerHost) incremental.BuildInfoReader                                                     = incremental.NewBuildInfoReader
-		_ func(compiler.CompilerHost) incremental.Host                                                                = incremental.CreateHost
-		_ func(*tsoptions.ParsedCommandLine, incremental.BuildInfoReader, compiler.CompilerHost) *incremental.Program = incremental.ReadBuildInfoProgram
+		_ func(
+			compiler.CompilerHost,
+		) incremental.BuildInfoReader = incremental.NewBuildInfoReader
+		_ func(
+			compiler.CompilerHost,
+		) incremental.Host = incremental.CreateHost
+		_ func(
+			*tsoptions.ParsedCommandLine,
+			incremental.BuildInfoReader,
+			compiler.CompilerHost,
+		) *incremental.Program = incremental.ReadBuildInfoProgram
 	)
 
 	// The type aliases must name real upstream types rather than local stand-ins. Asserting

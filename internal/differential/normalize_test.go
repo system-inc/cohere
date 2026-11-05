@@ -45,7 +45,11 @@ func TestNormalizeRuleName(test *testing.T) {
 		},
 		{name: "short rule and message id", raw: "no-enum/enumDeclared", want: "no-enum"},
 		{name: "bare name", raw: "no-debugger", want: "no-debugger"},
-		{name: "parenthesized plugin", raw: "structure(react-component-no-multiple-primary)", want: "react-component-no-multiple-primary"},
+		{
+			name: "parenthesized plugin",
+			raw:  "structure(react-component-no-multiple-primary)",
+			want: "react-component-no-multiple-primary",
+		},
 		{name: "surrounding space", raw: "  no-debugger  ", want: "no-debugger"},
 	}
 

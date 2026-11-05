@@ -101,7 +101,11 @@ func alphaNum(code uint16) bool {
 
 // unicodeRange is upstream's /^[a-f0-9?\-]/i.
 func unicodeRange(code uint16) bool {
-	return (code >= 'a' && code <= 'f') || (code >= 'A' && code <= 'F') || (code >= '0' && code <= '9') || code == '?' || code == '-'
+	return (code >= 'a' && code <= 'f') ||
+		(code >= 'A' && code <= 'F') ||
+		(code >= '0' && code <= '9') ||
+		code == '?' ||
+		code == '-'
 }
 
 // regexLastIndex is `regex.lastIndex = from; regex.test(css); regex.lastIndex` for the one-character
@@ -170,12 +174,27 @@ func tokenize(input []uint16, options Options) []token {
 	}
 
 	push := func(kind string, value []uint16, startLine int, startColumn int, endLine int, endColumn int, index int) {
-		tokens = append(tokens, token{kind: kind, value: value, startLine: startLine, startColumn: startColumn, endLine: endLine, endColumn: endColumn, index: index})
+		tokens = append(tokens, token{
+			kind:        kind,
+			value:       value,
+			startLine:   startLine,
+			startColumn: startColumn,
+			endLine:     endLine,
+			endColumn:   endColumn,
+			index:       index,
+		})
 	}
 
 	// pushStale pushes a bracket or paren token, whose end column is `next - offset` with a stale `next`.
 	pushStale := func(kind string) {
-		each := token{kind: kind, value: slice(position, position+1), startLine: line, startColumn: position - offset, endLine: line, index: position}
+		each := token{
+			kind:        kind,
+			value:       slice(position, position+1),
+			startLine:   line,
+			startColumn: position - offset,
+			endLine:     line,
+			index:       position,
+		}
 		if next == undefinedNext {
 			each.endColumnIsNaN = true
 		} else {
@@ -185,7 +204,14 @@ func tokenize(input []uint16, options Options) []token {
 	}
 
 	unclosed := func(what string) {
-		panic(&Error{Name: "TokenizeError", Message: "Unclosed " + what + " at line: " + itoa(line) + ", column: " + itoa(position-offset) + ", token: " + itoa(position)})
+		panic(&Error{Name: "TokenizeError", Message: "Unclosed " +
+			what +
+			" at line: " +
+			itoa(line) +
+			", column: " +
+			itoa(position-offset) +
+			", token: " +
+			itoa(position)})
 	}
 
 	for position < length {
@@ -273,7 +299,11 @@ func tokenize(input []uint16, options Options) []token {
 			position = next
 
 		case at:
-			lastIndex := regexLastIndex(css, position+1, func(css []uint16, index int) bool { return atEnd(css[index]) })
+			lastIndex := regexLastIndex(
+				css,
+				position+1,
+				func(css []uint16, index int) bool { return atEnd(css[index]) },
+			)
 
 			if lastIndex == 0 {
 				next = length - 1
@@ -319,7 +349,8 @@ func tokenize(input []uint16, options Options) []token {
 			position = next - 1
 
 		default:
-			if code == slash && (charCodeAt(position+1) == asterisk || (options.Loose && !isURLArg && charCodeAt(position+1) == slash)) {
+			if code == slash && (charCodeAt(position+1) == asterisk ||
+				(options.Loose && !isURLArg && charCodeAt(position+1) == slash)) {
 				isStandardComment := charCodeAt(position+1) == asterisk
 
 				if isStandardComment {

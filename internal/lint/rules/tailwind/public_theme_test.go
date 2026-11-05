@@ -65,7 +65,10 @@ func TestClassOrderReadsTheRepositoryOnThePublicTheme(test *testing.T) {
 		test.Fatalf("could not place %q", unplaceable)
 	}
 	if _, placed := keys[ownClass]; !placed {
-		test.Errorf("%s got no key, so the order came from a table that cannot know a repository's own utilities", ownClass)
+		test.Errorf(
+			"%s got no key, so the order came from a table that cannot know a repository's own utilities",
+			ownClass,
+		)
 	}
 }
 
@@ -113,7 +116,12 @@ func TestExistenceComesFromTheRepositoryOnThePublicThemes(test *testing.T) {
 			test.Errorf("%s: the public theme says exists=%v, want %v", testCase.className, got, testCase.onPublic)
 		}
 		if got := classExistsIn(testCase.className, independent); got != testCase.onIndependent {
-			test.Errorf("%s: the independent theme says exists=%v, want %v", testCase.className, got, testCase.onIndependent)
+			test.Errorf(
+				"%s: the independent theme says exists=%v, want %v",
+				testCase.className,
+				got,
+				testCase.onIndependent,
+			)
 		}
 	}
 }
@@ -152,9 +160,18 @@ func TestClassOrderRanksByTheReadingThatCompilesOnThePublicTheme(test *testing.T
 	for _, testCase := range []struct {
 		input, want []string
 	}{
-		{[]string{"shadow--0", "surface--2", "edge--1", "border"}, []string{"border", "edge--1", "surface--2", "shadow--0"}},
-		{[]string{"shadow--6", "hover:shadow--3", "p-2", "rounded-md"}, []string{"rounded-md", "p-2", "shadow--6", "hover:shadow--3"}},
-		{[]string{"flex", "dark:bg-transparent", "hover:tone--0-4"}, []string{"hover:tone--0-4", "flex", "dark:bg-transparent"}},
+		{
+			[]string{"shadow--0", "surface--2", "edge--1", "border"},
+			[]string{"border", "edge--1", "surface--2", "shadow--0"},
+		},
+		{
+			[]string{"shadow--6", "hover:shadow--3", "p-2", "rounded-md"},
+			[]string{"rounded-md", "p-2", "shadow--6", "hover:shadow--3"},
+		},
+		{
+			[]string{"flex", "dark:bg-transparent", "hover:tone--0-4"},
+			[]string{"hover:tone--0-4", "flex", "dark:bg-transparent"},
+		},
 	} {
 		ordered, decided := orderClasses(testCase.input, designSystem, defaultClassOrderOptions())
 		if !decided {
@@ -203,12 +220,19 @@ func TestRepositoryUtilityRootsAreNeverReportedOnThePublicTheme(test *testing.T)
 			continue
 		}
 		if !system.DeclaresFunctionalUtility(candidates[0].Root) {
-			test.Errorf("%s reads as %q, which the public theme does not declare by `@utility`", className, candidates[0].Root)
+			test.Errorf(
+				"%s reads as %q, which the public theme does not declare by `@utility`",
+				className,
+				candidates[0].Root,
+			)
 			continue
 		}
 		if !classExistsIn(className, system) {
-			test.Errorf("%s reads as the theme's root %q and is reported, which is a false positive on a declared utility",
-				className, candidates[0].Root)
+			test.Errorf(
+				"%s reads as the theme's root %q and is reported, which is a false positive on a declared utility",
+				className,
+				candidates[0].Root,
+			)
 		}
 	}
 }
@@ -224,8 +248,14 @@ func TestClassOrderPlacesRootsDeclaredBothWaysOnThePublicTheme(test *testing.T) 
 	for _, testCase := range []struct {
 		input, want []string
 	}{
-		{[]string{"appear-50", "pane-wide", "appear", "rail", "pane", "rail-thin"}, []string{"pane", "pane-wide", "rail-thin", "rail", "appear-50", "appear"}},
-		{[]string{"swell-50", "drift-up", "swell", "drift-up-4", "p-2", "flex"}, []string{"flex", "p-2", "swell-50", "drift-up", "drift-up-4", "swell"}},
+		{
+			[]string{"appear-50", "pane-wide", "appear", "rail", "pane", "rail-thin"},
+			[]string{"pane", "pane-wide", "rail-thin", "rail", "appear-50", "appear"},
+		},
+		{
+			[]string{"swell-50", "drift-up", "swell", "drift-up-4", "p-2", "flex"},
+			[]string{"flex", "p-2", "swell-50", "drift-up", "drift-up-4", "swell"},
+		},
 	} {
 		ordered, decided := orderClasses(testCase.input, designSystem, defaultClassOrderOptions())
 		if !decided {
@@ -258,7 +288,12 @@ func TestRepositoryUtilitiesAreCompiledOnThePublicTheme(test *testing.T) {
 			continue
 		}
 		if !slices.Equal(facts.Properties, properties) {
-			test.Errorf("%s compiled to %v, want %v, the properties its @utility block sets", className, facts.Properties, properties)
+			test.Errorf(
+				"%s compiled to %v, want %v, the properties its @utility block sets",
+				className,
+				facts.Properties,
+				properties,
+			)
 		}
 	}
 

@@ -267,7 +267,11 @@ func TestNoDeprecatedAgainstNodeTypes(test *testing.T) {
 				"      ",
 			environmentDependent: true,
 			expected: []noDeprecatedFinding{
-				{messageId: "deprecatedWithReason", name: "fail", reason: "since v10.0.0 - use fail([message]) or other assert functions instead."},
+				{
+					messageId: "deprecatedWithReason",
+					name:      "fail",
+					reason:    "since v10.0.0 - use fail([message]) or other assert functions instead.",
+				},
 			},
 		},
 		{
@@ -279,7 +283,11 @@ func TestNoDeprecatedAgainstNodeTypes(test *testing.T) {
 			options:      "{\"allow\":[{\"from\":\"package\",\"name\":\"exists\",\"package\":\"hoge\"}]}",
 			harnessBound: "the deprecation is on @types/node's fs.exists, which the harness's \"types\": [] excludes; the allowlist arm this case exercises is proven by the other allow cases, and whether fs.exists is marked deprecated differs between @types/node versions anyway",
 			expected: []noDeprecatedFinding{
-				{messageId: "deprecatedWithReason", name: "exists", reason: "Since v1.0.0 - Use {@link stat} or {@link access} instead."},
+				{
+					messageId: "deprecatedWithReason",
+					name:      "exists",
+					reason:    "Since v1.0.0 - Use {@link stat} or {@link access} instead.",
+				},
 			},
 		},
 	}

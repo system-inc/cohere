@@ -219,7 +219,10 @@ func TestEveryTableIsTailwindsOrHasAStatedReason(test *testing.T) {
 	var unaccounted []string
 	for name := range declared {
 		if !accounted[name] && !tablesExemptFromTheInventory[name] {
-			unaccounted = append(unaccounted, fmt.Sprintf("%s (%s, %d entries)", name, declared[name].file, declared[name].entries))
+			unaccounted = append(
+				unaccounted,
+				fmt.Sprintf("%s (%s, %d entries)", name, declared[name].file, declared[name].entries),
+			)
 		}
 	}
 	sort.Strings(unaccounted)

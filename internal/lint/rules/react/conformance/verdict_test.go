@@ -39,7 +39,10 @@ func TestAggregatedScoreAgainstReactsOwnFixtures(test *testing.T) {
 	test.Parallel()
 	fixtures := load(test)
 
-	report, aggregateError := Aggregate(fixtures, declineEverything{reason: "scored without a rule engine; see the note on this test"})
+	report, aggregateError := Aggregate(
+		fixtures,
+		declineEverything{reason: "scored without a rule engine; see the note on this test"},
+	)
 	if aggregateError != nil {
 		test.Fatalf("aggregating: %v", aggregateError)
 	}
@@ -196,7 +199,11 @@ func TestEveryCategoryIsReachable(test *testing.T) {
 			Name:    "passed",
 			Fixture: globalsFixture,
 			Result: Result{Errors: []ReportedError{
-				{Heading: "Error", Message: "Cannot reassign variables declared outside of the component/hook", Line: 1},
+				{
+					Heading: "Error",
+					Message: "Cannot reassign variables declared outside of the component/hook",
+					Line:    1,
+				},
 			}},
 			Want: VerdictPassed,
 		},
@@ -210,7 +217,11 @@ func TestEveryCategoryIsReachable(test *testing.T) {
 			Name:    "failed: reported the wrong line",
 			Fixture: globalsFixture,
 			Result: Result{Errors: []ReportedError{
-				{Heading: "Error", Message: "Cannot reassign variables declared outside of the component/hook", Line: 9},
+				{
+					Heading: "Error",
+					Message: "Cannot reassign variables declared outside of the component/hook",
+					Line:    9,
+				},
 			}},
 			Want: VerdictFailed,
 		},
@@ -311,7 +322,11 @@ func TestStatedDivergenceCategoryCanHoldAnEntry(test *testing.T) {
 	}, Result{}, nil)
 
 	if verdict.Verdict != VerdictStatedDivergence {
-		test.Fatalf("classified as %q, want %q; the category is decorative rather than wired", verdict.Verdict, VerdictStatedDivergence)
+		test.Fatalf(
+			"classified as %q, want %q; the category is decorative rather than wired",
+			verdict.Verdict,
+			VerdictStatedDivergence,
+		)
 	}
 	if !strings.Contains(verdict.Reason, "TestStatedDivergenceCategoryCanHoldAnEntry") {
 		test.Errorf("the reason does not name the boundary that holds it: %s", verdict.Reason)
@@ -335,7 +350,10 @@ func TestStatedDivergenceCategoryCanHoldAnEntry(test *testing.T) {
 		}},
 	}, Result{}, nil)
 	if shadowed.Verdict != VerdictStatedDivergence {
-		test.Errorf("a stated divergence on an import-less fixture classified as %q; the decision must outrank the corpus artifact", shadowed.Verdict)
+		test.Errorf(
+			"a stated divergence on an import-less fixture classified as %q; the decision must outrank the corpus artifact",
+			shadowed.Verdict,
+		)
 	}
 }
 

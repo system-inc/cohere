@@ -44,7 +44,20 @@ func main() {
 	for _, mode := range strings.Split(*modes, ",") {
 		measured = append(measured, benchresults.Mode(mode))
 	}
-	path, recordError := record(*runsPath, *engine, *project, *projectCommit, *idleFloor, *settle, *rounds, measured, *band, *stoppedEarly, *edit, *out)
+	path, recordError := record(
+		*runsPath,
+		*engine,
+		*project,
+		*projectCommit,
+		*idleFloor,
+		*settle,
+		*rounds,
+		measured,
+		*band,
+		*stoppedEarly,
+		*edit,
+		*out,
+	)
 	if recordError != nil {
 		fmt.Fprintf(os.Stderr, "record: %v\n", recordError)
 		os.Exit(1)
@@ -52,8 +65,15 @@ func main() {
 	fmt.Printf("recorded %s\n", path)
 }
 
-func record(runsPath, engine, project, projectCommit string, idleFloor, settle float64, rounds int, measured []benchresults.Mode,
-	band float64, stoppedEarly bool, edit, out string) (string, error) {
+func record(
+	runsPath, engine, project, projectCommit string,
+	idleFloor, settle float64,
+	rounds int,
+	measured []benchresults.Mode,
+	band float64,
+	stoppedEarly bool,
+	edit, out string,
+) (string, error) {
 	cohere, err := engineProvenance(engine)
 	if err != nil {
 		return "", err
@@ -91,7 +111,10 @@ func record(runsPath, engine, project, projectCommit string, idleFloor, settle f
 	}
 	path := filepath.Join(out, benchresults.FileName(result))
 	if _, statError := os.Stat(path); statError == nil {
-		return "", fmt.Errorf("%s exists; a second run of this commit on this machine today needs a record of its own", path)
+		return "", fmt.Errorf(
+			"%s exists; a second run of this commit on this machine today needs a record of its own",
+			path,
+		)
 	}
 	return path, os.WriteFile(path, encoded, 0o644)
 }
@@ -187,8 +210,12 @@ func readRuns(path string) ([]benchresults.Run, error) {
 		return nil, err
 	}
 	defer file.Close()
-	modes := map[string]benchresults.Mode{"cold": benchresults.ModeCold, "warm": benchresults.ModeWarm, "edit": benchresults.ModeEdit,
-		"idle": benchresults.ModeIdle}
+	modes := map[string]benchresults.Mode{
+		"cold": benchresults.ModeCold,
+		"warm": benchresults.ModeWarm,
+		"edit": benchresults.ModeEdit,
+		"idle": benchresults.ModeIdle,
+	}
 	runs := []benchresults.Run{}
 	scanner := bufio.NewScanner(file)
 	for line := 1; scanner.Scan(); line++ {
@@ -210,9 +237,20 @@ func readRuns(path string) ([]benchresults.Run, error) {
 			}
 		}
 		runs = append(runs, benchresults.Run{
-			Mode: mode, Round: int(numbers[1]), VerdictSeconds: numbers[2], SettledSeconds: numbers[3],
-			EngineSeconds: numbers[4], LoadBefore: numbers[7], LoadAfter: numbers[8], IdleBefore: numbers[9], IdleAfter: numbers[10],
-			Quiet: fields[11] == "quiet", Findings: int(numbers[5]), Cache: fields[6], Exit: int(numbers[12]), Primes: int(numbers[13]),
+			Mode:           mode,
+			Round:          int(numbers[1]),
+			VerdictSeconds: numbers[2],
+			SettledSeconds: numbers[3],
+			EngineSeconds:  numbers[4],
+			LoadBefore:     numbers[7],
+			LoadAfter:      numbers[8],
+			IdleBefore:     numbers[9],
+			IdleAfter:      numbers[10],
+			Quiet:          fields[11] == "quiet",
+			Findings:       int(numbers[5]),
+			Cache:          fields[6],
+			Exit:           int(numbers[12]),
+			Primes:         int(numbers[13]),
 		})
 	}
 	return runs, scanner.Err()

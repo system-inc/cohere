@@ -164,7 +164,12 @@ func expectGapRootDescriptionsResolve(test *testing.T, system *LoadedDesignSyste
 	}
 
 	sort.Strings(disagreements)
-	test.Logf("gap root resolution: %d cases, %d agreed, %d disagreed", len(gapRootResolutionCases), agreed, len(disagreements))
+	test.Logf(
+		"gap root resolution: %d cases, %d agreed, %d disagreed",
+		len(gapRootResolutionCases),
+		agreed,
+		len(disagreements),
+	)
 
 	for _, disagreement := range disagreements {
 		test.Errorf("%s", disagreement)
@@ -252,7 +257,10 @@ func TestArbitraryColorsWithAnAlphaResolveOnEveryColorRoot(test *testing.T) {
 			checked++
 
 			if !ClassValueResolvesIn(&candidates[0], system) {
-				test.Errorf("%s is an arbitrary colour with an alpha and does not resolve, which reports working markup", className)
+				test.Errorf(
+					"%s is an arbitrary colour with an alpha and does not resolve, which reports working markup",
+					className,
+				)
 			}
 		}
 

@@ -346,7 +346,11 @@ func (run *engineRun) acceptProvenance(record *engineProvenanceRecord) error {
 		if record.Contract != nil {
 			spoken = fmt.Sprint(*record.Contract)
 		}
-		return fmt.Errorf("the engine speaks contract %s and this front door speaks contract %d", spoken, engineContractVersion)
+		return fmt.Errorf(
+			"the engine speaks contract %s and this front door speaks contract %d",
+			spoken,
+			engineContractVersion,
+		)
 	}
 	run.provenance = record
 	run.report.engineSourceTreeModified = record.SourceTreeModified
@@ -391,7 +395,10 @@ func (run *engineRun) acceptUnreadable(record *engineUnreadableRecord) error {
 		return fmt.Errorf("an unreadable record before the project record")
 	}
 	if run.nextPhase > 0 {
-		return fmt.Errorf("an unreadable record after phase %s, and contract 2 places them before the first phase", phaseOrder[run.nextPhase-1])
+		return fmt.Errorf(
+			"an unreadable record after phase %s, and contract 2 places them before the first phase",
+			phaseOrder[run.nextPhase-1],
+		)
 	}
 	if record.File == "" {
 		return fmt.Errorf("an unreadable record with no file")
@@ -405,7 +412,12 @@ func (run *engineRun) acceptFinding(record *engineFindingRecord) error {
 		return fmt.Errorf("a finding record in a %s run", run.mode)
 	}
 	if record.File == "" || record.Line < 1 || record.Column < 1 {
-		return fmt.Errorf("a finding with no position (file %q, line %d, column %d)", record.File, record.Line, record.Column)
+		return fmt.Errorf(
+			"a finding with no position (file %q, line %d, column %d)",
+			record.File,
+			record.Line,
+			record.Column,
+		)
 	}
 	run.findings++
 	run.findingsInPhase++
@@ -427,7 +439,15 @@ func (run *engineRun) acceptFinding(record *engineFindingRecord) error {
 		activeSummary.Findings++
 	}
 	printFinding(run.out,
-		runFinding{Path: record.File, Line: record.Line, Column: record.Column, Severity: severity, Rule: rule, MessageID: messageID, Message: singleLineDescription(record.Message)},
+		runFinding{
+			Path:      record.File,
+			Line:      record.Line,
+			Column:    record.Column,
+			Severity:  severity,
+			Rule:      rule,
+			MessageID: messageID,
+			Message:   singleLineDescription(record.Message),
+		},
 		engineFindingLine(record)+"\n")
 	return nil
 }
@@ -468,8 +488,13 @@ func (run *engineRun) acceptUnused(record *engineUnusedRecord) error {
 		return unusedPlaceError
 	}
 	if record.File == "" || record.Line < 1 || record.Column < 1 || record.Rule == "" || record.Subject == "" {
-		return fmt.Errorf("an unused record missing its file, position, rule or subject (file %q, line %d, column %d, rule %q)",
-			record.File, record.Line, record.Column, record.Rule)
+		return fmt.Errorf(
+			"an unused record missing its file, position, rule or subject (file %q, line %d, column %d, rule %q)",
+			record.File,
+			record.Line,
+			record.Column,
+			record.Rule,
+		)
 	}
 	run.unusedPending = append(run.unusedPending, *record)
 	return nil
@@ -494,7 +519,12 @@ func (run *engineRun) acceptUnusedCoverage(record *engineUnusedCoverageRecord) e
 		return fmt.Errorf("unused records of another rule arrived before the coverage record for %s", record.Rule)
 	}
 	if *record.Found != len(items) {
-		return fmt.Errorf("the unusedCoverage record for %s counts %d found and %d unused records came with it", record.Rule, *record.Found, len(items))
+		return fmt.Errorf(
+			"the unusedCoverage record for %s counts %d found and %d unused records came with it",
+			record.Rule,
+			*record.Found,
+			len(items),
+		)
 	}
 	run.unusedPending = nil
 	run.unusedCoverage++
@@ -521,12 +551,31 @@ func (run *engineRun) acceptUnusedCoverage(record *engineUnusedCoverageRecord) e
 			fmt.Fprintf(run.out, "    %s:%d:%d \u2014 %s\n", item.File, item.Line, item.Column, item.Subject)
 		}
 	}
-	fmt.Fprintf(run.out, "  looked at %d files and %d %s (%s)\n", record.FilesChecked, record.Checked, swiftUnusedNoun(record.Rule), record.Rule)
+	fmt.Fprintf(
+		run.out,
+		"  looked at %d files and %d %s (%s)\n",
+		record.FilesChecked,
+		record.Checked,
+		swiftUnusedNoun(record.Rule),
+		record.Rule,
+	)
 	for _, reason := range sortedKeys(record.FilesNotChecked) {
-		fmt.Fprintf(run.out, "  not checked for unused %s: %d files (%s)\n", swiftUnusedNoun(record.Rule), record.FilesNotChecked[reason], reason)
+		fmt.Fprintf(
+			run.out,
+			"  not checked for unused %s: %d files (%s)\n",
+			swiftUnusedNoun(record.Rule),
+			record.FilesNotChecked[reason],
+			reason,
+		)
 	}
 	for _, reason := range sortedKeys(record.Skipped) {
-		fmt.Fprintf(run.out, "  never reported: %d %s (%s)\n", record.Skipped[reason], swiftUnusedNoun(record.Rule), reason)
+		fmt.Fprintf(
+			run.out,
+			"  never reported: %d %s (%s)\n",
+			record.Skipped[reason],
+			swiftUnusedNoun(record.Rule),
+			reason,
+		)
 	}
 	return nil
 }
@@ -622,7 +671,10 @@ func (run *engineRun) changedFiles(files []engineChangedFile, rewritten int) ([]
 			return nil, fmt.Errorf("the fix record lists %s as rewritten by no fix and not by the formatter", file.File)
 		}
 		path := file.File
-		if relative, relativePathError := filepath.Rel(root, file.File); root != "" && relativePathError == nil && !strings.HasPrefix(relative, "..") {
+		if relative, relativePathError := filepath.Rel(
+			root,
+			file.File,
+		); root != "" && relativePathError == nil && !strings.HasPrefix(relative, "..") {
 			path = relative
 		}
 		changed = append(changed, changedFile{
@@ -640,10 +692,20 @@ func (run *engineRun) acceptTypes(record *engineTypesRecord) error {
 		return fmt.Errorf("a types record in a %s run", run.mode)
 	}
 	if record.Diagnostics != run.findingsInPhase {
-		return fmt.Errorf("the types record counts %d diagnostics and %d finding records came with it", record.Diagnostics, run.findingsInPhase)
+		return fmt.Errorf(
+			"the types record counts %d diagnostics and %d finding records came with it",
+			record.Diagnostics,
+			run.findingsInPhase,
+		)
 	}
 	elapsed := time.Duration(record.ElapsedMilliseconds) * time.Millisecond
-	fmt.Fprintf(accountOutput(run.out), "types: %d diagnostics over %d files in %s\n", record.Diagnostics, record.Files, round(elapsed))
+	fmt.Fprintf(
+		accountOutput(run.out),
+		"types: %d diagnostics over %d files in %s\n",
+		record.Diagnostics,
+		record.Files,
+		round(elapsed),
+	)
 
 	// The compiler checks the whole module whatever the scope, so a scoped run's types line covers more
 	// than the scope does. Said, so the larger number does not read as a scope that leaked.
@@ -652,7 +714,11 @@ func (run *engineRun) acceptTypes(record *engineTypesRecord) error {
 			run.language.Container, run.project.FilesInScope)
 	}
 	for _, file := range record.FilesWithoutRecord {
-		fmt.Fprintf(accountOutput(run.out), "  types: no compiler record for %s, so its diagnostics are unknown\n", file)
+		fmt.Fprintf(
+			accountOutput(run.out),
+			"  types: no compiler record for %s, so its diagnostics are unknown\n",
+			file,
+		)
 	}
 	run.filesWithoutRecord += len(record.FilesWithoutRecord)
 	streams.Show(run.out)
@@ -664,12 +730,19 @@ func (run *engineRun) acceptLint(record *engineLintRecord) error {
 		return fmt.Errorf("a lint record in a %s run", run.mode)
 	}
 	if record.Findings != run.findingsInPhase {
-		return fmt.Errorf("the lint record counts %d findings and %d finding records came with it", record.Findings, run.findingsInPhase)
+		return fmt.Errorf(
+			"the lint record counts %d findings and %d finding records came with it",
+			record.Findings,
+			run.findingsInPhase,
+		)
 	}
 
 	walkCost := fmt.Sprintf("in %s", round(time.Duration(record.ElapsedMilliseconds)*time.Millisecond))
 	if record.ReusedFrom != "" {
-		walkCost = fmt.Sprintf("walked by the %s phase (nothing was rewritten, so its findings still hold)", record.ReusedFrom)
+		walkCost = fmt.Sprintf(
+			"walked by the %s phase (nothing was rewritten, so its findings still hold)",
+			record.ReusedFrom,
+		)
 	}
 	// The dash is escaped, not changed: it is the TypeScript run's lint line, which internal/differential finds
 	// by it. See writeLintReport.
@@ -739,8 +812,12 @@ func classifyEngineCoverage(record *engineLintRecord) (coverageSummary, error) {
 
 	found := record.RulesRun - record.RulesWatchedAndQuiet - len(silent)
 	if record.RulesWatchedAndQuiet < 0 || found < 0 {
-		return coverageSummary{}, fmt.Errorf("the lint record counts %d rules run, and %d watched and quiet plus %d silent is more than that",
-			record.RulesRun, record.RulesWatchedAndQuiet, len(silent))
+		return coverageSummary{}, fmt.Errorf(
+			"the lint record counts %d rules run, and %d watched and quiet plus %d silent is more than that",
+			record.RulesRun,
+			record.RulesWatchedAndQuiet,
+			len(silent),
+		)
 	}
 	summary.Unnamed[coverageRanAndFoundNothing] = record.RulesWatchedAndQuiet
 	summary.Unnamed[coverageFoundSomething] = found
@@ -749,12 +826,18 @@ func classifyEngineCoverage(record *engineLintRecord) (coverageSummary, error) {
 	// files ran on the rest. Its category is the counted one; the partial fact is said once, by name.
 	for name, files := range record.RulesScopedOff {
 		if !isSilent[name] {
-			summary.PartialFacts = append(summary.PartialFacts, fmt.Sprintf("%s is off by the config for %d files and ran on the rest", name, files))
+			summary.PartialFacts = append(
+				summary.PartialFacts,
+				fmt.Sprintf("%s is off by the config for %d files and ran on the rest", name, files),
+			)
 		}
 	}
 	for name := range notConfigured {
 		if !isSilent[name] {
-			summary.PartialFacts = append(summary.PartialFacts, fmt.Sprintf("%s is not in the config for some files and ran on the rest", name))
+			summary.PartialFacts = append(
+				summary.PartialFacts,
+				fmt.Sprintf("%s is not in the config for some files and ran on the rest", name),
+			)
 		}
 	}
 	sort.Strings(summary.PartialFacts)
@@ -825,11 +908,18 @@ func (run *engineRun) acceptPhase(record *enginePhaseRecord) error {
 	}
 	outcome, known := engineOutcomes[record.Outcome]
 	if !known {
-		return fmt.Errorf("phase %s has outcome %q, which is not one of ran, skipped, notReached, reused", record.Name, record.Outcome)
+		return fmt.Errorf(
+			"phase %s has outcome %q, which is not one of ran, skipped, notReached, reused",
+			record.Name,
+			record.Outcome,
+		)
 	}
 	if phaseOrder[run.nextPhase] == phaseUnused {
 		if len(run.unusedPending) > 0 {
-			return fmt.Errorf("%d unused records arrived with no unusedCoverage record to count them", len(run.unusedPending))
+			return fmt.Errorf(
+				"%d unused records arrived with no unusedCoverage record to count them",
+				len(run.unusedPending),
+			)
 		}
 		if record.Outcome == "ran" && run.unusedCoverage == 0 {
 			return fmt.Errorf("the unused phase ran and no unusedCoverage record said what it looked at")
@@ -885,7 +975,11 @@ func (run *engineRun) acceptSummary(record *engineSummaryRecord) error {
 		return fmt.Errorf("a summary with no record for phase %s", phaseOrder[run.nextPhase])
 	}
 	if *record.Findings != run.findings {
-		return fmt.Errorf("the summary counts %d findings and %d finding records arrived", *record.Findings, run.findings)
+		return fmt.Errorf(
+			"the summary counts %d findings and %d finding records arrived",
+			*record.Findings,
+			run.findings,
+		)
 	}
 
 	// The two views of completeness are compared in one direction only. Where the records show a gap

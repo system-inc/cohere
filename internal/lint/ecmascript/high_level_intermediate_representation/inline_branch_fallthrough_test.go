@@ -37,7 +37,12 @@ return callback;
 			test.Fatal("fixture's block IDs coincide, so a skipped remap cannot be detected")
 		}
 		if copied.Fallthrough != want {
-			test.Errorf("copied fallthrough=%d, want %d; nested fallthrough=%d", copied.Fallthrough, want, branch.Fallthrough)
+			test.Errorf(
+				"copied fallthrough=%d, want %d; nested fallthrough=%d",
+				copied.Fallthrough,
+				want,
+				branch.Fallthrough,
+			)
 		}
 	}
 	if branches != 1 {
@@ -62,9 +67,21 @@ return <div first={firstSet} second={secondSet}/>;
 		fires  bool
 	}{
 		{"conditional", source, false},
-		{"array allocation", strings.ReplaceAll(strings.ReplaceAll(source, "new Set(first)", "[first]"), "new Set(second)", "[second]"), false},
-		{"unconditional", strings.ReplaceAll(strings.ReplaceAll(source, "mounted ? new Set(first) : new Set()", "new Set(first)"), "mounted ? new Set(second) : new Set()", "new Set(second)"), false},
-		{"unpreserved dependency", `import {useMemo} from 'react'; function Component({propA}) {return useMemo(() => propA.x(), [propA.x]);}`, true},
+		{
+			"array allocation",
+			strings.ReplaceAll(strings.ReplaceAll(source, "new Set(first)", "[first]"), "new Set(second)", "[second]"),
+			false,
+		},
+		{"unconditional", strings.ReplaceAll(
+			strings.ReplaceAll(source, "mounted ? new Set(first) : new Set()", "new Set(first)"),
+			"mounted ? new Set(second) : new Set()",
+			"new Set(second)",
+		), false},
+		{
+			"unpreserved dependency",
+			`import {useMemo} from 'react'; function Component({propA}) {return useMemo(() => propA.x(), [propA.x]);}`,
+			true,
+		},
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()

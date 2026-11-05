@@ -339,9 +339,9 @@ func noExtraneousClassEmptyIsLoadBearing(ruleContext rule.Context, exportHolder 
 // empty class has. A declaration is its own binding. A class expression bound to a variable is judged by
 // that binding's uses, exactly as a declaration is: `const token = class Token {}` handed only to
 // constructor slots is the same load-bearing token. A `let` needs no rule of its own: reassigning it is a
-// use that wants no constructor, so a reassigned one is reported, and one never reassigned is a const. Any other class expression has no binding to follow,
-// so its own position decides: `{ target: class Target {} }` in a property typed as a constructor.
-// Found by api's Base pass, where five such tokens came back after the declaration form landed.
+// use that wants no constructor, so a reassigned one is reported, and one never reassigned is a const. Any other class
+// expression has no binding to follow, so its own position decides: `{ target: class Target {} }` in a property typed
+// as a constructor. Found by api's Base pass, where five such tokens came back after the declaration form landed.
 func noExtraneousClassEmptyClassIsLoadBearing(ruleContext rule.Context, classNode *ast.Node, name *ast.Node) bool {
 	if ruleContext.TypeChecker == nil {
 		return false

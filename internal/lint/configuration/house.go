@@ -167,7 +167,9 @@ func LoadHouse(path string, registeredNames []string, detection HouseDetection) 
 	}
 	if tailwind {
 		house.applied = append(house.applied, AppliedSet{Name: TailwindSetName, Applied: true,
-			Evidence: "every file, since " + relativeTo(root, detection.TailwindEntryPoint) + " is a Tailwind stylesheet"})
+			Evidence: "every file, since " +
+				relativeTo(root, detection.TailwindEntryPoint) +
+				" is a Tailwind stylesheet"})
 	} else {
 		house.applied = append(house.applied, AppliedSet{Name: TailwindSetName, Evidence: detection.TailwindSkipped})
 	}
@@ -191,7 +193,10 @@ func LoadHouse(path string, registeredNames []string, detection HouseDetection) 
 			}
 			variant.Rules[key] = RuleSetting{Severity: SeverityOff}
 			if _, reasoned := house.gatedReasons[key]; !reasoned {
-				house.gatedReasons[key] = OffReason{File: whole.ruleWriters[key], Reason: setReasons[whole.ruleWriters[key]]}
+				house.gatedReasons[key] = OffReason{
+					File:   whole.ruleWriters[key],
+					Reason: setReasons[whole.ruleWriters[key]],
+				}
 			}
 		}
 	}
@@ -207,7 +212,11 @@ func perFileSet(name string, files int, evidence string) AppliedSet {
 	if files == 1 {
 		noun = "file that"
 	}
-	return AppliedSet{Name: name, Applied: true, Evidence: fmt.Sprintf("%d %s %s", files, noun, singularVerb(files, evidence))}
+	return AppliedSet{
+		Name:     name,
+		Applied:  true,
+		Evidence: fmt.Sprintf("%d %s %s", files, noun, singularVerb(files, evidence)),
+	}
 }
 
 // singularVerb turns "import react or contain JSX" into "imports react or contains JSX" for one file.
@@ -219,7 +228,10 @@ func singularVerb(files int, evidence string) string {
 }
 
 func relativeTo(root string, path string) string {
-	if relative, relativePathError := filepath.Rel(root, path); relativePathError == nil && !strings.HasPrefix(relative, "..") {
+	if relative, relativePathError := filepath.Rel(
+		root,
+		path,
+	); relativePathError == nil && !strings.HasPrefix(relative, "..") {
 		return filepath.ToSlash(relative)
 	}
 	return path
@@ -228,7 +240,13 @@ func relativeTo(root string, path string) string {
 // loadHouseVariant loads cohere:typescript, the per-file sets variant names, cohere:tailwind when
 // tailwind is true, and the project's own layers on top, each of which extends every set so a rule it
 // writes replaces the set's ruling rather than colliding with it.
-func loadHouseVariant(ownLayers []configLayer, root string, registeredNames []string, variant houseVariant, tailwind bool) (*Config, error) {
+func loadHouseVariant(
+	ownLayers []configLayer,
+	root string,
+	registeredNames []string,
+	variant houseVariant,
+	tailwind bool,
+) (*Config, error) {
 	sets := []string{TypeScriptSetName}
 	if variant.react {
 		sets = append(sets, ReactSetName)

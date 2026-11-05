@@ -61,7 +61,10 @@ func (referenceLiveness) Meet(left, right map[*ast.Symbol]bool) map[*ast.Symbol]
 	}
 	return merged
 }
-func (referenceLiveness) Transfer(block *control_flow_graph.Block[deadStoreEvent], incoming map[*ast.Symbol]bool) map[*ast.Symbol]bool {
+func (referenceLiveness) Transfer(
+	block *control_flow_graph.Block[deadStoreEvent],
+	incoming map[*ast.Symbol]bool,
+) map[*ast.Symbol]bool {
 	outgoing := map[*ast.Symbol]bool{}
 	for symbol := range incoming {
 		outgoing[symbol] = true
@@ -109,48 +112,63 @@ func TestDeadStoreBitsetSolvesAsTheMapDid(test *testing.T) {
 		"  return later() + total;\n" +
 		"}\n"
 	solved := 0
-	probe := rule.Rule{Name: "dead-store-bitset", NeedsTypeChecker: true, Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
-			symbols, occupied := collectSymbolFacts(ruleContext, node)
-			for _, root := range codePathRoots(ruleContext, node) {
-				if !occupied[root.Node] {
-					continue
-				}
-				graph := deadStoreGraph(ruleContext, root.Node, symbols)
-				numbers := map[*ast.Symbol]int{}
-				for _, block := range graph.Blocks {
-					for index := range block.Events {
-						event := &block.Events[index]
-						if _, numbered := numbers[event.symbol]; !numbered {
-							numbers[event.symbol] = len(numbers)
-						}
-						event.number = numbers[event.symbol]
+	probe := rule.Rule{
+		Name:             "dead-store-bitset",
+		NeedsTypeChecker: true,
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+			return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
+				symbols, occupied := collectSymbolFacts(ruleContext, node)
+				for _, root := range codePathRoots(ruleContext, node) {
+					if !occupied[root.Node] {
+						continue
 					}
-				}
-				bitset := control_flow_graph.Solve[liveSymbols, deadStoreEvent](graph, control_flow_graph.Backward,
-					deadStoreLiveness{reachable: map[int]bool{}, words: (len(numbers) + 63) / 64})
-				reference := control_flow_graph.Solve[map[*ast.Symbol]bool, deadStoreEvent](graph,
-					control_flow_graph.Backward, referenceLiveness{})
-				if bitset.Rounds() != reference.Rounds() {
-					test.Errorf("%v: the bitset converged in %d rounds, the map in %d", root.Node.Kind, bitset.Rounds(), reference.Rounds())
-				}
-				for _, block := range graph.Blocks {
-					bits, ok := bitset.In(block)
-					set, referenceOk := reference.In(block)
-					if ok != referenceOk {
-						test.Fatalf("block %d is reachable to one solution and not the other", block.Index())
-					}
-					for symbol, number := range numbers {
-						if bits.has(number) != set[symbol] {
-							test.Errorf("%v block %d: %s live %t in the bitset, %t in the map", root.Node.Kind, block.Index(),
-								symbol.Name, bits.has(number), set[symbol])
+					graph := deadStoreGraph(ruleContext, root.Node, symbols)
+					numbers := map[*ast.Symbol]int{}
+					for _, block := range graph.Blocks {
+						for index := range block.Events {
+							event := &block.Events[index]
+							if _, numbered := numbers[event.symbol]; !numbered {
+								numbers[event.symbol] = len(numbers)
+							}
+							event.number = numbers[event.symbol]
 						}
 					}
+					bitset := control_flow_graph.Solve[liveSymbols, deadStoreEvent](graph, control_flow_graph.Backward,
+						deadStoreLiveness{reachable: map[int]bool{}, words: (len(numbers) + 63) / 64})
+					reference := control_flow_graph.Solve[map[*ast.Symbol]bool, deadStoreEvent](graph,
+						control_flow_graph.Backward, referenceLiveness{})
+					if bitset.Rounds() != reference.Rounds() {
+						test.Errorf(
+							"%v: the bitset converged in %d rounds, the map in %d",
+							root.Node.Kind,
+							bitset.Rounds(),
+							reference.Rounds(),
+						)
+					}
+					for _, block := range graph.Blocks {
+						bits, ok := bitset.In(block)
+						set, referenceOk := reference.In(block)
+						if ok != referenceOk {
+							test.Fatalf("block %d is reachable to one solution and not the other", block.Index())
+						}
+						for symbol, number := range numbers {
+							if bits.has(number) != set[symbol] {
+								test.Errorf(
+									"%v block %d: %s live %t in the bitset, %t in the map",
+									root.Node.Kind,
+									block.Index(),
+									symbol.Name,
+									bits.has(number),
+									set[symbol],
+								)
+							}
+						}
+					}
+					solved++
 				}
-				solved++
-			}
-		}}
-	}}
+			}}
+		},
+	}
 	rule_testing.RunTypedFiles(test, probe, map[string]string{"/fixture.ts": source}, "/fixture.ts")
 	if solved < 2 {
 		test.Fatalf("solved %d roots, want the function and its closure", solved)

@@ -59,8 +59,20 @@ func TestMaxClassesPerFileFires(test *testing.T) {
 		{"a declaration then an expression", "class Foo {}\nvar x = class {};", "", 2, 1},
 		{"two declarations on one line at a maximum of one", "class Foo {} class Bar {}", "1", 2, 1},
 		{"three declarations on one line at a maximum of two", "class Foo {} class Bar {} class Baz {}", "2", 3, 2},
-		{"two declarations with an expression ignored at a maximum of one", "\n                class Foo {}\n                class Bar {}\n                const myExpression = class {}\n            ", "{\"ignoreExpressions\": true, \"max\": 1}", 2, 1},
-		{"three declarations with an expression ignored at a maximum of two", "\n                class Foo {}\n                class Bar {}\n                class Baz {}\n                const myExpression = class {}\n            ", "{\"ignoreExpressions\": true, \"max\": 2}", 3, 2},
+		{
+			"two declarations with an expression ignored at a maximum of one",
+			"\n                class Foo {}\n                class Bar {}\n                const myExpression = class {}\n            ",
+			"{\"ignoreExpressions\": true, \"max\": 1}",
+			2,
+			1,
+		},
+		{
+			"three declarations with an expression ignored at a maximum of two",
+			"\n                class Foo {}\n                class Bar {}\n                class Baz {}\n                const myExpression = class {}\n            ",
+			"{\"ignoreExpressions\": true, \"max\": 2}",
+			3,
+			2,
+		},
 		{"comments wrapping two declarations", "/* comment */\nclass A {}\nclass B {}\n/* comment */", "", 2, 1},
 	}
 
@@ -99,8 +111,16 @@ func TestMaxClassesPerFileStaysSilent(test *testing.T) {
 		{"two declarations at a maximum of two", "class Foo {}\nclass Bar {}", "2"},
 		{"a single declaration under the object shape", "class Foo {}", "{\"max\": 1}"},
 		{"two declarations under the object shape", "class Foo {}\nclass Bar {}", "{\"max\": 2}"},
-		{"an expression ignored at a maximum of one", "\n                class Foo {}\n                const myExpression = class {}\n            ", "{\"ignoreExpressions\": true, \"max\": 1}"},
-		{"an expression ignored at a maximum of two", "\n                class Foo {}\n                class Bar {}\n                const myExpression = class {}\n            ", "{\"ignoreExpressions\": true, \"max\": 2}"},
+		{
+			"an expression ignored at a maximum of one",
+			"\n                class Foo {}\n                const myExpression = class {}\n            ",
+			"{\"ignoreExpressions\": true, \"max\": 1}",
+		},
+		{
+			"an expression ignored at a maximum of two",
+			"\n                class Foo {}\n                class Bar {}\n                const myExpression = class {}\n            ",
+			"{\"ignoreExpressions\": true, \"max\": 2}",
+		},
 	}
 
 	for _, testCase := range cases {
@@ -137,7 +157,13 @@ func TestMaxClassesPerFileSpansTheProgramBody(test *testing.T) {
 		// upstream asserts line 2 column 1 to line 3 column 11
 		{"a file wrapped in comments", "/* comment */\nclass A {}\nclass B {}\n/* comment */", "", 14, 35},
 		// upstream asserts line 2 column 17 to line 4 column 46
-		{"an indented file inside a template", "\n                class Foo {}\n                class Bar {}\n                const myExpression = class {}\n            ", "{\"ignoreExpressions\": true, \"max\": 1}", 17, 104},
+		{
+			"an indented file inside a template",
+			"\n                class Foo {}\n                class Bar {}\n                const myExpression = class {}\n            ",
+			"{\"ignoreExpressions\": true, \"max\": 1}",
+			17,
+			104,
+		},
 	}
 
 	for _, testCase := range cases {
@@ -242,7 +268,9 @@ func TestDecodeMaxClassesPerFileOptions(test *testing.T) {
 		// rather than at lint time. Accepting them here would report every file holding a single
 		// class.
 		for _, raw := range []string{"0", `{"max": 0}`, "-1"} {
-			if _, decodeMaximumClassesPerFileOptionsError := DecodeMaxClassesPerFileOptions(json.RawMessage(raw)); decodeMaximumClassesPerFileOptionsError == nil {
+			if _, decodeMaximumClassesPerFileOptionsError := DecodeMaxClassesPerFileOptions(
+				json.RawMessage(raw),
+			); decodeMaximumClassesPerFileOptionsError == nil {
 				test.Fatalf("%s should have been refused", raw)
 			}
 		}
@@ -280,15 +308,31 @@ func TestMaxClassesPerFileDoesNotCountAClassDeclaredInsideAFunction(test *testin
 	}{
 		{"a class nested in another class's method", "class A { m() { class B {} } }", false},
 		{"a class inside a function", "function f(){ class A {} }\nclass B {}", false},
-		{"classes inside a test callback, as the nexus type tests write them", "describe('x', () => {\n    class A {}\n    class B {}\n    it('y', () => { class C {} });\n});", false},
+		{
+			"classes inside a test callback, as the nexus type tests write them",
+			"describe('x', () => {\n    class A {}\n    class B {}\n    it('y', () => { class C {} });\n});",
+			false,
+		},
 		{"a class inside an arrow beside a top-level one", "class A {}\nconst f = () => { class B {} };", false},
 		{"a class in a namespace still counts", "class A {}\nnamespace N { class B {} }", true},
 		{"a class in a bare block still counts", "class A {}\n{ class B {} }", true},
 		{"a class in a static block still counts", "class A { static { class B {} } }", true},
-		{"an expression inside a function still counts without ignoreExpressions", "class A {}\nfunction f() { return class {}; }", true},
-		{"two top-level classes beside a nested one still report", "class A {}\nclass B {}\nfunction f() { class C {} }", true},
+		{
+			"an expression inside a function still counts without ignoreExpressions",
+			"class A {}\nfunction f() { return class {}; }",
+			true,
+		},
+		{
+			"two top-level classes beside a nested one still report",
+			"class A {}\nclass B {}\nfunction f() { class C {} }",
+			true,
+		},
 		// After a function the walk is at the top level again, so later classes count.
-		{"two top-level classes after a function still report", "function f() { class C {} }\nclass A {}\nclass B {}", true},
+		{
+			"two top-level classes after a function still report",
+			"function f() { class C {} }\nclass A {}\nclass B {}",
+			true,
+		},
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()

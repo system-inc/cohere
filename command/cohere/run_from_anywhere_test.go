@@ -120,7 +120,13 @@ func runCohere(test *testing.T, binary string, directory string, arguments ...st
 // runCohereWithEnvironment is runCohere with variables set for the binary alone, each "NAME=value"
 // overriding this process's own. A test that sets them this way rather than with test.Setenv can run in
 // parallel (#nxgt2ca).
-func runCohereWithEnvironment(test *testing.T, binary string, directory string, environment []string, arguments ...string) (string, int) {
+func runCohereWithEnvironment(
+	test *testing.T,
+	binary string,
+	directory string,
+	environment []string,
+	arguments ...string,
+) (string, int) {
 	test.Helper()
 	command := exec.Command(binary, verboseArguments(arguments)...)
 	command.Dir = directory
@@ -226,7 +232,11 @@ func TestCohereRunsFromAnywhere(test *testing.T) {
 		}
 		modified := information.ModTime()
 
-		writeTree(test, root, map[string]string{"index.ts": "export const value: number = 3;\nexport const more = 4;\n"})
+		writeTree(
+			test,
+			root,
+			map[string]string{"index.ts": "export const value: number = 3;\nexport const more = 4;\n"},
+		)
 		// Past the filesystem's timestamp resolution, so a write would move the mtime visibly.
 		time.Sleep(20 * time.Millisecond)
 
@@ -241,7 +251,12 @@ func TestCohereRunsFromAnywhere(test *testing.T) {
 			test.Error("a --no-fix run rewrote the build info")
 		}
 		if information, statError := os.Stat(buildInfo); statError != nil || !information.ModTime().Equal(modified) {
-			test.Errorf("a --no-fix run touched the build info: mtime %v, was %v (stat: %v)", information.ModTime(), modified, statError)
+			test.Errorf(
+				"a --no-fix run touched the build info: mtime %v, was %v (stat: %v)",
+				information.ModTime(),
+				modified,
+				statError,
+			)
 		}
 	})
 }
@@ -275,7 +290,9 @@ func TestAScopedRunKeepsItsScopeAfterAFixRewritesAFile(test *testing.T) {
 	if !strings.Contains(output, "graph rebuilt") {
 		test.Fatalf("no fix was applied, so the rebuild this test is about never ran:\n%s", output)
 	}
-	if fixed, readError := os.ReadFile(filepath.Join(root, "Scoped.ts")); readError != nil || strings.Contains(string(fixed), "debugger") {
+	if fixed, readError := os.ReadFile(
+		filepath.Join(root, "Scoped.ts"),
+	); readError != nil || strings.Contains(string(fixed), "debugger") {
 		test.Fatalf("the debugger statement was not removed (read error %v):\n%s", readError, fixed)
 	}
 

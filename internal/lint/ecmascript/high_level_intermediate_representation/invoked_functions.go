@@ -89,7 +89,10 @@ func CollectAssumedInvokedFunctions(function *Function) AssumedInvokedFunctions 
 // Upstream's step 1, and its comment gives the reason it only matches `FunctionExpression`:
 // "conservatively only match function expressions which can have guaranteed ssa. ObjectMethods and
 // ObjectProperties do not". A value whose definition is not unique cannot be traced to one function.
-func collectInvokedCandidates(function *Function, candidates map[static_single_assignment.IdentifierId]*invokedCandidate) {
+func collectInvokedCandidates(
+	function *Function,
+	candidates map[static_single_assignment.IdentifierId]*invokedCandidate,
+) {
 	for _, block := range function.Blocks {
 		if block == nil {
 			continue

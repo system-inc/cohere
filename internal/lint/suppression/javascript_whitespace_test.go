@@ -43,9 +43,24 @@ func TestDirectivesReadWhitespaceAsJavaScriptDoes(test *testing.T) {
 		{"U+0085 before a listed rule", "/* eslint-disable no-console,\u0085no-debugger */\ndebugger;", 1, false},
 		{"U+FEFF around the reason separator", "/* eslint-disable no-debugger\ufeff--\ufeffwhy */\ndebugger;", 1, true},
 		// An enable that ESLint reads closes the block, so the `debugger;` after it is reported.
-		{"enable, U+00A0 after the word", "/* eslint-disable no-debugger */\n/* eslint-enable\u00a0no-debugger */\ndebugger;", 2, false},
-		{"enable, U+FEFF after the word", "/* eslint-disable no-debugger */\n/* eslint-enable\ufeffno-debugger */\ndebugger;", 2, false},
-		{"enable, U+0085 after the word", "/* eslint-disable no-debugger */\n/* eslint-enable\u0085no-debugger */\ndebugger;", 2, true},
+		{
+			"enable, U+00A0 after the word",
+			"/* eslint-disable no-debugger */\n/* eslint-enable\u00a0no-debugger */\ndebugger;",
+			2,
+			false,
+		},
+		{
+			"enable, U+FEFF after the word",
+			"/* eslint-disable no-debugger */\n/* eslint-enable\ufeffno-debugger */\ndebugger;",
+			2,
+			false,
+		},
+		{
+			"enable, U+0085 after the word",
+			"/* eslint-disable no-debugger */\n/* eslint-enable\u0085no-debugger */\ndebugger;",
+			2,
+			true,
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {

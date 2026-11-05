@@ -23,7 +23,10 @@ func takeVerdictFile() *os.File {
 	// or a script, where the same number may be a file the script opened (`3>log`), and a byte written
 	// there would land in someone else's output. Such a descriptor is left exactly as it was found.
 	var status syscall.Stat_t
-	if fstatError := syscall.Fstat(descriptor, &status); fstatError != nil || status.Mode&syscall.S_IFMT != syscall.S_IFIFO {
+	if fstatError := syscall.Fstat(
+		descriptor,
+		&status,
+	); fstatError != nil || status.Mode&syscall.S_IFMT != syscall.S_IFIFO {
 		return nil
 	}
 	syscall.CloseOnExec(descriptor)

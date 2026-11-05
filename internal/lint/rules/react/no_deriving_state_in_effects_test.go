@@ -252,16 +252,56 @@ func TestNoDerivingStateInEffectsMeasuredCases(test *testing.T) {
 	const noDerivingStateInEffects = "noDerivingStateInEffects"
 
 	cases := []derivedEffectCase{
-		{name: "branchOnDep", source: "import {useEffect, useState} from \"./react\";\nfunction Component({a, b}) {\n  const [v, setV] = useState('');\n  useEffect(() => {\n    if (a) { setV(a + b); }\n  }, [a, b]);\n  return v;\n}\n", findings: 0},
-		{name: "dispatchNotSetter", source: "import {useEffect, useReducer} from \"./react\";\nfunction Component({a, b}) {\n  const [v, dispatch] = useReducer((s, x) => s, '');\n  useEffect(() => {\n    dispatch(a + b);\n  }, [a, b]);\n  return v;\n}\n", findings: 0},
-		{name: "emptyDeps", source: "import {useEffect, useState} from \"./react\";\nfunction Component({a}) {\n  const [v, setV] = useState('');\n  useEffect(() => {\n    setV(a);\n  }, []);\n  return v;\n}\n", findings: 0},
-		{name: "inlineBoth", source: "import {useEffect, useState} from \"./react\";\nfunction Component({a, b}) {\n  const [v, setV] = useState('');\n  useEffect(() => {\n    setV(a + b);\n  }, [a, b]);\n  return v;\n}\n", findings: 1},
-		{name: "layoutEffect", source: "import {useLayoutEffect, useState} from \"./react\";\nfunction Component({a, b}) {\n  const [v, setV] = useState('');\n  useLayoutEffect(() => {\n    setV(a + b);\n  }, [a, b]);\n  return v;\n}\n", findings: 0},
-		{name: "namespace", source: "import * as React from \"./react\";\nfunction Component({a, b}) {\n  const [v, setV] = React.useState('');\n  React.useEffect(() => {\n    setV(a + b);\n  }, [a, b]);\n  return v;\n}\n", findings: 1},
-		{name: "noDepArray", source: "import {useEffect, useState} from \"./react\";\nfunction Component({a}) {\n  const [v, setV] = useState('');\n  useEffect(() => {\n    setV(a);\n  });\n  return v;\n}\n", findings: 0},
-		{name: "oneOfTwoDeps", source: "import {useEffect, useState} from \"./react\";\nfunction Component({a, b}) {\n  const [v, setV] = useState('');\n  useEffect(() => {\n    setV(a);\n  }, [a, b]);\n  return v;\n}\n", findings: 0},
-		{name: "renamedImport", source: "import {useEffect as useFx, useState} from \"./react\";\nfunction Component({a, b}) {\n  const [v, setV] = useState('');\n  useFx(() => {\n    setV(a + b);\n  }, [a, b]);\n  return v;\n}\n", findings: 1},
-		{name: "twoSetters", source: "import {useEffect, useState} from \"./react\";\nfunction Component({a, b}) {\n  const [v, setV] = useState('');\n  const [w, setW] = useState('');\n  useEffect(() => {\n    setV(a + b);\n    setW(a + b);\n  }, [a, b]);\n  return v + w;\n}\n", findings: 2},
+		{
+			name:     "branchOnDep",
+			source:   "import {useEffect, useState} from \"./react\";\nfunction Component({a, b}) {\n  const [v, setV] = useState('');\n  useEffect(() => {\n    if (a) { setV(a + b); }\n  }, [a, b]);\n  return v;\n}\n",
+			findings: 0,
+		},
+		{
+			name:     "dispatchNotSetter",
+			source:   "import {useEffect, useReducer} from \"./react\";\nfunction Component({a, b}) {\n  const [v, dispatch] = useReducer((s, x) => s, '');\n  useEffect(() => {\n    dispatch(a + b);\n  }, [a, b]);\n  return v;\n}\n",
+			findings: 0,
+		},
+		{
+			name:     "emptyDeps",
+			source:   "import {useEffect, useState} from \"./react\";\nfunction Component({a}) {\n  const [v, setV] = useState('');\n  useEffect(() => {\n    setV(a);\n  }, []);\n  return v;\n}\n",
+			findings: 0,
+		},
+		{
+			name:     "inlineBoth",
+			source:   "import {useEffect, useState} from \"./react\";\nfunction Component({a, b}) {\n  const [v, setV] = useState('');\n  useEffect(() => {\n    setV(a + b);\n  }, [a, b]);\n  return v;\n}\n",
+			findings: 1,
+		},
+		{
+			name:     "layoutEffect",
+			source:   "import {useLayoutEffect, useState} from \"./react\";\nfunction Component({a, b}) {\n  const [v, setV] = useState('');\n  useLayoutEffect(() => {\n    setV(a + b);\n  }, [a, b]);\n  return v;\n}\n",
+			findings: 0,
+		},
+		{
+			name:     "namespace",
+			source:   "import * as React from \"./react\";\nfunction Component({a, b}) {\n  const [v, setV] = React.useState('');\n  React.useEffect(() => {\n    setV(a + b);\n  }, [a, b]);\n  return v;\n}\n",
+			findings: 1,
+		},
+		{
+			name:     "noDepArray",
+			source:   "import {useEffect, useState} from \"./react\";\nfunction Component({a}) {\n  const [v, setV] = useState('');\n  useEffect(() => {\n    setV(a);\n  });\n  return v;\n}\n",
+			findings: 0,
+		},
+		{
+			name:     "oneOfTwoDeps",
+			source:   "import {useEffect, useState} from \"./react\";\nfunction Component({a, b}) {\n  const [v, setV] = useState('');\n  useEffect(() => {\n    setV(a);\n  }, [a, b]);\n  return v;\n}\n",
+			findings: 0,
+		},
+		{
+			name:     "renamedImport",
+			source:   "import {useEffect as useFx, useState} from \"./react\";\nfunction Component({a, b}) {\n  const [v, setV] = useState('');\n  useFx(() => {\n    setV(a + b);\n  }, [a, b]);\n  return v;\n}\n",
+			findings: 1,
+		},
+		{
+			name:     "twoSetters",
+			source:   "import {useEffect, useState} from \"./react\";\nfunction Component({a, b}) {\n  const [v, setV] = useState('');\n  const [w, setW] = useState('');\n  useEffect(() => {\n    setV(a + b);\n    setW(a + b);\n  }, [a, b]);\n  return v + w;\n}\n",
+			findings: 2,
+		},
 		// A spread callback argument. Upstream tests `value.args[0].kind === 'Identifier'`, which a
 		// spread element is not, and this rule tests `args[0].Spread`. The two agree and both are
 		// silent.
@@ -277,7 +317,11 @@ func TestNoDerivingStateInEffectsMeasuredCases(test *testing.T) {
 		// than by reasoning a third time: `Call $28(...$29, $32)` where `$29` is the
 		// FunctionExpression's lvalue, so `functions` hits and `args[0].Spread` is true. Measured
 		// both ways: pristine 0 findings, mutant 1. React 7.1.1 is silent on it.
-		{name: "spreadCallbackArgument", source: "import {useEffect, useState} from \"./react\";\nfunction Component({a, b}) {\n  const [v, setV] = useState('');\n  useEffect(...(() => { setV(a + b); }), [a, b]);\n  return v;\n}\n", findings: 0},
+		{
+			name:     "spreadCallbackArgument",
+			source:   "import {useEffect, useState} from \"./react\";\nfunction Component({a, b}) {\n  const [v, setV] = useState('');\n  useEffect(...(() => { setV(a + b); }), [a, b]);\n  return v;\n}\n",
+			findings: 0,
+		},
 		// The taint count test, and the fixture that finally reaches it.
 		//
 		// `oneOfTwoDeps` above reads as though it covers this and does not: with `b` declared as a
@@ -289,8 +333,16 @@ func TestNoDerivingStateInEffectsMeasuredCases(test *testing.T) {
 		// taint from only some of them, which is what `log(b)` does here. Measured against React
 		// 7.1.1: the partial case is clean and the full case reports, and the count mutant reports
 		// on both.
-		{name: "everyDepCapturedButSetterReadsOnlyOne", source: "import {useEffect, useState} from \"./react\";\nfunction Component({a, b}) {\n  const [v, setV] = useState('');\n  useEffect(() => { log(b); setV(a); }, [a, b]);\n  return v;\n}\n", findings: 0},
-		{name: "everyDepCapturedAndSetterReadsBoth", source: "import {useEffect, useState} from \"./react\";\nfunction Component({a, b}) {\n  const [v, setV] = useState('');\n  useEffect(() => { log(b); setV(a + b); }, [a, b]);\n  return v;\n}\n", findings: 1},
+		{
+			name:     "everyDepCapturedButSetterReadsOnlyOne",
+			source:   "import {useEffect, useState} from \"./react\";\nfunction Component({a, b}) {\n  const [v, setV] = useState('');\n  useEffect(() => { log(b); setV(a); }, [a, b]);\n  return v;\n}\n",
+			findings: 0,
+		},
+		{
+			name:     "everyDepCapturedAndSetterReadsBoth",
+			source:   "import {useEffect, useState} from \"./react\";\nfunction Component({a, b}) {\n  const [v, setV] = useState('');\n  useEffect(() => { log(b); setV(a + b); }, [a, b]);\n  return v;\n}\n",
+			findings: 1,
+		},
 		// A loop inside the effect body, which is what the back-edge guard is for.
 		//
 		// Upstream refuses to analyse a block whose predecessor it has not yet seen, so an effect
@@ -301,26 +353,50 @@ func TestNoDerivingStateInEffectsMeasuredCases(test *testing.T) {
 		// on `while` and `do-while`: the counted loop declines earlier for its own reasons, in the
 		// allowed-instruction switch, so a fixture using only `for` would read as coverage while
 		// testing nothing. Measured both ways, pristine 0 and mutant 1 on these two.
-		{name: "whileLoopInEffectBody", source: "import {useEffect, useState} from \"./react\";\nfunction Component({a}) {\n  const [v, setV] = useState('');\n  useEffect(() => { while (g()) { h(); } setV(a); }, [a]);\n  return v;\n}\n", findings: 0},
-		{name: "doWhileLoopInEffectBody", source: "import {useEffect, useState} from \"./react\";\nfunction Component({a}) {\n  const [v, setV] = useState('');\n  useEffect(() => { do { h(); } while (g()); setV(a); }, [a]);\n  return v;\n}\n", findings: 0},
+		{
+			name:     "whileLoopInEffectBody",
+			source:   "import {useEffect, useState} from \"./react\";\nfunction Component({a}) {\n  const [v, setV] = useState('');\n  useEffect(() => { while (g()) { h(); } setV(a); }, [a]);\n  return v;\n}\n",
+			findings: 0,
+		},
+		{
+			name:     "doWhileLoopInEffectBody",
+			source:   "import {useEffect, useState} from \"./react\";\nfunction Component({a}) {\n  const [v, setV] = useState('');\n  useEffect(() => { do { h(); } while (g()); setV(a); }, [a]);\n  return v;\n}\n",
+			findings: 0,
+		},
 		// A local dependency whose initializer is not a literal. This is the other side of
 		// `dependencyIsFoldedConstant`: upstream folds `const x = 'lit'` away and leaves
 		// `const x = compute()` alone, so this reports where the constant cases are silent.
 		// Measured against React 7.1.1, which reports it. Without this the primitive test in that
 		// helper could be replaced by `return true` and nothing would notice, which would silence
 		// every effect with a local dep.
-		{name: "localDependencyFromANonLiteralInitializer", source: "import {useEffect, useState} from \"./react\";\nfunction Component({firstName}) {\n  const lastName = compute();\n  const [fullName, setFullName] = useState('');\n  useEffect(() => {\n    setFullName(firstName + ' ' + lastName);\n  }, [firstName, lastName]);\n  return <div>{fullName}</div>;\n}\n", findings: 1},
+		{
+			name:     "localDependencyFromANonLiteralInitializer",
+			source:   "import {useEffect, useState} from \"./react\";\nfunction Component({firstName}) {\n  const lastName = compute();\n  const [fullName, setFullName] = useState('');\n  useEffect(() => {\n    setFullName(firstName + ' ' + lastName);\n  }, [firstName, lastName]);\n  return <div>{fullName}</div>;\n}\n",
+			findings: 1,
+		},
 		// The setter's argument count. Upstream tests `value.args.length === 1`, so a setter called
 		// with two arguments is not the shape it judges and the effect is abandoned. Both of these
 		// are clean under React 7.1.1 and clean here, and each separately kills the mutant that
 		// drops the argument test.
-		{name: "setterCalledWithTwoArguments", source: "import {useEffect, useState} from \"./react\";\nfunction Component({a, b}) {\n  const [v, setV] = useState('');\n  useEffect(() => {\n    setV(a + b, a);\n  }, [a, b]);\n  return v;\n}\n", findings: 0},
-		{name: "setterCalledWithASpreadArgument", source: "import {useEffect, useState} from \"./react\";\nfunction Component({a, b}) {\n  const [v, setV] = useState('');\n  useEffect(() => {\n    setV(...[a + b]);\n  }, [a, b]);\n  return v;\n}\n", findings: 0},
+		{
+			name:     "setterCalledWithTwoArguments",
+			source:   "import {useEffect, useState} from \"./react\";\nfunction Component({a, b}) {\n  const [v, setV] = useState('');\n  useEffect(() => {\n    setV(a + b, a);\n  }, [a, b]);\n  return v;\n}\n",
+			findings: 0,
+		},
+		{
+			name:     "setterCalledWithASpreadArgument",
+			source:   "import {useEffect, useState} from \"./react\";\nfunction Component({a, b}) {\n  const [v, setV] = useState('');\n  useEffect(() => {\n    setV(...[a + b]);\n  }, [a, b]);\n  return v;\n}\n",
+			findings: 0,
+		},
 		// A component declared inside another function. Lowering puts it in the enclosing function's
 		// arena rather than walking into it, so the rule recurses through `function.Functions` to
 		// reach it. That recursion's mutant survived every other fixture in this file, because
 		// nothing else here nests a component. React 7.1.1 reports this one.
-		{name: "effectInsideANestedComponent", source: "import {useEffect, useState} from \"./react\";\nfunction Outer() {\n  function Inner({a, b}) {\n    const [v, setV] = useState('');\n    useEffect(() => {\n      setV(a + b);\n    }, [a, b]);\n    return v;\n  }\n  return Inner;\n}\n", findings: 1},
+		{
+			name:     "effectInsideANestedComponent",
+			source:   "import {useEffect, useState} from \"./react\";\nfunction Outer() {\n  function Inner({a, b}) {\n    const [v, setV] = useState('');\n    useEffect(() => {\n      setV(a + b);\n    }, [a, b]);\n    return v;\n  }\n  return Inner;\n}\n",
+			findings: 1,
+		},
 	}
 
 	for _, testCase := range cases {
@@ -389,7 +465,13 @@ func TestNoDerivingStateInEffectsPointsAtTheSetterCall(test *testing.T) {
 			for index, want := range testCase.wantText {
 				span := result.Diagnostics[index].Range
 				if span.Pos() < 0 || span.End() > len(written) || span.Pos() >= span.End() {
-					test.Fatalf("finding %d range %d..%d is outside the %d byte file", index, span.Pos(), span.End(), len(written))
+					test.Fatalf(
+						"finding %d range %d..%d is outside the %d byte file",
+						index,
+						span.Pos(),
+						span.End(),
+						len(written),
+					)
 				}
 				if got := written[span.Pos():span.End()]; got != want {
 					test.Errorf("finding %d points at %q, want %q", index, got, want)
@@ -408,7 +490,10 @@ func TestNoDerivingStateInEffectsPointsAtTheSetterCall(test *testing.T) {
 func TestNoDerivingStateInEffectsMessage(test *testing.T) {
 	test.Parallel()
 
-	result := runNoDerivingStateInEffects(test, "import {useEffect, useState} from \"./react\";\nfunction Component({a, b}) {\n  const [v, setV] = useState('');\n  useEffect(() => {\n    setV(a + b);\n  }, [a, b]);\n  return v;\n}\n")
+	result := runNoDerivingStateInEffects(
+		test,
+		"import {useEffect, useState} from \"./react\";\nfunction Component({a, b}) {\n  const [v, setV] = useState('');\n  useEffect(() => {\n    setV(a + b);\n  }, [a, b]);\n  return v;\n}\n",
+	)
 	if len(result.Diagnostics) != 1 {
 		test.Fatalf("expected exactly one finding, got %d", len(result.Diagnostics))
 	}
@@ -455,7 +540,13 @@ func TestNoDerivingStateInEffectsRequiresTheTypedHarness(test *testing.T) {
 func TestNoDerivingStateInEffectsJudgesOnlyWhatReactCompiles(test *testing.T) {
 	test.Parallel()
 
-	rule_testing.ExpectClean(test, runNoDerivingStateInEffects(test, "import {useEffect, useState} from \"./react\";\n\nexport function deriveName(initialName: string) {\n  const [name, setName] = useState('');\n  useEffect(() => {\n    setName(initialName);\n  }, [initialName]);\n  return name;\n}\n"))
+	rule_testing.ExpectClean(test, runNoDerivingStateInEffects(
+		test,
+		"import {useEffect, useState} from \"./react\";\n\nexport function deriveName(initialName: string) {\n  const [name, setName] = useState('');\n  useEffect(() => {\n    setName(initialName);\n  }, [initialName]);\n  return name;\n}\n",
+	))
 
-	rule_testing.ExpectFindings(test, runNoDerivingStateInEffects(test, "import {useEffect, useState} from \"./react\";\n\nexport function wrapper() {\n  function Component({initialName}: {initialName: string}) {\n    const [name, setName] = useState('');\n    useEffect(() => {\n      setName(initialName);\n    }, [initialName]);\n    return <div>{name}</div>;\n  }\n  return Component;\n}\n"), "noDerivingStateInEffects")
+	rule_testing.ExpectFindings(test, runNoDerivingStateInEffects(
+		test,
+		"import {useEffect, useState} from \"./react\";\n\nexport function wrapper() {\n  function Component({initialName}: {initialName: string}) {\n    const [name, setName] = useState('');\n    useEffect(() => {\n      setName(initialName);\n    }, [initialName]);\n    return <div>{name}</div>;\n  }\n  return Component;\n}\n",
+	), "noDerivingStateInEffects")
 }

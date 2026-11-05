@@ -68,7 +68,14 @@ func TestCompiledGlobsAnswerAsMatchDid(test *testing.T) {
 			}
 			resolved := loaded.Resolve(filepath.Join(directory, path))
 			if resolved.Ignored != (wantIgnoredBy != "") || resolved.IgnoredBy != wantIgnoredBy {
-				test.Errorf("%s: %q resolved ignored=%v by %q, want by %q", name, path, resolved.Ignored, resolved.IgnoredBy, wantIgnoredBy)
+				test.Errorf(
+					"%s: %q resolved ignored=%v by %q, want by %q",
+					name,
+					path,
+					resolved.Ignored,
+					resolved.IgnoredBy,
+					wantIgnoredBy,
+				)
 			}
 			if resolved.Ignored {
 				continue
@@ -115,7 +122,10 @@ func TestCompiledGlobFormsMatchAsBefore(test *testing.T) {
 		pattern string
 		paths   []string
 	}{
-		{"**/generated/**/*.{ts,tsx}", []string{"a/generated/b/c.ts", "generated/c.tsx", "a/generated/c.js", "generated.ts"}},
+		{
+			"**/generated/**/*.{ts,tsx}",
+			[]string{"a/generated/b/c.ts", "generated/c.tsx", "a/generated/c.js", "generated.ts"},
+		},
 		{"modules/*", []string{"modules/os", "modules/os/Os.ts", "modules"}},
 		{"node_modules/**", []string{"node_modules", "node_modules/a/b.js", "x/node_modules"}},
 		{"{a,{b,c}}/x.ts", []string{"a/x.ts", "b/x.ts", "c/x.ts", "d/x.ts"}},

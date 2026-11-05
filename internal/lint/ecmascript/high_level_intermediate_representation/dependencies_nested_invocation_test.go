@@ -17,8 +17,16 @@ const callback = React.useCallback(() => properties.inputReference.current.value
 		{"unknown callback consumer", callback + `consume(callback); return null;}`, false},
 		{"namespace effect", callback + `React.useEffect(() => callback(), [callback]); return null;}`, false},
 		{"jsx assumes invocation", callback + `return <div onClick={callback}/>;}`, true},
-		{"ordinary property", strings.ReplaceAll(callback, ".current", ".value") + `return <div onClick={callback}/>;}`, false},
-		{"missing reactive dependency", `import {useMemo} from 'react'; function Component(props) { const result = useMemo(() => [props.value], []); return <div>{result}</div>; }`, true},
+		{
+			"ordinary property",
+			strings.ReplaceAll(callback, ".current", ".value") + `return <div onClick={callback}/>;}`,
+			false,
+		},
+		{
+			"missing reactive dependency",
+			`import {useMemo} from 'react'; function Component(props) { const result = useMemo(() => [props.value], []); return <div>{result}</div>; }`,
+			true,
+		},
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()

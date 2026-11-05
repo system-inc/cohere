@@ -86,7 +86,11 @@ func TestMemoizationLevelOfMatchesUpstreamGroups(test *testing.T) {
 		{name: "primitive under forceMemoizePrimitives", want: MemoizationConditional, value: &Primitive{}},
 		{name: "binary under forceMemoizePrimitives", want: MemoizationConditional, value: &BinaryExpression{}},
 		{name: "unary under forceMemoizePrimitives", want: MemoizationConditional, value: &UnaryExpression{}},
-		{name: "template literal under forceMemoizePrimitives", want: MemoizationConditional, value: &TemplateLiteral{}},
+		{
+			name:  "template literal under forceMemoizePrimitives",
+			want:  MemoizationConditional,
+			value: &TemplateLiteral{},
+		},
 		{name: "load global under forceMemoizePrimitives", want: MemoizationConditional, value: &LoadGlobal{}},
 		{name: "jsx text under forceMemoizePrimitives", want: MemoizationConditional, value: &JsxText{}},
 

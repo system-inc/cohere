@@ -135,7 +135,10 @@ func buildRules(inputs Inputs, sets []RuleSet) (Rules, error) {
 			if setRule.Severity == configuration.SeverityOff.String() {
 				continue
 			}
-			enabledBy[setRule.Name] = append(enabledBy[setRule.Name], RuleSetSeverity{Set: set.Name, Severity: setRule.Severity})
+			enabledBy[setRule.Name] = append(
+				enabledBy[setRule.Name],
+				RuleSetSeverity{Set: set.Name, Severity: setRule.Severity},
+			)
 		}
 	}
 
@@ -160,7 +163,10 @@ func buildRules(inputs Inputs, sets []RuleSet) (Rules, error) {
 			row.UpstreamName = name
 		} else {
 			// A house rule whose name does not fit the scheme refuses the build, so it cannot publish.
-			parsed, parseRuleNameError := policy.Naming.ParseRuleName(row.Namespace, name[strings.LastIndex(name, "/")+1:])
+			parsed, parseRuleNameError := policy.Naming.ParseRuleName(
+				row.Namespace,
+				name[strings.LastIndex(name, "/")+1:],
+			)
 			if parseRuleNameError != nil {
 				return Rules{}, fmt.Errorf("docsdata: %s: %w", name, parseRuleNameError)
 			}
@@ -216,7 +222,11 @@ func buildSwiftRows(registry []byte, verdicts map[string]SwiftVerdict) ([]RuleRo
 			return nil, fmt.Errorf("docsdata: the Swift rule %s is not under %s/", entry.Name, swiftNamespace)
 		}
 		if !swiftOrigins[entry.Origin] {
-			return nil, fmt.Errorf("docsdata: %s: the origin %q is not one of house, swiftlint, swift-format", entry.Name, entry.Origin)
+			return nil, fmt.Errorf(
+				"docsdata: %s: the origin %q is not one of house, swiftlint, swift-format",
+				entry.Name,
+				entry.Origin,
+			)
 		}
 		row := RuleRow{
 			Name:         entry.Name,

@@ -283,7 +283,10 @@ func TestParseCSSCustomPropertyWhitespaceIsRaw(test *testing.T) {
 	// The ordinary declaration does not, which is what makes the difference above load-bearing
 	// rather than incidental.
 	if strings.Contains(ordinary.Value, "\n") {
-		test.Errorf("ordinary declaration value kept a newline it should have collapsed: %s", quoteForDiff(ordinary.Value))
+		test.Errorf(
+			"ordinary declaration value kept a newline it should have collapsed: %s",
+			quoteForDiff(ordinary.Value),
+		)
 	}
 }
 

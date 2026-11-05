@@ -97,7 +97,10 @@ var NoDupeClassMembers = rule.Rule{
 		// Nothing here fabricates an AST node. The list is a `NodeList` holding the class's own
 		// member nodes minus some, with the original list's own Loc, so every node the core sees is
 		// one the parser produced and every span it reports is real.
-		filtered := func(coreListener func(*ast.Node), setMembers func(*ast.Node, *ast.NodeList) func()) func(*ast.Node) {
+		filtered := func(
+			coreListener func(*ast.Node),
+			setMembers func(*ast.Node, *ast.NodeList) func(),
+		) func(*ast.Node) {
 			return func(node *ast.Node) {
 				restore := setMembers(node, nil)
 				if restore == nil {

@@ -39,13 +39,16 @@ func TestNoHeadImportInDocumentReports(test *testing.T) {
 			source:   "\n\t\t\t      import Document, { Html, Main, NextScript } from 'next/document'\n\t\t\t      import Head from 'next/head'\n\n\t\t\t      class MyDocument extends Document {\n\t\t\t        render() {\n\t\t\t          return (\n\t\t\t            <Html>\n\t\t\t              <Head />\n\t\t\t              <body>\n\t\t\t                <Main />\n\t\t\t                <NextScript />\n\t\t\t              </body>\n\t\t\t            </Html>\n\t\t\t          )\n\t\t\t        }\n\t\t\t      }\n\n\t\t\t      export default MyDocument\n\t\t\t      ",
 		},
 		{
-			// Upstream. The page-suffix convention, and the only upstream fixture where the trailing dot in `_document.` does real work: a port comparing the basename for equality passes every other case and fails this one.
+			// Upstream. The page-suffix convention, and the only upstream fixture where the trailing dot in
+			// `_document.` does real work: a port comparing the basename for equality passes every other case and fails
+			// this one.
 			name:     "the page suffix convention",
 			fileName: "pages/_document.page.tsx",
 			source:   "\n\t\t\t      import Document, { Html, Main, NextScript } from 'next/document'\n\t\t\t      import Head from 'next/head'\n\n\t\t\t      class MyDocument extends Document {\n\t\t\t        render() {\n\t\t\t          return (\n\t\t\t            <Html>\n\t\t\t              <Head />\n\t\t\t              <body>\n\t\t\t                <Main />\n\t\t\t                <NextScript />\n\t\t\t              </body>\n\t\t\t            </Html>\n\t\t\t          )\n\t\t\t        }\n\t\t\t      }\n\n\t\t\t      export default MyDocument\n\t\t\t      ",
 		},
 		{
-			// Upstream. The directory form, which only this rule's own gate spelling accepts. Upstream lists it twice, byte-identically, and the duplicate is dropped here.
+			// Upstream. The directory form, which only this rule's own gate spelling accepts. Upstream lists it twice,
+			// byte-identically, and the duplicate is dropped here.
 			name:     "the directory form",
 			fileName: "pages/_document/index.tsx",
 			source:   "\n\t\t\t      import Document, { Html, Main, NextScript } from 'next/document'\n\t\t\t      import Head from 'next/head'\n\n\t\t\t      class MyDocument extends Document {\n\t\t\t        render() {\n\t\t\t          return (\n\t\t\t            <Html>\n\t\t\t              <Head />\n\t\t\t              <body>\n\t\t\t                <Main />\n\t\t\t                <NextScript />\n\t\t\t              </body>\n\t\t\t            </Html>\n\t\t\t          )\n\t\t\t        }\n\t\t\t      }\n\n\t\t\t      export default MyDocument\n\t\t\t      ",

@@ -96,7 +96,12 @@ func TestConsistencyOrganizeImportsFires(test *testing.T) {
 	for _, testCase := range testCases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.Run(test, ConsistencyRequireOrganizedImports, "/repository/app/Thing.tsx", testCase.source)
+			result := rule_testing.Run(
+				test,
+				ConsistencyRequireOrganizedImports,
+				"/repository/app/Thing.tsx",
+				testCase.source,
+			)
 			rule_testing.ExpectFindings(test, result, "importsNotOrganized")
 
 			span := result.Diagnostics[0].Range
@@ -205,7 +210,12 @@ func TestConsistencyOrganizeImportsStaysSilent(test *testing.T) {
 func TestConsistencyOrganizeImportsHoldsGeneratedFilesToTheRule(test *testing.T) {
 	test.Parallel()
 	for _, fileName := range []string{"/repository/app/generated/Thing.tsx", "/repository/app/Thing.generated.ts"} {
-		result := rule_testing.Run(test, ConsistencyRequireOrganizedImports, fileName, "import z from 'zebra';\nimport a from 'alpha';\n\nexport const X = 1;\n")
+		result := rule_testing.Run(
+			test,
+			ConsistencyRequireOrganizedImports,
+			fileName,
+			"import z from 'zebra';\nimport a from 'alpha';\n\nexport const X = 1;\n",
+		)
 		rule_testing.ExpectFindings(test, result, "importsNotOrganized")
 	}
 }

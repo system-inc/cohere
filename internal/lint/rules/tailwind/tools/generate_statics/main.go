@@ -75,7 +75,9 @@ func main() {
 	flag.Parse()
 
 	if len(inputs) < 2 {
-		fail("at least two design systems are required: one extraction cannot tell a framework registration from a repository one, and a table built from a single system would ship that repository's utilities as framework facts")
+		fail(
+			"at least two design systems are required: one extraction cannot tell a framework registration from a repository one, and a table built from a single system would ship that repository's utilities as framework facts",
+		)
 	}
 
 	systems := make([]staticsFile, 0, len(inputs))
@@ -89,7 +91,10 @@ func main() {
 			fail("parse %s: %v", path, decodeError)
 		}
 		if len(file.Statics) == 0 {
-			fail("%s holds no statics, so an intersection against it is empty for a reason that is not a measurement", path)
+			fail(
+				"%s holds no statics, so an intersection against it is empty for a reason that is not a measurement",
+				path,
+			)
 		}
 		systems = append(systems, file)
 	}
@@ -97,21 +102,28 @@ func main() {
 	// One Tailwind, or the comparison is between two different engines and proves nothing.
 	for index := 1; index < len(systems); index++ {
 		if systems[index].TailwindVersion != systems[0].TailwindVersion {
-			fail("inputs were generated against different Tailwind versions (%s and %s); a check run against a different engine than the table came from cannot detect a difference in the table",
-				systems[0].TailwindVersion, systems[index].TailwindVersion)
+			fail(
+				"inputs were generated against different Tailwind versions (%s and %s); a check run against a different engine than the table came from cannot detect a difference in the table",
+				systems[0].TailwindVersion,
+				systems[index].TailwindVersion,
+			)
 		}
 	}
 
 	shared, dropped := intersect(systems)
 	if len(shared) == 0 {
-		fail("no static utility is registered by every input system, which means the inputs describe unrelated design systems rather than one framework")
+		fail(
+			"no static utility is registered by every input system, which means the inputs describe unrelated design systems rather than one framework",
+		)
 	}
 
 	// The split has to be visible, not merely performed. A run where every system registers exactly
 	// the same names has not demonstrated that the intersection is doing anything, and that is the
 	// state two repositories vendoring one submodule are in.
 	if len(dropped) == 0 {
-		fail("every input system registers an identical name set, so the intersection removed nothing and the framework/repository split is unverified; include a design system that shares no stylesheet with the others")
+		fail(
+			"every input system registers an identical name set, so the intersection removed nothing and the framework/repository split is unverified; include a design system that shares no stylesheet with the others",
+		)
 	}
 
 	source, renderError := render(systems, shared, dropped)
@@ -128,8 +140,13 @@ func main() {
 	}
 
 	// Ignored: what it reports is already written, and a summary that cannot reach the terminal changes none of it.
-	fmt.Fprintf(os.Stderr, "generate_statics: %d design systems, %d statics registered by all of them (%d dropped as repository-specific)\n",
-		len(systems), len(shared), len(dropped))
+	fmt.Fprintf(
+		os.Stderr,
+		"generate_statics: %d design systems, %d statics registered by all of them (%d dropped as repository-specific)\n",
+		len(systems),
+		len(shared),
+		len(dropped),
+	)
 	// Ignored: the rest of the same summary, which changes nothing already written.
 	fmt.Fprintf(os.Stderr, "  dropped: %s\n", strings.Join(firstFew(dropped, 8), ", "))
 }

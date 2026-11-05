@@ -97,7 +97,11 @@ func TestStrictOrderMatchesUpstream(test *testing.T) {
 			result := runClassOrderFixtureWithOptions(test,
 				`export const element = <img className="`+testCase.source+`" />;`,
 				EnforceConsistentClassOrderOptions{Order: "strict"})
-			rule_testing.ExpectFixedSource(test, result, `export const element = <img className="`+testCase.want+`" />;`+"\n")
+			rule_testing.ExpectFixedSource(
+				test,
+				result,
+				`export const element = <img className="`+testCase.want+`" />;`+"\n",
+			)
 		})
 	}
 }

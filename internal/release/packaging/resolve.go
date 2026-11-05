@@ -153,10 +153,19 @@ func resolveOverride(path string) (string, error) {
 
 	information, err := os.Stat(absolutePath)
 	if err != nil {
-		return "", fmt.Errorf("%s points at %s, and there is nothing there: %w", BinaryOverrideVariable, absolutePath, err)
+		return "", fmt.Errorf(
+			"%s points at %s, and there is nothing there: %w",
+			BinaryOverrideVariable,
+			absolutePath,
+			err,
+		)
 	}
 	if information.IsDir() {
-		return "", fmt.Errorf("%s points at %s, which is a directory rather than a binary", BinaryOverrideVariable, absolutePath)
+		return "", fmt.Errorf(
+			"%s points at %s, which is a directory rather than a binary",
+			BinaryOverrideVariable,
+			absolutePath,
+		)
 	}
 	if requireExecutableError := requireExecutable(absolutePath, information); requireExecutableError != nil {
 		return "", requireExecutableError

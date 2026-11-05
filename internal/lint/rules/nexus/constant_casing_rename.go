@@ -87,7 +87,10 @@ func fileLocalRenameFix(ruleContext rule.Context, name *ast.Node, newName string
 					return true
 				}
 				if isReference {
-					edits = append(edits, siteEdit{textRange: rule.TokenRange(ruleContext.SourceFile, node), text: edit})
+					edits = append(
+						edits,
+						siteEdit{textRange: rule.TokenRange(ruleContext.SourceFile, node), text: edit},
+					)
 				}
 			}
 		}

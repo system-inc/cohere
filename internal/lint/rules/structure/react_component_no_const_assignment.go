@@ -10,7 +10,10 @@ import (
 
 // reactComponentNoConstAssignmentText is the rule's message, whose wording lives in
 // `policy/messages/react-component-no-const-assignment.json`.
-var reactComponentNoConstAssignmentText = policy.MessageOf("structure/react-component-no-const-assignment", "noConstAssignment")
+var reactComponentNoConstAssignmentText = policy.MessageOf(
+	"structure/react-component-no-const-assignment",
+	"noConstAssignment",
+)
 
 // messageNoConstAssignment names the component and what to write instead. The declaration to write is
 // one value, code the rule builds, since whether it is exported changes the code and not the wording.
@@ -20,8 +23,10 @@ func messageNoConstAssignment(identifierName string, isExported bool) rule.Messa
 		prefix = "export "
 	}
 	return rule.Message{
-		Id:          reactComponentNoConstAssignmentText.Id,
-		Description: reactComponentNoConstAssignmentText.Render(map[string]string{"declaration": prefix + "function " + identifierName + "()"}),
+		Id: reactComponentNoConstAssignmentText.Id,
+		Description: reactComponentNoConstAssignmentText.Render(
+			map[string]string{"declaration": prefix + "function " + identifierName + "()"},
+		),
 	}
 }
 

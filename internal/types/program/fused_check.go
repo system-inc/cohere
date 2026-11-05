@@ -55,7 +55,12 @@ func NewFusedCheck() *FusedCheck {
 // itself, or for a stolen file, a file of the thief's own group. The checker's lock is taken and released
 // inside the call, so it must not be held: the walk calls this before it takes a checker for the file's
 // rules, never while holding one.
-func (check *FusedCheck) checkFile(ctx context.Context, g *Graph, sourceFile *ast.SourceFile, checkerFile *ast.SourceFile) {
+func (check *FusedCheck) checkFile(
+	ctx context.Context,
+	g *Graph,
+	sourceFile *ast.SourceFile,
+	checkerFile *ast.SourceFile,
+) {
 	check.mutex.Lock()
 	_, done := check.checked[sourceFile]
 	check.mutex.Unlock()
@@ -75,7 +80,12 @@ func (check *FusedCheck) checkFile(ctx context.Context, g *Graph, sourceFile *as
 
 // semanticDiagnosticsOn is GetSemanticDiagnostics with the checker that owns checkerFile instead of the one
 // that owns sourceFile: the same skip, the same call on the checker, the same filter and sort.
-func semanticDiagnosticsOn(ctx context.Context, program *compiler.Program, sourceFile *ast.SourceFile, checkerFile *ast.SourceFile) []*ast.Diagnostic {
+func semanticDiagnosticsOn(
+	ctx context.Context,
+	program *compiler.Program,
+	sourceFile *ast.SourceFile,
+	checkerFile *ast.SourceFile,
+) []*ast.Diagnostic {
 	if program.SkipTypeChecking(sourceFile, false) {
 		return nil
 	}

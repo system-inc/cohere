@@ -36,7 +36,10 @@ func TestANestedRepositoryEditReachesItsImportersWarm(test *testing.T) {
 	}
 	git := func(directory string, arguments ...string) {
 		test.Helper()
-		command := exec.Command("git", append([]string{"-c", "user.email=fixture@example.com", "-c", "user.name=fixture"}, arguments...)...)
+		command := exec.Command(
+			"git",
+			append([]string{"-c", "user.email=fixture@example.com", "-c", "user.name=fixture"}, arguments...)...,
+		)
 		command.Dir = directory
 		if output, outputError := command.CombinedOutput(); outputError != nil {
 			test.Fatalf("git %v: %v\n%s", arguments, outputError, output)
@@ -46,11 +49,17 @@ func TestANestedRepositoryEditReachesItsImportersWarm(test *testing.T) {
 	// EventType is a literal in the finding state, which a string union makes redundant, and a number otherwise.
 	const withFinding = "export type EventType = 'alarm';\n"
 	const withoutFinding = "export type EventType = number;\n"
-	write("tsconfig.json", `{"compilerOptions":{"strict":true,"noEmit":true,"target":"es2022","module":"esnext","moduleResolution":"bundler"},"include":["source","libraries"]}`)
+	write(
+		"tsconfig.json",
+		`{"compilerOptions":{"strict":true,"noEmit":true,"target":"es2022","module":"esnext","moduleResolution":"bundler"},"include":["source","libraries"]}`,
+	)
 	write("CohereSettings.json", `{"rules":{"@typescript-eslint/no-redundant-type-constituents":"error"}}`)
 	write("package.json", `{"name":"fixture","private":true,"type":"module"}`)
 	write(".gitignore", ".cache/\nnode_modules/\n")
-	write("source/Use.ts", "import type { EventType } from '../libraries/base/Event';\nexport type EitherType = string | EventType;\n")
+	write(
+		"source/Use.ts",
+		"import type { EventType } from '../libraries/base/Event';\nexport type EitherType = string | EventType;\n",
+	)
 	write("libraries/base/Event.ts", withoutFinding)
 	write("libraries/base/package.json", `{"name":"base","private":true,"type":"module"}`)
 	nested := filepath.Join(root, "libraries", "base")
@@ -83,21 +92,39 @@ func TestANestedRepositoryEditReachesItsImportersWarm(test *testing.T) {
 		write("libraries/base/Event.ts", step.before)
 		run("--no-fix")
 		if replayed := run("--no-fix"); !strings.HasPrefix(replayed, "cached: ") {
-			test.Fatalf("%s: an unchanged tree did not replay, so the edit below proves nothing:\n%s", step.name, replayed)
+			test.Fatalf(
+				"%s: an unchanged tree did not replay, so the edit below proves nothing:\n%s",
+				step.name,
+				replayed,
+			)
 		}
 
 		write("libraries/base/Event.ts", step.after)
 		warm := run("--no-fix")
 		cold := run("--no-fix", "--no-cache")
 		if strings.HasPrefix(warm, "cached: ") {
-			test.Fatalf("%s: a run after the nested repository's Event.ts changed replayed the run from before:\n%s", step.name, warm)
+			test.Fatalf(
+				"%s: a run after the nested repository's Event.ts changed replayed the run from before:\n%s",
+				step.name,
+				warm,
+			)
 		}
 		if findings(warm) != findings(cold) {
-			test.Fatalf("%s: warm and cold disagree after the nested repository's Event.ts changed\n--- warm\n%s\n--- cold\n%s",
-				step.name, warm, cold)
+			test.Fatalf(
+				"%s: warm and cold disagree after the nested repository's Event.ts changed\n--- warm\n%s\n--- cold\n%s",
+				step.name,
+				warm,
+				cold,
+			)
 		}
 		if got := len(finding.FindAllString(cold, -1)); got != step.want {
-			test.Fatalf("%s: cold reports %d findings, want %d, so the fixture does not test what it says:\n%s", step.name, got, step.want, cold)
+			test.Fatalf(
+				"%s: cold reports %d findings, want %d, so the fixture does not test what it says:\n%s",
+				step.name,
+				got,
+				step.want,
+				cold,
+			)
 		}
 	}
 }

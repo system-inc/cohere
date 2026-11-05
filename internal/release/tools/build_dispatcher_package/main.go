@@ -63,14 +63,23 @@ func main() {
 		}
 	}
 	if len(platformDirectories) == 0 {
-		fmt.Fprintln(os.Stderr, "no platform package is staged in", os.Args[1], "so the launcher would have no binary it could check; stage one there first")
+		fmt.Fprintln(
+			os.Stderr,
+			"no platform package is staged in",
+			os.Args[1],
+			"so the launcher would have no binary it could check; stage one there first",
+		)
 		os.Exit(1)
 	}
 	checksums, err := release.Checksums(os.Args[1], platformDirectories)
 	if err != nil {
 		panic(err)
 	}
-	if writeError := os.WriteFile(filepath.Join(directory, release.ChecksumsFileName), checksums, 0o644); writeError != nil {
+	if writeError := os.WriteFile(
+		filepath.Join(directory, release.ChecksumsFileName),
+		checksums,
+		0o644,
+	); writeError != nil {
 		panic(writeError)
 	}
 

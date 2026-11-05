@@ -68,21 +68,64 @@ func TestNoUnknownPropertyFires(test *testing.T) {
 		{"invalid 11", `<div onmousedown="bar"></div>;`, ``, []string{`unknownPropWithStandardName`}},
 		{"invalid 12", `<div onMousedown="bar"></div>;`, ``, []string{`unknownPropWithStandardName`}},
 		{"invalid 13", `<use xlink:href="bar" />;`, ``, []string{`unknownPropWithStandardName`}},
-		{"invalid 14", `<rect clip-path="bar" transform-origin="center" />;`, ``, []string{`unknownPropWithStandardName`}},
-		{"invalid 15", `<script crossorigin nomodule />`, ``, []string{`unknownPropWithStandardName`, `unknownPropWithStandardName`}},
+		{
+			"invalid 14",
+			`<rect clip-path="bar" transform-origin="center" />;`,
+			``,
+			[]string{`unknownPropWithStandardName`},
+		},
+		{
+			"invalid 15",
+			`<script crossorigin nomodule />`,
+			``,
+			[]string{`unknownPropWithStandardName`, `unknownPropWithStandardName`},
+		},
 		{"invalid 16", `<div crossorigin />`, ``, []string{`unknownPropWithStandardName`}},
 		{"invalid 17", `<div crossOrigin />`, ``, []string{`invalidPropOnTag`}},
 		{"invalid 18", `<div as="audio" />`, ``, []string{`invalidPropOnTag`}},
-		{"invalid 19", `<div onAbort={this.abort} onDurationChange={this.durationChange} onEmptied={this.emptied} onEnded={this.end} onResize={this.resize} onError={this.error} />`, ``, []string{`invalidPropOnTag`, `invalidPropOnTag`, `invalidPropOnTag`, `invalidPropOnTag`, `invalidPropOnTag`, `invalidPropOnTag`}},
+		{
+			"invalid 19",
+			`<div onAbort={this.abort} onDurationChange={this.durationChange} onEmptied={this.emptied} onEnded={this.end} onResize={this.resize} onError={this.error} />`,
+			``,
+			[]string{
+				`invalidPropOnTag`,
+				`invalidPropOnTag`,
+				`invalidPropOnTag`,
+				`invalidPropOnTag`,
+				`invalidPropOnTag`,
+				`invalidPropOnTag`,
+			},
+		},
 		{"invalid 20", `<div onLoad={this.load} />`, ``, []string{`invalidPropOnTag`}},
 		{"invalid 21", `<div fill="pink" />`, ``, []string{`invalidPropOnTag`}},
-		{"invalid 22", `<div controls={this.controls} loop={true} muted={false} src={this.videoSrc} playsInline={true} allowFullScreen></div>`, ``, []string{`invalidPropOnTag`, `invalidPropOnTag`, `invalidPropOnTag`, `invalidPropOnTag`, `invalidPropOnTag`}},
+		{
+			"invalid 22",
+			`<div controls={this.controls} loop={true} muted={false} src={this.videoSrc} playsInline={true} allowFullScreen></div>`,
+			``,
+			[]string{
+				`invalidPropOnTag`,
+				`invalidPropOnTag`,
+				`invalidPropOnTag`,
+				`invalidPropOnTag`,
+				`invalidPropOnTag`,
+			},
+		},
 		{"invalid 23", `<div download="foo" />`, ``, []string{`invalidPropOnTag`}},
 		{"invalid 24", `<div imageSrcSet="someImageSrcSet" />`, ``, []string{`invalidPropOnTag`}},
 		{"invalid 25", `<div imageSizes="someImageSizes" />`, ``, []string{`invalidPropOnTag`}},
 		{"invalid 26", `<div data-xml-anything="invalid" />`, ``, []string{`unknownProp`}},
-		{"invalid 27", `<div data-testID="bar" data-under_sCoRe="bar" dataNotAnDataAttribute="yes" />;`, `{"requireDataLowercase":true}`, []string{`dataLowercaseRequired`, `dataLowercaseRequired`, `unknownProp`}},
-		{"invalid 28", `<App data-testID="bar" data-under_sCoRe="bar" dataNotAnDataAttribute="yes" />;`, `{"requireDataLowercase":true}`, []string{`dataLowercaseRequired`, `dataLowercaseRequired`}},
+		{
+			"invalid 27",
+			`<div data-testID="bar" data-under_sCoRe="bar" dataNotAnDataAttribute="yes" />;`,
+			`{"requireDataLowercase":true}`,
+			[]string{`dataLowercaseRequired`, `dataLowercaseRequired`, `unknownProp`},
+		},
+		{
+			"invalid 28",
+			`<App data-testID="bar" data-under_sCoRe="bar" dataNotAnDataAttribute="yes" />;`,
+			`{"requireDataLowercase":true}`,
+			[]string{`dataLowercaseRequired`, `dataLowercaseRequired`},
+		},
 		{"invalid 29", `<div abbr="abbr" />`, ``, []string{`invalidPropOnTag`}},
 		{"invalid 30", `<div webkitDirectory="" />`, ``, []string{`invalidPropOnTag`}},
 		{"invalid 31", `<div webkitdirectory="" />`, ``, []string{`invalidPropOnTag`}},
@@ -101,13 +144,23 @@ func TestNoUnknownPropertyFires(test *testing.T) {
 		// Upstream sets 16.0.99 to accept `allowTransparency`, a name React dropped in 16.1.
 		{"valid 46", `<div allowTransparency="true" />`, ``, []string{`unknownProp`}},
 		// Upstream sets 19.0.0 to accept `precedence`, which the no-settings default does not reach.
-		{"valid 50", `<link precedence="medium" href="https://foo.bar" rel="canonical" />`, ``, []string{`unknownProp`}},
+		{
+			"valid 50",
+			`<link precedence="medium" href="https://foo.bar" rel="canonical" />`,
+			``,
+			[]string{`unknownProp`},
+		},
 		// Cases upstream's corpus does not write, each measured against the installed build.
 
 		// A namespaced attribute reports, which is why this rule reads source text rather than
 		// calling jsx.AttributeName: that shelf helper declines a namespaced name by design, and
 		// using it would silently drop every one of these.
-		{"a namespaced xlink attribute", `<svg><use xlink:href="#a" /></svg>`, ``, []string{"unknownPropWithStandardName"}},
+		{
+			"a namespaced xlink attribute",
+			`<svg><use xlink:href="#a" /></svg>`,
+			``,
+			[]string{"unknownPropWithStandardName"},
+		},
 		{"a namespaced xmlns attribute", `<svg xmlns:xlink="u" />`, ``, []string{"unknownProp"}},
 		{"a bogus namespaced attribute", `<div foo:bar="x" />`, ``, []string{"unknownProp"}},
 		// The xml exclusion inside the data-attribute test.
@@ -124,9 +177,24 @@ func TestNoUnknownPropertyFires(test *testing.T) {
 		// normalisation rewrites it to `allowFullScreen`, so a port matching the ignore list after
 		// normalisation would exempt on the canonical spelling and not on the written one, which is
 		// the exact inverse of upstream. All three rows measured against the installed build.
-		{"the canonical spelling does not exempt allowfullscreen", `<div allowfullscreen="true" />`, `{"ignore":["allowFullScreen"]}`, []string{"invalidPropOnTag"}},
-		{"an unignored allowfullscreen on the wrong tag reports", `<div allowfullscreen="true" />`, ``, []string{"invalidPropOnTag"}},
-		{"the canonical spelling does not exempt charset", `<div charset="utf-8" />`, `{"ignore":["charSet"]}`, []string{"invalidPropOnTag"}},
+		{
+			"the canonical spelling does not exempt allowfullscreen",
+			`<div allowfullscreen="true" />`,
+			`{"ignore":["allowFullScreen"]}`,
+			[]string{"invalidPropOnTag"},
+		},
+		{
+			"an unignored allowfullscreen on the wrong tag reports",
+			`<div allowfullscreen="true" />`,
+			``,
+			[]string{"invalidPropOnTag"},
+		},
+		{
+			"the canonical spelling does not exempt charset",
+			`<div charset="utf-8" />`,
+			`{"ignore":["charSet"]}`,
+			[]string{"invalidPropOnTag"},
+		},
 		// The ARIA list is matched exactly, unlike the property search below it. A mutant lowering
 		// the name before the lookup survives every corpus case, because upstream writes no
 		// miscased ARIA attribute anywhere.
@@ -134,7 +202,12 @@ func TestNoUnknownPropertyFires(test *testing.T) {
 		// html-like guard. This is the control for the member-tag row in the silent table: the two
 		// differ only in the dot, and without upstream's early member-tag return the member form
 		// would report here too. Both measured on the installed build.
-		{"a component reaches the data branch", `<Foo data-Baz="x" />`, `{"requireDataLowercase":true}`, []string{"dataLowercaseRequired"}},
+		{
+			"a component reaches the data branch",
+			`<Foo data-Baz="x" />`,
+			`{"requireDataLowercase":true}`,
+			[]string{"dataLowercaseRequired"},
+		},
 		{"a miscased aria attribute", `<div aria-Hidden="true" />`, ``, []string{"unknownProp"}},
 		{"an uppercase aria attribute", `<div ARIA-HIDDEN="true" />`, ``, []string{"unknownProp"}},
 	}
@@ -143,7 +216,13 @@ func TestNoUnknownPropertyFires(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			options := noUnknownPropertyOptions(test, testCase.rawOptions)
-			result := rule_testing.RunWithOptions(test, NoUnknownProperty, noUnknownPropertyFile, testCase.sourceText, options)
+			result := rule_testing.RunWithOptions(
+				test,
+				NoUnknownProperty,
+				noUnknownPropertyFile,
+				testCase.sourceText,
+				options,
+			)
 			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
@@ -171,7 +250,11 @@ func TestNoUnknownPropertyStaysSilent(test *testing.T) {
 		{"valid 10", `<div onMouseDown={this._onMouseDown}></div>;`, ``},
 		{"valid 13", `<a href="someLink" download="foo">Read more</a>`, ``},
 		{"valid 14", `<area download="foo" />`, ``},
-		{"valid 15", `<img src="cat_keyboard.jpeg" alt="A cat sleeping on a keyboard" align="top" fetchPriority="high" />`, ``},
+		{
+			"valid 15",
+			`<img src="cat_keyboard.jpeg" alt="A cat sleeping on a keyboard" align="top" fetchPriority="high" />`,
+			``,
+		},
 		{"valid 16", `<input type="password" required />`, ``},
 		{"valid 17", `<input ref={this.input} type="radio" />`, ``},
 		{"valid 18", `<input type="file" webkitdirectory="" />`, ``},
@@ -180,7 +263,11 @@ func TestNoUnknownPropertyStaysSilent(test *testing.T) {
 		{"valid 21", `<iframe scrolling="?" onLoad={a} onError={b} align="top" />`, ``},
 		{"valid 22", `<input key="bar" type="radio" />`, ``},
 		{"valid 23", `<button disabled>You cannot click me</button>;`, ``},
-		{"valid 24", `<svg key="lock" viewBox="box" fill={10} d="d" stroke={1} strokeWidth={2} strokeLinecap={3} strokeLinejoin={4} transform="something" clipRule="else" x1={5} x2="6" y1="7" y2="8"></svg>`, ``},
+		{
+			"valid 24",
+			`<svg key="lock" viewBox="box" fill={10} d="d" stroke={1} strokeWidth={2} strokeLinecap={3} strokeLinejoin={4} transform="something" clipRule="else" x1={5} x2="6" y1="7" y2="8"></svg>`,
+			``,
+		},
 		{"valid 25", `<g fill="#7B82A0" fillRule="evenodd"></g>`, ``},
 		{"valid 26", `<mask fill="#7B82A0"></mask>`, ``},
 		{"valid 27", `<symbol fill="#7B82A0"></symbol>`, ``},
@@ -193,17 +280,29 @@ func TestNoUnknownPropertyStaysSilent(test *testing.T) {
 		{"valid 34", `<script onLoad={bar} onError={foo} />`, ``},
 		{"valid 35", `<source onLoad={bar} onError={foo} />`, ``},
 		{"valid 36", `<link onLoad={bar} onError={foo} />`, ``},
-		{"valid 37", `<link rel="preload" as="image" href="someHref" imageSrcSet="someImageSrcSet" imageSizes="someImageSizes" />`, ``},
+		{
+			"valid 37",
+			`<link rel="preload" as="image" href="someHref" imageSrcSet="someImageSrcSet" imageSizes="someImageSizes" />`,
+			``,
+		},
 		{"valid 38", `<object onLoad={bar} />`, ``},
 		{"valid 40", `<video allowFullScreen webkitAllowFullScreen mozAllowFullScreen />`, ``},
 		{"valid 41", `<iframe allowFullScreen webkitAllowFullScreen mozAllowFullScreen />`, ``},
 		{"valid 42", `<table border="1" />`, ``},
 		{"valid 43", `<th abbr="abbr" />`, ``},
 		{"valid 44", `<td abbr="abbr" />`, ``},
-		{"valid 45", `<template shadowrootmode="open" shadowrootclonable shadowrootdelegatesfocus shadowrootserializable />`, ``},
+		{
+			"valid 45",
+			`<template shadowrootmode="open" shadowrootclonable shadowrootdelegatesfocus shadowrootserializable />`,
+			``,
+		},
 		{"valid 47", `<div onPointerDown={this.onDown} onPointerUp={this.onUp} />`, ``},
 		{"valid 48", `<input type="checkbox" defaultChecked={this.state.checkbox} />`, ``},
-		{"valid 49", `<div onTouchStart={this.startAnimation} onTouchEnd={this.stopAnimation} onTouchCancel={this.cancel} onTouchMove={this.move} onMouseMoveCapture={this.capture} onTouchCancelCapture={this.log} />`, ``},
+		{
+			"valid 49",
+			`<div onTouchStart={this.startAnimation} onTouchEnd={this.stopAnimation} onTouchCancel={this.cancel} onTouchMove={this.move} onMouseMoveCapture={this.capture} onTouchCancelCapture={this.log} />`,
+			``,
+		},
 		{"valid 51", `<meta charset="utf-8" />;`, ``},
 		{"valid 52", `<meta charSet="utf-8" />;`, ``},
 		{"valid 53", `<div class="foo" is="my-elem"></div>;`, ``},
@@ -225,12 +324,28 @@ func TestNoUnknownPropertyStaysSilent(test *testing.T) {
 		{"valid 69", `<audio crossOrigin />`, ``},
 		{"valid 70", `<svg focusable><image crossOrigin /></svg>`, ``},
 		{"valid 71", `<details onToggle={this.onToggle}>Some details</details>`, ``},
-		{"valid 72", `<path fill="pink" d="M 10,30 A 20,20 0,0,1 50,30 A 20,20 0,0,1 90,30 Q 90,60 50,90 Q 10,60 10,30 z"></path>`, ``},
+		{
+			"valid 72",
+			`<path fill="pink" d="M 10,30 A 20,20 0,0,1 50,30 A 20,20 0,0,1 90,30 Q 90,60 50,90 Q 10,60 10,30 z"></path>`,
+			``,
+		},
 		{"valid 73", `<line fill="pink" x1="0" y1="80" x2="100" y2="20"></line>`, ``},
 		{"valid 74", `<link as="audio">Audio content</link>`, ``},
-		{"valid 75", `<video controlsList="nodownload" controls={this.controls} loop={true} muted={false} src={this.videoSrc} playsInline={true} onResize={this.onResize}></video>`, ``},
-		{"valid 76", `<audio controlsList="nodownload" controls={this.controls} crossOrigin="anonymous" disableRemotePlayback loop muted preload="none" src="something" onAbort={this.abort} onDurationChange={this.durationChange} onEmptied={this.emptied} onEnded={this.end} onError={this.error} onResize={this.onResize}></audio>`, ``},
-		{"valid 77", `<marker id={markerId} viewBox="0 0 2 2" refX="1" refY="1" markerWidth="1" markerHeight="1" orient="auto" />`, ``},
+		{
+			"valid 75",
+			`<video controlsList="nodownload" controls={this.controls} loop={true} muted={false} src={this.videoSrc} playsInline={true} onResize={this.onResize}></video>`,
+			``,
+		},
+		{
+			"valid 76",
+			`<audio controlsList="nodownload" controls={this.controls} crossOrigin="anonymous" disableRemotePlayback loop muted preload="none" src="something" onAbort={this.abort} onDurationChange={this.durationChange} onEmptied={this.emptied} onEnded={this.end} onError={this.error} onResize={this.onResize}></audio>`,
+			``,
+		},
+		{
+			"valid 77",
+			`<marker id={markerId} viewBox="0 0 2 2" refX="1" refY="1" markerWidth="1" markerHeight="1" orient="auto" />`,
+			``,
+		},
 		{"valid 78", `<pattern id="pattern" viewBox="0,0,10,10" width="10%" height="10%" />`, ``},
 		{"valid 79", `<symbol id="myDot" width="10" height="10" viewBox="0 0 2 2" />`, ``},
 		{"valid 80", `<view id="one" viewBox="0 0 100 100" />`, ``},
@@ -288,7 +403,11 @@ func TestNoUnknownPropertyStaysSilent(test *testing.T) {
 		{"valid 11", `<div onScrollEnd={this._onScrollEnd}></div>;`, ``},
 		{"valid 12", `<div onScrollEndCapture={this._onScrollEndCapture}></div>;`, ``},
 		{"valid 39", `<body onLoad={bar} />`, ``},
-		{"valid 84", `<dialog closedby="something" onClose={handler} open id="dialog" returnValue="something" onCancel={handler2} />`, ``},
+		{
+			"valid 84",
+			`<dialog closedby="something" onClose={handler} open id="dialog" returnValue="something" onCancel={handler2} />`,
+			``,
+		},
 
 		// Cases upstream's corpus does not write, each measured against the installed build.
 
@@ -317,14 +436,24 @@ func TestNoUnknownPropertyStaysSilent(test *testing.T) {
 		{"the written spelling exempts charset", `<div charset="utf-8" />`, `{"ignore":["charset"]}`},
 		// The control for the pair above: the written spelling exempts, and this is the row the
 		// mutant has to break.
-		{"the written spelling exempts allowfullscreen", `<div allowfullscreen="true" />`, `{"ignore":["allowfullscreen"]}`},
+		{
+			"the written spelling exempts allowfullscreen",
+			`<div allowfullscreen="true" />`,
+			`{"ignore":["allowfullscreen"]}`,
+		},
 	}
 
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			options := noUnknownPropertyOptions(test, testCase.rawOptions)
-			result := rule_testing.RunWithOptions(test, NoUnknownProperty, noUnknownPropertyFile, testCase.sourceText, options)
+			result := rule_testing.RunWithOptions(
+				test,
+				NoUnknownProperty,
+				noUnknownPropertyFile,
+				testCase.sourceText,
+				options,
+			)
 			rule_testing.ExpectClean(test, result)
 		})
 	}
@@ -350,13 +479,23 @@ func TestNoUnknownPropertyRepairs(test *testing.T) {
 		// The value is untouched, including one holding an expression that must survive intact.
 		{"the value survives the repair", `<div class={someExpression} />`, `<div className={someExpression} />`},
 		// A namespaced name is replaced whole, colon included.
-		{"a namespaced name is replaced whole", `<svg><use xlink:href="#a" /></svg>`, `<svg><use xlinkHref="#a" /></svg>`},
+		{
+			"a namespaced name is replaced whole",
+			`<svg><use xlink:href="#a" /></svg>`,
+			`<svg><use xlinkHref="#a" /></svg>`,
+		},
 	}
 
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, NoUnknownProperty, noUnknownPropertyFile, testCase.sourceText, noUnknownPropertyOptions(test, ``))
+			result := rule_testing.RunWithOptions(
+				test,
+				NoUnknownProperty,
+				noUnknownPropertyFile,
+				testCase.sourceText,
+				noUnknownPropertyOptions(test, ``),
+			)
 			rule_testing.ExpectFindings(test, result, "unknownPropWithStandardName")
 			rule_testing.ExpectFixedSource(test, result, testCase.wantFixed)
 		})
@@ -385,7 +524,13 @@ func TestNoUnknownPropertyDoesNotRepairWhatItCannotName(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, NoUnknownProperty, noUnknownPropertyFile, testCase.sourceText, noUnknownPropertyOptions(test, testCase.rawOptions))
+			result := rule_testing.RunWithOptions(
+				test,
+				NoUnknownProperty,
+				noUnknownPropertyFile,
+				testCase.sourceText,
+				noUnknownPropertyOptions(test, testCase.rawOptions),
+			)
 			if len(result.Diagnostics) != 1 {
 				test.Fatalf("expected one finding, got %d", len(result.Diagnostics))
 			}
@@ -436,7 +581,13 @@ func TestNoUnknownPropertyMessageText(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, NoUnknownProperty, noUnknownPropertyFile, testCase.sourceText, noUnknownPropertyOptions(test, testCase.rawOptions))
+			result := rule_testing.RunWithOptions(
+				test,
+				NoUnknownProperty,
+				noUnknownPropertyFile,
+				testCase.sourceText,
+				noUnknownPropertyOptions(test, testCase.rawOptions),
+			)
 			if len(result.Diagnostics) != 1 {
 				test.Fatalf("expected one finding, got %d", len(result.Diagnostics))
 			}
@@ -469,7 +620,13 @@ func TestNoUnknownPropertyAnchor(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, NoUnknownProperty, noUnknownPropertyFile, testCase.sourceText, noUnknownPropertyOptions(test, ``))
+			result := rule_testing.RunWithOptions(
+				test,
+				NoUnknownProperty,
+				noUnknownPropertyFile,
+				testCase.sourceText,
+				noUnknownPropertyOptions(test, ``),
+			)
 			if len(result.Diagnostics) != 1 {
 				test.Fatalf("expected one finding, got %d", len(result.Diagnostics))
 			}
@@ -492,17 +649,35 @@ func TestNoUnknownPropertyIgnoreOption(test *testing.T) {
 
 	test.Run("the written spelling exempts", func(test *testing.T) {
 		test.Parallel()
-		result := rule_testing.RunWithOptions(test, NoUnknownProperty, noUnknownPropertyFile, `<div class="x" />`, noUnknownPropertyOptions(test, `{"ignore":["class"]}`))
+		result := rule_testing.RunWithOptions(
+			test,
+			NoUnknownProperty,
+			noUnknownPropertyFile,
+			`<div class="x" />`,
+			noUnknownPropertyOptions(test, `{"ignore":["class"]}`),
+		)
 		rule_testing.ExpectClean(test, result)
 	})
 	test.Run("the canonical spelling does not exempt the written one", func(test *testing.T) {
 		test.Parallel()
-		result := rule_testing.RunWithOptions(test, NoUnknownProperty, noUnknownPropertyFile, `<div class="x" />`, noUnknownPropertyOptions(test, `{"ignore":["className"]}`))
+		result := rule_testing.RunWithOptions(
+			test,
+			NoUnknownProperty,
+			noUnknownPropertyFile,
+			`<div class="x" />`,
+			noUnknownPropertyOptions(test, `{"ignore":["className"]}`),
+		)
 		rule_testing.ExpectFindings(test, result, "unknownPropWithStandardName")
 	})
 	test.Run("an unrelated entry exempts nothing", func(test *testing.T) {
 		test.Parallel()
-		result := rule_testing.RunWithOptions(test, NoUnknownProperty, noUnknownPropertyFile, `<div class="x" />`, noUnknownPropertyOptions(test, `{"ignore":["other"]}`))
+		result := rule_testing.RunWithOptions(
+			test,
+			NoUnknownProperty,
+			noUnknownPropertyFile,
+			`<div class="x" />`,
+			noUnknownPropertyOptions(test, `{"ignore":["other"]}`),
+		)
 		rule_testing.ExpectFindings(test, result, "unknownPropWithStandardName")
 	})
 }
@@ -516,22 +691,46 @@ func TestNoUnknownPropertyRequireDataLowercase(test *testing.T) {
 
 	test.Run("off by default", func(test *testing.T) {
 		test.Parallel()
-		result := rule_testing.RunWithOptions(test, NoUnknownProperty, noUnknownPropertyFile, `<div data-Foo="x" />`, noUnknownPropertyOptions(test, ``))
+		result := rule_testing.RunWithOptions(
+			test,
+			NoUnknownProperty,
+			noUnknownPropertyFile,
+			`<div data-Foo="x" />`,
+			noUnknownPropertyOptions(test, ``),
+		)
 		rule_testing.ExpectClean(test, result)
 	})
 	test.Run("explicitly false", func(test *testing.T) {
 		test.Parallel()
-		result := rule_testing.RunWithOptions(test, NoUnknownProperty, noUnknownPropertyFile, `<div data-Foo="x" />`, noUnknownPropertyOptions(test, `{"requireDataLowercase":false}`))
+		result := rule_testing.RunWithOptions(
+			test,
+			NoUnknownProperty,
+			noUnknownPropertyFile,
+			`<div data-Foo="x" />`,
+			noUnknownPropertyOptions(test, `{"requireDataLowercase":false}`),
+		)
 		rule_testing.ExpectClean(test, result)
 	})
 	test.Run("on reports", func(test *testing.T) {
 		test.Parallel()
-		result := rule_testing.RunWithOptions(test, NoUnknownProperty, noUnknownPropertyFile, `<div data-Foo="x" />`, noUnknownPropertyOptions(test, `{"requireDataLowercase":true}`))
+		result := rule_testing.RunWithOptions(
+			test,
+			NoUnknownProperty,
+			noUnknownPropertyFile,
+			`<div data-Foo="x" />`,
+			noUnknownPropertyOptions(test, `{"requireDataLowercase":true}`),
+		)
 		rule_testing.ExpectFindings(test, result, "dataLowercaseRequired")
 	})
 	test.Run("on leaves a lowercase data attribute alone", func(test *testing.T) {
 		test.Parallel()
-		result := rule_testing.RunWithOptions(test, NoUnknownProperty, noUnknownPropertyFile, `<div data-foo="x" />`, noUnknownPropertyOptions(test, `{"requireDataLowercase":true}`))
+		result := rule_testing.RunWithOptions(
+			test,
+			NoUnknownProperty,
+			noUnknownPropertyFile,
+			`<div data-foo="x" />`,
+			noUnknownPropertyOptions(test, `{"requireDataLowercase":true}`),
+		)
 		rule_testing.ExpectClean(test, result)
 	})
 }
@@ -555,7 +754,13 @@ func TestNoUnknownPropertyHasNoFileSuffixGate(test *testing.T) {
 	} {
 		test.Run(fileName, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, NoUnknownProperty, fileName, source, noUnknownPropertyOptions(test, ``))
+			result := rule_testing.RunWithOptions(
+				test,
+				NoUnknownProperty,
+				fileName,
+				source,
+				noUnknownPropertyOptions(test, ``),
+			)
 			rule_testing.ExpectFindings(test, result, "unknownPropWithStandardName")
 		})
 	}
@@ -585,7 +790,9 @@ func TestDecodeNoUnknownPropertyOptions(test *testing.T) {
 
 	test.Run("both keys decode", func(test *testing.T) {
 		test.Parallel()
-		decoded, decodeNoUnknownPropertyOptionsError := DecodeNoUnknownPropertyOptions([]byte(`{"ignore":["a","b"],"requireDataLowercase":true}`))
+		decoded, decodeNoUnknownPropertyOptionsError := DecodeNoUnknownPropertyOptions(
+			[]byte(`{"ignore":["a","b"],"requireDataLowercase":true}`),
+		)
 		if decodeNoUnknownPropertyOptionsError != nil {
 			test.Fatalf("decoding both keys: %v", decodeNoUnknownPropertyOptionsError)
 		}

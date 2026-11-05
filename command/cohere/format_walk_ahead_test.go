@@ -77,7 +77,10 @@ func TestTheFormatWalkBegunAheadIsTheOneTheFixPhaseWouldMake(test *testing.T) {
 	if !reflect.DeepEqual(taken, direct) {
 		test.Fatalf("the walk begun ahead differs from a direct walk\nahead:  %+v\ndirect: %+v", taken, direct)
 	}
-	if _, enumerateFormatTreeError := enumerateFormatTree(engine, root); enumerateFormatTreeError != nil || engine.walks != 2 {
+	if _, enumerateFormatTreeError := enumerateFormatTree(
+		engine,
+		root,
+	); enumerateFormatTreeError != nil || engine.walks != 2 {
 		test.Errorf("a second call took the same walk again (%d walks)", engine.walks)
 	}
 
@@ -85,10 +88,16 @@ func TestTheFormatWalkBegunAheadIsTheOneTheFixPhaseWouldMake(test *testing.T) {
 	// Waited for, so the counts below never race the walk's goroutine.
 	<-aheadFormatWalk.done
 	other := &countingEngine{Resolving: resolving}
-	if _, enumerateFormatTreeError := enumerateFormatTree(other, root); enumerateFormatTreeError != nil || other.walks != 1 {
+	if _, enumerateFormatTreeError := enumerateFormatTree(
+		other,
+		root,
+	); enumerateFormatTreeError != nil || other.walks != 1 {
 		test.Errorf("another engine took the walk begun for this one (%d walks of its own)", other.walks)
 	}
-	if _, enumerateFormatTreeError := enumerateFormatTree(engine, filepath.Join(root, "other")); enumerateFormatTreeError != nil || engine.walks != 4 {
+	if _, enumerateFormatTreeError := enumerateFormatTree(
+		engine,
+		filepath.Join(root, "other"),
+	); enumerateFormatTreeError != nil || engine.walks != 4 {
 		test.Errorf("a walk of another root was taken from the walk begun ahead (%d walks)", engine.walks)
 	}
 }

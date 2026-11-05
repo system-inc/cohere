@@ -24,7 +24,12 @@ func TestDeclarationIdentityReadersPreserveFirstAnyAndFile(test *testing.T) {
 		{"own then foreign", &ast.Symbol{Declarations: []*ast.Node{own, foreign}}, true, true},
 	} {
 		set := map[*ast.Node]bool{own: true, foreign: false}
-		got := [4]bool{rule.HasDeclaration(tc.symbol, own), rule.HasDeclarationInSet(tc.symbol, set), rule.FirstDeclarationInSet(tc.symbol, set), rule.IsDeclaredInFile(home, tc.symbol)}
+		got := [4]bool{
+			rule.HasDeclaration(tc.symbol, own),
+			rule.HasDeclarationInSet(tc.symbol, set),
+			rule.FirstDeclarationInSet(tc.symbol, set),
+			rule.IsDeclaredInFile(home, tc.symbol),
+		}
 		want := [4]bool{tc.any, tc.any, tc.first, tc.any}
 		if got != want {
 			test.Errorf("%s: got %v, want %v", tc.name, got, want)

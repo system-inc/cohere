@@ -130,7 +130,10 @@ func printMdast(path *astPath, options *options, print printing.PrintFunc, _ any
 		// - parts.length is odd
 		// - odd (0-indexed) elements are line-like doc
 		parts := []doc.Doc{doc.Text("")}
-		textsNodes := splitText(options.OriginalText[node.Position.Start.Offset:node.Position.End.Offset], settings.nodes)
+		textsNodes := splitText(
+			options.OriginalText[node.Position.Start.Offset:node.Position.End.Offset],
+			settings.nodes,
+		)
 		for _, textNode := range textsNodes {
 			if textNode.NodeType == "word" {
 				parts[len(parts)-1] = doc.Concat{parts[len(parts)-1], doc.Text(textNode.Value)}
@@ -209,10 +212,19 @@ func printMdast(path *astPath, options *options, print printing.PrintFunc, _ any
 		padding := ""
 		if strings.HasPrefix(code, "`") || strings.HasSuffix(code, "`") ||
 			(len(code) > 0 && strings.ContainsAny(code[:1], "\n ") && strings.ContainsAny(code[len(code)-1:], "\n ") &&
-				strings.ContainsFunc(code, func(character rune) bool { return character != '\n' && character != ' ' })) {
+				strings.ContainsFunc(
+					code,
+					func(character rune) bool { return character != '\n' && character != ' ' },
+				)) {
 			padding = " "
 		}
-		return doc.Concat{doc.Text(backtickString), doc.Text(padding), doc.Text(code), doc.Text(padding), doc.Text(backtickString)}
+		return doc.Concat{
+			doc.Text(backtickString),
+			doc.Text(padding),
+			doc.Text(code),
+			doc.Text(padding),
+			doc.Text(backtickString),
+		}
 	case "wikiLink":
 		if node.ValueNull {
 			// Upstream prints a null value into the doc, which the doc printer rejects.
@@ -273,7 +285,10 @@ func printMdast(path *astPath, options *options, print printing.PrintFunc, _ any
 		if node.IsIndented {
 			// indented code block
 			alignment := strings.Repeat(" ", 4)
-			return doc.AlignWithString(alignment, doc.Concat{doc.Text(alignment), replaceEndOfLine(node.Value, doc.Hardline)})
+			return doc.AlignWithString(
+				alignment,
+				doc.Concat{doc.Text(alignment), replaceEndOfLine(node.Value, doc.Hardline)},
+			)
 		}
 
 		// fenced code block
@@ -371,7 +386,11 @@ func printMdast(path *astPath, options *options, print printing.PrintFunc, _ any
 				(settings.proseWrap == "preserve" &&
 					node.Children[0].Position.Start.Line == node.Children[0].Position.End.Line))
 		if shouldInlineFootnote {
-			return doc.Concat{doc.Text(printFootnoteReference(node)), doc.Text(": "), printChildren(path, options, print, nil)}
+			return doc.Concat{
+				doc.Text(printFootnoteReference(node)),
+				doc.Text(": "),
+				printChildren(path, options, print, nil),
+			}
 		}
 		return doc.Concat{
 			doc.Text(printFootnoteReference(node)),

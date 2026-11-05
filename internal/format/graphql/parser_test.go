@@ -137,7 +137,11 @@ func TestParseStringValues(test *testing.T) {
 		{name: "escapes", text: `{ a(s: "q\" b\\ s\/ n\n t\t") }`, want: "q\" b\\ s/ n\n t\t"},
 		{name: "variable-width unicode escape", text: `{ a(s: "\u{1F600}x") }`, want: "😀x"},
 		{name: "surrogate pair escape", text: "{ a(s: \"\x5cuD83D\x5cuDE00\") }", want: "😀"},
-		{name: "block string dedent", text: "{ a(s: \"\"\"\n\n    first\n      indented\n    \\\"\"\" last\n\n\"\"\") }", want: "first\n  indented\n\"\"\" last"},
+		{
+			name: "block string dedent",
+			text: "{ a(s: \"\"\"\n\n    first\n      indented\n    \\\"\"\" last\n\n\"\"\") }",
+			want: "first\n  indented\n\"\"\" last",
+		},
 		{name: "block string first line kept", text: "{ a(s: \"\"\"  one\n    two\"\"\") }", want: "  one\ntwo"},
 		{name: "block string CRLF", text: "{ a(s: \"\"\"\r\n  x\r\n  y\r\n\"\"\") }", want: "x\ny"},
 	}
@@ -147,7 +151,9 @@ func TestParseStringValues(test *testing.T) {
 			test.Errorf("%s: %v", each.name, parseError)
 			continue
 		}
-		value := document.List("definitions")[0].Child("selectionSet").List("selections")[0].List("arguments")[0].Child("value")
+		value := document.List("definitions")[0].Child("selectionSet").List("selections")[0].List("arguments")[0].Child(
+			"value",
+		)
 		if got := value.String("value"); got != each.want {
 			test.Errorf("%s: got %q, want %q", each.name, got, each.want)
 		}
@@ -166,7 +172,13 @@ func TestParseComments(test *testing.T) {
 	}
 	var got []string
 	for _, comment := range comments {
-		got = append(got, comment.Type()+"["+strconv.Itoa(comment.Range[0])+","+strconv.Itoa(comment.Range[1])+"]"+comment.String("value"))
+		got = append(got, comment.Type()+
+			"["+
+			strconv.Itoa(comment.Range[0])+
+			","+
+			strconv.Itoa(comment.Range[1])+
+			"]"+
+			comment.String("value"))
 	}
 	want := []string{"Comment[0,10] one 😀", "Comment[15,20] two", "Comment[23,24]"}
 	if strings.Join(got, "|") != strings.Join(want, "|") {
@@ -184,9 +196,15 @@ func TestParseErrors(test *testing.T) {
 		{text: "{ a(b: \"😀\") ? }", want: `Syntax Error: Unexpected character: "?". (1:14)`},
 		{text: "{\r\n a 😀 }", want: "Syntax Error: Unexpected character: U+1F600. (2:4)"},
 		{text: "extend type Foo", want: "Syntax Error: Unexpected <EOF>. (1:16)"},
-		{text: "enum E { null }", want: `Syntax Error: Name "null" is reserved and cannot be used for an enum value. (1:10)`},
+		{
+			text: "enum E { null }",
+			want: `Syntax Error: Name "null" is reserved and cannot be used for an enum value. (1:10)`,
+		},
 		{text: `{ a(s: "\u{110000}") }`, want: `Syntax Error: Invalid Unicode escape sequence: "\u{110000}". (1:9)`},
-		{text: "type T { f(a: Int = $v): Int }", want: `Syntax Error: Unexpected variable "$v" in constant value. (1:21)`},
+		{
+			text: "type T { f(a: Int = $v): Int }",
+			want: `Syntax Error: Unexpected variable "$v" in constant value. (1:21)`,
+		},
 	}
 	for _, each := range cases {
 		document, comments, parseError := Parse(each.text)

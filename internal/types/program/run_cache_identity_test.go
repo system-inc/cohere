@@ -28,11 +28,29 @@ func TestARunIsNotRecordedOverAFileChangedWhileItRan(test *testing.T) {
 	if writeError := os.WriteFile(file, []byte("export const a = 2;\n"), 0o644); writeError != nil {
 		test.Fatal(writeError)
 	}
-	if _, recordRunCacheError := program.RecordRunCache("key", []string{file}, nil, nil, nil, nil, 0, readSince); recordRunCacheError == nil ||
+	if _, recordRunCacheError := program.RecordRunCache(
+		"key",
+		[]string{file},
+		nil,
+		nil,
+		nil,
+		nil,
+		0,
+		readSince,
+	); recordRunCacheError == nil ||
 		!strings.Contains(recordRunCacheError.Error(), "a.ts changed after the run began reading") {
 		test.Fatalf("a run that began reading before a.ts was saved was recorded (%v)", recordRunCacheError)
 	}
-	if _, recordRunCacheError := program.RecordRunCache("key", []string{file}, nil, nil, nil, nil, 0, time.Now()); recordRunCacheError != nil {
+	if _, recordRunCacheError := program.RecordRunCache(
+		"key",
+		[]string{file},
+		nil,
+		nil,
+		nil,
+		nil,
+		0,
+		time.Now(),
+	); recordRunCacheError != nil {
 		test.Fatalf("a run that began reading after the save was refused: %v", recordRunCacheError)
 	}
 }
@@ -85,7 +103,16 @@ func TestADirectoryInputDoesNotMakeItsParentOne(test *testing.T) {
 	if writeError := os.WriteFile(file, []byte("export const a = 1;\n"), 0o644); writeError != nil {
 		test.Fatal(writeError)
 	}
-	cache, recordRunCacheError := program.RecordRunCache("key", []string{project, file}, nil, nil, nil, nil, 0, time.Time{})
+	cache, recordRunCacheError := program.RecordRunCache(
+		"key",
+		[]string{project, file},
+		nil,
+		nil,
+		nil,
+		nil,
+		0,
+		time.Time{},
+	)
 	if recordRunCacheError != nil {
 		test.Fatal(recordRunCacheError)
 	}

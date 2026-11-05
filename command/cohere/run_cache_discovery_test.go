@@ -22,8 +22,12 @@ func TestAFileCreatedAfterDiscoveryIsNeverReplayedOver(test *testing.T) {
 	late := filepath.Join(fixture.root, "source", "late.ts")
 	command := exec.Command(fixture.binary, verboseArguments([]string{"--no-format"})...)
 	command.Dir = fixture.root
-	command.Env = append([]string{"HOME=" + fixture.home, "COHERE_TEST_CREATE_AFTER_DISCOVERY=" + late}, withoutHome(os.Environ())...)
-	if output, outputError := command.CombinedOutput(); outputError != nil && !strings.Contains(string(output), "late.ts") {
+	command.Env = append(
+		[]string{"HOME=" + fixture.home, "COHERE_TEST_CREATE_AFTER_DISCOVERY=" + late},
+		withoutHome(os.Environ())...,
+	)
+	if output, outputError := command.CombinedOutput(); outputError != nil &&
+		!strings.Contains(string(output), "late.ts") {
 		// A run that saw the file fails on it, which is fine; one that failed for any other reason is not.
 		if _, isExit := outputError.(*exec.ExitError); !isExit {
 			test.Fatalf("the run that created the file failed: %v\n%s", outputError, output)
@@ -35,7 +39,10 @@ func TestAFileCreatedAfterDiscoveryIsNeverReplayedOver(test *testing.T) {
 
 	output, _ := fixture.run(true)
 	if isRunCacheReplay(output) {
-		test.Fatalf("the run after a file appeared beside discovery's listing replayed a verdict that never saw it:\n%s", output)
+		test.Fatalf(
+			"the run after a file appeared beside discovery's listing replayed a verdict that never saw it:\n%s",
+			output,
+		)
 	}
 	if !strings.Contains(output, "late.ts") {
 		test.Errorf("the file with a type error in it was not reported:\n%s", output)
@@ -65,7 +72,10 @@ func TestAFileCreatedAfterDiscoveryIsFormattedNextRun(test *testing.T) {
 	formatting()
 	formatting()
 	if output := formatting(); !isRunCacheReplay(output) {
-		test.Fatalf("an unchanged, formatted tree did not replay, so nothing below can show a change was noticed:\n%s", output)
+		test.Fatalf(
+			"an unchanged, formatted tree did not replay, so nothing below can show a change was noticed:\n%s",
+			output,
+		)
 	}
 
 	late := filepath.Join(fixture.root, "docs", "late.md")
@@ -76,7 +86,10 @@ func TestAFileCreatedAfterDiscoveryIsFormattedNextRun(test *testing.T) {
 	}
 
 	if output := formatting(); isRunCacheReplay(output) {
-		test.Fatalf("the run after a file appeared beside discovery's listing replayed a verdict whose walk never saw it:\n%s", output)
+		test.Fatalf(
+			"the run after a file appeared beside discovery's listing replayed a verdict whose walk never saw it:\n%s",
+			output,
+		)
 	}
 	contents, readError := os.ReadFile(late)
 	if readError != nil {

@@ -40,9 +40,9 @@ import (
 // exactly once per function. That also answers whether construction wants a cache of its own: it
 // does not, because it is not separable from the lowering it mutates. Measured on the probe
 // component in cache_test.go, construction is about 18% of the combined cost (23µs against 102µs
-// for lowering), and all of it is now paid once rather than three times. Callers read it and must not mutate it; the three callers today only
-// read, deriving their own maps (`UnconditionalBlocks` builds a fresh map, the taint passes build
-// their own).
+// for lowering), and all of it is now paid once rather than three times. Callers read it and must not mutate it; the
+// three callers today only read, deriving their own maps (`UnconditionalBlocks` builds a fresh map, the taint passes
+// build their own).
 //
 // # Why the function node alone is the key
 //

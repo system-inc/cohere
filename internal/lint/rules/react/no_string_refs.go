@@ -104,10 +104,10 @@ type noStringRefsWireOptions struct {
 // `18.2.0` and `17.0.0` report, `18.3.0` and `19.0.0` report nothing.
 //
 // cohere reads no React settings. The loader reads `settings` for better-tailwindcss only and
-// refuses `settings.react` by name, so no React version can reach a rule here by any route. The faithful reading of that is not "pick a version" but "reproduce the answer
-// upstream gives under this repository's configuration", and that answer is silence: this tree
-// configures no React version, and it runs React 19.2.8, where the deprecation is genuinely not in
-// force.
+// refuses `settings.react` by name, so no React version can reach a rule here by any route. The faithful reading of
+// that is not "pick a version" but "reproduce the answer upstream gives under this repository's configuration", and
+// that answer is silence: this tree configures no React version, and it runs React 19.2.8, where the deprecation is
+// genuinely not in force.
 //
 // So the half is off by default and reachable by an option this rule adds. Shipping it always-on
 // would report on every `this.refs` in the tree where upstream reports on none, and shipping it

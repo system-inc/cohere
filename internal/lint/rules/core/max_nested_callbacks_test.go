@@ -39,18 +39,38 @@ func TestMaxNestedCallbacksStaysSilent(test *testing.T) {
 		optionsJson string
 	}{
 		{name: "valid0", source: "foo(function() { bar(thing, function(data) {}); });", optionsJson: "3"},
-		{name: "valid1", source: "var foo = function() {}; bar(function(){ baz(function() { qux(foo); }) });", optionsJson: "2"},
+		{
+			name:        "valid1",
+			source:      "var foo = function() {}; bar(function(){ baz(function() { qux(foo); }) });",
+			optionsJson: "2",
+		},
 		{name: "valid2", source: "fn(function(){}, function(){}, function(){});", optionsJson: "2"},
 		{name: "valid3", source: "fn(() => {}, function(){}, function(){});", optionsJson: "2"},
-		{name: "valid4", source: "foo(function() {foo(function() {foo(function() {foo(function() {foo(function() {foo(function() {foo(function() {foo(function() {foo(function() {foo(function() {});});});});});});});});});});", optionsJson: ""},
+		{
+			name:        "valid4",
+			source:      "foo(function() {foo(function() {foo(function() {foo(function() {foo(function() {foo(function() {foo(function() {foo(function() {foo(function() {foo(function() {});});});});});});});});});});",
+			optionsJson: "",
+		},
 		{name: "valid5", source: "foo(function() { bar(thing, function(data) {}); });", optionsJson: "{\"max\": 3}"},
 		{name: "valid6", source: "(() => {})();", optionsJson: "{\"max\": 0}"},
 		{name: "valid7", source: "(function() {})();", optionsJson: "{\"max\": 0}"},
 		{name: "valid8", source: "new Promise(() => {});", optionsJson: "0"},
 		{name: "valid9", source: "new Promise(() => {});", optionsJson: "{\"max\": 0}"},
-		{name: "valid10", source: "new Promise(() => {});", optionsJson: "{\"max\": 0, \"checkConstructorCallCallbacks\": false}"},
-		{name: "valid11", source: "new (() => {})();", optionsJson: "{\"max\": 0, \"checkConstructorCallCallbacks\": true}"},
-		{name: "valid12", source: "new Promise(() => {});", optionsJson: "{\"max\": 1, \"checkConstructorCallCallbacks\": true}"},
+		{
+			name:        "valid10",
+			source:      "new Promise(() => {});",
+			optionsJson: "{\"max\": 0, \"checkConstructorCallCallbacks\": false}",
+		},
+		{
+			name:        "valid11",
+			source:      "new (() => {})();",
+			optionsJson: "{\"max\": 0, \"checkConstructorCallCallbacks\": true}",
+		},
+		{
+			name:        "valid12",
+			source:      "new Promise(() => {});",
+			optionsJson: "{\"max\": 1, \"checkConstructorCallCallbacks\": true}",
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -239,7 +259,8 @@ func TestMaxNestedCallbacksFires(test *testing.T) {
 				// it with the reasoning, so the assertion is on the part upstream specifies.
 				wantPrefix := fmt.Sprintf("Too many nested callbacks (%d). Maximum allowed is %d. ",
 					testCase.wantCounts[index][0], testCase.wantCounts[index][1])
-				if got := finding.Message.Description; len(got) < len(wantPrefix) || got[:len(wantPrefix)] != wantPrefix {
+				if got := finding.Message.Description; len(got) < len(wantPrefix) ||
+					got[:len(wantPrefix)] != wantPrefix {
 					test.Errorf("finding %d message:\n got %q\nwant prefix %q", index, got, wantPrefix)
 				}
 			}
@@ -278,7 +299,9 @@ func TestDecodeMaxNestedCallbacksOptions(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, decodeMaximumNestedCallbacksOptionsError := DecodeMaxNestedCallbacksOptions([]byte(testCase.optionsJson))
+			decoded, decodeMaximumNestedCallbacksOptionsError := DecodeMaxNestedCallbacksOptions(
+				[]byte(testCase.optionsJson),
+			)
 			if decodeMaximumNestedCallbacksOptionsError != nil {
 				test.Fatalf("decoding %q: %v", testCase.optionsJson, decodeMaximumNestedCallbacksOptionsError)
 			}

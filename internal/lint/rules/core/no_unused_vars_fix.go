@@ -40,13 +40,21 @@ func noUnusedVarsRemovalMessage(id string, name string) rule.Message {
 	if id == "removeUnusedImportDeclaration" {
 		return rule.Message{Id: id, Description: "Remove the import declaration: nothing it binds is used."}
 	}
-	return rule.Message{Id: id, Description: "Remove '" + name + "' from the import, keeping the bindings beside it that are used."}
+	return rule.Message{
+		Id:          id,
+		Description: "Remove '" + name + "' from the import, keeping the bindings beside it that are used.",
+	}
 }
 
 // importRemoval is the edit that removes an unused import binding, and which of upstream's two messages
 // names it. It declines (false) where upstream's fixer does: a binding with more than one declaration, or
 // a declaration whose tokens are not the shape the edit needs.
-func importRemoval(ruleContext rule.Context, candidate candidateBinding, symbol *ast.Symbol, reportedUnused map[*ast.Node]bool) (rule.Fix, string, bool) {
+func importRemoval(
+	ruleContext rule.Context,
+	candidate candidateBinding,
+	symbol *ast.Symbol,
+	reportedUnused map[*ast.Node]bool,
+) (rule.Fix, string, bool) {
 	// Upstream fixes only a variable with exactly one definition, since cleaning up several is a
 	// different edit it declines to guess at.
 	if symbol != nil && len(rule.DeclarationsIn(ruleContext.SourceFile, symbol)) > 1 {
@@ -68,7 +76,10 @@ func importRemoval(ruleContext rule.Context, candidate candidateBinding, symbol 
 		if importDeclaration == nil || !allReported(importDeclarationBindings(importDeclaration), reportedUnused) {
 			return rule.Fix{}, "", false
 		}
-		return removeNodeWithTrailingNewline(ruleContext.SourceFile, importDeclaration), "removeUnusedImportDeclaration", true
+		return removeNodeWithTrailingNewline(
+			ruleContext.SourceFile,
+			importDeclaration,
+		), "removeUnusedImportDeclaration", true
 
 	case ast.KindImportClause:
 		// The default binding.
@@ -78,7 +89,10 @@ func importRemoval(ruleContext rule.Context, candidate candidateBinding, symbol 
 		}
 		bindings := importDeclarationBindings(importDeclaration)
 		if len(bindings) == 1 || allReported(bindings, reportedUnused) {
-			return removeNodeWithTrailingNewline(ruleContext.SourceFile, importDeclaration), "removeUnusedImportDeclaration", true
+			return removeNodeWithTrailingNewline(
+				ruleContext.SourceFile,
+				importDeclaration,
+			), "removeUnusedImportDeclaration", true
 		}
 		// `import Unused, { Used } from 'm'`: the default and the comma after it.
 		list := tokens.Of(ruleContext.SourceFile, importDeclaration)
@@ -87,7 +101,9 @@ func importRemoval(ruleContext rule.Context, candidate candidateBinding, symbol 
 		if !found || comma.Kind != ast.KindCommaToken {
 			return rule.Fix{}, "", false
 		}
-		return rule.RemoveRange(core.NewTextRange(min(name.Pos(), comma.Start), max(name.End(), comma.End))), "removeUnusedVar", true
+		return rule.RemoveRange(
+			core.NewTextRange(min(name.Pos(), comma.Start), max(name.End(), comma.End)),
+		), "removeUnusedVar", true
 
 	case ast.KindImportSpecifier:
 		importDeclaration := enclosingImportDeclaration(declaration)
@@ -96,7 +112,10 @@ func importRemoval(ruleContext rule.Context, candidate candidateBinding, symbol 
 		}
 		bindings := importDeclarationBindings(importDeclaration)
 		if len(bindings) == 1 || allReported(bindings, reportedUnused) {
-			return removeNodeWithTrailingNewline(ruleContext.SourceFile, importDeclaration), "removeUnusedImportDeclaration", true
+			return removeNodeWithTrailingNewline(
+				ruleContext.SourceFile,
+				importDeclaration,
+			), "removeUnusedImportDeclaration", true
 		}
 		list := tokens.Of(ruleContext.SourceFile, importDeclaration)
 		statement := rule.TokenRange(ruleContext.SourceFile, importDeclaration)
@@ -134,7 +153,9 @@ func importRemoval(ruleContext rule.Context, candidate candidateBinding, symbol 
 				return rule.Fix{}, "", false
 			}
 		}
-		return rule.RemoveRange(core.NewTextRange(min(specifier.Pos(), comma.Start), max(specifier.End(), comma.End))), "removeUnusedVar", true
+		return rule.RemoveRange(
+			core.NewTextRange(min(specifier.Pos(), comma.Start), max(specifier.End(), comma.End)),
+		), "removeUnusedVar", true
 	}
 	return rule.Fix{}, "", false
 }

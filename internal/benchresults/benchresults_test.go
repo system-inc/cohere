@@ -19,12 +19,78 @@ func TestEveryCommittedRecordValidates(test *testing.T) {
 func honestRecord() Record {
 	commit := strings.Repeat("a", 40)
 	runs := []Run{
-		{Mode: ModeWarm, Round: 1, VerdictSeconds: 0.11, SettledSeconds: 0.2, EngineSeconds: 0.08, LoadBefore: 6, LoadAfter: 6, IdleBefore: 96, IdleAfter: 95, Cache: "replay"},
-		{Mode: ModeEdit, Round: 1, VerdictSeconds: 0.7, SettledSeconds: 0.9, EngineSeconds: 0.65, LoadBefore: 3, LoadAfter: 5, IdleBefore: 95, IdleAfter: 70, Cache: "files 3891/3976"},
-		{Mode: ModeCold, Round: 1, VerdictSeconds: 1.8, SettledSeconds: 2.1, EngineSeconds: 1.75, LoadBefore: 3.5, LoadAfter: 4, IdleBefore: 92, IdleAfter: 91, Cache: "off"},
-		{Mode: ModeWarm, Round: 2, VerdictSeconds: 0.1, SettledSeconds: 0.2, EngineSeconds: 0.07, LoadBefore: 1, LoadAfter: 1.5, IdleBefore: 97, IdleAfter: 97, Cache: "replay"},
-		{Mode: ModeEdit, Round: 2, VerdictSeconds: 0.68, SettledSeconds: 0.8, EngineSeconds: 0.62, LoadBefore: 2, LoadAfter: 2, IdleBefore: 80, IdleAfter: 93, Cache: "files 3891/3976"},
-		{Mode: ModeCold, Round: 2, VerdictSeconds: 1.9, SettledSeconds: 2.2, EngineSeconds: 1.85, LoadBefore: 2, LoadAfter: 2.5, IdleBefore: 89.9, IdleAfter: 95, Cache: "off"},
+		{
+			Mode:           ModeWarm,
+			Round:          1,
+			VerdictSeconds: 0.11,
+			SettledSeconds: 0.2,
+			EngineSeconds:  0.08,
+			LoadBefore:     6,
+			LoadAfter:      6,
+			IdleBefore:     96,
+			IdleAfter:      95,
+			Cache:          "replay",
+		},
+		{
+			Mode:           ModeEdit,
+			Round:          1,
+			VerdictSeconds: 0.7,
+			SettledSeconds: 0.9,
+			EngineSeconds:  0.65,
+			LoadBefore:     3,
+			LoadAfter:      5,
+			IdleBefore:     95,
+			IdleAfter:      70,
+			Cache:          "files 3891/3976",
+		},
+		{
+			Mode:           ModeCold,
+			Round:          1,
+			VerdictSeconds: 1.8,
+			SettledSeconds: 2.1,
+			EngineSeconds:  1.75,
+			LoadBefore:     3.5,
+			LoadAfter:      4,
+			IdleBefore:     92,
+			IdleAfter:      91,
+			Cache:          "off",
+		},
+		{
+			Mode:           ModeWarm,
+			Round:          2,
+			VerdictSeconds: 0.1,
+			SettledSeconds: 0.2,
+			EngineSeconds:  0.07,
+			LoadBefore:     1,
+			LoadAfter:      1.5,
+			IdleBefore:     97,
+			IdleAfter:      97,
+			Cache:          "replay",
+		},
+		{
+			Mode:           ModeEdit,
+			Round:          2,
+			VerdictSeconds: 0.68,
+			SettledSeconds: 0.8,
+			EngineSeconds:  0.62,
+			LoadBefore:     2,
+			LoadAfter:      2,
+			IdleBefore:     80,
+			IdleAfter:      93,
+			Cache:          "files 3891/3976",
+		},
+		{
+			Mode:           ModeCold,
+			Round:          2,
+			VerdictSeconds: 1.9,
+			SettledSeconds: 2.2,
+			EngineSeconds:  1.85,
+			LoadBefore:     2,
+			LoadAfter:      2.5,
+			IdleBefore:     89.9,
+			IdleAfter:      95,
+			Cache:          "off",
+		},
 	}
 	for index := range runs {
 		// Round 2 needed a second prime, as #547dhjz makes a round do, and the record says so.
@@ -66,11 +132,27 @@ func loadSchemaRecord() Record {
 // three quiet runs agreed within 5%. It read no cache, so it primed nothing.
 func coldOnlyRecord() Record {
 	record := honestRecord()
-	record.MeasuredModes, record.Edit, record.Band, record.StoppedEarly, record.Rounds = []Mode{ModeCold}, "", 5, true, 3
+	record.MeasuredModes, record.Edit, record.Band, record.StoppedEarly, record.Rounds = []Mode{
+		ModeCold,
+	}, "", 5, true, 3
 	record.Runs = []Run{}
 	for round, seconds := range []float64{1.52, 1.55, 1.58} {
-		record.Runs = append(record.Runs, Run{Mode: ModeCold, Round: round + 1, VerdictSeconds: seconds, SettledSeconds: seconds + 0.04,
-			EngineSeconds: seconds - 0.01, LoadBefore: 4, LoadAfter: 5, IdleBefore: 95, IdleAfter: 94, Quiet: true, Cache: "off"})
+		record.Runs = append(
+			record.Runs,
+			Run{
+				Mode:           ModeCold,
+				Round:          round + 1,
+				VerdictSeconds: seconds,
+				SettledSeconds: seconds + 0.04,
+				EngineSeconds:  seconds - 0.01,
+				LoadBefore:     4,
+				LoadAfter:      5,
+				IdleBefore:     95,
+				IdleAfter:      94,
+				Quiet:          true,
+				Cache:          "off",
+			},
+		)
 	}
 	record.Modes = Summarize(record.MeasuredModes, record.Runs)
 	return record
@@ -143,25 +225,49 @@ func TestADishonestRecordIsRefused(test *testing.T) {
 		},
 		// The first real record (91cf8e39) read 'none' on every replay, since the instrument grepped a footer
 		// that had moved behind --verbose (#zrgrk14).
-		"a warm run that only took every file from the cache": func(record *Record) { record.Runs[0].Cache = "files 3976/3976" },
-		"a replay whose cache read none":                      func(record *Record) { record.Runs[0].Cache = "none" },
-		"an edit run that replayed nothing":                   func(record *Record) { record.Runs[1].Cache = "none" },
-		"an edit run that replayed everything":                func(record *Record) { record.Runs[1].Cache = "files 3976/3976" },
-		"a cold run that read the cache":                      func(record *Record) { record.Runs[2].Cache = "files 3891/3976" },
-		"a round whose runs disagree on its primes":           func(record *Record) { record.Runs[1].Primes = 2 },
-		"a run with no primes recorded":                       func(record *Record) { record.Runs[0].Primes = 0 },
-		"a run whose output was not read":                     func(record *Record) { record.Runs[0].EngineSeconds = 0 },
-		"an engine from a modified tree":                      func(record *Record) { record.Cohere.Dirty = true },
-		"an abbreviated commit":                               func(record *Record) { record.Cohere.Commit = record.Cohere.Commit[:12] },
+		"a warm run that only took every file from the cache": func(
+			record *Record,
+		) {
+			record.Runs[0].Cache = "files 3976/3976"
+		},
+		"a replay whose cache read none":    func(record *Record) { record.Runs[0].Cache = "none" },
+		"an edit run that replayed nothing": func(record *Record) { record.Runs[1].Cache = "none" },
+		"an edit run that replayed everything": func(
+			record *Record,
+		) {
+			record.Runs[1].Cache = "files 3976/3976"
+		},
+		"a cold run that read the cache": func(
+			record *Record,
+		) {
+			record.Runs[2].Cache = "files 3891/3976"
+		},
+		"a round whose runs disagree on its primes": func(record *Record) { record.Runs[1].Primes = 2 },
+		"a run with no primes recorded":             func(record *Record) { record.Runs[0].Primes = 0 },
+		"a run whose output was not read": func(
+			record *Record,
+		) {
+			record.Runs[0].EngineSeconds = 0
+		},
+		"an engine from a modified tree": func(record *Record) { record.Cohere.Dirty = true },
+		"an abbreviated commit": func(
+			record *Record,
+		) {
+			record.Cohere.Commit = record.Cohere.Commit[:12]
+		},
 		"a missing round": func(record *Record) {
 			record.Runs = record.Runs[:5]
 			record.Modes = Summarize(record.MeasuredModes, record.Runs)
 		},
-		"an idle floor of zero":       func(record *Record) { record.IdleFloor = 0 },
-		"an idle floor over 100%":     func(record *Record) { record.IdleFloor = 101 },
-		"another schema":              func(record *Record) { record.Schema = SchemaVersion + 1 },
-		"no measured modes":           func(record *Record) { record.MeasuredModes = nil },
-		"a measured mode named twice": func(record *Record) { record.MeasuredModes = append(record.MeasuredModes, ModeCold) },
+		"an idle floor of zero":   func(record *Record) { record.IdleFloor = 0 },
+		"an idle floor over 100%": func(record *Record) { record.IdleFloor = 101 },
+		"another schema":          func(record *Record) { record.Schema = SchemaVersion + 1 },
+		"no measured modes":       func(record *Record) { record.MeasuredModes = nil },
+		"a measured mode named twice": func(
+			record *Record,
+		) {
+			record.MeasuredModes = append(record.MeasuredModes, ModeCold)
+		},
 		"a run of a mode not measured": func(record *Record) {
 			record.MeasuredModes = []Mode{ModeWarm, ModeEdit}
 			record.Modes = Summarize(record.MeasuredModes, record.Runs)

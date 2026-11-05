@@ -489,7 +489,12 @@ func TestNoArrowFunctionLifecycleFires(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.Run(test, NoArrowFunctionLifecycle, noArrowFunctionLifecycleFile, testCase.sourceText)
+			result := rule_testing.Run(
+				test,
+				NoArrowFunctionLifecycle,
+				noArrowFunctionLifecycleFile,
+				testCase.sourceText,
+			)
 			wantIds := make([]string, testCase.wantCount)
 			for index := range wantIds {
 				wantIds[index] = "lifecycle"
@@ -760,15 +765,24 @@ func TestNoArrowFunctionLifecycleStaysSilent(test *testing.T) {
 		{"a plain object is not a component", "var H = { render: () => <div /> };"},
 		// The static and instance lists are separate, so these two invert against their partners
 		// in the firing table.
-		{"an instance getDerivedStateFromProps is not on the instance list", "class H extends React.Component { getDerivedStateFromProps = () => {}; render() { return <div />; } }"},
+		{
+			"an instance getDerivedStateFromProps is not on the instance list",
+			"class H extends React.Component { getDerivedStateFromProps = () => {}; render() { return <div />; } }",
+		},
 		{"a static render is not on the static list", "class H extends React.Component { static render = () => {}; }"},
 		// An ES5 object property always uses the instance list, so the static name is clean there
 		// while the same name as a static class field reports.
-		{"an ES5 getDerivedStateFromProps uses the instance list", "var H = createReactClass({ getDerivedStateFromProps: () => {}, render: function(){ return <div/>; } });"},
+		{
+			"an ES5 getDerivedStateFromProps uses the instance list",
+			"var H = createReactClass({ getDerivedStateFromProps: () => {}, render: function(){ return <div/>; } });",
+		},
 		// A computed key has no readable name for the membership test.
 		{"a computed lifecycle key", "class H extends React.Component { ['render'] = () => <div />; }"},
 		// A function expression is not an arrow.
-		{"a function expression class field", "class H extends React.Component { render = function() { return <div />; }; }"},
+		{
+			"a function expression class field",
+			"class H extends React.Component { render = function() { return <div />; }; }",
+		},
 		// A class with no React base is not a component, even with a lifecycle-named arrow.
 		{"a class extending something unrelated", "class H extends Foo { render = () => <div />; }"},
 		{"a class with no heritage", "class H { render = () => <div />; }"},
@@ -777,7 +791,12 @@ func TestNoArrowFunctionLifecycleStaysSilent(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.Run(test, NoArrowFunctionLifecycle, noArrowFunctionLifecycleFile, testCase.sourceText)
+			result := rule_testing.Run(
+				test,
+				NoArrowFunctionLifecycle,
+				noArrowFunctionLifecycleFile,
+				testCase.sourceText,
+			)
 			rule_testing.ExpectClean(test, result)
 		})
 	}
@@ -797,8 +816,16 @@ func TestNoArrowFunctionLifecycleStaticSplit(test *testing.T) {
 		sourceText string
 		wantFires  bool
 	}{
-		{"static getDerivedStateFromProps", "class H extends React.Component { static getDerivedStateFromProps = () => {}; render() { return <div />; } }", true},
-		{"instance getDerivedStateFromProps", "class H extends React.Component { getDerivedStateFromProps = () => {}; render() { return <div />; } }", false},
+		{
+			"static getDerivedStateFromProps",
+			"class H extends React.Component { static getDerivedStateFromProps = () => {}; render() { return <div />; } }",
+			true,
+		},
+		{
+			"instance getDerivedStateFromProps",
+			"class H extends React.Component { getDerivedStateFromProps = () => {}; render() { return <div />; } }",
+			false,
+		},
 		{"static render", "class H extends React.Component { static render = () => {}; }", false},
 		{"instance render", "class H extends React.Component { render = () => <div />; }", true},
 	}
@@ -806,7 +833,12 @@ func TestNoArrowFunctionLifecycleStaticSplit(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.Run(test, NoArrowFunctionLifecycle, noArrowFunctionLifecycleFile, testCase.sourceText)
+			result := rule_testing.Run(
+				test,
+				NoArrowFunctionLifecycle,
+				noArrowFunctionLifecycleFile,
+				testCase.sourceText,
+			)
 			if testCase.wantFires {
 				rule_testing.ExpectFindings(test, result, "lifecycle")
 			} else {
@@ -834,24 +866,47 @@ func TestNoArrowFunctionLifecycleDeclinesUnrenderableParameters(test *testing.T)
 		name       string
 		sourceText string
 	}{
-		{"a destructured parameter", "class H extends React.Component { componentDidUpdate = ({ a }) => { f(a); }; render() { return <div />; } }"},
-		{"a defaulted parameter", "class H extends React.Component { componentDidUpdate = (a = 1) => { f(a); }; render() { return <div />; } }"},
-		{"a rest parameter", "class H extends React.Component { componentDidUpdate = (...a) => { f(a); }; render() { return <div />; } }"},
-		{"a typed parameter", "class H extends React.Component { componentDidUpdate = (previous: Properties) => { f(previous); }; render() { return <div />; } }"},
+		{
+			"a destructured parameter",
+			"class H extends React.Component { componentDidUpdate = ({ a }) => { f(a); }; render() { return <div />; } }",
+		},
+		{
+			"a defaulted parameter",
+			"class H extends React.Component { componentDidUpdate = (a = 1) => { f(a); }; render() { return <div />; } }",
+		},
+		{
+			"a rest parameter",
+			"class H extends React.Component { componentDidUpdate = (...a) => { f(a); }; render() { return <div />; } }",
+		},
+		{
+			"a typed parameter",
+			"class H extends React.Component { componentDidUpdate = (previous: Properties) => { f(previous); }; render() { return <div />; } }",
+		},
 
 		// A return annotation is lost by the same rewrite and the parameter check cannot see it,
 		// because it sits outside the parameter list. Measured before the guard existed: the head
 		// is rebuilt as `(params) `, replacing everything between the key and the body, so
 		// `componentDidMount = (): void => {}` was repaired to `componentDidMount() {}` with the
 		// `: void` silently gone. Untyped parameters walked straight past the check above.
-		{"a return annotation", "class H extends React.Component { componentDidMount = (): void => { f(); }; render() { return <div />; } }"},
-		{"a return annotation with untyped parameters", "class H extends React.Component { componentDidUpdate = (previous): boolean => { return f(previous); }; render() { return <div />; } }"},
+		{
+			"a return annotation",
+			"class H extends React.Component { componentDidMount = (): void => { f(); }; render() { return <div />; } }",
+		},
+		{
+			"a return annotation with untyped parameters",
+			"class H extends React.Component { componentDidUpdate = (previous): boolean => { return f(previous); }; render() { return <div />; } }",
+		},
 	}
 
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.Run(test, NoArrowFunctionLifecycle, noArrowFunctionLifecycleFile, testCase.sourceText)
+			result := rule_testing.Run(
+				test,
+				NoArrowFunctionLifecycle,
+				noArrowFunctionLifecycleFile,
+				testCase.sourceText,
+			)
 			rule_testing.ExpectFindings(test, result, "lifecycle")
 
 			// The finding is real; the repair is what is withheld. Asserting the absence of a fix
@@ -911,7 +966,12 @@ func TestNoArrowFunctionLifecycleKeepsTheHeadWhole(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.Run(test, NoArrowFunctionLifecycle, noArrowFunctionLifecycleFile, testCase.sourceText)
+			result := rule_testing.Run(
+				test,
+				NoArrowFunctionLifecycle,
+				noArrowFunctionLifecycleFile,
+				testCase.sourceText,
+			)
 			rule_testing.ExpectFindings(test, result, "lifecycle")
 			rule_testing.ExpectFixedSource(test, result, testCase.wantFixed)
 		})
@@ -980,7 +1040,12 @@ func TestNoArrowFunctionLifecycleAnchor(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.Run(test, NoArrowFunctionLifecycle, noArrowFunctionLifecycleFile, testCase.sourceText)
+			result := rule_testing.Run(
+				test,
+				NoArrowFunctionLifecycle,
+				noArrowFunctionLifecycleFile,
+				testCase.sourceText,
+			)
 			rule_testing.ExpectFindings(test, result, "lifecycle")
 
 			fixture := strings.TrimSpace(testCase.sourceText) + "\n"

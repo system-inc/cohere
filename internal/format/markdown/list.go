@@ -103,7 +103,10 @@ func printListItem(path *astPath, options *options, print printing.PrintFunc, li
 				return doc.AlignWithString(strings.Repeat(" ", len(prefix)), print(nil, nil)), true
 			}
 
-			alignment := strings.Repeat(" ", clamp(settingsOf(options).tabWidth-len(listPrefix), 0, 3)) // 4+ will cause indented code block
+			alignment := strings.Repeat(
+				" ",
+				clamp(settingsOf(options).tabWidth-len(listPrefix), 0, 3),
+			) // 4+ will cause indented code block
 			return doc.Concat{doc.Text(alignment), doc.AlignWithString(alignment, print(nil, nil))}, true
 		}),
 	}

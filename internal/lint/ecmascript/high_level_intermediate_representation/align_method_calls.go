@@ -82,7 +82,10 @@ func AlignMethodCallScopes(function *Function, scopes *ReactiveScopes) *Reactive
 		switch {
 		case lvalueScope != 0 && propertyScope != 0:
 			if lvalueScope != propertyScope {
-				merged.Union([]static_single_assignment.IdentifierId{static_single_assignment.IdentifierId(lvalueScope), static_single_assignment.IdentifierId(propertyScope)})
+				merged.Union([]static_single_assignment.IdentifierId{
+					static_single_assignment.IdentifierId(lvalueScope),
+					static_single_assignment.IdentifierId(propertyScope),
+				})
 			}
 		case lvalueScope != 0:
 			// The call is scoped and the property is not, so the property joins the call's scope.
@@ -104,8 +107,11 @@ func AlignMethodCallScopes(function *Function, scopes *ReactiveScopes) *Reactive
 // The two are applied in that order because a mapping names a scope by id, and a merge changes which
 // id survives. Applying the mapping first would assign a property to a scope that the merge is about
 // to fold away.
-func rebuildWithAlignedMethodCalls(scopes *ReactiveScopes, scopeMapping map[static_single_assignment.IdentifierId]ScopeId,
-	merged *DisjointSet) *ReactiveScopes {
+func rebuildWithAlignedMethodCalls(
+	scopes *ReactiveScopes,
+	scopeMapping map[static_single_assignment.IdentifierId]ScopeId,
+	merged *DisjointSet,
+) *ReactiveScopes {
 	// survivorOf resolves a scope through the merge, or returns it unchanged.
 	survivorOf := func(scope ScopeId) ScopeId {
 		if scope == 0 || !merged.Has(static_single_assignment.IdentifierId(scope)) {

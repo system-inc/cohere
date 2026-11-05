@@ -240,7 +240,10 @@ func classifyTypeScriptCoverage(
 			entry.Details = append(entry.Details, fmt.Sprintf("%d findings", coverage.RulesReporting[name]))
 		case coverage.RulesListening[name] > 0 && scopedOff+unconfigured > 0:
 			entry.Category = coverageRanOnPartOfTheTree
-			entry.Details = append(entry.Details, partOfTheTreeDetail(coverage.RulesListening[name], offered, scopedOff, unconfigured))
+			entry.Details = append(
+				entry.Details,
+				partOfTheTreeDetail(coverage.RulesListening[name], offered, scopedOff, unconfigured),
+			)
 		case coverage.RulesListening[name] > 0:
 			entry.Category = coverageRanAndFoundNothing
 		case offered > 0:
@@ -299,7 +302,10 @@ func classifyTypeScriptCoverage(
 		summary.Crashes = append(summary.Crashes, coverageCrash{File: crash.FileName, Cause: fmt.Sprint(crash.Cause)})
 	}
 	for _, crash := range coverage.RulesCrashed {
-		summary.RuleCrashes = append(summary.RuleCrashes, coverageRuleCrash{Rule: crash.RuleName, File: crash.FileName, Cause: fmt.Sprint(crash.Cause)})
+		summary.RuleCrashes = append(
+			summary.RuleCrashes,
+			coverageRuleCrash{Rule: crash.RuleName, File: crash.FileName, Cause: fmt.Sprint(crash.Cause)},
+		)
 	}
 	sort.Slice(summary.RuleCrashes, func(first, second int) bool {
 		if summary.RuleCrashes[first].Rule != summary.RuleCrashes[second].Rule {
@@ -383,7 +389,10 @@ func (summary coverageSummary) coverageFilesLine(details bool) string {
 		// Keep the coverage count beside the walk's fixable unused-disable findings. The walk only
 		// reports names whose rules ran, so a filtered run preserves unselected names.
 		if summary.Suppression.Dead > 0 {
-			terms = append(terms, fmt.Sprintf("%d disable comments silenced nothing while their rule ran", summary.Suppression.Dead))
+			terms = append(
+				terms,
+				fmt.Sprintf("%d disable comments silenced nothing while their rule ran", summary.Suppression.Dead),
+			)
 		}
 	}
 	if !details {
@@ -423,7 +432,10 @@ func writeCoverageDetails(out *bufio.Writer, summary coverageSummary) {
 			line := "    " + entry.Name
 			details := entry.Details
 			if entry.NeedsAction {
-				details = append(append([]string(nil), details...), "declares no reason to register none, so it checked nothing")
+				details = append(
+					append([]string(nil), details...),
+					"declares no reason to register none, so it checked nothing",
+				)
 			}
 			if entry.OffWithoutReason {
 				details = append(append([]string(nil), details...), "off with no reason given")
@@ -438,8 +450,11 @@ func writeCoverageDetails(out *bufio.Writer, summary coverageSummary) {
 		fmt.Fprintf(out, "  partly: %s\n", fact)
 	}
 	if summary.Suppression != nil && summary.Suppression.ForUnrunRules > 0 {
-		fmt.Fprintf(out, "  suppressions: %d unused disable comments name only rules cohere has not ported yet, so nothing looked and they are not dead\n",
-			summary.Suppression.ForUnrunRules)
+		fmt.Fprintf(
+			out,
+			"  suppressions: %d unused disable comments name only rules cohere has not ported yet, so nothing looked and they are not dead\n",
+			summary.Suppression.ForUnrunRules,
+		)
 	}
 	if summary.Suppression != nil && len(summary.Suppression.DeadSites) > 0 {
 		writeDeadSuppressions(out, summary.Suppression.DeadSites)
@@ -520,7 +535,11 @@ func skipLines(skips map[string]map[string]int) []string {
 // that found nothing unless it is named here (#pa7k7zv).
 func writeRuleSkips(out *bufio.Writer, skips map[string]map[string]int) {
 	lines := skipLines(skips)
-	fmt.Fprintf(out, "  skipped (%d): rules that declined files on a compiler option or a missing precondition, so they checked nothing there\n", len(lines))
+	fmt.Fprintf(
+		out,
+		"  skipped (%d): rules that declined files on a compiler option or a missing precondition, so they checked nothing there\n",
+		len(lines),
+	)
 	for _, line := range lines {
 		fmt.Fprintf(out, "    %s\n", line)
 	}
@@ -725,9 +744,14 @@ func writeLintReport(out *bufio.Writer, report lintReport) {
 	account := accountOutput(out)
 	// The dash is escaped, not changed: internal/differential finds this line by it, and swift/Contract.md
 	// names it as the line both engines print.
-	printInvocation(accountOutput(out),
+	printInvocation(
+		accountOutput(out),
 		"lint: %d findings \u2014 %d rules over %d files, %d nodes visited%s, %s%s\n",
-		len(report.Result.Diagnostics), coverage.RulesRun, coverage.FilesWalked, coverage.NodesVisited, nodesReplayedClause(coverage),
+		len(report.Result.Diagnostics),
+		coverage.RulesRun,
+		coverage.FilesWalked,
+		coverage.NodesVisited,
+		nodesReplayedClause(coverage),
 		report.WalkCost,
 		replayedFromCache(report.Result),
 	)
@@ -808,10 +832,19 @@ func writeDepartures(out *bufio.Writer, lintConfiguration *configuration.Config)
 	for _, name := range names {
 		departure := lintConfiguration.Departures[name]
 		file := departure.File
-		if relative, relativePathError := filepath.Rel(lintConfiguration.Root, departure.File); relativePathError == nil {
+		if relative, relativePathError := filepath.Rel(
+			lintConfiguration.Root,
+			departure.File,
+		); relativePathError == nil {
 			file = relative
 		}
-		fmt.Fprintf(out, "  departure: %s is set differently from the house ruling in %s: %s\n", name, file, departure.Reason)
+		fmt.Fprintf(
+			out,
+			"  departure: %s is set differently from the house ruling in %s: %s\n",
+			name,
+			file,
+			departure.Reason,
+		)
 	}
 }
 
@@ -828,7 +861,10 @@ func writeOverrideReasons(out *bufio.Writer, lintConfiguration *configuration.Co
 			continue
 		}
 		file := override.File
-		if relative, relativePathError := filepath.Rel(lintConfiguration.Root, override.File); relativePathError == nil {
+		if relative, relativePathError := filepath.Rel(
+			lintConfiguration.Root,
+			override.File,
+		); relativePathError == nil {
 			file = relative
 		}
 		names := make([]string, 0, len(override.Rules))
@@ -859,7 +895,12 @@ func writeCoverageNotes(out *bufio.Writer, summary coverageSummary, details bool
 		writeCrashedNote(out, crash.File, crash.Cause)
 	}
 	for _, crash := range summary.RuleCrashes {
-		fmt.Fprintf(out, "  crashed: %s: %s\n", crash.File, runCrash{Path: crash.File, Rule: crash.Rule, Cause: crash.Cause}.message())
+		fmt.Fprintf(
+			out,
+			"  crashed: %s: %s\n",
+			crash.File,
+			runCrash{Path: crash.File, Rule: crash.Rule, Cause: crash.Cause}.message(),
+		)
 	}
 	if details {
 		writeCoverageDetails(out, summary)
@@ -872,14 +913,23 @@ func writeCoverageNotes(out *bufio.Writer, summary coverageSummary, details bool
 		fmt.Fprintf(out, "  skipped: %s\n", line)
 	}
 	if offWithoutReason := summary.offWithoutReasonCount(); offWithoutReason > 0 {
-		fmt.Fprintf(out, "  off with no reason: %d rule%s your settings turn off without saying why; cohere --coverage names them\n", offWithoutReason, plural(offWithoutReason))
+		fmt.Fprintf(
+			out,
+			"  off with no reason: %d rule%s your settings turn off without saying why; cohere --coverage names them\n",
+			offWithoutReason,
+			plural(offWithoutReason),
+		)
 	}
 	for _, entry := range summary.Entries {
 		if !entry.NeedsAction {
 			continue
 		}
-		fmt.Fprintf(out, "  no listener: rule %s was %s and registered no listener on any, and it declares no reason it may (answering in Run, or declining files it is not about), so it checked nothing\n",
-			entry.Name, strings.Join(entry.Details, ", "))
+		fmt.Fprintf(
+			out,
+			"  no listener: rule %s was %s and registered no listener on any, and it declares no reason it may (answering in Run, or declining files it is not about), so it checked nothing\n",
+			entry.Name,
+			strings.Join(entry.Details, ", "),
+		)
 	}
 }
 
@@ -904,7 +954,11 @@ func replayedFromCache(result program.Result) string {
 	}
 	replayed := fmt.Sprintf("; %d of %d files replayed from cache", result.FilesReplayed, result.Coverage.FilesWalked)
 	if result.TypeAwareRerun > 0 || result.ShapeKeyedRerun > 0 {
-		replayed += fmt.Sprintf(" (type-aware rules ran again on %d of them, shape-keyed on %d)", result.TypeAwareRerun, result.ShapeKeyedRerun)
+		replayed += fmt.Sprintf(
+			" (type-aware rules ran again on %d of them, shape-keyed on %d)",
+			result.TypeAwareRerun,
+			result.ShapeKeyedRerun,
+		)
 	}
 	if result.DesignSystemRerun > 0 {
 		replayed += fmt.Sprintf(" (design-system rules ran again on %d of them)", result.DesignSystemRerun)

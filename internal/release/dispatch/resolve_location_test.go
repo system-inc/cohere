@@ -29,7 +29,10 @@ func TestTheDevelopmentHashLandsInCoheresOwnCache(test *testing.T) {
 	}
 
 	test.Chdir(project)
-	if recordDevelopmentHashError := recordDevelopmentHash(paths, "0123456789abcdef"); recordDevelopmentHashError != nil {
+	if recordDevelopmentHashError := recordDevelopmentHash(
+		paths,
+		"0123456789abcdef",
+	); recordDevelopmentHashError != nil {
 		test.Fatal(recordDevelopmentHashError)
 	}
 
@@ -38,7 +41,9 @@ func TestTheDevelopmentHashLandsInCoheresOwnCache(test *testing.T) {
 	if !filepath.IsAbs(written) || !strings.HasPrefix(written, cache) {
 		test.Errorf("the development hash path %s is not inside the module's cache %s", written, cache)
 	}
-	if contents, readError := os.ReadFile(written); readError != nil || strings.TrimSpace(string(contents)) != "0123456789abcdef" {
+	if contents, readError := os.ReadFile(
+		written,
+	); readError != nil || strings.TrimSpace(string(contents)) != "0123456789abcdef" {
 		test.Errorf("the hash was not written where the path says (read %q, %v)", contents, readError)
 	}
 

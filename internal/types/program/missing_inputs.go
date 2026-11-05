@@ -63,7 +63,10 @@ func (graph *Graph) MissingGeneratedInputs(generated func(target string) bool) [
 			if !tspath.IsExternalModuleNameRelative(name) {
 				continue
 			}
-			if resolved := graph.Program.GetResolvedModuleFromModuleSpecifier(sourceFile, specifier); resolved != nil && resolved.IsResolved() {
+			if resolved := graph.Program.GetResolvedModuleFromModuleSpecifier(
+				sourceFile,
+				specifier,
+			); resolved != nil && resolved.IsResolved() {
 				continue
 			}
 			target := tspath.GetNormalizedAbsolutePath(name, directory)

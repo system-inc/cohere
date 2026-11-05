@@ -10,7 +10,10 @@ const consistencyNoHandRolledDelayId = "handRolledDelay"
 
 // consistencyNoHandRolledDelayText is the rule's message, whose wording lives in
 // `policy/messages/consistency-no-hand-rolled-delay.json`.
-var consistencyNoHandRolledDelayText = policy.MessageOf("nexus/consistency-no-hand-rolled-delay", consistencyNoHandRolledDelayId)
+var consistencyNoHandRolledDelayText = policy.MessageOf(
+	"nexus/consistency-no-hand-rolled-delay",
+	consistencyNoHandRolledDelayId,
+)
 
 func consistencyNoHandRolledDelayMessage() rule.Message {
 	return rule.Message{Id: consistencyNoHandRolledDelayId, Description: consistencyNoHandRolledDelayText.Render(nil)}

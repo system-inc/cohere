@@ -142,7 +142,12 @@ func (reuse *FindingsReuse) Recorded() *LintCache {
 	reuse.mutex.Lock()
 	defer reuse.mutex.Unlock()
 	design, keepReplayed := reuse.settleDesignSystem()
-	cache := &LintCache{Version: lintCacheVersion, Key: reuse.key, Entries: make([]LintCacheEntry, 0, len(reuse.next)), DesignSystem: design}
+	cache := &LintCache{
+		Version:      lintCacheVersion,
+		Key:          reuse.key,
+		Entries:      make([]LintCacheEntry, 0, len(reuse.next)),
+		DesignSystem: design,
+	}
 	for _, entry := range reuse.next {
 		switch {
 		case entry.DesignFingerprint == [sha256.Size]byte{} && design != nil:
@@ -152,7 +157,10 @@ func (reuse *FindingsReuse) Recorded() *LintCache {
 		}
 		cache.Entries = append(cache.Entries, entry)
 	}
-	sort.Slice(cache.Entries, func(first, second int) bool { return cache.Entries[first].Path < cache.Entries[second].Path })
+	sort.Slice(
+		cache.Entries,
+		func(first, second int) bool { return cache.Entries[first].Path < cache.Entries[second].Path },
+	)
 	return cache
 }
 
@@ -257,7 +265,13 @@ func withheldFits(entry LintCacheEntry, text string) bool {
 	}
 	ran := make(map[string]bool, len(entry.Rules)+len(entry.TypedRules)+len(entry.ShapedRules)+len(entry.DesignRules)+
 		len(entry.DerivedRules))
-	for _, names := range [][]string{entry.Rules, entry.TypedRules, entry.ShapedRules, entry.DesignRules, entry.DerivedRules} {
+	for _, names := range [][]string{
+		entry.Rules,
+		entry.TypedRules,
+		entry.ShapedRules,
+		entry.DesignRules,
+		entry.DerivedRules,
+	} {
 		for _, name := range names {
 			ran[name] = true
 		}
@@ -305,10 +319,18 @@ func ruleNames(rules []rule.Rule) []string {
 // Mutates: listening counts each replayed rule that listened on the file, as a walked file's do
 func replayEntry(entry LintCacheEntry, hits classHits, sourceFile *ast.SourceFile, diagnostics *[]rule.Diagnostic,
 	reporting map[string]int, offered map[string]int, listening map[string]int) RuleNotes {
-	replays := make(map[string]bool, len(entry.Rules)+len(entry.TypedRules)+len(entry.ShapedRules)+len(entry.DesignRules)+
-		len(entry.DerivedRules))
-	for _, names := range [][]string{entry.Rules, classIf(hits.typed, entry.TypedRules), classIf(hits.shaped, entry.ShapedRules),
-		classIf(hits.design, entry.DesignRules), classIf(hits.derived, entry.DerivedRules)} {
+	replays := make(
+		map[string]bool,
+		len(entry.Rules)+len(entry.TypedRules)+len(entry.ShapedRules)+len(entry.DesignRules)+
+			len(entry.DerivedRules),
+	)
+	for _, names := range [][]string{
+		entry.Rules,
+		classIf(hits.typed, entry.TypedRules),
+		classIf(hits.shaped, entry.ShapedRules),
+		classIf(hits.design, entry.DesignRules),
+		classIf(hits.derived, entry.DerivedRules),
+	} {
 		for _, name := range names {
 			replays[name] = true
 			offered[name]++
@@ -337,8 +359,13 @@ func replayEntry(entry LintCacheEntry, hits classHits, sourceFile *ast.SourceFil
 // replayedAdamic is the part of an entry's readiness record that its replayed classes produced, nil when the
 // entry has none. The walk adds what the rules it ran measured.
 func replayedAdamic(entry LintCacheEntry, hits classHits) *AdamicRecord {
-	return adamicOf(entry.Adamic, ruleSet(entry.Rules, classIf(hits.typed, entry.TypedRules),
-		classIf(hits.shaped, entry.ShapedRules), classIf(hits.design, entry.DesignRules), classIf(hits.derived, entry.DerivedRules)))
+	return adamicOf(entry.Adamic, ruleSet(
+		entry.Rules,
+		classIf(hits.typed, entry.TypedRules),
+		classIf(hits.shaped, entry.ShapedRules),
+		classIf(hits.design, entry.DesignRules),
+		classIf(hits.derived, entry.DerivedRules),
+	))
 }
 
 // ruleSet is every name in the lists, as a set.
@@ -403,10 +430,20 @@ func mergeNotes(first RuleNotes, second RuleNotes) RuleNotes {
 //
 // fileAdamic is what the walk measured for readiness, nil when it measured nothing; only the cacheable rules'
 // part is kept, since the rest run on every walk.
-func recordableEntry(sourceFile *ast.SourceFile, keys cacheKeys, fileDiagnostics []rule.Diagnostic,
-	fileListening map[string]int, fileNotes RuleNotes, fileAdamic *AdamicRecord, visited int, silenced suppressionTally) (LintCacheEntry, bool) {
-	cacheable := append(append(append(append(append([]string{}, keys.pure...), keys.typed...), keys.shaped...), keys.design...),
-		keys.derived...)
+func recordableEntry(
+	sourceFile *ast.SourceFile,
+	keys cacheKeys,
+	fileDiagnostics []rule.Diagnostic,
+	fileListening map[string]int,
+	fileNotes RuleNotes,
+	fileAdamic *AdamicRecord,
+	visited int,
+	silenced suppressionTally,
+) (LintCacheEntry, bool) {
+	cacheable := append(
+		append(append(append(append([]string{}, keys.pure...), keys.typed...), keys.shaped...), keys.design...),
+		keys.derived...,
+	)
 	isCacheable := make(map[string]bool, len(cacheable))
 	for _, name := range cacheable {
 		isCacheable[name] = true
@@ -471,16 +508,33 @@ func withheldBy(withheld []LintCacheWithheld, names map[string]bool) []LintCache
 //
 // The readiness record merges the same way, rule by rule, and is nil when this walk measured nothing: an entry
 // half measured is unmeasured.
-func refreshClasses(old LintCacheEntry, keys cacheKeys, hits classHits, fileDiagnostics []rule.Diagnostic,
-	fileListening map[string]int, fileNotes RuleNotes, fileAdamic *AdamicRecord, silenced suppressionTally) (LintCacheEntry, bool) {
+func refreshClasses(
+	old LintCacheEntry,
+	keys cacheKeys,
+	hits classHits,
+	fileDiagnostics []rule.Diagnostic,
+	fileListening map[string]int,
+	fileNotes RuleNotes,
+	fileAdamic *AdamicRecord,
+	silenced suppressionTally,
+) (LintCacheEntry, bool) {
 	ran := map[string]bool{}
-	for _, name := range append(append(append(append([]string{}, classIf(!hits.typed, keys.typed)...), classIf(!hits.shaped, keys.shaped)...),
-		classIf(!hits.design, keys.design)...), classIf(!hits.derived, keys.derived)...) {
+	for _, name := range append(
+		append(append(append([]string{}, classIf(!hits.typed, keys.typed)...), classIf(!hits.shaped, keys.shaped)...),
+			classIf(!hits.design, keys.design)...),
+		classIf(!hits.derived, keys.derived)...,
+	) {
 		ran[name] = true
 	}
-	kept := make(map[string]bool, len(old.Rules)+len(old.TypedRules)+len(old.ShapedRules)+len(old.DesignRules)+len(old.DerivedRules))
-	for _, name := range append(append(append(append(append([]string{}, old.Rules...), classIf(hits.typed, old.TypedRules)...),
-		classIf(hits.shaped, old.ShapedRules)...), classIf(hits.design, old.DesignRules)...), classIf(hits.derived, old.DerivedRules)...) {
+	kept := make(
+		map[string]bool,
+		len(old.Rules)+len(old.TypedRules)+len(old.ShapedRules)+len(old.DesignRules)+len(old.DerivedRules),
+	)
+	for _, name := range append(
+		append(append(append(append([]string{}, old.Rules...), classIf(hits.typed, old.TypedRules)...),
+			classIf(hits.shaped, old.ShapedRules)...), classIf(hits.design, old.DesignRules)...),
+		classIf(hits.derived, old.DerivedRules)...,
+	) {
 		kept[name] = true
 	}
 	refreshed := LintCacheEntry{

@@ -48,8 +48,11 @@ func TestNoInvalidRegexpFires(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoInvalidRegexp, noInvalidRegexpFile, testCase.sourceText),
-				"invalidRegexp")
+			rule_testing.ExpectFindings(
+				test,
+				rule_testing.RunTyped(test, NoInvalidRegexp, noInvalidRegexpFile, testCase.sourceText),
+				"invalidRegexp",
+			)
 		})
 	}
 }
@@ -97,7 +100,10 @@ func TestNoInvalidRegexpStaysSilent(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoInvalidRegexp, noInvalidRegexpFile, testCase.sourceText))
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.RunTyped(test, NoInvalidRegexp, noInvalidRegexpFile, testCase.sourceText),
+			)
 		})
 	}
 }
@@ -135,20 +141,35 @@ func TestNoInvalidRegexpHonorsAllowConstructorFlags(test *testing.T) {
 		{"an allowed flag beside a valid one", `{"allowConstructorFlags": ["a"]}`, "new RegExp('.', 'ga');\n", false},
 		{"two allowed flags in any order", `{"allowConstructorFlags": ["a", "z"]}`, "new RegExp('.', 'zga');\n", false},
 		{"one string allowing two flags", `{"allowConstructorFlags": ["az"]}`, "new RegExp('.', 'za');\n", false},
-		{"an allowed flag with an unknown pattern", `{"allowConstructorFlags": ["a"]}`, "new RegExp(pattern, 'ga');\n", false},
+		{
+			"an allowed flag with an unknown pattern",
+			`{"allowConstructorFlags": ["a"]}`,
+			"new RegExp(pattern, 'ga');\n",
+			false,
+		},
 		{"an empty allow-list", `{"allowConstructorFlags": []}`, "new RegExp('.', 'a');\n", true},
 		{"an empty options object", `{}`, "new RegExp('.', 'a');\n", true},
 		{"a flag the list does not name", `{"allowConstructorFlags": ["a"]}`, "new RegExp('.', 'z');\n", true},
 		{"the other case of an allowed flag", `{"allowConstructorFlags": ["a"]}`, "RegExp('.', 'A');\n", true},
 		{"an allowed flag twice", `{"allowConstructorFlags": ["a"]}`, "new RegExp('.', 'aga');\n", true},
-		{"an allowed flag twice with a non-literal pattern", `{"allowConstructorFlags": ["a"]}`, "new RegExp(pattern, 'aa');\n", true},
+		{
+			"an allowed flag twice with a non-literal pattern",
+			`{"allowConstructorFlags": ["a"]}`,
+			"new RegExp(pattern, 'aa');\n",
+			true,
+		},
 
 		// A language flag in the list is dropped rather than added a second time, so it is still
 		// struck once and a second copy is still a duplicate.
 		{"a language flag listed and doubled", `{"allowConstructorFlags": ["u"]}`, "new RegExp('.', 'uu');\n", true},
 
 		// An allowed flag carries no meaning into the pattern, so `\u{0}` is still read without `u`.
-		{"an allowed flag over a pattern only u accepts", `{"allowConstructorFlags": ["a"]}`, "new RegExp('\\\\u{0}*', 'a');\n", true},
+		{
+			"an allowed flag over a pattern only u accepts",
+			`{"allowConstructorFlags": ["a"]}`,
+			"new RegExp('\\\\u{0}*', 'a');\n",
+			true,
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -157,7 +178,13 @@ func TestNoInvalidRegexpHonorsAllowConstructorFlags(test *testing.T) {
 			if decodeNoInvalidRegexpOptionsError != nil {
 				test.Fatalf("decoding %s: %v", testCase.options, decodeNoInvalidRegexpOptionsError)
 			}
-			result := rule_testing.RunTypedWithOptions(test, NoInvalidRegexp, noInvalidRegexpFile, testCase.sourceText, options)
+			result := rule_testing.RunTypedWithOptions(
+				test,
+				NoInvalidRegexp,
+				noInvalidRegexpFile,
+				testCase.sourceText,
+				options,
+			)
 			if testCase.reports {
 				rule_testing.ExpectFindings(test, result, "invalidRegexp")
 			} else {
@@ -192,7 +219,11 @@ func TestNoInvalidRegexpDecodesOnlyUpstreamsSchema(test *testing.T) {
 				test.Errorf("%s decoded, and upstream's schema refuses it", testCase.raw)
 			}
 			if !testCase.refused && decodeNoInvalidRegexpOptionsError != nil {
-				test.Errorf("%s was refused, and upstream's schema accepts it: %v", testCase.raw, decodeNoInvalidRegexpOptionsError)
+				test.Errorf(
+					"%s was refused, and upstream's schema accepts it: %v",
+					testCase.raw,
+					decodeNoInvalidRegexpOptionsError,
+				)
 			}
 		})
 	}

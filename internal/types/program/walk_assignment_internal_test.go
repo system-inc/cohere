@@ -17,15 +17,29 @@ func TestTheWalkGivesEachWorkerTheFilesOfOneChecker(test *testing.T) {
 	test.Parallel()
 	root := test.TempDir()
 	configuration := `{"compilerOptions": {"target": "ES2022", "module": "esnext", "moduleResolution": "bundler", "strict": true, "noEmit": true}}`
-	if writeError := os.WriteFile(filepath.Join(root, "tsconfig.json"), []byte(configuration), 0o644); writeError != nil {
+	if writeError := os.WriteFile(
+		filepath.Join(root, "tsconfig.json"),
+		[]byte(configuration),
+		0o644,
+	); writeError != nil {
 		test.Fatal(writeError)
 	}
 	for index := range 40 {
 		text := fmt.Sprintf("export const value%d = %d;\n", index, index)
 		if index > 0 {
-			text = fmt.Sprintf("import { value%d } from \"./f%d\";\nexport const value%d = value%d + 1;\n", index-1, index-1, index, index-1)
+			text = fmt.Sprintf(
+				"import { value%d } from \"./f%d\";\nexport const value%d = value%d + 1;\n",
+				index-1,
+				index-1,
+				index,
+				index-1,
+			)
 		}
-		if writeError := os.WriteFile(filepath.Join(root, fmt.Sprintf("f%d.ts", index)), []byte(text), 0o644); writeError != nil {
+		if writeError := os.WriteFile(
+			filepath.Join(root, fmt.Sprintf("f%d.ts", index)),
+			[]byte(text),
+			0o644,
+		); writeError != nil {
 			test.Fatal(writeError)
 		}
 	}

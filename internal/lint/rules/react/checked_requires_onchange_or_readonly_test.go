@@ -62,13 +62,43 @@ func TestCheckedRequiresFires(test *testing.T) {
 		{"upstream invalid-1", "<input type=\"radio\" checked={true} />", "", []string{"missingProperty"}},
 		{"upstream invalid-2", "<input type=\"checkbox\" checked />", "", []string{"missingProperty"}},
 		{"upstream invalid-3", "<input type=\"checkbox\" checked={true} />", "", []string{"missingProperty"}},
-		{"upstream invalid-4", "<input type=\"checkbox\" checked={condition ? true : false} />", "", []string{"missingProperty"}},
-		{"upstream invalid-5", "<input type=\"checkbox\" checked defaultChecked />", "", []string{"exclusiveCheckedAttribute", "missingProperty"}},
+		{
+			"upstream invalid-4",
+			"<input type=\"checkbox\" checked={condition ? true : false} />",
+			"",
+			[]string{"missingProperty"},
+		},
+		{
+			"upstream invalid-5",
+			"<input type=\"checkbox\" checked defaultChecked />",
+			"",
+			[]string{"exclusiveCheckedAttribute", "missingProperty"},
+		},
 		{"upstream invalid-6", "React.createElement(\"input\", { checked: false })", "", []string{"missingProperty"}},
-		{"upstream invalid-7", "React.createElement(\"input\", { checked: true, defaultChecked: true })", "", []string{"exclusiveCheckedAttribute", "missingProperty"}},
-		{"upstream invalid-8", "<input type=\"checkbox\" checked defaultChecked />", "{\"ignoreMissingProperties\":true}", []string{"exclusiveCheckedAttribute"}},
-		{"upstream invalid-9", "<input type=\"checkbox\" checked defaultChecked />", "{\"ignoreExclusiveCheckedAttribute\":true}", []string{"missingProperty"}},
-		{"upstream invalid-10", "<input type=\"checkbox\" checked defaultChecked />", "{\"ignoreMissingProperties\":false,\"ignoreExclusiveCheckedAttribute\":false}", []string{"exclusiveCheckedAttribute", "missingProperty"}},
+		{
+			"upstream invalid-7",
+			"React.createElement(\"input\", { checked: true, defaultChecked: true })",
+			"",
+			[]string{"exclusiveCheckedAttribute", "missingProperty"},
+		},
+		{
+			"upstream invalid-8",
+			"<input type=\"checkbox\" checked defaultChecked />",
+			"{\"ignoreMissingProperties\":true}",
+			[]string{"exclusiveCheckedAttribute"},
+		},
+		{
+			"upstream invalid-9",
+			"<input type=\"checkbox\" checked defaultChecked />",
+			"{\"ignoreExclusiveCheckedAttribute\":true}",
+			[]string{"missingProperty"},
+		},
+		{
+			"upstream invalid-10",
+			"<input type=\"checkbox\" checked defaultChecked />",
+			"{\"ignoreMissingProperties\":false,\"ignoreExclusiveCheckedAttribute\":false}",
+			[]string{"exclusiveCheckedAttribute", "missingProperty"},
+		},
 	}
 
 	for _, testCase := range cases {
@@ -113,9 +143,21 @@ func TestCheckedRequiresStaysSilent(test *testing.T) {
 		{"upstream valid-15", "React.createElement('input', { checked: foo, onChange: noop, readOnly: true })", ""},
 		{"upstream valid-16", "<input type=\"checkbox\" checked />", "{\"ignoreMissingProperties\":true}"},
 		{"upstream valid-17", "<input type=\"checkbox\" checked={true} />", "{\"ignoreMissingProperties\":true}"},
-		{"upstream valid-18", "<input type=\"checkbox\" onChange={noop} checked defaultChecked />", "{\"ignoreExclusiveCheckedAttribute\":true}"},
-		{"upstream valid-19", "<input type=\"checkbox\" onChange={noop} checked={true} defaultChecked />", "{\"ignoreExclusiveCheckedAttribute\":true}"},
-		{"upstream valid-20", "<input type=\"checkbox\" onChange={noop} checked defaultChecked />", "{\"ignoreMissingProperties\":true,\"ignoreExclusiveCheckedAttribute\":true}"},
+		{
+			"upstream valid-18",
+			"<input type=\"checkbox\" onChange={noop} checked defaultChecked />",
+			"{\"ignoreExclusiveCheckedAttribute\":true}",
+		},
+		{
+			"upstream valid-19",
+			"<input type=\"checkbox\" onChange={noop} checked={true} defaultChecked />",
+			"{\"ignoreExclusiveCheckedAttribute\":true}",
+		},
+		{
+			"upstream valid-20",
+			"<input type=\"checkbox\" onChange={noop} checked defaultChecked />",
+			"{\"ignoreMissingProperties\":true,\"ignoreExclusiveCheckedAttribute\":true}",
+		},
 		{"upstream valid-21", "<span/>", ""},
 		{"upstream valid-22", "React.createElement('span')", ""},
 		{"upstream valid-23", "(()=>{})()", ""},
@@ -138,7 +180,9 @@ func TestCheckedRequiresStaysSilent(test *testing.T) {
 // with a case that only the typed path can report.
 func runCheckedRequires(test *testing.T, sourceText string, rawOptions string) rule_testing.Result {
 	test.Helper()
-	decoded, decodeCheckedRequiresOnChangeOrReadOnlyOptionsError := DecodeCheckedRequiresOnChangeOrReadOnlyOptions([]byte(rawOptions))
+	decoded, decodeCheckedRequiresOnChangeOrReadOnlyOptionsError := DecodeCheckedRequiresOnChangeOrReadOnlyOptions(
+		[]byte(rawOptions),
+	)
 	if decodeCheckedRequiresOnChangeOrReadOnlyOptionsError != nil {
 		test.Fatalf("decoding %q: %v", rawOptions, decodeCheckedRequiresOnChangeOrReadOnlyOptionsError)
 	}
@@ -525,7 +569,9 @@ func TestCheckedRequiresDecodesItsOptions(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, decodeCheckedRequiresOnChangeOrReadOnlyOptionsError := DecodeCheckedRequiresOnChangeOrReadOnlyOptions([]byte(testCase.raw))
+			decoded, decodeCheckedRequiresOnChangeOrReadOnlyOptionsError := DecodeCheckedRequiresOnChangeOrReadOnlyOptions(
+				[]byte(testCase.raw),
+			)
 			if decodeCheckedRequiresOnChangeOrReadOnlyOptionsError != nil {
 				test.Fatalf("decoding %q: %v", testCase.raw, decodeCheckedRequiresOnChangeOrReadOnlyOptionsError)
 			}
@@ -547,10 +593,14 @@ func TestCheckedRequiresDecodesItsOptions(test *testing.T) {
 func TestCheckedRequiresRejectsMalformedOptions(test *testing.T) {
 	test.Parallel()
 
-	if _, decodeCheckedRequiresOnChangeOrReadOnlyOptionsError := DecodeCheckedRequiresOnChangeOrReadOnlyOptions([]byte(`{"ignoreMissingProperties":`)); decodeCheckedRequiresOnChangeOrReadOnlyOptionsError == nil {
+	if _, decodeCheckedRequiresOnChangeOrReadOnlyOptionsError := DecodeCheckedRequiresOnChangeOrReadOnlyOptions(
+		[]byte(`{"ignoreMissingProperties":`),
+	); decodeCheckedRequiresOnChangeOrReadOnlyOptionsError == nil {
 		test.Fatal("truncated JSON decoded without error")
 	}
-	if _, decodeCheckedRequiresOnChangeOrReadOnlyOptionsError := DecodeCheckedRequiresOnChangeOrReadOnlyOptions(json.RawMessage(`"error"`)); decodeCheckedRequiresOnChangeOrReadOnlyOptionsError == nil {
+	if _, decodeCheckedRequiresOnChangeOrReadOnlyOptionsError := DecodeCheckedRequiresOnChangeOrReadOnlyOptions(
+		json.RawMessage(`"error"`),
+	); decodeCheckedRequiresOnChangeOrReadOnlyOptionsError == nil {
 		test.Fatal("a string decoded into the options struct without error")
 	}
 }

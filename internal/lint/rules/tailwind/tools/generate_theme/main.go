@@ -23,8 +23,8 @@
 //
 // `-check` regenerates and fails when the committed fixture disagrees, which is what makes a
 // Tailwind upgrade that changes theme resolution show up as a failing gate instead of a silent
-// behavior change. Like the other internal/lint/rules/tailwind/tools/generate_* tools, nothing invokes it automatically; it is a
-// manual gate.
+// behavior change. Like the other internal/lint/rules/tailwind/tools/generate_* tools, nothing invokes it
+// automatically; it is a manual gate.
 //
 // Node is required to run it and never to use the result.
 package main
@@ -40,9 +40,21 @@ import (
 )
 
 func main() {
-	packageRoot := flag.String("package-root", "", "path to the tailwindcss package root (the directory holding package.json)")
-	stylesheets := flag.String("stylesheets", "", "path to a JSON array of {name, path} naming real repository stylesheets to include")
-	output := flag.String("output", filepath.Join("internal", "tailwind", "testdata", "theme_fixtures.json"), "where to write the fixture")
+	packageRoot := flag.String(
+		"package-root",
+		"",
+		"path to the tailwindcss package root (the directory holding package.json)",
+	)
+	stylesheets := flag.String(
+		"stylesheets",
+		"",
+		"path to a JSON array of {name, path} naming real repository stylesheets to include",
+	)
+	output := flag.String(
+		"output",
+		filepath.Join("internal", "tailwind", "testdata", "theme_fixtures.json"),
+		"where to write the fixture",
+	)
 	check := flag.Bool("check", false, "regenerate and fail if the committed fixture disagrees")
 	flag.Parse()
 
@@ -69,7 +81,11 @@ func main() {
 		// Go whitespace: this tool comparing its own committed fixture with its own output.
 		if !bytes.Equal(bytes.TrimSpace(committed), bytes.TrimSpace(generated)) {
 			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
-			fmt.Fprintf(os.Stderr, "%s is stale: the engine now resolves a different theme. Re-run without -check and read the diff.\n", *output)
+			fmt.Fprintf(
+				os.Stderr,
+				"%s is stale: the engine now resolves a different theme. Re-run without -check and read the diff.\n",
+				*output,
+			)
 			os.Exit(1)
 		}
 		// Ignored: the check has passed, and the exit code says so whether or not this lands.

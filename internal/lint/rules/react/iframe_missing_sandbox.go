@@ -365,7 +365,9 @@ var IframeMissingSandbox = rule.Rule{
 								// upstream's identifier-only reading. A computed key or a spread could
 								// be either, and is opaque.
 								name := propertyIdentifierName(property)
-								if keyNode := property.Name(); name == "" && keyNode != nil && keyNode.Kind == ast.KindStringLiteral {
+								if keyNode := property.Name(); name == "" &&
+									keyNode != nil &&
+									keyNode.Kind == ast.KindStringLiteral {
 									name = keyNode.Text()
 								}
 								switch {
@@ -502,13 +504,18 @@ func iframeMissingSandboxValueIsCrossOrigin(ruleContext rule.Context, value *ast
 	case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral:
 		return iframeMissingSandboxClassifyUrl(value.Text(), true) == iframeMissingSandboxOriginCross
 	case ast.KindTemplateExpression:
-		return iframeMissingSandboxClassifyUrl(value.AsTemplateExpression().Head.Text(), false) == iframeMissingSandboxOriginCross
+		return iframeMissingSandboxClassifyUrl(
+			value.AsTemplateExpression().Head.Text(),
+			false,
+		) == iframeMissingSandboxOriginCross
 	}
 	if ruleContext.TypeChecker == nil {
 		return false
 	}
 	if followConst && ast.IsIdentifier(value) {
-		if symbol := ruleContext.TypeChecker.GetSymbolAtLocation(value); symbol != nil && symbol.ValueDeclaration != nil &&
+		if symbol := ruleContext.TypeChecker.GetSymbolAtLocation(
+			value,
+		); symbol != nil && symbol.ValueDeclaration != nil &&
 			ast.IsVariableDeclaration(symbol.ValueDeclaration) &&
 			ast.GetCombinedNodeFlags(symbol.ValueDeclaration)&ast.NodeFlagsConst != 0 {
 			if initializer := symbol.ValueDeclaration.Initializer(); initializer != nil &&
@@ -533,7 +540,10 @@ func iframeMissingSandboxValueIsCrossOrigin(ruleContext rule.Context, value *ast
 				return false
 			}
 		case type_checking.IsTypeFlagSet(constituent, checker.TypeFlagsTemplateLiteral):
-			if iframeMissingSandboxClassifyUrl(constituent.AsTemplateLiteralType().Texts()[0], false) != iframeMissingSandboxOriginCross {
+			if iframeMissingSandboxClassifyUrl(
+				constituent.AsTemplateLiteralType().Texts()[0],
+				false,
+			) != iframeMissingSandboxOriginCross {
 				return false
 			}
 		default:

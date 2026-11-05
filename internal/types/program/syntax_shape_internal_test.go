@@ -11,7 +11,11 @@ func syntaxOf(test *testing.T, text string) string {
 	test.Helper()
 	root := test.TempDir()
 	configuration := `{"compilerOptions": {"target": "ES2022", "module": "esnext", "moduleResolution": "bundler", "strict": true, "noEmit": true}}`
-	if writeError := os.WriteFile(filepath.Join(root, "tsconfig.json"), []byte(configuration), 0o644); writeError != nil {
+	if writeError := os.WriteFile(
+		filepath.Join(root, "tsconfig.json"),
+		[]byte(configuration),
+		0o644,
+	); writeError != nil {
 		test.Fatal(writeError)
 	}
 	if writeError := os.WriteFile(filepath.Join(root, "lib.ts"), []byte(text), 0o644); writeError != nil {

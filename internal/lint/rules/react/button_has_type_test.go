@@ -71,33 +71,195 @@ func TestButtonHasTypeFires(test *testing.T) {
 		wantIds    []string
 		wantTexts  []string
 	}{
-		{"upstream invalid-0", "<button/>", "", []string{"missingType"}, []string{"Missing an explicit type attribute for button"}},
-		{"upstream invalid-1", "<button type=\"foo\"/>", "", []string{"invalidValue"}, []string{"\"foo\" is an invalid value for button type attribute"}},
-		{"upstream invalid-2", "<button type={foo}/>", "", []string{"complexType"}, []string{"The button type attribute must be specified by a static string or a trivial ternary expression"}},
-		{"upstream invalid-3", "<button type={\"foo\"}/>", "", []string{"invalidValue"}, []string{"\"foo\" is an invalid value for button type attribute"}},
-		{"upstream invalid-4", "<button type={'foo'}/>", "", []string{"invalidValue"}, []string{"\"foo\" is an invalid value for button type attribute"}},
-		{"upstream invalid-5", "<button type={`foo`}/>", "", []string{"invalidValue"}, []string{"\"foo\" is an invalid value for button type attribute"}},
-		{"upstream invalid-6", "<button type={`button${foo}`}/>", "", []string{"complexType"}, []string{"The button type attribute must be specified by a static string or a trivial ternary expression"}},
-		{"upstream invalid-7", "<button type=\"reset\"/>", "{\"reset\":false}", []string{"forbiddenValue"}, []string{"\"reset\" is an invalid value for button type attribute"}},
-		{"upstream invalid-8", "<button type={condition ? \"button\" : foo}/>", "", []string{"complexType"}, []string{"The button type attribute must be specified by a static string or a trivial ternary expression"}},
-		{"upstream invalid-9", "<button type={condition ? \"button\" : \"foo\"}/>", "", []string{"invalidValue"}, []string{"\"foo\" is an invalid value for button type attribute"}},
-		{"upstream invalid-10", "<button type={condition ? \"button\" : \"reset\"}/>", "{\"reset\":false}", []string{"forbiddenValue"}, []string{"\"reset\" is an invalid value for button type attribute"}},
-		{"upstream invalid-11", "<button type={condition ? foo : \"button\"}/>", "", []string{"complexType"}, []string{"The button type attribute must be specified by a static string or a trivial ternary expression"}},
-		{"upstream invalid-12", "<button type={condition ? \"foo\" : \"button\"}/>", "", []string{"invalidValue"}, []string{"\"foo\" is an invalid value for button type attribute"}},
-		{"upstream invalid-13", "<button type/>", "", []string{"invalidValue"}, []string{"\"true\" is an invalid value for button type attribute"}},
-		{"upstream invalid-14", "<button type={condition ? \"reset\" : \"button\"}/>", "{\"reset\":false}", []string{"forbiddenValue"}, []string{"\"reset\" is an invalid value for button type attribute"}},
-		{"upstream invalid-15", "React.createElement(\"button\")", "", []string{"missingType"}, []string{"Missing an explicit type attribute for button"}},
-		{"upstream invalid-16", "React.createElement(\"button\", {type: foo})", "", []string{"complexType"}, []string{"The button type attribute must be specified by a static string or a trivial ternary expression"}},
-		{"upstream invalid-17", "React.createElement(\"button\", {type: \"foo\"})", "", []string{"invalidValue"}, []string{"\"foo\" is an invalid value for button type attribute"}},
-		{"upstream invalid-18", "React.createElement(\"button\", {type: \"reset\"})", "{\"reset\":false}", []string{"forbiddenValue"}, []string{"\"reset\" is an invalid value for button type attribute"}},
-		{"upstream invalid-19", "React.createElement(\"button\", {type: condition ? \"button\" : foo})", "", []string{"complexType"}, []string{"The button type attribute must be specified by a static string or a trivial ternary expression"}},
-		{"upstream invalid-20", "React.createElement(\"button\", {type: condition ? \"button\" : \"foo\"})", "", []string{"invalidValue"}, []string{"\"foo\" is an invalid value for button type attribute"}},
-		{"upstream invalid-21", "React.createElement(\"button\", {type: condition ? \"button\" : \"reset\"})", "{\"reset\":false}", []string{"forbiddenValue"}, []string{"\"reset\" is an invalid value for button type attribute"}},
-		{"upstream invalid-22", "React.createElement(\"button\", {type: condition ? foo : \"button\"})", "", []string{"complexType"}, []string{"The button type attribute must be specified by a static string or a trivial ternary expression"}},
-		{"upstream invalid-23", "React.createElement(\"button\", {type: condition ? \"foo\" : \"button\"})", "", []string{"invalidValue"}, []string{"\"foo\" is an invalid value for button type attribute"}},
-		{"upstream invalid-24", "React.createElement(\"button\", {type: condition ? \"reset\" : \"button\"})", "{\"reset\":false}", []string{"forbiddenValue"}, []string{"\"reset\" is an invalid value for button type attribute"}},
-		{"upstream invalid-25", "React.createElement(\"button\", {...extraProps})", "", []string{"missingType"}, []string{"Missing an explicit type attribute for button"}},
-		{"upstream invalid-27", "function Button({ type, ...extraProps }) { const button = type; return <button type={button} {...extraProps} />; }", "", []string{"complexType"}, []string{"The button type attribute must be specified by a static string or a trivial ternary expression"}},
+		{
+			"upstream invalid-0",
+			"<button/>",
+			"",
+			[]string{"missingType"},
+			[]string{"Missing an explicit type attribute for button"},
+		},
+		{
+			"upstream invalid-1",
+			"<button type=\"foo\"/>",
+			"",
+			[]string{"invalidValue"},
+			[]string{"\"foo\" is an invalid value for button type attribute"},
+		},
+		{
+			"upstream invalid-2",
+			"<button type={foo}/>",
+			"",
+			[]string{"complexType"},
+			[]string{"The button type attribute must be specified by a static string or a trivial ternary expression"},
+		},
+		{
+			"upstream invalid-3",
+			"<button type={\"foo\"}/>",
+			"",
+			[]string{"invalidValue"},
+			[]string{"\"foo\" is an invalid value for button type attribute"},
+		},
+		{
+			"upstream invalid-4",
+			"<button type={'foo'}/>",
+			"",
+			[]string{"invalidValue"},
+			[]string{"\"foo\" is an invalid value for button type attribute"},
+		},
+		{
+			"upstream invalid-5",
+			"<button type={`foo`}/>",
+			"",
+			[]string{"invalidValue"},
+			[]string{"\"foo\" is an invalid value for button type attribute"},
+		},
+		{
+			"upstream invalid-6",
+			"<button type={`button${foo}`}/>",
+			"",
+			[]string{"complexType"},
+			[]string{"The button type attribute must be specified by a static string or a trivial ternary expression"},
+		},
+		{
+			"upstream invalid-7",
+			"<button type=\"reset\"/>",
+			"{\"reset\":false}",
+			[]string{"forbiddenValue"},
+			[]string{"\"reset\" is an invalid value for button type attribute"},
+		},
+		{
+			"upstream invalid-8",
+			"<button type={condition ? \"button\" : foo}/>",
+			"",
+			[]string{"complexType"},
+			[]string{"The button type attribute must be specified by a static string or a trivial ternary expression"},
+		},
+		{
+			"upstream invalid-9",
+			"<button type={condition ? \"button\" : \"foo\"}/>",
+			"",
+			[]string{"invalidValue"},
+			[]string{"\"foo\" is an invalid value for button type attribute"},
+		},
+		{
+			"upstream invalid-10",
+			"<button type={condition ? \"button\" : \"reset\"}/>",
+			"{\"reset\":false}",
+			[]string{"forbiddenValue"},
+			[]string{"\"reset\" is an invalid value for button type attribute"},
+		},
+		{
+			"upstream invalid-11",
+			"<button type={condition ? foo : \"button\"}/>",
+			"",
+			[]string{"complexType"},
+			[]string{"The button type attribute must be specified by a static string or a trivial ternary expression"},
+		},
+		{
+			"upstream invalid-12",
+			"<button type={condition ? \"foo\" : \"button\"}/>",
+			"",
+			[]string{"invalidValue"},
+			[]string{"\"foo\" is an invalid value for button type attribute"},
+		},
+		{
+			"upstream invalid-13",
+			"<button type/>",
+			"",
+			[]string{"invalidValue"},
+			[]string{"\"true\" is an invalid value for button type attribute"},
+		},
+		{
+			"upstream invalid-14",
+			"<button type={condition ? \"reset\" : \"button\"}/>",
+			"{\"reset\":false}",
+			[]string{"forbiddenValue"},
+			[]string{"\"reset\" is an invalid value for button type attribute"},
+		},
+		{
+			"upstream invalid-15",
+			"React.createElement(\"button\")",
+			"",
+			[]string{"missingType"},
+			[]string{"Missing an explicit type attribute for button"},
+		},
+		{
+			"upstream invalid-16",
+			"React.createElement(\"button\", {type: foo})",
+			"",
+			[]string{"complexType"},
+			[]string{"The button type attribute must be specified by a static string or a trivial ternary expression"},
+		},
+		{
+			"upstream invalid-17",
+			"React.createElement(\"button\", {type: \"foo\"})",
+			"",
+			[]string{"invalidValue"},
+			[]string{"\"foo\" is an invalid value for button type attribute"},
+		},
+		{
+			"upstream invalid-18",
+			"React.createElement(\"button\", {type: \"reset\"})",
+			"{\"reset\":false}",
+			[]string{"forbiddenValue"},
+			[]string{"\"reset\" is an invalid value for button type attribute"},
+		},
+		{
+			"upstream invalid-19",
+			"React.createElement(\"button\", {type: condition ? \"button\" : foo})",
+			"",
+			[]string{"complexType"},
+			[]string{"The button type attribute must be specified by a static string or a trivial ternary expression"},
+		},
+		{
+			"upstream invalid-20",
+			"React.createElement(\"button\", {type: condition ? \"button\" : \"foo\"})",
+			"",
+			[]string{"invalidValue"},
+			[]string{"\"foo\" is an invalid value for button type attribute"},
+		},
+		{
+			"upstream invalid-21",
+			"React.createElement(\"button\", {type: condition ? \"button\" : \"reset\"})",
+			"{\"reset\":false}",
+			[]string{"forbiddenValue"},
+			[]string{"\"reset\" is an invalid value for button type attribute"},
+		},
+		{
+			"upstream invalid-22",
+			"React.createElement(\"button\", {type: condition ? foo : \"button\"})",
+			"",
+			[]string{"complexType"},
+			[]string{"The button type attribute must be specified by a static string or a trivial ternary expression"},
+		},
+		{
+			"upstream invalid-23",
+			"React.createElement(\"button\", {type: condition ? \"foo\" : \"button\"})",
+			"",
+			[]string{"invalidValue"},
+			[]string{"\"foo\" is an invalid value for button type attribute"},
+		},
+		{
+			"upstream invalid-24",
+			"React.createElement(\"button\", {type: condition ? \"reset\" : \"button\"})",
+			"{\"reset\":false}",
+			[]string{"forbiddenValue"},
+			[]string{"\"reset\" is an invalid value for button type attribute"},
+		},
+		{
+			"upstream invalid-25",
+			"React.createElement(\"button\", {...extraProps})",
+			"",
+			[]string{"missingType"},
+			[]string{"Missing an explicit type attribute for button"},
+		},
+		{
+			"upstream invalid-27",
+			"function Button({ type, ...extraProps }) { const button = type; return <button type={button} {...extraProps} />; }",
+			"",
+			[]string{"complexType"},
+			[]string{"The button type attribute must be specified by a static string or a trivial ternary expression"},
+		},
 	}
 
 	for _, testCase := range cases {
@@ -218,8 +380,14 @@ func TestButtonHasTypePragmaIsFixedAtReact(test *testing.T) {
 		name       string
 		sourceText string
 	}{
-		{"a foreign pragma constructing a span is clean either way", "declare const Foo: any;\nFoo.createElement(\"span\");\n"},
-		{"a foreign pragma constructing a button is silent here and reports upstream under settings", "declare const Foo: any;\nFoo.createElement(\"button\");\n"},
+		{
+			"a foreign pragma constructing a span is clean either way",
+			"declare const Foo: any;\nFoo.createElement(\"span\");\n",
+		},
+		{
+			"a foreign pragma constructing a button is silent here and reports upstream under settings",
+			"declare const Foo: any;\nFoo.createElement(\"button\");\n",
+		},
 	}
 
 	for _, testCase := range cases {
@@ -258,7 +426,12 @@ func TestButtonHasTypeReadsStaticValuesUpstreamsWay(test *testing.T) {
 		{"exponent renders expanded", "const a = <button type={1e3}/>;\n", []string{"invalidValue"}, "\"1000\""},
 		{"a numeric separator is dropped", "const a = <button type={1_0}/>;\n", []string{"invalidValue"}, "\"10\""},
 		{"a bigint drops its suffix", "const a = <button type={1n}/>;\n", []string{"invalidValue"}, "\"1\""},
-		{"a regular expression renders as source", "const a = <button type={/re/}/>;\n", []string{"invalidValue"}, "\"/re/\""},
+		{
+			"a regular expression renders as source",
+			"const a = <button type={/re/}/>;\n",
+			[]string{"invalidValue"},
+			"\"/re/\"",
+		},
 		{"an empty template is an empty string", "const a = <button type={``}/>;\n", []string{"invalidValue"}, "\"\""},
 		{"an empty string attribute", "const a = <button type=\"\"/>;\n", []string{"invalidValue"}, "\"\""},
 		{"a valueless attribute renders true", "const a = <button type/>;\n", []string{"invalidValue"}, "\"true\""},
@@ -271,7 +444,12 @@ func TestButtonHasTypeReadsStaticValuesUpstreamsWay(test *testing.T) {
 		// Upstream measured this on `bu${''}tton`, which the checker folds to the literal "button",
 		// so cohere is deliberately silent there (pinned in TestButtonHasTypeTrustsAProvenType). The
 		// interpolation here is a `string`, which nothing can fold, and it still reports.
-		{"an interpolating template is not static", "declare const part: string;\nconst a = <button type={`bu${part}tton`}/>;\n", []string{"complexType"}, ""},
+		{
+			"an interpolating template is not static",
+			"declare const part: string;\nconst a = <button type={`bu${part}tton`}/>;\n",
+			[]string{"complexType"},
+			"",
+		},
 	}
 
 	for _, testCase := range cases {
@@ -376,7 +554,11 @@ func TestButtonHasTypeSpans(test *testing.T) {
 		{"missing type points at the whole element", "<button/>", []string{"<button/>"}},
 		{"a paired element too", "<button></button>", []string{"<button></button>"}},
 		{"an invalid value points at the whole element", "<button type=\"foo\"/>", []string{"<button type=\"foo\"/>"}},
-		{"a complex type points at the EXPRESSION", "declare const foo: string;\nconst a = <button type={foo}/>;", []string{"foo"}},
+		{
+			"a complex type points at the EXPRESSION",
+			"declare const foo: string;\nconst a = <button type={foo}/>;",
+			[]string{"foo"},
+		},
 		{
 			"a complex ternary branch points at that branch",
 			"declare const condition: boolean;\ndeclare const foo: string;\nconst a = <button type={condition ? \"button\" : foo}/>;",
@@ -461,10 +643,26 @@ func TestButtonHasTypeMatchesUpstreamOnShapesTheCorpusOmits(test *testing.T) {
 		{"a component named Button declines", "declare const Button: any;\nconst a = <Button/>;\n", nil},
 		{"a member-expression tag declines", "declare const button: any;\nconst a = <button.x/>;\n", nil},
 		{"an uppercase tag declines", "declare const BUTTON: any;\nconst a = <BUTTON/>;\n", nil},
-		{"an uppercase attribute name is not the type attribute", "const a = <button TYPE=\"button\"/>;\n", []string{"missingType"}},
-		{"a spread does not exempt", "declare const props: object;\nconst a = <button {...props}/>;\n", []string{"missingType"}},
-		{"a spread after a valid type is clean", "declare const props: object;\nconst a = <button type=\"button\" {...props}/>;\n", nil},
-		{"a spread before a valid type is clean", "declare const props: object;\nconst a = <button {...props} type=\"button\"/>;\n", nil},
+		{
+			"an uppercase attribute name is not the type attribute",
+			"const a = <button TYPE=\"button\"/>;\n",
+			[]string{"missingType"},
+		},
+		{
+			"a spread does not exempt",
+			"declare const props: object;\nconst a = <button {...props}/>;\n",
+			[]string{"missingType"},
+		},
+		{
+			"a spread after a valid type is clean",
+			"declare const props: object;\nconst a = <button type=\"button\" {...props}/>;\n",
+			nil,
+		},
+		{
+			"a spread before a valid type is clean",
+			"declare const props: object;\nconst a = <button {...props} type=\"button\"/>;\n",
+			nil,
+		},
 		{
 			"a string-literal object key is invisible",
 			"declare const React: any;\nReact.createElement('button', {'type': 'foo'});\n",
@@ -573,10 +771,14 @@ func TestButtonHasTypeDecodesItsOptions(test *testing.T) {
 func TestButtonHasTypeRejectsMalformedOptions(test *testing.T) {
 	test.Parallel()
 
-	if _, decodeButtonHasTypeOptionsError := DecodeButtonHasTypeOptions([]byte(`{"button":`)); decodeButtonHasTypeOptionsError == nil {
+	if _, decodeButtonHasTypeOptionsError := DecodeButtonHasTypeOptions(
+		[]byte(`{"button":`),
+	); decodeButtonHasTypeOptionsError == nil {
 		test.Fatal("truncated JSON decoded without error")
 	}
-	if _, decodeButtonHasTypeOptionsError := DecodeButtonHasTypeOptions([]byte(`"error"`)); decodeButtonHasTypeOptionsError == nil {
+	if _, decodeButtonHasTypeOptionsError := DecodeButtonHasTypeOptions(
+		[]byte(`"error"`),
+	); decodeButtonHasTypeOptionsError == nil {
 		test.Fatal("a string decoded into the options struct without error")
 	}
 }
@@ -613,7 +815,11 @@ func TestButtonHasTypeSeparatesInvalidFromForbidden(test *testing.T) {
 
 	rule_testing.ExpectClean(test, runButtonHasType(test, element, ""))
 	rule_testing.ExpectFindings(test, runButtonHasType(test, element, `{"reset":false}`), "forbiddenValue")
-	rule_testing.ExpectFindings(test, runButtonHasType(test, "const a = <button type=\"nope\"/>;\n", `{"reset":false}`), "invalidValue")
+	rule_testing.ExpectFindings(
+		test,
+		runButtonHasType(test, "const a = <button type=\"nope\"/>;\n", `{"reset":false}`),
+		"invalidValue",
+	)
 
 	// Each flag is then exercised against its own type, with the other two left on. Upstream's
 	// corpus only ever switches `reset` off, so a rule whose `submit` arm read the `button` flag
@@ -625,10 +831,20 @@ func TestButtonHasTypeSeparatesInvalidFromForbidden(test *testing.T) {
 		rawOptions string
 		wantIds    []string
 	}{
-		{"button off reports button", "const a = <button type=\"button\"/>;\n", `{"button":false}`, []string{"forbiddenValue"}},
+		{
+			"button off reports button",
+			"const a = <button type=\"button\"/>;\n",
+			`{"button":false}`,
+			[]string{"forbiddenValue"},
+		},
 		{"button off leaves submit alone", "const a = <button type=\"submit\"/>;\n", `{"button":false}`, nil},
 		{"button off leaves reset alone", "const a = <button type=\"reset\"/>;\n", `{"button":false}`, nil},
-		{"submit off reports submit", "const a = <button type=\"submit\"/>;\n", `{"submit":false}`, []string{"forbiddenValue"}},
+		{
+			"submit off reports submit",
+			"const a = <button type=\"submit\"/>;\n",
+			`{"submit":false}`,
+			[]string{"forbiddenValue"},
+		},
 		{"submit off leaves button alone", "const a = <button type=\"button\"/>;\n", `{"submit":false}`, nil},
 		{"submit off leaves reset alone", "const a = <button type=\"reset\"/>;\n", `{"submit":false}`, nil},
 		{"reset off leaves button alone", "const a = <button type=\"button\"/>;\n", `{"reset":false}`, nil},
@@ -831,15 +1047,25 @@ func TestButtonHasTypeTrustsAProvenType(test *testing.T) {
 		{"a valid union with a member the config forbids",
 			properties + "function Button({ type = 'button' }: ButtonProperties) { return <button type={type} />; }\n",
 			"{\"reset\":false}"},
-		{"a string enum with one invalid member",
-			"enum Kind { Plain = 'button', Odd = 'menu' }\ndeclare const kind: Kind;\nconst a = <button type={kind} />;\n", ""},
-		{"createElement with an untyped shorthand",
-			"declare const React: { createElement(...a: unknown[]): unknown };\ndeclare const type: string;\nReact.createElement('button', { type });\n", ""},
+		{
+			"a string enum with one invalid member",
+			"enum Kind { Plain = 'button', Odd = 'menu' }\ndeclare const kind: Kind;\nconst a = <button type={kind} />;\n",
+			"",
+		},
+		{
+			"createElement with an untyped shorthand",
+			"declare const React: { createElement(...a: unknown[]): unknown };\ndeclare const type: string;\nReact.createElement('button', { type });\n",
+			"",
+		},
 	}
 	for _, testCase := range reporting {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectFindings(test, runButtonHasType(test, testCase.sourceText, testCase.rawOptions), "complexType")
+			rule_testing.ExpectFindings(
+				test,
+				runButtonHasType(test, testCase.sourceText, testCase.rawOptions),
+				"complexType",
+			)
 		})
 	}
 }

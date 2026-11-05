@@ -30,7 +30,9 @@ func buildProject(test *testing.T, files map[string]string) (string, *program.Gr
 			test.Fatal(writeError)
 		}
 	}
-	graph, buildError := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json"), CurrentDirectory: root})
+	graph, buildError := program.Build(
+		program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json"), CurrentDirectory: root},
+	)
 	if buildError != nil {
 		test.Fatal(buildError)
 	}
@@ -59,7 +61,12 @@ func TestReactIsDetectedFromImportsAndJsxNotFromPackageJson(test *testing.T) {
 			test.Fatal(relativeError)
 		}
 		if detection.ReactFiles[file.FileName().AsString()] != want[relative] {
-			test.Errorf("%s: react=%v, want %v", relative, detection.ReactFiles[file.FileName().AsString()], want[relative])
+			test.Errorf(
+				"%s: react=%v, want %v",
+				relative,
+				detection.ReactFiles[file.FileName().AsString()],
+				want[relative],
+			)
 		}
 	}
 	// next is in package.json and imported nowhere, so no file is Next's.
@@ -83,7 +90,13 @@ func TestNextIsDetectedFromImportsAndItsOwnFilesOnlyInANextProgram(test *testing
 	}
 	root, graph := buildProject(test, files)
 	detection := Detect(graph.ProjectFiles(), root, graph.Program.Host().FS(), nil, "")
-	want := map[string]bool{"app/layout.tsx": true, "app/page.tsx": true, "app/api/health/route.ts": true, "middleware.ts": true, "source/Link.tsx": true}
+	want := map[string]bool{
+		"app/layout.tsx":          true,
+		"app/page.tsx":            true,
+		"app/api/health/route.ts": true,
+		"middleware.ts":           true,
+		"source/Link.tsx":         true,
+	}
 	for _, file := range graph.ProjectFiles() {
 		relative, relativeError := filepath.Rel(root, file.FileName().AsString())
 		if relativeError != nil {
@@ -93,7 +106,12 @@ func TestNextIsDetectedFromImportsAndItsOwnFilesOnlyInANextProgram(test *testing
 			continue
 		}
 		if detection.NextFiles[file.FileName().AsString()] != want[relative] {
-			test.Errorf("%s: next=%v, want %v", relative, detection.NextFiles[file.FileName().AsString()], want[relative])
+			test.Errorf(
+				"%s: next=%v, want %v",
+				relative,
+				detection.NextFiles[file.FileName().AsString()],
+				want[relative],
+			)
 		}
 	}
 
@@ -101,7 +119,13 @@ func TestNextIsDetectedFromImportsAndItsOwnFilesOnlyInANextProgram(test *testing
 	delete(files, "app/layout.tsx")
 	delete(files, "source/Link.tsx")
 	root, graph = buildProject(test, files)
-	if detection := Detect(graph.ProjectFiles(), root, graph.Program.Host().FS(), nil, ""); len(detection.NextFiles) != 0 {
+	if detection := Detect(
+		graph.ProjectFiles(),
+		root,
+		graph.Program.Host().FS(),
+		nil,
+		"",
+	); len(detection.NextFiles) != 0 {
 		test.Errorf("an app/ directory with no import of next applied cohere:next: %v", detection.NextFiles)
 	}
 }
@@ -122,7 +146,8 @@ func TestTailwindIsDetectedFromTheStylesheetAndSkippedByNameWithoutOne(test *tes
 		"app/globals.css": "body { margin: 0; }\n",
 	})
 	detection = Detect(graph.ProjectFiles(), root, graph.Program.Host().FS(), nil, "")
-	if detection.TailwindEntryPoint != "" || !strings.Contains(detection.TailwindSkipped, "app/globals.css does not import tailwindcss") {
+	if detection.TailwindEntryPoint != "" ||
+		!strings.Contains(detection.TailwindSkipped, "app/globals.css does not import tailwindcss") {
 		test.Errorf("a plain stylesheet applied tailwind: %+v", detection)
 	}
 

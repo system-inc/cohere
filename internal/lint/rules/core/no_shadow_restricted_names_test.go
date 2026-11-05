@@ -43,10 +43,16 @@ func TestNoShadowRestrictedNamesFires(test *testing.T) {
 		// be the carved-out clean form and upstream kept the case honest by omitting it.
 		{"every declaration form for undefined in one input",
 			"function undefined(undefined) { !function undefined(undefined) { try {} catch(undefined) {} }; }", 5},
-		{"every declaration form for Infinity in one input",
-			"function Infinity(Infinity) { var Infinity; !function Infinity(Infinity) { try {} catch(Infinity) {} }; }", 6},
-		{"every declaration form for arguments in one input",
-			"function arguments(arguments) { var arguments; !function arguments(arguments) { try {} catch(arguments) {} }; }", 6},
+		{
+			"every declaration form for Infinity in one input",
+			"function Infinity(Infinity) { var Infinity; !function Infinity(Infinity) { try {} catch(Infinity) {} }; }",
+			6,
+		},
+		{
+			"every declaration form for arguments in one input",
+			"function arguments(arguments) { var arguments; !function arguments(arguments) { try {} catch(arguments) {} }; }",
+			6,
+		},
 		{"every declaration form for eval in one input",
 			"function eval(eval) { var eval; !function eval(eval) { try {} catch(eval) {} }; }", 6},
 		// An arrow parameter rather than a function parameter, and a `var eval` initialized with
@@ -57,8 +63,11 @@ func TestNoShadowRestrictedNamesFires(test *testing.T) {
 		// `VariableDeclarator` with no init, so the carve-out does not reach it.
 		{"an array destructuring binding named undefined", "var [undefined] = [1]", 1},
 		// Four object-pattern shapes in one input: shorthand, renamed value, nested, and rest.
-		{"four object destructuring bindings named undefined",
-			"var {undefined} = obj; var {a: undefined} = obj; var {a: {b: {undefined}}} = obj; var {a, ...undefined} = obj;", 4},
+		{
+			"four object destructuring bindings named undefined",
+			"var {undefined} = obj; var {a: undefined} = obj; var {a: {b: {undefined}}} = obj; var {a, ...undefined} = obj;",
+			4,
+		},
 		// The carve-out's own boundary. The declaration is bare, so only the later write makes it
 		// report, and it reports once at the declaration rather than at the write.
 		{"a bare var undefined that is later assigned", "var undefined; undefined = 5;", 1},
@@ -68,11 +77,17 @@ func TestNoShadowRestrictedNamesFires(test *testing.T) {
 		{"a namespace import named undefined", "import * as undefined from 'foo';", 1},
 		// globalThis, which reports by default. Upstream lists this input twice byte-identically,
 		// once for ecmaVersion 2015 and once for 2020; the two are the same input to us.
-		{"every declaration form for globalThis in one input",
-			"function globalThis(globalThis) { var globalThis; !function globalThis(globalThis) { try {} catch(globalThis) {} }; }", 6},
+		{
+			"every declaration form for globalThis in one input",
+			"function globalThis(globalThis) { var globalThis; !function globalThis(globalThis) { try {} catch(globalThis) {} }; }",
+			6,
+		},
 		{"an array destructuring binding named globalThis", "const [globalThis] = [1]", 1},
-		{"four object destructuring bindings named globalThis",
-			"var {globalThis} = obj; var {a: globalThis} = obj; var {a: {b: {globalThis}}} = obj; var {a, ...globalThis} = obj;", 4},
+		{
+			"four object destructuring bindings named globalThis",
+			"var {globalThis} = obj; var {a: globalThis} = obj; var {a: {b: {globalThis}}} = obj; var {a, ...globalThis} = obj;",
+			4,
+		},
 		// No carve-out for globalThis: a bare `let globalThis` reports on its own, and this input
 		// reports once rather than twice even though it also writes.
 		{"a bare let globalThis that is later assigned", "let globalThis; globalThis = 5;", 1},

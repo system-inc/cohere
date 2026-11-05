@@ -77,7 +77,9 @@ func TestRulesFlagDisclosesADevelopmentBuildBesideTheList(test *testing.T) {
 	// quietly.
 	note := standardError.String()
 	if note == "" {
-		test.Fatal("a locally built binary printed no provenance note, so the disclosure is not reaching the surface people quote")
+		test.Fatal(
+			"a locally built binary printed no provenance note, so the disclosure is not reaching the surface people quote",
+		)
 	}
 	if !strings.Contains(note, "local build") {
 		test.Fatalf("the note does not say the build is local: %q", note)
@@ -85,7 +87,10 @@ func TestRulesFlagDisclosesADevelopmentBuildBesideTheList(test *testing.T) {
 	// Built from the working tree, the binary is either dirty (the disclaimer) or a clean named
 	// commit (which reproduces it). Either way the note must say which, so one of the two must hold.
 	if !strings.Contains(note, "not necessarily what is committed") && !strings.Contains(note, "reproduces them") {
-		test.Fatalf("the note says neither that the count may differ from the repository nor which commit reproduces it: %q", note)
+		test.Fatalf(
+			"the note says neither that the count may differ from the repository nor which commit reproduces it: %q",
+			note,
+		)
 	}
 
 	// The count has to appear in the note itself. A note that qualifies "the rules" in the abstract

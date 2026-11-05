@@ -140,7 +140,10 @@ func TestReactiveTransformRewritesNestedBlocks(test *testing.T) {
 		{name: "for-of body", source: `function f(xs) { let t = 0; for (const x of xs) { t = t + x; } return t; }`},
 		{name: "while body", source: `function f(a) { let i = 0; while (i < a) { i = i + 1; } return i; }`},
 		{name: "try blocks", source: `function f(a) { try { const x = a.b; return x; } catch (e) { return 0; } }`},
-		{name: "switch arms", source: `function f(a) { switch (a) { case 1: { const x = 1; return x; } default: return 2; } }`},
+		{
+			name:   "switch arms",
+			source: `function f(a) { switch (a) { case 1: { const x = 1; return x; } default: return 2; } }`,
+		},
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
@@ -192,7 +195,11 @@ func TestReactiveTransformCorpus(test *testing.T) {
 
 	converted, survived, totalRemoved := 0, 0, 0
 
-	forEachCorpusFunction(test, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(test, 400, func(
+		function *Function,
+		ranges *mutation_aliasing.MutableRanges,
+		scopes *ReactiveScopes,
+	) {
 		aligned, merged := AlignThenMergeReactiveScopes(function, scopes)
 		BuildReactiveScopeTerminals(function, scopes, MergedScopeIdentity{Aligned: aligned, Merged: merged})
 

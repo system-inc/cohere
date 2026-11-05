@@ -399,7 +399,8 @@ func Compare(inputs Inputs) Report {
 		// A rule whose every difference was acknowledged is acknowledged, not both-active. Leaving
 		// it both-active would print the rule as an unresolved defect beside a per-finding line
 		// saying it is resolved, and a reader trusts the summary over the detail.
-		if differences := differencesForRule[ruleName]; differences != nil && differences.total == differences.acknowledged {
+		if differences := differencesForRule[ruleName]; differences != nil &&
+			differences.total == differences.acknowledged {
 			agreement.Classification = ClassificationAcknowledged
 		}
 		report.Agreements = append(report.Agreements, *agreement)
@@ -503,8 +504,11 @@ func Write(out *strings.Builder, report Report) {
 	}
 
 	plantedCount := len(report.Differences) - len(observed)
-	fmt.Fprintf(out, "\ndifferences: %d observed, %d planted by this harness — %d both-active, %d not-ported, %d not-configured, %d unclassified\n",
-		len(observed), plantedCount,
+	fmt.Fprintf(
+		out,
+		"\ndifferences: %d observed, %d planted by this harness — %d both-active, %d not-ported, %d not-configured, %d unclassified\n",
+		len(observed),
+		plantedCount,
 		byClassification[ClassificationBothActive],
 		byClassification[ClassificationNotPorted],
 		byClassification[ClassificationNotConfigured],
@@ -533,7 +537,11 @@ func Write(out *strings.Builder, report Report) {
 	if len(report.StaleAcknowledgements) > 0 || len(report.AmbiguousAcknowledgements) > 0 {
 		fmt.Fprintf(out, "\nacknowledgements that excuse no single current difference:\n")
 		for _, stale := range report.StaleAcknowledgements {
-			fmt.Fprintf(out, "  stale      %s  (matches none: remove it, or re-anchor it if its site moved)\n", stale.Key())
+			fmt.Fprintf(
+				out,
+				"  stale      %s  (matches none: remove it, or re-anchor it if its site moved)\n",
+				stale.Key(),
+			)
 		}
 		for _, ambiguous := range report.AmbiguousAcknowledgements {
 			fmt.Fprintf(out, "  ambiguous  %s  (matches several: narrow its anchor to one)\n", ambiguous.Key())

@@ -19,7 +19,11 @@ import (
 
 func main() {
 	root := flag.String("root", "", "the tree to measure (must already be formatted by our Prettier)")
-	fileList := flag.String("files", "", "a newline-delimited file of paths to measure, relative to -root; without it the tree is walked")
+	fileList := flag.String(
+		"files",
+		"",
+		"a newline-delimited file of paths to measure, relative to -root; without it the tree is walked",
+	)
 	limit := flag.Int("limit", 0, "stop after this many files (0 means all)")
 	samples := flag.Int("samples", 3, "how many example lines to print per difference kind")
 	flag.Parse()

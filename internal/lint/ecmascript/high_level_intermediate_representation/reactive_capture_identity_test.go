@@ -60,7 +60,10 @@ return () => (argument: number) => [reactiveValue, stableValue, argument];
 					}
 					for _, parameter := range nested.Params {
 						if parameter.Reactive {
-							test.Errorf("nested parameter id=%d inherited unrelated outer reactivity", parameter.Identifier)
+							test.Errorf(
+								"nested parameter id=%d inherited unrelated outer reactivity",
+								parameter.Identifier,
+							)
 						}
 					}
 					check(nested)
@@ -68,7 +71,11 @@ return () => (argument: number) => [reactiveValue, stableValue, argument];
 			}
 			check(function)
 			if reactiveCaptures == 0 || stableCaptures == 0 {
-				test.Fatalf("fixture requires both capture kinds, got reactive=%d stable=%d", reactiveCaptures, stableCaptures)
+				test.Fatalf(
+					"fixture requires both capture kinds, got reactive=%d stable=%d",
+					reactiveCaptures,
+					stableCaptures,
+				)
 			}
 		})
 	}

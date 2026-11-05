@@ -31,7 +31,13 @@ func TestBoundaryNoProjectImportFires(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, BoundaryNoProjectImport, baseLibraryFile, testCase.source, baseLibraryOptions)
+			result := rule_testing.RunWithOptions(
+				test,
+				BoundaryNoProjectImport,
+				baseLibraryFile,
+				testCase.source,
+				baseLibraryOptions,
+			)
 			rule_testing.ExpectFindings(test, result, "forbiddenProjectImport")
 		})
 	}
@@ -46,21 +52,42 @@ func TestBoundaryNoProjectImportStaysSilent(test *testing.T) {
 		source   string
 		options  any
 	}{
-		{"whitelisted specifier", baseLibraryFile, "import { settings } from '@project/ProjectSettings';\n", baseLibraryOptions},
+		{
+			"whitelisted specifier",
+			baseLibraryFile,
+			"import { settings } from '@project/ProjectSettings';\n",
+			baseLibraryOptions,
+		},
 		{"relative import", baseLibraryFile, "import { Thing } from './Thing';\n", baseLibraryOptions},
 		{"sibling alias", baseLibraryFile, "import { Thing } from '@structure/source/Thing';\n", baseLibraryOptions},
 		{"unrelated package", baseLibraryFile, "import { Thing } from '@projector/Thing';\n", baseLibraryOptions},
-		{"outside the guarded library", "/repo/application/source/Thing.ts", "import { helper } from '@project/source/Helper';\n", baseLibraryOptions},
+		{
+			"outside the guarded library",
+			"/repo/application/source/Thing.ts",
+			"import { helper } from '@project/source/Helper';\n",
+			baseLibraryOptions,
+		},
 		// A rule registered without its required option must guard nothing rather than guard
 		// everything. Failing open here would have been a silent tree-wide false positive; the
 		// liveness harness in ahra reports exactly this rule as its one dead fixture.
 		{"no options at all", baseLibraryFile, "import { helper } from '@project/source/Helper';\n", nil},
-		{"empty library directory", baseLibraryFile, "import { helper } from '@project/source/Helper';\n", BoundaryNoProjectImportOptions{}},
+		{
+			"empty library directory",
+			baseLibraryFile,
+			"import { helper } from '@project/source/Helper';\n",
+			BoundaryNoProjectImportOptions{},
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, BoundaryNoProjectImport, testCase.fileName, testCase.source, testCase.options)
+			result := rule_testing.RunWithOptions(
+				test,
+				BoundaryNoProjectImport,
+				testCase.fileName,
+				testCase.source,
+				testCase.options,
+			)
 			rule_testing.ExpectClean(test, result)
 		})
 	}
@@ -74,7 +101,13 @@ func TestBoundaryNoProjectImportReportsAtTheSpecifier(test *testing.T) {
 
 	sourceText := "// Dependencies\n// a second comment\nimport { helper } from '@project/source/Helper';\\n"
 
-	result := rule_testing.RunWithOptions(test, BoundaryNoProjectImport, baseLibraryFile, sourceText, baseLibraryOptions)
+	result := rule_testing.RunWithOptions(
+		test,
+		BoundaryNoProjectImport,
+		baseLibraryFile,
+		sourceText,
+		baseLibraryOptions,
+	)
 	if len(result.Diagnostics) == 0 {
 		test.Fatalf("expected a finding, got none")
 	}

@@ -32,8 +32,11 @@ func TestNoUnsafeFunctionTypeFires(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectFindings(test, rule_testing.Run(test, NoUnsafeFunctionType, unsafeFunctionFile, testCase.sourceText),
-				"bannedFunctionType")
+			rule_testing.ExpectFindings(
+				test,
+				rule_testing.Run(test, NoUnsafeFunctionType, unsafeFunctionFile, testCase.sourceText),
+				"bannedFunctionType",
+			)
 		})
 	}
 }
@@ -84,7 +87,10 @@ func TestNoUnsafeFunctionTypeStaysSilent(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.Run(test, NoUnsafeFunctionType, unsafeFunctionFile, testCase.sourceText))
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.Run(test, NoUnsafeFunctionType, unsafeFunctionFile, testCase.sourceText),
+			)
 		})
 	}
 }

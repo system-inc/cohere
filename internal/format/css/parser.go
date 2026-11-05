@@ -118,11 +118,19 @@ func customSelectorName(parameters string) string {
 }
 
 var (
-	atRootWithPattern = regexp.MustCompile(`(?s)^\(` + javaScriptWhitespaceClass + `*(?:without|with)` + javaScriptWhitespaceClass + `*:.+\)$`)
+	atRootWithPattern = regexp.MustCompile(
+		`(?s)^\(` + javaScriptWhitespaceClass + `*(?:without|with)` + javaScriptWhitespaceClass + `*:.+\)$`,
+	)
 	// /(\$\S+?)(\s+)?\.{3}/
-	scssVariableArgumentsPattern = regexp.MustCompile(`(\$` + javaScriptNonWhitespaceClass + `+?)(` + javaScriptWhitespaceClass + `+)?\.{3}`)
+	scssVariableArgumentsPattern = regexp.MustCompile(
+		`(\$` + javaScriptNonWhitespaceClass + `+?)(` + javaScriptWhitespaceClass + `+)?\.{3}`,
+	)
 	// /^(?!if)([^"'\s(]+)(\s+)\(/, the lookahead tested apart since RE2 has none.
-	scssDirectiveFunctionPattern = regexp.MustCompile(`^([^"'(` + javaScriptWhitespaceClass[1:len(javaScriptWhitespaceClass)-1] + `]+)(` + javaScriptWhitespaceClass + `+)\(`)
+	scssDirectiveFunctionPattern = regexp.MustCompile(`^([^"'(` +
+		javaScriptWhitespaceClass[1:len(javaScriptWhitespaceClass)-1] +
+		`]+)(` +
+		javaScriptWhitespaceClass +
+		`+)\(`)
 )
 
 // javaScriptNonWhitespaceClass is JavaScript's \S.
@@ -175,7 +183,9 @@ func parseNestedCSS(node *estree.Node, options *parseOptions) *estree.Node {
 	}
 
 	// Custom properties looks like declarations
-	if property, isString := node.Get("prop").(string); node.Type() == "css-decl" && isString && strings.HasPrefix(property, "--") {
+	if property, isString := node.Get(
+		"prop",
+	).(string); node.Type() == "css-decl" && isString && strings.HasPrefix(property, "--") {
 		if value, isString := node.Get("value").(string); isString && strings.HasPrefix(value, "{") {
 			var rules []*estree.Node
 			hasRules := false
@@ -322,7 +332,10 @@ func parseNestedCSS(node *estree.Node, options *parseOptions) *estree.Node {
 			nodeParameters, _ := node.Get("params").(string)
 			customSelector := trim(customSelectorName(nodeParameters))
 			node.Set("customSelector", customSelector)
-			node.Set("selector", parseSelector(trim(sliceJavaScript(nodeParameters, len(customSelector), len(nodeParameters)))))
+			node.Set(
+				"selector",
+				parseSelector(trim(sliceJavaScript(nodeParameters, len(customSelector), len(nodeParameters)))),
+			)
 			node.Delete("params")
 			return node
 		}
@@ -373,7 +386,11 @@ func parseNestedCSS(node *estree.Node, options *parseOptions) *estree.Node {
 				if match[4] != -1 {
 					spaces = parameters[match[4]:match[5]]
 				}
-				parameters = parameters[:match[0]] + parameters[match[2]:match[3]] + "..." + spaces + parameters[match[1]:]
+				parameters = parameters[:match[0]] +
+					parameters[match[2]:match[3]] +
+					"..." +
+					spaces +
+					parameters[match[1]:]
 			}
 			// Remove unnecessary spaces before SCSS control, mixin and function directives
 			// Move spaces after the `(`, so we can keep the range correct
@@ -417,7 +434,11 @@ func scssOrRaw(raw map[string]any) string {
 	return text
 }
 
-func parseWithParser(parse func(string) (*estree.Node, error), text string, options *parseOptions) (*estree.Node, error) {
+func parseWithParser(
+	parse func(string) (*estree.Node, error),
+	text string,
+	options *parseOptions,
+) (*estree.Node, error) {
 	frontMatter, textToParse := parseFrontMatter(text)
 
 	// Prevent file access https://github.com/postcss/postcss/blob/4f4e2932fc97e2c117e1a4b15f0272ed551ed59d/lib/previous-map.js#L18
@@ -456,7 +477,11 @@ func parseScss(text string, options *parseOptions) (*estree.Node, error) {
 
 // parseCatching is parseWithParser, and the one place a throw upstream would let through comes back as
 // an error.
-func parseCatching(parse func(string) (*estree.Node, error), text string, options *parseOptions) (root *estree.Node, err error) {
+func parseCatching(
+	parse func(string) (*estree.Node, error),
+	text string,
+	options *parseOptions,
+) (root *estree.Node, err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			root = nil

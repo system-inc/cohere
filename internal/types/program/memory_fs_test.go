@@ -82,18 +82,27 @@ func TestAMemoryProgramReportsWhatTheDiskProgramDoes(test *testing.T) {
 	if resolveSymlinksError != nil {
 		test.Fatal(resolveSymlinksError)
 	}
-	diskFiles, diskOurs, diskDiagnostics := buildReport(test, program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+	diskFiles, diskOurs, diskDiagnostics := buildReport(
+		test,
+		program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory},
+	)
 
 	// The memory build sits at the same absolute root, so every file name compares as it is; nothing is
 	// read from that directory, which a second root proves below.
 	memoryFiles, memoryOurs, memoryDiagnostics := buildReport(test, program.Options{
-		ConfigFileName: "tsconfig.json", CurrentDirectory: directory, FileSystem: program.NewMemoryFS(inMemory(directory, memoryFixture)),
+		ConfigFileName:   "tsconfig.json",
+		CurrentDirectory: directory,
+		FileSystem:       program.NewMemoryFS(inMemory(directory, memoryFixture)),
 	})
 	if !slices.Equal(diskFiles, memoryFiles) {
 		test.Fatalf("the memory program holds different files:\ndisk   %v\nmemory %v", diskFiles, memoryFiles)
 	}
 	if !slices.Equal(diskOurs, memoryOurs) || !slices.Equal(diskOurs, []string{"src/main.ts", "src/nested/shared.ts"}) {
-		test.Fatalf("the programs' own files differ, or are not the two included:\ndisk   %v\nmemory %v", diskOurs, memoryOurs)
+		test.Fatalf(
+			"the programs' own files differ, or are not the two included:\ndisk   %v\nmemory %v",
+			diskOurs,
+			memoryOurs,
+		)
 	}
 	if !slices.Equal(diskDiagnostics, memoryDiagnostics) {
 		test.Fatalf("the memory program reports differently:\ndisk   %v\nmemory %v", diskDiagnostics, memoryDiagnostics)
@@ -105,10 +114,18 @@ func TestAMemoryProgramReportsWhatTheDiskProgramDoes(test *testing.T) {
 	// A root that exists only in memory builds the same report: the build read nothing from disk.
 	elsewhere := "/cohere-memory-fixture"
 	_, elsewhereOurs, elsewhereDiagnostics := buildReport(test, program.Options{
-		ConfigFileName: "tsconfig.json", CurrentDirectory: elsewhere, FileSystem: program.NewMemoryFS(inMemory(elsewhere, memoryFixture)),
+		ConfigFileName:   "tsconfig.json",
+		CurrentDirectory: elsewhere,
+		FileSystem:       program.NewMemoryFS(inMemory(elsewhere, memoryFixture)),
 	})
 	if !slices.Equal(elsewhereOurs, diskOurs) || !slices.Equal(elsewhereDiagnostics, diskDiagnostics) {
-		test.Fatalf("a root only memory holds reports differently:\nown %v %v\ndisk %v %v", elsewhereOurs, elsewhereDiagnostics, diskOurs, diskDiagnostics)
+		test.Fatalf(
+			"a root only memory holds reports differently:\nown %v %v\ndisk %v %v",
+			elsewhereOurs,
+			elsewhereDiagnostics,
+			diskOurs,
+			diskDiagnostics,
+		)
 	}
 
 	missing := inMemory(directory, memoryFixture)
@@ -117,7 +134,10 @@ func TestAMemoryProgramReportsWhatTheDiskProgramDoes(test *testing.T) {
 		ConfigFileName: "tsconfig.json", CurrentDirectory: directory, FileSystem: program.NewMemoryFS(missing),
 	})
 	if slices.Equal(missingDiagnostics, diskDiagnostics) {
-		test.Fatalf("control: a memory program missing an imported file reported what the whole one did: %v", missingDiagnostics)
+		test.Fatalf(
+			"control: a memory program missing an imported file reported what the whole one did: %v",
+			missingDiagnostics,
+		)
 	}
 }
 
@@ -132,13 +152,19 @@ func TestAMemoryFSListsItsTree(test *testing.T) {
 		"/project/sub/deep/d.ts": "d",
 		"/top.ts":                "top",
 	})
-	if entries := memory.GetAccessibleEntries("/"); !slices.Equal(entries.Files, []string{"top.ts"}) || !slices.Equal(entries.Directories, []string{"project"}) {
+	if entries := memory.GetAccessibleEntries(
+		"/",
+	); !slices.Equal(entries.Files, []string{"top.ts"}) || !slices.Equal(entries.Directories, []string{"project"}) {
 		test.Errorf("the root lists %+v", entries)
 	}
-	if entries := memory.GetAccessibleEntries("/project/sub"); !slices.Equal(entries.Files, []string{"b.ts", "c.ts"}) || !slices.Equal(entries.Directories, []string{"deep"}) {
+	if entries := memory.GetAccessibleEntries(
+		"/project/sub",
+	); !slices.Equal(entries.Files, []string{"b.ts", "c.ts"}) || !slices.Equal(entries.Directories, []string{"deep"}) {
 		test.Errorf("a directory with two files and a subdirectory lists %+v", entries)
 	}
-	if !memory.DirectoryExists("/project/sub/deep") || memory.DirectoryExists("/project/a.ts") || memory.FileExists("/project/sub") {
+	if !memory.DirectoryExists("/project/sub/deep") ||
+		memory.DirectoryExists("/project/a.ts") ||
+		memory.FileExists("/project/sub") {
 		test.Error("a file and a directory were confused")
 	}
 	if contents, found := memory.ReadFile("/project/sub/../a.ts"); !found || contents != "a" {
@@ -147,10 +173,15 @@ func TestAMemoryFSListsItsTree(test *testing.T) {
 	if _, found := memory.ReadFile("/project/missing.ts"); found || memory.Stat("/project/missing.ts") != nil {
 		test.Error("a file that was never given was found")
 	}
-	if information := memory.Stat("/project/sub/b.ts"); information == nil || information.IsDir() || information.Size() != 1 {
+	if information := memory.Stat(
+		"/project/sub/b.ts",
+	); information == nil || information.IsDir() || information.Size() != 1 {
 		test.Errorf("a file's stat is %+v", information)
 	}
-	if writeFileError := memory.WriteFile("/project/new.ts", "x"); writeFileError == nil || memory.FileExists("/project/new.ts") {
+	if writeFileError := memory.WriteFile(
+		"/project/new.ts",
+		"x",
+	); writeFileError == nil || memory.FileExists("/project/new.ts") {
 		test.Error("a write to the read-only filesystem succeeded")
 	}
 }
@@ -182,7 +213,9 @@ func TestMemoryFSReadsBytesAsTheDiskDoes(test *testing.T) {
 				test.Fatal(writeError)
 			}
 			fromDisk, diskOk := osvfs.FS().ReadFile(tspath.RootedFilePath(onDisk))
-			fromMemory, memoryOk := program.NewMemoryFS(map[string]string{"/fixture/a.ts": testCase.bytes}).ReadFile("/fixture/a.ts")
+			fromMemory, memoryOk := program.NewMemoryFS(map[string]string{"/fixture/a.ts": testCase.bytes}).ReadFile(
+				"/fixture/a.ts",
+			)
 			if fromMemory != fromDisk || memoryOk != diskOk {
 				test.Fatalf("memory read %q (%v), the disk %q (%v)", fromMemory, memoryOk, fromDisk, diskOk)
 			}

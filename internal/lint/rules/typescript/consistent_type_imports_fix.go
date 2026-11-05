@@ -420,7 +420,11 @@ func (fixer *consistentTypeImportsFixer) insertTypeSpecifierForImportDeclaration
 
 	moduleStart, _ := fixer.nodeRange(fixer.statement.AsImportDeclaration().ModuleSpecifier)
 	if isDefaultImport {
-		if openingBrace, found := fixer.tokens.FirstBetween(importToken.End, moduleStart, ast.KindOpenBraceToken); found {
+		if openingBrace, found := fixer.tokens.FirstBetween(
+			importToken.End,
+			moduleStart,
+			ast.KindOpenBraceToken,
+		); found {
 			// import Foo, {} from 'foo'
 			comma, found := fixer.tokens.Before(openingBrace.Start)
 			if !found || comma.Kind != ast.KindCommaToken {
@@ -459,7 +463,11 @@ func (fixer *consistentTypeImportsFixer) removeTypeKeywordOfSpecifier(specifier 
 
 // consistentTypeImportsRemoveTypeFix is upstream's repair under `prefer: no-type-imports`: drop the
 // `type` keyword from a declaration, or from one inline specifier.
-func consistentTypeImportsRemoveTypeFix(sourceFile *ast.SourceFile, statement *ast.Node, specifier *ast.Node) (rule.Fix, bool) {
+func consistentTypeImportsRemoveTypeFix(
+	sourceFile *ast.SourceFile,
+	statement *ast.Node,
+	specifier *ast.Node,
+) (rule.Fix, bool) {
 	fixer := newConsistentTypeImportsFixer(sourceFile, statement)
 	if _, found := fixer.importToken(); !found {
 		return rule.Fix{}, false

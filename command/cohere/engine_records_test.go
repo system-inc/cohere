@@ -86,9 +86,15 @@ func forbidLines(test *testing.T, output string, unwanted ...string) {
 // Not parallel: its subtests render check runs through engineRun, whose record acceptors set the package-level
 // activeSummary
 func TestSwiftRunRendersEachContractFixture(test *testing.T) {
-	// Not parallel: it renders a check run through engineRun, whose record acceptors set the package-level activeSummary
+	// Not parallel: it renders a check run through engineRun, whose record acceptors set the package-level
+	// activeSummary
 	test.Run("Clean", func(test *testing.T) {
-		output, exitCode, renderRecordsError := renderRecords(test, engineModeCheck, contractFixture(test, "Clean.jsonl"), 0)
+		output, exitCode, renderRecordsError := renderRecords(
+			test,
+			engineModeCheck,
+			contractFixture(test, "Clean.jsonl"),
+			0,
+		)
 		if renderRecordsError != nil || exitCode != 0 {
 			test.Fatalf("exit %d, err %v\n%s", exitCode, renderRecordsError, output)
 		}
@@ -108,9 +114,15 @@ func TestSwiftRunRendersEachContractFixture(test *testing.T) {
 		forbidLines(test, output, "did not check everything", "modified tree", "in scope (")
 	})
 
-	// Not parallel: it renders a check run through engineRun, whose record acceptors set the package-level activeSummary
+	// Not parallel: it renders a check run through engineRun, whose record acceptors set the package-level
+	// activeSummary
 	test.Run("Findings", func(test *testing.T) {
-		output, exitCode, renderRecordsError := renderRecords(test, engineModeCheck, contractFixture(test, "Findings.jsonl"), 1)
+		output, exitCode, renderRecordsError := renderRecords(
+			test,
+			engineModeCheck,
+			contractFixture(test, "Findings.jsonl"),
+			1,
+		)
 		if renderRecordsError != nil || exitCode != 1 {
 			test.Fatalf("exit %d, err %v\n%s", exitCode, renderRecordsError, output)
 		}
@@ -128,7 +140,8 @@ func TestSwiftRunRendersEachContractFixture(test *testing.T) {
 
 	// --coverage names each rule the record names exactly once, under its category, and counts the
 	// ones the record only counts.
-	// Not parallel: it renders a check run through engineRun, whose record acceptors set the package-level activeSummary
+	// Not parallel: it renders a check run through engineRun, whose record acceptors set the package-level
+	// activeSummary
 	test.Run("FindingsWithCoverage", func(test *testing.T) {
 		var out bytes.Buffer
 		stream := bufio.NewWriter(&out)
@@ -153,9 +166,15 @@ func TestSwiftRunRendersEachContractFixture(test *testing.T) {
 		forbidLines(test, output, "details: cohere --coverage")
 	})
 
-	// Not parallel: it renders a check run through engineRun, whose record acceptors set the package-level activeSummary
+	// Not parallel: it renders a check run through engineRun, whose record acceptors set the package-level
+	// activeSummary
 	test.Run("TypesBail", func(test *testing.T) {
-		output, exitCode, renderRecordsError := renderRecords(test, engineModeCheck, contractFixture(test, "TypesBail.jsonl"), 1)
+		output, exitCode, renderRecordsError := renderRecords(
+			test,
+			engineModeCheck,
+			contractFixture(test, "TypesBail.jsonl"),
+			1,
+		)
 		if renderRecordsError != nil || exitCode != 1 {
 			test.Fatalf("exit %d, err %v\n%s", exitCode, renderRecordsError, output)
 		}
@@ -171,9 +190,15 @@ func TestSwiftRunRendersEachContractFixture(test *testing.T) {
 
 	// Contract 2: the file the engine could not read is named with the excluded files, and the run is
 	// incomplete with exit 1 though every phase ran and nothing was found.
-	// Not parallel: it renders a check run through engineRun, whose record acceptors set the package-level activeSummary
+	// Not parallel: it renders a check run through engineRun, whose record acceptors set the package-level
+	// activeSummary
 	test.Run("Unreadable", func(test *testing.T) {
-		output, exitCode, renderRecordsError := renderRecords(test, engineModeCheck, contractFixture(test, "Unreadable.jsonl"), 1)
+		output, exitCode, renderRecordsError := renderRecords(
+			test,
+			engineModeCheck,
+			contractFixture(test, "Unreadable.jsonl"),
+			1,
+		)
 		if renderRecordsError != nil || exitCode != 1 {
 			test.Fatalf("exit %d, err %v\n%s", exitCode, renderRecordsError, output)
 		}
@@ -186,9 +211,15 @@ func TestSwiftRunRendersEachContractFixture(test *testing.T) {
 
 	// The --unused report renders after lint and is not a gate: two items, and the summary still counts no
 	// findings and exits 0. Were the renderer to count them, the summary check would refuse the stream.
-	// Not parallel: it renders a check run through engineRun, whose record acceptors set the package-level activeSummary
+	// Not parallel: it renders a check run through engineRun, whose record acceptors set the package-level
+	// activeSummary
 	test.Run("Unused", func(test *testing.T) {
-		output, exitCode, renderRecordsError := renderRecords(test, engineModeCheck, contractFixture(test, "Unused.jsonl"), 0)
+		output, exitCode, renderRecordsError := renderRecords(
+			test,
+			engineModeCheck,
+			contractFixture(test, "Unused.jsonl"),
+			0,
+		)
 		if renderRecordsError != nil || exitCode != 0 {
 			test.Fatalf("exit %d, err %v\n%s", exitCode, renderRecordsError, output)
 		}
@@ -224,17 +255,25 @@ func TestSwiftRunRendersEachContractFixture(test *testing.T) {
 			test.Errorf("the declarations section printed before the imports section ended:\n%s", output)
 		}
 		if got := strings.Count(output, "never reported: "); got != 11 {
-			test.Errorf("%d never-reported lines, the fixture holds 1 for imports and 10 for declarations:\n%s", got, output)
+			test.Errorf(
+				"%d never-reported lines, the fixture holds 1 for imports and 10 for declarations:\n%s",
+				got,
+				output,
+			)
 		}
 	})
 
 	// A rule the front door has no words for prints under its own id and counts items, never under
 	// another rule's heading.
-	// Not parallel: it renders a check run through engineRun, whose record acceptors set the package-level activeSummary
+	// Not parallel: it renders a check run through engineRun, whose record acceptors set the package-level
+	// activeSummary
 	test.Run("UnusedUnknownRule", func(test *testing.T) {
 		lines := []string{}
 		for _, line := range contractFixture(test, "Unused.jsonl") {
-			lines = append(lines, strings.ReplaceAll(line, "cohere-swift/correctness-no-unused-import", "cohere-swift/unused-parameter"))
+			lines = append(
+				lines,
+				strings.ReplaceAll(line, "cohere-swift/correctness-no-unused-import", "cohere-swift/unused-parameter"),
+			)
 		}
 		output, exitCode, renderRecordsError := renderRecords(test, engineModeCheck, lines, 0)
 		if renderRecordsError != nil || exitCode != 0 {
@@ -254,9 +293,15 @@ func TestSwiftRunRendersEachContractFixture(test *testing.T) {
 	// The contract's crash: the stream stops after the fix phase. Exit 0 or 1 without a summary is a
 	// crash whatever the code says, so both are asserted.
 	for _, engineExit := range []int{0, 1} {
-		// Not parallel: it renders a check run through engineRun, whose record acceptors set the package-level activeSummary
+		// Not parallel: it renders a check run through engineRun, whose record acceptors set the package-level
+		// activeSummary
 		test.Run("CrashWithoutSummary", func(test *testing.T) {
-			output, exitCode, renderRecordsError := renderRecords(test, engineModeCheck, contractFixture(test, "CrashWithoutSummary.jsonl"), engineExit)
+			output, exitCode, renderRecordsError := renderRecords(
+				test,
+				engineModeCheck,
+				contractFixture(test, "CrashWithoutSummary.jsonl"),
+				engineExit,
+			)
 			if renderRecordsError == nil || exitCode != 1 {
 				test.Fatalf("a stream with no summary exited %d with err %v\n%s", exitCode, renderRecordsError, output)
 			}
@@ -299,47 +344,163 @@ func TestSwiftRunRefusesBrokenStreams(test *testing.T) {
 		engineExit int
 		reason     string
 	}{
-		{"a line that is not a record", replace(findings, 4, "warning: the build printed to stdout"), 1, "not a record"},
+		{
+			"a line that is not a record",
+			replace(findings, 4, "warning: the build printed to stdout"),
+			1,
+			"not a record",
+		},
 		{"a record of unknown kind", replace(findings, 4, `{"kind":"telemetry"}`), 1, "unknown kind"},
 		{"provenance not first", without(findings, 0), 1, "provenance is always first"},
-		{"a contract the front door does not speak", replace(findings, 0, strings.Replace(findings[0], `"contract":3`, `"contract":2`, 1)), 1, "contract 2"},
-		{"a provenance with no contract", replace(findings, 0, strings.Replace(findings[0], `"contract":3,`, "", 1)), 1, "contract none"},
-		{"a finding the summary does not count", replace(findings, last, strings.Replace(findings[last], `"findings":2`, `"findings":1`, 1)), 1, "counts 1 findings and 2"},
-		{"a types record that disagrees with its findings", replace(findings, 5, strings.Replace(findings[5], `"diagnostics":1`, `"diagnostics":0`, 1)), 1, "types record counts 0"},
-		{"a lint record that disagrees with its findings", replace(findings, 8, strings.Replace(findings[8], `"findings":1`, `"findings":3`, 1)), 1, "lint record counts 3"},
+		{
+			"a contract the front door does not speak",
+			replace(findings, 0, strings.Replace(findings[0], `"contract":3`, `"contract":2`, 1)),
+			1,
+			"contract 2",
+		},
+		{
+			"a provenance with no contract",
+			replace(findings, 0, strings.Replace(findings[0], `"contract":3,`, "", 1)),
+			1,
+			"contract none",
+		},
+		{
+			"a finding the summary does not count",
+			replace(findings, last, strings.Replace(findings[last], `"findings":2`, `"findings":1`, 1)),
+			1,
+			"counts 1 findings and 2",
+		},
+		{
+			"a types record that disagrees with its findings",
+			replace(findings, 5, strings.Replace(findings[5], `"diagnostics":1`, `"diagnostics":0`, 1)),
+			1,
+			"types record counts 0",
+		},
+		{
+			"a lint record that disagrees with its findings",
+			replace(findings, 8, strings.Replace(findings[8], `"findings":1`, `"findings":3`, 1)),
+			1,
+			"lint record counts 3",
+		},
 		{"a missing phase record", without(findings, 9), 1, "expects lint"},
-		{"phases out of order", replace(clean, 3, `{"kind":"phase","name":"lint","outcome":"ran","elapsedMilliseconds":1,"detail":""}`), 0, "expects fix"},
-		{"an outcome the pipeline does not have", replace(clean, 3, strings.Replace(clean[3], `"ran"`, `"partial"`, 1)), 0, "not one of"},
+		{
+			"phases out of order",
+			replace(clean, 3, `{"kind":"phase","name":"lint","outcome":"ran","elapsedMilliseconds":1,"detail":""}`),
+			0,
+			"expects fix",
+		},
+		{
+			"an outcome the pipeline does not have",
+			replace(clean, 3, strings.Replace(clean[3], `"ran"`, `"partial"`, 1)),
+			0,
+			"not one of",
+		},
 		{"a record after the summary", append(append([]string(nil), clean...), clean[1]), 0, "after the summary"},
 		// The dangerous direction: lint was cut off and the summary claims the run was complete.
-		{"a summary claiming complete over a bailed lint", replace(bail, len(bail)-1, strings.Replace(bail[len(bail)-1], `"complete":false`, `"complete":true`, 1)), 1, "calls the run complete"},
-		{"a summary whose exit code disagrees with its own findings", replace(findings, last, strings.Replace(findings[last], `"exitCode":1`, `"exitCode":0`, 1)), 0, "summary says exit 0"},
+		{
+			"a summary claiming complete over a bailed lint",
+			replace(bail, len(bail)-1, strings.Replace(bail[len(bail)-1], `"complete":false`, `"complete":true`, 1)),
+			1,
+			"calls the run complete",
+		},
+		{
+			"a summary whose exit code disagrees with its own findings",
+			replace(findings, last, strings.Replace(findings[last], `"exitCode":1`, `"exitCode":0`, 1)),
+			0,
+			"summary says exit 0",
+		},
 		{"an engine whose exit disagrees with its summary", findings, 0, "said it would exit 1"},
 		{"a summary missing its fields", replace(findings, last, `{"kind":"summary"}`), 1, "missing findings"},
 		// changedFiles, additive within contract 3: "N cohered" is the list, so the list must be the count.
-		{"a changed-file list shorter than its count", replace(findings, 2, strings.Replace(findings[2], `"filesRewritten":1`, `"filesRewritten":2`, 1)), 1, "counts 2 files rewritten and lists 1"},
-		{"a file listed twice", replace(findings, 2, strings.Replace(strings.Replace(findings[2], `"filesRewritten":1`, `"filesRewritten":2`, 1), `"formatted":true}]`, `"formatted":true},{"file":"/project/Sources/Example/ByteRing.swift","fixedBy":{},"formatted":true}]`, 1)), 1, "lists /project/Sources/Example/ByteRing.swift twice"},
-		{"a file nothing changed", replace(findings, 2, strings.Replace(strings.Replace(findings[2], `{"cohere-swift/legacy-constructors":1}`, `{}`, 1), `"formatted":true`, `"formatted":false`, 1)), 1, "rewritten by no fix and not by the formatter"},
+		{
+			"a changed-file list shorter than its count",
+			replace(findings, 2, strings.Replace(findings[2], `"filesRewritten":1`, `"filesRewritten":2`, 1)),
+			1,
+			"counts 2 files rewritten and lists 1",
+		},
+		{"a file listed twice", replace(findings, 2, strings.Replace(
+			strings.Replace(findings[2], `"filesRewritten":1`, `"filesRewritten":2`, 1),
+			`"formatted":true}]`,
+			`"formatted":true},{"file":"/project/Sources/Example/ByteRing.swift","fixedBy":{},"formatted":true}]`,
+			1,
+		)), 1, "lists /project/Sources/Example/ByteRing.swift twice"},
+		{"a file nothing changed", replace(findings, 2, strings.Replace(
+			strings.Replace(findings[2], `{"cohere-swift/legacy-constructors":1}`, `{}`, 1),
+			`"formatted":true`,
+			`"formatted":false`,
+			1,
+		)), 1, "rewritten by no fix and not by the formatter"},
 		// Contract 2's unreadable record: a summary may not call the run complete over one, and it has one place.
-		{"a summary claiming complete over an unreadable file", replace(unreadable, len(unreadable)-1, `{"kind":"summary","findings":0,"complete":true,"exitCode":0}`), 0, "calls the run complete"},
-		{"an unreadable record after a phase", append(append(append([]string(nil), unreadable[:5]...), unreadable[2]), unreadable[5:]...), 1, "after phase fix"},
-		{"an unreadable record before the project", append([]string{unreadable[0], unreadable[2]}, unreadable[1:]...), 1, "before the project record"},
+		{
+			"a summary claiming complete over an unreadable file",
+			replace(unreadable, len(unreadable)-1, `{"kind":"summary","findings":0,"complete":true,"exitCode":0}`),
+			0,
+			"calls the run complete",
+		},
+		{
+			"an unreadable record after a phase",
+			append(append(append([]string(nil), unreadable[:5]...), unreadable[2]), unreadable[5:]...),
+			1,
+			"after phase fix",
+		},
+		{
+			"an unreadable record before the project",
+			append([]string{unreadable[0], unreadable[2]}, unreadable[1:]...),
+			1,
+			"before the project record",
+		},
 		// The --unused report: well-formed, in its place, and counted by its coverage record.
-		{"an unused record that does not decode", replace(unused, 8, `{"kind":"unused","line":"one"}`), 0, "does not decode"},
-		{"an unused record with no subject", replace(unused, 8, strings.Replace(unused[8], `"subject":`, `"unnamed":`, 1)), 0, "missing its file, position, rule or subject"},
-		{"an unused record before the lint phase", append(append(append([]string(nil), unused[:7]...), unused[8], unused[7]), unused[9:]...), 0, "outside the unused phase"},
-		{"an unused coverage count that disagrees", replace(unused, 11, strings.Replace(unused[11], `"found":3`, `"found":4`, 1)), 0, "counts 4 found and 3"},
+		{
+			"an unused record that does not decode",
+			replace(unused, 8, `{"kind":"unused","line":"one"}`),
+			0,
+			"does not decode",
+		},
+		{
+			"an unused record with no subject",
+			replace(unused, 8, strings.Replace(unused[8], `"subject":`, `"unnamed":`, 1)),
+			0,
+			"missing its file, position, rule or subject",
+		},
+		{
+			"an unused record before the lint phase",
+			append(append(append([]string(nil), unused[:7]...), unused[8], unused[7]), unused[9:]...),
+			0,
+			"outside the unused phase",
+		},
+		{
+			"an unused coverage count that disagrees",
+			replace(unused, 11, strings.Replace(unused[11], `"found":3`, `"found":4`, 1)),
+			0,
+			"counts 4 found and 3",
+		},
 		// The fixture holds two rules: unused-import's records at 8-10 and its coverage at 11, then
 		// unused-declaration's records at 12-13 and its coverage at 14.
 		{"unused records with no coverage record", without(unused, 14), 0, "with no unusedCoverage record"},
-		{"one rule's records interleaved before another's coverage", without(unused, 11), 0, "of another rule arrived before the coverage record"},
-		{"an unused phase that ran with no coverage", without(without(without(without(without(without(without(unused, 14), 13), 12), 11), 10), 9), 8), 0, "no unusedCoverage record said"},
+		{
+			"one rule's records interleaved before another's coverage",
+			without(unused, 11),
+			0,
+			"of another rule arrived before the coverage record",
+		},
+		{
+			"an unused phase that ran with no coverage",
+			without(without(without(without(without(without(without(unused, 14), 13), 12), 11), 10), 9), 8),
+			0,
+			"no unusedCoverage record said",
+		},
 	}
 
 	for _, testCase := range cases {
-		// Not parallel: it renders a check run through engineRun, whose record acceptors set the package-level activeSummary
+		// Not parallel: it renders a check run through engineRun, whose record acceptors set the package-level
+		// activeSummary
 		test.Run(testCase.name, func(test *testing.T) {
-			output, exitCode, renderRecordsError := renderRecords(test, engineModeCheck, testCase.lines, testCase.engineExit)
+			output, exitCode, renderRecordsError := renderRecords(
+				test,
+				engineModeCheck,
+				testCase.lines,
+				testCase.engineExit,
+			)
 			if renderRecordsError == nil || exitCode != 1 {
 				test.Fatalf("accepted a broken stream: exit %d, err %v\n%s", exitCode, renderRecordsError, output)
 			}
@@ -357,7 +518,10 @@ func TestSwiftRunGroupsExcludedFiles(test *testing.T) {
 	clean := contractFixture(test, "Clean.jsonl")
 	vendored := []string{}
 	for index := range excludedNamedLimit + 1 {
-		vendored = append(vendored, `{"file":"/project/Vendor/F`+string(rune('a'+index))+`.swift","reason":"vendored under Vendor/"}`)
+		vendored = append(
+			vendored,
+			`{"file":"/project/Vendor/F`+string(rune('a'+index))+`.swift","reason":"vendored under Vendor/"}`,
+		)
 	}
 	clean[1] = strings.Replace(clean[1], `"excluded":[`, `"excluded":[`+strings.Join(vendored, ",")+",", 1)
 
@@ -379,13 +543,22 @@ func TestSwiftRunGroupsExcludedFiles(test *testing.T) {
 func TestSwiftRunBelievesAnEngineThatFellShort(test *testing.T) {
 	clean := contractFixture(test, "Clean.jsonl")
 	last := len(clean) - 1
-	clean[last] = strings.Replace(strings.Replace(clean[last], `"complete":true`, `"complete":false`, 1), `"exitCode":0`, `"exitCode":1`, 1)
+	clean[last] = strings.Replace(
+		strings.Replace(clean[last], `"complete":true`, `"complete":false`, 1),
+		`"exitCode":0`,
+		`"exitCode":1`,
+		1,
+	)
 
 	output, exitCode, renderRecordsError := renderRecords(test, engineModeCheck, clean, 1)
 	if renderRecordsError != nil || exitCode != 1 {
 		test.Fatalf("exit %d, err %v\n%s", exitCode, renderRecordsError, output)
 	}
-	requireLines(test, output, "  this run did not check everything: the Swift engine reported that it fell short without a record saying where\n")
+	requireLines(
+		test,
+		output,
+		"  this run did not check everything: the Swift engine reported that it fell short without a record saying where\n",
+	)
 }
 
 // TestSwiftRunListingModes holds the two runs that end without a summary on purpose.
@@ -399,7 +572,11 @@ func TestSwiftRunListingModes(test *testing.T) {
 		if renderRecordsError != nil || exitCode != 0 {
 			test.Fatalf("exit %d, err %v", exitCode, renderRecordsError)
 		}
-		requireLines(test, output, "swift engine: cohere-swift 0.1.0 (commit dev, swiftlang-6.4.0.34.1, swift-syntax 604.0.0, swift-format 604.0.0)\n")
+		requireLines(
+			test,
+			output,
+			"swift engine: cohere-swift 0.1.0 (commit dev, swiftlang-6.4.0.34.1, swift-syntax 604.0.0, swift-format 604.0.0)\n",
+		)
 	})
 
 	test.Run("rules, sorted", func(test *testing.T) {
@@ -434,7 +611,9 @@ func TestSwiftRunListingModes(test *testing.T) {
 	test.Run("an engine that could not run", func(test *testing.T) {
 		test.Parallel()
 		_, exitCode, renderRecordsError := renderRecords(test, engineModeCheck, []string{provenance}, 2)
-		if renderRecordsError == nil || exitCode != 1 || !strings.Contains(renderRecordsError.Error(), "did not run, so nothing was checked") {
+		if renderRecordsError == nil ||
+			exitCode != 1 ||
+			!strings.Contains(renderRecordsError.Error(), "did not run, so nothing was checked") {
 			test.Fatalf("exit 2 was rendered as exit %d, err %v", exitCode, renderRecordsError)
 		}
 	})
@@ -472,7 +651,14 @@ func TestSwiftEngineArguments(test *testing.T) {
 		test.Errorf("--rules ran in mode %s", mode)
 	}
 
-	if _, _, engineArgumentsError := engineArguments(swiftLanguage, swiftFlags, location, map[string]bool{"explain": true}, value, nil); engineArgumentsError == nil || !strings.Contains(engineArgumentsError.Error(), "--explain") {
+	if _, _, engineArgumentsError := engineArguments(
+		swiftLanguage,
+		swiftFlags,
+		location,
+		map[string]bool{"explain": true},
+		value,
+		nil,
+	); engineArgumentsError == nil || !strings.Contains(engineArgumentsError.Error(), "--explain") {
 		test.Errorf("--explain was not refused by name: %v", engineArgumentsError)
 	}
 }
@@ -498,25 +684,57 @@ func TestSwiftEngineArgumentsRefuseWhatNothingHonors(test *testing.T) {
 		"stdin-filepath": "--stdin-filepath is not implemented for Swift yet",
 		"cache-dump":     "--cache-dump is not implemented for Swift yet",
 	} {
-		if _, _, engineArgumentsError := engineArguments(swiftLanguage, swiftFlags, location, map[string]bool{"no-fix": true, flag: true}, value, nil); engineArgumentsError == nil ||
-			!strings.Contains(engineArgumentsError.Error(), says) || !strings.Contains(engineArgumentsError.Error(), "nothing was checked") {
+		if _, _, engineArgumentsError := engineArguments(
+			swiftLanguage,
+			swiftFlags,
+			location,
+			map[string]bool{"no-fix": true, flag: true},
+			value,
+			nil,
+		); engineArgumentsError == nil ||
+			!strings.Contains(engineArgumentsError.Error(), says) ||
+			!strings.Contains(engineArgumentsError.Error(), "nothing was checked") {
 			test.Errorf("--%s was not refused by name: %v", flag, engineArgumentsError)
 		}
 	}
 
 	for _, flag := range []string{"format-only", "no-format", "no-cache"} {
 		values[flag] = "true"
-		arguments, _, engineArgumentsError := engineArguments(swiftLanguage, swiftFlags, location, map[string]bool{"no-fix": true, flag: true}, value, nil)
-		if engineArgumentsError != nil || strings.Join(arguments, " ") != "--contract 3 --root /work/macos --no-fix --"+flag {
-			test.Errorf("--%s did not reach the engine: %q (%v)", flag, strings.Join(arguments, " "), engineArgumentsError)
+		arguments, _, engineArgumentsError := engineArguments(
+			swiftLanguage,
+			swiftFlags,
+			location,
+			map[string]bool{"no-fix": true, flag: true},
+			value,
+			nil,
+		)
+		if engineArgumentsError != nil ||
+			strings.Join(arguments, " ") != "--contract 3 --root /work/macos --no-fix --"+flag {
+			test.Errorf(
+				"--%s did not reach the engine: %q (%v)",
+				flag,
+				strings.Join(arguments, " "),
+				engineArgumentsError,
+			)
 		}
 	}
 	values["no-format"] = "false"
 
-	given := map[string]bool{"no-fix": true, "no-format": true, "verbose": true, "phases": true, "coverage": true, "directory": true}
+	given := map[string]bool{
+		"no-fix":    true,
+		"no-format": true,
+		"verbose":   true,
+		"phases":    true,
+		"coverage":  true,
+		"directory": true,
+	}
 	arguments, _, engineArgumentsError := engineArguments(swiftLanguage, swiftFlags, location, given, value, nil)
 	if engineArgumentsError != nil || strings.Join(arguments, " ") != "--contract 3 --root /work/macos --no-fix" {
-		test.Errorf("the flags the front door answers were not passed over: %q (%v)", strings.Join(arguments, " "), engineArgumentsError)
+		test.Errorf(
+			"the flags the front door answers were not passed over: %q (%v)",
+			strings.Join(arguments, " "),
+			engineArgumentsError,
+		)
 	}
 }
 
@@ -527,10 +745,20 @@ func TestSwiftEngineArgumentsRefuseWhatNothingHonors(test *testing.T) {
 // there
 func TestSwiftRunListsTheFilesItRewrote(test *testing.T) {
 	activeSummary = runSummary{}
-	if _, _, renderRecordsError := renderRecords(test, engineModeCheck, contractFixture(test, "Findings.jsonl"), 1); renderRecordsError != nil {
+	if _, _, renderRecordsError := renderRecords(
+		test,
+		engineModeCheck,
+		contractFixture(test, "Findings.jsonl"),
+		1,
+	); renderRecordsError != nil {
 		test.Fatal(renderRecordsError)
 	}
-	want := []changedFile{{Path: "Sources/Example/ByteRing.swift", Fixed: true, Formatted: true, FixedBy: map[string]int{"cohere-swift/legacy-constructors": 1}}}
+	want := []changedFile{{
+		Path:      "Sources/Example/ByteRing.swift",
+		Fixed:     true,
+		Formatted: true,
+		FixedBy:   map[string]int{"cohere-swift/legacy-constructors": 1},
+	}}
 	if !reflect.DeepEqual(activeSummary.Changed, want) {
 		test.Errorf("the summary lists %+v, expected %+v", activeSummary.Changed, want)
 	}
@@ -616,7 +844,11 @@ func TestEngineRunVersionInGoWords(test *testing.T) {
 	}
 
 	clean := render(provenance, "a97349d9534c52c831ec0835fe7ceba880637fd1")
-	requireLines(test, clean, "\n  swift contract: 3\ngo engine: cohere-go 0.1.0 (commit dev, go1.27.0 darwin/arm64, contract 3)\n")
+	requireLines(
+		test,
+		clean,
+		"\n  swift contract: 3\ngo engine: cohere-go 0.1.0 (commit dev, go1.27.0 darwin/arm64, contract 3)\n",
+	)
 	forbidLines(test, clean, "modified tree", "identical to commit", "swift engine", "Swift", "swift-syntax")
 
 	modified := render(strings.Replace(provenance, `"sourceTreeModified":false`, `"sourceTreeModified":true`, 1), "")

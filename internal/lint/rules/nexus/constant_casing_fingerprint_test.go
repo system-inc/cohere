@@ -16,7 +16,12 @@ func constantCasingFingerprintOf(test *testing.T, files map[string]string, subje
 }
 
 // constantCasingFingerprintWithOptions is constantCasingFingerprintOf under the rule's options.
-func constantCasingFingerprintWithOptions(test *testing.T, files map[string]string, subject string, options any) [sha256.Size]byte {
+func constantCasingFingerprintWithOptions(
+	test *testing.T,
+	files map[string]string,
+	subject string,
+	options any,
+) [sha256.Size]byte {
 	test.Helper()
 	var fingerprint [sha256.Size]byte
 	probe := ConsistencyRequireConstantCasing
@@ -58,12 +63,21 @@ func TestConsistencyRequireConstantCasingFingerprintsExactlyTheImporterIndex(tes
 	original := constantCasingFingerprintOf(test, base, source)
 
 	moves := map[string]map[string]string{
-		"a new importer of an exported name": with(other, "import { otherPath } from './Source';\nexport const Other = otherPath;\n"),
+		"a new importer of an exported name": with(
+			other,
+			"import { otherPath } from './Source';\nexport const Other = otherPath;\n",
+		),
 		"an importer taking a second name": with(reader,
 			"import { archivePath, otherPath } from './Source';\nexport const Reading = archivePath + otherPath;\n"),
-		"an export star from an imported file":  with(other, "export * from './Source';\n"),
-		"the same name taken from another file": with(reader, "import { archivePath } from './Mirror';\nexport const Reading = archivePath;\n"),
-		"an importer taking a different name":   with(reader, "import { otherPath } from './Source';\nexport const Reading = otherPath;\n"),
+		"an export star from an imported file": with(other, "export * from './Source';\n"),
+		"the same name taken from another file": with(
+			reader,
+			"import { archivePath } from './Mirror';\nexport const Reading = archivePath;\n",
+		),
+		"an importer taking a different name": with(
+			reader,
+			"import { otherPath } from './Source';\nexport const Reading = otherPath;\n",
+		),
 		"a computed import pointed at another directory": with(loader,
 			"export const load = (code: string) => import(`./locales/${code}`);\n"),
 		"a computed import removed": with(loader, "export const load = (code: string) => code;\n"),
@@ -77,7 +91,10 @@ func TestConsistencyRequireConstantCasingFingerprintsExactlyTheImporterIndex(tes
 	holds := map[string]map[string]string{
 		"a comment in the importer": with(reader,
 			"// reads the archive\nimport { archivePath } from './Source';\nexport const Reading = archivePath;\n"),
-		"an exported value changed": with(source, "export const archivePath = 'archives';\nexport const otherPath = 'other';\n"),
+		"an exported value changed": with(
+			source,
+			"export const archivePath = 'archives';\nexport const otherPath = 'other';\n",
+		),
 		"an import's local alias renamed": with(reader,
 			"import { archivePath as path } from './Source';\nexport const Reading = path;\n"),
 		"a file with a computed import edited elsewhere": with(loader,
@@ -103,7 +120,12 @@ func TestConsistencyRequireConstantCasingFingerprintDoesNotHashItsOptions(test *
 	}
 	framework := ConsistencyRequireConstantCasingOptions{FrameworkConstantNames: []string{"runtime"}}
 
-	if constantCasingFingerprintWithOptions(test, files, source, nil) != constantCasingFingerprintWithOptions(test, files, source, framework) {
+	if constantCasingFingerprintWithOptions(
+		test,
+		files,
+		source,
+		nil,
+	) != constantCasingFingerprintWithOptions(test, files, source, framework) {
 		test.Fatal("the options moved the fingerprint, though nothing the index reads depends on them")
 	}
 

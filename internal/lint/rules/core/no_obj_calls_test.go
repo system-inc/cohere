@@ -17,7 +17,11 @@ func TestNoObjCallsFiresAndStaysQuiet(test *testing.T) {
 	test.Parallel()
 
 	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoObjCalls, "input.ts", "Math();"), "unexpectedCall")
-	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoObjCalls, "input.ts", "let j = JSON; j();"), "unexpectedRefCall")
+	rule_testing.ExpectFindings(
+		test,
+		rule_testing.RunTyped(test, NoObjCalls, "input.ts", "let j = JSON; j();"),
+		"unexpectedRefCall",
+	)
 	rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoObjCalls, "input.ts", "var Math; Math();"))
 	rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoObjCalls, "input.ts", "JSON.parse('{}');"))
 }
@@ -50,10 +54,24 @@ func TestNoObjCallsReportsOnlyTheNamespaceObjects(test *testing.T) {
 func TestNoObjCallsTakesAnUndeclaredGlobalObjectAsTheGlobal(test *testing.T) {
 	test.Parallel()
 
-	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoObjCalls, "input.ts", "window.JSON();"), "unexpectedCall")
-	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoObjCalls, "input.ts", "var foo = self.Math; foo();"), "unexpectedRefCall")
-	rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoObjCalls, "input.ts", "function f(window: any) { window.JSON(); }"))
-	rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoObjCalls, "input.ts", "function f(globalThis: any) { globalThis.Math(); }"))
+	rule_testing.ExpectFindings(
+		test,
+		rule_testing.RunTyped(test, NoObjCalls, "input.ts", "window.JSON();"),
+		"unexpectedCall",
+	)
+	rule_testing.ExpectFindings(
+		test,
+		rule_testing.RunTyped(test, NoObjCalls, "input.ts", "var foo = self.Math; foo();"),
+		"unexpectedRefCall",
+	)
+	rule_testing.ExpectClean(
+		test,
+		rule_testing.RunTyped(test, NoObjCalls, "input.ts", "function f(window: any) { window.JSON(); }"),
+	)
+	rule_testing.ExpectClean(
+		test,
+		rule_testing.RunTyped(test, NoObjCalls, "input.ts", "function f(globalThis: any) { globalThis.Math(); }"),
+	)
 }
 
 // TestNoObjCallsDoesNotFollowAnArithmeticAssignment pins the tracker's one departure from
@@ -63,7 +81,11 @@ func TestNoObjCallsDoesNotFollowAnArithmeticAssignment(test *testing.T) {
 	test.Parallel()
 
 	rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoObjCalls, "input.ts", "let x; x += JSON; x();"))
-	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoObjCalls, "input.ts", "let x; x ??= JSON; x();"), "unexpectedRefCall")
+	rule_testing.ExpectFindings(
+		test,
+		rule_testing.RunTyped(test, NoObjCalls, "input.ts", "let x; x ??= JSON; x();"),
+		"unexpectedRefCall",
+	)
 }
 
 // TestNoObjCallsNamesTheCalleeAndTheGlobal pins what each message says, which the table's ids cannot.
@@ -86,7 +108,12 @@ func TestNoObjCallsNamesTheCalleeAndTheGlobal(test *testing.T) {
 		}
 		for _, want := range testCase.want {
 			if !strings.Contains(result.Diagnostics[0].Message.Description, want) {
-				test.Errorf("%s: the message %q does not name %s", testCase.source, result.Diagnostics[0].Message.Description, want)
+				test.Errorf(
+					"%s: the message %q does not name %s",
+					testCase.source,
+					result.Diagnostics[0].Message.Description,
+					want,
+				)
 			}
 		}
 	}

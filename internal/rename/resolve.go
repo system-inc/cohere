@@ -92,7 +92,9 @@ func resolveAnchor(
 	// A shorthand property's identifier resolves through the plain accessor to the property rather
 	// than to the binding, so anchoring on it would rename the object's contract instead of the
 	// variable the user pointed at. The value symbol is the one a cursor there means.
-	if parent := found.Parent; parent != nil && parent.Kind == ast.KindShorthandPropertyAssignment && parent.Name() == found {
+	if parent := found.Parent; parent != nil &&
+		parent.Kind == ast.KindShorthandPropertyAssignment &&
+		parent.Name() == found {
 		if value := fileChecker.GetShorthandAssignmentValueSymbol(parent); value != nil {
 			return value, found, nil
 		}

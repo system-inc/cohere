@@ -172,7 +172,10 @@ func TestProvenanceLinesAreKeptTaggedAndReplayedWithTheirSource(test *testing.T)
 		test.Errorf("the terminal saw the tag or lost the line: %q", shown)
 	}
 	if !bytes.HasPrefix(tee.buffer.Bytes(), provenanceTag) {
-		test.Fatalf("the recording lost the provenance tag, so a replay would print the line as current: %q", tee.buffer.String())
+		test.Fatalf(
+			"the recording lost the provenance tag, so a replay would print the line as current: %q",
+			tee.buffer.String(),
+		)
 	}
 
 	replayed := string(replayLines(tee.buffer.Bytes(), "03:41:07"))

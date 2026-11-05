@@ -124,17 +124,37 @@ func TestNoNamespaceCreateElementBoundary(test *testing.T) {
 		findings   []string
 	}{
 		{"the pragma spelling reports", "React.createElement(\"ns:x\");", []string{"noNamespace"}},
-		{"a parenthesized pragma callee reports, because a parenthesis is not a node upstream walks", "(React.createElement)(\"ns:x\");", []string{"noNamespace"}},
+		{
+			"a parenthesized pragma callee reports, because a parenthesis is not a node upstream walks",
+			"(React.createElement)(\"ns:x\");",
+			[]string{"noNamespace"},
+		},
 		{"a bare call is silent without a React import to trace it to", "createElement(\"ns:x\");", nil},
 		{"another object is silent, and Preact is the case that matters", "Preact.createElement(\"ns:x\");", nil},
-		{"document is silent for the same reason rather than by a special case", "document.createElement(\"ns:x\");", nil},
+		{
+			"document is silent for the same reason rather than by a special case",
+			"document.createElement(\"ns:x\");",
+			nil,
+		},
 		{"a computed member is silent", "React[\"createElement\"](\"ns:x\");", nil},
-		{"a template literal is silent, because upstream tests for a Literal node", "React.createElement(`ns:x`);", nil},
+		{
+			"a template literal is silent, because upstream tests for a Literal node",
+			"React.createElement(`ns:x`);",
+			nil,
+		},
 		{"no arguments at all is silent", "React.createElement();", nil},
-		{"the name is read syntactically, so a local React holding a number still reports", "const React = 1; React.createElement(\"ns:x\");", []string{"noNamespace"}},
+		{
+			"the name is read syntactically, so a local React holding a number still reports",
+			"const React = 1; React.createElement(\"ns:x\");",
+			[]string{"noNamespace"},
+		},
 		{"a colon anywhere in the string is enough", "React.createElement(\":\");", []string{"noNamespace"}},
 		{"and more than one colon still reports once", "React.createElement(\"a:b:c\");", []string{"noNamespace"}},
-		{"a namespaced name past the first argument is still read from the first", "React.createElement(\"a:b\", {}, \"c\");", []string{"noNamespace"}},
+		{
+			"a namespaced name past the first argument is still read from the first",
+			"React.createElement(\"a:b\", {}, \"c\");",
+			[]string{"noNamespace"},
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -253,7 +273,10 @@ func TestNoNamespaceSpanAndMessage(test *testing.T) {
 		if result.Diagnostics[0].Message.Id != "noNamespace" {
 			test.Fatalf("message id was %q", result.Diagnostics[0].Message.Id)
 		}
-		if !strings.HasPrefix(result.Diagnostics[0].Message.Description, "This element names a namespace, and React has no notion of one.") {
+		if !strings.HasPrefix(
+			result.Diagnostics[0].Message.Description,
+			"This element names a namespace, and React has no notion of one.",
+		) {
 			test.Fatalf("message description was %q", result.Diagnostics[0].Message.Description)
 		}
 	})
@@ -372,7 +395,10 @@ func TestNoNamespaceDoesNotPanicOnNonLiteralArguments(test *testing.T) {
 		{"a nested call", "declare const a: any;\nReact.createElement(a.b.c());"},
 		{"a conditional", "declare const x: boolean;\nReact.createElement(x ? 'a:b' : 'c');"},
 		{"a template literal", "React.createElement(`x:y`);"},
-		{"a spread argument, which has no first literal at all", "declare const args: any[];\nReact.createElement(...args);"},
+		{
+			"a spread argument, which has no first literal at all",
+			"declare const args: any[];\nReact.createElement(...args);",
+		},
 		{"a parenthesized literal, which is not a literal node", "React.createElement(('a:b'));"},
 
 		// The property-access half. Two of the six crashed files were this shape, reached through

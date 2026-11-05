@@ -40,7 +40,17 @@ var formatCases = []formatCase{
 		fileName: "Probe.ts",
 		source: "if (a) { b() } else if (c) { d() } else { e() }\nfor (let i = 0; i < 3; i++) {}\nfor (const x of y) {}\n" +
 			"while (a) {}\ndo { a() } while (b)\nswitch (a) { case 1: break; default: }\nfor (;;) {}\n",
-		contains: []string{"if(a) {", "}\nelse if(c) {", "}\nelse {", "for(let i", "for(const x of y)", "while(a)", "} while(b);", "switch(a)", "for(;;)"},
+		contains: []string{
+			"if(a) {",
+			"}\nelse if(c) {",
+			"}\nelse {",
+			"for(let i",
+			"for(const x of y)",
+			"while(a)",
+			"} while(b);",
+			"switch(a)",
+			"for(;;)",
+		},
 	},
 	{
 		name:     "member chains, call arguments and arrow chains break as the fork breaks them",
@@ -83,7 +93,11 @@ var formatCases = []formatCase{
 		fileName: "Probe.js",
 		source: "/**\n * @typedef {{ a: number }} Shape\n * @param {string} name\n * @returns {Shape}\n */\nexport function make (name) { return /** @type {Shape} */ ({ 'a': 1, '2': name, 'b-c': 3 }) }\n" +
 			"const view = <div className='x'>{make('y')}</div>\n",
-		contains: []string{"export function make(name) {", "/** @type {Shape} */ ({ a: 1, 2: name, 'b-c': 3 })", "<div className=\"x\">"},
+		contains: []string{
+			"export function make(name) {",
+			"/** @type {Shape} */ ({ a: 1, 2: name, 'b-c': 3 })",
+			"<div className=\"x\">",
+		},
 	},
 	{
 		name:     "json: comments, trailing commas, quoting and numbers through the JavaScript printer",
@@ -96,7 +110,12 @@ var formatCases = []formatCase{
 		name:     "json-stringify: package.json breaks every object and array",
 		fileName: "package.json",
 		source:   "{\"name\":\"probe\",\"private\":true,\"files\":[],\"scripts\":{\"build\":\"tsc\"},\"keywords\":[\"a\",\"b\"],\"version\":1.50}\n",
-		contains: []string{"{\n    \"name\": \"probe\",", "\"files\": [],", "\"keywords\": [\n        \"a\",", "\"version\": 1.50"},
+		contains: []string{
+			"{\n    \"name\": \"probe\",",
+			"\"files\": [],",
+			"\"keywords\": [\n        \"a\",",
+			"\"version\": 1.50",
+		},
 	},
 }
 
@@ -119,10 +138,20 @@ func formatFor(fileName string) func(string, string, formatoptions.Options) (str
 // generic call to TypeScript, so printing the TSX parse would rewrite the program's meaning.
 func TestJavaScriptRefusesWhatTypeScriptReadsDifferently(test *testing.T) {
 	test.Parallel()
-	if _, formatJavaScriptError := FormatJavaScript("Probe.js", "const result = a < b > (c);\n", formatoptions.Default(), nil); formatJavaScriptError == nil {
+	if _, formatJavaScriptError := FormatJavaScript(
+		"Probe.js",
+		"const result = a < b > (c);\n",
+		formatoptions.Default(),
+		nil,
+	); formatJavaScriptError == nil {
 		test.Fatal("a JavaScript file that parses as a TypeScript generic call was printed instead of refused")
 	}
-	if _, formatJavaScriptError := FormatJavaScript("Probe.js", "const result = a < b;\n", formatoptions.Default(), nil); formatJavaScriptError != nil {
+	if _, formatJavaScriptError := FormatJavaScript(
+		"Probe.js",
+		"const result = a < b;\n",
+		formatoptions.Default(),
+		nil,
+	); formatJavaScriptError != nil {
 		test.Fatalf("plain JavaScript was refused: %v", formatJavaScriptError)
 	}
 }
@@ -142,7 +171,10 @@ func TestFormatMatchesTheFork(test *testing.T) {
 				test.Fatalf("%s: the oracle failed: %v", testCase.name, err)
 			}
 			if expected == testCase.source {
-				test.Fatalf("%s: the oracle left the snippet unchanged, so an identity printer would pass", testCase.name)
+				test.Fatalf(
+					"%s: the oracle left the snippet unchanged, so an identity printer would pass",
+					testCase.name,
+				)
 			}
 			for _, substring := range testCase.contains {
 				if !strings.Contains(expected, substring) {
@@ -155,7 +187,13 @@ func TestFormatMatchesTheFork(test *testing.T) {
 				continue
 			}
 			if actual != expected {
-				test.Errorf("%s (bracketSameLine %v):\n--- fork\n%s--- native\n%s", testCase.name, options.BracketSameLine, expected, actual)
+				test.Errorf(
+					"%s (bracketSameLine %v):\n--- fork\n%s--- native\n%s",
+					testCase.name,
+					options.BracketSameLine,
+					expected,
+					actual,
+				)
 			}
 		}
 	}

@@ -442,7 +442,12 @@ x || y;
 declare let x: '' | undefined;
 x || y;
       `, optionsJson: `{"ignorePrimitives": {"bigint": true, "boolean": true, "number": true, "string": false}}`, findings: 1},
-	{name: "upstream invalid[237]", source: "\ndeclare let x: `` | undefined;\nx || y;\n      ", optionsJson: `{"ignorePrimitives": {"bigint": true, "boolean": true, "number": true, "string": false}}`, findings: 1},
+	{
+		name:        "upstream invalid[237]",
+		source:      "\ndeclare let x: `` | undefined;\nx || y;\n      ",
+		optionsJson: `{"ignorePrimitives": {"bigint": true, "boolean": true, "number": true, "string": false}}`,
+		findings:    1,
+	},
 	{name: "upstream invalid[238]", source: `
 declare let x: 0 | undefined;
 x || y;
@@ -459,7 +464,12 @@ x || y;
 declare let x: 'a' | undefined;
 x || y;
       `, optionsJson: `{"ignorePrimitives": {"bigint": true, "boolean": true, "number": true, "string": false}}`, findings: 1},
-	{name: "upstream invalid[247]", source: "\ndeclare let x: `hello${'string'}` | undefined;\nx || y;\n      ", optionsJson: `{"ignorePrimitives": {"bigint": true, "boolean": true, "number": true, "string": false}}`, findings: 1},
+	{
+		name:        "upstream invalid[247]",
+		source:      "\ndeclare let x: `hello${'string'}` | undefined;\nx || y;\n      ",
+		optionsJson: `{"ignorePrimitives": {"bigint": true, "boolean": true, "number": true, "string": false}}`,
+		findings:    1,
+	},
 	{name: "upstream invalid[248]", source: `
 declare let x: 1 | undefined;
 x || y;
@@ -476,7 +486,12 @@ x || y;
 declare let x: 'a' | 'b' | undefined;
 x || y;
       `, optionsJson: `{"ignorePrimitives": {"bigint": true, "boolean": true, "number": true, "string": false}}`, findings: 1},
-	{name: "upstream invalid[262]", source: "\ndeclare let x: 'a' | `b` | undefined;\nx || y;\n      ", optionsJson: `{"ignorePrimitives": {"bigint": true, "boolean": true, "number": true, "string": false}}`, findings: 1},
+	{
+		name:        "upstream invalid[262]",
+		source:      "\ndeclare let x: 'a' | `b` | undefined;\nx || y;\n      ",
+		optionsJson: `{"ignorePrimitives": {"bigint": true, "boolean": true, "number": true, "string": false}}`,
+		findings:    1,
+	},
 	{name: "upstream invalid[263]", source: `
 declare let x: 0 | 1 | undefined;
 x || y;

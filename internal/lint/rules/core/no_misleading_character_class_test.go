@@ -85,7 +85,10 @@ func TestNoMisleadingCharacterClassFires(test *testing.T) {
 		{"var r = /[\\u{1F468}\\u{200D}\\u{1F469}\\u{200D}\\u{1F466}]/u", []string{joiner}},
 		{"var r = /[\\uD83D\\uDC68\\u200D\\uD83D\\uDC69]/u", []string{joiner}},
 		{"var r = /[\\u{1F468}\\u{200D}\\u{1F469}]/u", []string{joiner}},
-		{"var r = /[\\u{1F468}\\u{200D}\\u{1F469}\\u{200D}\\u{1F466}]foo[\\u{1F468}\\u{200D}\\u{1F469}\\u{200D}\\u{1F466}]/u", []string{joiner, joiner}},
+		{
+			"var r = /[\\u{1F468}\\u{200D}\\u{1F469}\\u{200D}\\u{1F466}]foo[\\u{1F468}\\u{200D}\\u{1F469}\\u{200D}\\u{1F466}]/u",
+			[]string{joiner, joiner},
+		},
 		{"var r = RegExp(\"[👍]\", \"\")", []string{withoutFlag}},
 		{"var r = new RegExp(\"[👍]\", \"\")", []string{withoutFlag}},
 		{"var r = new RegExp('[👍]', ``)", []string{withoutFlag}},
@@ -141,12 +144,21 @@ func TestNoMisleadingCharacterClassFires(test *testing.T) {
 		{"var r = new RegExp(\"[👩‍👦][👩‍👦]\", \"u\")", []string{joiner, joiner}},
 		{"var r = new RegExp(\"[👨‍👩‍👦]foo[👨‍👩‍👦]\", \"u\")", []string{joiner, joiner}},
 		{"var r = new RegExp(\"[👨‍👩‍👦👩‍👦]\", \"u\")", []string{joiner, joiner}},
-		{"var r = new RegExp(\"[\\\\uD83D\\\\uDC68\\\\u200D\\\\uD83D\\\\uDC69\\\\u200D\\\\uD83D\\\\uDC66]\", \"u\")", []string{joiner}},
-		{"var r = new RegExp(\"[\\\\u{1F468}\\\\u{200D}\\\\u{1F469}\\\\u{200D}\\\\u{1F466}]\", \"u\")", []string{joiner}},
+		{
+			"var r = new RegExp(\"[\\\\uD83D\\\\uDC68\\\\u200D\\\\uD83D\\\\uDC69\\\\u200D\\\\uD83D\\\\uDC66]\", \"u\")",
+			[]string{joiner},
+		},
+		{
+			"var r = new RegExp(\"[\\\\u{1F468}\\\\u{200D}\\\\u{1F469}\\\\u{200D}\\\\u{1F466}]\", \"u\")",
+			[]string{joiner},
+		},
 		{"var r = new globalThis.RegExp(\"[❇️]\", \"\")", []string{combining}},
 		{"var r = new globalThis.RegExp(\"[👶🏻]\", \"u\")", []string{emoji}},
 		{"var r = new globalThis.RegExp(\"[🇯🇵]\", \"\")", []string{withoutFlag, withoutFlag}},
-		{"var r = new globalThis.RegExp(\"[\\\\u{1F468}\\\\u{200D}\\\\u{1F469}\\\\u{200D}\\\\u{1F466}]\", \"u\")", []string{joiner}},
+		{
+			"var r = new globalThis.RegExp(\"[\\\\u{1F468}\\\\u{200D}\\\\u{1F469}\\\\u{200D}\\\\u{1F466}]\", \"u\")",
+			[]string{joiner},
+		},
 		{"/[\\ud83d\\u{dc4d}]/u", []string{escapedPair}},
 		{"/[\\u{d83d}\\udc4d]/u", []string{escapedPair}},
 		{"/[\\u{d83d}\\u{dc4d}]/u", []string{escapedPair}},
@@ -318,7 +330,8 @@ func TestNoMisleadingCharacterClassAllowEscape(test *testing.T) {
 			result := rule_testing.RunTypedWithOptions(test, NoMisleadingCharacterClass,
 				misleadingCharacterClassFile, testCase.sourceText, allowEscape)
 			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
-			body := testCase.sourceText[strings.Index(testCase.sourceText, "[")+1 : strings.LastIndex(testCase.sourceText, "]")]
+			body := testCase.sourceText[strings.Index(testCase.sourceText, "[")+
+				1 : strings.LastIndex(testCase.sourceText, "]")]
 			for _, diagnostic := range result.Diagnostics {
 				if got := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]; got != body {
 					test.Fatalf("points at %q, wanted %q", got, body)

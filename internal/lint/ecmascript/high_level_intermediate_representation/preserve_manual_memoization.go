@@ -305,8 +305,11 @@ func (validator *manualMemoValidator) visitInstruction(instruction *ReactiveInst
 //
 // The `StartMemoize` condition additionally accepts a pruned scope, because a pruned scope was a
 // deliberate decision rather than a lost one. The `FinishMemoize` condition does not.
-func (validator *manualMemoValidator) check(identifier static_single_assignment.IdentifierId, order static_single_assignment.EvaluationOrder,
-	kind PreserveManualMemoizationKind) {
+func (validator *manualMemoValidator) check(
+	identifier static_single_assignment.IdentifierId,
+	order static_single_assignment.EvaluationOrder,
+	kind PreserveManualMemoizationKind,
+) {
 	if validator.scopes == nil {
 		return
 	}

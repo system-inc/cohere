@@ -31,7 +31,9 @@ func requireArraySortCompareOptionsFor(test *testing.T, optionsJson string) any 
 	if optionsJson == "" {
 		return DefaultRequireArraySortCompareSettings()
 	}
-	decoded, decodeRequireArraySortCompareOptionsError := DecodeRequireArraySortCompareOptions(json.RawMessage(optionsJson))
+	decoded, decodeRequireArraySortCompareOptionsError := DecodeRequireArraySortCompareOptions(
+		json.RawMessage(optionsJson),
+	)
 	if decodeRequireArraySortCompareOptionsError != nil {
 		test.Fatalf("decoding %s: %v", optionsJson, decodeRequireArraySortCompareOptionsError)
 	}
@@ -307,7 +309,9 @@ func TestDecodeRequireArraySortCompareOptionsKeepsTheDefaultWhenTheKeyIsAbsent(t
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, decodeRequireArraySortCompareOptionsError := DecodeRequireArraySortCompareOptions(json.RawMessage(testCase.raw))
+			decoded, decodeRequireArraySortCompareOptionsError := DecodeRequireArraySortCompareOptions(
+				json.RawMessage(testCase.raw),
+			)
 			if decodeRequireArraySortCompareOptionsError != nil {
 				test.Fatalf("decoding %s: %v", testCase.raw, decodeRequireArraySortCompareOptionsError)
 			}
@@ -379,7 +383,8 @@ func TestRequireArraySortCompareStaysSilentOnShapesTheCorpusDoesNotWrite(test *t
 		sourceText string
 	}{
 		{
-			// An explicit undefined behaves identically at run time and is silent, because the argument count is part of upstream's selector.
+			// An explicit undefined behaves identically at run time and is silent, because the argument count is part
+			// of upstream's selector.
 			sourceText: "function f(a: number[]) {\n  a.sort(undefined);\n}",
 		},
 		{
@@ -387,7 +392,8 @@ func TestRequireArraySortCompareStaysSilentOnShapesTheCorpusDoesNotWrite(test *t
 			sourceText: "function f(a: [string, string]) {\n  a.sort();\n}",
 		},
 		{
-			// A mixed tuple fails the exemption, then fails the array test too, since a tuple is not an array type. Silent for the second reason rather than the first.
+			// A mixed tuple fails the exemption, then fails the array test too, since a tuple is not an array type.
+			// Silent for the second reason rather than the first.
 			sourceText: "function f(a: [string, number]) {\n  a.sort();\n}",
 		},
 		{
@@ -469,7 +475,9 @@ func TestRequireArraySortCompareFiresOnShapesTheCorpusDoesNotWrite(test *testing
 			wantSpan:   "a['sort']()",
 		},
 		{
-			// A parenthesized callee. estree has no paren node, so upstream's child selector sees through it and reports. This case is why the callee is paren-skipped; the first version of this rule reasoned its way to the opposite answer and was wrong.
+			// A parenthesized callee. estree has no paren node, so upstream's child selector sees through it and
+			// reports. This case is why the callee is paren-skipped; the first version of this rule reasoned its way to
+			// the opposite answer and was wrong.
 			sourceText: "function f(a: number[]) {\n  (a.sort)();\n}",
 			wantSpan:   "(a.sort)()",
 		},
@@ -494,7 +502,9 @@ func TestRequireArraySortCompareFiresOnShapesTheCorpusDoesNotWrite(test *testing
 			wantSpan:   "a.sort()",
 		},
 		{
-			// A never array is an array with no type arguments to check, so the exemption's every-loop is vacuously true on the element side while the array test still reports. It reports because the receiver is not a string array by the exemption's own test.
+			// A never array is an array with no type arguments to check, so the exemption's every-loop is vacuously
+			// true on the element side while the array test still reports. It reports because the receiver is not a
+			// string array by the exemption's own test.
 			sourceText: "function f(a: never[]) {\n  a.sort();\n}",
 			wantSpan:   "a.sort()",
 		},

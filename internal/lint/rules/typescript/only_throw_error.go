@@ -262,7 +262,12 @@ var OnlyThrowError = rule.Rule{
 					return
 				}
 
-				if type_checking.TypeMatchesSomeSpecifier(argumentType, settings.Allow, settings.AllowInline, ruleContext.Program) {
+				if type_checking.TypeMatchesSomeSpecifier(
+					argumentType,
+					settings.Allow,
+					settings.AllowInline,
+					ruleContext.Program,
+				) {
 					return
 				}
 

@@ -62,7 +62,12 @@ func TestTailwindFixersComposeInOnePass(test *testing.T) {
 	for _, testCase := range testCases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result, fixTextError := edit.FixText("/Component.tsx", testCase.source, proposeFromTailwindFixers(test), edit.DefaultMaxPasses)
+			result, fixTextError := edit.FixText(
+				"/Component.tsx",
+				testCase.source,
+				proposeFromTailwindFixers(test),
+				edit.DefaultMaxPasses,
+			)
 			if fixTextError != nil {
 				test.Fatalf("unexpected error: %v", fixTextError)
 			}
@@ -70,7 +75,12 @@ func TestTailwindFixersComposeInOnePass(test *testing.T) {
 				test.Errorf("refused %s (conflicts with %s): %s",
 					rejection.Proposal.RuleName, rejection.ConflictsWith, rejection.Reason)
 			}
-			test.Logf("%d passes, %d fixes applied by %v", result.Passes, len(result.Applied), appliedRuleNames(result.Applied))
+			test.Logf(
+				"%d passes, %d fixes applied by %v",
+				result.Passes,
+				len(result.Applied),
+				appliedRuleNames(result.Applied),
+			)
 			if !result.Converged {
 				test.Fatalf("did not converge in %d passes", result.Passes)
 			}
@@ -78,7 +88,10 @@ func TestTailwindFixersComposeInOnePass(test *testing.T) {
 				test.Fatalf("the fixers produced\n  %q\nwant the plugin's\n  %q", result.Text, testCase.want)
 			}
 			if result.Passes > 4 {
-				test.Errorf("took %d passes; the rename, the repeat and the padding land together, then the order", result.Passes)
+				test.Errorf(
+					"took %d passes; the rename, the repeat and the padding land together, then the order",
+					result.Passes,
+				)
 			}
 		})
 	}

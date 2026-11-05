@@ -66,7 +66,10 @@ func loadValueParserCorpus(test *testing.T) valueParserCorpus {
 		test.Fatalf("fixture does not record which bundle symbol it was generated from")
 	}
 	if len(corpus.ExhaustiveCases) < 2000 {
-		test.Fatalf("fixture holds only %d exhaustive cases; the enumeration is meant to be thousands", len(corpus.ExhaustiveCases))
+		test.Fatalf(
+			"fixture holds only %d exhaustive cases; the enumeration is meant to be thousands",
+			len(corpus.ExhaustiveCases),
+		)
 	}
 	return corpus
 }
@@ -101,9 +104,17 @@ func TestParseValueMatchesEngine(test *testing.T) {
 		}
 	}
 
-	test.Logf("compared %d parse trees (%d nodes, max depth %d) and %d reprints against Tailwind %s (%s, symbols %s/%s)",
-		comparedValues, comparedNodes, maximumDepth, comparedValues,
-		corpus.TailwindVersion, corpus.Bundle, corpus.ParseSymbol, corpus.ToCssSymbol)
+	test.Logf(
+		"compared %d parse trees (%d nodes, max depth %d) and %d reprints against Tailwind %s (%s, symbols %s/%s)",
+		comparedValues,
+		comparedNodes,
+		maximumDepth,
+		comparedValues,
+		corpus.TailwindVersion,
+		corpus.Bundle,
+		corpus.ParseSymbol,
+		corpus.ToCssSymbol,
+	)
 }
 
 // TestParseValueMatchesEngineExhaustively parses every string of length 1 to 3 over an alphabet of
@@ -250,7 +261,12 @@ func TestUnclosedFunctionKeepsRemainderAtTopLevel(test *testing.T) {
 		{Kind: ValueNodeKindWord, Value: "bar"},
 	}
 	if difference := diffValueNodes(got, want, ""); difference != "" {
-		test.Errorf("ParseValue(\"foo(bar\") = %s, want %s (%s)", renderValueNodes(got), renderValueNodes(want), difference)
+		test.Errorf(
+			"ParseValue(\"foo(bar\") = %s, want %s (%s)",
+			renderValueNodes(got),
+			renderValueNodes(want),
+			difference,
+		)
 	}
 
 	// Anything already separated lands inside, so only the trailing buffer escapes: the separator
@@ -279,7 +295,12 @@ func TestSlashIsItsOwnWord(test *testing.T) {
 		{Kind: ValueNodeKindWord, Value: "10"},
 	}
 	if difference := diffValueNodes(got[0].Nodes, want, ""); difference != "" {
-		test.Errorf("theme() arguments = %s, want %s (%s)", renderValueNodes(got[0].Nodes), renderValueNodes(want), difference)
+		test.Errorf(
+			"theme() arguments = %s, want %s (%s)",
+			renderValueNodes(got[0].Nodes),
+			renderValueNodes(want),
+			difference,
+		)
 	}
 }
 

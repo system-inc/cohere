@@ -50,11 +50,18 @@ func TestEveryReleaseTargetCompiles(test *testing.T) {
 	test.Parallel()
 
 	if testing.Short() {
-		test.Skipf("NOT MEASURED: -short skips checking cohere for the %d release targets, so a platform that no longer builds would pass here", len(release.Targets))
+		test.Skipf(
+			"NOT MEASURED: -short skips checking cohere for the %d release targets, so a platform that no longer builds would pass here",
+			len(release.Targets),
+		)
 	}
 	mode := os.Getenv(crossCompileVariable)
 	if mode != "" && mode != "build" {
-		test.Fatalf("%s is %q; it is unset to type-check each target, or \"build\" to build each one", crossCompileVariable, mode)
+		test.Fatalf(
+			"%s is %q; it is unset to type-check each target, or \"build\" to build each one",
+			crossCompileVariable,
+			mode,
+		)
 	}
 
 	moduleDirectory := filepath.Join("..", "..", "..")
@@ -66,13 +73,27 @@ func TestEveryReleaseTargetCompiles(test *testing.T) {
 			test.Parallel()
 			if mode != "build" {
 				if problems := typeCheckTarget(moduleDirectory, target); len(problems) > 0 {
-					test.Fatalf("cohere does not type-check for %s, so a release would fail there:\n%s", target, strings.Join(problems, "\n"))
+					test.Fatalf(
+						"cohere does not type-check for %s, so a release would fail there:\n%s",
+						target,
+						strings.Join(problems, "\n"),
+					)
 				}
 				return
 			}
-			command := release.GoBuildCommand(moduleDirectory, target, strings.Join(release.StripFlags, " "), filepath.Join(test.TempDir(), target.BinaryFileName()))
+			command := release.GoBuildCommand(
+				moduleDirectory,
+				target,
+				strings.Join(release.StripFlags, " "),
+				filepath.Join(test.TempDir(), target.BinaryFileName()),
+			)
 			if output, outputError := command.CombinedOutput(); outputError != nil {
-				test.Fatalf("cohere does not compile for %s, so a release would fail there: %v\n%s", target, outputError, output)
+				test.Fatalf(
+					"cohere does not compile for %s, so a release would fail there: %v\n%s",
+					target,
+					outputError,
+					output,
+				)
 			}
 		})
 	}
@@ -122,14 +143,32 @@ func TestTypeCheckCatchesAPlatformOnlyBreak(test *testing.T) {
 
 	directory := test.TempDir()
 	writeFile(test, filepath.Join(directory, "go.mod"), "module crosscompile\n\ngo 1.21\n")
-	writeFile(test, filepath.Join(directory, "command", "cohere", "main.go"), "package main\n\nfunc main() { onlyOnDarwin() }\n")
-	writeFile(test, filepath.Join(directory, "command", "cohere", "only_darwin.go"), "package main\n\nfunc onlyOnDarwin() {}\n")
-	writeFile(test, filepath.Join(directory, "command", "cohere", "broken_windows.go"), "package main\n\nvar broken int = \"text\"\n")
+	writeFile(
+		test,
+		filepath.Join(directory, "command", "cohere", "main.go"),
+		"package main\n\nfunc main() { onlyOnDarwin() }\n",
+	)
+	writeFile(
+		test,
+		filepath.Join(directory, "command", "cohere", "only_darwin.go"),
+		"package main\n\nfunc onlyOnDarwin() {}\n",
+	)
+	writeFile(
+		test,
+		filepath.Join(directory, "command", "cohere", "broken_windows.go"),
+		"package main\n\nvar broken int = \"text\"\n",
+	)
 
-	if problems := typeCheckTarget(directory, release.Target{GoOperatingSystem: "darwin", GoArchitecture: "arm64"}); len(problems) > 0 {
+	if problems := typeCheckTarget(
+		directory,
+		release.Target{GoOperatingSystem: "darwin", GoArchitecture: "arm64"},
+	); len(problems) > 0 {
 		test.Fatalf("the control does not type-check even for darwin, so it cannot show anything: %v", problems)
 	}
-	problems := strings.Join(typeCheckTarget(directory, release.Target{GoOperatingSystem: "windows", GoArchitecture: "amd64"}), "\n")
+	problems := strings.Join(
+		typeCheckTarget(directory, release.Target{GoOperatingSystem: "windows", GoArchitecture: "amd64"}),
+		"\n",
+	)
 	for _, want := range []string{"onlyOnDarwin", "broken_windows.go"} {
 		if !strings.Contains(problems, want) {
 			test.Errorf("the windows type-check did not report %s: %q", want, problems)
@@ -149,7 +188,9 @@ func TestEveryPackagesTestsTypeCheckForWindows(test *testing.T) {
 	test.Parallel()
 
 	if testing.Short() {
-		test.Skip("NOT MEASURED: -short skips type-checking the module's tests for Windows, so a test that no longer builds there would pass here")
+		test.Skip(
+			"NOT MEASURED: -short skips type-checking the module's tests for Windows, so a test that no longer builds there would pass here",
+		)
 	}
 	var windows release.Target
 	for _, target := range release.Targets {
@@ -175,8 +216,16 @@ func TestTypeCheckOfTestsCatchesAUnixOnlyTestHelper(test *testing.T) {
 	directory := test.TempDir()
 	writeFile(test, filepath.Join(directory, "go.mod"), "module crosscompile\n\ngo 1.21\n")
 	writeFile(test, filepath.Join(directory, "tool", "tool.go"), "package tool\n")
-	writeFile(test, filepath.Join(directory, "tool", "helper_unix_test.go"), "//go:build unix\n\npackage tool\n\nfunc stand() string { return \"/bin/sh\" }\n")
-	writeFile(test, filepath.Join(directory, "tool", "tool_test.go"), "package tool\n\nimport \"testing\"\n\nfunc TestTool(t *testing.T) { _ = stand() }\n")
+	writeFile(
+		test,
+		filepath.Join(directory, "tool", "helper_unix_test.go"),
+		"//go:build unix\n\npackage tool\n\nfunc stand() string { return \"/bin/sh\" }\n",
+	)
+	writeFile(
+		test,
+		filepath.Join(directory, "tool", "tool_test.go"),
+		"package tool\n\nimport \"testing\"\n\nfunc TestTool(t *testing.T) { _ = stand() }\n",
+	)
 
 	darwin := release.Target{GoOperatingSystem: "darwin", GoArchitecture: "arm64"}
 	windows := release.Target{GoOperatingSystem: "windows", GoArchitecture: "amd64"}
@@ -186,7 +235,10 @@ func TestTypeCheckOfTestsCatchesAUnixOnlyTestHelper(test *testing.T) {
 	if problems := typeCheck(directory, windows, false, "./..."); len(problems) > 0 {
 		test.Fatalf("the control's code alone failed for windows, so it does not isolate the tests: %v", problems)
 	}
-	if problems := strings.Join(typeCheck(directory, windows, true, "./..."), "\n"); !strings.Contains(problems, "stand") {
+	if problems := strings.Join(
+		typeCheck(directory, windows, true, "./..."),
+		"\n",
+	); !strings.Contains(problems, "stand") {
 		test.Errorf("the windows type-check of the tests did not report the Unix-only helper: %q", problems)
 	}
 }
@@ -199,18 +251,42 @@ func TestCrossCompileCatchesAPlatformOnlyBreak(test *testing.T) {
 
 	directory := test.TempDir()
 	writeFile(test, filepath.Join(directory, "go.mod"), "module crosscompile\n\ngo 1.21\n")
-	writeFile(test, filepath.Join(directory, "command", "cohere", "main.go"), "package main\n\nfunc main() { onlyOnDarwin() }\n")
-	writeFile(test, filepath.Join(directory, "command", "cohere", "only_darwin.go"), "package main\n\nfunc onlyOnDarwin() {}\n")
+	writeFile(
+		test,
+		filepath.Join(directory, "command", "cohere", "main.go"),
+		"package main\n\nfunc main() { onlyOnDarwin() }\n",
+	)
+	writeFile(
+		test,
+		filepath.Join(directory, "command", "cohere", "only_darwin.go"),
+		"package main\n\nfunc onlyOnDarwin() {}\n",
+	)
 
 	darwin := release.Target{GoOperatingSystem: "darwin", GoArchitecture: "arm64"}
-	if output, outputError := release.GoBuildCommand(directory, darwin, "", filepath.Join(test.TempDir(), "cohere")).CombinedOutput(); outputError != nil {
-		test.Fatalf("the control does not compile even for darwin, so it cannot show anything: %v\n%s", outputError, output)
+	if output, outputError := release.GoBuildCommand(
+		directory,
+		darwin,
+		"",
+		filepath.Join(test.TempDir(), "cohere"),
+	).CombinedOutput(); outputError != nil {
+		test.Fatalf(
+			"the control does not compile even for darwin, so it cannot show anything: %v\n%s",
+			outputError,
+			output,
+		)
 	}
 
 	windows := release.Target{GoOperatingSystem: "windows", GoArchitecture: "amd64"}
-	output, outputError := release.GoBuildCommand(directory, windows, "", filepath.Join(test.TempDir(), "cohere.exe")).CombinedOutput()
+	output, outputError := release.GoBuildCommand(
+		directory,
+		windows,
+		"",
+		filepath.Join(test.TempDir(), "cohere.exe"),
+	).CombinedOutput()
 	if outputError == nil {
-		test.Fatal("a call to a darwin-only function compiled for windows, so the cross-compile check cannot catch a platform-only break")
+		test.Fatal(
+			"a call to a darwin-only function compiled for windows, so the cross-compile check cannot catch a platform-only break",
+		)
 	}
 	if !strings.Contains(string(output), "onlyOnDarwin") {
 		test.Fatalf("the windows build failed, but not on the darwin-only call: %s", output)

@@ -199,7 +199,11 @@ func loadDesignSystemForProgram(program rule.Program, location DesignSystemLocat
 }
 
 // loadDesignSystemThrough is the load itself, asking fileSystem every question about the disk.
-func loadDesignSystemThrough(program rule.Program, fileSystem *rule.RecordingFS, location DesignSystemLocation) DesignSystemResult {
+func loadDesignSystemThrough(
+	program rule.Program,
+	fileSystem *rule.RecordingFS,
+	location DesignSystemLocation,
+) DesignSystemResult {
 	projectRoot := projectRootOf(program)
 	if projectRoot == "" {
 		return DesignSystemResult{Err: fmt.Errorf("determining the project root from the program")}
@@ -387,7 +391,10 @@ func stylesheetsUnder(root string, system *tailwindengine.LoadedDesignSystem) []
 	}
 	relative := make([]string, 0, len(system.Stylesheets))
 	for _, path := range system.Stylesheets {
-		if trimmed, relativePathError := filepath.Rel(root, path); relativePathError == nil && !strings.HasPrefix(trimmed, "..") {
+		if trimmed, relativePathError := filepath.Rel(
+			root,
+			path,
+		); relativePathError == nil && !strings.HasPrefix(trimmed, "..") {
 			relative = append(relative, trimmed)
 			continue
 		}

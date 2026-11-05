@@ -1167,7 +1167,9 @@ func TestDecodeFuncNameMatchingOptions(test *testing.T) {
 		`"never"`,
 		`{"considerPropertyDescriptor": true}`,
 	} {
-		if decoded, decodeFuncNameMatchingOptionsError := DecodeFuncNameMatchingOptions([]byte(raw)); decodeFuncNameMatchingOptionsError == nil {
+		if decoded, decodeFuncNameMatchingOptionsError := DecodeFuncNameMatchingOptions(
+			[]byte(raw),
+		); decodeFuncNameMatchingOptionsError == nil {
 			test.Errorf("%s decoded to %+v; it must be refused", raw, decoded)
 		}
 	}

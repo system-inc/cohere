@@ -348,7 +348,11 @@ func TestNoDeprecatedAcrossFiles(test *testing.T) {
 				"      ",
 			withDeprecatedFixture: true,
 			expected: []noDeprecatedFinding{
-				{messageId: "deprecatedWithReason", name: "reexportedDeprecatedFunctionWithOverloads", reason: "Reason"},
+				{
+					messageId: "deprecatedWithReason",
+					name:      "reexportedDeprecatedFunctionWithOverloads",
+					reason:    "Reason",
+				},
 			},
 		},
 		{
@@ -360,7 +364,11 @@ func TestNoDeprecatedAcrossFiles(test *testing.T) {
 				"      ",
 			withDeprecatedFixture: true,
 			expected: []noDeprecatedFinding{
-				{messageId: "deprecatedWithReason", name: "reexportedDeprecatedFunctionWithOverloads", reason: "Reason"},
+				{
+					messageId: "deprecatedWithReason",
+					name:      "reexportedDeprecatedFunctionWithOverloads",
+					reason:    "Reason",
+				},
 			},
 		},
 		{
@@ -372,7 +380,11 @@ func TestNoDeprecatedAcrossFiles(test *testing.T) {
 				"      ",
 			withDeprecatedFixture: true,
 			expected: []noDeprecatedFinding{
-				{messageId: "deprecatedWithReason", name: "reexportedDeprecatedFunctionWithOverloads", reason: "Reason"},
+				{
+					messageId: "deprecatedWithReason",
+					name:      "reexportedDeprecatedFunctionWithOverloads",
+					reason:    "Reason",
+				},
 			},
 		},
 		{
@@ -384,7 +396,11 @@ func TestNoDeprecatedAcrossFiles(test *testing.T) {
 				"      ",
 			withDeprecatedFixture: true,
 			expected: []noDeprecatedFinding{
-				{messageId: "deprecatedWithReason", name: "reexportedDeprecatedFunctionWithOverloads", reason: "Reason"},
+				{
+					messageId: "deprecatedWithReason",
+					name:      "reexportedDeprecatedFunctionWithOverloads",
+					reason:    "Reason",
+				},
 			},
 		},
 		{
@@ -396,7 +412,11 @@ func TestNoDeprecatedAcrossFiles(test *testing.T) {
 				"      ",
 			withDeprecatedFixture: true,
 			expected: []noDeprecatedFinding{
-				{messageId: "deprecatedWithReason", name: "reexportedDeprecatedFunctionWithOverloads", reason: "Reason"},
+				{
+					messageId: "deprecatedWithReason",
+					name:      "reexportedDeprecatedFunctionWithOverloads",
+					reason:    "Reason",
+				},
 			},
 		},
 		{
@@ -408,7 +428,11 @@ func TestNoDeprecatedAcrossFiles(test *testing.T) {
 				"      ",
 			withDeprecatedFixture: true,
 			expected: []noDeprecatedFinding{
-				{messageId: "deprecatedWithReason", name: "reexportedDeprecatedFunctionWithOverloads", reason: "Reason"},
+				{
+					messageId: "deprecatedWithReason",
+					name:      "reexportedDeprecatedFunctionWithOverloads",
+					reason:    "Reason",
+				},
 			},
 		},
 		{
@@ -420,7 +444,11 @@ func TestNoDeprecatedAcrossFiles(test *testing.T) {
 				"      ",
 			withDeprecatedFixture: true,
 			expected: []noDeprecatedFinding{
-				{messageId: "deprecatedWithReason", name: "reexportedDeprecatedFunctionWithOverloads", reason: "Reason"},
+				{
+					messageId: "deprecatedWithReason",
+					name:      "reexportedDeprecatedFunctionWithOverloads",
+					reason:    "Reason",
+				},
 			},
 		},
 		{

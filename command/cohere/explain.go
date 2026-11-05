@@ -75,7 +75,9 @@ func printExplanation(out *bufio.Writer, explanation *program.Explanation) {
 
 // partitionAccounts splits rules by what happened to them, keeping the three cases apart because
 // they are three different answers to "why did this rule not report anything".
-func partitionAccounts(accounts []program.RuleAccount) (listened, declinedBySelf, declinedByConfig []program.RuleAccount) {
+func partitionAccounts(
+	accounts []program.RuleAccount,
+) (listened, declinedBySelf, declinedByConfig []program.RuleAccount) {
 	for _, account := range accounts {
 		switch {
 		case account.DeclinedBecause != "":

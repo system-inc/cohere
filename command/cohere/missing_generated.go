@@ -61,7 +61,11 @@ func missingGeneratedRemedy(target string) string {
 
 // missingGeneratedMessage is the cause as its line says it.
 func missingGeneratedMessage(input program.MissingInput) string {
-	return fmt.Sprintf("%s does not exist: it is generated output (git ignores it), and %s", input.Specifier, missingGeneratedRemedy(input.Target))
+	return fmt.Sprintf(
+		"%s does not exist: it is generated output (git ignores it), and %s",
+		input.Specifier,
+		missingGeneratedRemedy(input.Target),
+	)
 }
 
 // printMissingGenerated prints each missing generated file as a finding, in every view, ahead of anything
@@ -76,7 +80,14 @@ func printMissingGenerated(missing []program.MissingInput) {
 			Severity: "error",
 			Rule:     missingGeneratedRule,
 			Message:  message,
-		}, fmt.Sprintf("%s:%d:%d - error %s: %s\n", input.Importer, input.Line, input.Column, missingGeneratedRule, message))
+		}, fmt.Sprintf(
+			"%s:%d:%d - error %s: %s\n",
+			input.Importer,
+			input.Line,
+			input.Column,
+			missingGeneratedRule,
+			message,
+		))
 	}
 }
 

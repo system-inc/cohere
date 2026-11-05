@@ -643,8 +643,8 @@ func applyScopeRewrites(function *Function, rewrites []scopeRewrite) ScopeTermin
 
 // reindexBlocks rebuilds the id-to-block index from Function.Blocks.
 //
-// Lives here rather than in high_level_intermediate_representation.go because this is the only pass that replaces the block slice
-// wholesale; lowering appends through `NewBlock`, which maintains the index as it goes.
+// Lives here rather than in high_level_intermediate_representation.go because this is the only pass that replaces the
+// block slice wholesale; lowering appends through `NewBlock`, which maintains the index as it goes.
 func (function *Function) reindexBlocks() {
 	function.blocksById = make(map[static_single_assignment.BlockId]*BasicBlock, len(function.Blocks))
 	for _, block := range function.Blocks {

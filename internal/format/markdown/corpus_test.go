@@ -246,10 +246,17 @@ func TestCorpusFormatMatchesOracle(test *testing.T) {
 		test.Logf("%s: md %d/%d identical (%.2f%%), rewrite subset %d/%d (%.2f%%)",
 			root, all.identical, all.measured, percent(all.identical, all.measured),
 			all.rewriteIdentical, all.rewriteTotal, percent(all.rewriteIdentical, all.rewriteTotal))
-		test.Logf("%s without embedded-language files: md %d/%d identical (%.2f%%), rewrite subset %d/%d (%.2f%%); outcomes %v",
-			root, withoutEmbed.identical, withoutEmbed.measured, percent(withoutEmbed.identical, withoutEmbed.measured),
-			withoutEmbed.rewriteIdentical, withoutEmbed.rewriteTotal, percent(withoutEmbed.rewriteIdentical, withoutEmbed.rewriteTotal),
-			differences)
+		test.Logf(
+			"%s without embedded-language files: md %d/%d identical (%.2f%%), rewrite subset %d/%d (%.2f%%); outcomes %v",
+			root,
+			withoutEmbed.identical,
+			withoutEmbed.measured,
+			percent(withoutEmbed.identical, withoutEmbed.measured),
+			withoutEmbed.rewriteIdentical,
+			withoutEmbed.rewriteTotal,
+			percent(withoutEmbed.rewriteIdentical, withoutEmbed.rewriteTotal),
+			differences,
+		)
 
 		sort.Slice(different, func(left, right int) bool { return different[left].Path < different[right].Path })
 		for index, result := range different {

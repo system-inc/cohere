@@ -122,8 +122,14 @@ var scssParseFixtures = []parseFixture{
 	// Interpolation.
 	{name: "interpolation in selectors", text: ".a-#{$b} { c: d }\n#{$sel} > a {}\n.a #{&}__b {}\n#{'.x'} {}"},
 	{name: "interpolation in property names", text: "a { #{$prop}: 1px; border-#{$side}: 0; #{$a}-#{$b}: c; }"},
-	{name: "interpolation in values", text: "a { width: calc(100% - #{$x}); content: \"#{$a}\"; b: #{$c}px; d: a#{$e}b; }"},
-	{name: "interpolation in at-rule params", text: "@media #{$q} and (min-width: #{$w}) {}\n@include x(#{$y});\n@if #{$a} == b {}"},
+	{
+		name: "interpolation in values",
+		text: "a { width: calc(100% - #{$x}); content: \"#{$a}\"; b: #{$c}px; d: a#{$e}b; }",
+	},
+	{
+		name: "interpolation in at-rule params",
+		text: "@media #{$q} and (min-width: #{$w}) {}\n@include x(#{$y});\n@if #{$a} == b {}",
+	},
 	{name: "interpolation in at-rule names", text: "@#{$name} foo;\n@media#{$q}{}\n@a#{$b}#{$c} d;\n@a #{$b};"},
 	{name: "nested interpolation", text: "a { b: #{ #{$x} } }"},
 	{name: "interpolation holding a brace in a string", text: "a { b: #{'}'}; c: #{\"a\\\"}\"}; }"},
@@ -144,7 +150,10 @@ var scssParseFixtures = []parseFixture{
 	{name: "bad paren content", text: "a{b:x(a\n);c:y(\"q\");d:z(a/b);e:w(a\\b)}"},
 
 	// Variables.
-	{name: "variables with flags", text: "$a: 1px;\n$b: red !default;\n$c: 2 !global;\n$d: 3 !default !global;\n.x { $e: 1 !global; $f : 2; }"},
+	{
+		name: "variables with flags",
+		text: "$a: 1px;\n$b: red !default;\n$c: 2 !global;\n$d: 3 !default !global;\n.x { $e: 1 !global; $f : 2; }",
+	},
 	{name: "maps", text: "$map: (key1: value1, key2: value2, key3: value3);"},
 	{name: "multiline nested map", text: "$map: (\n  key1: value1,\n  key2: (a: b, c: d),\n  'key3': value3,\n);"},
 	{name: "lists", text: "$list: 1px 2px, 3px;\n$l2: (a, b, c);\n$l3: [a b];"},
@@ -161,7 +170,10 @@ var scssParseFixtures = []parseFixture{
 	{name: "nested property important with spaces", text: "a { margin: 0 ! important { left: 1px } }"},
 	{name: "nested property important alone", text: "a { margin: !important { left: 1px } b: x !important { c: d } }"},
 	{name: "nested property important uppercase", text: "a { margin: 0 !IMPORTANT { left: 1px } }"},
-	{name: "nested property important word", text: "a { margin: 0 important { left: 1px } b: 0 ! /* c */ important { d: e } }"},
+	{
+		name: "nested property important word",
+		text: "a { margin: 0 important { left: 1px } b: 0 ! /* c */ important { d: e } }",
+	},
 	{name: "nested property hack", text: "a { _margin: 0 { left: 1px } *b: 1 { c: d } }"},
 	{name: "nested property with comments", text: "a { margin /* c */ : /* d */ 0 { left: 1px } }"},
 	{name: "nested property with an inline comment", text: "a { margin: 0 // c\n { left: 1px } }"},
@@ -176,14 +188,32 @@ var scssParseFixtures = []parseFixture{
 	{name: "colon inside parens", text: "a { b(c: d) { } }"},
 
 	// Mixins, functions and control directives.
-	{name: "mixin and include", text: "@mixin foo($a, $b: 10px) { width: $a; }\n.x { @include foo(1px, $b: 2px); @include bar; @include baz { color: red; } @include qux($args...); }"},
-	{name: "include with a block and arguments", text: ".a { @include breakpoint(md) { b: c } @include x() using ($y) { z: $y } }"},
+	{
+		name: "mixin and include",
+		text: "@mixin foo($a, $b: 10px) { width: $a; }\n.x { @include foo(1px, $b: 2px); @include bar; @include baz { color: red; } @include qux($args...); }",
+	},
+	{
+		name: "include with a block and arguments",
+		text: ".a { @include breakpoint(md) { b: c } @include x() using ($y) { z: $y } }",
+	},
 	{name: "function and return", text: "@function double($n) { @return $n * 2; }"},
-	{name: "content, use, forward, extend", text: "@use 'sass:math';\n@use \"a\" as b with ($c: d);\n@forward 'src/list' hide list-reset;\n@mixin m { @content; @content(1); }\n.a { @extend %placeholder; @extend .b !optional; }"},
+	{
+		name: "content, use, forward, extend",
+		text: "@use 'sass:math';\n@use \"a\" as b with ($c: d);\n@forward 'src/list' hide list-reset;\n@mixin m { @content; @content(1); }\n.a { @extend %placeholder; @extend .b !optional; }",
+	},
 	{name: "debug, warn, error", text: "@debug 'x';\n@warn \"y #{$z}\";\n@error 'bad';"},
-	{name: "if and else", text: "@if $a == 1 { b: c } @else if $a == 2 { d: e } @else { f: g }\n@if not index($list, $x) {}\n.a{@if $x{b:c}@else{d:e}}"},
-	{name: "each", text: "@each $name, $glyph in $icons { .icon-#{$name}:before { content: $glyph; } }\n@each $key, $value in (a: 1, b: 2) {}"},
-	{name: "for and while", text: "@for $i from 1 through 3 { .item-#{$i} { width: 2em * $i; } }\n@while $i > 0 { .item-#{$i} { width: 2em * $i; } $i: $i - 2; }"},
+	{
+		name: "if and else",
+		text: "@if $a == 1 { b: c } @else if $a == 2 { d: e } @else { f: g }\n@if not index($list, $x) {}\n.a{@if $x{b:c}@else{d:e}}",
+	},
+	{
+		name: "each",
+		text: "@each $name, $glyph in $icons { .icon-#{$name}:before { content: $glyph; } }\n@each $key, $value in (a: 1, b: 2) {}",
+	},
+	{
+		name: "for and while",
+		text: "@for $i from 1 through 3 { .item-#{$i} { width: 2em * $i; } }\n@while $i > 0 { .item-#{$i} { width: 2em * $i; } $i: $i - 2; }",
+	},
 	{name: "at-root and nested media", text: ".a { @at-root .b { c: d } @media (min-width: $md) { e: f } }"},
 	{name: "import list", text: "@import 'a', 'b';\n@import url(foo.css);"},
 
@@ -205,16 +235,38 @@ var scssParseFixtures = []parseFixture{
 
 	// Prettier's css-in-js placeholders.
 	{name: "placeholder as a selector", text: "@prettier-placeholder-0-id {\n  color: red;\n}"},
-	{name: "placeholder with a pseudo class", text: "@prettier-placeholder-0-id:hover { }\n@prettier-placeholder-1-id @prettier-placeholder-2-id {}"},
-	{name: "placeholder inside a selector", text: ".a @prettier-placeholder-0-id { }\n.b@prettier-placeholder-1-id, .c { }"},
-	{name: "placeholder as a value", text: "a { color: @prettier-placeholder-0-id; margin: @prettier-placeholder-0-id @prettier-placeholder-1-id; width: calc(100% - @prettier-placeholder-2-id); transition: opacity @prettier-placeholder-3-idms; }"},
-	{name: "placeholder as a property", text: "@prettier-placeholder-0-id: 1px;\na { @prettier-placeholder-1-id: 1px; @prettier-placeholder-2-id-x: y }"},
-	{name: "placeholder after a word in a property", text: "a { border-@prettier-placeholder-1-id: 1px; }", malformed: true},
+	{
+		name: "placeholder with a pseudo class",
+		text: "@prettier-placeholder-0-id:hover { }\n@prettier-placeholder-1-id @prettier-placeholder-2-id {}",
+	},
+	{
+		name: "placeholder inside a selector",
+		text: ".a @prettier-placeholder-0-id { }\n.b@prettier-placeholder-1-id, .c { }",
+	},
+	{
+		name: "placeholder as a value",
+		text: "a { color: @prettier-placeholder-0-id; margin: @prettier-placeholder-0-id @prettier-placeholder-1-id; width: calc(100% - @prettier-placeholder-2-id); transition: opacity @prettier-placeholder-3-idms; }",
+	},
+	{
+		name: "placeholder as a property",
+		text: "@prettier-placeholder-0-id: 1px;\na { @prettier-placeholder-1-id: 1px; @prettier-placeholder-2-id-x: y }",
+	},
+	{
+		name:      "placeholder after a word in a property",
+		text:      "a { border-@prettier-placeholder-1-id: 1px; }",
+		malformed: true,
+	},
 	{name: "placeholder standalone", text: "@prettier-placeholder-0-id;\n@prettier-placeholder-1-id\n"},
-	{name: "placeholder standalone in a block", text: "a { @prettier-placeholder-0-id; color: red; @prettier-placeholder-1-id }"},
+	{
+		name: "placeholder standalone in a block",
+		text: "a { @prettier-placeholder-0-id; color: red; @prettier-placeholder-1-id }",
+	},
 	{name: "placeholder in media params", text: "@media (max-width: @prettier-placeholder-0-id) { a { b: c } }"},
 	{name: "placeholder in a comment", text: "/* @prettier-placeholder-0-id */\n// @prettier-placeholder-1-id\n"},
-	{name: "placeholder template", text: "\n  display: flex;\n  @prettier-placeholder-0-id;\n  color: @prettier-placeholder-1-id;\n  &:hover { @prettier-placeholder-2-id }\n"},
+	{
+		name: "placeholder template",
+		text: "\n  display: flex;\n  @prettier-placeholder-0-id;\n  color: @prettier-placeholder-1-id;\n  &:hover { @prettier-placeholder-2-id }\n",
+	},
 
 	// Malformed.
 	{name: "unclosed interpolation", text: "a { b: #{c", malformed: true},
@@ -250,7 +302,12 @@ func TestParseSCSSAgreesWithPostcssScss(test *testing.T) {
 	var inputs []input
 	malformed := map[string]bool{}
 	corpusFiles := map[string]bool{}
-	walkError := filepath.WalkDir(filepath.Join(root, "tests", "format", "scss"), func(path string, entry fs.DirEntry, err error) error {
+	walkError := filepath.WalkDir(filepath.Join(
+		root,
+		"tests",
+		"format",
+		"scss",
+	), func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -374,10 +431,24 @@ func TestParseSCSSAgreesWithPostcssScss(test *testing.T) {
 			identical++
 		}
 	}
-	test.Logf("%d compared (%d .scss files, %d css-in-js templates from %d JavaScript files, %d fixtures): %d identical, %d refused by both with the same error, %d different; %d .scss files refused",
-		len(records), len(corpusFiles), templates, len(javaScriptFiles), len(scssParseFixtures), identical, refusedByBoth, different, corpusRefused)
+	test.Logf(
+		"%d compared (%d .scss files, %d css-in-js templates from %d JavaScript files, %d fixtures): %d identical, %d refused by both with the same error, %d different; %d .scss files refused",
+		len(records),
+		len(corpusFiles),
+		templates,
+		len(javaScriptFiles),
+		len(scssParseFixtures),
+		identical,
+		refusedByBoth,
+		different,
+		corpusRefused,
+	)
 	if corpusRefused > len(corpusFiles)/10 {
-		test.Errorf("postcss-scss refused %d of %d .scss files; the comparison is thinner than it looks", corpusRefused, len(corpusFiles))
+		test.Errorf(
+			"postcss-scss refused %d of %d .scss files; the comparison is thinner than it looks",
+			corpusRefused,
+			len(corpusFiles),
+		)
 	}
 	if templates == 0 {
 		test.Errorf("no css-in-js templates came out of %d JavaScript files", len(javaScriptFiles))
@@ -393,7 +464,15 @@ func TestParseSCSSAgreesWithPostcssScss(test *testing.T) {
 		}
 	}
 	test.Logf("postcss-scss features compared: %v", features)
-	for _, feature := range []string{"inline comment", "inline comment raws.text", "nested declaration", "raws.selector.scss", "raws.value.scss", "raws.params.scss", "TypeError refusal"} {
+	for _, feature := range []string{
+		"inline comment",
+		"inline comment raws.text",
+		"nested declaration",
+		"raws.selector.scss",
+		"raws.value.scss",
+		"raws.params.scss",
+		"TypeError refusal",
+	} {
 		if features[feature] == 0 {
 			test.Errorf("no input exercises %s", feature)
 		}

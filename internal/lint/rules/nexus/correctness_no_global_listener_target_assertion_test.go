@@ -55,7 +55,11 @@ func correctnessNoGlobalListenerTargetAssertionExpect(test *testing.T, result ru
 			test.Fatalf("finding %d is %q, want %q", index, span, want[index])
 		}
 		if len(diagnostic.Fixes) != 0 || len(diagnostic.Suggestions) != 0 {
-			test.Fatalf("expected no fix and no suggestion, got %d and %d", len(diagnostic.Fixes), len(diagnostic.Suggestions))
+			test.Fatalf(
+				"expected no fix and no suggestion, got %d and %d",
+				len(diagnostic.Fixes),
+				len(diagnostic.Suggestions),
+			)
 		}
 	}
 }

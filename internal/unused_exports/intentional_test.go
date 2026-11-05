@@ -13,11 +13,26 @@ func TestIntentionalMarker(test *testing.T) {
 		wantReason string
 	}{
 		{"bare marker", "// cohere-keep\nexport function f() {}", true, ""},
-		{"marker with reason", "// cohere-keep: public API for the SDK\nexport function f() {}", true, "public API for the SDK"},
-		{"marker with reason no colon", "// cohere-keep held for an external consumer\nexport function f() {}", true, "held for an external consumer"},
+		{
+			"marker with reason",
+			"// cohere-keep: public API for the SDK\nexport function f() {}",
+			true,
+			"public API for the SDK",
+		},
+		{
+			"marker with reason no colon",
+			"// cohere-keep held for an external consumer\nexport function f() {}",
+			true,
+			"held for an external consumer",
+		},
 		{"block comment", "/* cohere-keep: parked deliberately */\nexport const x = 1;", true, "parked deliberately"},
 		{"no marker", "// an ordinary comment\nexport function f() {}", false, ""},
-		{"marker is a prefix of another word", "// cohere-keeper is not a directive\nexport function f() {}", false, ""},
+		{
+			"marker is a prefix of another word",
+			"// cohere-keeper is not a directive\nexport function f() {}",
+			false,
+			"",
+		},
 		// Both edges of the word are guarded. `unverify-keeping` embeds the marker but is not one,
 		// and reading it as a directive would suppress a finding nobody meant to suppress.
 		{"marker inside a longer word", "// unverify-keeping\nexport function f() {}", false, ""},

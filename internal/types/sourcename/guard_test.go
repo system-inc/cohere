@@ -118,22 +118,50 @@ func treated(expression ast.Expr) bool {
 func tsDecisionsIn(fileSet *token.FileSet, file *ast.File, relative string) []tsDecision {
 	var found []tsDecision
 	add := func(node ast.Node, literal string, how string) {
-		found = append(found, tsDecision{file: relative, line: fileSet.Position(node.Pos()).Line, literal: literal, how: how})
+		found = append(
+			found,
+			tsDecision{file: relative, line: fileSet.Position(node.Pos()).Line, literal: literal, how: how},
+		)
 	}
 	ast.Inspect(file, func(node ast.Node) bool {
 		switch typed := node.(type) {
 		case *ast.CallExpr:
-			if call, isSuffixCall := callsSelector(typed, "strings", "HasSuffix", "TrimSuffix", "CutSuffix"); isSuffixCall && len(call.Args) == 2 {
-				if literal, isLiteral := stringLiteral(call.Args[1]); isLiteral && endsLikeTypeScript(literal) && !treated(call.Args[0]) {
+			if call, isSuffixCall := callsSelector(
+				typed,
+				"strings",
+				"HasSuffix",
+				"TrimSuffix",
+				"CutSuffix",
+			); isSuffixCall && len(call.Args) == 2 {
+				if literal, isLiteral := stringLiteral(
+					call.Args[1],
+				); isLiteral && endsLikeTypeScript(literal) && !treated(call.Args[0]) {
 					add(call, literal, "a suffix check on a name that is not sourcename.TreatedAs")
 				}
 			}
-			if call, isKind := callsSelector(typed, "core", "GetScriptKindFromFileName"); isKind && len(call.Args) == 1 && !treated(call.Args[0]) {
-				add(call, "GetScriptKindFromFileName", "a script kind read from a name that is not sourcename.TreatedAs, which is Unknown for `.a`")
+			if call, isKind := callsSelector(
+				typed,
+				"core",
+				"GetScriptKindFromFileName",
+			); isKind && len(call.Args) == 1 && !treated(call.Args[0]) {
+				add(
+					call,
+					"GetScriptKindFromFileName",
+					"a script kind read from a name that is not sourcename.TreatedAs, which is Unknown for `.a`",
+				)
 			}
-			if call, isRegexp := callsSelector(typed, "regexp", "MustCompile", "Compile"); isRegexp && len(call.Args) == 1 {
+			if call, isRegexp := callsSelector(
+				typed,
+				"regexp",
+				"MustCompile",
+				"Compile",
+			); isRegexp && len(call.Args) == 1 {
 				if literal, isLiteral := stringLiteral(call.Args[0]); isLiteral && strings.Contains(literal, `\.ts`) {
-					add(call, literal, "a regexp on a `.ts` ending; check sourcename.TreatedAs(name) with strings.HasSuffix instead")
+					add(
+						call,
+						literal,
+						"a regexp on a `.ts` ending; check sourcename.TreatedAs(name) with strings.HasSuffix instead",
+					)
 				}
 			}
 		case *ast.BinaryExpr:
@@ -219,7 +247,8 @@ func tsDecisions(test *testing.T) []tsDecision {
 		}
 	}
 	sort.Slice(found, func(left, right int) bool {
-		return found[left].file < found[right].file || found[left].file == found[right].file && found[left].line < found[right].line
+		return found[left].file < found[right].file ||
+			found[left].file == found[right].file && found[left].line < found[right].line
 	})
 	return found
 }
@@ -234,8 +263,14 @@ func TestEveryTypeScriptExtensionDecisionTreatsAdamicAsTypeScript(test *testing.
 	for _, decision := range tsDecisions(test) {
 		seen[decision.key()] = true
 		if _, isAllowed := tsDecisionsAllowed[decision.key()]; !isAllowed {
-			test.Errorf("%s:%d: %s (%q): ask sourcename.TreatedAs, or add %q to tsDecisionsAllowed with why it can't be an Adamic file",
-				decision.file, decision.line, decision.how, decision.literal, decision.key())
+			test.Errorf(
+				"%s:%d: %s (%q): ask sourcename.TreatedAs, or add %q to tsDecisionsAllowed with why it can't be an Adamic file",
+				decision.file,
+				decision.line,
+				decision.how,
+				decision.literal,
+				decision.key(),
+			)
 		}
 	}
 	for key := range tsDecisionsAllowed {

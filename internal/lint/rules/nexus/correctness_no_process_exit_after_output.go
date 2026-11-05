@@ -17,7 +17,10 @@ const correctnessNoProcessExitAfterOutputId = "exitAfterOutput"
 
 // correctnessNoProcessExitAfterOutputText is the rule's message, whose wording lives in
 // `policy/messages/correctness-no-process-exit-after-output.json`.
-var correctnessNoProcessExitAfterOutputText = policy.MessageOf("nexus/correctness-no-process-exit-after-output", correctnessNoProcessExitAfterOutputId)
+var correctnessNoProcessExitAfterOutputText = policy.MessageOf(
+	"nexus/correctness-no-process-exit-after-output",
+	correctnessNoProcessExitAfterOutputId,
+)
 
 func correctnessNoProcessExitAfterOutputMessage() rule.Message {
 	return rule.Message{
@@ -231,7 +234,9 @@ func correctnessNoProcessExitAfterOutputScanFile(ruleContext rule.Context, sourc
 	var findWrites func(node *ast.Node) bool
 	findWrites = func(node *ast.Node) bool {
 		if node.Kind == ast.KindCallExpression {
-			if root := rootsByNode[control_flow_graph.RootOf(node)]; root != nil && !root.hasWrite && writers.writes(node) {
+			if root := rootsByNode[control_flow_graph.RootOf(
+				node,
+			)]; root != nil && !root.hasWrite && writers.writes(node) {
 				root.hasWrite = true
 			}
 		}
@@ -274,7 +279,9 @@ func correctnessNoProcessExitAfterOutputIsWrite(ruleContext rule.Context, call *
 	}
 	if correctnessNoProcessExitAfterOutputConsoleMethods[member] && receiver.Kind == ast.KindIdentifier &&
 		receiver.Text() == "console" {
-		return correctnessNoProcessExitAfterOutputIsGlobalVariable(ruleContext.TypeChecker.GetSymbolAtLocation(receiver))
+		return correctnessNoProcessExitAfterOutputIsGlobalVariable(
+			ruleContext.TypeChecker.GetSymbolAtLocation(receiver),
+		)
 	}
 	if member != "write" {
 		return false
@@ -420,11 +427,17 @@ func correctnessNoProcessExitAfterOutputIsProcessMember(ruleContext rule.Context
 			return false
 		}
 		owner := declaration.Parent
-		if owner == nil || owner.Kind != ast.KindInterfaceDeclaration || owner.Name() == nil || owner.Name().Text() != "Process" {
+		if owner == nil ||
+			owner.Kind != ast.KindInterfaceDeclaration ||
+			owner.Name() == nil ||
+			owner.Name().Text() != "Process" {
 			return false
 		}
 		block := owner.Parent
-		if block == nil || block.Kind != ast.KindModuleBlock || block.Parent == nil || block.Parent.Kind != ast.KindModuleDeclaration {
+		if block == nil ||
+			block.Kind != ast.KindModuleBlock ||
+			block.Parent == nil ||
+			block.Parent.Kind != ast.KindModuleDeclaration {
 			return false
 		}
 		namespace := block.Parent.Name()
@@ -458,7 +471,9 @@ func correctnessNoProcessExitAfterOutputIsGlobalVariable(symbol *ast.Symbol) boo
 			if ast.IsExternalModule(container.AsSourceFile()) {
 				return false
 			}
-		case container != nil && container.Kind == ast.KindModuleBlock && ast.IsGlobalScopeAugmentation(container.Parent):
+		case container != nil &&
+			container.Kind == ast.KindModuleBlock &&
+			ast.IsGlobalScopeAugmentation(container.Parent):
 		default:
 			return false
 		}
@@ -510,21 +525,30 @@ func correctnessNoProcessExitAfterOutputAnalyzeRoot(
 	recorded := map[*ast.Node]bool{}
 	graph := control_flow_graph.Build(root.node, control_flow_graph.Hooks[correctnessNoProcessExitAfterOutputEvent]{
 		Expression: func(graphBuilder *builder, node *ast.Node) {
-			if node.Kind != ast.KindCallExpression || correctnessNoProcessExitAfterOutputInCatchBinding(node, root.node) {
+			if node.Kind != ast.KindCallExpression ||
+				correctnessNoProcessExitAfterOutputInCatchBinding(node, root.node) {
 				return
 			}
 			if correctnessNoProcessExitAfterOutputIsExit(ruleContext, node) {
 				recorded[node] = true
-				graphBuilder.Emit(correctnessNoProcessExitAfterOutputEvent{kind: correctnessNoProcessExitAfterOutputExit, node: node})
+				graphBuilder.Emit(
+					correctnessNoProcessExitAfterOutputEvent{kind: correctnessNoProcessExitAfterOutputExit, node: node},
+				)
 				return
 			}
 			if writers.writes(node) && !correctnessNoProcessExitAfterOutputHoldsExit(ruleContext, node) {
-				graphBuilder.Emit(correctnessNoProcessExitAfterOutputEvent{kind: correctnessNoProcessExitAfterOutputWrite, node: node})
+				graphBuilder.Emit(correctnessNoProcessExitAfterOutputEvent{
+					kind: correctnessNoProcessExitAfterOutputWrite,
+					node: node,
+				})
 			}
 		},
 		Statement: func(graphBuilder *builder, node *ast.Node) {
 			if node.Kind == ast.KindBlock && node.Parent != nil && node.Parent.Kind == ast.KindCatchClause {
-				graphBuilder.Emit(correctnessNoProcessExitAfterOutputEvent{kind: correctnessNoProcessExitAfterOutputCatchEntered, node: node.Parent.Parent})
+				graphBuilder.Emit(correctnessNoProcessExitAfterOutputEvent{
+					kind: correctnessNoProcessExitAfterOutputCatchEntered,
+					node: node.Parent.Parent,
+				})
 			}
 		},
 	})
@@ -534,7 +558,11 @@ func correctnessNoProcessExitAfterOutputAnalyzeRoot(
 		}
 	}
 
-	walk := correctnessNoProcessExitAfterOutputWalk{root: root.node, chains: map[*ast.Node]string{}, tries: map[*ast.Node]int{}}
+	walk := correctnessNoProcessExitAfterOutputWalk{
+		root:   root.node,
+		chains: map[*ast.Node]string{},
+		tries:  map[*ast.Node]int{},
+	}
 	reported := map[*ast.Node]bool{}
 	type position struct {
 		block *control_flow_graph.Block[correctnessNoProcessExitAfterOutputEvent]

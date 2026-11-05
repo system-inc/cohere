@@ -48,27 +48,41 @@ func TestASolutionRootIsNotRunAndWhatItReferencesIs(test *testing.T) {
 		"packages/core/index.ts":      "export const core = 1;\n",
 	}
 	found := ownedDiscovery(test, newRepository(test, files))
-	if want := []string{"tsconfig.app.json", "tsconfig.node.json", "packages/core"}; !reflect.DeepEqual(found.labels(), want) {
+	if want := []string{
+		"tsconfig.app.json",
+		"tsconfig.node.json",
+		"packages/core",
+	}; !reflect.DeepEqual(found.labels(), want) {
 		test.Fatalf("ran %v, want %v", found.labels(), want)
 	}
 	if !reflect.DeepEqual(found.Ownership.Solutions, []string{"."}) {
 		test.Errorf("solutions %v, want the root", found.Ownership.Solutions)
 	}
 	if !found.Ownership.SharedDirectory["tsconfig.node.json"] || found.Ownership.SharedDirectory["tsconfig.app.json"] {
-		test.Errorf("the second tsconfig in the root should run with the cache off, and only it: %v", found.Ownership.SharedDirectory)
+		test.Errorf(
+			"the second tsconfig in the root should run with the cache off, and only it: %v",
+			found.Ownership.SharedDirectory,
+		)
 	}
 	root := found.Root
 	if got := found.Ownership.Yields["tsconfig.node.json"].Directories; !reflect.DeepEqual(got, []string{root}) {
 		test.Errorf("the second tsconfig in the root formats %v away, want the root itself", got)
 	}
-	if got := found.Ownership.Yields["tsconfig.app.json"].Directories; !reflect.DeepEqual(got, []string{filepath.Join(root, "packages", "core")}) {
+	if got := found.Ownership.Yields["tsconfig.app.json"].Directories; !reflect.DeepEqual(
+		got,
+		[]string{filepath.Join(root, "packages", "core")},
+	) {
 		test.Errorf("the root's first tsconfig leaves %v to others' format walks, want packages/core", got)
 	}
 
 	files["tsconfig.json"] = `{"files":["vite.config.ts"],"references":[{"path":"./packages/core"}]}`
 	found = ownedDiscovery(test, newRepository(test, files))
 	if len(found.Ownership.Solutions) != 0 || found.labels()[0] != "." {
-		test.Fatalf("a root with a file of its own was taken for a solution: ran %v, solutions %v", found.labels(), found.Ownership.Solutions)
+		test.Fatalf(
+			"a root with a file of its own was taken for a solution: ran %v, solutions %v",
+			found.labels(),
+			found.Ownership.Solutions,
+		)
 	}
 }
 
@@ -89,7 +103,10 @@ func TestNestedProjectsAreFoundUnderAnyRoot(test *testing.T) {
 		"tsconfig.json":    `{` + ownershipOptions + `,"include":["*.config.ts"]}`,
 		"eslint.config.ts": "export default [];\n",
 	}
-	for name, extra := range map[string]map[string]string{"a config-only root": configurationOnly, "no root tsconfig": nil} {
+	for name, extra := range map[string]map[string]string{
+		"a config-only root": configurationOnly,
+		"no root tsconfig":   nil,
+	} {
 		test.Run(name, func(test *testing.T) {
 			test.Parallel()
 			files := map[string]string{}
@@ -132,8 +149,14 @@ func TestAFileIncludedTwiceBelongsToTheNearerTsconfig(test *testing.T) {
 	if want := []string{".", "packages/a"}; !reflect.DeepEqual(found.labels(), want) {
 		test.Fatalf("ran %v, want %v", found.labels(), want)
 	}
-	if got, want := found.Ownership.Yields["."].Files, []string{filepath.Join(root, "packages", "a", "src", "inner.ts")}; !reflect.DeepEqual(got, want) {
-		test.Fatalf("the root yields %v, want %v: run.ts is outside packages/a's include, so it stays the root's", got, want)
+	if got, want := found.Ownership.Yields["."].Files, []string{
+		filepath.Join(root, "packages", "a", "src", "inner.ts"),
+	}; !reflect.DeepEqual(got, want) {
+		test.Fatalf(
+			"the root yields %v, want %v: run.ts is outside packages/a's include, so it stays the root's",
+			got,
+			want,
+		)
 	}
 	if yield, yields := found.Ownership.Yields["packages/a"]; yields {
 		test.Errorf("the nearer tsconfig yields %+v, want nothing", yield)
@@ -145,8 +168,14 @@ func TestAFileIncludedTwiceBelongsToTheNearerTsconfig(test *testing.T) {
 		test.Fatal(removeError)
 	}
 	found = ownedDiscovery(test, root)
-	if want := []string{"packages/a"}; !reflect.DeepEqual(found.labels(), want) || !reflect.DeepEqual(found.Ownership.Yielding, []string{"."}) {
-		test.Fatalf("ran %v, yielding %v; want packages/a alone, the root yielding everything", found.labels(), found.Ownership.Yielding)
+	if want := []string{
+		"packages/a",
+	}; !reflect.DeepEqual(found.labels(), want) || !reflect.DeepEqual(found.Ownership.Yielding, []string{"."}) {
+		test.Fatalf(
+			"ran %v, yielding %v; want packages/a alone, the root yielding everything",
+			found.labels(),
+			found.Ownership.Yielding,
+		)
 	}
 }
 
@@ -186,7 +215,10 @@ func TestOneProjectIsNotRead(test *testing.T) {
 	if mentionsReferences(filepath.Join(root, "tsconfig.json")) {
 		test.Fatal("the byte search found references in a tsconfig without them")
 	}
-	writeTree(test, root, map[string]string{"packages/a/tsconfig.json": `{` + ownershipOptions + `}`, "packages/a/a.ts": "export const a = 1;\n"})
+	writeTree(test, root, map[string]string{
+		"packages/a/tsconfig.json": `{` + ownershipOptions + `}`,
+		"packages/a/a.ts":          "export const a = 1;\n",
+	})
 	found = ownedDiscovery(test, root)
 	if !reflect.DeepEqual(found.labels(), []string{".", "packages/a"}) {
 		test.Fatalf("an unreadable tsconfig beside another project was dropped: ran %v", found.labels())
@@ -203,7 +235,12 @@ func TestChildArgumentsCarryTheLintConfigAbsolute(test *testing.T) {
 		{"--no-fix", "--lint-config=settings/Cohere.json", "--json"},
 	} {
 		got := childArguments(arguments, "/work/settings/Cohere.json")
-		if want := []string{"--no-fix", "--json", "--lint-config", "/work/settings/Cohere.json"}; !reflect.DeepEqual(got, want) {
+		if want := []string{
+			"--no-fix",
+			"--json",
+			"--lint-config",
+			"/work/settings/Cohere.json",
+		}; !reflect.DeepEqual(got, want) {
 			test.Errorf("%v became %v, want %v", arguments, got, want)
 		}
 	}
@@ -236,12 +273,23 @@ func TestOneRunChecksEveryNestedProjectAndEachFileOnce(test *testing.T) {
 		test.Fatalf("a debugger statement passed the run:\n%s", output)
 	}
 	if count := strings.Count(output, "inner.ts:2:3"); count != 1 {
-		test.Errorf("the finding in a file two tsconfigs include was reported %d times, want once, by packages/a:\n%s", count, output)
+		test.Errorf(
+			"the finding in a file two tsconfigs include was reported %d times, want once, by packages/a:\n%s",
+			count,
+			output,
+		)
 	}
-	if count := strings.Count(output, filepath.Join("packages", "a", "notes.json")+":1:1 - --fix would rewrite"); count != 1 {
+	if count := strings.Count(
+		output,
+		filepath.Join("packages", "a", "notes.json")+":1:1 - --fix would rewrite",
+	); count != 1 {
 		test.Errorf("a nested project's unformatted file was reported %d times, want once:\n%s", count, output)
 	}
-	for _, want := range []string{"== packages/a (TypeScript) ==", "projects: 2 checked (2 TypeScript)", "left 1 files the tsconfig includes"} {
+	for _, want := range []string{
+		"== packages/a (TypeScript) ==",
+		"projects: 2 checked (2 TypeScript)",
+		"left 1 files the tsconfig includes",
+	} {
 		if !strings.Contains(output, want) {
 			test.Errorf("the report lacks %q:\n%s", want, output)
 		}
@@ -254,7 +302,9 @@ func TestOneRunChecksEveryNestedProjectAndEachFileOnce(test *testing.T) {
 		"CohereSettings.json": settings,
 	})
 	output, code = runWithEngine(test, binary, "", solution, "--no-fix", "--no-format")
-	if code == 0 || !strings.Contains(output, "main.ts:2:3") || !strings.Contains(output, ". not run: a solution tsconfig") {
+	if code == 0 ||
+		!strings.Contains(output, "main.ts:2:3") ||
+		!strings.Contains(output, ". not run: a solution tsconfig") {
 		test.Fatalf("a solution root did not run what it references (exit %d):\n%s", code, output)
 	}
 }

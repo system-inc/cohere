@@ -156,7 +156,10 @@ var NoForInArray = rule.Rule{
 				return false
 			}
 
-			return type_checking.IsTypeFlagSet(checker.Checker_getTypeOfSymbol(ruleContext.TypeChecker, lengthProperty), checker.TypeFlagsNumberLike)
+			return type_checking.IsTypeFlagSet(
+				checker.Checker_getTypeOfSymbol(ruleContext.TypeChecker, lengthProperty),
+				checker.TypeFlagsNumberLike,
+			)
 		}
 		isArrayLike := func(t *checker.Type) bool {
 			return type_checking.TypeRecurser(t, func(t *checker.Type) bool {
@@ -170,7 +173,10 @@ var NoForInArray = rule.Rule{
 					return
 				}
 
-				t := type_checking.GetConstrainedTypeAtLocation(ruleContext.TypeChecker, node.AsForInOrOfStatement().Expression)
+				t := type_checking.GetConstrainedTypeAtLocation(
+					ruleContext.TypeChecker,
+					node.AsForInOrOfStatement().Expression,
+				)
 
 				if isArrayLike(t) {
 					ruleContext.ReportRange(

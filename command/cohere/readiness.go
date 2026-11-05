@@ -42,16 +42,28 @@ var adamicOptions = []struct {
 	on   func(options *core.CompilerOptions) bool
 }{
 	{"strict", func(options *core.CompilerOptions) bool {
-		for _, value := range []core.Tristate{options.NoImplicitAny, options.StrictNullChecks, options.StrictFunctionTypes,
-			options.StrictBindCallApply, options.StrictPropertyInitialization, options.UseUnknownInCatchVariables} {
+		for _, value := range []core.Tristate{
+			options.NoImplicitAny,
+			options.StrictNullChecks,
+			options.StrictFunctionTypes,
+			options.StrictBindCallApply,
+			options.StrictPropertyInitialization,
+			options.UseUnknownInCatchVariables,
+		} {
 			if !options.GetStrictOptionValue(value) {
 				return false
 			}
 		}
 		return true
 	}},
-	{"noUncheckedIndexedAccess", func(options *core.CompilerOptions) bool { return options.NoUncheckedIndexedAccess.IsTrue() }},
-	{"exactOptionalPropertyTypes", func(options *core.CompilerOptions) bool { return options.ExactOptionalPropertyTypes.IsTrue() }},
+	{
+		"noUncheckedIndexedAccess",
+		func(options *core.CompilerOptions) bool { return options.NoUncheckedIndexedAccess.IsTrue() },
+	},
+	{
+		"exactOptionalPropertyTypes",
+		func(options *core.CompilerOptions) bool { return options.ExactOptionalPropertyTypes.IsTrue() },
+	},
 }
 
 // loadReadiness is the set's rules with their raw options, read the way the loader reads any chain. A
@@ -142,7 +154,12 @@ func (summary *readinessSummary) segment() string {
 	if summary.Files == 0 {
 		return "Adamic readiness not measured: no file was linted"
 	}
-	text := fmt.Sprintf("%d%% Adamic-ready (%s of %s", summary.Ready*100/summary.Files, grouped(summary.Ready), grouped(summary.Files))
+	text := fmt.Sprintf(
+		"%d%% Adamic-ready (%s of %s",
+		summary.Ready*100/summary.Files,
+		grouped(summary.Ready),
+		grouped(summary.Files),
+	)
 	if summary.Unmeasured > 0 {
 		text += "; " + grouped(summary.Unmeasured) + " unmeasured"
 	}
@@ -205,7 +222,12 @@ func requestedReadiness() *program.Readiness {
 }
 
 // readinessOf is the run's readiness from its walk.
-func readinessOf(graph *program.Graph, result program.Result, typesRan bool, typeErrorFiles map[string]bool) *readinessSummary {
+func readinessOf(
+	graph *program.Graph,
+	result program.Result,
+	typesRan bool,
+	typeErrorFiles map[string]bool,
+) *readinessSummary {
 	if _, readinessSetError := readinessSet(); readinessSetError != nil {
 		return notMeasured(readinessSetError.Error())
 	}

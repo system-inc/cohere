@@ -154,7 +154,10 @@ func (provenance Provenance) Trustworthy() (bool, []string) {
 	// planted anything would otherwise pass this guard vacuously — the exact shape of bug this
 	// package exists to catch, one level up, inside the catcher. Found by a test, not by reading.
 	if !provenance.ControlsProven() {
-		reasons = append(reasons, "no control fired in both directions, so the harness has not been shown able to detect a difference")
+		reasons = append(
+			reasons,
+			"no control fired in both directions, so the harness has not been shown able to detect a difference",
+		)
 	}
 
 	for _, control := range provenance.ControlsRun {
@@ -218,7 +221,10 @@ func (provenance Provenance) Describe() string {
 		provenance.GateFilesLinted, provenance.GateRulesRun, provenance.GateCommand)
 
 	if len(provenance.ControlsRun) == 0 {
-		fmt.Fprintf(builder, "controls: none run — this harness has NOT been shown able to detect a difference on this run\n")
+		fmt.Fprintf(
+			builder,
+			"controls: none run — this harness has NOT been shown able to detect a difference on this run\n",
+		)
 		return builder.String()
 	}
 
@@ -245,10 +251,17 @@ func (provenance Provenance) Describe() string {
 	if !provenance.ControlsProven() {
 		switch {
 		case len(directions) == 0:
-			fmt.Fprintf(builder, "controls: no directional control ran, so a one-sided difference in either direction would still report clean\n")
+			fmt.Fprintf(
+				builder,
+				"controls: no directional control ran, so a one-sided difference in either direction would still report clean\n",
+			)
 		case len(directions) == 1:
 			for side := range directions {
-				fmt.Fprintf(builder, "controls: only the %s direction was exercised, so a defect on the other side would still report clean\n", side)
+				fmt.Fprintf(
+					builder,
+					"controls: only the %s direction was exercised, so a defect on the other side would still report clean\n",
+					side,
+				)
 			}
 		default:
 			fmt.Fprintf(builder, "controls: both directions were exercised but not every control fired\n")

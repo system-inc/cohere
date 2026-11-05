@@ -35,7 +35,9 @@ func TestGraphTimingMeasuresTheBuildItTimes(test *testing.T) {
 
 	timing := &program.GraphTiming{}
 	started := time.Now()
-	timed, err := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory, Timing: timing})
+	timed, err := program.Build(
+		program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory, Timing: timing},
+	)
 	if err != nil {
 		test.Fatalf("building timed: %v", err)
 	}
@@ -50,22 +52,34 @@ func TestGraphTimingMeasuresTheBuildItTimes(test *testing.T) {
 		return names
 	}
 	if !slices.Equal(fileNames(untimed), fileNames(timed)) {
-		test.Fatalf("the timed build holds different files from the untimed one:\nuntimed %v\ntimed   %v", fileNames(untimed), fileNames(timed))
+		test.Fatalf(
+			"the timed build holds different files from the untimed one:\nuntimed %v\ntimed   %v",
+			fileNames(untimed),
+			fileNames(timed),
+		)
 	}
 
 	if timing.Builds != 1 {
 		test.Errorf("Builds is %d for one build", timing.Builds)
 	}
 	if timing.Config <= 0 || timing.Program <= 0 || timing.Verify <= 0 {
-		test.Errorf("a wall part read zero: config %v, program %v, verify %v", timing.Config, timing.Program, timing.Verify)
+		test.Errorf(
+			"a wall part read zero: config %v, program %v, verify %v",
+			timing.Config,
+			timing.Program,
+			timing.Verify,
+		)
 	}
 	if parts := timing.Config + timing.Program + timing.Verify; parts > wall {
 		test.Errorf("the wall parts add to %v, more than the %v the whole build took", parts, wall)
 	}
 
 	if timing.SourceFileLoads != int64(len(timed.SourceFiles())) {
-		test.Errorf("the timing host saw %d loads and the program holds %d files, so the program was not built through it",
-			timing.SourceFileLoads, len(timed.SourceFiles()))
+		test.Errorf(
+			"the timing host saw %d loads and the program holds %d files, so the program was not built through it",
+			timing.SourceFileLoads,
+			len(timed.SourceFiles()),
+		)
 	}
 	if timing.SourceFileSummed <= 0 {
 		test.Errorf("%d loads summed to %v", timing.SourceFileLoads, timing.SourceFileSummed)
@@ -77,7 +91,10 @@ func TestGraphTimingMeasuresTheBuildItTimes(test *testing.T) {
 	// main.ts, helper.ts and the package's declaration are read from disk; the libs come from the binary
 	// and the cache above the timing layer answers repeats, so the count is these three and package.json.
 	if timing.ProgramDisk.Reads.Count < 3 {
-		test.Errorf("the program read %d files from disk, and the fixture has three it must read", timing.ProgramDisk.Reads.Count)
+		test.Errorf(
+			"the program read %d files from disk, and the fixture has three it must read",
+			timing.ProgramDisk.Reads.Count,
+		)
 	}
 	if timing.ProgramDisk.Existence.Count == 0 {
 		test.Errorf("resolving 'packaged' asked the disk nothing: %+v", timing.ProgramDisk)

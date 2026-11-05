@@ -29,7 +29,11 @@ var commentRangeFactory ast.NodeFactory
 
 func GetCommentsInRange(sourceFile *ast.SourceFile, inRange core.TextRange) iter.Seq[ast.CommentRange] {
 	return func(yield func(ast.CommentRange) bool) {
-		for commentRange := range scanner.GetTrailingCommentRanges(&commentRangeFactory, sourceFile.Text(), inRange.Pos()) {
+		for commentRange := range scanner.GetTrailingCommentRanges(
+			&commentRangeFactory,
+			sourceFile.Text(),
+			inRange.Pos(),
+		) {
 			if commentRange.Pos() >= inRange.End() {
 				break
 			}
@@ -38,7 +42,11 @@ func GetCommentsInRange(sourceFile *ast.SourceFile, inRange core.TextRange) iter
 			}
 		}
 
-		for commentRange := range scanner.GetLeadingCommentRanges(&commentRangeFactory, sourceFile.Text(), inRange.Pos()) {
+		for commentRange := range scanner.GetLeadingCommentRanges(
+			&commentRangeFactory,
+			sourceFile.Text(),
+			inRange.Pos(),
+		) {
 			if commentRange.Pos() >= inRange.End() {
 				break
 			}

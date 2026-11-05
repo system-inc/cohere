@@ -93,7 +93,10 @@ func TestOptInPragmaFixturesAreEnumerated(test *testing.T) {
 	}
 	for name := range got {
 		if !want[name] {
-			test.Errorf("%s carries an opt-in pragma and is not enumerated; it needs a divergence entry or a decision", name)
+			test.Errorf(
+				"%s carries an opt-in pragma and is not enumerated; it needs a divergence entry or a decision",
+				name,
+			)
 		}
 	}
 }

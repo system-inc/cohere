@@ -90,11 +90,17 @@ func TestConfigFiresOnUpstreamFixtures(test *testing.T) {
 	}{
 		// error.invalid-type-provider-hook-name-not-typed-as-hook
 		// A `use`-prefixed named import whose configured type is a plain function.
-		{"namedHookNotTypedAsHook", "import {useHookNotTypedAsHook} from 'ReactCompilerTest';\n\nfunction Component() {\n  return useHookNotTypedAsHook();\n}\n"},
+		{
+			"namedHookNotTypedAsHook",
+			"import {useHookNotTypedAsHook} from 'ReactCompilerTest';\n\nfunction Component() {\n  return useHookNotTypedAsHook();\n}\n",
+		},
 		// error.invalid-type-provider-hooklike-module-default-not-hook
 		// A default import from a `use`-prefixed module whose default is a plain function.
 		// The name checked here is the module's, not the property's.
-		{"defaultFromHooklikeModule", "import foo from 'useDefaultExportNotTypedAsHook';\n\nfunction Component() {\n  return <div>{foo()}</div>;\n}\n"},
+		{
+			"defaultFromHooklikeModule",
+			"import foo from 'useDefaultExportNotTypedAsHook';\n\nfunction Component() {\n  return <div>{foo()}</div>;\n}\n",
+		},
 	}
 
 	for _, testCase := range cases {
@@ -236,9 +242,15 @@ func TestConfigDeclinesTheUseSiteFixtures(test *testing.T) {
 		source string
 	}{
 		// error.invalid-type-provider-hook-name-not-typed-as-hook-namespace
-		{"dottedMemberUseSite", "import ReactCompilerTest from 'ReactCompilerTest';\n\nfunction Component() {\n  return ReactCompilerTest.useHookNotTypedAsHook();\n}\n"},
+		{
+			"dottedMemberUseSite",
+			"import ReactCompilerTest from 'ReactCompilerTest';\n\nfunction Component() {\n  return ReactCompilerTest.useHookNotTypedAsHook();\n}\n",
+		},
 		// error.invalid-type-provider-nonhook-name-typed-as-hook
-		{"jsxUseSite", "import {notAhookTypedAsHook} from 'ReactCompilerTest';\n\nfunction Component() {\n  return <div>{notAhookTypedAsHook()}</div>;\n}\n"},
+		{
+			"jsxUseSite",
+			"import {notAhookTypedAsHook} from 'ReactCompilerTest';\n\nfunction Component() {\n  return <div>{notAhookTypedAsHook()}</div>;\n}\n",
+		},
 	}
 
 	for _, testCase := range cases {
@@ -351,8 +363,14 @@ func TestConfigMessageText(test *testing.T) {
 	if found.Message.Id != "invalidTypeConfiguration" {
 		test.Errorf("message id = %q, want %q", found.Message.Id, "invalidTypeConfiguration")
 	}
-	if !strings.HasPrefix(found.Message.Description, "A module's compiler type configuration disagrees with the name it is attached to.") {
-		test.Errorf("message description = %q, want it to open with the disagreement sentence", found.Message.Description)
+	if !strings.HasPrefix(
+		found.Message.Description,
+		"A module's compiler type configuration disagrees with the name it is attached to.",
+	) {
+		test.Errorf(
+			"message description = %q, want it to open with the disagreement sentence",
+			found.Message.Description,
+		)
 	}
 }
 

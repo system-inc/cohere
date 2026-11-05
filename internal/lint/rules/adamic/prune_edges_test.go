@@ -22,7 +22,10 @@ var offeredSites = rule.Rule{
 			return nil
 		}
 		return flow.WalkerFor(ruleContext).Listeners(func(site flow.Site) {
-			ruleContext.ReportNode(site.Node, rule.Message{Id: "offered", Description: ruleContext.TypeChecker.TypeToString(site.Target)})
+			ruleContext.ReportNode(
+				site.Node,
+				rule.Message{Id: "offered", Description: ruleContext.TypeChecker.TypeToString(site.Target)},
+			)
 		})
 	},
 }

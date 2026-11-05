@@ -155,7 +155,8 @@ func TestNoDynamicDeleteStaysSilentOnShapesTheCorpusDoesNotWrite(test *testing.T
 		sourceText string
 	}{
 		{
-			// estree has no parenthesized node, so upstream's Literal test sees through the parens. This is the case a port testing our kinds without skipping parens would report.
+			// estree has no parenthesized node, so upstream's Literal test sees through the parens. This is the case a
+			// port testing our kinds without skipping parens would report.
 			sourceText: "const c: { [i: string]: 0 } = {};\ndelete c[(7)];",
 		},
 		{
@@ -171,11 +172,13 @@ func TestNoDynamicDeleteStaysSilentOnShapesTheCorpusDoesNotWrite(test *testing.T
 			sourceText: "const c: { [i: string]: 0 } = {};\ndelete c?.[x];",
 		},
 		{
-			// The same input with an acceptable key, which is what proves the exclusion is structural rather than a consequence of the index test.
+			// The same input with an acceptable key, which is what proves the exclusion is structural rather than a
+			// consequence of the index test.
 			sourceText: "const c: { [i: string]: 0 } = {};\ndelete c?.[7];",
 		},
 		{
-			// The outermost access is a property access, so the operand test declines. The computed access is not the thing being deleted.
+			// The outermost access is a property access, so the operand test declines. The computed access is not the
+			// thing being deleted.
 			sourceText: "const c: { [i: string]: 0 } = {};\ndelete c[x].a;",
 		},
 		{
@@ -249,7 +252,8 @@ func TestNoDynamicDeleteFiresOnShapesTheCorpusDoesNotWrite(test *testing.T) {
 			wantSpan:   "y, 'b'",
 		},
 		{
-			// Nested unary minus: the inner operand is a unary expression rather than a numeric literal, so the accept arm declines.
+			// Nested unary minus: the inner operand is a unary expression rather than a numeric literal, so the accept
+			// arm declines.
 			sourceText: "const c: { [i: string]: 0 } = {};\ndelete c[- -7];",
 			wantSpan:   "- -7",
 		},

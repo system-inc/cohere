@@ -41,7 +41,13 @@ func TestAnOptionsDiagnosticFailsTheRunWithoutStoppingLint(test *testing.T) {
 	} {
 		test.Run(shape.name, func(test *testing.T) {
 			test.Parallel()
-			output, code := runCohere(test, binary, optionsProject(test, shape.compilerOptions, ""), "--no-fix", "--no-format")
+			output, code := runCohere(
+				test,
+				binary,
+				optionsProject(test, shape.compilerOptions, ""),
+				"--no-fix",
+				"--no-format",
+			)
 			if code == 0 {
 				test.Fatalf("an options diagnostic passed the run:\n%s", output)
 			}
@@ -61,8 +67,12 @@ func TestAnOptionsDiagnosticFailsTheRunWithoutStoppingLint(test *testing.T) {
 		if code == 0 || !strings.Contains(output, "TS2322") || !strings.Contains(output, "TS5102") {
 			test.Fatalf("the run did not report both diagnostics and fail (exit %d):\n%s", code, output)
 		}
-		if !strings.Contains(output, "lint did not run (types bailed: 1 type diagnostics") || strings.Contains(output, "[no-debugger/") {
-			test.Fatalf("a source type error did not stop lint, or the bail counted the options diagnostic:\n%s", output)
+		if !strings.Contains(output, "lint did not run (types bailed: 1 type diagnostics") ||
+			strings.Contains(output, "[no-debugger/") {
+			test.Fatalf(
+				"a source type error did not stop lint, or the bail counted the options diagnostic:\n%s",
+				output,
+			)
 		}
 	})
 

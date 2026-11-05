@@ -43,16 +43,56 @@ func TestConstructorSuperFires(test *testing.T) {
 		// missingAll: 15 inputs
 		{`class A extends null { constructor() { } }`, `class A extends null { constructor() { } }`, `missingAll`},
 		{`class A extends B { constructor() { } }`, `class A extends B { constructor() { } }`, `missingAll`},
-		{`class A extends B { constructor() { for (var a of b) super.f`, `class A extends B { constructor() { for (var a of b) super.foo(); } }`, `missingAll`},
-		{`class A extends B { constructor() { for (var i = 1; i < 10; `, `class A extends B { constructor() { for (var i = 1; i < 10; i++) super.foo(); } }`, `missingAll`},
-		{`class A extends B { constructor() { var c = class extends D `, `class A extends B { constructor() { var c = class extends D { constructor() { super(); } } } }`, `missingAll`},
-		{`class A extends B { constructor() { var c = () => super(); }`, `class A extends B { constructor() { var c = () => super(); } }`, `missingAll`},
-		{`class A extends B { constructor() { class C extends D { cons`, `class A extends B { constructor() { class C extends D { constructor() { super(); } } } }`, `missingAll`},
-		{`class A extends B { constructor() { var C = class extends D `, `class A extends B { constructor() { var C = class extends D { constructor() { super(); } } } }`, `missingAll`},
-		{`class A extends B { constructor() { super(); class C extends`, `class A extends B { constructor() { super(); class C extends D { constructor() { } } } }`, `missingAll`},
-		{`class A extends B { constructor() { super(); var C = class e`, `class A extends B { constructor() { super(); var C = class extends D { constructor() { } } } }`, `missingAll`},
-		{`class A extends B { constructor() { a && super(); } }`, `class A extends B { constructor() { a && super(); } }`, `missingAll`},
-		{`class A extends B { constructor() { return; super(); } }`, `class A extends B { constructor() { return; super(); } }`, `missingAll`},
+		{
+			`class A extends B { constructor() { for (var a of b) super.f`,
+			`class A extends B { constructor() { for (var a of b) super.foo(); } }`,
+			`missingAll`,
+		},
+		{
+			`class A extends B { constructor() { for (var i = 1; i < 10; `,
+			`class A extends B { constructor() { for (var i = 1; i < 10; i++) super.foo(); } }`,
+			`missingAll`,
+		},
+		{
+			`class A extends B { constructor() { var c = class extends D `,
+			`class A extends B { constructor() { var c = class extends D { constructor() { super(); } } } }`,
+			`missingAll`,
+		},
+		{
+			`class A extends B { constructor() { var c = () => super(); }`,
+			`class A extends B { constructor() { var c = () => super(); } }`,
+			`missingAll`,
+		},
+		{
+			`class A extends B { constructor() { class C extends D { cons`,
+			`class A extends B { constructor() { class C extends D { constructor() { super(); } } } }`,
+			`missingAll`,
+		},
+		{
+			`class A extends B { constructor() { var C = class extends D `,
+			`class A extends B { constructor() { var C = class extends D { constructor() { super(); } } } }`,
+			`missingAll`,
+		},
+		{
+			`class A extends B { constructor() { super(); class C extends`,
+			`class A extends B { constructor() { super(); class C extends D { constructor() { } } } }`,
+			`missingAll`,
+		},
+		{
+			`class A extends B { constructor() { super(); var C = class e`,
+			`class A extends B { constructor() { super(); var C = class extends D { constructor() { } } } }`,
+			`missingAll`,
+		},
+		{
+			`class A extends B { constructor() { a && super(); } }`,
+			`class A extends B { constructor() { a && super(); } }`,
+			`missingAll`,
+		},
+		{
+			`class A extends B { constructor() { return; super(); } }`,
+			`class A extends B { constructor() { return; super(); } }`,
+			`missingAll`,
+		},
 		{`class Foo extends Bar { constructor() { for (a in b) for (c `, `class Foo extends Bar {
                             constructor() {
                                 for (a in b) for (c in d);
@@ -79,14 +119,46 @@ func TestConstructorSuperFires(test *testing.T) {
 
                         }`, `missingAll`},
 		// missingSome: 13 inputs
-		{`class A extends B { constructor() { if (a) super(); } }`, `class A extends B { constructor() { if (a) super(); } }`, `missingSome`},
-		{`class A extends B { constructor() { if (a); else super(); } `, `class A extends B { constructor() { if (a); else super(); } }`, `missingSome`},
-		{`class A extends B { constructor() { switch (a) { case 0: sup`, `class A extends B { constructor() { switch (a) { case 0: super(); } } }`, `missingSome`},
-		{`class A extends B { constructor() { switch (a) { case 0: bre`, `class A extends B { constructor() { switch (a) { case 0: break; default: super(); } } }`, `missingSome`},
-		{`class A extends B { constructor() { try { super(); } catch (`, `class A extends B { constructor() { try { super(); } catch (err) {} } }`, `missingSome`},
-		{`class A extends B { constructor() { try { a; } catch (err) {`, `class A extends B { constructor() { try { a; } catch (err) { super(); } } }`, `missingSome`},
-		{`class A extends B { constructor() { if (a) return; super(); `, `class A extends B { constructor() { if (a) return; super(); } }`, `missingSome`},
-		{`class A extends B { constructor(a) { while (a) super(); } }`, `class A extends B { constructor(a) { while (a) super(); } }`, `missingSome`},
+		{
+			`class A extends B { constructor() { if (a) super(); } }`,
+			`class A extends B { constructor() { if (a) super(); } }`,
+			`missingSome`,
+		},
+		{
+			`class A extends B { constructor() { if (a); else super(); } `,
+			`class A extends B { constructor() { if (a); else super(); } }`,
+			`missingSome`,
+		},
+		{
+			`class A extends B { constructor() { switch (a) { case 0: sup`,
+			`class A extends B { constructor() { switch (a) { case 0: super(); } } }`,
+			`missingSome`,
+		},
+		{
+			`class A extends B { constructor() { switch (a) { case 0: bre`,
+			`class A extends B { constructor() { switch (a) { case 0: break; default: super(); } } }`,
+			`missingSome`,
+		},
+		{
+			`class A extends B { constructor() { try { super(); } catch (`,
+			`class A extends B { constructor() { try { super(); } catch (err) {} } }`,
+			`missingSome`,
+		},
+		{
+			`class A extends B { constructor() { try { a; } catch (err) {`,
+			`class A extends B { constructor() { try { a; } catch (err) { super(); } } }`,
+			`missingSome`,
+		},
+		{
+			`class A extends B { constructor() { if (a) return; super(); `,
+			`class A extends B { constructor() { if (a) return; super(); } }`,
+			`missingSome`,
+		},
+		{
+			`class A extends B { constructor(a) { while (a) super(); } }`,
+			`class A extends B { constructor(a) { while (a) super(); } }`,
+			`missingSome`,
+		},
 		{`class C extends D { constructor() { do { super(); } while (f`, `class C extends D {
 
                             constructor() {
@@ -130,22 +202,82 @@ func TestConstructorSuperFires(test *testing.T) {
             }
         }`, `missingSome`},
 		// badSuper: 11 inputs
-		{`class A extends null { constructor() { super(); } }`, `class A extends null { constructor() { super(); } }`, `badSuper`},
-		{`class A extends 100 { constructor() { super(); } }`, `class A extends 100 { constructor() { super(); } }`, `badSuper`},
-		{`class A extends 'test' { constructor() { super(); } }`, `class A extends 'test' { constructor() { super(); } }`, `badSuper`},
-		{`class A extends (B = 5) { constructor() { super(); } }`, `class A extends (B = 5) { constructor() { super(); } }`, `badSuper`},
-		{`class A extends (B && 5) { constructor() { super(); } }`, `class A extends (B && 5) { constructor() { super(); } }`, `badSuper`},
-		{`class A extends (B &&= 5) { constructor() { super(); } }`, `class A extends (B &&= 5) { constructor() { super(); } }`, `badSuper`},
-		{`class A extends (B += C) { constructor() { super(); } }`, `class A extends (B += C) { constructor() { super(); } }`, `badSuper`},
-		{`class A extends (B -= C) { constructor() { super(); } }`, `class A extends (B -= C) { constructor() { super(); } }`, `badSuper`},
-		{`class A extends (B **= C) { constructor() { super(); } }`, `class A extends (B **= C) { constructor() { super(); } }`, `badSuper`},
-		{`class A extends (B |= C) { constructor() { super(); } }`, `class A extends (B |= C) { constructor() { super(); } }`, `badSuper`},
-		{`class A extends (B &= C) { constructor() { super(); } }`, `class A extends (B &= C) { constructor() { super(); } }`, `badSuper`},
+		{
+			`class A extends null { constructor() { super(); } }`,
+			`class A extends null { constructor() { super(); } }`,
+			`badSuper`,
+		},
+		{
+			`class A extends 100 { constructor() { super(); } }`,
+			`class A extends 100 { constructor() { super(); } }`,
+			`badSuper`,
+		},
+		{
+			`class A extends 'test' { constructor() { super(); } }`,
+			`class A extends 'test' { constructor() { super(); } }`,
+			`badSuper`,
+		},
+		{
+			`class A extends (B = 5) { constructor() { super(); } }`,
+			`class A extends (B = 5) { constructor() { super(); } }`,
+			`badSuper`,
+		},
+		{
+			`class A extends (B && 5) { constructor() { super(); } }`,
+			`class A extends (B && 5) { constructor() { super(); } }`,
+			`badSuper`,
+		},
+		{
+			`class A extends (B &&= 5) { constructor() { super(); } }`,
+			`class A extends (B &&= 5) { constructor() { super(); } }`,
+			`badSuper`,
+		},
+		{
+			`class A extends (B += C) { constructor() { super(); } }`,
+			`class A extends (B += C) { constructor() { super(); } }`,
+			`badSuper`,
+		},
+		{
+			`class A extends (B -= C) { constructor() { super(); } }`,
+			`class A extends (B -= C) { constructor() { super(); } }`,
+			`badSuper`,
+		},
+		{
+			`class A extends (B **= C) { constructor() { super(); } }`,
+			`class A extends (B **= C) { constructor() { super(); } }`,
+			`badSuper`,
+		},
+		{
+			`class A extends (B |= C) { constructor() { super(); } }`,
+			`class A extends (B |= C) { constructor() { super(); } }`,
+			`badSuper`,
+		},
+		{
+			`class A extends (B &= C) { constructor() { super(); } }`,
+			`class A extends (B &= C) { constructor() { super(); } }`,
+			`badSuper`,
+		},
 		// duplicate: 4 inputs
-		{`class A extends B { constructor() { super(); super(); } }`, `class A extends B { constructor() { super(); super(); } }`, `duplicate`},
-		{`class A extends B { constructor() { super() || super(); } }`, `class A extends B { constructor() { super() || super(); } }`, `duplicate`},
-		{`class A extends B { constructor() { if (a) super(); super();`, `class A extends B { constructor() { if (a) super(); super(); } }`, `duplicate`},
-		{`class A extends B { constructor() { switch (a) { case 0: sup (2)`, `class A extends B { constructor() { switch (a) { case 0: super(); default: super(); } } }`, `duplicate`},
+		{
+			`class A extends B { constructor() { super(); super(); } }`,
+			`class A extends B { constructor() { super(); super(); } }`,
+			`duplicate`,
+		},
+		{
+			`class A extends B { constructor() { super() || super(); } }`,
+			`class A extends B { constructor() { super() || super(); } }`,
+			`duplicate`,
+		},
+		{
+			`class A extends B { constructor() { if (a) super(); super();`,
+			`class A extends B { constructor() { if (a) super(); super(); } }`,
+			`duplicate`,
+		},
+		{
+			`class A extends B { constructor() { switch (a) { case 0: sup (2)`,
+			`class A extends B { constructor() { switch (a) { case 0: super(); default: super(); } } }`,
+			`duplicate`,
+		},
 	}
 
 	for _, testCase := range cases {
@@ -178,35 +310,119 @@ func TestConstructorSuperStaysSilent(test *testing.T) {
 		{`class A extends null { }`, `class A extends null { }`},
 		{`class A extends B { }`, `class A extends B { }`},
 		{`class A extends B { constructor() { super(); } }`, `class A extends B { constructor() { super(); } }`},
-		{`class A extends B { constructor() { if (true) { super(); } e`, `class A extends B { constructor() { if (true) { super(); } else { super(); } } }`},
-		{`class A extends (class B {}) { constructor() { super(); } }`, `class A extends (class B {}) { constructor() { super(); } }`},
-		{`class A extends (B = C) { constructor() { super(); } }`, `class A extends (B = C) { constructor() { super(); } }`},
-		{`class A extends (B &&= C) { constructor() { super(); } }`, `class A extends (B &&= C) { constructor() { super(); } }`},
-		{`class A extends (B ||= C) { constructor() { super(); } }`, `class A extends (B ||= C) { constructor() { super(); } }`},
-		{`class A extends (B ??= C) { constructor() { super(); } }`, `class A extends (B ??= C) { constructor() { super(); } }`},
-		{`class A extends (B ||= 5) { constructor() { super(); } }`, `class A extends (B ||= 5) { constructor() { super(); } }`},
-		{`class A extends (B ??= 5) { constructor() { super(); } }`, `class A extends (B ??= 5) { constructor() { super(); } }`},
-		{`class A extends (B || C) { constructor() { super(); } }`, `class A extends (B || C) { constructor() { super(); } }`},
-		{`class A extends (5 && B) { constructor() { super(); } }`, `class A extends (5 && B) { constructor() { super(); } }`},
-		{`class A extends (false && B) { constructor() { super(); } }`, `class A extends (false && B) { constructor() { super(); } }`},
-		{`class A extends (B || 5) { constructor() { super(); } }`, `class A extends (B || 5) { constructor() { super(); } }`},
-		{`class A extends (B ?? 5) { constructor() { super(); } }`, `class A extends (B ?? 5) { constructor() { super(); } }`},
-		{`class A extends (a ? B : C) { constructor() { super(); } }`, `class A extends (a ? B : C) { constructor() { super(); } }`},
-		{`class A extends (B, C) { constructor() { super(); } }`, `class A extends (B, C) { constructor() { super(); } }`},
-		{`class A { constructor() { class B extends C { constructor() `, `class A { constructor() { class B extends C { constructor() { super(); } } } }`},
-		{`class A extends B { constructor() { super(); class C extends`, `class A extends B { constructor() { super(); class C extends D { constructor() { super(); } } } }`},
-		{`class A extends B { constructor() { super(); class C { const`, `class A extends B { constructor() { super(); class C { constructor() { } } } }`},
-		{`class A extends B { constructor() { a ? super() : super(); }`, `class A extends B { constructor() { a ? super() : super(); } }`},
-		{`class A extends B { constructor() { if (a) super(); else sup`, `class A extends B { constructor() { if (a) super(); else super(); } }`},
-		{`class A extends B { constructor() { switch (a) { case 0: sup`, `class A extends B { constructor() { switch (a) { case 0: super(); break; default: super(); } } }`},
-		{`class A extends B { constructor() { try {} finally { super()`, `class A extends B { constructor() { try {} finally { super(); } } }`},
-		{`class A extends B { constructor() { if (a) throw Error(); su`, `class A extends B { constructor() { if (a) throw Error(); super(); } }`},
-		{`class A extends B { constructor() { if (true) return a; supe`, `class A extends B { constructor() { if (true) return a; super(); } }`},
-		{`class A extends null { constructor() { return a; } }`, `class A extends null { constructor() { return a; } }`},
+		{
+			`class A extends B { constructor() { if (true) { super(); } e`,
+			`class A extends B { constructor() { if (true) { super(); } else { super(); } } }`,
+		},
+		{
+			`class A extends (class B {}) { constructor() { super(); } }`,
+			`class A extends (class B {}) { constructor() { super(); } }`,
+		},
+		{
+			`class A extends (B = C) { constructor() { super(); } }`,
+			`class A extends (B = C) { constructor() { super(); } }`,
+		},
+		{
+			`class A extends (B &&= C) { constructor() { super(); } }`,
+			`class A extends (B &&= C) { constructor() { super(); } }`,
+		},
+		{
+			`class A extends (B ||= C) { constructor() { super(); } }`,
+			`class A extends (B ||= C) { constructor() { super(); } }`,
+		},
+		{
+			`class A extends (B ??= C) { constructor() { super(); } }`,
+			`class A extends (B ??= C) { constructor() { super(); } }`,
+		},
+		{
+			`class A extends (B ||= 5) { constructor() { super(); } }`,
+			`class A extends (B ||= 5) { constructor() { super(); } }`,
+		},
+		{
+			`class A extends (B ??= 5) { constructor() { super(); } }`,
+			`class A extends (B ??= 5) { constructor() { super(); } }`,
+		},
+		{
+			`class A extends (B || C) { constructor() { super(); } }`,
+			`class A extends (B || C) { constructor() { super(); } }`,
+		},
+		{
+			`class A extends (5 && B) { constructor() { super(); } }`,
+			`class A extends (5 && B) { constructor() { super(); } }`,
+		},
+		{
+			`class A extends (false && B) { constructor() { super(); } }`,
+			`class A extends (false && B) { constructor() { super(); } }`,
+		},
+		{
+			`class A extends (B || 5) { constructor() { super(); } }`,
+			`class A extends (B || 5) { constructor() { super(); } }`,
+		},
+		{
+			`class A extends (B ?? 5) { constructor() { super(); } }`,
+			`class A extends (B ?? 5) { constructor() { super(); } }`,
+		},
+		{
+			`class A extends (a ? B : C) { constructor() { super(); } }`,
+			`class A extends (a ? B : C) { constructor() { super(); } }`,
+		},
+		{
+			`class A extends (B, C) { constructor() { super(); } }`,
+			`class A extends (B, C) { constructor() { super(); } }`,
+		},
+		{
+			`class A { constructor() { class B extends C { constructor() `,
+			`class A { constructor() { class B extends C { constructor() { super(); } } } }`,
+		},
+		{
+			`class A extends B { constructor() { super(); class C extends`,
+			`class A extends B { constructor() { super(); class C extends D { constructor() { super(); } } } }`,
+		},
+		{
+			`class A extends B { constructor() { super(); class C { const`,
+			`class A extends B { constructor() { super(); class C { constructor() { } } } }`,
+		},
+		{
+			`class A extends B { constructor() { a ? super() : super(); }`,
+			`class A extends B { constructor() { a ? super() : super(); } }`,
+		},
+		{
+			`class A extends B { constructor() { if (a) super(); else sup`,
+			`class A extends B { constructor() { if (a) super(); else super(); } }`,
+		},
+		{
+			`class A extends B { constructor() { switch (a) { case 0: sup`,
+			`class A extends B { constructor() { switch (a) { case 0: super(); break; default: super(); } } }`,
+		},
+		{
+			`class A extends B { constructor() { try {} finally { super()`,
+			`class A extends B { constructor() { try {} finally { super(); } } }`,
+		},
+		{
+			`class A extends B { constructor() { if (a) throw Error(); su`,
+			`class A extends B { constructor() { if (a) throw Error(); super(); } }`,
+		},
+		{
+			`class A extends B { constructor() { if (true) return a; supe`,
+			`class A extends B { constructor() { if (true) return a; super(); } }`,
+		},
+		{
+			`class A extends null { constructor() { return a; } }`,
+			`class A extends null { constructor() { return a; } }`,
+		},
 		{`class A { constructor() { return a; } }`, `class A { constructor() { return a; } }`},
-		{`class A extends B { constructor(a) { super(); for (const b o`, `class A extends B { constructor(a) { super(); for (const b of a) { this.a(); } } }`},
-		{`class A extends B { constructor(a) { super(); for (b in a) (`, `class A extends B { constructor(a) { super(); for (b in a) ( foo(b) ); } }`},
-		{`class Foo extends Object { constructor(method) { super(); th`, `class Foo extends Object { constructor(method) { super(); this.method = method || function() {}; } }`},
+		{
+			`class A extends B { constructor(a) { super(); for (const b o`,
+			`class A extends B { constructor(a) { super(); for (const b of a) { this.a(); } } }`,
+		},
+		{
+			`class A extends B { constructor(a) { super(); for (b in a) (`,
+			`class A extends B { constructor(a) { super(); for (b in a) ( foo(b) ); } }`,
+		},
+		{
+			`class Foo extends Object { constructor(method) { super(); th`,
+			`class Foo extends Object { constructor(method) { super(); this.method = method || function() {}; } }`,
+		},
 		{`class A extends Object { constructor() { super(); for (let i`, `class A extends Object {
                 constructor() {
                     super();
@@ -260,7 +476,10 @@ func TestConstructorSuperStaysSilent(test *testing.T) {
                             }
                         }
                     `},
-		{`class A extends obj?.prop { constructor() { super(); } }`, `class A extends obj?.prop { constructor() { super(); } }`},
+		{
+			`class A extends obj?.prop { constructor() { super(); } }`,
+			`class A extends obj?.prop { constructor() { super(); } }`,
+		},
 		{`class A extends Base { constructor(list) { for (const a of l`, `
                         class A extends Base {
                             constructor(list) {
@@ -274,8 +493,14 @@ func TestConstructorSuperStaysSilent(test *testing.T) {
                             }
                         }
                     `},
-		{`class A extends B { constructor() { super(); try { throw new`, `class A extends B { constructor() { super(); try { throw new Error(); } catch (e) {} } }`},
-		{`class A extends B { constructor() { try { mayThrow(); } catc`, `class A extends B { constructor() { try { mayThrow(); } catch (e) {} finally { super(); } } }`},
+		{
+			`class A extends B { constructor() { super(); try { throw new`,
+			`class A extends B { constructor() { super(); try { throw new Error(); } catch (e) {} } }`,
+		},
+		{
+			`class A extends B { constructor() { try { mayThrow(); } catc`,
+			`class A extends B { constructor() { try { mayThrow(); } catch (e) {} finally { super(); } } }`,
+		},
 	}
 
 	for _, testCase := range cases {
@@ -679,7 +904,10 @@ func TestConstructorSuperDoesNotBlameANestedClassForAnUnconstructableExtends(tes
 	// The span matters as much as the id here, since the whole failure mode is the finding landing
 	// on the inner class's correct call. Asserting the outer constructor is what makes this test
 	// see the defect rather than merely notice a count.
-	if got := sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]; !strings.HasPrefix(got, "constructor() { class C") {
+	if got := sourceText[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]; !strings.HasPrefix(
+		got,
+		"constructor() { class C",
+	) {
 		test.Errorf("reported at %q, want the outer constructor", got)
 	}
 }

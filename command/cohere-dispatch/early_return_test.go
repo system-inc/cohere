@@ -28,9 +28,21 @@ func TestReturningEarlyChangesNothingTheCallerSees(test *testing.T) {
 		arguments []string
 	}{
 		{"clean", map[string]string{"Clean.ts": "export const clean = 1;\n"}, []string{"--no-fix"}},
-		{"findings", map[string]string{"Producer.ts": "export function value(): number {\n    debugger;\n    return 1;\n}\n"}, []string{"--no-fix"}},
-		{"a type error", map[string]string{"Broken.ts": "export const broken: number = \"text\";\n"}, []string{"--no-fix"}},
-		{"a rewrite", map[string]string{"Producer.ts": "export function value(): number {\n    debugger;\n    return 1;\n}\n"}, nil},
+		{
+			"findings",
+			map[string]string{"Producer.ts": "export function value(): number {\n    debugger;\n    return 1;\n}\n"},
+			[]string{"--no-fix"},
+		},
+		{
+			"a type error",
+			map[string]string{"Broken.ts": "export const broken: number = \"text\";\n"},
+			[]string{"--no-fix"},
+		},
+		{
+			"a rewrite",
+			map[string]string{"Producer.ts": "export function value(): number {\n    debugger;\n    return 1;\n}\n"},
+			nil,
+		},
 	}
 	durations := regexp.MustCompile(`\d+(\.\d+)?(ms|s|µs| GB)\b`)
 	clock := regexp.MustCompile(`\d\d:\d\d:\d\d`)
@@ -78,8 +90,15 @@ func TestReturningEarlyChangesNothingTheCallerSees(test *testing.T) {
 			waited := run(true)
 			early := run(false)
 			if early.stdout != waited.stdout || early.stderr != waited.stderr || early.code != waited.code {
-				test.Fatalf("returning early changed what the caller sees:\n--- waited (exit %d)\n%s\n%s\n--- early (exit %d)\n%s\n%s",
-					waited.code, waited.stdout, waited.stderr, early.code, early.stdout, early.stderr)
+				test.Fatalf(
+					"returning early changed what the caller sees:\n--- waited (exit %d)\n%s\n%s\n--- early (exit %d)\n%s\n%s",
+					waited.code,
+					waited.stdout,
+					waited.stderr,
+					early.code,
+					early.stdout,
+					early.stderr,
+				)
 			}
 
 			// The engine finishes alone after an early return, and what it finishes is the cache table: a run that
@@ -98,7 +117,9 @@ func TestReturningEarlyChangesNothingTheCallerSees(test *testing.T) {
 				}
 				time.Sleep(20 * time.Millisecond)
 			}
-			if _, statError := os.Stat(filepath.Join(early.root, ".cache", "cohere", "notes-after-return.txt")); statError == nil {
+			if _, statError := os.Stat(
+				filepath.Join(early.root, ".cache", "cohere", "notes-after-return.txt"),
+			); statError == nil {
 				test.Error("the engine left a note after returning, so something it did in the background failed")
 			}
 		})
@@ -196,20 +217,36 @@ func TestAProfiledRunIsWholeWhenTheCallerHasItsAnswer(test *testing.T) {
 		reader, err := gzip.NewReader(file)
 		if err != nil {
 			_ = file.Close() // Ignored: a profile only read, and the test fails on what the read found.
-			test.Fatalf("round %d: the profile is not a whole gzip stream when the caller had its answer: %v", round, err)
+			test.Fatalf(
+				"round %d: the profile is not a whole gzip stream when the caller had its answer: %v",
+				round,
+				err,
+			)
 		}
 		read, err := io.Copy(io.Discard, reader)
 		_ = file.Close() // Ignored: a profile only read, to its end.
 		if err != nil || read == 0 {
-			test.Fatalf("round %d: the profile read %d bytes and then %v when the caller had its answer", round, read, err)
+			test.Fatalf(
+				"round %d: the profile read %d bytes and then %v when the caller had its answer",
+				round,
+				read,
+				err,
+			)
 		}
 	}
 }
 
 // writeRepositoryProject writes a project that records its runs: a repository with its cache ignored.
 func writeRepositoryProject(test *testing.T) string {
-	root := writeEarlyReturnProject(test, map[string]string{"Clean.ts": "export const clean = 1;\n", ".gitignore": ".cache/\n"})
-	for _, arguments := range [][]string{{"init", "--quiet"}, {"add", "-A"}, {"-c", "user.email=fixture@example.com", "-c", "user.name=fixture", "commit", "--quiet", "-m", "initial"}} {
+	root := writeEarlyReturnProject(
+		test,
+		map[string]string{"Clean.ts": "export const clean = 1;\n", ".gitignore": ".cache/\n"},
+	)
+	for _, arguments := range [][]string{
+		{"init", "--quiet"},
+		{"add", "-A"},
+		{"-c", "user.email=fixture@example.com", "-c", "user.name=fixture", "commit", "--quiet", "-m", "initial"},
+	} {
 		git := exec.Command("git", arguments...)
 		git.Dir = root
 		if output, outputError := git.CombinedOutput(); outputError != nil {
@@ -232,7 +269,12 @@ func TestARunWaitsForAWriterStillHoldingTheTable(test *testing.T) {
 	test.Parallel()
 	dispatcher, engine := buildDispatcherAndEngine(test)
 	root := writeRepositoryProject(test)
-	if output, outputError := earlyReturnCommand(dispatcher, engine, root, "--no-fix").CombinedOutput(); outputError != nil {
+	if output, outputError := earlyReturnCommand(
+		dispatcher,
+		engine,
+		root,
+		"--no-fix",
+	).CombinedOutput(); outputError != nil {
 		test.Fatalf("the first run failed: %v\n%s", outputError, output)
 	}
 

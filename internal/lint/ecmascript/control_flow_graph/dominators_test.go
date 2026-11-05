@@ -83,7 +83,10 @@ func TestDominatorsMatchTheDefinition(test *testing.T) {
 		{name: "loop with continue", code: `function f(x, y) { while (x) { if (y) continue; a(); } b(); }`},
 		{name: "do while", code: `function f(x) { do { a(); } while (x); b(); }`},
 		{name: "for of", code: `function f(xs) { for (const x of xs) { a(x); } b(); }`},
-		{name: "switch", code: `function f(x) { switch (x) { case 0: a(); break; case 1: b(); break; default: c(); } d(); }`},
+		{
+			name: "switch",
+			code: `function f(x) { switch (x) { case 0: a(); break; case 1: b(); break; default: c(); } d(); }`,
+		},
 		{name: "switch fallthrough", code: `function f(x) { switch (x) { case 0: a(); case 1: b(); break; } c(); }`},
 		{name: "try catch", code: `function f() { try { a(); } catch (e) { b(); } c(); }`},
 		{name: "try finally", code: `function f() { try { a(); } finally { b(); } c(); }`},
@@ -94,7 +97,10 @@ func TestDominatorsMatchTheDefinition(test *testing.T) {
 		{name: "short circuit", code: `function f(x, y) { if (x && y) a(); b(); }`},
 		{name: "ternary", code: `function f(x) { const v = x ? a() : b(); c(v); }`},
 		{name: "optional chain", code: `function f(x) { x?.a(); b(); }`},
-		{name: "labelled break", code: `function f(x, y) { outer: while (x) { while (y) { break outer; } a(); } b(); }`},
+		{
+			name: "labelled break",
+			code: `function f(x, y) { outer: while (x) { while (y) { break outer; } a(); } b(); }`,
+		},
 		{name: "generator yield in loop", code: `function* f(x) { while (x) { a(); yield x; } b(); }`},
 		{name: "infinite loop", code: `function f() { for (;;) { a(); } }`},
 		// Everything after the `return` is unreachable, so exactly one block participates.
@@ -127,8 +133,11 @@ func TestDominatorsMatchTheDefinition(test *testing.T) {
 				wantPairs = 4
 			}
 			if checked < wantPairs {
-				test.Fatalf("only %d reachable pairs checked, want at least %d; the graph is smaller than this case assumes",
-					checked, wantPairs)
+				test.Fatalf(
+					"only %d reachable pairs checked, want at least %d; the graph is smaller than this case assumes",
+					checked,
+					wantPairs,
+				)
 			}
 		})
 	}
@@ -179,8 +188,11 @@ func TestDominatorsRejectABrokenTree(test *testing.T) {
 		}
 	}
 	if disagreements == 0 {
-		test.Fatalf("reparenting block %d from %d to the entry changed no answer; the definition check cannot see a broken tree",
-			target, original)
+		test.Fatalf(
+			"reparenting block %d from %d to the entry changed no answer; the definition check cannot see a broken tree",
+			target,
+			original,
+		)
 	}
 }
 
@@ -194,7 +206,10 @@ func TestDominatorsOnKnownShapes(test *testing.T) {
 
 	test.Run("the join after a diamond is not dominated by either arm", func(test *testing.T) {
 		test.Parallel()
-		graph, locations := buildPathTestGraph(test, `function f(x) { if (x) markLeft(); else markRight(); markJoin(); }`)
+		graph, locations := buildPathTestGraph(
+			test,
+			`function f(x) { if (x) markLeft(); else markRight(); markJoin(); }`,
+		)
 		dominators := AnalyzeDominators(graph)
 		left := locations["markLeft"][0]
 		right := locations["markRight"][0]
@@ -276,7 +291,9 @@ func TestDominatorsOnKnownShapes(test *testing.T) {
 		graph, _ := buildPathTestGraph(test, `function f() { a(); }`)
 		dominators := AnalyzeDominators(graph)
 		if _, ok := dominators.ImmediateDominator(graph.Blocks[0]); ok {
-			test.Error("the entry block has no immediate dominator; returning itself would loop a caller walking upward")
+			test.Error(
+				"the entry block has no immediate dominator; returning itself would loop a caller walking upward",
+			)
 		}
 	})
 }
@@ -370,11 +387,19 @@ func TestPredecessorsAreTheInverseOfSuccessors(test *testing.T) {
 						}
 					}
 					if !found {
-						test.Errorf("block %d lists block %d as a predecessor, but block %d has no successor edge to it",
-							block.Index(), predecessor.Index(), predecessor.Index())
+						test.Errorf(
+							"block %d lists block %d as a predecessor, but block %d has no successor edge to it",
+							block.Index(),
+							predecessor.Index(),
+							predecessor.Index(),
+						)
 					}
 					if !predecessor.Reachable {
-						test.Errorf("block %d lists unreachable block %d as a predecessor", block.Index(), predecessor.Index())
+						test.Errorf(
+							"block %d lists unreachable block %d as a predecessor",
+							block.Index(),
+							predecessor.Index(),
+						)
 					}
 					edges++
 				}
@@ -400,8 +425,11 @@ func TestPredecessorsAreTheInverseOfSuccessors(test *testing.T) {
 						}
 					}
 					if !found {
-						test.Errorf("block %d has a successor edge to block %d, which does not list it as a predecessor",
-							block.Index(), successor.Index())
+						test.Errorf(
+							"block %d has a successor edge to block %d, which does not list it as a predecessor",
+							block.Index(),
+							successor.Index(),
+						)
 					}
 				}
 			}
@@ -463,8 +491,11 @@ func TestReversePostOrderPlacesPredecessorsFirst(test *testing.T) {
 					}
 				}
 				if !earlier {
-					test.Errorf("block %d appears before all of its predecessors; only a back-edge target may, and it has %d predecessors",
-						block.Index(), len(predecessors))
+					test.Errorf(
+						"block %d appears before all of its predecessors; only a back-edge target may, and it has %d predecessors",
+						block.Index(),
+						len(predecessors),
+					)
 				}
 			}
 

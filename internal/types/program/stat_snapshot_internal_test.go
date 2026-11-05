@@ -42,7 +42,16 @@ func TestTheCheckedStatsAnswerAsTheDiskDoes(test *testing.T) {
 		test.Fatal(symlinkError)
 	}
 
-	recorded, recordRunCacheError := RecordRunCache("key", []string{file, directory, fileLink, directoryLink}, nil, []string{absent}, nil, []byte("verdict"), 0, time.Time{})
+	recorded, recordRunCacheError := RecordRunCache(
+		"key",
+		[]string{file, directory, fileLink, directoryLink},
+		nil,
+		[]string{absent},
+		nil,
+		[]byte("verdict"),
+		0,
+		time.Time{},
+	)
 	if recordRunCacheError != nil {
 		test.Fatal(recordRunCacheError)
 	}
@@ -57,25 +66,46 @@ func TestTheCheckedStatsAnswerAsTheDiskDoes(test *testing.T) {
 	paths := []string{file, directory, fileLink, directoryLink, absent}
 	for _, path := range paths {
 		for _, asked := range []string{path, path + "/", filepath.Dir(path) + "//" + filepath.Base(path)} {
-			if got, want := checked.FileExists(tspath.RootedFilePath(asked)), disk.FileExists(tspath.RootedFilePath(asked)); got != want {
+			if got, want := checked.FileExists(
+				tspath.RootedFilePath(asked),
+			), disk.FileExists(tspath.RootedFilePath(asked)); got != want {
 				test.Errorf("FileExists(%s): the check says %t, the disk %t", asked, got, want)
 			}
-			if got, want := checked.DirectoryExists(tspath.RootedDirectoryPath(asked)), disk.DirectoryExists(tspath.RootedDirectoryPath(asked)); got != want {
+			if got, want := checked.DirectoryExists(
+				tspath.RootedDirectoryPath(asked),
+			), disk.DirectoryExists(tspath.RootedDirectoryPath(asked)); got != want {
 				test.Errorf("DirectoryExists(%s): the check says %t, the disk %t", asked, got, want)
 			}
 			got, want := checked.Stat(tspath.RootedPath(asked)), disk.Stat(tspath.RootedPath(asked))
 			switch {
 			case (got == nil) != (want == nil):
 				test.Errorf("Stat(%s): the check found something %t, the disk %t", asked, got != nil, want != nil)
-			case got != nil && (got.IsDir() != want.IsDir() || got.Size() != want.Size() || !got.ModTime().Equal(want.ModTime()) || got.Mode() != want.Mode()):
-				test.Errorf("Stat(%s): the check says %v %d %v %v, the disk %v %d %v %v", asked,
-					got.IsDir(), got.Size(), got.ModTime(), got.Mode(), want.IsDir(), want.Size(), want.ModTime(), want.Mode())
+			case got != nil && (got.IsDir() != want.IsDir() ||
+				got.Size() != want.Size() ||
+				!got.ModTime().Equal(want.ModTime()) ||
+				got.Mode() != want.Mode()):
+				test.Errorf(
+					"Stat(%s): the check says %v %d %v %v, the disk %v %d %v %v",
+					asked,
+					got.IsDir(),
+					got.Size(),
+					got.ModTime(),
+					got.Mode(),
+					want.IsDir(),
+					want.Size(),
+					want.ModTime(),
+					want.Mode(),
+				)
 			}
 		}
 	}
 	// Three questions of each path as the check statted it, and none in the other spellings, or the agreement
 	// above was the disk agreeing with itself.
 	if got, want := answered.Load(), int64(3*len(paths)); got != want {
-		test.Errorf("the check answered %d questions, want %d: one of each kind for each path, as the check statted it", got, want)
+		test.Errorf(
+			"the check answered %d questions, want %d: one of each kind for each path, as the check statted it",
+			got,
+			want,
+		)
 	}
 }

@@ -37,12 +37,15 @@ func TestOnlyCohereDevTrims(test *testing.T) {
 		relative = filepath.ToSlash(relative)
 		if entry.IsDir() {
 			// The vendored compiler, caches and fixtures hold no caller of ours.
-			if relative != "." && (strings.HasPrefix(entry.Name(), ".") || entry.Name() == "testdata" || relative == "TypeScript") {
+			if relative != "." &&
+				(strings.HasPrefix(entry.Name(), ".") || entry.Name() == "testdata" || relative == "TypeScript") {
 				return filepath.SkipDir
 			}
 			return nil
 		}
-		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") || strings.HasPrefix(relative, trimCaller+"/") {
+		if !strings.HasSuffix(path, ".go") ||
+			strings.HasSuffix(path, "_test.go") ||
+			strings.HasPrefix(relative, trimCaller+"/") {
 			return nil
 		}
 		imports, err := parser.ParseFile(files, path, nil, parser.ImportsOnly)
@@ -79,7 +82,11 @@ func TestOnlyCohereDevTrims(test *testing.T) {
 		test.Fatal(err)
 	}
 	for _, caller := range callers {
-		test.Errorf("%s calls gocache.Trim outside %s: only cohere-dev's trim may delete from a live Go cache, "+
-			"holding the pool's lock; ask it (cohere-dev trim-cache) rather than trim beside the builds", caller, trimCaller)
+		test.Errorf(
+			"%s calls gocache.Trim outside %s: only cohere-dev's trim may delete from a live Go cache, "+
+				"holding the pool's lock; ask it (cohere-dev trim-cache) rather than trim beside the builds",
+			caller,
+			trimCaller,
+		)
 	}
 }

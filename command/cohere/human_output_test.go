@@ -42,7 +42,12 @@ func TestChangedFileLinesAreCapped(test *testing.T) {
 	}
 	got := changedFileLines(files, plain)
 	if len(got) != changedFilesShown+1 {
-		test.Fatalf("%d files listed %d lines, want %d and a line saying how many more", len(files), len(got), changedFilesShown)
+		test.Fatalf(
+			"%d files listed %d lines, want %d and a line saying how many more",
+			len(files),
+			len(got),
+			changedFilesShown,
+		)
 	}
 	if want := "… 5 more · --verbose for all"; got[len(got)-1] != want {
 		test.Errorf("the last line is %q, want %q", got[len(got)-1], want)

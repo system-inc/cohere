@@ -39,17 +39,27 @@ func TestAnEarlyFormatResultIsDiscardedWhenTheFileChangesBeforeTheBuild(test *te
 				}
 			}
 			configuration := `{"compilerOptions":{"strict":true,"module":"esnext","target":"esnext","moduleResolution":"bundler"},"include":["**/*.ts"]}`
-			if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration), 0o644); writeError != nil {
+			if writeError := os.WriteFile(
+				filepath.Join(directory, "tsconfig.json"),
+				[]byte(configuration),
+				0o644,
+			); writeError != nil {
 				test.Fatal(writeError)
 			}
-			graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+			graph, buildError := program.Build(
+				program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory},
+			)
 			if buildError != nil {
 				test.Fatal(buildError)
 			}
 
 			_, kept := speculation.keepable(nil, graph)[fileName]
 			if kept == edited {
-				test.Errorf("edited between the early read and the build: %t, and the early result was kept: %t", edited, kept)
+				test.Errorf(
+					"edited between the early read and the build: %t, and the early result was kept: %t",
+					edited,
+					kept,
+				)
 			}
 		})
 	}
@@ -104,10 +114,17 @@ func TestANarrowedSpeculationRunsOnFewerWorkersAndStillReachesEveryFile(test *te
 	speculation.wait()
 
 	if most := mostAfter.Load(); most == 0 || most > narrowed {
-		test.Errorf("after narrowing to %d workers, %d files were formatted at once (0 means none was begun after it)", narrowed, most)
+		test.Errorf(
+			"after narrowing to %d workers, %d files were formatted at once (0 means none was begun after it)",
+			narrowed,
+			most,
+		)
 	}
 	if len(speculation.attempts) != len(candidates) {
-		test.Errorf("narrowed, the speculation kept %d of %d unchanged files: files the narrowed workers left were lost",
-			len(speculation.attempts), len(candidates))
+		test.Errorf(
+			"narrowed, the speculation kept %d of %d unchanged files: files the narrowed workers left were lost",
+			len(speculation.attempts),
+			len(candidates),
+		)
 	}
 }

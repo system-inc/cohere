@@ -43,7 +43,9 @@ const FormatterPassLoop = "command/cohere/format.go"
 // caught by TestFormatterInputsCoverWhatCanChangeTheOutput, which needs the real module's list to be
 // whole.
 func FormatterIdentity(moduleDirectory string, goVersion string, environment []string) (string, error) {
-	if _, statError := os.Stat(filepath.Join(moduleDirectory, filepath.FromSlash(formatterPackage))); errors.Is(statError, os.ErrNotExist) {
+	if _, statError := os.Stat(
+		filepath.Join(moduleDirectory, filepath.FromSlash(formatterPackage)),
+	); errors.Is(statError, os.ErrNotExist) {
 		return "", nil
 	}
 	inputs, formatterInputsError := FormatterInputs(moduleDirectory, environment)
@@ -93,7 +95,11 @@ func FormatterInputs(moduleDirectory string, environment []string) ([]FormatterI
 	// The printers alone are dozens of files, so a short list is a `go list` that answered about
 	// something else, and an identity hashed from it would match a formatter it does not describe.
 	if len(inputs) < 10 {
-		return nil, fmt.Errorf("go list found %d formatter inputs in %s, which cannot be right", len(inputs), moduleDirectory)
+		return nil, fmt.Errorf(
+			"go list found %d formatter inputs in %s, which cannot be right",
+			len(inputs),
+			moduleDirectory,
+		)
 	}
 
 	sum, err := fileSum(filepath.Join(moduleDirectory, FormatterPassLoop))

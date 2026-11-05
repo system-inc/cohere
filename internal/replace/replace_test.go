@@ -36,8 +36,18 @@ func TestARenameRefusedWhileHeldIsRetriedUntilItIsLetGo(test *testing.T) {
 	other := errors.New("no such directory")
 	calls := 0
 	failing := func(string, string) error { calls++; return other }
-	if replacingError := replacing(failing, held, sleep, "from", "to"); !errors.Is(replacingError, other) || calls != 1 {
-		test.Fatalf("a rename refused for another reason was retried (%d calls) or lost its error: %v", calls, replacingError)
+	if replacingError := replacing(
+		failing,
+		held,
+		sleep,
+		"from",
+		"to",
+	); !errors.Is(replacingError, other) || calls != 1 {
+		test.Fatalf(
+			"a rename refused for another reason was retried (%d calls) or lost its error: %v",
+			calls,
+			replacingError,
+		)
 	}
 }
 

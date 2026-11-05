@@ -19,7 +19,14 @@ import (
 func nestedTree(test *testing.T) string {
 	test.Helper()
 	root := test.TempDir()
-	for _, directory := range []string{".git", "library/.git", "library/inner/.git", "library/source", "modules", "projects/clone/.git"} {
+	for _, directory := range []string{
+		".git",
+		"library/.git",
+		"library/inner/.git",
+		"library/source",
+		"modules",
+		"projects/clone/.git",
+	} {
 		if createDirectoryError := os.MkdirAll(filepath.Join(root, directory), 0o755); createDirectoryError != nil {
 			test.Fatal(createDirectoryError)
 		}
@@ -56,7 +63,12 @@ func TestARunInsideALibraryWritesTheLibrary(test *testing.T) {
 	} {
 		got := writeRepositoryRoot(filepath.Join(root, testCase.start), root)
 		if got != filepath.Join(root, testCase.want) {
-			test.Errorf("a run started in %s writes %s, want %s", testCase.start, got, filepath.Join(root, testCase.want))
+			test.Errorf(
+				"a run started in %s writes %s, want %s",
+				testCase.start,
+				got,
+				filepath.Join(root, testCase.want),
+			)
 		}
 	}
 
@@ -80,13 +92,22 @@ func TestARunWritesOnlyItsOwnRepository(test *testing.T) {
 	if why := unwritableRepository(library, filepath.Join(library, "source", "Thing.ts")); why != "" {
 		test.Errorf("the library's own file was refused: %s", why)
 	}
-	if why := unwritableRepository(library, filepath.Join(root, "modules", "Host.ts")); why != "the project outside "+library {
+	if why := unwritableRepository(
+		library,
+		filepath.Join(root, "modules", "Host.ts"),
+	); why != "the project outside "+library {
 		test.Errorf("the project's file was not refused as outside the library: %q", why)
 	}
-	if why := unwritableRepository(library, filepath.Join(library, "inner", "Deep.ts")); why != "nested repository inner" {
+	if why := unwritableRepository(
+		library,
+		filepath.Join(library, "inner", "Deep.ts"),
+	); why != "nested repository inner" {
 		test.Errorf("a file in a repository nested in the library was not refused under it: %q", why)
 	}
-	if why := unwritableRepository(root, filepath.Join(library, "source", "Thing.ts")); why != "nested repository library" {
+	if why := unwritableRepository(
+		root,
+		filepath.Join(library, "source", "Thing.ts"),
+	); why != "nested repository library" {
 		test.Errorf("from the project, the library's file was not refused under the library: %q", why)
 	}
 }
@@ -114,7 +135,11 @@ func TestTheProjectReadsItsLibrariesDrift(test *testing.T) {
 	}
 	want := []string{"library/inner: library/inner/Deep.ts", "library: library/source/Thing.ts"}
 	if strings.Join(got, ", ") != strings.Join(want, ", ") {
-		test.Fatalf("drift %v, want %v (the ignored file and the undeclared clone skipped, the project's own file not read here)", got, want)
+		test.Fatalf(
+			"drift %v, want %v (the ignored file and the undeclared clone skipped, the project's own file not read here)",
+			got,
+			want,
+		)
 	}
 	if check.Repositories != 2 || check.Files != 4 {
 		test.Fatalf("read %d repositories and %d files, want 2 and 4", check.Repositories, check.Files)
@@ -149,7 +174,13 @@ func TestTheNestedCheckKeepsEachRepositorysOwnRecord(test *testing.T) {
 			test.Fatalf("%s: drift %v, want %v", label, got, wantDrift)
 		}
 		if result.Files != 4 || result.Checked != wantChecked {
-			test.Fatalf("%s: %d files, %d checked, want 4 files and %d checked", label, result.Files, result.Checked, wantChecked)
+			test.Fatalf(
+				"%s: %d files, %d checked, want 4 files and %d checked",
+				label,
+				result.Files,
+				result.Checked,
+				wantChecked,
+			)
 		}
 	}
 	drifted := []string{"library/inner/Deep.ts", "library/source/Thing.ts"}
@@ -200,7 +231,13 @@ func TestTheNestedCheckKeepsEachRepositorysOwnRecord(test *testing.T) {
 
 	// The positive control: a file the last check recorded clean, misformatted, is drift again.
 	writeTree(test, root, map[string]string{"library/source/Tidy.ts": "export const tidy   =   1\n"})
-	check("a recorded file misformatted", 3, "library/inner/Deep.ts", "library/source/Thing.ts", "library/source/Tidy.ts")
+	check(
+		"a recorded file misformatted",
+		3,
+		"library/inner/Deep.ts",
+		"library/source/Thing.ts",
+		"library/source/Tidy.ts",
+	)
 	writeTree(test, root, map[string]string{"library/source/Tidy.ts": "export const tidy = 1\n"})
 
 	// An entry vouching for Thing.ts's misformatted bytes. Under this formatter's key and options the
@@ -240,7 +277,11 @@ func TestTheNestedCheckKeepsEachRepositorysOwnRecord(test *testing.T) {
 		test.Fatal(err)
 	}
 	if all.Checked != 4 || len(all.Drift) != 2 {
-		test.Fatalf("--format-all checked %d of 4 files and found %d drifted, want 4 and 2 (the record's word taken for Thing.ts)", all.Checked, len(all.Drift))
+		test.Fatalf(
+			"--format-all checked %d of 4 files and found %d drifted, want 4 and 2 (the record's word taken for Thing.ts)",
+			all.Checked,
+			len(all.Drift),
+		)
 	}
 }
 
@@ -350,9 +391,13 @@ func TestALibraryIsFormattedFromItsOwnRootAndReadFromItsProject(test *testing.T)
 	// says its fix was not applied.
 	before := treeSnapshot(test, root)
 	output, code := runCohere(test, binary, root, "--no-fix", "--format")
-	if code == 0 || !strings.Contains(output, "nested repositories: 1 read, 2 files: 2 checked by the formatter, 1 would change under their own run") ||
+	if code == 0 || !strings.Contains(
+		output,
+		"nested repositories: 1 read, 2 files: 2 checked by the formatter, 1 would change under their own run",
+	) ||
 		!strings.Contains(output, "1 fix not applied: in nested repository library") ||
-		!strings.Contains(output, filepath.Join(library, "Inner.ts")+":1:1 - the formatter would rewrite this file in nested repository library") {
+		!strings.Contains(output, filepath.Join(library, "Inner.ts")+
+			":1:1 - the formatter would rewrite this file in nested repository library") {
 		test.Fatalf("the project's check did not report the library's drift, exit %d:\n%s", code, output)
 	}
 	assertTreeUnchanged(test, root, before, output)
@@ -388,13 +433,19 @@ func TestALibraryIsFormattedFromItsOwnRootAndReadFromItsProject(test *testing.T)
 	// The library's run left its record in the library, and the project's check reads it, so nothing in
 	// the library is formatted again.
 	output, _ = runCohere(test, binary, root, "--no-fix", "--format")
-	if !strings.Contains(output, "nested repositories: 1 read, 2 files: none checked by the formatter, all 2 taken on their record's word as formatted at their current bytes") {
+	if !strings.Contains(
+		output,
+		"nested repositories: 1 read, 2 files: none checked by the formatter, all 2 taken on their record's word as formatted at their current bytes",
+	) {
 		test.Fatalf("the library is still reported, or formatted again, after its own run formatted it:\n%s", output)
 	}
 
 	// `--format-all` reads every nested file whatever the record says.
 	output, _ = runCohere(test, binary, root, "--no-fix", "--format-all")
-	if !strings.Contains(output, "nested repositories: 1 read, 2 files: 2 checked by the formatter, 0 would change under their own run\n") {
+	if !strings.Contains(
+		output,
+		"nested repositories: 1 read, 2 files: 2 checked by the formatter, 0 would change under their own run\n",
+	) {
 		test.Fatalf("--format-all took the library's record's word:\n%s", output)
 	}
 	if !strings.Contains(output, filepath.Join(root, "Producer.ts")+":1:1 - --fix would rewrite this file") {
@@ -406,8 +457,12 @@ func TestALibraryIsFormattedFromItsOwnRootAndReadFromItsProject(test *testing.T)
 	writeTree(test, root, map[string]string{"library/Inner.ts": "export const inner   =   1;\n"})
 	for _, label := range []string{"the check after the plant", "the check after that"} {
 		output, code = runCohere(test, binary, root, "--no-fix", "--format")
-		if code == 0 || !strings.Contains(output, "nested repositories: 1 read, 2 files: 1 checked by the formatter, 1 would change under their own run; 1 taken on their record's word as formatted at their current bytes") ||
-			!strings.Contains(output, filepath.Join(library, "Inner.ts")+":1:1 - the formatter would rewrite this file in nested repository library") {
+		if code == 0 || !strings.Contains(
+			output,
+			"nested repositories: 1 read, 2 files: 1 checked by the formatter, 1 would change under their own run; 1 taken on their record's word as formatted at their current bytes",
+		) ||
+			!strings.Contains(output, filepath.Join(library, "Inner.ts")+
+				":1:1 - the formatter would rewrite this file in nested repository library") {
 			test.Fatalf("%s did not report the planted misformat, exit %d:\n%s", label, code, output)
 		}
 	}

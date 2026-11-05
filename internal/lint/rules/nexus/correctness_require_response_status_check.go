@@ -17,16 +17,28 @@ const (
 
 // The rule's messages, whose wording lives in `policy/messages/correctness-require-response-status-check.json`.
 var (
-	correctnessRequireResponseStatusCheckBodyText    = policy.MessageOf("nexus/correctness-require-response-status-check", correctnessRequireResponseStatusCheckBodyId)
-	correctnessRequireResponseStatusCheckDiscardText = policy.MessageOf("nexus/correctness-require-response-status-check", correctnessRequireResponseStatusCheckDiscardId)
+	correctnessRequireResponseStatusCheckBodyText = policy.MessageOf(
+		"nexus/correctness-require-response-status-check",
+		correctnessRequireResponseStatusCheckBodyId,
+	)
+	correctnessRequireResponseStatusCheckDiscardText = policy.MessageOf(
+		"nexus/correctness-require-response-status-check",
+		correctnessRequireResponseStatusCheckDiscardId,
+	)
 )
 
 func correctnessRequireResponseStatusCheckBodyMessage() rule.Message {
-	return rule.Message{Id: correctnessRequireResponseStatusCheckBodyId, Description: correctnessRequireResponseStatusCheckBodyText.Render(nil)}
+	return rule.Message{
+		Id:          correctnessRequireResponseStatusCheckBodyId,
+		Description: correctnessRequireResponseStatusCheckBodyText.Render(nil),
+	}
 }
 
 func correctnessRequireResponseStatusCheckDiscardMessage() rule.Message {
-	return rule.Message{Id: correctnessRequireResponseStatusCheckDiscardId, Description: correctnessRequireResponseStatusCheckDiscardText.Render(nil)}
+	return rule.Message{
+		Id:          correctnessRequireResponseStatusCheckDiscardId,
+		Description: correctnessRequireResponseStatusCheckDiscardText.Render(nil),
+	}
 }
 
 // CorrectnessRequireResponseStatusCheck reports a fetch Response whose body is read on a path that
@@ -234,7 +246,9 @@ func correctnessRequireResponseStatusCheckScanFile(ruleContext rule.Context, sou
 			if correctnessRequireResponseStatusCheckIsProducer(ruleContext, call) {
 				if binding := correctnessRequireResponseStatusCheckConstBinding(ruleContext, node); binding != nil {
 					track(binding)
-				} else if use, report := correctnessRequireResponseStatusCheckClassify(node); use == correctnessRequireResponseStatusCheckBodyRead {
+				} else if use, report := correctnessRequireResponseStatusCheckClassify(
+					node,
+				); use == correctnessRequireResponseStatusCheckBodyRead {
 					ruleContext.ReportNode(report, correctnessRequireResponseStatusCheckBodyMessage())
 				}
 			}
@@ -278,7 +292,9 @@ func correctnessRequireResponseStatusCheckIsProducer(ruleContext rule.Context, n
 		return correctnessRequireResponseStatusCheckIsGlobalFetch(ruleContext.TypeChecker.GetSymbolAtLocation(name))
 	case "request", "baseApiRequest":
 		return callee.Kind == ast.KindPropertyAccessExpression &&
-			correctnessRequireResponseStatusCheckIsNetworkServiceMethod(ruleContext.TypeChecker.GetSymbolAtLocation(name))
+			correctnessRequireResponseStatusCheckIsNetworkServiceMethod(
+				ruleContext.TypeChecker.GetSymbolAtLocation(name),
+			)
 	}
 	return false
 }
@@ -305,7 +321,9 @@ func correctnessRequireResponseStatusCheckIsGlobalFetch(symbol *ast.Symbol) bool
 			if ast.IsExternalModule(container.AsSourceFile()) {
 				return false
 			}
-		case container != nil && container.Kind == ast.KindModuleBlock && ast.IsGlobalScopeAugmentation(container.Parent):
+		case container != nil &&
+			container.Kind == ast.KindModuleBlock &&
+			ast.IsGlobalScopeAugmentation(container.Parent):
 		default:
 			return false
 		}
@@ -344,7 +362,8 @@ func correctnessRequireResponseStatusCheckIsNetworkServiceMethod(symbol *ast.Sym
 		}
 		matched := false
 		for _, known := range correctnessRequireResponseStatusCheckNetworkServiceDeclarations {
-			if class.Name().Text() == known.className && strings.HasSuffix(file.FileName().AsString(), known.fileSuffix) {
+			if class.Name().Text() == known.className &&
+				strings.HasSuffix(file.FileName().AsString(), known.fileSuffix) {
 				matched = true
 			}
 		}
@@ -358,7 +377,10 @@ func correctnessRequireResponseStatusCheckIsNetworkServiceMethod(symbol *ast.Sym
 // correctnessRequireResponseStatusCheckConstBinding is the binding `const response = await
 // <producer>(...)` declares, when the await is that whole initializer and the name is a plain
 // identifier.
-func correctnessRequireResponseStatusCheckConstBinding(ruleContext rule.Context, await *ast.Node) *correctnessRequireResponseStatusCheckBinding {
+func correctnessRequireResponseStatusCheckConstBinding(
+	ruleContext rule.Context,
+	await *ast.Node,
+) *correctnessRequireResponseStatusCheckBinding {
 	declaration := await.Parent
 	for declaration != nil && declaration.Kind == ast.KindParenthesizedExpression {
 		declaration = declaration.Parent
@@ -384,7 +406,10 @@ func correctnessRequireResponseStatusCheckConstBinding(ruleContext rule.Context,
 // correctnessRequireResponseStatusCheckThenBinding is the parameter of `producer(...).then(function(
 // response) { ... })`, a callback passed straight to `.then` on a tracked call, when that parameter
 // is a plain identifier with no default.
-func correctnessRequireResponseStatusCheckThenBinding(ruleContext rule.Context, call *ast.Node) *correctnessRequireResponseStatusCheckBinding {
+func correctnessRequireResponseStatusCheckThenBinding(
+	ruleContext rule.Context,
+	call *ast.Node,
+) *correctnessRequireResponseStatusCheckBinding {
 	callee := ast.SkipParentheses(call.AsCallExpression().Expression)
 	if callee.Kind != ast.KindPropertyAccessExpression {
 		return nil
@@ -408,7 +433,10 @@ func correctnessRequireResponseStatusCheckThenBinding(ruleContext rule.Context, 
 	}
 	parameter := parameters[0].AsParameterDeclaration()
 	name := parameter.Name()
-	if name == nil || name.Kind != ast.KindIdentifier || parameter.Initializer != nil || parameter.DotDotDotToken != nil {
+	if name == nil ||
+		name.Kind != ast.KindIdentifier ||
+		parameter.Initializer != nil ||
+		parameter.DotDotDotToken != nil {
 		return nil
 	}
 	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(name)
@@ -421,7 +449,9 @@ func correctnessRequireResponseStatusCheckThenBinding(ruleContext rule.Context, 
 // correctnessRequireResponseStatusCheckClassify reads what one expression of a Response is used for,
 // looking out through the wrappers that do not change the value, and returns the node a body read
 // reports at.
-func correctnessRequireResponseStatusCheckClassify(expression *ast.Node) (correctnessRequireResponseStatusCheckUse, *ast.Node) {
+func correctnessRequireResponseStatusCheckClassify(
+	expression *ast.Node,
+) (correctnessRequireResponseStatusCheckUse, *ast.Node) {
 	outer := expression
 	for outer.Parent != nil {
 		switch outer.Parent.Kind {
@@ -436,7 +466,8 @@ func correctnessRequireResponseStatusCheckClassify(expression *ast.Node) (correc
 	if parent == nil {
 		return correctnessRequireResponseStatusCheckEscape, nil
 	}
-	isAccess := (parent.Kind == ast.KindPropertyAccessExpression && parent.AsPropertyAccessExpression().Expression == outer) ||
+	isAccess := (parent.Kind == ast.KindPropertyAccessExpression &&
+		parent.AsPropertyAccessExpression().Expression == outer) ||
 		(parent.Kind == ast.KindElementAccessExpression && parent.AsElementAccessExpression().Expression == outer)
 	if !isAccess {
 		return correctnessRequireResponseStatusCheckEscape, nil
@@ -601,17 +632,21 @@ func correctnessRequireResponseStatusCheckUncheckedReads(
 
 	// The body reads reachable from a declaration with nothing checked yet.
 	var candidates []correctnessRequireResponseStatusCheckPosition
-	correctnessRequireResponseStatusCheckWalk(starts, func(block *control_flow_graph.Block[correctnessRequireResponseStatusCheckEvent], index int) bool {
-		event := block.Events[index]
-		if event.binding != binding {
+	correctnessRequireResponseStatusCheckWalk(
+		starts,
+		func(block *control_flow_graph.Block[correctnessRequireResponseStatusCheckEvent], index int) bool {
+			event := block.Events[index]
+			if event.binding != binding {
+				return true
+			}
+			if event.declare || event.use != correctnessRequireResponseStatusCheckBodyRead {
+				return false
+			}
+			candidates = append(candidates, correctnessRequireResponseStatusCheckPosition{block: block, start: index})
 			return true
-		}
-		if event.declare || event.use != correctnessRequireResponseStatusCheckBodyRead {
-			return false
-		}
-		candidates = append(candidates, correctnessRequireResponseStatusCheckPosition{block: block, start: index})
-		return true
-	}, nil)
+		},
+		nil,
+	)
 
 	var reports []*ast.Node
 	reported := map[*ast.Node]bool{}
@@ -621,7 +656,9 @@ func correctnessRequireResponseStatusCheckUncheckedReads(
 			continue
 		}
 		unchecked := false
-		correctnessRequireResponseStatusCheckWalk([]correctnessRequireResponseStatusCheckPosition{{block: candidate.block, start: candidate.start + 1}},
+		correctnessRequireResponseStatusCheckWalk([]correctnessRequireResponseStatusCheckPosition{
+			{block: candidate.block, start: candidate.start + 1},
+		},
 			func(block *control_flow_graph.Block[correctnessRequireResponseStatusCheckEvent], index int) bool {
 				event := block.Events[index]
 				if event.binding != binding || unchecked {

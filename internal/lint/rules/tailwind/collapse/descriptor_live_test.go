@@ -73,7 +73,9 @@ func liveTableForOracle(test *testing.T, entryPoint string) (*LoadedDesignSystem
 func liveTableFor(test *testing.T, spelling string) (*LoadedDesignSystem, *Table) {
 	test.Helper()
 	entryPoint, packageRoot := liveEntryPointFor(test, spelling)
-	system, loadDesignSystemError := LoadDesignSystem(LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot})
+	system, loadDesignSystemError := LoadDesignSystem(
+		LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot},
+	)
 	if loadDesignSystemError != nil {
 		test.Fatalf("loading the design system at %s: %v", entryPoint, loadDesignSystemError)
 	}
@@ -129,7 +131,11 @@ func expectLiveTableAgreesWithTheEngine(test *testing.T, fixtures *descriptorFix
 	test.Helper()
 
 	if fixtures.TailwindVersion != live.TailwindVersion {
-		test.Fatalf("the fixtures are Tailwind %s and the live table is Tailwind %s", fixtures.TailwindVersion, live.TailwindVersion)
+		test.Fatalf(
+			"the fixtures are Tailwind %s and the live table is Tailwind %s",
+			fixtures.TailwindVersion,
+			live.TailwindVersion,
+		)
 	}
 
 	agreed, mismatched, declined, withoutReading := 0, 0, 0, 0
@@ -263,7 +269,10 @@ func checkTableCarriesTheTheme(test *testing.T, name string, system *LoadedDesig
 				continue
 			}
 			if !descriptor.PerDeclaration {
-				test.Errorf("functional `@utility %s` is not marked PerDeclaration, so the table would answer it from a row rather than declining to the evaluator", root)
+				test.Errorf(
+					"functional `@utility %s` is not marked PerDeclaration, so the table would answer it from a row rather than declining to the evaluator",
+					root,
+				)
 			}
 			functionalRoots++
 		}
@@ -290,7 +299,11 @@ func TestLiveTableBaseHalfCarriesNoRepositoryTokens(test *testing.T) {
 					continue
 				}
 				if !FrameworkNamespaces[namespace] {
-					test.Errorf("%s keys a reading on namespace %q, which is not one of the framework's", root, namespace)
+					test.Errorf(
+						"%s keys a reading on namespace %q, which is not one of the framework's",
+						root,
+						namespace,
+					)
 				}
 				checked++
 			}
@@ -299,7 +312,11 @@ func TestLiveTableBaseHalfCarriesNoRepositoryTokens(test *testing.T) {
 	if checked == 0 {
 		test.Fatal("no namespace buckets were checked, so this test proved nothing")
 	}
-	test.Logf("%d namespace buckets in the base table, all keyed on the %d framework namespaces", checked, len(FrameworkNamespaces))
+	test.Logf(
+		"%d namespace buckets in the base table, all keyed on the %d framework namespaces",
+		checked,
+		len(FrameworkNamespaces),
+	)
 }
 
 // TestLiveTableDeclinesOnlyWhereTheEvaluatorAnswers is the price of declining, measured.
@@ -318,7 +335,11 @@ func TestLiveTableDeclinesOnlyWhereTheEvaluatorAnswers(test *testing.T) {
 	forEachOracleCopy(test, "descriptor_fixtures.json", func(test *testing.T, fixtureName string) {
 		fixtures := loadDescriptorFixtures(test, fixtureName)
 		measured := testTable(test)
-		if tableName := oracleSibling(test, fixtureName, "descriptor_table.json"); tableName != "descriptor_table.json" {
+		if tableName := oracleSibling(
+			test,
+			fixtureName,
+			"descriptor_table.json",
+		); tableName != "descriptor_table.json" {
 			var err error
 			measured, err = loadTestTable(tableName, oracleSibling(test, fixtureName, "descriptor_context.json"))
 			if err != nil {
@@ -332,7 +353,13 @@ func TestLiveTableDeclinesOnlyWhereTheEvaluatorAnswers(test *testing.T) {
 
 // expectLiveTableDeclinesOnlyWhereTheEvaluatorAnswers checks every case one live table declines and its
 // measured table answers against the evaluator.
-func expectLiveTableDeclinesOnlyWhereTheEvaluatorAnswers(test *testing.T, fixtures *descriptorFixtures, measured *Table, system *LoadedDesignSystem, live *Table) {
+func expectLiveTableDeclinesOnlyWhereTheEvaluatorAnswers(
+	test *testing.T,
+	fixtures *descriptorFixtures,
+	measured *Table,
+	system *LoadedDesignSystem,
+	live *Table,
+) {
 	test.Helper()
 
 	evaluator := system.Utilities()
@@ -358,7 +385,10 @@ func expectLiveTableDeclinesOnlyWhereTheEvaluatorAnswers(test *testing.T, fixtur
 		}
 		reading, answered := evaluator.Reading(candidate)
 		if !answered {
-			test.Errorf("%s: the live table declined, the measured table answered, and the evaluator cannot answer it either", one.ClassName)
+			test.Errorf(
+				"%s: the live table declined, the measured table answered, and the evaluator cannot answer it either",
+				one.ClassName,
+			)
 			continue
 		}
 		want := Reading{Order: one.Reading.Order, Count: one.Reading.Count}
@@ -373,8 +403,12 @@ func expectLiveTableDeclinesOnlyWhereTheEvaluatorAnswers(test *testing.T, fixtur
 	if moved == 0 {
 		test.Fatal("no cases moved from answered to declined, so this test proved nothing")
 	}
-	test.Logf("%d cases the live table declines and the measured table answers: %d recovered exactly by the evaluator, %d had no engine reading",
-		moved, recovered, unscored)
+	test.Logf(
+		"%d cases the live table declines and the measured table answers: %d recovered exactly by the evaluator, %d had no engine reading",
+		moved,
+		recovered,
+		unscored,
+	)
 }
 
 // TestLiveTableIsNilWithoutADesignSystem pins the failing-safe behaviour.
@@ -384,7 +418,9 @@ func expectLiveTableDeclinesOnlyWhereTheEvaluatorAnswers(test *testing.T, fixtur
 func TestLiveTableIsNilWithoutADesignSystem(test *testing.T) {
 	test.Parallel()
 	if table := NewTable(nil); table != nil {
-		test.Fatalf("NewTable(nil) returned a table; a caller with no design system must decline rather than read a framework-only one")
+		test.Fatalf(
+			"NewTable(nil) returned a table; a caller with no design system must decline rather than read a framework-only one",
+		)
 	}
 }
 
@@ -395,7 +431,9 @@ func TestLiveTableIsNilWithoutADesignSystem(test *testing.T) {
 // the order of magnitude of a per-run cost, not whether it is fast in isolation.
 func BenchmarkNewTable(benchmark *testing.B) {
 	entryPoint, packageRoot := liveEntryPointFor(benchmark, corpusRepositories[0].spelling)
-	system, loadDesignSystemError := LoadDesignSystem(LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot})
+	system, loadDesignSystemError := LoadDesignSystem(
+		LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot},
+	)
 	if loadDesignSystemError != nil {
 		benchmark.Fatalf("loading the design system: %v", loadDesignSystemError)
 	}
@@ -418,7 +456,9 @@ func BenchmarkLoadDesignSystemWithTable(benchmark *testing.B) {
 	benchmark.ReportAllocs()
 	benchmark.ResetTimer()
 	for range benchmark.N {
-		system, loadDesignSystemError := LoadDesignSystem(LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot})
+		system, loadDesignSystemError := LoadDesignSystem(
+			LoadOptions{EntryPoint: entryPoint, TailwindPackageRoot: packageRoot},
+		)
 		if loadDesignSystemError != nil {
 			benchmark.Fatalf("loading the design system: %v", loadDesignSystemError)
 		}

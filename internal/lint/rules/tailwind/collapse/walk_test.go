@@ -192,7 +192,11 @@ func TestWalkDescendsIntoWrappersUnlikePropertySort(test *testing.T) {
 		{"context", Context(map[string]string{"theme": "true"}, buried)},
 	} {
 		if got := record([]*Node{wrapper.node}, nil); !strings.Contains(got, "display") {
-			test.Errorf("%s: Walk did not descend into it (%s); upstream's walk descends on the presence of children", wrapper.name, got)
+			test.Errorf(
+				"%s: Walk did not descend into it (%s); upstream's walk descends on the presence of children",
+				wrapper.name,
+				got,
+			)
 		}
 		if got := PropertySort([]*Node{wrapper.node}); got.Count != 0 {
 			test.Errorf("%s: PropertySort descended into it; the two traversals must differ here", wrapper.name)

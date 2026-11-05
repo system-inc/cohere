@@ -351,7 +351,11 @@ const (
 // undefined must be one no value of which is falsy, so removing the nullish ones is removing every
 // falsy value. A type also holding `0`, `false` or an empty string has no comparison that means `!!x`, and the
 // truthiness narrowing there is visible, so neither rewrite is safe and a person decides.
-func noImplicitCoercionNarrowingRewrite(ruleContext rule.Context, node *ast.Node, operand *ast.Node) (noImplicitCoercionRewrite, string) {
+func noImplicitCoercionNarrowingRewrite(
+	ruleContext rule.Context,
+	node *ast.Node,
+	operand *ast.Node,
+) (noImplicitCoercionRewrite, string) {
 	if !noImplicitCoercionIsNarrowableReference(operand) {
 		return noImplicitCoercionRewriteBoolean, ""
 	}
@@ -444,7 +448,10 @@ func noImplicitCoercionIsFalsyLiteral(candidate *checker.Type) bool {
 	switch {
 	case type_checking.IsTypeFlagSet(candidate, checker.TypeFlagsBigIntLiteral):
 		return true
-	case type_checking.IsTypeFlagSet(candidate, checker.TypeFlagsBooleanLiteral|checker.TypeFlagsStringLiteral|checker.TypeFlagsNumberLiteral):
+	case type_checking.IsTypeFlagSet(
+		candidate,
+		checker.TypeFlagsBooleanLiteral|checker.TypeFlagsStringLiteral|checker.TypeFlagsNumberLiteral,
+	):
 		switch value := candidate.AsLiteralType().Value().(type) {
 		case bool:
 			return !value
@@ -474,9 +481,15 @@ func noImplicitCoercionIsAlwaysTruthy(candidate *checker.Type) bool {
 		return true
 	}
 	switch {
-	case type_checking.IsTypeFlagSet(candidate, checker.TypeFlagsObject|checker.TypeFlagsNonPrimitive|checker.TypeFlagsESSymbolLike):
+	case type_checking.IsTypeFlagSet(
+		candidate,
+		checker.TypeFlagsObject|checker.TypeFlagsNonPrimitive|checker.TypeFlagsESSymbolLike,
+	):
 		return true
-	case type_checking.IsTypeFlagSet(candidate, checker.TypeFlagsBooleanLiteral|checker.TypeFlagsStringLiteral|checker.TypeFlagsNumberLiteral):
+	case type_checking.IsTypeFlagSet(
+		candidate,
+		checker.TypeFlagsBooleanLiteral|checker.TypeFlagsStringLiteral|checker.TypeFlagsNumberLiteral,
+	):
 		return !noImplicitCoercionIsFalsyLiteral(candidate)
 	}
 	return false

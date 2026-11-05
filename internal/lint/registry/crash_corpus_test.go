@@ -171,7 +171,9 @@ func TestNoRegisteredRuleCrashesOnTheCorpusWithTypes(test *testing.T) {
 		}
 	}
 
-	graph, err := program.Build(program.Options{ConfigFileName: filepath.Join(directory, "tsconfig.json"), CurrentDirectory: directory})
+	graph, err := program.Build(
+		program.Options{ConfigFileName: filepath.Join(directory, "tsconfig.json"), CurrentDirectory: directory},
+	)
 	if err != nil {
 		test.Fatalf("building the corpus program: %v", err)
 	}
@@ -188,7 +190,10 @@ func TestNoRegisteredRuleCrashesOnTheCorpusWithTypes(test *testing.T) {
 		}
 		typed++
 		if result.Coverage.RulesOffered[subject.Name] == 0 {
-			test.Errorf("type-aware rule %s was offered no file of the corpus, so its typed half went unswept", subject.Name)
+			test.Errorf(
+				"type-aware rule %s was offered no file of the corpus, so its typed half went unswept",
+				subject.Name,
+			)
 		}
 	}
 	if typed == 0 {

@@ -142,7 +142,12 @@ var NoUnsafeCall = rule.Rule{
 				return
 			}
 
-			if !type_checking.IsBuiltinSymbolLike(ruleContext.Program, ruleContext.TypeChecker, subjectType, "Function") {
+			if !type_checking.IsBuiltinSymbolLike(
+				ruleContext.Program,
+				ruleContext.TypeChecker,
+				subjectType,
+				"Function",
+			) {
 				return
 			}
 
@@ -236,11 +241,17 @@ func unsafeCallMessageFor(messageId string, typeText string) rule.Message {
 	case "errorNew":
 		return rule.Message{Id: messageId, Description: "Unsafe construction of a type that could not be resolved."}
 	case "errorTemplateTag":
-		return rule.Message{Id: messageId, Description: "Unsafe use of a template tag whose type could not be resolved."}
+		return rule.Message{
+			Id:          messageId,
+			Description: "Unsafe use of a template tag whose type could not be resolved.",
+		}
 	case "unsafeCallThis":
-		return rule.Message{Id: messageId, Description: "Unsafe call of " + typeText + " typed value. `this` is typed as " +
-			typeText + ".\nYou can try to fix this by turning on the `noImplicitThis` compiler option, " +
-			"or adding a `this` parameter to the function."}
+		return rule.Message{
+			Id: messageId,
+			Description: "Unsafe call of " + typeText + " typed value. `this` is typed as " +
+				typeText + ".\nYou can try to fix this by turning on the `noImplicitThis` compiler option, " +
+				"or adding a `this` parameter to the function.",
+		}
 	case "unsafeNew":
 		return rule.Message{Id: messageId, Description: "Unsafe construction of " + typeText + " typed value."}
 	case "unsafeTemplateTag":

@@ -47,7 +47,9 @@ type LastUsage struct {
 // The second return is not decoration. Upstream indexes its map with a non-null assertion and would
 // throw on a miss; a linter cannot, and the two callers treat a miss differently -- one skips the
 // declaration, the other declines the merge.
-func (usage *LastUsage) LastUsedAt(declaration static_single_assignment.DeclarationId) (static_single_assignment.EvaluationOrder, bool) {
+func (usage *LastUsage) LastUsedAt(
+	declaration static_single_assignment.DeclarationId,
+) (static_single_assignment.EvaluationOrder, bool) {
 	if usage == nil || usage.byDeclaration == nil {
 		return 0, false
 	}
@@ -71,7 +73,9 @@ func (usage *LastUsage) Len() int {
 // The graph is taken alongside the tree because a `Place` here names an `IdentifierId` and this
 // pass keys on `DeclarationId`; the mapping between them lives on the graph's identifier table.
 func FindLastUsage(tree *ReactiveFunction, function *Function) *LastUsage {
-	usage := &LastUsage{byDeclaration: map[static_single_assignment.DeclarationId]static_single_assignment.EvaluationOrder{}}
+	usage := &LastUsage{
+		byDeclaration: map[static_single_assignment.DeclarationId]static_single_assignment.EvaluationOrder{},
+	}
 	if tree == nil || function == nil {
 		return usage
 	}
@@ -128,8 +132,11 @@ func AreEqualDependencies(a, b []ReactiveScopeDependency) bool {
 // A declaration with no recorded usage answers FALSE, which is the conservative direction and
 // differs from upstream only in that upstream would throw. A value never read is not a value proven
 // safe to merge; it is a value this pass has no information about.
-func AreLValuesLastUsedByScope(scopeEnd static_single_assignment.EvaluationOrder, lvalues []static_single_assignment.DeclarationId,
-	usage *LastUsage) bool {
+func AreLValuesLastUsedByScope(
+	scopeEnd static_single_assignment.EvaluationOrder,
+	lvalues []static_single_assignment.DeclarationId,
+	usage *LastUsage,
+) bool {
 	for _, lvalue := range lvalues {
 		lastUsedAt, found := usage.LastUsedAt(lvalue)
 		if !found || lastUsedAt >= scopeEnd {
@@ -196,8 +203,13 @@ func ScopeIsEligibleForMerging(function *Function, scope ScopeId, dependencies *
 // evaluation, which is what `IsAlwaysInvalidatingType` answers. Upstream also requires those
 // dependencies be rooted -- `path.length === 0` -- because a property read off an invalidating
 // value is not itself guaranteed to change.
-func CanMergeScopes(function *Function, current, next ScopeId, dependencies *ScopeDependencies,
-	temporaries map[static_single_assignment.DeclarationId]static_single_assignment.DeclarationId, typeChecker *shimchecker.Checker) bool {
+func CanMergeScopes(
+	function *Function,
+	current, next ScopeId,
+	dependencies *ScopeDependencies,
+	temporaries map[static_single_assignment.DeclarationId]static_single_assignment.DeclarationId,
+	typeChecker *shimchecker.Checker,
+) bool {
 	if dependencies == nil {
 		return false
 	}
@@ -249,8 +261,12 @@ func CanMergeScopes(function *Function, current, next ScopeId, dependencies *Sco
 // `StoreLocal` chain so that a value copied into a temporary is still recognised as the earlier
 // scope's output. Without that indirection an ordinary `const b = a` between two scopes would hide
 // the flow and silently prevent a merge upstream performs.
-func declaredByOrAliasedFrom(function *Function, dependency static_single_assignment.IdentifierId,
-	declarations []static_single_assignment.IdentifierId, temporaries map[static_single_assignment.DeclarationId]static_single_assignment.DeclarationId) bool {
+func declaredByOrAliasedFrom(
+	function *Function,
+	dependency static_single_assignment.IdentifierId,
+	declarations []static_single_assignment.IdentifierId,
+	temporaries map[static_single_assignment.DeclarationId]static_single_assignment.DeclarationId,
+) bool {
 	target := declarationOf(function, dependency)
 	aliased, hasAlias := temporaries[target]
 	for _, declaration := range declarations {
@@ -407,7 +423,10 @@ func (merger *scopeMerger) mergeBlock(block ReactiveBlock) ReactiveBlock {
 			}
 			shape.Instructions = merger.mergeBlock(shape.Instructions)
 			merger.parentScope = parent
-			if !shape.Pruned && parent != nil && AreEqualDependencies(merger.dependencies.DependenciesOf(*parent), merger.dependencies.DependenciesOf(shape.Scope)) {
+			if !shape.Pruned && parent != nil && AreEqualDependencies(
+				merger.dependencies.DependenciesOf(*parent),
+				merger.dependencies.DependenciesOf(shape.Scope),
+			) {
 				merger.nestedScopesRemoved++
 				rebuilt = append(rebuilt, shape.Instructions...)
 				continue

@@ -50,7 +50,12 @@ func TestNoUnnecessaryTypeConstraintFires(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.sourceText, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.Run(test, NoUnnecessaryTypeConstraint, unnecessaryTypeConstraintFile, testCase.sourceText)
+			result := rule_testing.Run(
+				test,
+				NoUnnecessaryTypeConstraint,
+				unnecessaryTypeConstraintFile,
+				testCase.sourceText,
+			)
 			expected := make([]string, testCase.count)
 			for index := range expected {
 				expected[index] = "noUnnecessaryTypeConstraint"
@@ -99,7 +104,10 @@ func TestNoUnnecessaryTypeConstraintStaysSilent(test *testing.T) {
 	for _, sourceText := range cases {
 		test.Run(sourceText, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.Run(test, NoUnnecessaryTypeConstraint, unnecessaryTypeConstraintFile, sourceText))
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.Run(test, NoUnnecessaryTypeConstraint, unnecessaryTypeConstraintFile, sourceText),
+			)
 		})
 	}
 }
@@ -144,25 +152,65 @@ func TestNoUnnecessaryTypeConstraintSuggestionsWriteWhatTheyClaim(test *testing.
 		{unnecessaryTypeConstraintFile, "function data<T extends any>() {}", "function data<T>() {}"},
 		{unnecessaryTypeConstraintFile, "function data<T extends any, U>() {}", "function data<T, U>() {}"},
 		{unnecessaryTypeConstraintFile, "function data<T, U extends any>() {}", "function data<T, U>() {}"},
-		{unnecessaryTypeConstraintFile, "function data<T extends any, U extends T>() {}", "function data<T, U extends T>() {}"},
+		{
+			unnecessaryTypeConstraintFile,
+			"function data<T extends any, U extends T>() {}",
+			"function data<T, U extends T>() {}",
+		},
 		{unnecessaryTypeConstraintFile, "const data = <T extends any>() => {};", "const data = <T,>() => {};"},
 		{unnecessaryTypeConstraintFile, "const data = <T extends any,>() => {};", "const data = <T,>() => {};"},
 		{unnecessaryTypeConstraintFile, "const data = <T extends any, >() => {};", "const data = <T, >() => {};"},
 		{unnecessaryTypeConstraintFile, "const data = <T extends any ,>() => {};", "const data = <T ,>() => {};"},
 		{unnecessaryTypeConstraintFile, "const data = <T extends any , >() => {};", "const data = <T , >() => {};"},
-		{unnecessaryTypeConstraintFile, "const data = <T extends any = unknown>() => {};", "const data = <T = unknown>() => {};"},
-		{unnecessaryTypeConstraintFile, "const data = <T extends any, U extends any>() => {};", "const data = <T, U>() => {};"},
+		{
+			unnecessaryTypeConstraintFile,
+			"const data = <T extends any = unknown>() => {};",
+			"const data = <T = unknown>() => {};",
+		},
+		{
+			unnecessaryTypeConstraintFile,
+			"const data = <T extends any, U extends any>() => {};",
+			"const data = <T, U>() => {};",
+		},
 		{unnecessaryTypeConstraintFile, "function data<T extends unknown>() {}", "function data<T>() {}"},
-		{"/repository/source/no_unnecessary_type_constraint.ts", "const data = <T extends any>() => {};", "const data = <T>() => {};"},
-		{"/repository/source/no_unnecessary_type_constraint.mts", "const data = <T extends any>() => {};", "const data = <T,>() => {};"},
-		{"/repository/source/no_unnecessary_type_constraint.cts", "const data = <T extends any>() => {};", "const data = <T,>() => {};"},
-		{unnecessaryTypeConstraintFile, "const data = <T extends any /* comment */,>() => {};", "const data = <T /* comment */,>() => {};"},
-		{unnecessaryTypeConstraintFile, "const data = <T extends any /* comment */>() => {};", "const data = <T, /* comment */>() => {};"},
+		{
+			"/repository/source/no_unnecessary_type_constraint.ts",
+			"const data = <T extends any>() => {};",
+			"const data = <T>() => {};",
+		},
+		{
+			"/repository/source/no_unnecessary_type_constraint.mts",
+			"const data = <T extends any>() => {};",
+			"const data = <T,>() => {};",
+		},
+		{
+			"/repository/source/no_unnecessary_type_constraint.cts",
+			"const data = <T extends any>() => {};",
+			"const data = <T,>() => {};",
+		},
+		{
+			unnecessaryTypeConstraintFile,
+			"const data = <T extends any /* comment */,>() => {};",
+			"const data = <T /* comment */,>() => {};",
+		},
+		{
+			unnecessaryTypeConstraintFile,
+			"const data = <T extends any /* comment */>() => {};",
+			"const data = <T, /* comment */>() => {};",
+		},
 		{unnecessaryTypeConstraintFile, "const data = <T extends unknown>() => {};", "const data = <T,>() => {};"},
 		{unnecessaryTypeConstraintFile, "class Data<T extends unknown> {}", "class Data<T> {}"},
 		{unnecessaryTypeConstraintFile, "const Data = class<T extends unknown> {};", "const Data = class<T> {};"},
-		{unnecessaryTypeConstraintFile, "class Data { member<T extends unknown>() {} }", "class Data { member<T>() {} }"},
-		{unnecessaryTypeConstraintFile, "const Data = class { member<T extends unknown>() {} };", "const Data = class { member<T>() {} };"},
+		{
+			unnecessaryTypeConstraintFile,
+			"class Data { member<T extends unknown>() {} }",
+			"class Data { member<T>() {} }",
+		},
+		{
+			unnecessaryTypeConstraintFile,
+			"const Data = class { member<T extends unknown>() {} };",
+			"const Data = class { member<T>() {} };",
+		},
 		{unnecessaryTypeConstraintFile, "interface Data<T extends unknown> {}", "interface Data<T> {}"},
 		{unnecessaryTypeConstraintFile, "type Data<T extends unknown> = {};", "type Data<T> = {};"},
 	}
@@ -224,7 +272,12 @@ func TestNoUnnecessaryTypeConstraintPointsAtTheParameterName(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.sourceText, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.Run(test, NoUnnecessaryTypeConstraint, unnecessaryTypeConstraintFile, testCase.sourceText)
+			result := rule_testing.Run(
+				test,
+				NoUnnecessaryTypeConstraint,
+				unnecessaryTypeConstraintFile,
+				testCase.sourceText,
+			)
 			if len(result.Diagnostics) != len(testCase.wantTexts) {
 				test.Fatalf("wanted %d diagnostics, got %d", len(testCase.wantTexts), len(result.Diagnostics))
 			}

@@ -30,7 +30,10 @@ func writeGolden(test *testing.T, contents record) string {
 func TestAGoldenFromOtherBundlesIsRefused(test *testing.T) {
 	test.Parallel()
 	path := writeGolden(test, record{Digest: "recorded", Answers: map[string]Answer{"k": {Output: "x"}}})
-	if _, readError := read(path, "embedded"); readError == nil || !strings.Contains(readError.Error(), "recorded from Prettier bundles recorded") {
+	if _, readError := read(
+		path,
+		"embedded",
+	); readError == nil || !strings.Contains(readError.Error(), "recorded from Prettier bundles recorded") {
 		test.Fatalf("a golden from other bundles was read: %v", readError)
 	}
 	// The control: the same file, with the digest it was recorded under, reads.

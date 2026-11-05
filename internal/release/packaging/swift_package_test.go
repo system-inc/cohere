@@ -59,12 +59,25 @@ func TestMinimumMacOSIsReadFromTheBinary(test *testing.T) {
 	test.Parallel()
 
 	binary := smallMacBinary(test, "arm64")
-	if requireMinimumMacOSError := requireMinimumMacOS(binary, MinimumSwiftEngineMacOS); requireMinimumMacOSError != nil {
+	if requireMinimumMacOSError := requireMinimumMacOS(
+		binary,
+		MinimumSwiftEngineMacOS,
+	); requireMinimumMacOSError != nil {
 		test.Fatalf("a binary Go built for an old macOS was refused: %v", requireMinimumMacOSError)
 	}
 
 	tooNew := filepath.Join(test.TempDir(), "too-new")
-	rewrite := exec.Command("vtool", "-set-build-version", "macos", "27.0", "27.0", "-replace", "-output", tooNew, binary)
+	rewrite := exec.Command(
+		"vtool",
+		"-set-build-version",
+		"macos",
+		"27.0",
+		"27.0",
+		"-replace",
+		"-output",
+		tooNew,
+		binary,
+	)
 	if output, outputError := rewrite.CombinedOutput(); outputError != nil {
 		test.Fatalf("rewriting the minimum macOS: %v\n%s", outputError, output)
 	}
@@ -136,7 +149,9 @@ func contractPair(test *testing.T, cohereVersion string, engineScript string) (c
 	coherePath = filepath.Join(directory, "cohere")
 	enginePath = filepath.Join(directory, SwiftEngineFileName)
 	writeExecutable(test, coherePath, 0o755)
-	writeFile(test, coherePath, "#!/bin/sh\n[ \"$1\" = --version ] || exit 9\nprintf '%s\\n' '"+strings.ReplaceAll(cohereVersion, "\n", "' '")+"'\n")
+	writeFile(test, coherePath, "#!/bin/sh\n[ \"$1\" = --version ] || exit 9\nprintf '%s\\n' '"+
+		strings.ReplaceAll(cohereVersion, "\n", "' '")+
+		"'\n")
 	writeExecutable(test, enginePath, 0o755)
 	writeFile(test, enginePath, "#!/bin/sh\n"+engineScript+"\n")
 	return coherePath, enginePath
@@ -161,7 +176,11 @@ func TestSwiftContractAcceptsAMatchingPair(test *testing.T) {
 	test.Parallel()
 
 	coherePath, enginePath := contractPair(test, "cohere 1.0.0\n  swift contract: 3", speaksContract("3"))
-	if requireSwiftContractError := requireSwiftContract(coherePath, enginePath, stampedCommit); requireSwiftContractError != nil {
+	if requireSwiftContractError := requireSwiftContract(
+		coherePath,
+		enginePath,
+		stampedCommit,
+	); requireSwiftContractError != nil {
 		test.Fatalf("a pair speaking the same contract was refused: %v", requireSwiftContractError)
 	}
 }
@@ -233,8 +252,16 @@ let package = Package(name: "Stand", products: [.executable(name: "cohere-swift"
 	program := "#if TREE_MODIFIED\nlet tree = \"modified\"\n#else\nlet tree = \"clean\"\n#endif\n" +
 		"#if COHERE_RELEASE_STAMP\nprint(tree, EngineReleaseStamp.commit)\n#else\nprint(tree, \"dev\")\n#endif\n"
 	writeFile(test, source, program)
-	writeFile(test, filepath.Join(module, "swift", "Sources", "CohereSwift", "Command", "Placeholder.swift"), "enum Placeholder {}\n")
-	writeFile(test, filepath.Join(module, "swift", ".gitignore"), "/Sources/CohereSwift/Command/"+SwiftEngineStampFileName+"\n")
+	writeFile(
+		test,
+		filepath.Join(module, "swift", "Sources", "CohereSwift", "Command", "Placeholder.swift"),
+		"enum Placeholder {}\n",
+	)
+	writeFile(
+		test,
+		filepath.Join(module, "swift", ".gitignore"),
+		"/Sources/CohereSwift/Command/"+SwiftEngineStampFileName+"\n",
+	)
 	writeFile(test, filepath.Join(module, ".gitignore"), ".scratch/\n")
 	gitIn(test, module, "init", "--quiet")
 	gitIn(test, module, "add", ".")
@@ -249,7 +276,13 @@ let package = Package(name: "Stand", products: [.executable(name: "cohere-swift"
 	says := func() string {
 		test.Helper()
 		destination := filepath.Join(test.TempDir(), SwiftEngineFileName)
-		if buildSwiftEngineError := buildSwiftEngine(module, scratch, target, destination, commit); buildSwiftEngineError != nil {
+		if buildSwiftEngineError := buildSwiftEngine(
+			module,
+			scratch,
+			target,
+			destination,
+			commit,
+		); buildSwiftEngineError != nil {
 			test.Fatal(buildSwiftEngineError)
 		}
 		output, outputError := exec.Command(destination).Output()
@@ -262,11 +295,16 @@ let package = Package(name: "Stand", products: [.executable(name: "cohere-swift"
 	if got := says(); got != "clean "+commit {
 		test.Fatalf("an engine built from a clean tree says %q, and should say clean and its commit %s", got, commit)
 	}
-	if _, statError := os.Stat(filepath.Join(module, "swift", "Sources", "CohereSwift", "Command", SwiftEngineStampFileName)); statError == nil {
+	if _, statError := os.Stat(
+		filepath.Join(module, "swift", "Sources", "CohereSwift", "Command", SwiftEngineStampFileName),
+	); statError == nil {
 		test.Fatal("the stamp was left in the checkout after the build")
 	}
 	writeFile(test, source, program+"// edited\n")
 	if got := says(); got != "modified "+commit {
-		test.Fatalf("an engine built after a tracked file was edited says %q, so its provenance would call the tree clean", got)
+		test.Fatalf(
+			"an engine built after a tracked file was edited says %q, so its provenance would call the tree clean",
+			got,
+		)
 	}
 }

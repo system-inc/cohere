@@ -216,7 +216,10 @@ function getData<T>(url: string): Promise<T extends null ? T : null> {
   return Promise.resolve(null);
 }
     `},
-	{name: "valid47", source: "\nfunction getData<T extends string>(url: string): Promise<`a${T}b`> {\n  return Promise.resolve(null);\n}\n    "},
+	{
+		name:   "valid47",
+		source: "\nfunction getData<T extends string>(url: string): Promise<`a${T}b`> {\n  return Promise.resolve(null);\n}\n    ",
+	},
 	{name: "valid48", source: `
 async function getData<T>(url: string): Promise<T | null> {
   return null;
@@ -513,13 +516,33 @@ function getLength<T extends Lengthy>(x: T) {
 	{name: "invalid30", source: `declare function take<T, U extends T>(param: U): U;`, ids: []string{"sole"}},
 	{name: "invalid31", source: `declare function get<T, U = T>(param: U): U;`, ids: []string{"sole"}},
 	{name: "invalid32", source: `declare function get<T, U extends T = T>(param: T): U;`, ids: []string{"sole"}},
-	{name: "invalid33", source: `declare function compare<T, U extends T>(param1: T, param2: U): boolean;`, ids: []string{"sole"}},
-	{name: "invalid34", source: `declare function get<T>(param: <U, V>(param: U) => V): T;`, ids: []string{"sole", "sole", "sole"}},
-	{name: "invalid35", source: `declare function get<T>(param: <T, U>(param: T) => U): T;`, ids: []string{"sole", "sole", "sole"}},
+	{
+		name:   "invalid33",
+		source: `declare function compare<T, U extends T>(param1: T, param2: U): boolean;`,
+		ids:    []string{"sole"},
+	},
+	{
+		name:   "invalid34",
+		source: `declare function get<T>(param: <U, V>(param: U) => V): T;`,
+		ids:    []string{"sole", "sole", "sole"},
+	},
+	{
+		name:   "invalid35",
+		source: `declare function get<T>(param: <T, U>(param: T) => U): T;`,
+		ids:    []string{"sole", "sole", "sole"},
+	},
 	{name: "invalid39", source: `declare function takeArray<T>(input: T[]): void;`, ids: []string{"sole"}},
-	{name: "invalid40", source: `declare function takeArrayNullish<T>(input: (T | null)[]): void;`, ids: []string{"sole"}},
+	{
+		name:   "invalid40",
+		source: `declare function takeArrayNullish<T>(input: (T | null)[]): void;`,
+		ids:    []string{"sole"},
+	},
 	{name: "invalid41", source: `declare function takeTuple<T>(input: [T]): void;`, ids: []string{"sole"}},
-	{name: "invalid42", source: `declare function takeTupleMultiUnrelated<T>(input: [T, number]): void;`, ids: []string{"sole"}},
+	{
+		name:   "invalid42",
+		source: `declare function takeTupleMultiUnrelated<T>(input: [T, number]): void;`,
+		ids:    []string{"sole"},
+	},
 	{name: "invalid43", source: `
 declare function takeTupleMultiUnrelatedNullish<T>(
   input: [T | null, null],
@@ -605,7 +628,12 @@ func TestNoUnnecessaryTypeParametersStaysSilent(test *testing.T) {
 	for _, testCase := range noUnnecessaryTypeParametersValidCases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTyped(test, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
+			result := rule_testing.RunTyped(
+				test,
+				NoUnnecessaryTypeParameters,
+				noUnnecessaryTypeParametersFile,
+				testCase.source,
+			)
 			rule_testing.ExpectClean(test, result)
 		})
 	}
@@ -619,7 +647,12 @@ func TestNoUnnecessaryTypeParametersFires(test *testing.T) {
 	for _, testCase := range noUnnecessaryTypeParametersInvalidCases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTyped(test, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
+			result := rule_testing.RunTyped(
+				test,
+				NoUnnecessaryTypeParameters,
+				noUnnecessaryTypeParametersFile,
+				testCase.source,
+			)
 			rule_testing.ExpectFindings(test, result, testCase.ids...)
 		})
 	}
@@ -681,7 +714,12 @@ function inferredMappedReturnType<T extends string>(x: T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTyped(test, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
+			result := rule_testing.RunTyped(
+				test,
+				NoUnnecessaryTypeParameters,
+				noUnnecessaryTypeParametersFile,
+				testCase.source,
+			)
 			// Upstream is silent on each of these. This port reports once. Asserting the divergence
 			// rather than the upstream verdict means closing the gap makes this test fail loudly,
 			// which is the point: a divergence nobody is told about becomes permanent.
@@ -728,14 +766,27 @@ const isNodeOfType =
     node?.type === nodeType;
 `
 
-	unresolved := rule_testing.RunTyped(test, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, withUnresolvableImport)
+	unresolved := rule_testing.RunTyped(
+		test,
+		NoUnnecessaryTypeParameters,
+		noUnnecessaryTypeParametersFile,
+		withUnresolvableImport,
+	)
 	if len(unresolved.Diagnostics) != 1 {
-		test.Fatalf("expected the documented harness divergence of exactly 1 finding, got %d", len(unresolved.Diagnostics))
+		test.Fatalf(
+			"expected the documented harness divergence of exactly 1 finding, got %d",
+			len(unresolved.Diagnostics),
+		)
 	}
 
 	// The control. If this ever reports, the cause is the rule rather than the unresolved import,
 	// and the comment above is wrong.
-	resolved := rule_testing.RunTyped(test, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, withLocalDeclarations)
+	resolved := rule_testing.RunTyped(
+		test,
+		NoUnnecessaryTypeParameters,
+		noUnnecessaryTypeParametersFile,
+		withLocalDeclarations,
+	)
 	rule_testing.ExpectClean(test, resolved)
 }
 
@@ -785,7 +836,12 @@ func TestNoUnnecessaryTypeParametersReportsAtTheTypeParameter(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTyped(test, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
+			result := rule_testing.RunTyped(
+				test,
+				NoUnnecessaryTypeParameters,
+				noUnnecessaryTypeParametersFile,
+				testCase.source,
+			)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
 				test.Fatalf("expected %d findings, got %d", len(testCase.wantSpans), len(result.Diagnostics))
 			}
@@ -884,12 +940,20 @@ func TestNoUnnecessaryTypeParametersArrayCarveOut(test *testing.T) {
 	}{
 		// The carve-out's own subjects. Without it these go silent while upstream reports.
 		{name: "Array spelled out", source: "declare function e<T>(param: Array<T>): void;\n", wantFindings: 1},
-		{name: "ReadonlyArray spelled out", source: "declare function f<T>(param: ReadonlyArray<T>): void;\n", wantFindings: 1},
+		{
+			name:         "ReadonlyArray spelled out",
+			source:       "declare function f<T>(param: ReadonlyArray<T>): void;\n",
+			wantFindings: 1,
+		},
 
 		// The shorthand forms, which upstream's corpus does cover, kept here so the pair reads
 		// together and a future edit cannot move one without the other being visible.
 		{name: "array shorthand", source: "declare function d<T>(param: T[]): void;\n", wantFindings: 1},
-		{name: "readonly array shorthand", source: "declare function g<T>(param: readonly T[]): void;\n", wantFindings: 1},
+		{
+			name:         "readonly array shorthand",
+			source:       "declare function g<T>(param: readonly T[]): void;\n",
+			wantFindings: 1,
+		},
 
 		// The other side of the same branch: a generic that is not an array stays exempt, so these
 		// are silent. Without them a mutation deleting the whole type-argument test would be
@@ -902,7 +966,12 @@ func TestNoUnnecessaryTypeParametersArrayCarveOut(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTyped(test, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
+			result := rule_testing.RunTyped(
+				test,
+				NoUnnecessaryTypeParameters,
+				noUnnecessaryTypeParametersFile,
+				testCase.source,
+			)
 			if len(result.Diagnostics) != testCase.wantFindings {
 				test.Fatalf("expected %d findings, got %d", testCase.wantFindings, len(result.Diagnostics))
 			}
@@ -968,7 +1037,12 @@ func TestNoUnnecessaryTypeParametersConstraintRecursion(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTyped(test, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
+			result := rule_testing.RunTyped(
+				test,
+				NoUnnecessaryTypeParameters,
+				noUnnecessaryTypeParametersFile,
+				testCase.source,
+			)
 			if len(result.Diagnostics) != len(testCase.wantMessages) {
 				test.Fatalf("expected %d findings, got %d", len(testCase.wantMessages), len(result.Diagnostics))
 			}
@@ -1003,16 +1077,33 @@ func TestNoUnnecessaryTypeParametersIndexSignaturesCountTwice(test *testing.T) {
 		name   string
 		source string
 	}{
-		{name: "number index in parameter position", source: "declare function f<T>(param: { [key: number]: T }): void;\n"},
-		{name: "string index in parameter position", source: "declare function g<T>(param: { [key: string]: T }): void;\n"},
-		{name: "number index in return position", source: "declare function h<T>(param: string): { [key: number]: T };\n"},
-		{name: "string index in return position", source: "declare function i<T>(param: string): { [key: string]: T };\n"},
+		{
+			name:   "number index in parameter position",
+			source: "declare function f<T>(param: { [key: number]: T }): void;\n",
+		},
+		{
+			name:   "string index in parameter position",
+			source: "declare function g<T>(param: { [key: string]: T }): void;\n",
+		},
+		{
+			name:   "number index in return position",
+			source: "declare function h<T>(param: string): { [key: number]: T };\n",
+		},
+		{
+			name:   "string index in return position",
+			source: "declare function i<T>(param: string): { [key: string]: T };\n",
+		},
 	}
 
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTyped(test, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
+			result := rule_testing.RunTyped(
+				test,
+				NoUnnecessaryTypeParameters,
+				noUnnecessaryTypeParametersFile,
+				testCase.source,
+			)
 			rule_testing.ExpectClean(test, result)
 		})
 	}
@@ -1044,7 +1135,10 @@ func TestNoUnnecessaryTypeParametersRecognizesTheExactEqualityIdiom(test *testin
 		name   string
 		source string
 	}{
-		{name: "UnionFromClasses.test.ts:23", source: "type IsExactlyType<TLeft, TRight> =\n    (<T>() => T extends TLeft ? 1 : 2) extends <T>() => T extends TRight ? 1 : 2 ? true : false;\n"},
+		{
+			name:   "UnionFromClasses.test.ts:23",
+			source: "type IsExactlyType<TLeft, TRight> =\n    (<T>() => T extends TLeft ? 1 : 2) extends <T>() => T extends TRight ? 1 : 2 ? true : false;\n",
+		},
 		{name: "upstream invalid57, the same idiom", source: `
 type Compute<A> = A extends Function ? A : { [K in keyof A]: Compute<A[K]> };
 type Equal<X, Y> =
@@ -1053,20 +1147,40 @@ type Equal<X, Y> =
   ? true
   : false;
       `},
-		{name: "parenthesized check type inside the witness", source: "type Same<L, R> = (<T>() => (T) extends L ? 1 : 2) extends (<T>() => T extends R ? 1 : 2) ? true : false;\n"},
-		{name: "the constructor-type spelling of the idiom", source: "type Same<L, R> = (new <T>() => T extends L ? 1 : 2) extends (new <T>() => T extends R ? 1 : 2) ? true : false;\n"},
+		{
+			name:   "parenthesized check type inside the witness",
+			source: "type Same<L, R> = (<T>() => (T) extends L ? 1 : 2) extends (<T>() => T extends R ? 1 : 2) ? true : false;\n",
+		},
+		{
+			name:   "the constructor-type spelling of the idiom",
+			source: "type Same<L, R> = (new <T>() => T extends L ? 1 : 2) extends (new <T>() => T extends R ? 1 : 2) ? true : false;\n",
+		},
 		// These five reported while the idiom had its own recognizer, as controls for how narrowly it
 		// matched the comparison. Each has no value parameter and uses `T` only in its return, so the
 		// witness principle that replaced the recognizer is silent on all five.
 		{name: "the witness shape outside a comparison", source: "type Witness = <T>() => T extends string ? 1 : 2;\n"},
-		{name: "an operand whose return is not a conditional", source: "type Same<L, R> = (<T>() => T) extends (<T>() => T) ? true : false;\n"},
-		{name: "an operand whose conditional checks another type", source: "type Same<L, R> = (<T>() => L extends T ? 1 : 2) extends (<T>() => R extends T ? 1 : 2) ? true : false;\n"},
-		{name: "a declaration returning the conditional", source: "declare function witness<T>(): T extends string ? 1 : 2;\n"},
+		{
+			name:   "an operand whose return is not a conditional",
+			source: "type Same<L, R> = (<T>() => T) extends (<T>() => T) ? true : false;\n",
+		},
+		{
+			name:   "an operand whose conditional checks another type",
+			source: "type Same<L, R> = (<T>() => L extends T ? 1 : 2) extends (<T>() => R extends T ? 1 : 2) ? true : false;\n",
+		},
+		{
+			name:   "a declaration returning the conditional",
+			source: "declare function witness<T>(): T extends string ? 1 : 2;\n",
+		},
 	}
 	for _, testCase := range silent {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTyped(test, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
+			result := rule_testing.RunTyped(
+				test,
+				NoUnnecessaryTypeParameters,
+				noUnnecessaryTypeParametersFile,
+				testCase.source,
+			)
 			rule_testing.ExpectClean(test, result)
 		})
 	}
@@ -1076,15 +1190,28 @@ type Equal<X, Y> =
 		source string
 		ids    []string
 	}{
-		{name: "the conditional in a parameter of an operand", source: "type Same<L> = (<T>(input: T extends L ? 1 : 2) => void) extends (() => void) ? true : false;\n", ids: []string{"sole"}},
+		{
+			name:   "the conditional in a parameter of an operand",
+			source: "type Same<L> = (<T>(input: T extends L ? 1 : 2) => void) extends (() => void) ? true : false;\n",
+			ids:    []string{"sole"},
+		},
 		// A method signature has a receiver to cast from, so the witness principle no longer silences it
 		// (#gtgw3av), and it reports as it did when the idiom had its own recognizer and as upstream does.
-		{name: "a method signature inside a compared type literal", source: "type Same<L> = { m<T>(): T extends L ? 1 : 2 } extends {} ? true : false;\n", ids: []string{"sole"}},
+		{
+			name:   "a method signature inside a compared type literal",
+			source: "type Same<L> = { m<T>(): T extends L ? 1 : 2 } extends {} ? true : false;\n",
+			ids:    []string{"sole"},
+		},
 	}
 	for _, testCase := range reporting {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTyped(test, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
+			result := rule_testing.RunTyped(
+				test,
+				NoUnnecessaryTypeParameters,
+				noUnnecessaryTypeParametersFile,
+				testCase.source,
+			)
 			rule_testing.ExpectFindings(test, result, testCase.ids...)
 		})
 	}
@@ -1104,7 +1231,10 @@ func TestNoUnnecessaryTypeParametersTypeWitnesses(test *testing.T) {
 	test.Parallel()
 
 	silent := []noUnnecessaryTypeParametersCase{
-		{name: "ObjectTypes.ts:93, typeOnly", source: "export function typeOnly<Shape>(): Shape {\n    return null as unknown as Shape;\n}\n"},
+		{
+			name:   "ObjectTypes.ts:93, typeOnly",
+			source: "export function typeOnly<Shape>(): Shape {\n    return null as unknown as Shape;\n}\n",
+		},
 		{name: "invalid3", source: `const f1 = <T,>(): T => {};`},
 		{name: "invalid10", source: `
 declare class C {
@@ -1112,11 +1242,26 @@ declare class C {
 }
       `},
 		// A witness body hands back nothing, however it spells it (Kirk's ruling of 2026-10-02).
-		{name: "typeOnly returning undefined", source: "export function typeOnly<Shape>(): Shape {\n    return undefined as unknown as Shape;\n}\n"},
-		{name: "typeOnly returning void 0 through a non-null assertion", source: "export function typeOnly<Shape>(): Shape {\n    return (void 0)!;\n}\n"},
-		{name: "an arrow whose expression body is null", source: "export const typeOnly = <Shape,>(): Shape => null as unknown as Shape;\n"},
-		{name: "a body that only throws", source: "export function unreachable<Shape>(): Shape {\n    throw new Error('never called');\n}\n"},
-		{name: "a nested function's value return is not the witness's", source: "export function typeOnly<Shape>(): Shape {\n    const unused = () => 1;\n    unused();\n    return null as unknown as Shape;\n}\n"},
+		{
+			name:   "typeOnly returning undefined",
+			source: "export function typeOnly<Shape>(): Shape {\n    return undefined as unknown as Shape;\n}\n",
+		},
+		{
+			name:   "typeOnly returning void 0 through a non-null assertion",
+			source: "export function typeOnly<Shape>(): Shape {\n    return (void 0)!;\n}\n",
+		},
+		{
+			name:   "an arrow whose expression body is null",
+			source: "export const typeOnly = <Shape,>(): Shape => null as unknown as Shape;\n",
+		},
+		{
+			name:   "a body that only throws",
+			source: "export function unreachable<Shape>(): Shape {\n    throw new Error('never called');\n}\n",
+		},
+		{
+			name:   "a nested function's value return is not the witness's",
+			source: "export function typeOnly<Shape>(): Shape {\n    const unused = () => 1;\n    unused();\n    return null as unknown as Shape;\n}\n",
+		},
 		{name: "invalid24", source: `declare function get<T>(): T;`},
 		{name: "invalid25", source: `declare function get<T extends object>(): T;`},
 		{name: "invalid36", source: `declare function makeReadonlyArray<T>(): readonly T[];`},
@@ -1144,42 +1289,112 @@ declare function f<T extends (A extends B ? C : D)>(): T | null;
 	for _, testCase := range silent {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTyped(test, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
+			result := rule_testing.RunTyped(
+				test,
+				NoUnnecessaryTypeParameters,
+				noUnnecessaryTypeParametersFile,
+				testCase.source,
+			)
 			rule_testing.ExpectClean(test, result)
 		})
 	}
 
 	// Each control differs from a witness in one property the principle reads, and reports.
 	reporting := []noUnnecessaryTypeParametersCase{
-		{name: "a value parameter is something to cast from", source: "declare function parse<T>(input: string): T;\n", ids: []string{"sole"}},
-		{name: "typeOnly with a parameter", source: "export function typeOnly<Shape>(seed: unknown): Shape {\n    return seed as Shape;\n}\n", ids: []string{"sole"}},
-		{name: "a this parameter is a receiver to cast from", source: "declare function fromThis<T>(this: Window): T;\n", ids: []string{"sole"}},
-		{name: "a parameter with a default is still a parameter", source: "declare function make<T>(seed?: number): T;\n", ids: []string{"sole"}},
+		{
+			name:   "a value parameter is something to cast from",
+			source: "declare function parse<T>(input: string): T;\n",
+			ids:    []string{"sole"},
+		},
+		{
+			name:   "typeOnly with a parameter",
+			source: "export function typeOnly<Shape>(seed: unknown): Shape {\n    return seed as Shape;\n}\n",
+			ids:    []string{"sole"},
+		},
+		{
+			name:   "a this parameter is a receiver to cast from",
+			source: "declare function fromThis<T>(this: Window): T;\n",
+			ids:    []string{"sole"},
+		},
+		{
+			name:   "a parameter with a default is still a parameter",
+			source: "declare function make<T>(seed?: number): T;\n",
+			ids:    []string{"sole"},
+		},
 		{name: "never used is not a witness", source: "declare function nothing<T>(): void;\n", ids: []string{"sole"}},
-		{name: "used in another parameter's constraint, outside the return", source: "declare function pair<T, U extends T>(): U;\n", ids: []string{"sole"}},
-		{name: "a method with a parameter", source: "interface Store { read<T>(key: string): T }\n", ids: []string{"sole"}},
+		{
+			name:   "used in another parameter's constraint, outside the return",
+			source: "declare function pair<T, U extends T>(): U;\n",
+			ids:    []string{"sole"},
+		},
+		{
+			name:   "a method with a parameter",
+			source: "interface Store { read<T>(key: string): T }\n",
+			ids:    []string{"sole"},
+		},
 		// A method's receiver is something to cast from, as a this parameter is (#gtgw3av). The three are
 		// api-phi-health's WorkerQueueProcessor.ts:67, OrmTrackingEntity.ts:70 and IntegrationTestEnvironment.ts:68.
-		{name: "a method returning a field as its type parameter", source: "export class Processor {\n    private message: unknown;\n    getMessage<MessageType = unknown>(): MessageType {\n        return this.message as MessageType;\n    }\n}\n", ids: []string{"sole"}},
-		{name: "a method cloning its receiver as its type parameter", source: "export class Entity {\n    clone<T extends this>(): T {\n        return Object.create(this) as T;\n    }\n}\n", ids: []string{"sole"}},
-		{name: "a method widening a field with its type parameter", source: "interface Base { a: string }\nexport class Environment {\n    private variables: Base = { a: '' };\n    getEnvironmentVariables<T>(): Base & T {\n        return this.variables as Base & T;\n    }\n}\n", ids: []string{"sole"}},
-		{name: "a parameterless method signature", source: "interface Store { current<T>(): T }\n", ids: []string{"sole"}},
+		{
+			name:   "a method returning a field as its type parameter",
+			source: "export class Processor {\n    private message: unknown;\n    getMessage<MessageType = unknown>(): MessageType {\n        return this.message as MessageType;\n    }\n}\n",
+			ids:    []string{"sole"},
+		},
+		{
+			name:   "a method cloning its receiver as its type parameter",
+			source: "export class Entity {\n    clone<T extends this>(): T {\n        return Object.create(this) as T;\n    }\n}\n",
+			ids:    []string{"sole"},
+		},
+		{
+			name:   "a method widening a field with its type parameter",
+			source: "interface Base { a: string }\nexport class Environment {\n    private variables: Base = { a: '' };\n    getEnvironmentVariables<T>(): Base & T {\n        return this.variables as Base & T;\n    }\n}\n",
+			ids:    []string{"sole"},
+		},
+		{
+			name:   "a parameterless method signature",
+			source: "interface Store { current<T>(): T }\n",
+			ids:    []string{"sole"},
+		},
 		// The default spelling of the row above. A use inside a parameter's own constraint has no control:
 		// the type walk counts every self-constrained shape (`<T extends Array<T>>(): T`) three times,
 		// past the threshold, so it is silent before the witness test is ever asked.
-		{name: "used in another parameter's default, outside the return", source: "declare function pick<T, U = T>(): U;\n", ids: []string{"sole"}},
-		{name: "no return annotation to witness through", source: "export function inferred<T>() { return null as unknown as T; }\n", ids: []string{"sole"}},
+		{
+			name:   "used in another parameter's default, outside the return",
+			source: "declare function pick<T, U = T>(): U;\n",
+			ids:    []string{"sole"},
+		},
+		{
+			name:   "no return annotation to witness through",
+			source: "export function inferred<T>() { return null as unknown as T; }\n",
+			ids:    []string{"sole"},
+		},
 		// A body that returns a real value cast to the caller's type is a cast from the world, not a
 		// witness (Kirk's ruling of 2026-10-02). The first row is api-phi-health's
 		// OrmDrizzleConfiguration.ts:38, ormDrizzleCredentialsFromEnvironment, which ESLint reports.
-		{name: "a free function returning what it reads from the environment", source: "declare const process: { env: Record<string, string | undefined> };\nexport function credentialsFromEnvironment<CredentialsType>(): CredentialsType {\n    return JSON.parse(process.env.CREDENTIALS ?? '{}') as CredentialsType;\n}\n", ids: []string{"sole"}},
-		{name: "an arrow whose expression body is a real value", source: "export const fromStorage = <Shape,>(): Shape => JSON.parse('{}') as Shape;\n", ids: []string{"sole"}},
-		{name: "one null return beside one real return", source: "export function maybe<Shape>(): Shape {\n    if(Math.random() > 0.5) {\n        return null as unknown as Shape;\n    }\n    return {} as Shape;\n}\n", ids: []string{"sole"}},
+		{
+			name:   "a free function returning what it reads from the environment",
+			source: "declare const process: { env: Record<string, string | undefined> };\nexport function credentialsFromEnvironment<CredentialsType>(): CredentialsType {\n    return JSON.parse(process.env.CREDENTIALS ?? '{}') as CredentialsType;\n}\n",
+			ids:    []string{"sole"},
+		},
+		{
+			name:   "an arrow whose expression body is a real value",
+			source: "export const fromStorage = <Shape,>(): Shape => JSON.parse('{}') as Shape;\n",
+			ids:    []string{"sole"},
+		},
+		{
+			name:   "one null return beside one real return",
+			source: "export function maybe<Shape>(): Shape {\n    if(Math.random() > 0.5) {\n        return null as unknown as Shape;\n    }\n    return {} as Shape;\n}\n",
+			ids:    []string{"sole"},
+		},
 	}
 	for _, testCase := range reporting {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTyped(test, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
+			result := rule_testing.RunTyped(
+				test,
+				NoUnnecessaryTypeParameters,
+				noUnnecessaryTypeParametersFile,
+				testCase.source,
+			)
 			rule_testing.ExpectFindings(test, result, testCase.ids...)
 		})
 	}
@@ -1199,31 +1414,62 @@ func TestNoUnnecessaryTypeParametersPhantomBrands(test *testing.T) {
 
 	const typedBinding = "abstract class TypedBinding {\n  constructor(public readonly name: string) {}\n}\n"
 	silent := []noUnnecessaryTypeParametersCase{
-		{name: "WorkerQueueBinding.ts", source: typedBinding + "export class WorkerQueueBinding<MessageType = unknown> extends TypedBinding {\n  declare private readonly __workerQueue: MessageType;\n}\n"},
-		{name: "RpcClientBinding.ts", source: typedBinding + "export class RpcClientBinding<RpcInterface extends object = object> extends TypedBinding {\n  declare private readonly __rpcClient: RpcInterface;\n}\n"},
+		{name: "WorkerQueueBinding.ts", source: typedBinding +
+			"export class WorkerQueueBinding<MessageType = unknown> extends TypedBinding {\n  declare private readonly __workerQueue: MessageType;\n}\n"},
+		{name: "RpcClientBinding.ts", source: typedBinding +
+			"export class RpcClientBinding<RpcInterface extends object = object> extends TypedBinding {\n  declare private readonly __rpcClient: RpcInterface;\n}\n"},
 		{name: "a public brand", source: "export class PublicBrand<M> {\n  declare readonly brand: M;\n}\n"},
-		{name: "a brand under a union", source: "export class UnionBrand<M> {\n  declare readonly brand: M | undefined;\n}\n"},
+		{
+			name:   "a brand under a union",
+			source: "export class UnionBrand<M> {\n  declare readonly brand: M | undefined;\n}\n",
+		},
 	}
 	for _, testCase := range silent {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTyped(test, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
+			result := rule_testing.RunTyped(
+				test,
+				NoUnnecessaryTypeParameters,
+				noUnnecessaryTypeParametersFile,
+				testCase.source,
+			)
 			rule_testing.ExpectClean(test, result)
 		})
 	}
 
 	reporting := []noUnnecessaryTypeParametersCase{
-		{name: "an ordinary property", source: "export class Holder<M> {\n  readonly value: M | undefined = undefined;\n}\n", ids: []string{"sole"}},
-		{name: "a member of an ambient class", source: "export declare class Ambient<M> {\n  brand: M;\n}\n", ids: []string{"sole"}},
-		{name: "a brand naming something else", source: "export class BrandElsewhere<M> {\n  declare readonly brand: string;\n  take(message: M): void {\n    void message;\n  }\n}\n", ids: []string{"sole"}},
+		{
+			name:   "an ordinary property",
+			source: "export class Holder<M> {\n  readonly value: M | undefined = undefined;\n}\n",
+			ids:    []string{"sole"},
+		},
+		{
+			name:   "a member of an ambient class",
+			source: "export declare class Ambient<M> {\n  brand: M;\n}\n",
+			ids:    []string{"sole"},
+		},
+		{
+			name:   "a brand naming something else",
+			source: "export class BrandElsewhere<M> {\n  declare readonly brand: string;\n  take(message: M): void {\n    void message;\n  }\n}\n",
+			ids:    []string{"sole"},
+		},
 		// The brand names a type this time, so only resolving the identifier, not spotting one, tells it
 		// apart from a brand carrying M.
-		{name: "a brand naming another type", source: "export class BrandOther<M> {\n  declare readonly brand: Date;\n  take(message: M): void {\n    void message;\n  }\n}\n", ids: []string{"sole"}},
+		{
+			name:   "a brand naming another type",
+			source: "export class BrandOther<M> {\n  declare readonly brand: Date;\n  take(message: M): void {\n    void message;\n  }\n}\n",
+			ids:    []string{"sole"},
+		},
 	}
 	for _, testCase := range reporting {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTyped(test, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, testCase.source)
+			result := rule_testing.RunTyped(
+				test,
+				NoUnnecessaryTypeParameters,
+				noUnnecessaryTypeParametersFile,
+				testCase.source,
+			)
 			rule_testing.ExpectFindings(test, result, testCase.ids...)
 		})
 	}
@@ -1241,7 +1487,11 @@ func TestNoUnnecessaryTypeParametersPhantomBrands(test *testing.T) {
 func TestNoUnnecessaryTypeParametersCountsAnObjectTypesPropertiesOnce(test *testing.T) {
 	test.Parallel()
 
-	fires := rule_testing.RunTyped(test, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, `interface ShortAnswerInterface { type: 'ShortAnswer'; placeholder: string }
+	fires := rule_testing.RunTyped(
+		test,
+		NoUnnecessaryTypeParameters,
+		noUnnecessaryTypeParametersFile,
+		`interface ShortAnswerInterface { type: 'ShortAnswer'; placeholder: string }
 interface RatingInterface { type: 'Rating'; maximum: number }
 type ComponentType = ShortAnswerInterface | RatingInterface;
 type RendererType<Kind extends ComponentType['type']> = (component: Extract<ComponentType, { type: Kind }>) => string;
@@ -1259,13 +1509,21 @@ export function rendererFor<Kind extends ComponentType['type']>(
         return renderer(component);
     };
 }
-`)
+`,
+	)
 	rule_testing.ExpectFindings(test, fires, "sole")
-	if !strings.HasPrefix(fires.Diagnostics[0].Message.Description, "Type parameter Kind is used only once in the function signature.") {
+	if !strings.HasPrefix(
+		fires.Diagnostics[0].Message.Description,
+		"Type parameter Kind is used only once in the function signature.",
+	) {
 		test.Errorf("expected upstream's sentence first, got %q", fires.Diagnostics[0].Message.Description)
 	}
 
-	silent := rule_testing.RunTyped(test, NoUnnecessaryTypeParameters, noUnnecessaryTypeParametersFile, `interface ShortAnswerInterface { type: 'ShortAnswer'; placeholder: string }
+	silent := rule_testing.RunTyped(
+		test,
+		NoUnnecessaryTypeParameters,
+		noUnnecessaryTypeParametersFile,
+		`interface ShortAnswerInterface { type: 'ShortAnswer'; placeholder: string }
 interface RatingInterface { type: 'Rating'; maximum: number }
 type ComponentType = ShortAnswerInterface | RatingInterface;
 type RendererType<Kind extends ComponentType['type']> = (component: Extract<ComponentType, { type: Kind }>) => string;
@@ -1283,6 +1541,7 @@ export function rendererFor<Kind extends ComponentType['type']>(
         return renderer(component);
     };
 }
-`)
+`,
+	)
 	rule_testing.ExpectClean(test, silent)
 }

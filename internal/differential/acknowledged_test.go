@@ -74,10 +74,26 @@ func TestAnAcknowledgementExcusesNothingElse(test *testing.T) {
 		finding Finding
 		side    Side
 	}{
-		{"a line in the same file without the anchor", Finding{File: "app/Probe.tsx", Line: 4, Rule: "storage-no-direct-local-storage"}, SideCohere},
-		{"the same text in a different file", Finding{File: "app/Other.tsx", Line: 1, Rule: "storage-no-direct-local-storage"}, SideCohere},
-		{"a different rule on the anchored line", Finding{File: "app/Probe.tsx", Line: 2, Rule: "no-self-assign"}, SideCohere},
-		{"the same finding from the other side", Finding{File: "app/Probe.tsx", Line: 2, Rule: "storage-no-direct-local-storage"}, SideGate},
+		{
+			"a line in the same file without the anchor",
+			Finding{File: "app/Probe.tsx", Line: 4, Rule: "storage-no-direct-local-storage"},
+			SideCohere,
+		},
+		{
+			"the same text in a different file",
+			Finding{File: "app/Other.tsx", Line: 1, Rule: "storage-no-direct-local-storage"},
+			SideCohere,
+		},
+		{
+			"a different rule on the anchored line",
+			Finding{File: "app/Probe.tsx", Line: 2, Rule: "no-self-assign"},
+			SideCohere,
+		},
+		{
+			"the same finding from the other side",
+			Finding{File: "app/Probe.tsx", Line: 2, Rule: "storage-no-direct-local-storage"},
+			SideGate,
+		},
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
@@ -99,7 +115,10 @@ func TestAnAcknowledgementExcusesNothingElse(test *testing.T) {
 				test.Error("an unrelated difference was excused by the acknowledgement")
 			}
 			if len(report.StaleAcknowledgements) != 1 {
-				test.Errorf("the entry excused nothing in this run, so it must be stale, got %v", report.StaleAcknowledgements)
+				test.Errorf(
+					"the entry excused nothing in this run, so it must be stale, got %v",
+					report.StaleAcknowledgements,
+				)
 			}
 		})
 	}
@@ -200,7 +219,11 @@ func TestSourceLineReaderReadsTheTreesLinesOneBased(test *testing.T) {
 	if createDirectoryError := os.MkdirAll(filepath.Join(root, "app"), 0o755); createDirectoryError != nil {
 		test.Fatal(createDirectoryError)
 	}
-	if writeError := os.WriteFile(filepath.Join(root, "app", "Probe.tsx"), []byte("first\nsecond\n"), 0o644); writeError != nil {
+	if writeError := os.WriteFile(
+		filepath.Join(root, "app", "Probe.tsx"),
+		[]byte("first\nsecond\n"),
+		0o644,
+	); writeError != nil {
 		test.Fatal(writeError)
 	}
 	read := sourceLineReaderAt(root)
@@ -218,7 +241,15 @@ func TestSourceLineReaderReadsTheTreesLinesOneBased(test *testing.T) {
 	} {
 		text, readable := read(testCase.file, testCase.line)
 		if text != testCase.text || readable != testCase.readable {
-			test.Errorf("%s:%d read %q, %v; expected %q, %v", testCase.file, testCase.line, text, readable, testCase.text, testCase.readable)
+			test.Errorf(
+				"%s:%d read %q, %v; expected %q, %v",
+				testCase.file,
+				testCase.line,
+				text,
+				readable,
+				testCase.text,
+				testCase.readable,
+			)
 		}
 	}
 }

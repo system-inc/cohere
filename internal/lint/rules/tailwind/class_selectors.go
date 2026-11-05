@@ -152,7 +152,11 @@ func (legacy *LegacySelector) UnmarshalJSON(raw []byte) error {
 		switch matcher.Match {
 		case MatcherTypeStrings, MatcherTypeObjectKeys, MatcherTypeObjectValues:
 		default:
-			return fmt.Errorf("selector %q: a matcher is strings, objectKeys or objectValues, not %q", name, matcher.Match)
+			return fmt.Errorf(
+				"selector %q: a matcher is strings, objectKeys or objectValues, not %q",
+				name,
+				matcher.Match,
+			)
 		}
 		// upstream's toSelectorMatcher: a strings matcher drops its path.
 		if matcher.Match == MatcherTypeStrings {
@@ -201,7 +205,10 @@ var DefaultSelectors = sync.OnceValue(func() []Selector {
 	if decodeError := decoder.Decode(&selectors); decodeError != nil {
 		// Invariant: default_selectors.json is embedded at build time, and every test that reads the default
 		// selectors decodes this same file, so one that does not decode fails the tests before it ships.
-		panic(fmt.Sprintf("default_selectors.json does not decode, so it was not written by tools/generate_class_literals: %v", decodeError))
+		panic(fmt.Sprintf(
+			"default_selectors.json does not decode, so it was not written by tools/generate_class_literals: %v",
+			decodeError,
+		))
 	}
 	return selectors
 })
@@ -222,9 +229,14 @@ func checkSelectors(selectors []Selector) error {
 				return fmt.Errorf("selectors[%d]: a %s selector needs a name or a path", index, selector.Kind)
 			}
 		default:
-			return fmt.Errorf("selectors[%d]: the kind is attribute, callee, tag or variable, not %q", index, selector.Kind)
+			return fmt.Errorf(
+				"selectors[%d]: the kind is attribute, callee, tag or variable, not %q",
+				index,
+				selector.Kind,
+			)
 		}
-		if selector.Kind != SelectorKindCallee && (selector.TargetCall != nil || selector.CallTarget != nil || selector.TargetArgument != nil) {
+		if selector.Kind != SelectorKindCallee &&
+			(selector.TargetCall != nil || selector.CallTarget != nil || selector.TargetArgument != nil) {
 			return fmt.Errorf("selectors[%d]: only a callee selector takes a call or argument target", index)
 		}
 		if selector.Kind != SelectorKindCallee && selector.Kind != SelectorKindTag && selector.Path != "" {
@@ -259,7 +271,10 @@ func checkMatchers(matchers []SelectorMatcher, isTopLevel bool) error {
 				return checkMatchersError
 			}
 		default:
-			return fmt.Errorf("a matcher is strings, objectKeys, objectValues or anonymousFunctionReturn, not %q", matcher.Type)
+			return fmt.Errorf(
+				"a matcher is strings, objectKeys, objectValues or anonymousFunctionReturn, not %q",
+				matcher.Type,
+			)
 		}
 	}
 	return nil

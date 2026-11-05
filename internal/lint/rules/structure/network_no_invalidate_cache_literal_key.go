@@ -9,12 +9,22 @@ import (
 // The rule's messages, one handle per id, whose wording lives in
 // `policy/messages/network-no-invalidate-cache-literal-key.json`.
 var (
-	networkNoInvalidateCacheLiteralKeyNoStringLiteralInvalidateCacheText          = policy.MessageOf("structure/network-no-invalidate-cache-literal-key", "noStringLiteralInvalidateCache")
-	networkNoInvalidateCacheLiteralKeyNoTemplateLiteralInvalidateCacheText        = policy.MessageOf("structure/network-no-invalidate-cache-literal-key", "noTemplateLiteralInvalidateCache")
-	networkNoInvalidateCacheLiteralKeyNoArrayWithStringLiteralInvalidateCacheText = policy.MessageOf("structure/network-no-invalidate-cache-literal-key", "noArrayWithStringLiteralInvalidateCache")
+	networkNoInvalidateCacheLiteralKeyNoStringLiteralInvalidateCacheText = policy.MessageOf(
+		"structure/network-no-invalidate-cache-literal-key",
+		"noStringLiteralInvalidateCache",
+	)
+	networkNoInvalidateCacheLiteralKeyNoTemplateLiteralInvalidateCacheText = policy.MessageOf(
+		"structure/network-no-invalidate-cache-literal-key",
+		"noTemplateLiteralInvalidateCache",
+	)
+	networkNoInvalidateCacheLiteralKeyNoArrayWithStringLiteralInvalidateCacheText = policy.MessageOf(
+		"structure/network-no-invalidate-cache-literal-key",
+		"noArrayWithStringLiteralInvalidateCache",
+	)
 )
 
-// messageNoStringLiteralInvalidateCache is the finding, rendered when it is reported so the text comes from the current catalog.
+// messageNoStringLiteralInvalidateCache is the finding, rendered when it is reported so the text comes from the current
+// catalog.
 func messageNoStringLiteralInvalidateCache() rule.Message {
 	return rule.Message{
 		Id:          networkNoInvalidateCacheLiteralKeyNoStringLiteralInvalidateCacheText.Id,
@@ -22,7 +32,8 @@ func messageNoStringLiteralInvalidateCache() rule.Message {
 	}
 }
 
-// messageNoTemplateLiteralInvalidateCache is the finding, rendered when it is reported so the text comes from the current catalog.
+// messageNoTemplateLiteralInvalidateCache is the finding, rendered when it is reported so the text comes from the
+// current catalog.
 func messageNoTemplateLiteralInvalidateCache() rule.Message {
 	return rule.Message{
 		Id:          networkNoInvalidateCacheLiteralKeyNoTemplateLiteralInvalidateCacheText.Id,
@@ -30,7 +41,8 @@ func messageNoTemplateLiteralInvalidateCache() rule.Message {
 	}
 }
 
-// messageNoArrayWithStringLiteralInvalidateCache is the finding, rendered when it is reported so the text comes from the current catalog.
+// messageNoArrayWithStringLiteralInvalidateCache is the finding, rendered when it is reported so the text comes from
+// the current catalog.
 func messageNoArrayWithStringLiteralInvalidateCache() rule.Message {
 	return rule.Message{
 		Id:          networkNoInvalidateCacheLiteralKeyNoArrayWithStringLiteralInvalidateCacheText.Id,

@@ -61,16 +61,64 @@ func TestJsxNoUselessFragmentFires(test *testing.T) {
 		{"upstream invalid-1", "<>{}</>", "", []string{"NeedsMoreChildren"}, ""},
 		{"upstream invalid-2", "<>{meow}</>", "", []string{"NeedsMoreChildren"}, ""},
 		{"upstream invalid-3", "<><div/></>", "", []string{"NeedsMoreChildren"}, "<div/>"},
-		{"upstream invalid-4", "\n        <>\n          <div/>\n        </>\n      ", "", []string{"NeedsMoreChildren"}, "\n        <div/>\n      "},
+		{
+			"upstream invalid-4",
+			"\n        <>\n          <div/>\n        </>\n      ",
+			"",
+			[]string{"NeedsMoreChildren"},
+			"\n        <div/>\n      ",
+		},
 		{"upstream invalid-5", "<Fragment />", "", []string{"NeedsMoreChildren"}, ""},
-		{"upstream invalid-6", "\n        <React.Fragment>\n          <Foo />\n        </React.Fragment>\n      ", "", []string{"NeedsMoreChildren"}, "\n        <Foo />\n      "},
+		{
+			"upstream invalid-6",
+			"\n        <React.Fragment>\n          <Foo />\n        </React.Fragment>\n      ",
+			"",
+			[]string{"NeedsMoreChildren"},
+			"\n        <Foo />\n      ",
+		},
 		{"upstream invalid-8", "<Eeee><>foo</></Eeee>", "", []string{"NeedsMoreChildren"}, ""},
-		{"upstream invalid-9", "<div><>{\"a\"}{\"b\"}</></div>", "", []string{"ChildOfHtmlElement"}, "<div>{\"a\"}{\"b\"}</div>"},
-		{"upstream invalid-11", "\n        <section>\n          <Eeee />\n          <Eeee />\n          <>{\"a\"}{\"b\"}</>\n        </section>", "", []string{"ChildOfHtmlElement"}, "\n        <section>\n          <Eeee />\n          <Eeee />\n          {\"a\"}{\"b\"}\n        </section>"},
-		{"upstream invalid-12", "<div><Fragment>{\"a\"}{\"b\"}</Fragment></div>", "", []string{"ChildOfHtmlElement"}, "<div>{\"a\"}{\"b\"}</div>"},
-		{"upstream invalid-13", "\n        <section>\n          git<>\n            <b>hub</b>.\n          </>\n\n          git<> <b>hub</b></>\n        </section>", "", []string{"ChildOfHtmlElement", "ChildOfHtmlElement"}, "\n        <section>\n          git<b>hub</b>.\n\n          git <b>hub</b>\n        </section>"},
-		{"upstream invalid-14", "<div>a <>{\"\"}{\"\"}</> a</div>", "", []string{"ChildOfHtmlElement"}, "<div>a {\"\"}{\"\"} a</div>"},
-		{"upstream invalid-15", "<><Foo>{moo}</Foo></>", "{\"allowExpressions\":true}", []string{"NeedsMoreChildren"}, "<Foo>{moo}</Foo>"},
+		{
+			"upstream invalid-9",
+			"<div><>{\"a\"}{\"b\"}</></div>",
+			"",
+			[]string{"ChildOfHtmlElement"},
+			"<div>{\"a\"}{\"b\"}</div>",
+		},
+		{
+			"upstream invalid-11",
+			"\n        <section>\n          <Eeee />\n          <Eeee />\n          <>{\"a\"}{\"b\"}</>\n        </section>",
+			"",
+			[]string{"ChildOfHtmlElement"},
+			"\n        <section>\n          <Eeee />\n          <Eeee />\n          {\"a\"}{\"b\"}\n        </section>",
+		},
+		{
+			"upstream invalid-12",
+			"<div><Fragment>{\"a\"}{\"b\"}</Fragment></div>",
+			"",
+			[]string{"ChildOfHtmlElement"},
+			"<div>{\"a\"}{\"b\"}</div>",
+		},
+		{
+			"upstream invalid-13",
+			"\n        <section>\n          git<>\n            <b>hub</b>.\n          </>\n\n          git<> <b>hub</b></>\n        </section>",
+			"",
+			[]string{"ChildOfHtmlElement", "ChildOfHtmlElement"},
+			"\n        <section>\n          git<b>hub</b>.\n\n          git <b>hub</b>\n        </section>",
+		},
+		{
+			"upstream invalid-14",
+			"<div>a <>{\"\"}{\"\"}</> a</div>",
+			"",
+			[]string{"ChildOfHtmlElement"},
+			"<div>a {\"\"}{\"\"} a</div>",
+		},
+		{
+			"upstream invalid-15",
+			"<><Foo>{moo}</Foo></>",
+			"{\"allowExpressions\":true}",
+			[]string{"NeedsMoreChildren"},
+			"<Foo>{moo}</Foo>",
+		},
 	}
 
 	for _, testCase := range cases {
@@ -486,7 +534,11 @@ func TestJsxNoUselessFragmentMatchesUpstreamOnShapesTheCorpusOmits(test *testing
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectFindings(test, runJsxNoUselessFragment(test, testCase.sourceText, ""), testCase.wantIds...)
+			rule_testing.ExpectFindings(
+				test,
+				runJsxNoUselessFragment(test, testCase.sourceText, ""),
+				testCase.wantIds...,
+			)
 		})
 	}
 }
@@ -529,10 +581,14 @@ func TestJsxNoUselessFragmentDecodesItsOptions(test *testing.T) {
 func TestJsxNoUselessFragmentRejectsMalformedOptions(test *testing.T) {
 	test.Parallel()
 
-	if _, decodeJsxNoUselessFragmentOptionsError := DecodeJsxNoUselessFragmentOptions([]byte(`{"allowExpressions":`)); decodeJsxNoUselessFragmentOptionsError == nil {
+	if _, decodeJsxNoUselessFragmentOptionsError := DecodeJsxNoUselessFragmentOptions(
+		[]byte(`{"allowExpressions":`),
+	); decodeJsxNoUselessFragmentOptionsError == nil {
 		test.Fatal("truncated JSON decoded without error")
 	}
-	if _, decodeJsxNoUselessFragmentOptionsError := DecodeJsxNoUselessFragmentOptions([]byte(`"error"`)); decodeJsxNoUselessFragmentOptionsError == nil {
+	if _, decodeJsxNoUselessFragmentOptionsError := DecodeJsxNoUselessFragmentOptions(
+		[]byte(`"error"`),
+	); decodeJsxNoUselessFragmentOptionsError == nil {
 		test.Fatal("a string decoded into the options struct without error")
 	}
 }
@@ -703,7 +759,11 @@ func TestJsxNoUselessFragmentReadsBothFragmentSpellings(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectFindings(test, runJsxNoUselessFragment(test, testCase.sourceText, ""), testCase.wantIds...)
+			rule_testing.ExpectFindings(
+				test,
+				runJsxNoUselessFragment(test, testCase.sourceText, ""),
+				testCase.wantIds...,
+			)
 		})
 	}
 }

@@ -64,7 +64,10 @@ export function buildSchema(): unknown[] {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoUseBeforeDefine, "fixture.ts", testCase.source))
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.RunTyped(test, NoUseBeforeDefine, "fixture.ts", testCase.source),
+			)
 		})
 	}
 }
@@ -131,8 +134,11 @@ export const second = (): unknown => first;
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoUseBeforeDefine, "fixture.ts", testCase.source),
-				"usedBeforeDefined")
+			rule_testing.ExpectFindings(
+				test,
+				rule_testing.RunTyped(test, NoUseBeforeDefine, "fixture.ts", testCase.source),
+				"usedBeforeDefined",
+			)
 		})
 	}
 }

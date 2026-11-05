@@ -152,7 +152,9 @@ func TestAnIgnoreFileThatCannotBeReadIsRefused(test *testing.T) {
 		if newGitignoreError != nil {
 			test.Fatal(newGitignoreError)
 		}
-		if _, enterError := matcher.Enter("sub"); enterError == nil || !strings.Contains(enterError.Error(), "symbolic link") {
+		if _, enterError := matcher.Enter(
+			"sub",
+		); enterError == nil || !strings.Contains(enterError.Error(), "symbolic link") {
 			test.Fatalf("entering a directory whose .gitignore is a link: %v", enterError)
 		}
 	})
@@ -160,7 +162,9 @@ func TestAnIgnoreFileThatCannotBeReadIsRefused(test *testing.T) {
 		test.Parallel()
 		root := test.TempDir()
 		writeTree(test, root, map[string]string{".gitignore": "a\x00b\n"})
-		if _, newGitignoreError := New(root); newGitignoreError == nil || !strings.Contains(newGitignoreError.Error(), ".gitignore:1") {
+		if _, newGitignoreError := New(
+			root,
+		); newGitignoreError == nil || !strings.Contains(newGitignoreError.Error(), ".gitignore:1") {
 			test.Fatalf("a NUL byte: %v", newGitignoreError)
 		}
 	})
@@ -244,7 +248,10 @@ func TestAListingAnswersOnlyForWhatItShowsAbsent(test *testing.T) {
 	// Named in its listing, or not listed at all: the disk is asked, as without a listing.
 	for _, path := range []string{"plain/built", "unlisted/cache"} {
 		if ignored, _ := decide(test, listed, path, true); !ignored {
-			test.Errorf("%s: a .gitignore the listing names, or in a directory it does not hold, was not read from the disk", path)
+			test.Errorf(
+				"%s: a .gitignore the listing names, or in a directory it does not hold, was not read from the disk",
+				path,
+			)
 		}
 	}
 	// A matcher Enter makes keeps the listing: plain/deep's `.gitignore` is on disk, and its listing shows none.

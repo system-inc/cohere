@@ -44,7 +44,9 @@ import (
 // nested-function walk measured against the old pattern scored -3 and against this one scores +1.
 //
 // Bounded: 7 slot occurrences over 5 distinct expressions corpus-wide.
-var goldenDependencyPattern = regexp.MustCompile(`\$\[[0-9]+\] !== ([A-Za-z_$][A-Za-z0-9_$]*(?:\??\.[A-Za-z_$][A-Za-z0-9_$]*)*)`)
+var goldenDependencyPattern = regexp.MustCompile(
+	`\$\[[0-9]+\] !== ([A-Za-z_$][A-Za-z0-9_$]*(?:\??\.[A-Za-z_$][A-Za-z0-9_$]*)*)`,
+)
 
 // goldenDependencies returns the dependency expressions upstream's compiled output compares.
 func goldenDependencies(test *testing.T, expectPath string) []string {

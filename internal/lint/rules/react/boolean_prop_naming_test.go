@@ -21,48 +21,356 @@ func TestBooleanPropNamingStaysSilent(test *testing.T) {
 		name, sourceText string
 		options          BooleanPropNamingOptions
 	}{
-		{"upstream valid 0", "\n        var Hello = createReactClass({\n          propTypes: {isSomething: PropTypes.bool, hasValue: PropTypes.bool},\n          render: function() { return <div />; }\n        });\n      ", BooleanPropNamingOptions{Rule: "^(is|has)[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}},
-		{"upstream valid 1", "\n        var Hello = createReactClass({\n          propTypes: {isSomething: PropTypes.bool},\n          render: function() { return <div />; }\n        });\n      ", BooleanPropNamingOptions{Rule: "^is[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}},
-		{"upstream valid 2", "\n        var Hello = createReactClass({\n          propTypes: {isSomething: React.PropTypes.bool},\n          render: function() { return <div />; }\n        });\n      ", BooleanPropNamingOptions{Rule: "^is[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}},
-		{"upstream valid 5", "\n        class Hello extends React.Component {\n          render () { return <div />; }\n        }\n        Hello.propTypes = {isSomething: PropTypes.bool}\n      ", BooleanPropNamingOptions{Rule: "^is[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}},
-		{"upstream valid 6", "\n        class Hello extends React.Component {\n          render () { return <div />; }\n        }\n        Hello.propTypes = wrap({ a: PropTypes.bool })\n      ", BooleanPropNamingOptions{Rule: "^is[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}},
-		{"upstream valid 7", "\n        class Hello extends React.Component {\n          render () { return <div />; }\n        }\n        Hello.propTypes = {something: PropTypes.any}\n      ", BooleanPropNamingOptions{Rule: "^is[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}},
-		{"upstream valid 8", "\n        class Hello extends Component {\n          render () { return <div />; }\n        }\n        Hello.propTypes = {isSomething: PropTypes.bool}\n      ", BooleanPropNamingOptions{Rule: "^is[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}},
-		{"upstream valid 9", "\n        class Hello extends React.Component {\n          static propTypes = {isSomething: PropTypes.bool};\n          render () { return <div />; }\n        }\n      ", BooleanPropNamingOptions{Rule: "^is[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}},
-		{"upstream valid 10", "\n        const spreadProps = { aSpreadProp: PropTypes.string };\n        class Hello extends React.Component {\n          static propTypes = {isSomething: PropTypes.bool, ...spreadProps};\n          render () { return <div />; }\n        }\n      ", BooleanPropNamingOptions{Rule: "^is[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}},
-		{"upstream valid 11", "\n        const spreadProps = { aSpreadProp: PropTypes.string };\n        class Hello extends Component {\n          render () { return <div />; }\n        }\n        Hello.propTypes = {isSomething: PropTypes.bool, ...spreadProps}\n      ", BooleanPropNamingOptions{Rule: "^is[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}},
-		{"upstream valid 12", "\n        class Hello extends React.Component {\n          static propTypes = {isSomething: React.PropTypes.bool};\n          render () { return <div />; }\n        }\n      ", BooleanPropNamingOptions{Rule: "^is[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}},
-		{"upstream valid 13", "\n        class Hello extends React.Component {\n          static propTypes = {something: PropTypes.any};\n          render () { return <div />; }\n        }\n      ", BooleanPropNamingOptions{Rule: "^is[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}},
-		{"upstream valid 16", "\n        var Hello = ({isSomething}) => { return <div /> }\n        Hello.propTypes = {isSomething: PropTypes.bool};\n      ", BooleanPropNamingOptions{Rule: "^is[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}},
-		{"upstream valid 18", "\n        class Hello extends React.Component {\n          static propTypes = {\n            isSomething: PropTypes.mutuallyExclusiveTrueProps,\n            something: PropTypes.bool\n          };\n          render () { return <div />; }\n        }\n      ", BooleanPropNamingOptions{Rule: "^is[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"mutuallyExclusiveTrueProps"}, ValidateNested: false, Message: ""}},
-		{"upstream valid 19", "\n        class Hello extends React.Component {\n          static propTypes = {\n            isSomething: mutuallyExclusiveTrueProps,\n            isSomethingElse: bool\n          };\n          render () { return <div />; }\n        }\n      ", BooleanPropNamingOptions{Rule: "^is[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool", "mutuallyExclusiveTrueProps"}, ValidateNested: false, Message: ""}},
-		{"upstream valid 20", "\n        var x = {a: 1}\n        var y = {...x}\n      ", BooleanPropNamingOptions{Rule: "^is[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}},
-		{"upstream valid 22", "\n      function Card(props) {\n        return <div>{props.showScore ? 'yeh' : 'no'}</div>;\n      }\n      Card.propTypes = merge({}, Card.propTypes, {\n          showScore: PropTypes.bool\n      });", BooleanPropNamingOptions{Rule: "^(is|has)[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}},
-		{"upstream valid 23", "\n        var Hello = createReactClass({\n          propTypes: {isSomething: PropTypes.bool.isRequired, hasValue: PropTypes.bool.isRequired},\n          render: function() { return <div />; }\n        });\n      ", BooleanPropNamingOptions{Rule: "^(is|has)[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}},
-		{"upstream valid 24", "\n        class Hello extends React.Component {\n          static propTypes = {\n            isSomething: PropTypes.bool.isRequired,\n            hasValue: PropTypes.bool.isRequired\n          };\n\n          render() {\n            return (\n              <div />\n            );\n          }\n        }\n      ", BooleanPropNamingOptions{Rule: "^(is|has)[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}},
-		{"upstream valid 25", "\n        class Hello extends React.Component {\n          render() {\n            return (\n              <div />\n            );\n          }\n        }\n\n        Hello.propTypes = {\n          isSomething: PropTypes.bool.isRequired,\n          hasValue: PropTypes.bool.isRequired\n        }\n      ", BooleanPropNamingOptions{Rule: "^(is|has)[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}},
-		{"upstream valid 26", "\n        var Hello = createReactClass({\n          propTypes: {something: PropTypes.shape({}).isRequired},\n          render: function() { return <div />; }\n        });\n      ", BooleanPropNamingOptions{Rule: "^is[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}},
-		{"upstream valid 28", "\n        class Hello extends React.Component {\n          render() {\n            return (\n              <div />\n            );\n          }\n        }\n\n        Hello.propTypes = {\n          isSomething: PropTypes.bool.isRequired,\n          nested: PropTypes.shape({\n            isWorking: PropTypes.bool\n          })\n        };\n      ", BooleanPropNamingOptions{Rule: "^(is|has)[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}},
-		{"upstream valid 29", "\n        class Hello extends React.Component {\n          render() {\n            return (\n              <div />\n            );\n          }\n        }\n\n        Hello.propTypes = {\n          isSomething: PropTypes.bool.isRequired,\n          nested: PropTypes.shape({\n            nested: PropTypes.shape({\n              isWorking: PropTypes.bool\n            })\n          })\n        };\n      ", BooleanPropNamingOptions{Rule: "^is[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: true, Message: ""}},
-		{"upstream valid 30", "\n        type TestFNType = {\n          isEnabled: boolean\n        }\n        const HelloNew = (props: TestFNType) => { return <div /> };\n      ", BooleanPropNamingOptions{Rule: "^is[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}},
-		{"upstream valid 31", "\n        type Props = {\n          isEnabled: boolean\n        } & OtherProps\n        const HelloNew = (props: Props) => { return <div /> };\n      ", BooleanPropNamingOptions{Rule: "^is[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}},
-		{"upstream valid 32", "\n        type Props = {\n          isEnabled: boolean\n        } & {\n          hasLOL: boolean\n        } & OtherProps\n        const HelloNew = (props: Props) => { return <div /> };\n      ", BooleanPropNamingOptions{Rule: "(is|has)[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}},
-		{"upstream valid 33", "\n        type Props = {\n          isEnabled: boolean\n        }\n\n        const HelloNew: React.FC<Props> = (props) => { return <div /> };\n      ", BooleanPropNamingOptions{Rule: "^is[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}},
-		{"upstream valid 34", "\n        type Props = {\n          isEnabled: boolean\n        } & {\n          hasLOL: boolean\n        }\n\n        const HelloNew: React.FC<Props> = (props) => { return <div /> };\n      ", BooleanPropNamingOptions{Rule: "^(is|has)[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}},
-		{"upstream valid 35", "\n        type Props = {\n          isEnabled: boolean\n        } | {\n          hasLOL: boolean\n        }\n\n        const HelloNew = (props: Props) => { return <div /> };\n      ", BooleanPropNamingOptions{Rule: "^(is|has)[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}},
-		{"upstream valid 36", "\n        type Props = {\n          isEnabled: boolean\n        } & ({\n          hasLOL: boolean\n        } | {\n          isLOL: boolean\n        })\n\n        const HelloNew = (props: Props) => { return <div /> };\n      ", BooleanPropNamingOptions{Rule: "^(is|has)[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}},
-		{"upstream valid 37", "\n        export const DataRow = (props: { label: string; value: string; } & React.HTMLAttributes<HTMLDivElement>) => {\n            const { label, value, ...otherProps } = props;\n            return (\n                <div {...otherProps}>\n                    <span>{label}</span>\n                    <span>{value}</span>\n                </div>\n            );\n        };\n      ", BooleanPropNamingOptions{Rule: "(^(is|has|should|without)[A-Z]([A-Za-z0-9]?)+|disabled|required|checked|defaultChecked)", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}},
-		{"upstream valid 38", "\n        // Strip @jsx comments, see https://github.com/microsoft/fluentui/issues/29126\n        const resultCode = result.code\n          .replace('/** @jsxRuntime automatic */', '')\n          .replace('/** @jsxImportSource @fluentui/react-jsx-runtime */', '');\n      ", BooleanPropNamingOptions{Rule: "^(is|has)[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}},
+		{
+			"upstream valid 0",
+			"\n        var Hello = createReactClass({\n          propTypes: {isSomething: PropTypes.bool, hasValue: PropTypes.bool},\n          render: function() { return <div />; }\n        });\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^(is|has)[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+		},
+		{
+			"upstream valid 1",
+			"\n        var Hello = createReactClass({\n          propTypes: {isSomething: PropTypes.bool},\n          render: function() { return <div />; }\n        });\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^is[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+		},
+		{
+			"upstream valid 2",
+			"\n        var Hello = createReactClass({\n          propTypes: {isSomething: React.PropTypes.bool},\n          render: function() { return <div />; }\n        });\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^is[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+		},
+		{
+			"upstream valid 5",
+			"\n        class Hello extends React.Component {\n          render () { return <div />; }\n        }\n        Hello.propTypes = {isSomething: PropTypes.bool}\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^is[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+		},
+		{
+			"upstream valid 6",
+			"\n        class Hello extends React.Component {\n          render () { return <div />; }\n        }\n        Hello.propTypes = wrap({ a: PropTypes.bool })\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^is[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+		},
+		{
+			"upstream valid 7",
+			"\n        class Hello extends React.Component {\n          render () { return <div />; }\n        }\n        Hello.propTypes = {something: PropTypes.any}\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^is[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+		},
+		{
+			"upstream valid 8",
+			"\n        class Hello extends Component {\n          render () { return <div />; }\n        }\n        Hello.propTypes = {isSomething: PropTypes.bool}\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^is[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+		},
+		{
+			"upstream valid 9",
+			"\n        class Hello extends React.Component {\n          static propTypes = {isSomething: PropTypes.bool};\n          render () { return <div />; }\n        }\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^is[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+		},
+		{
+			"upstream valid 10",
+			"\n        const spreadProps = { aSpreadProp: PropTypes.string };\n        class Hello extends React.Component {\n          static propTypes = {isSomething: PropTypes.bool, ...spreadProps};\n          render () { return <div />; }\n        }\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^is[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+		},
+		{
+			"upstream valid 11",
+			"\n        const spreadProps = { aSpreadProp: PropTypes.string };\n        class Hello extends Component {\n          render () { return <div />; }\n        }\n        Hello.propTypes = {isSomething: PropTypes.bool, ...spreadProps}\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^is[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+		},
+		{
+			"upstream valid 12",
+			"\n        class Hello extends React.Component {\n          static propTypes = {isSomething: React.PropTypes.bool};\n          render () { return <div />; }\n        }\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^is[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+		},
+		{
+			"upstream valid 13",
+			"\n        class Hello extends React.Component {\n          static propTypes = {something: PropTypes.any};\n          render () { return <div />; }\n        }\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^is[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+		},
+		{
+			"upstream valid 16",
+			"\n        var Hello = ({isSomething}) => { return <div /> }\n        Hello.propTypes = {isSomething: PropTypes.bool};\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^is[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+		},
+		{
+			"upstream valid 18",
+			"\n        class Hello extends React.Component {\n          static propTypes = {\n            isSomething: PropTypes.mutuallyExclusiveTrueProps,\n            something: PropTypes.bool\n          };\n          render () { return <div />; }\n        }\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^is[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"mutuallyExclusiveTrueProps"},
+				ValidateNested: false,
+				Message:        "",
+			},
+		},
+		{
+			"upstream valid 19",
+			"\n        class Hello extends React.Component {\n          static propTypes = {\n            isSomething: mutuallyExclusiveTrueProps,\n            isSomethingElse: bool\n          };\n          render () { return <div />; }\n        }\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^is[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool", "mutuallyExclusiveTrueProps"},
+				ValidateNested: false,
+				Message:        "",
+			},
+		},
+		{"upstream valid 20", "\n        var x = {a: 1}\n        var y = {...x}\n      ", BooleanPropNamingOptions{
+			Rule:           "^is[A-Z]([A-Za-z0-9]?)+",
+			PropTypeNames:  []string{"bool"},
+			ValidateNested: false,
+			Message:        "",
+		}},
+		{
+			"upstream valid 22",
+			"\n      function Card(props) {\n        return <div>{props.showScore ? 'yeh' : 'no'}</div>;\n      }\n      Card.propTypes = merge({}, Card.propTypes, {\n          showScore: PropTypes.bool\n      });",
+			BooleanPropNamingOptions{
+				Rule:           "^(is|has)[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+		},
+		{
+			"upstream valid 23",
+			"\n        var Hello = createReactClass({\n          propTypes: {isSomething: PropTypes.bool.isRequired, hasValue: PropTypes.bool.isRequired},\n          render: function() { return <div />; }\n        });\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^(is|has)[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+		},
+		{
+			"upstream valid 24",
+			"\n        class Hello extends React.Component {\n          static propTypes = {\n            isSomething: PropTypes.bool.isRequired,\n            hasValue: PropTypes.bool.isRequired\n          };\n\n          render() {\n            return (\n              <div />\n            );\n          }\n        }\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^(is|has)[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+		},
+		{
+			"upstream valid 25",
+			"\n        class Hello extends React.Component {\n          render() {\n            return (\n              <div />\n            );\n          }\n        }\n\n        Hello.propTypes = {\n          isSomething: PropTypes.bool.isRequired,\n          hasValue: PropTypes.bool.isRequired\n        }\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^(is|has)[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+		},
+		{
+			"upstream valid 26",
+			"\n        var Hello = createReactClass({\n          propTypes: {something: PropTypes.shape({}).isRequired},\n          render: function() { return <div />; }\n        });\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^is[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+		},
+		{
+			"upstream valid 28",
+			"\n        class Hello extends React.Component {\n          render() {\n            return (\n              <div />\n            );\n          }\n        }\n\n        Hello.propTypes = {\n          isSomething: PropTypes.bool.isRequired,\n          nested: PropTypes.shape({\n            isWorking: PropTypes.bool\n          })\n        };\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^(is|has)[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+		},
+		{
+			"upstream valid 29",
+			"\n        class Hello extends React.Component {\n          render() {\n            return (\n              <div />\n            );\n          }\n        }\n\n        Hello.propTypes = {\n          isSomething: PropTypes.bool.isRequired,\n          nested: PropTypes.shape({\n            nested: PropTypes.shape({\n              isWorking: PropTypes.bool\n            })\n          })\n        };\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^is[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: true,
+				Message:        "",
+			},
+		},
+		{
+			"upstream valid 30",
+			"\n        type TestFNType = {\n          isEnabled: boolean\n        }\n        const HelloNew = (props: TestFNType) => { return <div /> };\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^is[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+		},
+		{
+			"upstream valid 31",
+			"\n        type Props = {\n          isEnabled: boolean\n        } & OtherProps\n        const HelloNew = (props: Props) => { return <div /> };\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^is[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+		},
+		{
+			"upstream valid 32",
+			"\n        type Props = {\n          isEnabled: boolean\n        } & {\n          hasLOL: boolean\n        } & OtherProps\n        const HelloNew = (props: Props) => { return <div /> };\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "(is|has)[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+		},
+		{
+			"upstream valid 33",
+			"\n        type Props = {\n          isEnabled: boolean\n        }\n\n        const HelloNew: React.FC<Props> = (props) => { return <div /> };\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^is[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+		},
+		{
+			"upstream valid 34",
+			"\n        type Props = {\n          isEnabled: boolean\n        } & {\n          hasLOL: boolean\n        }\n\n        const HelloNew: React.FC<Props> = (props) => { return <div /> };\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^(is|has)[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+		},
+		{
+			"upstream valid 35",
+			"\n        type Props = {\n          isEnabled: boolean\n        } | {\n          hasLOL: boolean\n        }\n\n        const HelloNew = (props: Props) => { return <div /> };\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^(is|has)[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+		},
+		{
+			"upstream valid 36",
+			"\n        type Props = {\n          isEnabled: boolean\n        } & ({\n          hasLOL: boolean\n        } | {\n          isLOL: boolean\n        })\n\n        const HelloNew = (props: Props) => { return <div /> };\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^(is|has)[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+		},
+		{
+			"upstream valid 37",
+			"\n        export const DataRow = (props: { label: string; value: string; } & React.HTMLAttributes<HTMLDivElement>) => {\n            const { label, value, ...otherProps } = props;\n            return (\n                <div {...otherProps}>\n                    <span>{label}</span>\n                    <span>{value}</span>\n                </div>\n            );\n        };\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "(^(is|has|should|without)[A-Z]([A-Za-z0-9]?)+|disabled|required|checked|defaultChecked)",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+		},
+		{
+			"upstream valid 38",
+			"\n        // Strip @jsx comments, see https://github.com/microsoft/fluentui/issues/29126\n        const resultCode = result.code\n          .replace('/** @jsxRuntime automatic */', '')\n          .replace('/** @jsxImportSource @fluentui/react-jsx-runtime */', '');\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^(is|has)[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+		},
 		// #7mztrdd: the pattern is read as JavaScript reads it, `new RegExp(config.rule)`. RE2 refuses a
 		// lookahead and a lookbehind, so these did not even compile. In Node /^(?=is[A-Z])/ and
 		// /(?<=^is)[A-Z]/ both test true on isSomething.
-		{"a lookahead pattern passes a matching name", "\n        class Hello extends React.Component {\n          render () { return <div />; }\n        }\n        Hello.propTypes = {isSomething: PropTypes.bool}\n      ", BooleanPropNamingOptions{Rule: "^(?=is[A-Z])", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}},
-		{"a lookbehind pattern passes a matching name", "\n        class Hello extends React.Component {\n          render () { return <div />; }\n        }\n        Hello.propTypes = {isSomething: PropTypes.bool}\n      ", BooleanPropNamingOptions{Rule: "(?<=^is)[A-Z]", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}},
+		{
+			"a lookahead pattern passes a matching name",
+			"\n        class Hello extends React.Component {\n          render () { return <div />; }\n        }\n        Hello.propTypes = {isSomething: PropTypes.bool}\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^(?=is[A-Z])",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+		},
+		{
+			"a lookbehind pattern passes a matching name",
+			"\n        class Hello extends React.Component {\n          render () { return <div />; }\n        }\n        Hello.propTypes = {isSomething: PropTypes.bool}\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "(?<=^is)[A-Z]",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(test, BooleanPropNaming, booleanPropNamingFile, testCase.sourceText, testCase.options)
+			result := rule_testing.RunTypedWithOptions(
+				test,
+				BooleanPropNaming,
+				booleanPropNamingFile,
+				testCase.sourceText,
+				testCase.options,
+			)
 			rule_testing.ExpectClean(test, result)
 		})
 	}
@@ -79,120 +387,446 @@ func TestBooleanPropNamingFires(test *testing.T) {
 		options          BooleanPropNamingOptions
 		wantMessages     []string
 	}{
-		{"upstream invalid 0", "\n        var Hello = createReactClass({\n          propTypes: {something: PropTypes.bool},\n          render: function() { return <div />; }\n        });\n      ", BooleanPropNamingOptions{Rule: "^is[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}, []string{
-			"Prop name `something` doesn’t match rule `^is[A-Z]([A-Za-z0-9]?)+`",
-		}},
-		{"upstream invalid 1", "\n        var Hello = createReactClass({\n          propTypes: {something: React.PropTypes.bool},\n          render: function() { return <div />; }\n        });\n      ", BooleanPropNamingOptions{Rule: "^is[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}, []string{
-			"Prop name `something` doesn’t match rule `^is[A-Z]([A-Za-z0-9]?)+`",
-		}},
-		{"upstream invalid 3", "\n        class Hello extends React.Component {\n          render () { return <div />; }\n        }\n        Hello.propTypes = {something: PropTypes.bool}\n      ", BooleanPropNamingOptions{Rule: "^is[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}, []string{
-			"Prop name `something` doesn’t match rule `^is[A-Z]([A-Za-z0-9]?)+`",
-		}},
-		{"upstream invalid 4", "\n        class Hello extends Component {\n          render () { return <div />; }\n        }\n        Hello.propTypes = {something: PropTypes.bool}\n      ", BooleanPropNamingOptions{Rule: "^is[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}, []string{
-			"Prop name `something` doesn’t match rule `^is[A-Z]([A-Za-z0-9]?)+`",
-		}},
-		{"upstream invalid 5", "\n        class Hello extends React.Component {\n          static propTypes = {something: PropTypes.bool};\n          render () { return <div />; }\n        }\n      ", BooleanPropNamingOptions{Rule: "^is[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}, []string{
-			"Prop name `something` doesn’t match rule `^is[A-Z]([A-Za-z0-9]?)+`",
-		}},
-		{"upstream invalid 6", "\n        const spreadProps = { aSpreadProp: PropTypes.string };\n        class Hello extends Component {\n          render () { return <div />; }\n        }\n        Hello.propTypes = {something: PropTypes.bool, ...spreadProps}\n      ", BooleanPropNamingOptions{Rule: "^is[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}, []string{
-			"Prop name `something` doesn’t match rule `^is[A-Z]([A-Za-z0-9]?)+`",
-		}},
-		{"upstream invalid 7", "\n        const spreadProps = { aSpreadProp: PropTypes.string };\n        class Hello extends React.Component {\n          static propTypes = {something: PropTypes.bool, ...spreadProps};\n          render () { return <div />; }\n        }\n      ", BooleanPropNamingOptions{Rule: "^is[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}, []string{
-			"Prop name `something` doesn’t match rule `^is[A-Z]([A-Za-z0-9]?)+`",
-		}},
-		{"upstream invalid 9", "\n        var Hello = ({something}) => { return <div /> }\n        Hello.propTypes = {something: PropTypes.bool};\n      ", BooleanPropNamingOptions{Rule: "^is[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}, []string{
-			"Prop name `something` doesn’t match rule `^is[A-Z]([A-Za-z0-9]?)+`",
-		}},
-		{"upstream invalid 10", "\n        type Props = {\n          something: boolean;\n        };\n        function Hello(props: Props): React.Element { return <div /> }\n      ", BooleanPropNamingOptions{Rule: "^is[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}, []string{
-			"Prop name `something` doesn’t match rule `^is[A-Z]([A-Za-z0-9]?)+`",
-		}},
-		{"upstream invalid 12", "\n        class Hello extends React.Component {\n          static propTypes = {\n            something: PropTypes.mutuallyExclusiveTrueProps,\n            somethingElse: PropTypes.bool\n          };\n          render () { return <div />; }\n        }\n      ", BooleanPropNamingOptions{Rule: "^is[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool", "mutuallyExclusiveTrueProps"}, ValidateNested: false, Message: ""}, []string{
-			"Prop name `something` doesn’t match rule `^is[A-Z]([A-Za-z0-9]?)+`",
-			"Prop name `somethingElse` doesn’t match rule `^is[A-Z]([A-Za-z0-9]?)+`",
-		}},
-		{"upstream invalid 13", "\n        class Hello extends React.Component {\n          static propTypes = {\n            something: mutuallyExclusiveTrueProps,\n            somethingElse: bool\n          };\n          render () { return <div />; }\n        }\n      ", BooleanPropNamingOptions{Rule: "^is[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool", "mutuallyExclusiveTrueProps"}, ValidateNested: false, Message: ""}, []string{
-			"Prop name `something` doesn’t match rule `^is[A-Z]([A-Za-z0-9]?)+`",
-			"Prop name `somethingElse` doesn’t match rule `^is[A-Z]([A-Za-z0-9]?)+`",
-		}},
-		{"upstream invalid 20", "\n        class Hello extends React.Component {\n          render () { return <div />; }\n        }\n        Hello.propTypes = {something: PropTypes.bool}\n      ", BooleanPropNamingOptions{Rule: "^is[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: "Boolean prop names must begin with either 'is' or 'has'"}, []string{
-			"Boolean prop names must begin with either 'is' or 'has'",
-		}},
-		{"upstream invalid 21", "\n        class Hello extends React.Component {\n          render () { return <div />; }\n        }\n        Hello.propTypes = {something: PropTypes.bool}\n      ", BooleanPropNamingOptions{Rule: "^is[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: "It is better if your prop ({{ propName }}) matches this pattern: ({{ pattern }})"}, []string{
-			"It is better if your prop (something) matches this pattern: (^is[A-Z]([A-Za-z0-9]?)+)",
-		}},
+		{
+			"upstream invalid 0",
+			"\n        var Hello = createReactClass({\n          propTypes: {something: PropTypes.bool},\n          render: function() { return <div />; }\n        });\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^is[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+			[]string{
+				"Prop name `something` doesn’t match rule `^is[A-Z]([A-Za-z0-9]?)+`",
+			},
+		},
+		{
+			"upstream invalid 1",
+			"\n        var Hello = createReactClass({\n          propTypes: {something: React.PropTypes.bool},\n          render: function() { return <div />; }\n        });\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^is[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+			[]string{
+				"Prop name `something` doesn’t match rule `^is[A-Z]([A-Za-z0-9]?)+`",
+			},
+		},
+		{
+			"upstream invalid 3",
+			"\n        class Hello extends React.Component {\n          render () { return <div />; }\n        }\n        Hello.propTypes = {something: PropTypes.bool}\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^is[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+			[]string{
+				"Prop name `something` doesn’t match rule `^is[A-Z]([A-Za-z0-9]?)+`",
+			},
+		},
+		{
+			"upstream invalid 4",
+			"\n        class Hello extends Component {\n          render () { return <div />; }\n        }\n        Hello.propTypes = {something: PropTypes.bool}\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^is[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+			[]string{
+				"Prop name `something` doesn’t match rule `^is[A-Z]([A-Za-z0-9]?)+`",
+			},
+		},
+		{
+			"upstream invalid 5",
+			"\n        class Hello extends React.Component {\n          static propTypes = {something: PropTypes.bool};\n          render () { return <div />; }\n        }\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^is[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+			[]string{
+				"Prop name `something` doesn’t match rule `^is[A-Z]([A-Za-z0-9]?)+`",
+			},
+		},
+		{
+			"upstream invalid 6",
+			"\n        const spreadProps = { aSpreadProp: PropTypes.string };\n        class Hello extends Component {\n          render () { return <div />; }\n        }\n        Hello.propTypes = {something: PropTypes.bool, ...spreadProps}\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^is[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+			[]string{
+				"Prop name `something` doesn’t match rule `^is[A-Z]([A-Za-z0-9]?)+`",
+			},
+		},
+		{
+			"upstream invalid 7",
+			"\n        const spreadProps = { aSpreadProp: PropTypes.string };\n        class Hello extends React.Component {\n          static propTypes = {something: PropTypes.bool, ...spreadProps};\n          render () { return <div />; }\n        }\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^is[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+			[]string{
+				"Prop name `something` doesn’t match rule `^is[A-Z]([A-Za-z0-9]?)+`",
+			},
+		},
+		{
+			"upstream invalid 9",
+			"\n        var Hello = ({something}) => { return <div /> }\n        Hello.propTypes = {something: PropTypes.bool};\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^is[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+			[]string{
+				"Prop name `something` doesn’t match rule `^is[A-Z]([A-Za-z0-9]?)+`",
+			},
+		},
+		{
+			"upstream invalid 10",
+			"\n        type Props = {\n          something: boolean;\n        };\n        function Hello(props: Props): React.Element { return <div /> }\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^is[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+			[]string{
+				"Prop name `something` doesn’t match rule `^is[A-Z]([A-Za-z0-9]?)+`",
+			},
+		},
+		{
+			"upstream invalid 12",
+			"\n        class Hello extends React.Component {\n          static propTypes = {\n            something: PropTypes.mutuallyExclusiveTrueProps,\n            somethingElse: PropTypes.bool\n          };\n          render () { return <div />; }\n        }\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^is[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool", "mutuallyExclusiveTrueProps"},
+				ValidateNested: false,
+				Message:        "",
+			},
+			[]string{
+				"Prop name `something` doesn’t match rule `^is[A-Z]([A-Za-z0-9]?)+`",
+				"Prop name `somethingElse` doesn’t match rule `^is[A-Z]([A-Za-z0-9]?)+`",
+			},
+		},
+		{
+			"upstream invalid 13",
+			"\n        class Hello extends React.Component {\n          static propTypes = {\n            something: mutuallyExclusiveTrueProps,\n            somethingElse: bool\n          };\n          render () { return <div />; }\n        }\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^is[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool", "mutuallyExclusiveTrueProps"},
+				ValidateNested: false,
+				Message:        "",
+			},
+			[]string{
+				"Prop name `something` doesn’t match rule `^is[A-Z]([A-Za-z0-9]?)+`",
+				"Prop name `somethingElse` doesn’t match rule `^is[A-Z]([A-Za-z0-9]?)+`",
+			},
+		},
+		{
+			"upstream invalid 20",
+			"\n        class Hello extends React.Component {\n          render () { return <div />; }\n        }\n        Hello.propTypes = {something: PropTypes.bool}\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^is[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "Boolean prop names must begin with either 'is' or 'has'",
+			},
+			[]string{
+				"Boolean prop names must begin with either 'is' or 'has'",
+			},
+		},
+		{
+			"upstream invalid 21",
+			"\n        class Hello extends React.Component {\n          render () { return <div />; }\n        }\n        Hello.propTypes = {something: PropTypes.bool}\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^is[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "It is better if your prop ({{ propName }}) matches this pattern: ({{ pattern }})",
+			},
+			[]string{
+				"It is better if your prop (something) matches this pattern: (^is[A-Z]([A-Za-z0-9]?)+)",
+			},
+		},
 		// #7mztrdd, the control: in Node /^(?=is[A-Z])/ tests false on something, so the lookahead is
 		// tested rather than excusing every name, and the message quotes the pattern as written.
-		{"a lookahead pattern reports a name it does not match", "\n        class Hello extends React.Component {\n          render () { return <div />; }\n        }\n        Hello.propTypes = {something: PropTypes.bool}\n      ", BooleanPropNamingOptions{Rule: "^(?=is[A-Z])", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}, []string{
-			"Prop name `something` doesn’t match rule `^(?=is[A-Z])`",
-		}},
-		{"upstream invalid 22", "\n        var Hello = createReactClass({\n          propTypes: {something: PropTypes.bool.isRequired},\n          render: function() { return <div />; }\n        });\n      ", BooleanPropNamingOptions{Rule: "^is[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}, []string{
-			"Prop name `something` doesn’t match rule `^is[A-Z]([A-Za-z0-9]?)+`",
-		}},
-		{"upstream invalid 23", "\n        class Hello extends React.Component {\n          static propTypes = {\n            something: PropTypes.bool.isRequired\n          };\n\n          render() {\n            return (\n              <div />\n            );\n          }\n        }\n      ", BooleanPropNamingOptions{Rule: "^is[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}, []string{
-			"Prop name `something` doesn’t match rule `^is[A-Z]([A-Za-z0-9]?)+`",
-		}},
-		{"upstream invalid 24", "\n        class Hello extends React.Component {\n          render() {\n            return (\n              <div />\n            );\n          }\n        }\n\n        Hello.propTypes = {\n          something: PropTypes.bool.isRequired\n        }\n      ", BooleanPropNamingOptions{Rule: "^is[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}, []string{
-			"Prop name `something` doesn’t match rule `^is[A-Z]([A-Za-z0-9]?)+`",
-		}},
-		{"upstream invalid 26", "\n        class Hello extends React.Component {\n          render() {\n            return (\n              <div />\n            );\n          }\n        }\n\n        Hello.propTypes = {\n          isSomething: PropTypes.bool.isRequired,\n          nested: PropTypes.shape({\n            failingItIs: PropTypes.bool\n          })\n        };\n      ", BooleanPropNamingOptions{Rule: "^is[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: true, Message: ""}, []string{
-			"Prop name `failingItIs` doesn’t match rule `^is[A-Z]([A-Za-z0-9]?)+`",
-		}},
-		{"upstream invalid 27", "\n        class Hello extends React.Component {\n          render() {\n            return (\n              <div />\n            );\n          }\n        }\n\n        Hello.propTypes = {\n          isSomething: PropTypes.bool.isRequired,\n          nested: PropTypes.shape({\n            nested: PropTypes.shape({\n              failingItIs: PropTypes.bool\n            })\n          })\n        };\n      ", BooleanPropNamingOptions{Rule: "^is[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: true, Message: ""}, []string{
-			"Prop name `failingItIs` doesn’t match rule `^is[A-Z]([A-Za-z0-9]?)+`",
-		}},
-		{"upstream invalid 28", "\n      import { bool } from 'prop-types';\n        var Hello = createReactClass({\n          propTypes: {something: bool},\n          render: function() { return <div />; }\n        });\n      ", BooleanPropNamingOptions{Rule: "^is[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: true, Message: ""}, []string{
-			"Prop name `something` doesn’t match rule `^is[A-Z]([A-Za-z0-9]?)+`",
-		}},
-		{"upstream invalid 29", "\n        type TestConstType = {\n          enabled: boolean\n        }\n        const HelloNew = (props: TestConstType) => { return <div /> };\n      ", BooleanPropNamingOptions{Rule: "^is[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}, []string{
-			"Prop name `enabled` doesn’t match rule `^is[A-Z]([A-Za-z0-9]?)+`",
-		}},
-		{"upstream invalid 30", "\n        type TestFNType = {\n          enabled: boolean\n        }\n        const HelloNew = (props: TestFNType) => { return <div /> };\n      ", BooleanPropNamingOptions{Rule: "^is[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}, []string{
-			"Prop name `enabled` doesn’t match rule `^is[A-Z]([A-Za-z0-9]?)+`",
-		}},
-		{"upstream invalid 31", "\n        type Props = {\n          enabled: boolean\n        } & OtherProps\n\n        const HelloNew = (props: Props) => { return <div /> };\n      ", BooleanPropNamingOptions{Rule: "^is[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}, []string{
-			"Prop name `enabled` doesn’t match rule `^is[A-Z]([A-Za-z0-9]?)+`",
-		}},
-		{"upstream invalid 32", "\n        type Props = {\n          enabled: boolean\n        } & {\n          hasLOL: boolean\n        } & OtherProps\n\n        const HelloNew = (props: Props) => { return <div /> };\n      ", BooleanPropNamingOptions{Rule: "^(is|has)[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}, []string{
+		{
+			"a lookahead pattern reports a name it does not match",
+			"\n        class Hello extends React.Component {\n          render () { return <div />; }\n        }\n        Hello.propTypes = {something: PropTypes.bool}\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^(?=is[A-Z])",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+			[]string{
+				"Prop name `something` doesn’t match rule `^(?=is[A-Z])`",
+			},
+		},
+		{
+			"upstream invalid 22",
+			"\n        var Hello = createReactClass({\n          propTypes: {something: PropTypes.bool.isRequired},\n          render: function() { return <div />; }\n        });\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^is[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+			[]string{
+				"Prop name `something` doesn’t match rule `^is[A-Z]([A-Za-z0-9]?)+`",
+			},
+		},
+		{
+			"upstream invalid 23",
+			"\n        class Hello extends React.Component {\n          static propTypes = {\n            something: PropTypes.bool.isRequired\n          };\n\n          render() {\n            return (\n              <div />\n            );\n          }\n        }\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^is[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+			[]string{
+				"Prop name `something` doesn’t match rule `^is[A-Z]([A-Za-z0-9]?)+`",
+			},
+		},
+		{
+			"upstream invalid 24",
+			"\n        class Hello extends React.Component {\n          render() {\n            return (\n              <div />\n            );\n          }\n        }\n\n        Hello.propTypes = {\n          something: PropTypes.bool.isRequired\n        }\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^is[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+			[]string{
+				"Prop name `something` doesn’t match rule `^is[A-Z]([A-Za-z0-9]?)+`",
+			},
+		},
+		{
+			"upstream invalid 26",
+			"\n        class Hello extends React.Component {\n          render() {\n            return (\n              <div />\n            );\n          }\n        }\n\n        Hello.propTypes = {\n          isSomething: PropTypes.bool.isRequired,\n          nested: PropTypes.shape({\n            failingItIs: PropTypes.bool\n          })\n        };\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^is[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: true,
+				Message:        "",
+			},
+			[]string{
+				"Prop name `failingItIs` doesn’t match rule `^is[A-Z]([A-Za-z0-9]?)+`",
+			},
+		},
+		{
+			"upstream invalid 27",
+			"\n        class Hello extends React.Component {\n          render() {\n            return (\n              <div />\n            );\n          }\n        }\n\n        Hello.propTypes = {\n          isSomething: PropTypes.bool.isRequired,\n          nested: PropTypes.shape({\n            nested: PropTypes.shape({\n              failingItIs: PropTypes.bool\n            })\n          })\n        };\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^is[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: true,
+				Message:        "",
+			},
+			[]string{
+				"Prop name `failingItIs` doesn’t match rule `^is[A-Z]([A-Za-z0-9]?)+`",
+			},
+		},
+		{
+			"upstream invalid 28",
+			"\n      import { bool } from 'prop-types';\n        var Hello = createReactClass({\n          propTypes: {something: bool},\n          render: function() { return <div />; }\n        });\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^is[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: true,
+				Message:        "",
+			},
+			[]string{
+				"Prop name `something` doesn’t match rule `^is[A-Z]([A-Za-z0-9]?)+`",
+			},
+		},
+		{
+			"upstream invalid 29",
+			"\n        type TestConstType = {\n          enabled: boolean\n        }\n        const HelloNew = (props: TestConstType) => { return <div /> };\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^is[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+			[]string{
+				"Prop name `enabled` doesn’t match rule `^is[A-Z]([A-Za-z0-9]?)+`",
+			},
+		},
+		{
+			"upstream invalid 30",
+			"\n        type TestFNType = {\n          enabled: boolean\n        }\n        const HelloNew = (props: TestFNType) => { return <div /> };\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^is[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+			[]string{
+				"Prop name `enabled` doesn’t match rule `^is[A-Z]([A-Za-z0-9]?)+`",
+			},
+		},
+		{
+			"upstream invalid 31",
+			"\n        type Props = {\n          enabled: boolean\n        } & OtherProps\n\n        const HelloNew = (props: Props) => { return <div /> };\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^is[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+			[]string{
+				"Prop name `enabled` doesn’t match rule `^is[A-Z]([A-Za-z0-9]?)+`",
+			},
+		},
+		{
+			"upstream invalid 32",
+			"\n        type Props = {\n          enabled: boolean\n        } & {\n          hasLOL: boolean\n        } & OtherProps\n\n        const HelloNew = (props: Props) => { return <div /> };\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^(is|has)[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+			[]string{
+				"Prop name `enabled` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`",
+			},
+		},
+		{
+			"upstream invalid 33",
+			"\n        type Props = {\n          enabled: boolean\n        }\n\n        const HelloNew: React.FC<Props> = (props) => { return <div /> };\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^is[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+			[]string{
+				"Prop name `enabled` doesn’t match rule `^is[A-Z]([A-Za-z0-9]?)+`",
+			},
+		},
+		{
+			"upstream invalid 34",
+			"\n        type Props = {\n          enabled: boolean\n        } & {\n          hasLOL: boolean\n        }\n\n        const HelloNew: React.FC<Props> = (props) => { return <div /> };\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^(is|has)[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+			[]string{
+				"Prop name `enabled` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`",
+			},
+		},
+		{
+			"upstream invalid 35",
+			"\n        type Props = {\n          enabled: boolean\n        } | {\n          hasLOL: boolean\n        }\n\n        const HelloNew = (props: Props) => { return <div /> };\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^(is|has)[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+			[]string{
+				"Prop name `enabled` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`",
+			},
+		},
+		{
+			"upstream invalid 36",
+			"\n        type Props = {\n          enabled: boolean\n        } & ({\n          hasLOL: boolean\n        } | {\n          lol: boolean\n        })\n\n        const HelloNew = (props: Props) => { return <div /> };\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^(is|has)[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+			[]string{
+				"Prop name `enabled` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`",
+				"Prop name `lol` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`",
+			},
+		},
+		{
+			"upstream invalid 37",
+			"\n        interface TestFNType {\n          enabled: boolean\n        }\n        const HelloNew = (props: TestFNType) => { return <div /> };\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^is[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+			[]string{
+				"Prop name `enabled` doesn’t match rule `^is[A-Z]([A-Za-z0-9]?)+`",
+			},
+		},
+		{"upstream invalid 38", "const Hello = (props: {enabled:boolean}) => <div />;", BooleanPropNamingOptions{
+			Rule:           "^(is|has)[A-Z]([A-Za-z0-9]?)+",
+			PropTypeNames:  []string{"bool"},
+			ValidateNested: false,
+			Message:        "",
+		}, []string{
 			"Prop name `enabled` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`",
 		}},
-		{"upstream invalid 33", "\n        type Props = {\n          enabled: boolean\n        }\n\n        const HelloNew: React.FC<Props> = (props) => { return <div /> };\n      ", BooleanPropNamingOptions{Rule: "^is[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}, []string{
-			"Prop name `enabled` doesn’t match rule `^is[A-Z]([A-Za-z0-9]?)+`",
-		}},
-		{"upstream invalid 34", "\n        type Props = {\n          enabled: boolean\n        } & {\n          hasLOL: boolean\n        }\n\n        const HelloNew: React.FC<Props> = (props) => { return <div /> };\n      ", BooleanPropNamingOptions{Rule: "^(is|has)[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}, []string{
-			"Prop name `enabled` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`",
-		}},
-		{"upstream invalid 35", "\n        type Props = {\n          enabled: boolean\n        } | {\n          hasLOL: boolean\n        }\n\n        const HelloNew = (props: Props) => { return <div /> };\n      ", BooleanPropNamingOptions{Rule: "^(is|has)[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}, []string{
-			"Prop name `enabled` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`",
-		}},
-		{"upstream invalid 36", "\n        type Props = {\n          enabled: boolean\n        } & ({\n          hasLOL: boolean\n        } | {\n          lol: boolean\n        })\n\n        const HelloNew = (props: Props) => { return <div /> };\n      ", BooleanPropNamingOptions{Rule: "^(is|has)[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}, []string{
-			"Prop name `enabled` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`",
-			"Prop name `lol` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`",
-		}},
-		{"upstream invalid 37", "\n        interface TestFNType {\n          enabled: boolean\n        }\n        const HelloNew = (props: TestFNType) => { return <div /> };\n      ", BooleanPropNamingOptions{Rule: "^is[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}, []string{
-			"Prop name `enabled` doesn’t match rule `^is[A-Z]([A-Za-z0-9]?)+`",
-		}},
-		{"upstream invalid 38", "const Hello = (props: {enabled:boolean}) => <div />;", BooleanPropNamingOptions{Rule: "^(is|has)[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}, []string{
-			"Prop name `enabled` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`",
-		}},
-		{"upstream invalid 39", "\n        type Props = {\n          enabled: boolean\n        };\n        type BaseProps = {\n          semi: boolean\n        };\n\n        const Hello = (props: Props & BaseProps) => <div />;\n      ", BooleanPropNamingOptions{Rule: "^(is|has)[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}, []string{
-			"Prop name `enabled` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`",
-			"Prop name `semi` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`",
-		}},
-		{"upstream invalid 40", "\n        type Props = {\n          enabled: boolean\n        };\n\n        const Hello = (props: Props & {\n          semi: boolean\n        }) => <div />;\n      ", BooleanPropNamingOptions{Rule: "^(is|has)[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false, Message: ""}, []string{
-			"Prop name `enabled` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`",
-			"Prop name `semi` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`",
-		}},
+		{
+			"upstream invalid 39",
+			"\n        type Props = {\n          enabled: boolean\n        };\n        type BaseProps = {\n          semi: boolean\n        };\n\n        const Hello = (props: Props & BaseProps) => <div />;\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^(is|has)[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+			[]string{
+				"Prop name `enabled` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`",
+				"Prop name `semi` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`",
+			},
+		},
+		{
+			"upstream invalid 40",
+			"\n        type Props = {\n          enabled: boolean\n        };\n\n        const Hello = (props: Props & {\n          semi: boolean\n        }) => <div />;\n      ",
+			BooleanPropNamingOptions{
+				Rule:           "^(is|has)[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+				Message:        "",
+			},
+			[]string{
+				"Prop name `enabled` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`",
+				"Prop name `semi` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`",
+			},
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(test, BooleanPropNaming, booleanPropNamingFile, testCase.sourceText, testCase.options)
+			result := rule_testing.RunTypedWithOptions(
+				test,
+				BooleanPropNaming,
+				booleanPropNamingFile,
+				testCase.sourceText,
+				testCase.options,
+			)
 			if len(result.Diagnostics) != len(testCase.wantMessages) {
 				test.Fatalf("want %d findings, got %d", len(testCase.wantMessages), len(result.Diagnostics))
 			}
 			for index, diagnostic := range result.Diagnostics {
 				if diagnostic.Message.Description != testCase.wantMessages[index] {
-					test.Errorf("finding %d renders\n  got  %q\n  want %q", index, diagnostic.Message.Description, testCase.wantMessages[index])
+					test.Errorf(
+						"finding %d renders\n  got  %q\n  want %q",
+						index,
+						diagnostic.Message.Description,
+						testCase.wantMessages[index],
+					)
 				}
 			}
 		})
@@ -225,41 +859,344 @@ func TestBooleanPropNamingMatchesTheInstalledRuleOnInputsTheCorpusDoesNotWrite(t
 		options      BooleanPropNamingOptions
 		wantMessages []string
 	}{
-		{"default pattern accepts isX", "class C extends React.Component { render(){return <div/>;} }\nC.propTypes = { isEnabled: PropTypes.bool };", DefaultBooleanPropNamingOptions(), []string{}},
-		{"default pattern accepts hasX", "class C extends React.Component { render(){return <div/>;} }\nC.propTypes = { hasThing: PropTypes.bool };", DefaultBooleanPropNamingOptions(), []string{}},
-		{"default pattern rejects a bare name", "class C extends React.Component { render(){return <div/>;} }\nC.propTypes = { enabled: PropTypes.bool };", DefaultBooleanPropNamingOptions(), []string{"Prop name `enabled` doesn\u2019t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`"}},
-		{"default pattern rejects isx lowercase", "class C extends React.Component { render(){return <div/>;} }\nC.propTypes = { isenabled: PropTypes.bool };", DefaultBooleanPropNamingOptions(), []string{"Prop name `isenabled` doesn\u2019t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`"}},
-		{"PropTypes.bool", "class C extends React.Component { render(){return <div/>;} }\nC.propTypes = { enabled: PropTypes.bool };", BooleanPropNamingOptions{Rule: "^(is|has)[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false}, []string{"Prop name `enabled` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`"}},
-		{"React.PropTypes.bool", "class C extends React.Component { render(){return <div/>;} }\nC.propTypes = { enabled: React.PropTypes.bool };", BooleanPropNamingOptions{Rule: "^(is|has)[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false}, []string{"Prop name `enabled` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`"}},
-		{"bare bool identifier", "class C extends React.Component { render(){return <div/>;} }\nC.propTypes = { enabled: bool };", BooleanPropNamingOptions{Rule: "^(is|has)[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false}, []string{"Prop name `enabled` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`"}},
-		{"isRequired peel", "class C extends React.Component { render(){return <div/>;} }\nC.propTypes = { enabled: PropTypes.bool.isRequired };", BooleanPropNamingOptions{Rule: "^(is|has)[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false}, []string{"Prop name `enabled` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`"}},
-		{"double isRequired", "class C extends React.Component { render(){return <div/>;} }\nC.propTypes = { enabled: PropTypes.bool.isRequired.isRequired };", BooleanPropNamingOptions{Rule: "^(is|has)[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false}, []string{}},
-		{"not boolean", "class C extends React.Component { render(){return <div/>;} }\nC.propTypes = { enabled: PropTypes.string };", BooleanPropNamingOptions{Rule: "^(is|has)[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false}, []string{}},
-		{"spread element", "class C extends React.Component { render(){return <div/>;} }\nC.propTypes = { ...other, enabled: PropTypes.bool };", BooleanPropNamingOptions{Rule: "^(is|has)[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false}, []string{"Prop name `enabled` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`"}},
-		{"computed key renders the identifier", "class C extends React.Component { render(){return <div/>;} }\nC.propTypes = { [k]: PropTypes.bool };", BooleanPropNamingOptions{Rule: "^(is|has)[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false}, []string{"Prop name `k` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`"}},
-		{"quoted invalid key", "class C extends React.Component { render(){return <div/>;} }\nC.propTypes = { 'enabled': PropTypes.bool };", BooleanPropNamingOptions{Rule: "^(is|has)[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false}, []string{"Prop name `undefined` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`"}},
-		{"quoted VALID key still reports", "class C extends React.Component { render(){return <div/>;} }\nC.propTypes = { 'isEnabled': PropTypes.bool };", BooleanPropNamingOptions{Rule: "^(is|has)[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false}, []string{"Prop name `undefined` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`"}},
-		{"numeric key", "class C extends React.Component { render(){return <div/>;} }\nC.propTypes = { 1: PropTypes.bool };", BooleanPropNamingOptions{Rule: "^(is|has)[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false}, []string{"Prop name `undefined` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`"}},
-		{"valid name passes", "class C extends React.Component { render(){return <div/>;} }\nC.propTypes = { isEnabled: PropTypes.bool };", BooleanPropNamingOptions{Rule: "^(is|has)[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false}, []string{}},
-		{"hasX passes", "class C extends React.Component { render(){return <div/>;} }\nC.propTypes = { hasThing: PropTypes.bool };", BooleanPropNamingOptions{Rule: "^(is|has)[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false}, []string{}},
-		{"wrap call is silent", "class C extends React.Component { render(){return <div/>;} }\nC.propTypes = wrap({ enabled: PropTypes.bool });", BooleanPropNamingOptions{Rule: "^(is|has)[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false}, []string{}},
-		{"forbidExtraProps is silent", "class C extends React.Component { render(){return <div/>;} }\nC.propTypes = forbidExtraProps({ enabled: PropTypes.bool });", BooleanPropNamingOptions{Rule: "^(is|has)[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false}, []string{}},
-		{"shape nested off", "class C extends React.Component { render(){return <div/>;} }\nC.propTypes = { nested: PropTypes.shape({ enabled: PropTypes.bool }) };", BooleanPropNamingOptions{Rule: "^(is|has)[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false}, []string{}},
-		{"shape nested on", "class C extends React.Component { render(){return <div/>;} }\nC.propTypes = { nested: PropTypes.shape({ enabled: PropTypes.bool }) };", BooleanPropNamingOptions{Rule: "^(is|has)[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: true}, []string{"Prop name `enabled` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`"}},
-		{"arrayOf nested on", "class C extends React.Component { render(){return <div/>;} }\nC.propTypes = { n: PropTypes.arrayOf({ enabled: PropTypes.bool }) };", BooleanPropNamingOptions{Rule: "^(is|has)[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: true}, []string{"Prop name `enabled` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`"}},
-		{"static propTypes", "class C extends React.Component { static propTypes = { enabled: PropTypes.bool }; render(){return <div/>;} }", BooleanPropNamingOptions{Rule: "^(is|has)[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false}, []string{"Prop name `enabled` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`"}},
-		{"interface reference", "interface Props { enabled: boolean }\nfunction C(p: Props) { return <div/>; }", BooleanPropNamingOptions{Rule: "^(is|has)[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false}, []string{"Prop name `enabled` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`"}},
-		{"interface valid name", "interface Props { isEnabled: boolean }\nfunction C(p: Props) { return <div/>; }", BooleanPropNamingOptions{Rule: "^(is|has)[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false}, []string{}},
-		{"inline type literal", "function C(p: { enabled: boolean }) { return <div/>; }", BooleanPropNamingOptions{Rule: "^(is|has)[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false}, []string{"Prop name `enabled` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`"}},
-		{"type alias reference", "type Props = { enabled: boolean };\nfunction C(p: Props) { return <div/>; }", BooleanPropNamingOptions{Rule: "^(is|has)[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false}, []string{"Prop name `enabled` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`"}},
-		{"parenthesized intersection", "type Props = ({ a: boolean } & { b: boolean });\nfunction C(p: Props) { return <div/>; }", BooleanPropNamingOptions{Rule: "^(is|has)[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false}, []string{"Prop name `a` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`", "Prop name `b` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`"}},
-		{"bare intersection", "type Props = { a: boolean } & { b: boolean };\nfunction C(p: Props) { return <div/>; }", BooleanPropNamingOptions{Rule: "^(is|has)[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false}, []string{"Prop name `a` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`", "Prop name `b` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`"}},
-		{"union", "type Props = { a: boolean } | { b: boolean };\nfunction C(p: Props) { return <div/>; }", BooleanPropNamingOptions{Rule: "^(is|has)[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false}, []string{"Prop name `a` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`", "Prop name `b` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`"}},
-		{"optional boolean", "interface Props { enabled?: boolean }\nfunction C(p: Props) { return <div/>; }", BooleanPropNamingOptions{Rule: "^(is|has)[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false}, []string{"Prop name `enabled` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`"}},
-		{"boolean or undefined", "interface Props { enabled: boolean | undefined }\nfunction C(p: Props) { return <div/>; }", BooleanPropNamingOptions{Rule: "^(is|has)[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false}, []string{}},
-		{"non-boolean member", "interface Props { enabled: string }\nfunction C(p: Props) { return <div/>; }", BooleanPropNamingOptions{Rule: "^(is|has)[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false}, []string{}},
-		{"arrow component interface", "interface Props { enabled: boolean }\nconst C = (p: Props) => <div/>;", BooleanPropNamingOptions{Rule: "^(is|has)[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false}, []string{"Prop name `enabled` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`"}},
-		{"self-referential interface", "interface Props { enabled: boolean; self: Props }\nfunction C(p: Props) { return <div/>; }", BooleanPropNamingOptions{Rule: "^(is|has)[A-Z]([A-Za-z0-9]?)+", PropTypeNames: []string{"bool"}, ValidateNested: false}, []string{"Prop name `enabled` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`"}},
+		{
+			"default pattern accepts isX",
+			"class C extends React.Component { render(){return <div/>;} }\nC.propTypes = { isEnabled: PropTypes.bool };",
+			DefaultBooleanPropNamingOptions(),
+			[]string{},
+		},
+		{
+			"default pattern accepts hasX",
+			"class C extends React.Component { render(){return <div/>;} }\nC.propTypes = { hasThing: PropTypes.bool };",
+			DefaultBooleanPropNamingOptions(),
+			[]string{},
+		},
+		{
+			"default pattern rejects a bare name",
+			"class C extends React.Component { render(){return <div/>;} }\nC.propTypes = { enabled: PropTypes.bool };",
+			DefaultBooleanPropNamingOptions(),
+			[]string{"Prop name `enabled` doesn\u2019t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`"},
+		},
+		{
+			"default pattern rejects isx lowercase",
+			"class C extends React.Component { render(){return <div/>;} }\nC.propTypes = { isenabled: PropTypes.bool };",
+			DefaultBooleanPropNamingOptions(),
+			[]string{"Prop name `isenabled` doesn\u2019t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`"},
+		},
+		{
+			"PropTypes.bool",
+			"class C extends React.Component { render(){return <div/>;} }\nC.propTypes = { enabled: PropTypes.bool };",
+			BooleanPropNamingOptions{
+				Rule:           "^(is|has)[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+			},
+			[]string{"Prop name `enabled` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`"},
+		},
+		{
+			"React.PropTypes.bool",
+			"class C extends React.Component { render(){return <div/>;} }\nC.propTypes = { enabled: React.PropTypes.bool };",
+			BooleanPropNamingOptions{
+				Rule:           "^(is|has)[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+			},
+			[]string{"Prop name `enabled` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`"},
+		},
+		{
+			"bare bool identifier",
+			"class C extends React.Component { render(){return <div/>;} }\nC.propTypes = { enabled: bool };",
+			BooleanPropNamingOptions{
+				Rule:           "^(is|has)[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+			},
+			[]string{"Prop name `enabled` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`"},
+		},
+		{
+			"isRequired peel",
+			"class C extends React.Component { render(){return <div/>;} }\nC.propTypes = { enabled: PropTypes.bool.isRequired };",
+			BooleanPropNamingOptions{
+				Rule:           "^(is|has)[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+			},
+			[]string{"Prop name `enabled` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`"},
+		},
+		{
+			"double isRequired",
+			"class C extends React.Component { render(){return <div/>;} }\nC.propTypes = { enabled: PropTypes.bool.isRequired.isRequired };",
+			BooleanPropNamingOptions{
+				Rule:           "^(is|has)[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+			},
+			[]string{},
+		},
+		{
+			"not boolean",
+			"class C extends React.Component { render(){return <div/>;} }\nC.propTypes = { enabled: PropTypes.string };",
+			BooleanPropNamingOptions{
+				Rule:           "^(is|has)[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+			},
+			[]string{},
+		},
+		{
+			"spread element",
+			"class C extends React.Component { render(){return <div/>;} }\nC.propTypes = { ...other, enabled: PropTypes.bool };",
+			BooleanPropNamingOptions{
+				Rule:           "^(is|has)[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+			},
+			[]string{"Prop name `enabled` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`"},
+		},
+		{
+			"computed key renders the identifier",
+			"class C extends React.Component { render(){return <div/>;} }\nC.propTypes = { [k]: PropTypes.bool };",
+			BooleanPropNamingOptions{
+				Rule:           "^(is|has)[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+			},
+			[]string{"Prop name `k` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`"},
+		},
+		{
+			"quoted invalid key",
+			"class C extends React.Component { render(){return <div/>;} }\nC.propTypes = { 'enabled': PropTypes.bool };",
+			BooleanPropNamingOptions{
+				Rule:           "^(is|has)[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+			},
+			[]string{"Prop name `undefined` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`"},
+		},
+		{
+			"quoted VALID key still reports",
+			"class C extends React.Component { render(){return <div/>;} }\nC.propTypes = { 'isEnabled': PropTypes.bool };",
+			BooleanPropNamingOptions{
+				Rule:           "^(is|has)[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+			},
+			[]string{"Prop name `undefined` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`"},
+		},
+		{
+			"numeric key",
+			"class C extends React.Component { render(){return <div/>;} }\nC.propTypes = { 1: PropTypes.bool };",
+			BooleanPropNamingOptions{
+				Rule:           "^(is|has)[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+			},
+			[]string{"Prop name `undefined` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`"},
+		},
+		{
+			"valid name passes",
+			"class C extends React.Component { render(){return <div/>;} }\nC.propTypes = { isEnabled: PropTypes.bool };",
+			BooleanPropNamingOptions{
+				Rule:           "^(is|has)[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+			},
+			[]string{},
+		},
+		{
+			"hasX passes",
+			"class C extends React.Component { render(){return <div/>;} }\nC.propTypes = { hasThing: PropTypes.bool };",
+			BooleanPropNamingOptions{
+				Rule:           "^(is|has)[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+			},
+			[]string{},
+		},
+		{
+			"wrap call is silent",
+			"class C extends React.Component { render(){return <div/>;} }\nC.propTypes = wrap({ enabled: PropTypes.bool });",
+			BooleanPropNamingOptions{
+				Rule:           "^(is|has)[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+			},
+			[]string{},
+		},
+		{
+			"forbidExtraProps is silent",
+			"class C extends React.Component { render(){return <div/>;} }\nC.propTypes = forbidExtraProps({ enabled: PropTypes.bool });",
+			BooleanPropNamingOptions{
+				Rule:           "^(is|has)[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+			},
+			[]string{},
+		},
+		{
+			"shape nested off",
+			"class C extends React.Component { render(){return <div/>;} }\nC.propTypes = { nested: PropTypes.shape({ enabled: PropTypes.bool }) };",
+			BooleanPropNamingOptions{
+				Rule:           "^(is|has)[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+			},
+			[]string{},
+		},
+		{
+			"shape nested on",
+			"class C extends React.Component { render(){return <div/>;} }\nC.propTypes = { nested: PropTypes.shape({ enabled: PropTypes.bool }) };",
+			BooleanPropNamingOptions{
+				Rule:           "^(is|has)[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: true,
+			},
+			[]string{"Prop name `enabled` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`"},
+		},
+		{
+			"arrayOf nested on",
+			"class C extends React.Component { render(){return <div/>;} }\nC.propTypes = { n: PropTypes.arrayOf({ enabled: PropTypes.bool }) };",
+			BooleanPropNamingOptions{
+				Rule:           "^(is|has)[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: true,
+			},
+			[]string{"Prop name `enabled` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`"},
+		},
+		{
+			"static propTypes",
+			"class C extends React.Component { static propTypes = { enabled: PropTypes.bool }; render(){return <div/>;} }",
+			BooleanPropNamingOptions{
+				Rule:           "^(is|has)[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+			},
+			[]string{"Prop name `enabled` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`"},
+		},
+		{
+			"interface reference",
+			"interface Props { enabled: boolean }\nfunction C(p: Props) { return <div/>; }",
+			BooleanPropNamingOptions{
+				Rule:           "^(is|has)[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+			},
+			[]string{"Prop name `enabled` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`"},
+		},
+		{
+			"interface valid name",
+			"interface Props { isEnabled: boolean }\nfunction C(p: Props) { return <div/>; }",
+			BooleanPropNamingOptions{
+				Rule:           "^(is|has)[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+			},
+			[]string{},
+		},
+		{"inline type literal", "function C(p: { enabled: boolean }) { return <div/>; }", BooleanPropNamingOptions{
+			Rule:           "^(is|has)[A-Z]([A-Za-z0-9]?)+",
+			PropTypeNames:  []string{"bool"},
+			ValidateNested: false,
+		}, []string{"Prop name `enabled` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`"}},
+		{
+			"type alias reference",
+			"type Props = { enabled: boolean };\nfunction C(p: Props) { return <div/>; }",
+			BooleanPropNamingOptions{
+				Rule:           "^(is|has)[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+			},
+			[]string{"Prop name `enabled` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`"},
+		},
+		{
+			"parenthesized intersection",
+			"type Props = ({ a: boolean } & { b: boolean });\nfunction C(p: Props) { return <div/>; }",
+			BooleanPropNamingOptions{
+				Rule:           "^(is|has)[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+			},
+			[]string{
+				"Prop name `a` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`",
+				"Prop name `b` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`",
+			},
+		},
+		{
+			"bare intersection",
+			"type Props = { a: boolean } & { b: boolean };\nfunction C(p: Props) { return <div/>; }",
+			BooleanPropNamingOptions{
+				Rule:           "^(is|has)[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+			},
+			[]string{
+				"Prop name `a` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`",
+				"Prop name `b` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`",
+			},
+		},
+		{
+			"union",
+			"type Props = { a: boolean } | { b: boolean };\nfunction C(p: Props) { return <div/>; }",
+			BooleanPropNamingOptions{
+				Rule:           "^(is|has)[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+			},
+			[]string{
+				"Prop name `a` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`",
+				"Prop name `b` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`",
+			},
+		},
+		{
+			"optional boolean",
+			"interface Props { enabled?: boolean }\nfunction C(p: Props) { return <div/>; }",
+			BooleanPropNamingOptions{
+				Rule:           "^(is|has)[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+			},
+			[]string{"Prop name `enabled` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`"},
+		},
+		{
+			"boolean or undefined",
+			"interface Props { enabled: boolean | undefined }\nfunction C(p: Props) { return <div/>; }",
+			BooleanPropNamingOptions{
+				Rule:           "^(is|has)[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+			},
+			[]string{},
+		},
+		{
+			"non-boolean member",
+			"interface Props { enabled: string }\nfunction C(p: Props) { return <div/>; }",
+			BooleanPropNamingOptions{
+				Rule:           "^(is|has)[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+			},
+			[]string{},
+		},
+		{
+			"arrow component interface",
+			"interface Props { enabled: boolean }\nconst C = (p: Props) => <div/>;",
+			BooleanPropNamingOptions{
+				Rule:           "^(is|has)[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+			},
+			[]string{"Prop name `enabled` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`"},
+		},
+		{
+			"self-referential interface",
+			"interface Props { enabled: boolean; self: Props }\nfunction C(p: Props) { return <div/>; }",
+			BooleanPropNamingOptions{
+				Rule:           "^(is|has)[A-Z]([A-Za-z0-9]?)+",
+				PropTypeNames:  []string{"bool"},
+				ValidateNested: false,
+			},
+			[]string{"Prop name `enabled` doesn’t match rule `^(is|has)[A-Z]([A-Za-z0-9]?)+`"},
+		},
 	}
 
 	for _, testCase := range cases {

@@ -29,7 +29,11 @@ func TestATerminatedMixedRunLeavesNoChildBehind(test *testing.T) {
 	engine := fakeSwiftEngine(test, "echo $$ > '"+enginePID+".partial' && mv '"+enginePID+".partial' '"+enginePID+"'\n"+
 		"sleep 300 &\necho $! > '"+compilerPID+".partial' && mv '"+compilerPID+".partial' '"+compilerPID+"'\nwait")
 	root := newRepository(test, nil)
-	writeTree(test, filepath.Join(root, "apple", "Toy"), map[string]string{"Package.swift": discoveryPackage, "Sources/Toy/Toy.swift": "let toy = 1\n"})
+	writeTree(
+		test,
+		filepath.Join(root, "apple", "Toy"),
+		map[string]string{"Package.swift": discoveryPackage, "Sources/Toy/Toy.swift": "let toy = 1\n"},
+	)
 
 	run := exec.Command(binary, "--no-fix")
 	run.Dir = root

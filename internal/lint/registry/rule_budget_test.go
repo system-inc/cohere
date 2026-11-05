@@ -121,10 +121,18 @@ func buildBudgetGraph(test *testing.T, files map[string]string) *program.Graph {
 			test.Fatal(writeError)
 		}
 	}
-	if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(typedCorpusConfig), 0o644); writeError != nil {
+	if writeError := os.WriteFile(
+		filepath.Join(directory, "tsconfig.json"),
+		[]byte(typedCorpusConfig),
+		0o644,
+	); writeError != nil {
 		test.Fatal(writeError)
 	}
-	graph, buildError := program.Build(program.Options{ConfigFileName: filepath.Join(directory, "tsconfig.json"), CurrentDirectory: directory, SingleThreaded: true})
+	graph, buildError := program.Build(program.Options{
+		ConfigFileName:   filepath.Join(directory, "tsconfig.json"),
+		CurrentDirectory: directory,
+		SingleThreaded:   true,
+	})
 	if buildError != nil {
 		test.Fatal(buildError)
 	}
@@ -160,11 +168,21 @@ func measureOne(graph *program.Graph, subject rule.Rule, deadline time.Duration)
 	case got := <-done:
 		return got.result, got.err
 	case <-timer.C:
-		return program.Result{}, fmt.Errorf("rule CPU budget exceeded: %s reached deadline %.3fms (CPU budget %.3fms; CPU measurement unfinished)", subject.Name, float64(deadline)/float64(time.Millisecond), float64(deadline/3)/float64(time.Millisecond))
+		return program.Result{}, fmt.Errorf(
+			"rule CPU budget exceeded: %s reached deadline %.3fms (CPU budget %.3fms; CPU measurement unfinished)",
+			subject.Name,
+			float64(deadline)/float64(time.Millisecond),
+			float64(deadline/3)/float64(time.Millisecond),
+		)
 	}
 }
 
-func checkRuleBudget(test *testing.T, graph *program.Graph, rules []rule.Rule, budget time.Duration) ([]program.RuleTiming, error) {
+func checkRuleBudget(
+	test *testing.T,
+	graph *program.Graph,
+	rules []rule.Rule,
+	budget time.Duration,
+) ([]program.RuleTiming, error) {
 	test.Helper()
 	started := time.Now()
 	var rows []program.RuleTiming
@@ -179,7 +197,14 @@ func checkRuleBudget(test *testing.T, graph *program.Graph, rules []rule.Rule, b
 	}
 	// Coverage precedes every verdict, including a deadline or an incomplete walk.
 	defer func() {
-		test.Logf("rule CPU coverage: rules run=%d registered=%d corpus nodes=%d files=%d wall=%s", len(rows), len(rules), nodes, len(graph.ProjectFiles()), time.Since(started))
+		test.Logf(
+			"rule CPU coverage: rules run=%d registered=%d corpus nodes=%d files=%d wall=%s",
+			len(rows),
+			len(rules),
+			nodes,
+			len(graph.ProjectFiles()),
+			time.Since(started),
+		)
 	}()
 	for _, subject := range rules {
 		result, measureOneError := measureOne(graph, subject, budget*3)
@@ -190,15 +215,30 @@ func checkRuleBudget(test *testing.T, graph *program.Graph, rules []rule.Rule, b
 			return rows, fmt.Errorf("%s: no thread CPU measurement", subject.Name)
 		}
 		if len(result.Coverage.RulesCrashed) != 0 || len(result.Coverage.FilesCrashed) != 0 {
-			return rows, fmt.Errorf("%s: incomplete walk: rule crashes=%v file crashes=%v", subject.Name, result.Coverage.RulesCrashed, result.Coverage.FilesCrashed)
+			return rows, fmt.Errorf(
+				"%s: incomplete walk: rule crashes=%v file crashes=%v",
+				subject.Name,
+				result.Coverage.RulesCrashed,
+				result.Coverage.FilesCrashed,
+			)
 		}
 		if result.Coverage.RulesOffered[subject.Name] != len(graph.ProjectFiles()) {
-			return rows, fmt.Errorf("%s offered %d files, want %d", subject.Name, result.Coverage.RulesOffered[subject.Name], len(graph.ProjectFiles()))
+			return rows, fmt.Errorf(
+				"%s offered %d files, want %d",
+				subject.Name,
+				result.Coverage.RulesOffered[subject.Name],
+				len(graph.ProjectFiles()),
+			)
 		}
 		row := result.Timings.Sorted()[0]
 		rows = append(rows, row)
 		if row.TotalCPU() > budget {
-			return rows, fmt.Errorf("rule CPU budget exceeded: %s %.3fms > %.3fms", row.Name, float64(row.TotalCPU())/float64(time.Millisecond), float64(budget)/float64(time.Millisecond))
+			return rows, fmt.Errorf(
+				"rule CPU budget exceeded: %s %.3fms > %.3fms",
+				row.Name,
+				float64(row.TotalCPU())/float64(time.Millisecond),
+				float64(budget)/float64(time.Millisecond),
+			)
 		}
 	}
 	return rows, nil

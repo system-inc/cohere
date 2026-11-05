@@ -23,7 +23,11 @@ func TestConsistencyNoAmbiguousIdentifierFires(test *testing.T) {
 		{"a outside a comparator", "const a = 1;\n", []string{"noSingleLetter"}},
 		{"b outside a comparator", "const b = 1;\n", []string{"noSingleLetter"}},
 		// The reference and the parameter are both identifiers, so both report.
-		{"e used in a body", "try {\n    run();\n} catch (e) {\n    report(e);\n}\n", []string{"noAmbiguousE", "noAmbiguousE"}},
+		{
+			"e used in a body",
+			"try {\n    run();\n} catch (e) {\n    report(e);\n}\n",
+			[]string{"noAmbiguousE", "noAmbiguousE"},
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -47,7 +51,10 @@ func TestConsistencyNoAmbiguousIdentifierStaysSilent(test *testing.T) {
 		{"descriptive names", "const count = 1;\ntry {\n    run();\n} catch (error) {\n    report(error);\n}\n"},
 		{"sort comparator parameters", "const sorted = items.sort((a, b) => a - b);\n"},
 		{"sort comparator with a body", "const sorted = items.sort((a, b) => {\n    return a - b;\n});\n"},
-		{"sort comparator as a function expression", "const sorted = items.sort(function (a, b) {\n    return a - b;\n});\n"},
+		{
+			"sort comparator as a function expression",
+			"const sorted = items.sort(function (a, b) {\n    return a - b;\n});\n",
+		},
 		// These are names somebody else chose, not bindings this file has to track.
 		{"a property read", "const value = thing.e;\n"},
 		{"a property read of a", "const value = thing.a;\n"},
@@ -86,9 +93,24 @@ func TestConsistencyNoAmbiguousIdentifierInfersContext(test *testing.T) {
 		wantHint   string
 		wantName   string
 	}{
-		{"catch reads as an error", "try {\n    run();\n} catch (e) {\n    report();\n}\n", "appears to be an error", "error"},
-		{"a handler key reads as an event", "const properties = { onClick: (e) => run() };\n", "appears to be an event", "event"},
-		{"a handler-named variable reads as an event", "const handleClick = (e) => run();\n", "appears to be an event", "event"},
+		{
+			"catch reads as an error",
+			"try {\n    run();\n} catch (e) {\n    report();\n}\n",
+			"appears to be an error",
+			"error",
+		},
+		{
+			"a handler key reads as an event",
+			"const properties = { onClick: (e) => run() };\n",
+			"appears to be an event",
+			"event",
+		},
+		{
+			"a handler-named variable reads as an event",
+			"const handleClick = (e) => run();\n",
+			"appears to be an event",
+			"event",
+		},
 		{"a bare arrow is unclear", "const start = (e) => run();\n", "context unclear", "event"},
 	}
 	for _, testCase := range cases {

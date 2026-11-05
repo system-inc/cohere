@@ -31,7 +31,9 @@ func decodeClassLiteralPropertyStyleOptions(test *testing.T, configuration strin
 		// here is what puts the rule's own fallback under test rather than the decoder's.
 		return nil
 	}
-	options, decodeClassLiteralPropertyStyleOptionsError := DecodeClassLiteralPropertyStyleOptions([]byte(configuration))
+	options, decodeClassLiteralPropertyStyleOptionsError := DecodeClassLiteralPropertyStyleOptions(
+		[]byte(configuration),
+	)
 	if decodeClassLiteralPropertyStyleOptionsError != nil {
 		test.Fatalf("could not decode %s: %v", configuration, decodeClassLiteralPropertyStyleOptionsError)
 	}
@@ -252,7 +254,9 @@ func TestClassLiteralPropertyStyleFiresOnUpstreamFailCases(test *testing.T) {
 			sourceText:    "\nclass Mx {\n  public static get n() /* before */ : 1 | 2 /* after */ {\n    return 1;\n  }\n}\n      ",
 			wantIds:       []string{"preferFieldStyle"},
 			wantSpans:     []string{"n"},
-			wantSuggested: []string{"\nclass Mx {\n  public static readonly n /* before */ : 1 | 2 /* after */ = 1;\n}\n      "},
+			wantSuggested: []string{
+				"\nclass Mx {\n  public static readonly n /* before */ : 1 | 2 /* after */ = 1;\n}\n      ",
+			},
 		},
 		{
 			configuration: "",
@@ -336,35 +340,45 @@ func TestClassLiteralPropertyStyleFiresOnUpstreamFailCases(test *testing.T) {
 			sourceText:    "\nclass Mx {\n  public get myValue() {\n    return gql`\n      {\n        user(id: 5) {\n          firstName\n          lastName\n        }\n      }\n    `;\n  }\n}\n      ",
 			wantIds:       []string{"preferFieldStyle"},
 			wantSpans:     []string{"myValue"},
-			wantSuggested: []string{"\nclass Mx {\n  public readonly myValue = gql`\n      {\n        user(id: 5) {\n          firstName\n          lastName\n        }\n      }\n    `;\n}\n      "},
+			wantSuggested: []string{
+				"\nclass Mx {\n  public readonly myValue = gql`\n      {\n        user(id: 5) {\n          firstName\n          lastName\n        }\n      }\n    `;\n}\n      ",
+			},
 		},
 		{
 			configuration: "\"getters\"",
 			sourceText:    "\nclass Mx {\n  public readonly myValue = gql`\n    {\n      user(id: 5) {\n        firstName\n        lastName\n      }\n    }\n  `;\n}\n      ",
 			wantIds:       []string{"preferGetterStyle"},
 			wantSpans:     []string{"myValue"},
-			wantSuggested: []string{"\nclass Mx {\n  public get myValue() { return gql`\n    {\n      user(id: 5) {\n        firstName\n        lastName\n      }\n    }\n  `; }\n}\n      "},
+			wantSuggested: []string{
+				"\nclass Mx {\n  public get myValue() { return gql`\n    {\n      user(id: 5) {\n        firstName\n        lastName\n      }\n    }\n  `; }\n}\n      ",
+			},
 		},
 		{
 			configuration: "\"getters\"",
 			sourceText:    "\nclass A {\n  private readonly foo: string = 'bar';\n  constructor(foo: string) {\n    const bar = new (class {\n      private readonly foo: string = 'baz';\n      constructor() {\n        this.foo = 'qux';\n      }\n    })();\n  }\n}\n      ",
 			wantIds:       []string{"preferGetterStyle"},
 			wantSpans:     []string{"foo"},
-			wantSuggested: []string{"\nclass A {\n  private get foo() { return 'bar'; }\n  constructor(foo: string) {\n    const bar = new (class {\n      private readonly foo: string = 'baz';\n      constructor() {\n        this.foo = 'qux';\n      }\n    })();\n  }\n}\n      "},
+			wantSuggested: []string{
+				"\nclass A {\n  private get foo() { return 'bar'; }\n  constructor(foo: string) {\n    const bar = new (class {\n      private readonly foo: string = 'baz';\n      constructor() {\n        this.foo = 'qux';\n      }\n    })();\n  }\n}\n      ",
+			},
 		},
 		{
 			configuration: "\"getters\"",
 			sourceText:    "\nclass A {\n  private readonly ['foo']: string = 'bar';\n  constructor(foo: string) {\n    const bar = new (class {\n      private readonly foo: string = 'baz';\n      constructor() {}\n    })();\n\n    if (bar) {\n      this.foo = 'baz';\n    }\n  }\n}\n      ",
 			wantIds:       []string{"preferGetterStyle"},
 			wantSpans:     []string{"foo"},
-			wantSuggested: []string{"\nclass A {\n  private readonly ['foo']: string = 'bar';\n  constructor(foo: string) {\n    const bar = new (class {\n      private get foo() { return 'baz'; }\n      constructor() {}\n    })();\n\n    if (bar) {\n      this.foo = 'baz';\n    }\n  }\n}\n      "},
+			wantSuggested: []string{
+				"\nclass A {\n  private readonly ['foo']: string = 'bar';\n  constructor(foo: string) {\n    const bar = new (class {\n      private get foo() { return 'baz'; }\n      constructor() {}\n    })();\n\n    if (bar) {\n      this.foo = 'baz';\n    }\n  }\n}\n      ",
+			},
 		},
 		{
 			configuration: "\"getters\"",
 			sourceText:    "\nclass A {\n  private readonly foo: string = 'bar';\n  constructor(foo: string) {\n    function func() {\n      this.foo = 'aa';\n    }\n  }\n}\n      ",
 			wantIds:       []string{"preferGetterStyle"},
 			wantSpans:     []string{"foo"},
-			wantSuggested: []string{"\nclass A {\n  private get foo() { return 'bar'; }\n  constructor(foo: string) {\n    function func() {\n      this.foo = 'aa';\n    }\n  }\n}\n      "},
+			wantSuggested: []string{
+				"\nclass A {\n  private get foo() { return 'bar'; }\n  constructor(foo: string) {\n    function func() {\n      this.foo = 'aa';\n    }\n  }\n}\n      ",
+			},
 		},
 	}
 	for index, testCase := range cases {
@@ -695,7 +709,10 @@ func TestClassLiteralPropertyStyleKeepsWhatTheMemberCarries(test *testing.T) {
 			decodeClassLiteralPropertyStyleOptions(test, "\"getters\""))
 		rule_testing.ExpectFindings(test, result, "preferGetterStyle")
 		if suggestions := result.Diagnostics[0].Suggestions; len(suggestions) != 0 {
-			test.Fatalf("a decorated field was offered %d suggestion(s), which would delete the decorator", len(suggestions))
+			test.Fatalf(
+				"a decorated field was offered %d suggestion(s), which would delete the decorator",
+				len(suggestions),
+			)
 		}
 	})
 
@@ -760,7 +777,9 @@ func TestClassLiteralPropertyStyleDecoderResolvesTheStyle(test *testing.T) {
 	for index, testCase := range cases {
 		test.Run(classLiteralPropertyStyleCaseName(index), func(test *testing.T) {
 			test.Parallel()
-			decoded, decodeClassLiteralPropertyStyleOptionsError := DecodeClassLiteralPropertyStyleOptions([]byte(testCase.configuration))
+			decoded, decodeClassLiteralPropertyStyleOptionsError := DecodeClassLiteralPropertyStyleOptions(
+				[]byte(testCase.configuration),
+			)
 			if decodeClassLiteralPropertyStyleOptionsError != nil {
 				test.Fatalf("decoding %s: %v", testCase.configuration, decodeClassLiteralPropertyStyleOptionsError)
 			}
@@ -957,7 +976,9 @@ func TestClassLiteralPropertyStyleDecoderRefusesWhatUpstreamRefuses(test *testin
 		{`"fields"`, ClassLiteralPropertyStyleFields},
 		{`"getters"`, ClassLiteralPropertyStyleGetters},
 	} {
-		decoded, decodeClassLiteralPropertyStyleOptionsError := DecodeClassLiteralPropertyStyleOptions([]byte(accepted.wire))
+		decoded, decodeClassLiteralPropertyStyleOptionsError := DecodeClassLiteralPropertyStyleOptions(
+			[]byte(accepted.wire),
+		)
 		if decodeClassLiteralPropertyStyleOptionsError != nil {
 			test.Errorf("%s was refused: %v", accepted.wire, decodeClassLiteralPropertyStyleOptionsError)
 			continue
@@ -983,7 +1004,12 @@ func TestClassLiteralPropertyStyleDecoderRefusesWhatUpstreamRefuses(test *testin
 			continue
 		}
 		if !strings.Contains(decodeClassLiteralPropertyStyleOptionsError.Error(), refused.named) {
-			test.Errorf("%s was refused without naming %s: %v", refused.wire, refused.named, decodeClassLiteralPropertyStyleOptionsError)
+			test.Errorf(
+				"%s was refused without naming %s: %v",
+				refused.wire,
+				refused.named,
+				decodeClassLiteralPropertyStyleOptionsError,
+			)
 		}
 	}
 }

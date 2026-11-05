@@ -54,7 +54,12 @@ func TestALateEarlyFormatScopeFindsWhatAPromptOneDoes(test *testing.T) {
 		output, runError := command.CombinedOutput()
 		requireChildRan(test, runError)
 		if held && time.Since(started) < hold {
-			test.Fatalf("the held run took %s, under the %s hold, so the early pass was not held:\n%s", time.Since(started), hold, output)
+			test.Fatalf(
+				"the held run took %s, under the %s hold, so the early pass was not held:\n%s",
+				time.Since(started),
+				hold,
+				output,
+			)
 		}
 		return timing.ReplaceAllString(string(output), "T"), command.ProcessState.ExitCode()
 	}
@@ -67,6 +72,12 @@ func TestALateEarlyFormatScopeFindsWhatAPromptOneDoes(test *testing.T) {
 		}
 	}
 	if late != prompt || lateExit != promptExit {
-		test.Errorf("a late early-format scope changed the run (exit %d against %d)\n--- late\n%s\n--- prompt\n%s", lateExit, promptExit, late, prompt)
+		test.Errorf(
+			"a late early-format scope changed the run (exit %d against %d)\n--- late\n%s\n--- prompt\n%s",
+			lateExit,
+			promptExit,
+			late,
+			prompt,
+		)
 	}
 }

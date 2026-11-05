@@ -165,7 +165,10 @@ func TestNoEqNullMessage(test *testing.T) {
 	if got := result.Diagnostics[0].Message.Id; got != "unexpected" {
 		test.Errorf("message id is %q, want %q", got, "unexpected")
 	}
-	if got := result.Diagnostics[0].Message.Description; !strings.HasPrefix(got, "This compares against `null` with `==` or `!=`") {
+	if got := result.Diagnostics[0].Message.Description; !strings.HasPrefix(
+		got,
+		"This compares against `null` with `==` or `!=`",
+	) {
 		test.Errorf("message description starts %q, which is not the sentence this rule reports", got)
 	}
 }

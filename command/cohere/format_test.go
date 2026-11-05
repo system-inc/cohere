@@ -123,7 +123,11 @@ func TestSkipReasonsGroupByExtension(test *testing.T) {
 
 	first, second := firstError.Error(), secondError.Error()
 	if first != second {
-		test.Fatalf("two files of one type produced different skip reasons, so the summary cannot group them:\n  %q\n  %q", first, second)
+		test.Fatalf(
+			"two files of one type produced different skip reasons, so the summary cannot group them:\n  %q\n  %q",
+			first,
+			second,
+		)
 	}
 	if !strings.Contains(first, ".txt") {
 		test.Fatalf("the reason does not name the extension: %q", first)
@@ -345,7 +349,10 @@ func TestTheEnginesRealParseErrorsAreRecognized(test *testing.T) {
 		"SyntaxError: JSX element 'span' has no corresponding closing tag. (1:7)",
 	} {
 		if !isUnparseable(errors.New(message)) {
-			test.Fatalf("a real parse failure was not recognized, so it would be reported as a broken formatter: %q", message)
+			test.Fatalf(
+				"a real parse failure was not recognized, so it would be reported as a broken formatter: %q",
+				message,
+			)
 		}
 	}
 }
@@ -385,7 +392,11 @@ func TestFormattingOffConfiguresNoFormatter(test *testing.T) {
 	test.Parallel()
 	engine, configuredFormatterError := configuredFormatter(false)
 	if configuredFormatterError != nil || engine != nil {
-		test.Fatalf("formatting off configured %v, %v; want no formatter and no error", engine, configuredFormatterError)
+		test.Fatalf(
+			"formatting off configured %v, %v; want no formatter and no error",
+			engine,
+			configuredFormatterError,
+		)
 	}
 }
 
@@ -453,7 +464,11 @@ func TestTheTransformFormatsARealNonIdempotentInputToItsFixpoint(test *testing.T
 		test.Fatal(err)
 	}
 	if formatted != twice {
-		test.Fatalf("the transform stopped short of the fixpoint:\n--- transform\n%s--- two passes\n%s", formatted, twice)
+		test.Fatalf(
+			"the transform stopped short of the fixpoint:\n--- transform\n%s--- two passes\n%s",
+			formatted,
+			twice,
+		)
 	}
 	again, againError := formatTransform(engine)("Report.ts", formatted, nil)
 	if againError != nil {

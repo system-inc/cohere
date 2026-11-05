@@ -266,7 +266,9 @@ func TestPreferPromiseRejectErrorsDeclinesWithoutAChecker(test *testing.T) {
 	test.Parallel()
 
 	if !core.PreferPromiseRejectErrors.NeedsTypeChecker {
-		test.Errorf("the rule stopped declaring NeedsTypeChecker, so the registration path will hand it files with no checker")
+		test.Errorf(
+			"the rule stopped declaring NeedsTypeChecker, so the registration path will hand it files with no checker",
+		)
 	}
 	untyped := rule_testing.Run(test, core.PreferPromiseRejectErrors, "input.ts", "Promise.reject(5)")
 	rule_testing.ExpectClean(test, untyped)

@@ -123,7 +123,11 @@ func (scope formatScope) claimAdamic(held map[string]struct{}) (formatScope, []s
 	}
 	scope.FileNames, scope.index = fileNames, index
 	if joining > 0 {
-		scope.Description = fmt.Sprintf("%s · and %s the program holds", scope.Description, counted(joining, "Adamic .a file", "Adamic .a files"))
+		scope.Description = fmt.Sprintf(
+			"%s · and %s the program holds",
+			scope.Description,
+			counted(joining, "Adamic .a file", "Adamic .a files"),
+		)
 	}
 	return scope, claimed
 }
@@ -291,8 +295,11 @@ func (scope formatScope) narrowToEnumeration(enumeration formatfiles.Enumeration
 		// arrives here has lost its enumeration, and answering with an empty narrow scope is a loud
 		// wrong answer rather than a silent permissive one.
 		return formatScope{
-			index:       map[string]struct{}{},
-			Description: fmt.Sprintf("nothing (a whole-tree scope reached narrowing without its enumeration, walked %s)", enumeration.Root),
+			index: map[string]struct{}{},
+			Description: fmt.Sprintf(
+				"nothing (a whole-tree scope reached narrowing without its enumeration, walked %s)",
+				enumeration.Root,
+			),
 		}
 	}
 
@@ -368,9 +375,9 @@ func describeEnumeration(enumeration formatfiles.Enumeration, formattable int) s
 // formatCandidates is the files the format phase should visit.
 //
 // A whole-tree scope hands back everything the enumeration found; a narrow scope hands back its own
-// set, the named paths or the files not on record as formatted. Either way these are candidates rather than a promise: a file here still passes
-// through the transform's own Handles check and can still come back declined, which is what keeps a
-// skip visible instead of turning it into an absence.
+// set, the named paths or the files not on record as formatted. Either way these are candidates rather than a promise:
+// a file here still passes through the transform's own Handles check and can still come back declined, which is what
+// keeps a skip visible instead of turning it into an absence.
 //
 // A scope with no formatter configured yields nothing, so a fix-only run visits exactly the files
 // that had proposals and costs what it did before the format phase existed.

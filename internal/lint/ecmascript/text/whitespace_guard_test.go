@@ -76,7 +76,9 @@ func goWhitespaceSitesIn(fileSet *token.FileSet, file *ast.File, relative string
 	markedLines := map[int]bool{}
 	for _, group := range file.Comments {
 		for _, comment := range group.List {
-			body := strings.TrimSpace(strings.TrimPrefix(strings.TrimPrefix(comment.Text, "//"), "/*")) // Go whitespace: a Go comment's text
+			body := strings.TrimSpace(
+				strings.TrimPrefix(strings.TrimPrefix(comment.Text, "//"), "/*"),
+			) // Go whitespace: a Go comment's text
 			if strings.HasPrefix(body, goWhitespaceMarker) {
 				// The comment's own line keeps a trailing call, and the line below its group keeps the call
 				// there.
@@ -103,7 +105,10 @@ func goWhitespaceSitesIn(fileSet *token.FileSet, file *ast.File, relative string
 		}
 		line := fileSet.Position(selector.Pos()).Line
 		if !markedLines[line] {
-			found = append(found, goWhitespaceSite{file: relative, line: line, function: path + "." + selector.Sel.Name})
+			found = append(
+				found,
+				goWhitespaceSite{file: relative, line: line, function: path + "." + selector.Sel.Name},
+			)
 		}
 		return true
 	})
@@ -121,7 +126,10 @@ func goWhitespaceSites(test *testing.T) []goWhitespaceSite {
 	var found []goWhitespaceSite
 	files := 0
 	for _, directory := range []string{"internal/lint", "internal/format"} {
-		walkError := filepath.WalkDir(filepath.Join(moduleRoot, directory), func(path string, entry fs.DirEntry, err error) error {
+		walkError := filepath.WalkDir(filepath.Join(
+			moduleRoot,
+			directory,
+		), func(path string, entry fs.DirEntry, err error) error {
 			if err != nil {
 				return err
 			}
@@ -150,7 +158,8 @@ func goWhitespaceSites(test *testing.T) []goWhitespaceSite {
 		test.Fatalf("the walk read %d files under internal/lint and internal/format, which is not the tree", files)
 	}
 	sort.Slice(found, func(left, right int) bool {
-		return found[left].file < found[right].file || found[left].file == found[right].file && found[left].line < found[right].line
+		return found[left].file < found[right].file ||
+			found[left].file == found[right].file && found[left].line < found[right].line
 	})
 	return found
 }
@@ -171,12 +180,22 @@ func TestPortedCodeReadsWhitespaceAsJavaScriptDoes(test *testing.T) {
 			continue
 		}
 		if len(sites) < pinned {
-			test.Errorf("%s holds %d unmarked Go-whitespace calls, below its pin of %d: lower the pin in goWhitespaceUnswept", file, len(sites), pinned)
+			test.Errorf(
+				"%s holds %d unmarked Go-whitespace calls, below its pin of %d: lower the pin in goWhitespaceUnswept",
+				file,
+				len(sites),
+				pinned,
+			)
 			continue
 		}
 		for _, site := range sites {
-			test.Errorf("%s:%d: %s uses Go's whitespace, which is not JavaScript's: use text.TrimWhitespace, text.WhitespaceFields or text.IsWhitespace, or say why Go's set is right with a `// %s` comment",
-				site.file, site.line, site.function, goWhitespaceMarker)
+			test.Errorf(
+				"%s:%d: %s uses Go's whitespace, which is not JavaScript's: use text.TrimWhitespace, text.WhitespaceFields or text.IsWhitespace, or say why Go's set is right with a `// %s` comment",
+				site.file,
+				site.line,
+				site.function,
+				goWhitespaceMarker,
+			)
 		}
 	}
 	for file, pinned := range goWhitespaceUnswept {

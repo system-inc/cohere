@@ -288,7 +288,10 @@ func (ranges *MutableRanges) Len() int {
 // Contains reports whether a value is still being written at an evaluation position.
 //
 // This is React's `inRange` reached through the table. Half-open, and false for an unset range.
-func (ranges *MutableRanges) Contains(id static_single_assignment.IdentifierId, order static_single_assignment.EvaluationOrder) bool {
+func (ranges *MutableRanges) Contains(
+	id static_single_assignment.IdentifierId,
+	order static_single_assignment.EvaluationOrder,
+) bool {
 	return ranges.Get(id).Contains(order)
 }
 
@@ -339,7 +342,11 @@ func (ranges *MutableRanges) Set(id static_single_assignment.IdentifierId, r Mut
 // phis and loops.
 //
 // Reproduced in upstream's order, with the phases split into `AliasingGraph.Widen` and the loop below.
-func InferMutableRanges[G Graph[F, B, P], F any, B comparable, P any](graph G, function F, options Options) *MutableRanges {
+func InferMutableRanges[G Graph[F, B, P], F any, B comparable, P any](
+	graph G,
+	function F,
+	options Options,
+) *MutableRanges {
 	result := &MutableRanges{}
 
 	// Part 1: build the alias graph and widen every range a mutation reaches.
@@ -553,7 +560,11 @@ func RangeOf(ranges *MutableRanges, id static_single_assignment.IdentifierId) Mu
 // This is React's `inRange`. Under-approximates for the reason the package comment gives: false
 // here can mean "settled" or can mean "we could not see the mutation", and a consumer that must not
 // confuse those asks `RangeGaps` first.
-func IsMutableAt(ranges *MutableRanges, id static_single_assignment.IdentifierId, order static_single_assignment.EvaluationOrder) bool {
+func IsMutableAt(
+	ranges *MutableRanges,
+	id static_single_assignment.IdentifierId,
+	order static_single_assignment.EvaluationOrder,
+) bool {
 	return ranges.Contains(id, order)
 }
 
@@ -633,7 +644,11 @@ func phiOpenedRange(existing MutableRange, firstOrder static_single_assignment.E
 // `block.instructions.at(0)?.id ?? block.terminal.id`. Reproduced, because an empty block is common
 // in this graph - every goto-only join block is one - and using zero there would open a phi's range
 // at a position no instruction occupies, which reads back as unset.
-func BlockFirstOrder[G Graph[F, B, P], F any, B comparable, P any](graph G, function F, block B) static_single_assignment.EvaluationOrder {
+func BlockFirstOrder[G Graph[F, B, P], F any, B comparable, P any](
+	graph G,
+	function F,
+	block B,
+) static_single_assignment.EvaluationOrder {
 	count := graph.InstructionCount(function, block)
 	for index := 0; index < count; index++ {
 		if order, ok := graph.InstructionOrder(function, block, index); ok {
@@ -757,7 +772,12 @@ func newAliasingNode(id static_single_assignment.IdentifierId, value aliasingNod
 // choice. The index is compared against the mutation's index to decide whether the edge already
 // existed, so keeping the earliest makes the edge visible to the widest set of mutations. Keeping
 // the latest would silently narrow every range that flows through a repeated alias.
-func insertBackEdge(into map[static_single_assignment.IdentifierId]int, order *[]static_single_assignment.IdentifierId, from static_single_assignment.IdentifierId, index int) {
+func insertBackEdge(
+	into map[static_single_assignment.IdentifierId]int,
+	order *[]static_single_assignment.IdentifierId,
+	from static_single_assignment.IdentifierId,
+	index int,
+) {
 	if _, exists := into[from]; exists {
 		return
 	}
@@ -847,7 +867,10 @@ func (state *aliasingState) freeze(id static_single_assignment.IdentifierId) boo
 	return state.freezeWithSeen(id, map[static_single_assignment.IdentifierId]bool{})
 }
 
-func (state *aliasingState) freezeWithSeen(id static_single_assignment.IdentifierId, seen map[static_single_assignment.IdentifierId]bool) bool {
+func (state *aliasingState) freezeWithSeen(
+	id static_single_assignment.IdentifierId,
+	seen map[static_single_assignment.IdentifierId]bool,
+) bool {
 	if seen[id] {
 		return false
 	}
@@ -890,7 +913,10 @@ func (state *aliasingState) notMutable(id static_single_assignment.IdentifierId)
 // Upstream's `CreateFrom` at `InferMutationAliasingEffects.ts:731` reads the source's kind and
 // initializes the target with it, rewriting the effect into a plain `Create` of that kind when the
 // source is Primitive, Global or Frozen. This is that propagation, in the one bit this pass reads.
-func (state *aliasingState) deriveImmutable(from static_single_assignment.IdentifierId, into static_single_assignment.IdentifierId) {
+func (state *aliasingState) deriveImmutable(
+	from static_single_assignment.IdentifierId,
+	into static_single_assignment.IdentifierId,
+) {
 	if kind, present := state.immutable[from]; present {
 		state.immutable[into] = kind
 		return
@@ -911,8 +937,12 @@ func (state *aliasingState) deriveImmutable(from static_single_assignment.Identi
 //
 // A function rather than a method, since it reads the phi's places through the IR's Graph. Operands
 // are sorted by predecessor with one entry each, so ranging them is PhiOperandsInOrder's order.
-func derivePhiImmutable[G Graph[F, B, P], F any, B comparable, P any](s *aliasingState, graph G, phi *static_single_assignment.Phi[P],
-	seenBlocks map[static_single_assignment.BlockId]bool) {
+func derivePhiImmutable[G Graph[F, B, P], F any, B comparable, P any](
+	s *aliasingState,
+	graph G,
+	phi *static_single_assignment.Phi[P],
+	seenBlocks map[static_single_assignment.BlockId]bool,
+) {
 	if phi == nil || len(phi.Operands) == 0 {
 		return
 	}
@@ -964,7 +994,10 @@ func (state *aliasingState) create(id static_single_assignment.IdentifierId, val
 // that abstract value is frozen later.
 //
 // The builder hands the sources over as a slice of their own, which the state keeps.
-func (state *aliasingState) recordFreezeSources(into static_single_assignment.IdentifierId, sources []static_single_assignment.IdentifierId) {
+func (state *aliasingState) recordFreezeSources(
+	into static_single_assignment.IdentifierId,
+	sources []static_single_assignment.IdentifierId,
+) {
 	if len(sources) == 0 {
 		return
 	}
@@ -976,7 +1009,10 @@ func (state *aliasingState) recordFreezeSources(into static_single_assignment.Id
 // It is called only for Assign from a mutable/context source. Alias, Capture and MaybeAlias must
 // not call it: upstream records those as effects without changing the InstructionValues either
 // identifier denotes.
-func (state *aliasingState) shareIdentity(from static_single_assignment.IdentifierId, into static_single_assignment.IdentifierId) {
+func (state *aliasingState) shareIdentity(
+	from static_single_assignment.IdentifierId,
+	into static_single_assignment.IdentifierId,
+) {
 	if from == into {
 		return
 	}
@@ -1010,7 +1046,11 @@ func (state *aliasingState) detachIdentity(id static_single_assignment.Identifie
 // adds a FORWARD alias edge from -> into and records `created_from` on the target. Note the
 // asymmetry with `assign`: `create_from` does not check that the source node exists, because the
 // target is being created here regardless.
-func (state *aliasingState) createFrom(index int, from static_single_assignment.IdentifierId, into static_single_assignment.IdentifierId) {
+func (state *aliasingState) createFrom(
+	index int,
+	from static_single_assignment.IdentifierId,
+	into static_single_assignment.IdentifierId,
+) {
 	state.create(into, aliasingNodeObject)
 	if fromNode, ok := state.nodes[from]; ok {
 		fromNode.edges = append(fromNode.edges, aliasingEdge{index: index, node: into, kind: aliasingEdgeAlias})
@@ -1025,7 +1065,11 @@ func (state *aliasingState) createFrom(index int, from static_single_assignment.
 // Both endpoints must already exist or the edge is dropped entirely. That guard is upstream's and it
 // is the reason the entry values (params, context, returns) are created before the walk begins:
 // without those nodes, every edge touching a parameter would be silently discarded.
-func (state *aliasingState) assign(index int, from static_single_assignment.IdentifierId, into static_single_assignment.IdentifierId) {
+func (state *aliasingState) assign(
+	index int,
+	from static_single_assignment.IdentifierId,
+	into static_single_assignment.IdentifierId,
+) {
 	fromNode, fromOk := state.nodes[from]
 	toNode, toOk := state.nodes[into]
 	if !fromOk || !toOk {
@@ -1039,7 +1083,11 @@ func (state *aliasingState) assign(index int, from static_single_assignment.Iden
 //
 // A capture edge is followed BACKWARDS only by a transitive mutation. Mutating a container does not
 // mutate what it holds; mutating it transitively does.
-func (state *aliasingState) capture(index int, from static_single_assignment.IdentifierId, into static_single_assignment.IdentifierId) {
+func (state *aliasingState) capture(
+	index int,
+	from static_single_assignment.IdentifierId,
+	into static_single_assignment.IdentifierId,
+) {
 	fromNode, fromOk := state.nodes[from]
 	toNode, toOk := state.nodes[into]
 	if !fromOk || !toOk {
@@ -1053,7 +1101,11 @@ func (state *aliasingState) capture(index int, from static_single_assignment.Ide
 //
 // Traversing this edge in either direction downgrades the mutation to Conditional, which is the
 // conservative direction: an uncertain alias must not turn into a definite mutation.
-func (state *aliasingState) maybeAlias(index int, from static_single_assignment.IdentifierId, into static_single_assignment.IdentifierId) {
+func (state *aliasingState) maybeAlias(
+	index int,
+	from static_single_assignment.IdentifierId,
+	into static_single_assignment.IdentifierId,
+) {
 	fromNode, fromOk := state.nodes[from]
 	toNode, toOk := state.nodes[into]
 	if !fromOk || !toOk {
@@ -1308,7 +1360,11 @@ func (graph AliasingGraph) MutationCount() int {
 // shifts every subsequent index by a constant, which changes only which edges a mutation can see,
 // and the result is a range table that is subtly narrow or subtly wide with no invariant violated.
 // They are transcribed one for one against both implementations for that reason.
-func BuildAliasingGraph[G Graph[F, B, P], F any, B comparable, P any](graph G, function F, options Options) AliasingGraph {
+func BuildAliasingGraph[G Graph[F, B, P], F any, B comparable, P any](
+	graph G,
+	function F,
+	options Options,
+) AliasingGraph {
 	state := newAliasingState()
 	var mutations []pendingMutation
 	index := 0
@@ -1417,7 +1473,13 @@ func BuildAliasingGraph[G Graph[F, B, P], F any, B comparable, P any](graph G, f
 					// React's rule for closures, Graph.Closure: a closure whose captures are all
 					// immutable, and whose body only reads them, is created Frozen. Its captures are
 					// what a later Freeze of it freezes.
-					if captures, frozen := graph.Closure(function, block, instructionIndex, into, state.immutable); captures != nil {
+					if captures, frozen := graph.Closure(
+						function,
+						block,
+						instructionIndex,
+						into,
+						state.immutable,
+					); captures != nil {
 						sources := make([]static_single_assignment.IdentifierId, 0, len(captures))
 						for _, capture := range captures {
 							sources = append(sources, graph.IdentifierOf(capture))

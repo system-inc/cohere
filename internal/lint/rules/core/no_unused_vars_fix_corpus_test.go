@@ -32,9 +32,17 @@ var noUnusedVarsFixCorpusDivergences = map[int]struct {
 	17: {"React is exempt in every JSX file, whatever the pragma", []noUnusedVarsFixCorpusFinding{}, ""},
 	// Upstream attaches the removal to the usedIgnoredVar finding and deletes an import the file reads,
 	// leaving `console.log(_a)` reading nothing. See no_unused_vars_fix.go.
-	53: {"upstream's autofix deletes a used ignored import", []noUnusedVarsFixCorpusFinding{{"usedIgnoredVar", "_a", nil}}, ""},
+	53: {
+		"upstream's autofix deletes a used ignored import",
+		[]noUnusedVarsFixCorpusFinding{{"usedIgnoredVar", "_a", nil}},
+		"",
+	},
 	// Upstream removes a namespace import's whole declaration, deleting the used default beside it.
-	55: {"upstream's autofix deletes a used default beside an unused namespace", []noUnusedVarsFixCorpusFinding{{"unusedVar", "Unused", nil}}, ""},
+	55: {
+		"upstream's autofix deletes a used default beside an unused namespace",
+		[]noUnusedVarsFixCorpusFinding{{"unusedVar", "Unused", nil}},
+		"",
+	},
 }
 
 // noUnusedVarsFixTsconfig is the corpus tsconfig, for a JSX row with the pragma and fragment name upstream's
@@ -99,7 +107,11 @@ func TestNoUnusedVarsFixUpstreamCorpus(test *testing.T) {
 		}
 	}
 	if upstream != noUnusedVarsFixCorpusUpstreamRows {
-		test.Fatalf("the corpus holds %d upstream rows, and upstream has %d", upstream, noUnusedVarsFixCorpusUpstreamRows)
+		test.Fatalf(
+			"the corpus holds %d upstream rows, and upstream has %d",
+			upstream,
+			noUnusedVarsFixCorpusUpstreamRows,
+		)
 	}
 
 	for _, row := range noUnusedVarsFixCorpus {
@@ -118,9 +130,15 @@ func TestNoUnusedVarsFixUpstreamCorpus(test *testing.T) {
 				fileName = "file.tsx"
 			}
 			configuration := noUnusedVarsFixTsconfig(test, row)
-			result := rule_testing.RunTypedFilesWithSetupAndOptions(test, NoUnusedVars, map[string]string{fileName: row.source}, fileName, options,
+			result := rule_testing.RunTypedFilesWithSetupAndOptions(test, NoUnusedVars, map[string]string{
+				fileName: row.source,
+			}, fileName, options,
 				func(directory string) {
-					if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration), 0o644); writeError != nil {
+					if writeError := os.WriteFile(
+						filepath.Join(directory, "tsconfig.json"),
+						[]byte(configuration),
+						0o644,
+					); writeError != nil {
 						test.Fatal(writeError)
 					}
 				})
@@ -136,7 +154,10 @@ func TestNoUnusedVarsFixUpstreamCorpus(test *testing.T) {
 				if upstreamId, renamed := noUnusedVarsUpstreamIds[id]; renamed {
 					id = upstreamId
 				}
-				finding := noUnusedVarsFixCorpusFinding{id: id, text: row.source[diagnostic.Range.Pos():diagnostic.Range.End()]}
+				finding := noUnusedVarsFixCorpusFinding{
+					id:   id,
+					text: row.source[diagnostic.Range.Pos():diagnostic.Range.End()],
+				}
 				for _, suggestion := range diagnostic.Suggestions {
 					finding.suggestions = append(finding.suggestions, noUnusedVarsFixCorpusSuggestion{
 						id:     suggestion.Message.Id,

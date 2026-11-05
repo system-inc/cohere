@@ -152,7 +152,13 @@ func TestPathAnalysis(test *testing.T) {
 			}
 			gotEarly = gotEarly && !analysis.IsOnEveryFinalPath(block)
 			if gotEarly != testCase.wantEarly {
-				test.Errorf("early final = %v (final=%d, event=%d), want %v", gotEarly, shortestFinal, shortestEvent, testCase.wantEarly)
+				test.Errorf(
+					"early final = %v (final=%d, event=%d), want %v",
+					gotEarly,
+					shortestFinal,
+					shortestEvent,
+					testCase.wantEarly,
+				)
 			}
 		})
 	}

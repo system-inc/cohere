@@ -51,20 +51,52 @@ func ambientFixture(test *testing.T, name string) map[string]string {
 
 func TestNoAmbientDeclarations(test *testing.T) {
 	test.Parallel()
-	for _, name := range []string{"const", "let", "var", "function", "class", "global-method", "global-value", "module", "reference", "reference-types", "reference-lib"} {
+	for _, name := range []string{
+		"const",
+		"let",
+		"var",
+		"function",
+		"class",
+		"global-method",
+		"global-value",
+		"module",
+		"reference",
+		"reference-types",
+		"reference-lib",
+	} {
 		test.Run(name, func(test *testing.T) {
 			test.Parallel()
 			files := ambientFixture(test, name)
 			ambientCheckTypes(test, files)
-			result := rule_testing.RunTypedFilesWithSetup(test, ambientSubject(), files, "Case.ts", ambientSetup(test, files))
+			result := rule_testing.RunTypedFilesWithSetup(
+				test,
+				ambientSubject(),
+				files,
+				"Case.ts",
+				ambientSetup(test, files),
+			)
 			rule_testing.ExpectFindings(test, result, "ambientDeclaration")
-			expected := map[string]string{"const": "limit", "let": "limit", "var": "limit", "function": "missing", "class": "Missing", "global-method": "global", "global-value": "global", "module": "./value.js", "reference": "./phantom.d.ts", "reference-types": "phantom", "reference-lib": "dom"}[name]
+			expected := map[string]string{
+				"const":           "limit",
+				"let":             "limit",
+				"var":             "limit",
+				"function":        "missing",
+				"class":           "Missing",
+				"global-method":   "global",
+				"global-value":    "global",
+				"module":          "./value.js",
+				"reference":       "./phantom.d.ts",
+				"reference-types": "phantom",
+				"reference-lib":   "dom",
+			}[name]
 			if !strings.Contains(strings.Join(spans(files["Case.ts"], result), ""), expected) {
 				test.Errorf("finding does not name %q", expected)
 			}
 			if len(result.Diagnostics) == 1 {
 				message := result.Diagnostics[0].Message.Description
-				if !strings.Contains(message, "declar") || !strings.Contains(message, "runtime") || !strings.Contains(message, expected) {
+				if !strings.Contains(message, "declar") ||
+					!strings.Contains(message, "runtime") ||
+					!strings.Contains(message, expected) {
 					test.Errorf("message lacks reason: %s", message)
 				}
 			}
@@ -92,14 +124,30 @@ func TestNoAmbientDeclarationsNeighbours(test *testing.T) {
 	} {
 		test.Run(name, func(test *testing.T) {
 			test.Parallel()
-			files := map[string]string{"Case.ts": source, "phantom.d.ts": "declare const missing: number; declare const unused: number;", "value.ts": "export class Value { readonly present = 1; }"}
+			files := map[string]string{
+				"Case.ts":      source,
+				"phantom.d.ts": "declare const missing: number; declare const unused: number;",
+				"value.ts":     "export class Value { readonly present = 1; }",
+			}
 			ambientCheckTypes(test, files)
-			rule_testing.ExpectClean(test, rule_testing.RunTypedFilesWithSetup(test, ambientSubject(), files, "Case.ts", ambientSetup(test, files)))
+			rule_testing.ExpectClean(test, rule_testing.RunTypedFilesWithSetup(
+				test,
+				ambientSubject(),
+				files,
+				"Case.ts",
+				ambientSetup(test, files),
+			))
 			// Plant a phantom ambient binding into every clean fixture. This makes
 			// an accidentally disabled rule fail the clean test's own control.
 			files["Case.ts"] += "\ndeclare const planted: number; planted.toFixed();"
 			ambientCheckTypes(test, files)
-			rule_testing.ExpectFindings(test, rule_testing.RunTypedFilesWithSetup(test, ambientSubject(), files, "Case.ts", ambientSetup(test, files)), "ambientDeclaration")
+			rule_testing.ExpectFindings(test, rule_testing.RunTypedFilesWithSetup(
+				test,
+				ambientSubject(),
+				files,
+				"Case.ts",
+				ambientSetup(test, files),
+			), "ambientDeclaration")
 		})
 	}
 }
@@ -117,18 +165,37 @@ func TestNoAmbientDeclarationsFileScope(test *testing.T) {
 			filename := "Case" + extension
 			setup := func(directory string) {
 				writeAdamicSupport(test)(directory)
-				configuration := strings.Replace(strings.Replace(adamicConfiguration, `"strict": true`, `"strict": true, "allowJs": true`, 1), `"include": ["**/*.ts"]`, `"sourceExtensions": [".a"], "include": ["**/*"]`, 1)
-				if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration), 0o644); writeError != nil {
+				configuration := strings.Replace(
+					strings.Replace(adamicConfiguration, `"strict": true`, `"strict": true, "allowJs": true`, 1),
+					`"include": ["**/*.ts"]`,
+					`"sourceExtensions": [".a"], "include": ["**/*"]`,
+					1,
+				)
+				if writeError := os.WriteFile(
+					filepath.Join(directory, "tsconfig.json"),
+					[]byte(configuration),
+					0o644,
+				); writeError != nil {
 					test.Fatal(writeError)
 				}
 			}
-			result := rule_testing.RunTypedFilesWithSetup(test, ambientSubject(), map[string]string{filename: source}, filename, setup)
+			result := rule_testing.RunTypedFilesWithSetup(
+				test,
+				ambientSubject(),
+				map[string]string{filename: source},
+				filename,
+				setup,
+			)
 			if extension == ".ts" || extension == ".tsx" || extension == ".a" {
 				rule_testing.ExpectFindings(test, result, "ambientDeclaration")
 			} else {
 				rule_testing.ExpectClean(test, result)
 				// The same declaration in a source .ts file must report.
-				rule_testing.ExpectFindings(test, runAdamic(test, ambientSubject(), runtimeSource), "ambientDeclaration")
+				rule_testing.ExpectFindings(
+					test,
+					runAdamic(test, ambientSubject(), runtimeSource),
+					"ambientDeclaration",
+				)
 			}
 		})
 	}
@@ -181,12 +248,23 @@ func TestNoAmbientDeclarationFields(test *testing.T) {
 			files := ambientFixture(test, name)
 			ambientCheckTypes(test, files)
 			run := func() rule_testing.Result {
-				return rule_testing.RunTypedFilesWithSetup(test, ambientSubject(), files, "Case.ts", ambientSetup(test, files))
+				return rule_testing.RunTypedFilesWithSetup(
+					test,
+					ambientSubject(),
+					files,
+					"Case.ts",
+					ambientSetup(test, files),
+				)
 			}
 			if name == "field-same" {
 				rule_testing.ExpectClean(test, run())
 				// Plant the Node-failing narrowing into the same inherited field slot.
-				files["Case.ts"] = strings.Replace(files["Case.ts"], "readonly x: number = 1", `readonly x: number | string = "s"`, 1)
+				files["Case.ts"] = strings.Replace(
+					files["Case.ts"],
+					"readonly x: number = 1",
+					`readonly x: number | string = "s"`,
+					1,
+				)
 				ambientCheckTypes(test, files)
 			}
 			result := run()
@@ -219,24 +297,62 @@ func TestNoAmbientDeclarationTypeOnlyBindings(test *testing.T) {
 			test.Parallel()
 			files := map[string]string{"Case.ts": source}
 			ambientCheckTypes(test, files)
-			rule_testing.ExpectClean(test, rule_testing.RunTypedFilesWithSetup(test, ambientSubject(), files, "Case.ts", ambientSetup(test, files)))
-			plant := map[string]string{"unused": "missing.toFixed();", "type-only export": "missing.toFixed();", "brand": "translationSlotsBrand.toString();", "function": "missing().toFixed();", "class": "new Missing().value.toFixed();", "brand shorthand": "const value = { translationSlotsBrand }; value.translationSlotsBrand.toString();", "class heritage": "class D extends Missing {} new D();"}[name]
+			rule_testing.ExpectClean(test, rule_testing.RunTypedFilesWithSetup(
+				test,
+				ambientSubject(),
+				files,
+				"Case.ts",
+				ambientSetup(test, files),
+			))
+			plant := map[string]string{
+				"unused":           "missing.toFixed();",
+				"type-only export": "missing.toFixed();",
+				"brand":            "translationSlotsBrand.toString();",
+				"function":         "missing().toFixed();",
+				"class":            "new Missing().value.toFixed();",
+				"brand shorthand":  "const value = { translationSlotsBrand }; value.translationSlotsBrand.toString();",
+				"class heritage":   "class D extends Missing {} new D();",
+			}[name]
 			files["Case.ts"] += "\n" + plant
 			ambientCheckTypes(test, files)
-			rule_testing.ExpectFindings(test, rule_testing.RunTypedFilesWithSetup(test, ambientSubject(), files, "Case.ts", ambientSetup(test, files)), "ambientDeclaration")
+			rule_testing.ExpectFindings(test, rule_testing.RunTypedFilesWithSetup(
+				test,
+				ambientSubject(),
+				files,
+				"Case.ts",
+				ambientSetup(test, files),
+			), "ambientDeclaration")
 		})
 	}
-	for _, name := range []string{"brand-value", "brand-other-file", "brand-import-only", "brand-export-value", "brand-type-import"} {
+	for _, name := range []string{
+		"brand-value",
+		"brand-other-file",
+		"brand-import-only",
+		"brand-export-value",
+		"brand-type-import",
+	} {
 		test.Run(name, func(test *testing.T) {
 			test.Parallel()
 			files := ambientFixture(test, name)
 			ambientCheckTypes(test, files)
 			if name == "brand-type-import" {
-				rule_testing.ExpectClean(test, rule_testing.RunTypedFilesWithSetup(test, ambientSubject(), files, "Case.ts", ambientSetup(test, files)))
+				rule_testing.ExpectClean(test, rule_testing.RunTypedFilesWithSetup(
+					test,
+					ambientSubject(),
+					files,
+					"Case.ts",
+					ambientSetup(test, files),
+				))
 				files["Read.ts"] = strings.Replace(files["Read.ts"], "import type", "import", 1)
 				ambientCheckTypes(test, files)
 			}
-			rule_testing.ExpectFindings(test, rule_testing.RunTypedFilesWithSetup(test, ambientSubject(), files, "Case.ts", ambientSetup(test, files)), "ambientDeclaration")
+			rule_testing.ExpectFindings(test, rule_testing.RunTypedFilesWithSetup(
+				test,
+				ambientSubject(),
+				files,
+				"Case.ts",
+				ambientSetup(test, files),
+			), "ambientDeclaration")
 		})
 	}
 }

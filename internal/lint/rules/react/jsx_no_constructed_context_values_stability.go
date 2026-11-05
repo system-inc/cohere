@@ -121,7 +121,12 @@ func jsxNoConstructedContextValuesNearestFunction(node *ast.Node) *ast.Node {
 //
 // Only `const`, because a `let` can be reassigned to something stable after its initializer, and
 // following the initializer alone would report a value the code later replaced.
-func jsxNoConstructedContextValuesRenderConst(ruleContext rule.Context, identifier *ast.Node, scope *ast.Node, render *ast.Node) *ast.Node {
+func jsxNoConstructedContextValuesRenderConst(
+	ruleContext rule.Context,
+	identifier *ast.Node,
+	scope *ast.Node,
+	render *ast.Node,
+) *ast.Node {
 	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(identifier)
 	if symbol == nil || len(symbol.Declarations) == 0 {
 		return nil
@@ -129,7 +134,11 @@ func jsxNoConstructedContextValuesRenderConst(ruleContext rule.Context, identifi
 	// The first declaration. A `const` cannot merge with anything, and a function declared with
 	// overloads in a render body is a function declared during render whichever signature answers.
 	declaration := symbol.Declarations[0]
-	if !jsxNoConstructedContextValuesRunsWith(jsxNoConstructedContextValuesNearestFunction(declaration), scope, render) {
+	if !jsxNoConstructedContextValuesRunsWith(
+		jsxNoConstructedContextValuesNearestFunction(declaration),
+		scope,
+		render,
+	) {
 		return nil
 	}
 	switch declaration.Kind {
@@ -500,13 +509,19 @@ func (walk *jsxNoConstructedContextValuesStabilityWalk) callEvaluation(
 	if ast.HasSyntacticModifier(callee, ast.ModifierFlagsAsync) {
 		return jsxNoConstructedContextValuesEvaluation{fresh: &jsxNoConstructedContextValuesInstability{
 			origin: callee,
-			reason: fmt.Sprintf("is the result of `%s(...)`, an async function, which returns a new promise on every call", name),
+			reason: fmt.Sprintf(
+				"is the result of `%s(...)`, an async function, which returns a new promise on every call",
+				name,
+			),
 		}}
 	}
 	if jsxNoConstructedContextValuesIsGenerator(callee) {
 		return jsxNoConstructedContextValuesEvaluation{fresh: &jsxNoConstructedContextValuesInstability{
 			origin: callee,
-			reason: fmt.Sprintf("is the result of `%s(...)`, a generator, which returns a new iterator on every call", name),
+			reason: fmt.Sprintf(
+				"is the result of `%s(...)`, a generator, which returns a new iterator on every call",
+				name,
+			),
 		}}
 	}
 
@@ -583,7 +598,11 @@ func (walk *jsxNoConstructedContextValuesStabilityWalk) functionEvaluation(
 // jsxNoConstructedContextValuesLocalDeclaration resolves an identifier to a variable declared
 // directly in `scope`, of any kind, or nil. It is what an assignment target has to be for the
 // assignment to be a holder rather than an escape.
-func jsxNoConstructedContextValuesLocalDeclaration(ruleContext rule.Context, target *ast.Node, scope *ast.Node) *ast.Node {
+func jsxNoConstructedContextValuesLocalDeclaration(
+	ruleContext rule.Context,
+	target *ast.Node,
+	scope *ast.Node,
+) *ast.Node {
 	if target == nil || target.Kind != ast.KindIdentifier {
 		return nil
 	}
@@ -793,7 +812,10 @@ func jsxNoConstructedContextValuesCheckMemo(ruleContext rule.Context, value *ast
 	}
 	hook := jsxNoConstructedContextValuesMemoHookName(memo)
 	lineOf := func(node *ast.Node) int {
-		line, _ := scanner.GetLineAndCharacterOfPosition(ruleContext.SourceFile, rule.TokenRange(ruleContext.SourceFile, node).Pos())
+		line, _ := scanner.GetLineAndCharacterOfPosition(
+			ruleContext.SourceFile,
+			rule.TokenRange(ruleContext.SourceFile, node).Pos(),
+		)
 		return line + 1
 	}
 

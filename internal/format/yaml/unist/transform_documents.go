@@ -81,7 +81,11 @@ func (context *context) transformDocuments(parsedDocuments []*compose.Document, 
 	}
 	if len(tokensBeforeBody) > 0 {
 		firstToken := tokensBeforeBody[0]
-		throwError("Unexpected '%s' token at %s", firstToken.Type, getPointText(context.transformOffset(firstToken.Offset)))
+		throwError(
+			"Unexpected '%s' token at %s",
+			firstToken.Type,
+			getPointText(context.transformOffset(firstToken.Offset)),
+		)
 	}
 	if len(bufferComments) > 0 {
 		if currentDocumentData == nil {
@@ -101,16 +105,30 @@ func (context *context) transformDocuments(parsedDocuments []*compose.Document, 
 
 // transformDocument is upstream's transformDocument.
 func (context *context) transformDocument(document *documentData) *Node {
-	documentHead, docStart, tokensBeforeBody := context.transformDocumentHead(document.tokensBeforeBody, document.cstNode, document.node)
+	documentHead, docStart, tokensBeforeBody := context.transformDocumentHead(
+		document.tokensBeforeBody,
+		document.cstNode,
+		document.node,
+	)
 	documentBody, documentEndPoint, documentTrailingComment := context.transformDocumentBody(docStart, tokensBeforeBody,
 		document.cstNode, document.node, document.tokensAfterBody, document.documentEnd)
-	return context.createDocument(context.createPosition(context.position(documentHead).start, documentEndPoint), docStart != nil,
-		document.documentEnd != nil, documentHead, documentBody, documentTrailingComment)
+	return context.createDocument(
+		context.createPosition(context.position(documentHead).start, documentEndPoint),
+		docStart != nil,
+		document.documentEnd != nil,
+		documentHead,
+		documentBody,
+		documentTrailingComment,
+	)
 }
 
 // transformDocumentHead is upstream's transformDocumentHead: the directives, the comments that end the
 // head, and its trailing comment. It returns the --- token and the tokens between it and the body.
-func (context *context) transformDocumentHead(tokensBeforeBody []*cst.Token, cstNode *cst.Token, document *compose.Document) (*Node, *cst.Token, []*cst.Token) {
+func (context *context) transformDocumentHead(
+	tokensBeforeBody []*cst.Token,
+	cstNode *cst.Token,
+	document *compose.Document,
+) (*Node, *cst.Token, []*cst.Token) {
 	directives, endCommentCandidates := context.categorizeHeadNodes(tokensBeforeBody)
 	betweenTokens := []*cst.Token{}
 	var docStart *cst.Token
@@ -150,7 +168,9 @@ func (context *context) transformDocumentHead(tokensBeforeBody []*cst.Token, cst
 // categorizeHeadNodes is document-head.mjs's categorizeNodes: a comment on a directive's line is its
 // trailing comment, and the comments after the last directive are candidates for the head's end
 // comments.
-func (context *context) categorizeHeadNodes(tokensBeforeBody []*cst.Token) (directives []*Node, endCommentCandidates []*Node) {
+func (context *context) categorizeHeadNodes(
+	tokensBeforeBody []*cst.Token,
+) (directives []*Node, endCommentCandidates []*Node) {
 	directives = []*Node{}
 	endCommentCandidates = []*Node{}
 	var lastDirective *Node
@@ -193,8 +213,20 @@ func (context *context) getHeadPosition(directives []*Node, document *compose.Do
 
 // transformDocumentBody is upstream's transformDocumentBody: the body, the point where the document
 // ends, and the comment on the line of the ... marker.
-func (context *context) transformDocumentBody(docStart *cst.Token, tokensBeforeBody []*cst.Token, cstNode *cst.Token, document *compose.Document, tokensAfterBody []*cst.Token, docEnd *cst.Token) (*Node, *point, *Node) {
-	documentTrailingComment, endComments, propertyTokens := context.categorizeBodyNodes(tokensBeforeBody, cstNode, tokensAfterBody, docEnd)
+func (context *context) transformDocumentBody(
+	docStart *cst.Token,
+	tokensBeforeBody []*cst.Token,
+	cstNode *cst.Token,
+	document *compose.Document,
+	tokensAfterBody []*cst.Token,
+	docEnd *cst.Token,
+) (*Node, *point, *Node) {
+	documentTrailingComment, endComments, propertyTokens := context.categorizeBodyNodes(
+		tokensBeforeBody,
+		cstNode,
+		tokensAfterBody,
+		docEnd,
+	)
 	hasContent := false
 	if contents := document.Contents; contents != nil {
 		hasContent = contents.Range[0] < contents.Range[1]
@@ -221,7 +253,12 @@ func (context *context) transformDocumentBody(docStart *cst.Token, tokensBeforeB
 }
 
 // categorizeBodyNodes is document-body.mjs's categorizeNodes.
-func (context *context) categorizeBodyNodes(tokensBeforeBody []*cst.Token, cstNode *cst.Token, tokensAfterBody []*cst.Token, docEnd *cst.Token) (documentTrailingComment *Node, endComments []*Node, propertyTokens []*cst.Token) {
+func (context *context) categorizeBodyNodes(
+	tokensBeforeBody []*cst.Token,
+	cstNode *cst.Token,
+	tokensAfterBody []*cst.Token,
+	docEnd *cst.Token,
+) (documentTrailingComment *Node, endComments []*Node, propertyTokens []*cst.Token) {
 	endComments = []*Node{}
 	documentTrailingComments := []*Node{}
 	propertyTokens = []*cst.Token{}
@@ -274,7 +311,12 @@ func (context *context) categorizeBodyNodes(tokensBeforeBody []*cst.Token, cstNo
 }
 
 // getBodyPosition is document-body.mjs's getPosition.
-func (context *context) getBodyPosition(docStart *cst.Token, document *compose.Document, content *Node, docEnd *cst.Token) (*position, *point) {
+func (context *context) getBodyPosition(
+	docStart *cst.Token,
+	document *compose.Document,
+	content *Node,
+	docEnd *cst.Token,
+) (*position, *point) {
 	var origEnd int
 	if docEnd != nil {
 		origEnd = max(0, docEnd.Offset-1)

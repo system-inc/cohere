@@ -90,7 +90,10 @@ func expectedAlias(source string) string {
 
 // importRequireNodeNamespaceRequireNamespaceImportText is the rule's `requireNamespaceImport` message,
 // whose wording lives in `policy/messages/import-require-node-namespace.json`.
-var importRequireNodeNamespaceRequireNamespaceImportText = policy.MessageOf("nexus/import-require-node-namespace", "requireNamespaceImport")
+var importRequireNodeNamespaceRequireNamespaceImportText = policy.MessageOf(
+	"nexus/import-require-node-namespace",
+	"requireNamespaceImport",
+)
 
 func messageRequireNamespaceImport(source string, expected string, bare string) rule.Message {
 	return rule.Message{
@@ -105,7 +108,10 @@ func messageRequireNamespaceImport(source string, expected string, bare string) 
 
 // importRequireNodeNamespaceRequireNodePrefixText is the rule's `requireNodePrefix` message,
 // whose wording lives in `policy/messages/import-require-node-namespace.json`.
-var importRequireNodeNamespaceRequireNodePrefixText = policy.MessageOf("nexus/import-require-node-namespace", "requireNodePrefix")
+var importRequireNodeNamespaceRequireNodePrefixText = policy.MessageOf(
+	"nexus/import-require-node-namespace",
+	"requireNodePrefix",
+)
 
 func messageRequireNodePrefix(source string, expected string, bare string) rule.Message {
 	return rule.Message{
@@ -120,7 +126,10 @@ func messageRequireNodePrefix(source string, expected string, bare string) rule.
 
 // importRequireNodeNamespaceRequireCorrectAliasText is the rule's `requireCorrectAlias` message,
 // whose wording lives in `policy/messages/import-require-node-namespace.json`.
-var importRequireNodeNamespaceRequireCorrectAliasText = policy.MessageOf("nexus/import-require-node-namespace", "requireCorrectAlias")
+var importRequireNodeNamespaceRequireCorrectAliasText = policy.MessageOf(
+	"nexus/import-require-node-namespace",
+	"requireCorrectAlias",
+)
 
 func messageRequireCorrectAlias(expected string, actual string, bare string) rule.Message {
 	return rule.Message{

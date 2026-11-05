@@ -20,7 +20,16 @@ func TestRuleReachAnswersAsTheScanAndAsksEachKeyOnce(test *testing.T) {
 		}
 		return reached
 	}
-	keys := []string{"x", "nexus/x", "no-invalid-this", "@typescript-eslint/no-invalid-this", "eqeqeq", "unknown", "other", "nexus/other"}
+	keys := []string{
+		"x",
+		"nexus/x",
+		"no-invalid-this",
+		"@typescript-eslint/no-invalid-this",
+		"eqeqeq",
+		"unknown",
+		"other",
+		"nexus/other",
+	}
 
 	reach := newRuleReach(registered)
 	for round := range 2 {
@@ -47,9 +56,15 @@ func TestRuleReachAnswersAsTheScanAndAsksEachKeyOnce(test *testing.T) {
 		}
 	}
 	if len(reach.byKey) != len(keys) {
-		test.Fatalf("the memo holds %d keys after asking about %d, so a key was scanned under two names or missed", len(reach.byKey), len(keys))
+		test.Fatalf(
+			"the memo holds %d keys after asking about %d, so a key was scanned under two names or missed",
+			len(reach.byKey),
+			len(keys),
+		)
 	}
-	if !reach.sameRuling("nexus/x", "x") || !reach.sameRuling("@typescript-eslint/no-invalid-this", "no-invalid-this") || reach.sameRuling("eqeqeq", "x") {
+	if !reach.sameRuling("nexus/x", "x") ||
+		!reach.sameRuling("@typescript-eslint/no-invalid-this", "no-invalid-this") ||
+		reach.sameRuling("eqeqeq", "x") {
 		test.Fatal("the documented cases do not hold")
 	}
 }

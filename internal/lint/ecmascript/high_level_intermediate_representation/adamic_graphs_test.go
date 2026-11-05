@@ -18,7 +18,11 @@ import (
 
 // exportGraphs names the directory TestExportGraphsForAdamic writes to. Only a test flag sets it, so
 // nothing in a cohere run can reach the export.
-var exportGraphs = flag.String("export-graphs", "", "write the functions React Compiler's vendored fixtures lower to into this directory, in the cases format of Adamic's static_single_assignment slice")
+var exportGraphs = flag.String(
+	"export-graphs",
+	"",
+	"write the functions React Compiler's vendored fixtures lower to into this directory, in the cases format of Adamic's static_single_assignment slice",
+)
 
 // TestExportGraphsForAdamic writes every function React Compiler's own fixtures lower to, as this IR
 // hands it to static_single_assignment.Construct, for Adamic's port of that module (#dnv6f2c), which
@@ -49,7 +53,10 @@ func TestExportGraphsForAdamic(test *testing.T) {
 
 	fixtures, functions := 0, 0
 	for _, fixture := range reactCompilerFixtures(test) {
-		lowered := lowerReactCompilerFixture(test, fixture.source, func(ruleContext rule.Context, node *ast.Node) *Function {
+		lowered := lowerReactCompilerFixture(test, fixture.source, func(
+			ruleContext rule.Context,
+			node *ast.Node,
+		) *Function {
 			return Lower(node, ruleContext.TypeChecker)
 		})
 		name := fixture.name
@@ -71,7 +78,11 @@ func TestExportGraphsForAdamic(test *testing.T) {
 		if index == 0 {
 			continue
 		}
-		if writeError := os.WriteFile(filepath.Join(*exportGraphs, name+".txt"), []byte(out.String()), 0o644); writeError != nil {
+		if writeError := os.WriteFile(
+			filepath.Join(*exportGraphs, name+".txt"),
+			[]byte(out.String()),
+			0o644,
+		); writeError != nil {
 			test.Fatal(writeError)
 		}
 		fixtures++
@@ -121,14 +132,21 @@ func reactCompilerFixtures(test *testing.T) []reactCompilerFixture {
 		if err != nil {
 			test.Fatal(err)
 		}
-		fixtures = append(fixtures, reactCompilerFixture{name: strings.NewReplacer("/", "-", " ", "-").Replace(name), source: source})
+		fixtures = append(
+			fixtures,
+			reactCompilerFixture{name: strings.NewReplacer("/", "-", " ", "-").Replace(name), source: source},
+		)
 	}
 	return fixtures
 }
 
 // lowerReactCompilerFixture lowers every outermost function in a fixture's source through lower, with a
 // real type checker.
-func lowerReactCompilerFixture(test *testing.T, source string, lower func(rule.Context, *ast.Node) *Function) []*Function {
+func lowerReactCompilerFixture(
+	test *testing.T,
+	source string,
+	lower func(rule.Context, *ast.Node) *Function,
+) []*Function {
 	test.Helper()
 	var lowered []*Function
 	probe := rule.Rule{
@@ -154,7 +172,12 @@ func lowerReactCompilerFixture(test *testing.T, source string, lower func(rule.C
 }
 
 // writeAdamicCase writes one function as Adamic's cases records, read through any IR's Graph.
-func writeAdamicCase[G static_single_assignment.Graph[F, B, P], F any, B comparable, P any](out *strings.Builder, name string, graph G, function F) {
+func writeAdamicCase[G static_single_assignment.Graph[F, B, P], F any, B comparable, P any](
+	out *strings.Builder,
+	name string,
+	graph G,
+	function F,
+) {
 	identifiers := map[static_single_assignment.IdentifierId]int{}
 	var order []static_single_assignment.IdentifierId
 	identifier := func(place P) int {
@@ -192,7 +215,11 @@ func writeAdamicCase[G static_single_assignment.Graph[F, B, P], F any, B compara
 	if place := graph.Returns(function); place != nil {
 		returns = identifier(*place)
 	}
-	edgeNames := map[static_single_assignment.Edge]string{static_single_assignment.Real: "Real", static_single_assignment.Fallthrough: "Fallthrough", static_single_assignment.Exceptional: "Exceptional"}
+	edgeNames := map[static_single_assignment.Edge]string{
+		static_single_assignment.Real:        "Real",
+		static_single_assignment.Fallthrough: "Fallthrough",
+		static_single_assignment.Exceptional: "Exceptional",
+	}
 	var blocks []blockRecord
 	for _, block := range graph.Blocks(function) {
 		record := blockRecord{id: graph.Id(block), returns: graph.EndsInReturn(block)}
@@ -206,7 +233,9 @@ func writeAdamicCase[G static_single_assignment.Graph[F, B, P], F any, B compara
 				number := identifier(*place)
 				if role == static_single_assignment.Define {
 					instruction.places = append(instruction.places, placeRecord{"define", number})
-					if instruction.context && instruction.result == -1 && graph.ContextStoreDefines(function, block, index, *place) {
+					if instruction.context &&
+						instruction.result == -1 &&
+						graph.ContextStoreDefines(function, block, index, *place) {
 						instruction.result = number
 					}
 					return
@@ -225,7 +254,13 @@ func writeAdamicCase[G static_single_assignment.Graph[F, B, P], F any, B compara
 		blocks = append(blocks, record)
 	}
 
-	fmt.Fprintf(out, "function %s\nentry %d\nbound %d\nidentifier 0 -\n", name, graph.Entry(function), graph.BlockBound(function))
+	fmt.Fprintf(
+		out,
+		"function %s\nentry %d\nbound %d\nidentifier 0 -\n",
+		name,
+		graph.Entry(function),
+		graph.BlockBound(function),
+	)
 	declarations := map[static_single_assignment.DeclarationId]int{}
 	var declarationOrder []static_single_assignment.DeclarationId
 	for _, id := range order {

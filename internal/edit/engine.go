@@ -122,7 +122,13 @@ func FixText(fileName string, text string, propose Propose, maximumPasses int) (
 // and reverts, held two whole trees and a third being built on a file with fixes, and a 2.8 MB bundle is a
 // file with fixes (#xn1k1gz). The formatter parses a reverted file again, as it did before it was handed
 // trees at all. Found by @system_cohere_lint_fix in review.
-func fixText(fileName string, text string, seed *ast.SourceFile, propose Propose, maximumPasses int) (FileResult, *ast.SourceFile, error) {
+func fixText(
+	fileName string,
+	text string,
+	seed *ast.SourceFile,
+	propose Propose,
+	maximumPasses int,
+) (FileResult, *ast.SourceFile, error) {
 	if maximumPasses <= 0 {
 		maximumPasses = DefaultMaxPasses
 	}
@@ -385,7 +391,13 @@ func CheckFile(fileName string, propose Propose, transform Transform, maximumPas
 // The file is still read now, and the tree is taken only if it is of exactly the bytes read and is the tree
 // the guard would build (seedFor), so a tree of a stale copy, or of another script kind, is parsed past as if
 // it were not there. Taken, it is the starting guard's tree and the transform's (#dk2502g).
-func CheckFileSeeded(fileName string, seed *ast.SourceFile, propose Propose, transform Transform, maximumPasses int) (FileResult, error) {
+func CheckFileSeeded(
+	fileName string,
+	seed *ast.SourceFile,
+	propose Propose,
+	transform Transform,
+	maximumPasses int,
+) (FileResult, error) {
 	text, readFileError := readFile(fileName)
 	if readFileError != nil {
 		return FileResult{FileName: fileName}, readFileError
@@ -407,7 +419,13 @@ func CheckFileSeeded(fileName string, seed *ast.SourceFile, propose Propose, tra
 // fixer fires on the printed text, the fixes land and the result is formatted again, up to
 // FormatFixRoundLimit rounds. A file still changing after that is left exactly as it was found and
 // reported as not converged, naming the rules and the formatter, never written half-settled.
-func FixAndTransformText(fileName string, text string, propose Propose, transform Transform, maximumPasses int) (FileResult, error) {
+func FixAndTransformText(
+	fileName string,
+	text string,
+	propose Propose,
+	transform Transform,
+	maximumPasses int,
+) (FileResult, error) {
 	return fixAndTransformText(fileName, text, nil, propose, transform, maximumPasses)
 }
 
@@ -520,7 +538,12 @@ const FormatFixRoundLimit = 3
 //
 // tree is the guard's tree of result.Text, or nil, and is offered to the transform only while it is still
 // that text's.
-func applyTransform(result *FileResult, fileName string, transform Transform, tree *ast.SourceFile) (bool, *ast.SourceFile) {
+func applyTransform(
+	result *FileResult,
+	fileName string,
+	transform Transform,
+	tree *ast.SourceFile,
+) (bool, *ast.SourceFile) {
 	if tree != nil && tree.Text() != result.Text {
 		tree = nil
 	}
@@ -717,7 +740,10 @@ func Summarize(results []FileResult) Summary {
 			for _, proposal := range result.Applied {
 				fixesByRule[proposal.RuleName]++
 			}
-			summary.ChangedFiles = append(summary.ChangedFiles, ChangedFile{FileName: result.FileName, Changers: changers, FixesByRule: fixesByRule})
+			summary.ChangedFiles = append(
+				summary.ChangedFiles,
+				ChangedFile{FileName: result.FileName, Changers: changers, FixesByRule: fixesByRule},
+			)
 		}
 		if result.Transformed {
 			summary.FilesTransformed++
@@ -725,7 +751,10 @@ func Summarize(results []FileResult) Summary {
 		if result.TransformSkipped {
 			summary.FilesTransformSkipped++
 			summary.TransformSkipReasons[result.TransformSkipReason]++
-			summary.NotTransformed = append(summary.NotTransformed, NotTransformedFile{FileName: result.FileName, Reason: result.TransformSkipReason})
+			summary.NotTransformed = append(
+				summary.NotTransformed,
+				NotTransformedFile{FileName: result.FileName, Reason: result.TransformSkipReason},
+			)
 		}
 		summary.FixesApplied += len(result.Applied)
 		summary.FixesRefused += len(result.Rejected)
@@ -750,7 +779,10 @@ func Summarize(results []FileResult) Summary {
 			summary.RefusalsByReason[reason]++
 			if reason == ReasonParseFailure {
 				if refused == nil {
-					summary.FilesRefused = append(summary.FilesRefused, RefusedFile{FileName: result.FileName, Reason: rejection.Reason})
+					summary.FilesRefused = append(
+						summary.FilesRefused,
+						RefusedFile{FileName: result.FileName, Reason: rejection.Reason},
+					)
 					refused = &summary.FilesRefused[len(summary.FilesRefused)-1]
 				}
 				if !slices.Contains(refused.Rules, rejection.Proposal.RuleName) {
@@ -761,7 +793,10 @@ func Summarize(results []FileResult) Summary {
 				}
 			}
 			if rejection.Proposal.RuleName == transformRuleName {
-				summary.NotTransformed = append(summary.NotTransformed, NotTransformedFile{FileName: result.FileName, Reason: rejection.Reason, Failed: true})
+				summary.NotTransformed = append(
+					summary.NotTransformed,
+					NotTransformedFile{FileName: result.FileName, Reason: rejection.Reason, Failed: true},
+				)
 			}
 		}
 	}
@@ -790,9 +825,15 @@ func (summary Summary) Refusals() []string {
 		case len(refused.Rules) == 1 && refused.Rules[0] == transformRuleName:
 			blame = "the formatter's output breaks it"
 		case len(refused.Breaking) == 0:
-			blame = fmt.Sprintf("no one fix breaks it alone, the fixes from %s together do", strings.Join(refused.Rules, ", "))
+			blame = fmt.Sprintf(
+				"no one fix breaks it alone, the fixes from %s together do",
+				strings.Join(refused.Rules, ", "),
+			)
 		}
-		lines = append(lines, fmt.Sprintf("refused: %s: %s; nothing was written to it. %s", refused.FileName, refused.Reason, blame))
+		lines = append(
+			lines,
+			fmt.Sprintf("refused: %s: %s; nothing was written to it. %s", refused.FileName, refused.Reason, blame),
+		)
 	}
 	return lines
 }
@@ -802,8 +843,15 @@ func (summary Summary) Refusals() []string {
 // A parse failure reason embeds the compiler's message so a reader can act on it, which makes every
 // one of them a distinct string and would turn a tally into a list of four hundred singletons.
 func reasonKey(reason string) string {
-	for _, known := range []string{ReasonParseFailure, ReasonOverlap, ReasonInvalidRange, ReasonNoProgress, ReasonPassesReached, ReasonFormatFixUnsettled,
-		ReasonTransformFailed} {
+	for _, known := range []string{
+		ReasonParseFailure,
+		ReasonOverlap,
+		ReasonInvalidRange,
+		ReasonNoProgress,
+		ReasonPassesReached,
+		ReasonFormatFixUnsettled,
+		ReasonTransformFailed,
+	} {
 		if len(reason) >= len(known) && reason[:len(known)] == known {
 			return known
 		}

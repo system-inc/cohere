@@ -35,12 +35,30 @@ func TestTripleSlashReferenceStaysSilentOnUpstreamPassCases(test *testing.T) {
 		configuration string
 		sourceText    string
 	}{
-		{"{ \"lib\": \"never\", \"path\": \"never\", \"types\": \"never\" }", "\n                    // <reference path=\"foo\" />\n                    // <reference types=\"bar\" />\n                    // <reference lib=\"baz\" />\n                    import * as foo from 'foo';\n                    import * as bar from 'bar';\n                    import * as baz from 'baz';\n                  "},
-		{"{ \"lib\": \"never\", \"path\": \"never\", \"types\": \"never\" }", "\n                    // <reference path=\"foo\" />\n                    // <reference types=\"bar\" />\n                    // <reference lib=\"baz\" />\n                    import foo = require('foo');\n                    import bar = require('bar');\n                    import baz = require('baz');\n                  "},
-		{"{ \"lib\": \"always\", \"path\": \"always\", \"types\": \"always\" }", "\n                    /// <reference path=\"foo\" />\n                    /// <reference types=\"bar\" />\n                    /// <reference lib=\"baz\" />\n                    import * as foo from 'foo';\n                    import * as bar from 'bar';\n                    import * as baz from 'baz';\n                  "},
-		{"{ \"lib\": \"always\", \"path\": \"always\", \"types\": \"always\" }", "\n                    /// <reference path=\"foo\" />\n                    /// <reference types=\"bar\" />\n                    /// <reference lib=\"baz\" />\n                    import foo = require('foo');\n                    import bar = require('bar');\n                    import baz = require('baz');\n                  "},
-		{"{ \"lib\": \"always\", \"path\": \"always\", \"types\": \"always\" }", "\n                    /// <reference path=\"foo\" />\n                    /// <reference types=\"bar\" />\n                    /// <reference lib=\"baz\" />\n                    import foo = foo;\n                    import bar = bar;\n                    import baz = baz;\n                  "},
-		{"{ \"lib\": \"always\", \"path\": \"always\", \"types\": \"always\" }", "\n                    /// <reference path=\"foo\" />\n                    /// <reference types=\"bar\" />\n                    /// <reference lib=\"baz\" />\n                    import foo = foo.foo;\n                    import bar = bar.bar.bar.bar;\n                    import baz = baz.baz;\n                  "},
+		{
+			"{ \"lib\": \"never\", \"path\": \"never\", \"types\": \"never\" }",
+			"\n                    // <reference path=\"foo\" />\n                    // <reference types=\"bar\" />\n                    // <reference lib=\"baz\" />\n                    import * as foo from 'foo';\n                    import * as bar from 'bar';\n                    import * as baz from 'baz';\n                  ",
+		},
+		{
+			"{ \"lib\": \"never\", \"path\": \"never\", \"types\": \"never\" }",
+			"\n                    // <reference path=\"foo\" />\n                    // <reference types=\"bar\" />\n                    // <reference lib=\"baz\" />\n                    import foo = require('foo');\n                    import bar = require('bar');\n                    import baz = require('baz');\n                  ",
+		},
+		{
+			"{ \"lib\": \"always\", \"path\": \"always\", \"types\": \"always\" }",
+			"\n                    /// <reference path=\"foo\" />\n                    /// <reference types=\"bar\" />\n                    /// <reference lib=\"baz\" />\n                    import * as foo from 'foo';\n                    import * as bar from 'bar';\n                    import * as baz from 'baz';\n                  ",
+		},
+		{
+			"{ \"lib\": \"always\", \"path\": \"always\", \"types\": \"always\" }",
+			"\n                    /// <reference path=\"foo\" />\n                    /// <reference types=\"bar\" />\n                    /// <reference lib=\"baz\" />\n                    import foo = require('foo');\n                    import bar = require('bar');\n                    import baz = require('baz');\n                  ",
+		},
+		{
+			"{ \"lib\": \"always\", \"path\": \"always\", \"types\": \"always\" }",
+			"\n                    /// <reference path=\"foo\" />\n                    /// <reference types=\"bar\" />\n                    /// <reference lib=\"baz\" />\n                    import foo = foo;\n                    import bar = bar;\n                    import baz = baz;\n                  ",
+		},
+		{
+			"{ \"lib\": \"always\", \"path\": \"always\", \"types\": \"always\" }",
+			"\n                    /// <reference path=\"foo\" />\n                    /// <reference types=\"bar\" />\n                    /// <reference lib=\"baz\" />\n                    import foo = foo.foo;\n                    import bar = bar.bar.bar.bar;\n                    import baz = baz.baz;\n                  ",
+		},
 		{"{ \"path\": \"never\" }", "import * as foo from 'foo';"},
 		{"{ \"path\": \"never\" }", "import foo = require('foo');"},
 		{"{ \"types\": \"never\" }", "import * as foo from 'foo';"},
@@ -49,8 +67,14 @@ func TestTripleSlashReferenceStaysSilentOnUpstreamPassCases(test *testing.T) {
 		{"{ \"lib\": \"never\" }", "import foo = require('foo');"},
 		{"{ \"types\": \"prefer-import\" }", "import * as foo from 'foo';"},
 		{"{ \"types\": \"prefer-import\" }", "import foo = require('foo');"},
-		{"{ \"types\": \"prefer-import\" }", "\n                    /// <reference types=\"foo\" />\n                    import * as bar from 'bar';\n                  "},
-		{"{ \"lib\": \"never\", \"path\": \"never\", \"types\": \"never\" }", "\n                    /*\n                    /// <reference types=\"foo\" />\n                    */\n                    import * as foo from 'foo';\n                  "},
+		{
+			"{ \"types\": \"prefer-import\" }",
+			"\n                    /// <reference types=\"foo\" />\n                    import * as bar from 'bar';\n                  ",
+		},
+		{
+			"{ \"lib\": \"never\", \"path\": \"never\", \"types\": \"never\" }",
+			"\n                    /*\n                    /// <reference types=\"foo\" />\n                    */\n                    import * as foo from 'foo';\n                  ",
+		},
 	}
 	for index, testCase := range cases {
 		test.Run(testCase.configuration, func(test *testing.T) {
@@ -75,8 +99,16 @@ func TestTripleSlashReferenceFiresOnUpstreamFailCases(test *testing.T) {
 		sourceText    string
 		count         int
 	}{
-		{"{ \"types\": \"prefer-import\" }", "\n            /// <reference types=\"foo\" />\n            import * as foo from 'foo';\n                  ", 1},
-		{"{ \"types\": \"prefer-import\" }", "\n            /// <reference types=\"foo\" />\n            import foo = require('foo');\n                  ", 1},
+		{
+			"{ \"types\": \"prefer-import\" }",
+			"\n            /// <reference types=\"foo\" />\n            import * as foo from 'foo';\n                  ",
+			1,
+		},
+		{
+			"{ \"types\": \"prefer-import\" }",
+			"\n            /// <reference types=\"foo\" />\n            import foo = require('foo');\n                  ",
+			1,
+		},
 		{"{ \"path\": \"never\" }", "/// <reference path=\"foo\" />", 1},
 		{"{ \"types\": \"never\" }", "/// <reference types=\"foo\" />", 1},
 		{"{ \"lib\": \"never\" }", "/// <reference lib=\"foo\" />", 1},
@@ -111,14 +143,24 @@ func TestTripleSlashReferenceFiresOnCasesUpstreamDoesNotCover(test *testing.T) {
 		sourceText    string
 		count         int
 	}{
-		{"a directive above the first statement is still a directive", "{}", "/// <reference path=\"foo\" />\nconst a = 1;\n", 1},
+		{
+			"a directive above the first statement is still a directive",
+			"{}",
+			"/// <reference path=\"foo\" />\nconst a = 1;\n",
+			1,
+		},
 		{"four slashes, because the test is on the third character", "{}", "//// <reference path=\"foo\" />\n", 1},
 		{"a block comment whose content opens with a slash", "{}", "/*/ <reference path=\"foo\" /> */\n", 1},
 		{"attributes read in whitespace order, path first", "{}", "/// <reference path=\"bar\" lib=\"foo\" />\n", 1},
 		{"an unquoted value", "{}", "/// <reference path=foo />\n", 1},
 		{"no space before the closing slash", "{}", "/// <reference path=\"foo\"/>\n", 1},
 		{"text around the reference", "{}", "/// junk <reference path=\"foo\" /> junk\n", 1},
-		{"two imports of one module report the one directive twice", "{}", "/// <reference types=\"foo\" />\nimport * as a from 'foo';\nimport * as b from 'foo';\n", 2},
+		{
+			"two imports of one module report the one directive twice",
+			"{}",
+			"/// <reference types=\"foo\" />\nimport * as a from 'foo';\nimport * as b from 'foo';\n",
+			2,
+		},
 		{"a type-only import counts", "{}", "/// <reference types=\"foo\" />\nimport type { T } from 'foo';\n", 1},
 		{"a bare side-effect import counts", "{}", "/// <reference types=\"foo\" />\nimport 'foo';\n", 1},
 		{"types never reports without any import", "{\"types\": \"never\"}", "/// <reference types=\"foo\" />\n", 1},
@@ -152,13 +194,21 @@ func TestTripleSlashReferenceStaysSilentOnCasesUpstreamDoesNotCover(test *testin
 		configuration string
 		sourceText    string
 	}{
-		{"a directive after the first statement is not a directive", "{}", "const a = 1;\n/// <reference path=\"foo\" />\n"},
+		{
+			"a directive after the first statement is not a directive",
+			"{}",
+			"const a = 1;\n/// <reference path=\"foo\" />\n",
+		},
 		{"a directive between two statements", "{}", "const a = 1;\n/// <reference path=\"foo\" />\nconst b = 2;\n"},
 		{"a directive trailing code on the same line", "{}", "const a = 1; /// <reference path=\"foo\" />\n"},
 		{"a double slash is not a directive", "{}", "// <reference path=\"foo\" />\n"},
 		{"a block comment whose content opens with a space", "{}", "/* <reference path=\"foo\" /> */\n"},
 		{"a jsdoc block, whose content opens with a star", "{}", "/** <reference path=\"foo\" /> */\n"},
-		{"attributes read in whitespace order, lib first and lib defaults to always", "{}", "/// <reference lib=\"foo\" path=\"bar\" />\n"},
+		{
+			"attributes read in whitespace order, lib first and lib defaults to always",
+			"{}",
+			"/// <reference lib=\"foo\" path=\"bar\" />\n",
+		},
 		{"a value containing an equals sign declines the whole comment", "{}", "/// <reference path=\"a=b\" />\n"},
 		{"no-default-lib is not an attribute this rule reads", "{}", "/// <reference no-default-lib=\"true\" />\n"},
 		// A malformed first attribute declines the whole comment rather than falling through to a
@@ -166,17 +216,45 @@ func TestTripleSlashReferenceStaysSilentOnCasesUpstreamDoesNotCover(test *testin
 		// whose split is not exactly two parts, and the loop never continues. Measured on the release
 		// binary: both of these are silent even under a configuration that would report their second
 		// attribute. This is the fixture that catches turning that return into a continue.
-		{"a malformed first attribute declines the comment rather than falling through", "{\"types\": \"never\"}", "/// <reference path=\"a=b\" types=\"foo\" />\n"},
-		{"a malformed lib attribute declines a following path attribute", "{}", "/// <reference lib=\"a=b\" path=\"foo\" />\n"},
+		{
+			"a malformed first attribute declines the comment rather than falling through",
+			"{\"types\": \"never\"}",
+			"/// <reference path=\"a=b\" types=\"foo\" />\n",
+		},
+		{
+			"a malformed lib attribute declines a following path attribute",
+			"{}",
+			"/// <reference lib=\"a=b\" path=\"foo\" />\n",
+		},
 		{"lib defaults to always", "{}", "/// <reference lib=\"foo\" />\n"},
 		{"types defaults to prefer-import, so no import means no finding", "{}", "/// <reference types=\"foo\" />\n"},
-		{"a dynamic import is not one of the two shapes", "{}", "/// <reference types=\"foo\" />\nconst p = import('foo');\n"},
-		{"a require call is not an import-equals declaration", "{}", "/// <reference types=\"foo\" />\nconst q = require('foo');\n"},
+		{
+			"a dynamic import is not one of the two shapes",
+			"{}",
+			"/// <reference types=\"foo\" />\nconst p = import('foo');\n",
+		},
+		{
+			"a require call is not an import-equals declaration",
+			"{}",
+			"/// <reference types=\"foo\" />\nconst q = require('foo');\n",
+		},
 		{"an export-from is not an import", "{}", "/// <reference types=\"foo\" />\nexport * from 'foo';\n"},
-		{"an import nested in a namespace is not a top-level statement", "{}", "/// <reference types=\"foo\" />\ndeclare module M { import foo = require('foo'); }\n"},
-		{"an import-equals naming a qualified name rather than a module", "{}", "/// <reference types=\"foo\" />\nimport foo = foo.bar;\n"},
+		{
+			"an import nested in a namespace is not a top-level statement",
+			"{}",
+			"/// <reference types=\"foo\" />\ndeclare module M { import foo = require('foo'); }\n",
+		},
+		{
+			"an import-equals naming a qualified name rather than a module",
+			"{}",
+			"/// <reference types=\"foo\" />\nimport foo = foo.bar;\n",
+		},
 		{"path always", "{\"path\": \"always\"}", "/// <reference path=\"foo\" />\n"},
-		{"prefer-import is refused for path, so the default of never is kept and this reports elsewhere", "{\"lib\": \"prefer-import\"}", "/// <reference lib=\"foo\" />\n"},
+		{
+			"prefer-import is refused for path, so the default of never is kept and this reports elsewhere",
+			"{\"lib\": \"prefer-import\"}",
+			"/// <reference lib=\"foo\" />\n",
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -202,11 +280,36 @@ func TestTripleSlashReferencePointsAtTheDirective(test *testing.T) {
 		sourceText    string
 		reported      string
 	}{
-		{"the whole comment including the leading slashes", "{}", "/// <reference path=\"foo\" />\n", "/// <reference path=\"foo\" />"},
-		{"four slashes are all inside the span", "{}", "//// <reference path=\"foo\" />\n", "//// <reference path=\"foo\" />"},
-		{"a block comment reports its closing delimiter too", "{}", "/*/ <reference path=\"foo\" /> */\n", "/*/ <reference path=\"foo\" /> */"},
-		{"indentation is not part of the span", "{}", "\n    /// <reference path=\"foo\" />\n", "/// <reference path=\"foo\" />"},
-		{"a prefer-import finding points at the directive, not at the import", "{}", "/// <reference types=\"foo\" />\nimport * as foo from 'foo';\n", "/// <reference types=\"foo\" />"},
+		{
+			"the whole comment including the leading slashes",
+			"{}",
+			"/// <reference path=\"foo\" />\n",
+			"/// <reference path=\"foo\" />",
+		},
+		{
+			"four slashes are all inside the span",
+			"{}",
+			"//// <reference path=\"foo\" />\n",
+			"//// <reference path=\"foo\" />",
+		},
+		{
+			"a block comment reports its closing delimiter too",
+			"{}",
+			"/*/ <reference path=\"foo\" /> */\n",
+			"/*/ <reference path=\"foo\" /> */",
+		},
+		{
+			"indentation is not part of the span",
+			"{}",
+			"\n    /// <reference path=\"foo\" />\n",
+			"/// <reference path=\"foo\" />",
+		},
+		{
+			"a prefer-import finding points at the directive, not at the import",
+			"{}",
+			"/// <reference types=\"foo\" />\nimport * as foo from 'foo';\n",
+			"/// <reference types=\"foo\" />",
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -244,10 +347,20 @@ func TestTripleSlashReferenceNamesTheModuleInItsMessage(test *testing.T) {
 		moduleName    string
 	}{
 		{"the module name is the trimmed attribute value", "{}", "/// <reference path=\"foo\" />\n", "foo"},
-		{"single quotes survive, because only the double quote is trimmed", "{}", "/// <reference path='foo' />\n", "'foo'"},
+		{
+			"single quotes survive, because only the double quote is trimmed",
+			"{}",
+			"/// <reference path='foo' />\n",
+			"'foo'",
+		},
 		{"an empty value renders an empty name", "{}", "/// <reference path=\"\" />\n", ""},
 		{"trailing slashes are stripped from inside the value", "{}", "/// <reference path=\"foo///\"/>\n", "foo"},
-		{"the second attribute is the one read when it is the first match", "{}", "/// <reference path=\"bar\" lib=\"foo\" />\n", "bar"},
+		{
+			"the second attribute is the one read when it is the first match",
+			"{}",
+			"/// <reference path=\"bar\" lib=\"foo\" />\n",
+			"bar",
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -355,7 +468,11 @@ func TestTripleSlashReferenceDeclinesJavaScript(test *testing.T) {
 			decodeTripleSlashOptions(test, "{}")),
 		"tripleSlashReference")
 
-	for _, fileName := range []string{"/repository/source/Thing.js", "/repository/source/Thing.jsx", "/repository/source/Thing.mjs"} {
+	for _, fileName := range []string{
+		"/repository/source/Thing.js",
+		"/repository/source/Thing.jsx",
+		"/repository/source/Thing.mjs",
+	} {
 		rule_testing.ExpectClean(test,
 			rule_testing.RunWithOptions(test, TripleSlashReference, fileName, source,
 				decodeTripleSlashOptions(test, "{}")))
@@ -363,7 +480,11 @@ func TestTripleSlashReferenceDeclinesJavaScript(test *testing.T) {
 
 	// The TypeScript extensions the gate does admit, including the definition file where a
 	// directive is most likely to be written deliberately.
-	for _, fileName := range []string{"/repository/source/Thing.tsx", "/repository/source/Thing.mts", "/repository/source/Thing.d.ts"} {
+	for _, fileName := range []string{
+		"/repository/source/Thing.tsx",
+		"/repository/source/Thing.mts",
+		"/repository/source/Thing.d.ts",
+	} {
 		rule_testing.ExpectFindings(test,
 			rule_testing.RunWithOptions(test, TripleSlashReference, fileName, source,
 				decodeTripleSlashOptions(test, "{}")),
@@ -423,7 +544,9 @@ func TestDecodeTripleSlashReferenceOptions(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, decodeTripleSlashReferenceOptionsError := DecodeTripleSlashReferenceOptions([]byte(testCase.configuration))
+			decoded, decodeTripleSlashReferenceOptionsError := DecodeTripleSlashReferenceOptions(
+				[]byte(testCase.configuration),
+			)
 			if decodeTripleSlashReferenceOptionsError != nil {
 				test.Fatalf("could not decode: %v", decodeTripleSlashReferenceOptionsError)
 			}

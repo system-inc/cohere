@@ -87,7 +87,11 @@ func finishOpen() {
 			err = os.WriteFile(path, contents, 0o600)
 		}
 		if err != nil {
-			fmt.Fprintf(streams.Errors, "cohere: %s\n", sentence.FromError(fmt.Errorf("returning files to open: %w", err)))
+			fmt.Fprintf(
+				streams.Errors,
+				"cohere: %s\n",
+				sentence.FromError(fmt.Errorf("returning files to open: %w", err)),
+			)
 		}
 		return
 	}

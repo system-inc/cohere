@@ -60,7 +60,8 @@ func printTrailingComment[N Node[N]](path *AstPath[N], options *Options[N], prev
 	text := options.OriginalText
 	isBlock := printer.IsBlockComment != nil && printer.IsBlockComment(comment)
 
-	if (previous.present && previous.hasLineSuffix && !previous.isBlock) || HasNewline(text, printer.LocStart(comment), true) {
+	if (previous.present && previous.hasLineSuffix && !previous.isBlock) ||
+		HasNewline(text, printer.LocStart(comment), true) {
 		// This allows comments at the end of nested structures:
 		// {
 		//   x: 1,
@@ -103,7 +104,11 @@ type DanglingOptions[N Node[N]] struct {
 
 // PrintDanglingComments is upstream's printDanglingComments: the comments attached to the current node
 // that neither lead nor trail it, joined by hardlines.
-func PrintDanglingComments[N Node[N]](path *AstPath[N], options *Options[N], danglingOptions DanglingOptions[N]) doc.Doc {
+func PrintDanglingComments[N Node[N]](
+	path *AstPath[N],
+	options *Options[N],
+	danglingOptions DanglingOptions[N],
+) doc.Doc {
 	node, isNode := path.Node()
 	if !isNode || isNil(node) {
 		return doc.Text("")
@@ -213,7 +218,11 @@ func PrintTrailingComments[N Node[N]](path *AstPath[N], options *Options[N], fil
 }
 
 // PrintCommentsSeparately is upstream's printCommentsSeparately.
-func PrintCommentsSeparately[N Node[N]](path *AstPath[N], options *Options[N], filter CommentFilter[N]) (leading doc.Doc, trailing doc.Doc) {
+func PrintCommentsSeparately[N Node[N]](
+	path *AstPath[N],
+	options *Options[N],
+	filter CommentFilter[N],
+) (leading doc.Doc, trailing doc.Doc) {
 	return PrintLeadingComments(path, options, filter), PrintTrailingComments(path, options, filter)
 }
 

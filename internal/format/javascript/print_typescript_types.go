@@ -146,7 +146,10 @@ func printIndexSignature(path *Path, options *Options, print PrintFunc) Doc {
 		trailingComma = printTrailingComma(options, "")
 	}
 
-	parametersGroup := groupIn(path, concatIn(path, indentIn(path, concatIn(path, softline, join(concatIn(path, ", ", softline), printAll(path, print, "parameters")))),
+	parametersGroup := groupIn(path, concatIn(path, indentIn(
+		path,
+		concatIn(path, softline, join(concatIn(path, ", ", softline), printAll(path, print, "parameters"))),
+	),
 		trailingComma,
 		softline,
 	))

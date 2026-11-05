@@ -565,7 +565,8 @@ func ParseCandidate(input string, designSystem DesignSystem) []ParsedCandidate {
 			// the utility matcher decides. An arbitrary modifier cannot be a denominator, so it
 			// suppresses the fraction rather than producing a nonsensical one.
 			fraction := ""
-			if modifierSegment != nil && !(parsedModifier != nil && parsedModifier.Kind == ParsedModifierKindArbitrary) {
+			if modifierSegment != nil &&
+				!(parsedModifier != nil && parsedModifier.Kind == ParsedModifierKindArbitrary) {
 				fraction = value + "/" + *modifierSegment
 			}
 

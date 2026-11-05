@@ -244,8 +244,10 @@ var RestrictPlusOperands = rule.Rule{
 				// it to the union-aware form reports `string | null`, which the corpus passes.
 				if restrictPlusOperandsIsTypeFlagSetInUnion(side.baseType,
 					checker.TypeFlagsESSymbolLike|checker.TypeFlagsNever|checker.TypeFlagsUnknown) ||
-					(!settings.allowAny && restrictPlusOperandsIsTypeFlagSetInUnion(side.baseType, checker.TypeFlagsAny)) ||
-					(!settings.allowBoolean && restrictPlusOperandsIsTypeFlagSetInUnion(side.baseType, checker.TypeFlagsBooleanLike)) ||
+					(!settings.allowAny &&
+						restrictPlusOperandsIsTypeFlagSetInUnion(side.baseType, checker.TypeFlagsAny)) ||
+					(!settings.allowBoolean &&
+						restrictPlusOperandsIsTypeFlagSetInUnion(side.baseType, checker.TypeFlagsBooleanLike)) ||
 					(!settings.allowNullish && restrictPlusOperandsIsTypeFlagSetInUnion(side.baseType,
 						checker.TypeFlagsNull|checker.TypeFlagsUndefined)) {
 					ruleContext.ReportNode(side.node, buildRestrictPlusOperandsInvalidMessage(

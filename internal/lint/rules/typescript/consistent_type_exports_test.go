@@ -270,8 +270,10 @@ func TestConsistentTypeExportsFiresOnUpstreamFailCases(test *testing.T) {
 			configuration: "",
 			sourceText:    "\nexport {\n  Type2 as Foo,\n  value1 as BScope,\n  value2 as CScope,\n} from './consistent-type-exports';\n      ",
 			wantIds:       []string{"singleExportIsType"},
-			wantSpans:     []string{"export {\n  Type2 as Foo,\n  value1 as BScope,\n  value2 as CScope,\n} from './consistent-type-exports';"},
-			wantFixed:     "\nexport type { Type2 as Foo } from './consistent-type-exports';\nexport { value1 as BScope, value2 as CScope } from './consistent-type-exports';\n      ",
+			wantSpans: []string{
+				"export {\n  Type2 as Foo,\n  value1 as BScope,\n  value2 as CScope,\n} from './consistent-type-exports';",
+			},
+			wantFixed: "\nexport type { Type2 as Foo } from './consistent-type-exports';\nexport { value1 as BScope, value2 as CScope } from './consistent-type-exports';\n      ",
 		},
 		{
 			configuration: "",
@@ -340,15 +342,19 @@ func TestConsistentTypeExportsFiresOnUpstreamFailCases(test *testing.T) {
 			configuration: "{\"fixMixedExportsWithInlineTypeSpecifier\":false}",
 			sourceText:    "\nexport {\n  Type1,\n  Type2 as Foo,\n  type value1 as BScope,\n  value2 as CScope,\n} from './consistent-type-exports';\n      ",
 			wantIds:       []string{"multipleExportsAreTypes"},
-			wantSpans:     []string{"export {\n  Type1,\n  Type2 as Foo,\n  type value1 as BScope,\n  value2 as CScope,\n} from './consistent-type-exports';"},
-			wantFixed:     "\nexport type { Type1, Type2 as Foo, value1 as BScope } from './consistent-type-exports';\nexport { value2 as CScope } from './consistent-type-exports';\n      ",
+			wantSpans: []string{
+				"export {\n  Type1,\n  Type2 as Foo,\n  type value1 as BScope,\n  value2 as CScope,\n} from './consistent-type-exports';",
+			},
+			wantFixed: "\nexport type { Type1, Type2 as Foo, value1 as BScope } from './consistent-type-exports';\nexport { value2 as CScope } from './consistent-type-exports';\n      ",
 		},
 		{
 			configuration: "{\"fixMixedExportsWithInlineTypeSpecifier\":true}",
 			sourceText:    "\nexport {\n  Type1,\n  Type2 as Foo,\n  type value1 as BScope,\n  value2 as CScope,\n} from './consistent-type-exports';\n      ",
 			wantIds:       []string{"multipleExportsAreTypes"},
-			wantSpans:     []string{"export {\n  Type1,\n  Type2 as Foo,\n  type value1 as BScope,\n  value2 as CScope,\n} from './consistent-type-exports';"},
-			wantFixed:     "\nexport {\n  type Type1,\n  type Type2 as Foo,\n  type value1 as BScope,\n  value2 as CScope,\n} from './consistent-type-exports';\n      ",
+			wantSpans: []string{
+				"export {\n  Type1,\n  Type2 as Foo,\n  type value1 as BScope,\n  value2 as CScope,\n} from './consistent-type-exports';",
+			},
+			wantFixed: "\nexport {\n  type Type1,\n  type Type2 as Foo,\n  type value1 as BScope,\n  value2 as CScope,\n} from './consistent-type-exports';\n      ",
 		},
 		{
 			configuration: "",
@@ -375,8 +381,10 @@ func TestConsistentTypeExportsFiresOnUpstreamFailCases(test *testing.T) {
 			configuration: "",
 			sourceText:    "\n        /* comment 1 */ export\n          /* comment 2 */ *\n            // comment 3\n            from './consistent-type-exports/type-only-exports';\n      ",
 			wantIds:       []string{"typeOverValue"},
-			wantSpans:     []string{"export\n          /* comment 2 */ *\n            // comment 3\n            from './consistent-type-exports/type-only-exports';"},
-			wantFixed:     "\n        /* comment 1 */ export\n          /* comment 2 */ type *\n            // comment 3\n            from './consistent-type-exports/type-only-exports';\n      ",
+			wantSpans: []string{
+				"export\n          /* comment 2 */ *\n            // comment 3\n            from './consistent-type-exports/type-only-exports';",
+			},
+			wantFixed: "\n        /* comment 1 */ export\n          /* comment 2 */ type *\n            // comment 3\n            from './consistent-type-exports/type-only-exports';\n      ",
 		},
 		{
 			configuration: "",
@@ -630,7 +638,11 @@ func TestConsistentTypeExportsNamesTheExportsUpstreamNames(test *testing.T) {
 	}{
 		{"type A = 1;\nconst v = 4;\nexport { A, v };", "singleExportIsType", "A"},
 		{"type A = 1;\ntype B = 2;\nconst v = 4;\nexport { A, B, v };", "multipleExportsAreTypes", "A and B"},
-		{"type A = 1;\ntype B = 2;\ntype C = 3;\nconst v = 4;\nexport { A, B, C, v };", "multipleExportsAreTypes", "A, B and C"},
+		{
+			"type A = 1;\ntype B = 2;\ntype C = 3;\nconst v = 4;\nexport { A, B, C, v };",
+			"multipleExportsAreTypes",
+			"A, B and C",
+		},
 	}
 	for index, testCase := range cases {
 		test.Run(consistentTypeExportsCaseName(index), func(test *testing.T) {
@@ -670,7 +682,9 @@ func TestConsistentTypeExportsDecoderResolvesTheOption(test *testing.T) {
 	for index, testCase := range cases {
 		test.Run(consistentTypeExportsCaseName(index), func(test *testing.T) {
 			test.Parallel()
-			decoded, decodeConsistentTypeExportsOptionsError := DecodeConsistentTypeExportsOptions([]byte(testCase.configuration))
+			decoded, decodeConsistentTypeExportsOptionsError := DecodeConsistentTypeExportsOptions(
+				[]byte(testCase.configuration),
+			)
 			if decodeConsistentTypeExportsOptionsError != nil {
 				test.Fatalf("decoding %s: %v", testCase.configuration, decodeConsistentTypeExportsOptionsError)
 			}

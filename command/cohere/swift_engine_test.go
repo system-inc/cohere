@@ -34,7 +34,12 @@ func runFakeSwiftEngine(test *testing.T, body string, mode engineMode) (string, 
 	var standardError bytes.Buffer
 	stream := bufio.NewWriter(&out)
 	run := newEngineRun(stream, mode, swiftLanguage, "", time.Now())
-	exitCode, runEngineBinaryError := runEngineBinary(fakeSwiftEngine(test, body), []string{"--contract", "1"}, run, &standardError)
+	exitCode, runEngineBinaryError := runEngineBinary(
+		fakeSwiftEngine(test, body),
+		[]string{"--contract", "1"},
+		run,
+		&standardError,
+	)
 	flushStream(test, stream)
 	return out.String(), standardError.String(), exitCode, runEngineBinaryError
 }
@@ -49,7 +54,11 @@ func TestRunEngineBinaryEndings(test *testing.T) {
 
 	// Not parallel: it drives a check run through engineRun, whose record acceptors set the package-level activeSummary
 	test.Run("a real stream streams and exits with its summary", func(test *testing.T) {
-		out, _, exitCode, runFakeSwiftEngineError := runFakeSwiftEngine(test, "cat '"+filepath.Join(fixtures, "Findings.jsonl")+"'; exit 1", engineModeCheck)
+		out, _, exitCode, runFakeSwiftEngineError := runFakeSwiftEngine(
+			test,
+			"cat '"+filepath.Join(fixtures, "Findings.jsonl")+"'; exit 1",
+			engineModeCheck,
+		)
 		if runFakeSwiftEngineError != nil || exitCode != 1 {
 			test.Fatalf("exit %d, err %v\n%s", exitCode, runFakeSwiftEngineError, out)
 		}
@@ -60,7 +69,11 @@ func TestRunEngineBinaryEndings(test *testing.T) {
 
 	// Not parallel: it drives a check run through engineRun, whose record acceptors set the package-level activeSummary
 	test.Run("the control: a clean stream exits 0", func(test *testing.T) {
-		_, _, exitCode, runFakeSwiftEngineError := runFakeSwiftEngine(test, "cat '"+filepath.Join(fixtures, "Clean.jsonl")+"'", engineModeCheck)
+		_, _, exitCode, runFakeSwiftEngineError := runFakeSwiftEngine(
+			test,
+			"cat '"+filepath.Join(fixtures, "Clean.jsonl")+"'",
+			engineModeCheck,
+		)
 		if runFakeSwiftEngineError != nil || exitCode != 0 {
 			test.Fatalf("a clean engine run exited %d, err %v", exitCode, runFakeSwiftEngineError)
 		}
@@ -68,8 +81,14 @@ func TestRunEngineBinaryEndings(test *testing.T) {
 
 	// Not parallel: it drives a check run through engineRun, whose record acceptors set the package-level activeSummary
 	test.Run("exit 2 passes stderr through and says nothing was checked", func(test *testing.T) {
-		_, standardError, exitCode, runFakeSwiftEngineError := runFakeSwiftEngine(test, "echo 'cohere-swift: --timing is not implemented for Swift yet' >&2; exit 2", engineModeCheck)
-		if runFakeSwiftEngineError == nil || exitCode != 1 || !strings.Contains(runFakeSwiftEngineError.Error(), "did not run, so nothing was checked") {
+		_, standardError, exitCode, runFakeSwiftEngineError := runFakeSwiftEngine(
+			test,
+			"echo 'cohere-swift: --timing is not implemented for Swift yet' >&2; exit 2",
+			engineModeCheck,
+		)
+		if runFakeSwiftEngineError == nil ||
+			exitCode != 1 ||
+			!strings.Contains(runFakeSwiftEngineError.Error(), "did not run, so nothing was checked") {
 			test.Fatalf("exit %d, err %v", exitCode, runFakeSwiftEngineError)
 		}
 		if !strings.Contains(standardError, "--timing is not implemented") {
@@ -79,7 +98,11 @@ func TestRunEngineBinaryEndings(test *testing.T) {
 
 	// Not parallel: it drives a check run through engineRun, whose record acceptors set the package-level activeSummary
 	test.Run("a signal is named as a signal, never as an exit code", func(test *testing.T) {
-		out, _, exitCode, runFakeSwiftEngineError := runFakeSwiftEngine(test, "head -2 '"+filepath.Join(fixtures, "Clean.jsonl")+"'; kill -9 $$", engineModeCheck)
+		out, _, exitCode, runFakeSwiftEngineError := runFakeSwiftEngine(
+			test,
+			"head -2 '"+filepath.Join(fixtures, "Clean.jsonl")+"'; kill -9 $$",
+			engineModeCheck,
+		)
 		if runFakeSwiftEngineError == nil || exitCode != 1 {
 			test.Fatalf("a killed engine exited %d, err %v", exitCode, runFakeSwiftEngineError)
 		}
@@ -97,8 +120,14 @@ func TestRunEngineBinaryEndings(test *testing.T) {
 	// Not parallel: it drives a check run through engineRun, whose record acceptors set the package-level activeSummary
 	test.Run("a broken record kills the engine rather than waiting on it", func(test *testing.T) {
 		// The engine sleeps past any run, so a front door that waited on it hangs, a hang go test's -timeout fails.
-		_, _, exitCode, runFakeSwiftEngineError := runFakeSwiftEngine(test, "head -1 '"+filepath.Join(fixtures, "Clean.jsonl")+"'; echo 'Compiling swift-syntax'; sleep 100000", engineModeCheck)
-		if runFakeSwiftEngineError == nil || exitCode != 1 || !strings.Contains(runFakeSwiftEngineError.Error(), "the Swift engine is broken") {
+		_, _, exitCode, runFakeSwiftEngineError := runFakeSwiftEngine(
+			test,
+			"head -1 '"+filepath.Join(fixtures, "Clean.jsonl")+"'; echo 'Compiling swift-syntax'; sleep 100000",
+			engineModeCheck,
+		)
+		if runFakeSwiftEngineError == nil ||
+			exitCode != 1 ||
+			!strings.Contains(runFakeSwiftEngineError.Error(), "the Swift engine is broken") {
 			test.Fatalf("exit %d, err %v", exitCode, runFakeSwiftEngineError)
 		}
 	})
@@ -110,9 +139,15 @@ func TestRunEngineBinaryEndings(test *testing.T) {
 	test.Run("a broken engine's children die with it", func(test *testing.T) {
 		childFile := filepath.Join(test.TempDir(), "child")
 		_, _, exitCode, runFakeSwiftEngineError := runFakeSwiftEngine(test,
-			"sleep 100000 & echo $! > '"+childFile+"'; head -1 '"+filepath.Join(fixtures, "Clean.jsonl")+"'; echo 'Compiling swift-syntax'; wait",
+			"sleep 100000 & echo $! > '"+
+				childFile+
+				"'; head -1 '"+
+				filepath.Join(fixtures, "Clean.jsonl")+
+				"'; echo 'Compiling swift-syntax'; wait",
 			engineModeCheck)
-		if runFakeSwiftEngineError == nil || exitCode != 1 || !strings.Contains(runFakeSwiftEngineError.Error(), "the Swift engine is broken") {
+		if runFakeSwiftEngineError == nil ||
+			exitCode != 1 ||
+			!strings.Contains(runFakeSwiftEngineError.Error(), "the Swift engine is broken") {
 			test.Fatalf("exit %d, err %v", exitCode, runFakeSwiftEngineError)
 		}
 		requireProcessEnded(test, childFile)
@@ -134,11 +169,21 @@ func TestRunEngineBinaryEndings(test *testing.T) {
 			interrupts <- syscall.SIGTERM
 		}()
 		exitCode, runEngineBinaryUntilError := runEngineBinaryUntil(
-			fakeSwiftEngine(test, "sleep 100000 & echo $! > '"+childFile+"'; head -2 '"+filepath.Join(fixtures, "Clean.jsonl")+"'; wait"),
+			fakeSwiftEngine(
+				test,
+				"sleep 100000 & echo $! > '"+childFile+"'; head -2 '"+filepath.Join(fixtures, "Clean.jsonl")+"'; wait",
+			),
 			[]string{"--contract", "1"}, run, &standardError, interrupts)
 		flushStream(test, stream)
-		if runEngineBinaryUntilError == nil || exitCode != 1 || !strings.Contains(runEngineBinaryUntilError.Error(), "was killed by") {
-			test.Fatalf("an engine signalled through cohere exited %d, err %v\n%s", exitCode, runEngineBinaryUntilError, out.String())
+		if runEngineBinaryUntilError == nil ||
+			exitCode != 1 ||
+			!strings.Contains(runEngineBinaryUntilError.Error(), "was killed by") {
+			test.Fatalf(
+				"an engine signalled through cohere exited %d, err %v\n%s",
+				exitCode,
+				runEngineBinaryUntilError,
+				out.String(),
+			)
 		}
 		requireProcessEnded(test, childFile)
 	})

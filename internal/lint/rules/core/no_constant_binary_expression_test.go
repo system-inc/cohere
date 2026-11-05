@@ -23,7 +23,11 @@ func TestNoConstantBinaryExpressionFires(test *testing.T) {
 		{"an object on the left of nullish coalescing", "export const v = {} ?? a;\n", "constantShortCircuit"},
 		{"a string on the left of nullish coalescing", "export const v = 'x' ?? a;\n", "constantShortCircuit"},
 		{"a template on the left of nullish coalescing", "export const v = `x${a}` ?? b;\n", "constantShortCircuit"},
-		{"a wrapper call on the left of nullish coalescing", "export const v = String(a) ?? b;\n", "constantShortCircuit"},
+		{
+			"a wrapper call on the left of nullish coalescing",
+			"export const v = String(a) ?? b;\n",
+			"constantShortCircuit",
+		},
 		// A nullish literal on the left is reported too, and I first wrote these as clean cases
 		// reading "?? exists for null" as meaning null is exempt there. It is not: the operator
 		// still never chooses, it just always picks the right side. ESLint passes nonNullish=false
@@ -34,7 +38,11 @@ func TestNoConstantBinaryExpressionFires(test *testing.T) {
 		// chain can still produce it.
 		{"null on the left of nullish coalescing", "export const v = null ?? a;\n", "constantShortCircuit"},
 		{"undefined on the left of nullish coalescing", "export const v = undefined ?? a;\n", "constantShortCircuit"},
-		{"an arithmetic expression on the left of nullish coalescing", "export const v = (a + b) ?? a;\n", "constantShortCircuit"},
+		{
+			"an arithmetic expression on the left of nullish coalescing",
+			"export const v = (a + b) ?? a;\n",
+			"constantShortCircuit",
+		},
 		// A nested `??` whose right side is never nullish makes the whole chain never nullish, so
 		// the outer operator never chooses either. No other fixture reaches the recursive arm.
 		//
@@ -42,7 +50,11 @@ func TestNoConstantBinaryExpressionFires(test *testing.T) {
 		// I first wrote. `(a ?? null) ?? b` is correctly silent: the chain can still produce null,
 		// so the outer `??` really does choose. That asymmetry is what the recursive nonNullish
 		// argument exists for, and the silent case for it is in the other table.
-		{"a nested nullish chain ending in a non-nullish value", "export const v = (a ?? []) ?? b;\n", "constantShortCircuit"},
+		{
+			"a nested nullish chain ending in a non-nullish value",
+			"export const v = (a ?? []) ?? b;\n",
+			"constantShortCircuit",
+		},
 		// The strict boolean question is broader than the loose one, which reads backwards: it asks
 		// only whether the node can ever be a boolean. A one-element array can coerce to 0 or 1, so
 		// the loose comparison is not fixed, while the strict one is, since an array is never a
@@ -80,8 +92,12 @@ func TestNoConstantBinaryExpressionFires(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoConstantBinaryExpression, constantBinaryFile,
-				constantBinaryDeclarations+testCase.sourceText), testCase.wantId)
+			rule_testing.ExpectFindings(
+				test,
+				rule_testing.RunTyped(test, NoConstantBinaryExpression, constantBinaryFile,
+					constantBinaryDeclarations+testCase.sourceText),
+				testCase.wantId,
+			)
 		})
 	}
 }
@@ -140,15 +156,24 @@ func TestNoConstantBinaryExpressionRelationalArm(test *testing.T) {
 
 	source := constantBinaryDeclarations + "export const v = 1 < 2;\n"
 
-	rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoConstantBinaryExpression, constantBinaryFile, source,
-		NoConstantBinaryExpressionOptions{CheckRelationalComparisons: false}))
+	rule_testing.ExpectClean(
+		test,
+		rule_testing.RunTypedWithOptions(test, NoConstantBinaryExpression, constantBinaryFile, source,
+			NoConstantBinaryExpressionOptions{CheckRelationalComparisons: false}),
+	)
 
-	rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, NoConstantBinaryExpression, constantBinaryFile, source,
-		NoConstantBinaryExpressionOptions{CheckRelationalComparisons: true}),
-		"constantRelationalComparison")
+	rule_testing.ExpectFindings(
+		test,
+		rule_testing.RunTypedWithOptions(test, NoConstantBinaryExpression, constantBinaryFile, source,
+			NoConstantBinaryExpressionOptions{CheckRelationalComparisons: true}),
+		"constantRelationalComparison",
+	)
 
 	// A variable operand is not a literal, so the arm stays silent even when enabled.
-	rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoConstantBinaryExpression, constantBinaryFile,
-		constantBinaryDeclarations+"export const v = a < 2;\n",
-		NoConstantBinaryExpressionOptions{CheckRelationalComparisons: true}))
+	rule_testing.ExpectClean(
+		test,
+		rule_testing.RunTypedWithOptions(test, NoConstantBinaryExpression, constantBinaryFile,
+			constantBinaryDeclarations+"export const v = a < 2;\n",
+			NoConstantBinaryExpressionOptions{CheckRelationalComparisons: true}),
+	)
 }

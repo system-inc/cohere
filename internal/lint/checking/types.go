@@ -171,7 +171,9 @@ func IsCallback(
 ) bool {
 	t := checker.Checker_getApparentType(typeChecker, typeChecker.GetTypeOfSymbolAtLocation(parameter, node))
 
-	if parameter.ValueDeclaration != nil && ast.IsParameterDeclaration(parameter.ValueDeclaration) && parameter.ValueDeclaration.AsParameterDeclaration().DotDotDotToken != nil {
+	if parameter.ValueDeclaration != nil &&
+		ast.IsParameterDeclaration(parameter.ValueDeclaration) &&
+		parameter.ValueDeclaration.AsParameterDeclaration().DotDotDotToken != nil {
 		t = checker.Checker_getIndexTypeOfType(typeChecker, t, checker.Checker_numberType(typeChecker))
 		if t == nil {
 			return false
@@ -205,8 +207,13 @@ func IsThenableType(
 		thenType := typeChecker.GetTypeOfSymbolAtLocation(then, node)
 
 		for subTypePart := range UnionTypePartsSeq(thenType) {
-			for _, signature := range checker.Checker_getSignaturesOfType(typeChecker, subTypePart, checker.SignatureKindCall) {
-				if len(checker.Signature_parameters(signature)) != 0 && IsCallback(typeChecker, checker.Signature_parameters(signature)[0], node) {
+			for _, signature := range checker.Checker_getSignaturesOfType(
+				typeChecker,
+				subTypePart,
+				checker.SignatureKindCall,
+			) {
+				if len(checker.Signature_parameters(signature)) != 0 &&
+					IsCallback(typeChecker, checker.Signature_parameters(signature)[0], node) {
 					return true
 				}
 			}
@@ -216,7 +223,11 @@ func IsThenableType(
 }
 
 func GetWellKnownSymbolPropertyOfType(t *checker.Type, name string, typeChecker *checker.Checker) *ast.Symbol {
-	return checker.Checker_getPropertyOfType(typeChecker, t, checker.Checker_getPropertyNameForKnownSymbolName(typeChecker, name))
+	return checker.Checker_getPropertyOfType(
+		typeChecker,
+		t,
+		checker.Checker_getPropertyNameForKnownSymbolName(typeChecker, name),
+	)
 }
 
 // IsStrictCompilerOptionEnabled reports whether a strict-family option is on, as the compiler resolves

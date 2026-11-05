@@ -71,7 +71,9 @@ func ParseVersionRange(text string) (VersionRange, error) {
 	// Go whitespace: the "cohere" pin in cohere's own settings, which no JavaScript tool reads.
 	trimmed := strings.TrimSpace(text)
 	if trimmed == "" {
-		return VersionRange{}, fmt.Errorf("the \"cohere\" range is empty: write the releases this project accepts, like \"^1.0.0\"")
+		return VersionRange{}, fmt.Errorf(
+			"the \"cohere\" range is empty: write the releases this project accepts, like \"^1.0.0\"",
+		)
 	}
 	parsed := VersionRange{Text: trimmed}
 	for _, alternative := range strings.Split(trimmed, "||") {
@@ -96,7 +98,10 @@ func ParseVersionRange(text string) (VersionRange, error) {
 // parseComparator reads one comparator, expanding a caret or tilde into the bounds npm gives it.
 func parseComparator(field string) ([]versionComparator, error) {
 	if field == "-" || strings.ContainsAny(field, "xX*") && !strings.ContainsAny(field, "-+") {
-		return nil, fmt.Errorf("%q is a wildcard or hyphen range, which this reader does not take; write the bounds, like \">=1.2.0 <2.0.0\"", field)
+		return nil, fmt.Errorf(
+			"%q is a wildcard or hyphen range, which this reader does not take; write the bounds, like \">=1.2.0 <2.0.0\"",
+			field,
+		)
 	}
 	for _, operator := range []string{">=", "<=", ">", "<", "=", "^", "~"} {
 		rest, found := strings.CutPrefix(field, operator)
@@ -111,7 +116,10 @@ func parseComparator(field string) ([]versionComparator, error) {
 		case "^":
 			return []versionComparator{{">=", version}, {"<", caretCeiling(version)}}, nil
 		case "~":
-			return []versionComparator{{">=", version}, {"<", semanticVersion{version.major, version.minor + 1, 0, []string{"0"}}}}, nil
+			return []versionComparator{
+				{">=", version},
+				{"<", semanticVersion{version.major, version.minor + 1, 0, []string{"0"}}},
+			}, nil
 		default:
 			return []versionComparator{{operator, version}}, nil
 		}
@@ -153,7 +161,11 @@ func parseSemanticVersion(text string) (semanticVersion, error) {
 	for index, part := range parts {
 		number, parseError := strconv.Atoi(part)
 		if parseError != nil || number < 0 || (len(part) > 1 && part[0] == '0') {
-			return semanticVersion{}, fmt.Errorf("%q is not a version: %q is not a whole number without leading zeros", text, part)
+			return semanticVersion{}, fmt.Errorf(
+				"%q is not a version: %q is not a whole number without leading zeros",
+				text,
+				part,
+			)
 		}
 		numbers[index] = number
 	}

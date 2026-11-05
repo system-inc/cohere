@@ -57,8 +57,16 @@ import (
 )
 
 func main() {
-	systems := flag.String("systems", "", "path to a JSON array of {name, path} naming the design systems to measure, each path a file or a corpus spelling such as ahra:app/_theme/styles/theme.css (default: systems.json next to this command)")
-	output := flag.String("output", filepath.Join("internal", "tailwind", "testdata", "classorder_fixtures.json"), "where to write the fixture")
+	systems := flag.String(
+		"systems",
+		"",
+		"path to a JSON array of {name, path} naming the design systems to measure, each path a file or a corpus spelling such as ahra:app/_theme/styles/theme.css (default: systems.json next to this command)",
+	)
+	output := flag.String(
+		"output",
+		filepath.Join("internal", "tailwind", "testdata", "classorder_fixtures.json"),
+		"where to write the fixture",
+	)
 	check := flag.Bool("check", false, "regenerate and fail if the committed fixture disagrees")
 	flag.Parse()
 
@@ -90,7 +98,11 @@ func main() {
 		// Go whitespace: this tool comparing its own committed fixture with its own output.
 		if !bytes.Equal(bytes.TrimSpace(committed), bytes.TrimSpace(generated)) {
 			// Ignored: stderr is the last place left to say it, and the exit code says it whether or not this lands.
-			fmt.Fprintf(os.Stderr, "%s is stale: the engine now reads at least one class differently. Re-run without -check and read the diff.\n", *output)
+			fmt.Fprintf(
+				os.Stderr,
+				"%s is stale: the engine now reads at least one class differently. Re-run without -check and read the diff.\n",
+				*output,
+			)
 			os.Exit(1)
 		}
 		// Ignored: the check has passed, and the exit code says so whether or not this lands.
@@ -210,7 +222,11 @@ func build(toolDirectory, systemsPath string) ([]byte, fixture, error) {
 	if len(definitions) < 2 {
 		// The floor is two and it is not a preference. One design system is not a population, and
 		// per-repository divergence is unobservable from inside a single repository.
-		return nil, fixture{}, fmt.Errorf("%s names %d design systems; at least two are required, since one is not a population", systemsPath, len(definitions))
+		return nil, fixture{}, fmt.Errorf(
+			"%s names %d design systems; at least two are required, since one is not a population",
+			systemsPath,
+			len(definitions),
+		)
 	}
 
 	// The populations, the registration tables and the cross-system divergence, in one pass so that
@@ -224,7 +240,11 @@ func build(toolDirectory, systemsPath string) ([]byte, fixture, error) {
 		return nil, fixture{}, fmt.Errorf("parse enumerate.mjs output: %w", decodeError)
 	}
 	if len(built.Systems) != len(definitions) {
-		return nil, fixture{}, fmt.Errorf("enumerate.mjs returned %d systems for %d definitions", len(built.Systems), len(definitions))
+		return nil, fixture{}, fmt.Errorf(
+			"enumerate.mjs returned %d systems for %d definitions",
+			len(built.Systems),
+			len(definitions),
+		)
 	}
 
 	// The sibling extractors live beside this command under `tools/`, so they are reached from this

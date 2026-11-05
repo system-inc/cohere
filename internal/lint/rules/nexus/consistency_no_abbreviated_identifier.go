@@ -46,10 +46,16 @@ type ConsistencyNoAbbreviatedIdentifierOptions struct {
 // once there as the `reasoning` phrase, because it is the same argument every time. The id names the
 // shape, not the word: the word is already in the text, and the vocabulary's entries carry no id.
 var (
-	abbreviatedIdentifierText  = policy.MessageOf("nexus/consistency-no-abbreviated-identifier", "abbreviatedIdentifier")
+	abbreviatedIdentifierText = policy.MessageOf(
+		"nexus/consistency-no-abbreviated-identifier",
+		"abbreviatedIdentifier",
+	)
 	abbreviatedSuffixText      = policy.MessageOf("nexus/consistency-no-abbreviated-identifier", "abbreviatedSuffix")
 	millisecondSuffixText      = policy.MessageOf("nexus/consistency-no-abbreviated-identifier", "millisecondSuffix")
-	abbreviatedWordSegmentText = policy.MessageOf("nexus/consistency-no-abbreviated-identifier", "abbreviatedWordSegment")
+	abbreviatedWordSegmentText = policy.MessageOf(
+		"nexus/consistency-no-abbreviated-identifier",
+		"abbreviatedWordSegment",
+	)
 )
 
 // ConsistencyNoAbbreviatedIdentifier rejects abbreviated identifier names in favor of full words.
@@ -65,9 +71,9 @@ var (
 //	invalid: const originalInitCwd = process.cwd()
 //
 // The exemptions carry the judgment, and they divide into two kinds. Some names are not ours: a
-// property read, an import specifier, a member of a qualified type name, a JSX tag or attribute. Renaming any of those changes what the code reaches
-// for rather than what it calls something. The others are names a framework mandates, which the
-// caller names through options because only the caller knows which framework it is running.
+// property read, an import specifier, a member of a qualified type name, a JSX tag or attribute. Renaming any of those
+// changes what the code reaches for rather than what it calls something. The others are names a framework mandates,
+// which the caller names through options because only the caller knows which framework it is running.
 // Property declarations in our source and literals defining their own shape are judged. A contextual
 // property already declared elsewhere is judged at its declaration, and dependency contracts and
 // augmentations are silent. Ownership comes from the checker, never from a property-name list.
@@ -120,7 +126,9 @@ var ConsistencyNoAbbreviatedIdentifier = rule.Rule{
 					return
 				}
 			} else if node.Kind != ast.KindIdentifier || binding.IsForeignName(node) ||
-				(node.Parent != nil && node.Parent.Kind == ast.KindPropertyAccessExpression && node.Parent.Name() == node) {
+				(node.Parent != nil &&
+					node.Parent.Kind == ast.KindPropertyAccessExpression &&
+					node.Parent.Name() == node) {
 				return
 			}
 
@@ -568,14 +576,26 @@ func abbreviatedOwnsProperty(ruleContext rule.Context, name *ast.Node) bool {
 	if owner.Name() != nil && rule.IsDeclaredByADependency(ruleContext.TypeChecker.GetSymbolAtLocation(owner.Name())) {
 		return false
 	}
-	return !abbreviatedInheritedExternal(ruleContext, owner, name.Text(), ast.IsStatic(member), make(map[*ast.Node]bool))
+	return !abbreviatedInheritedExternal(
+		ruleContext,
+		owner,
+		name.Text(),
+		ast.IsStatic(member),
+		make(map[*ast.Node]bool),
+	)
 }
 
 // A local override can still carry a dependency's contract through another local override.
 // Follow the declarations behind inherited properties, with a cycle guard for erroneous heritage.
 //
 // Mutates: seen the walk marks every owner it visits, so one guard spans the whole recursion
-func abbreviatedInheritedExternal(ruleContext rule.Context, owner *ast.Node, name string, static bool, seen map[*ast.Node]bool) bool {
+func abbreviatedInheritedExternal(
+	ruleContext rule.Context,
+	owner *ast.Node,
+	name string,
+	static bool,
+	seen map[*ast.Node]bool,
+) bool {
 	if seen[owner] {
 		return false
 	}
@@ -607,7 +627,8 @@ func abbreviatedInheritedExternal(ruleContext rule.Context, owner *ast.Node, nam
 				continue
 			}
 			for _, declaration := range symbol.Declarations {
-				if declaration.Parent != nil && abbreviatedInheritedExternal(ruleContext, declaration.Parent, name, static, seen) {
+				if declaration.Parent != nil &&
+					abbreviatedInheritedExternal(ruleContext, declaration.Parent, name, static, seen) {
 					return true
 				}
 			}
@@ -619,7 +640,12 @@ func abbreviatedInheritedExternal(ruleContext rule.Context, owner *ast.Node, nam
 // A contextual type may be a union whose alternatives do not share the property. A named
 // declaration in any alternative still owns that spelling; a synthetic index/mapped property
 // without a declaration of this name does not. Inferred self-context is not an earlier declaration.
-func abbreviatedContextDeclaresProperty(ruleContext rule.Context, contextual *checker.Type, name string, literal *ast.Node) bool {
+func abbreviatedContextDeclaresProperty(
+	ruleContext rule.Context,
+	contextual *checker.Type,
+	name string,
+	literal *ast.Node,
+) bool {
 	// A missing contract has no declaration from which to infer ownership.
 	if rule.IsUnresolvedType(contextual) {
 		return true
@@ -677,7 +703,11 @@ func abbreviatedCombinedExternal(ruleContext rule.Context, literal *ast.Node, na
 			return false
 		}
 		for _, constituent := range constituents.Nodes {
-			if constituent != current && abbreviatedTypeHasExternalProperty(ruleContext, ruleContext.TypeChecker.GetTypeAtLocation(constituent), name) {
+			if constituent != current && abbreviatedTypeHasExternalProperty(
+				ruleContext,
+				ruleContext.TypeChecker.GetTypeAtLocation(constituent),
+				name,
+			) {
 				return true
 			}
 		}

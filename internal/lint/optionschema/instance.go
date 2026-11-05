@@ -127,10 +127,16 @@ func validate(schema *node, value any, path string) *Violation {
 	}
 
 	if len(schema.types) > 0 && !hasAnyType(value, schema.types) {
-		return &Violation{Path: pathOrRoot(path), Expected: fmt.Sprintf("%s, got %s", typeList(schema.types), describe(value))}
+		return &Violation{
+			Path:     pathOrRoot(path),
+			Expected: fmt.Sprintf("%s, got %s", typeList(schema.types), describe(value)),
+		}
 	}
 	if schema.hasConst && !equal(value, schema.constant) {
-		return &Violation{Path: pathOrRoot(path), Expected: fmt.Sprintf("%s, got %s", encode(schema.constant), describe(value))}
+		return &Violation{
+			Path:     pathOrRoot(path),
+			Expected: fmt.Sprintf("%s, got %s", encode(schema.constant), describe(value)),
+		}
 	}
 	if schema.enumValues != nil {
 		matched := false
@@ -145,7 +151,10 @@ func validate(schema *node, value any, path string) *Violation {
 			for index, candidate := range schema.enumValues {
 				listed[index] = encode(candidate)
 			}
-			return &Violation{Path: pathOrRoot(path), Expected: fmt.Sprintf("one of %s, got %s", strings.Join(listed, ", "), describe(value))}
+			return &Violation{
+				Path:     pathOrRoot(path),
+				Expected: fmt.Sprintf("one of %s, got %s", strings.Join(listed, ", "), describe(value)),
+			}
 		}
 	}
 
@@ -155,23 +164,38 @@ func validate(schema *node, value any, path string) *Violation {
 		// as an infinity of its sign with the range error, which still compares truthfully to both bounds.
 		number, _ := typed.Float64()
 		if schema.minimum != nil && number < *schema.minimum {
-			return &Violation{Path: pathOrRoot(path), Expected: fmt.Sprintf("a number of at least %s, got %s", formatNumber(*schema.minimum), typed)}
+			return &Violation{
+				Path:     pathOrRoot(path),
+				Expected: fmt.Sprintf("a number of at least %s, got %s", formatNumber(*schema.minimum), typed),
+			}
 		}
 		if schema.maximum != nil && number > *schema.maximum {
-			return &Violation{Path: pathOrRoot(path), Expected: fmt.Sprintf("a number of at most %s, got %s", formatNumber(*schema.maximum), typed)}
+			return &Violation{
+				Path:     pathOrRoot(path),
+				Expected: fmt.Sprintf("a number of at most %s, got %s", formatNumber(*schema.maximum), typed),
+			}
 		}
 	case string:
 		length := utf8.RuneCountInString(typed)
 		if schema.minLength != nil && length < *schema.minLength {
-			return &Violation{Path: pathOrRoot(path), Expected: fmt.Sprintf("a string of at least %d characters, got %s", *schema.minLength, describe(value))}
+			return &Violation{
+				Path:     pathOrRoot(path),
+				Expected: fmt.Sprintf("a string of at least %d characters, got %s", *schema.minLength, describe(value)),
+			}
 		}
 		if schema.maxLength != nil && length > *schema.maxLength {
-			return &Violation{Path: pathOrRoot(path), Expected: fmt.Sprintf("a string of at most %d characters, got %s", *schema.maxLength, describe(value))}
+			return &Violation{
+				Path:     pathOrRoot(path),
+				Expected: fmt.Sprintf("a string of at most %d characters, got %s", *schema.maxLength, describe(value)),
+			}
 		}
 		// A match that runs past esregexp's time bound counts as a match: this check may only refuse
 		// what ajv refuses, and a refusal stops the whole run.
 		if schema.pattern != nil && !schema.pattern.TestOrTimeout(typed) {
-			return &Violation{Path: pathOrRoot(path), Expected: fmt.Sprintf("a string matching /%s/, got %s", schema.patternSource, describe(value))}
+			return &Violation{
+				Path:     pathOrRoot(path),
+				Expected: fmt.Sprintf("a string matching /%s/, got %s", schema.patternSource, describe(value)),
+			}
 		}
 	case []any:
 		if violation := validateArray(schema, typed, path); violation != nil {
@@ -202,7 +226,11 @@ func validate(schema *node, value any, path string) *Violation {
 			}
 		}
 		if !matched {
-			return &Violation{Path: pathOrRoot(path), Expected: fmt.Sprintf("one of %d shapes, and matches none (the first: %s)", len(schema.anyOf), first.Error())}
+			return &Violation{Path: pathOrRoot(path), Expected: fmt.Sprintf(
+				"one of %d shapes, and matches none (the first: %s)",
+				len(schema.anyOf),
+				first.Error(),
+			)}
 		}
 	}
 	if len(schema.oneOf) > 0 {
@@ -218,9 +246,16 @@ func validate(schema *node, value any, path string) *Violation {
 		}
 		switch {
 		case matches == 0:
-			return &Violation{Path: pathOrRoot(path), Expected: fmt.Sprintf("exactly one of %d shapes, and matches none (the first: %s)", len(schema.oneOf), first.Error())}
+			return &Violation{Path: pathOrRoot(path), Expected: fmt.Sprintf(
+				"exactly one of %d shapes, and matches none (the first: %s)",
+				len(schema.oneOf),
+				first.Error(),
+			)}
 		case matches > 1:
-			return &Violation{Path: pathOrRoot(path), Expected: fmt.Sprintf("exactly one of %d shapes, and matches %d of them", len(schema.oneOf), matches)}
+			return &Violation{
+				Path:     pathOrRoot(path),
+				Expected: fmt.Sprintf("exactly one of %d shapes, and matches %d of them", len(schema.oneOf), matches),
+			}
 		}
 	}
 	if schema.not != nil && validate(schema.not, value, path) == nil {
@@ -231,16 +266,27 @@ func validate(schema *node, value any, path string) *Violation {
 
 func validateArray(schema *node, list []any, path string) *Violation {
 	if schema.minItems != nil && len(list) < *schema.minItems {
-		return &Violation{Path: pathOrRoot(path), Expected: fmt.Sprintf("at least %d items, got %d", *schema.minItems, len(list))}
+		return &Violation{
+			Path:     pathOrRoot(path),
+			Expected: fmt.Sprintf("at least %d items, got %d", *schema.minItems, len(list)),
+		}
 	}
 	if schema.maxItems != nil && len(list) > *schema.maxItems {
-		return &Violation{Path: pathOrRoot(path), Expected: fmt.Sprintf("at most %d items, got %d", *schema.maxItems, len(list))}
+		return &Violation{
+			Path:     pathOrRoot(path),
+			Expected: fmt.Sprintf("at most %d items, got %d", *schema.maxItems, len(list)),
+		}
 	}
 	if schema.uniqueItems {
 		for later := 1; later < len(list); later++ {
 			for earlier := 0; earlier < later; earlier++ {
 				if equal(list[earlier], list[later]) {
-					return &Violation{Path: pathOrRoot(path), Expected: fmt.Sprintf("unique items, and items %d and %d are both %s", earlier, later, encode(list[later]))}
+					return &Violation{Path: pathOrRoot(path), Expected: fmt.Sprintf(
+						"unique items, and items %d and %d are both %s",
+						earlier,
+						later,
+						encode(list[later]),
+					)}
 				}
 			}
 		}
@@ -252,7 +298,10 @@ func validateArray(schema *node, list []any, path string) *Violation {
 		case schema.tupleItems != nil && index < len(schema.tupleItems):
 			itemSchema = schema.tupleItems[index]
 		case schema.tupleItems != nil && schema.noAdditionalItems:
-			return &Violation{Path: pathOrRoot(path), Expected: fmt.Sprintf("at most %d items, got %d", len(schema.tupleItems), len(list))}
+			return &Violation{
+				Path:     pathOrRoot(path),
+				Expected: fmt.Sprintf("at most %d items, got %d", len(schema.tupleItems), len(list)),
+			}
 		case schema.tupleItems != nil:
 			itemSchema = schema.additionalItems
 		default:
@@ -300,7 +349,10 @@ func validateObject(schema *node, object map[string]any, path string) *Violation
 			continue
 		}
 		if schema.noAdditional {
-			return &Violation{Path: pathOrRoot(path), Expected: fmt.Sprintf("only its declared keys, and %q is not one", key)}
+			return &Violation{
+				Path:     pathOrRoot(path),
+				Expected: fmt.Sprintf("only its declared keys, and %q is not one", key),
+			}
 		}
 		if schema.additionalProperties != nil {
 			if violation := validate(schema.additionalProperties, object[key], keyPath); violation != nil {

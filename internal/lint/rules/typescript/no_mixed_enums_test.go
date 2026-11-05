@@ -85,9 +85,18 @@ func TestNoMixedEnumsFires(test *testing.T) {
 		{"\nenum Foo {\n  A,\n}\nenum Foo {\n  B = 'b',\n}\nenum Foo {\n  C,\n}\n      ", 1},
 		{"\nenum Foo {\n  A,\n}\nenum Foo {\n  B,\n}\nenum Foo {\n  C = 'c',\n}\n      ", 1},
 		{"\nenum Foo {\n  A = 1,\n}\nenum Foo {\n  B = 'B',\n}\n      ", 1},
-		{"\nnamespace Test {\n  export enum Bar {\n    A = 1,\n  }\n}\nnamespace Test {\n  export enum Bar {\n    B = 'B',\n  }\n}\n      ", 1},
-		{"\nnamespace Test {\n  export enum Bar {\n    A,\n  }\n}\nnamespace Test {\n  export enum Bar {\n    B = 'B',\n  }\n}\n      ", 1},
-		{"\nnamespace Outer {\n  export namespace Test {\n    export enum Bar {\n      A = 1,\n    }\n  }\n}\nnamespace Outer {\n  export namespace Test {\n    export enum Bar {\n      B = 'B',\n    }\n  }\n}\n      ", 1},
+		{
+			"\nnamespace Test {\n  export enum Bar {\n    A = 1,\n  }\n}\nnamespace Test {\n  export enum Bar {\n    B = 'B',\n  }\n}\n      ",
+			1,
+		},
+		{
+			"\nnamespace Test {\n  export enum Bar {\n    A,\n  }\n}\nnamespace Test {\n  export enum Bar {\n    B = 'B',\n  }\n}\n      ",
+			1,
+		},
+		{
+			"\nnamespace Outer {\n  export namespace Test {\n    export enum Bar {\n      A = 1,\n    }\n  }\n}\nnamespace Outer {\n  export namespace Test {\n    export enum Bar {\n      B = 'B',\n    }\n  }\n}\n      ",
+			1,
+		},
 	}
 	for index, testCase := range cases {
 		test.Run(fmt.Sprintf("upstream invalid %d", index), func(test *testing.T) {
@@ -115,8 +124,16 @@ func TestNoMixedEnumsAcrossFiles(test *testing.T) {
 		sourceText string
 		findings   int
 	}{
-		{"upstream valid multi 0", "\nimport { Enum } from './mixed-enums-decl';\n\ndeclare module './mixed-enums-decl' {\n  enum Enum {\n    StringLike = 'StringLike',\n  }\n}\n    ", 0},
-		{"upstream invalid multi 0", "\nimport { Enum } from './mixed-enums-decl';\n\ndeclare module './mixed-enums-decl' {\n  enum Enum {\n    Numeric = 0,\n  }\n}\n      ", 1},
+		{
+			"upstream valid multi 0",
+			"\nimport { Enum } from './mixed-enums-decl';\n\ndeclare module './mixed-enums-decl' {\n  enum Enum {\n    StringLike = 'StringLike',\n  }\n}\n    ",
+			0,
+		},
+		{
+			"upstream invalid multi 0",
+			"\nimport { Enum } from './mixed-enums-decl';\n\ndeclare module './mixed-enums-decl' {\n  enum Enum {\n    Numeric = 0,\n  }\n}\n      ",
+			1,
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -438,7 +455,11 @@ func TestNoMixedEnumsTemplateLiteralsAreStrings(test *testing.T) {
 		{"number then template", "enum E {\n  A = 1,\n  B = `b`,\n}\n", 1},
 		{"number then plain string (control)", "enum E {\n  A = 1,\n  B = 'b',\n}\n", 1},
 		{"template then number", "enum E {\n  A = `a`,\n  B = 1,\n}\n", 1},
-		{"template with a numeric substitution is still a string", "declare const n: number;\nenum E {\n  A = 1,\n  B = `${n}`,\n}\n", 1},
+		{
+			"template with a numeric substitution is still a string",
+			"declare const n: number;\nenum E {\n  A = 1,\n  B = `${n}`,\n}\n",
+			1,
+		},
 		{"two templates agree", "enum E {\n  A = `a`,\n  B = `b`,\n}\n", 0},
 	}
 	for _, testCase := range cases {
@@ -465,9 +486,21 @@ func TestNoMixedEnumsCheckerArm(test *testing.T) {
 		sourceText string
 		findings   int
 	}{
-		{"call returning string after number", "declare const f: () => string;\nenum E {\n  A = 1,\n  B = f(),\n}\n", 1},
-		{"call returning number after number (control)", "declare const g: () => number;\nenum E {\n  A = 1,\n  B = g(),\n}\n", 0},
-		{"call returning string after string (control)", "declare const f: () => string;\nenum E {\n  A = 'a',\n  B = f(),\n}\n", 0},
+		{
+			"call returning string after number",
+			"declare const f: () => string;\nenum E {\n  A = 1,\n  B = f(),\n}\n",
+			1,
+		},
+		{
+			"call returning number after number (control)",
+			"declare const g: () => number;\nenum E {\n  A = 1,\n  B = g(),\n}\n",
+			0,
+		},
+		{
+			"call returning string after string (control)",
+			"declare const f: () => string;\nenum E {\n  A = 'a',\n  B = f(),\n}\n",
+			0,
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -530,8 +563,16 @@ func TestNoMixedEnumsUnknownFirstMemberSilencesEverything(test *testing.T) {
 		{"the same without the leading boolean (control)", "enum E {\n  B = 1,\n  C = 'c',\n}\n", 1},
 		{"boolean first, then string, then number", "enum E {\n  A = false,\n  B = 'b',\n  C = 1,\n}\n", 0},
 		{"null first, then number, then string", "enum E {\n  A = null,\n  B = 1,\n  C = 'c',\n}\n", 0},
-		{"merged sibling whose first member is a boolean", "enum E {\n  Z = false,\n}\nenum E {\n  A = 1,\n  B = 'b',\n}\n", 0},
-		{"merged sibling with a boolean, then a string-first pair", "enum E {\n  Z = false,\n}\nenum E {\n  A = 'a',\n  B = 1,\n}\n", 0},
+		{
+			"merged sibling whose first member is a boolean",
+			"enum E {\n  Z = false,\n}\nenum E {\n  A = 1,\n  B = 'b',\n}\n",
+			0,
+		},
+		{
+			"merged sibling with a boolean, then a string-first pair",
+			"enum E {\n  Z = false,\n}\nenum E {\n  A = 'a',\n  B = 1,\n}\n",
+			0,
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {

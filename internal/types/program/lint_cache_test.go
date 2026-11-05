@@ -46,9 +46,13 @@ func sampleLintCache() *program.LintCache {
 					"no-empty":       {"Hub in /project/source/hub.ts": 2, "Other in /project/source/other.ts": 1},
 					"await-thenable": {"Hub in /project/source/hub.ts": 3},
 				},
-				// A count, a zero pair and a skip, so an encoder that dropped any part or the zero pair could not match.
+				// A count, a zero pair and a skip, so an encoder that dropped any part or the zero pair could not
+				// match.
 				Adamic: &program.AdamicRecord{
-					Counts:  []program.AdamicCount{{Rule: "adamic/invariant-mutable", Findings: 2}, {Rule: "adamic/single-spread"}},
+					Counts: []program.AdamicCount{
+						{Rule: "adamic/invariant-mutable", Findings: 2},
+						{Rule: "adamic/single-spread"},
+					},
 					Skipped: []string{"adamic/nominal-class"},
 				},
 				Findings: []program.LintCacheFinding{
@@ -89,7 +93,12 @@ func sampleLintCache() *program.LintCache {
 }
 
 // testIdentity is the build a test's tables are written and read by.
-var testIdentity = program.CacheTableIdentity{SelfCommit: "test", CompilerCommit: "test", GoToolchain: "go-test", Platform: "test/test"}
+var testIdentity = program.CacheTableIdentity{
+	SelfCommit:     "test",
+	CompilerCommit: "test",
+	GoToolchain:    "go-test",
+	Platform:       "test/test",
+}
 
 // roundTripLintCache sends a findings cache through the cache table's file and back, the only way one
 // reaches disk.
@@ -98,10 +107,21 @@ func roundTripLintCache(test *testing.T, cache *program.LintCache) *program.Lint
 	table := program.NewCacheTable()
 	table.Findings = cache
 	directory := test.TempDir()
-	if writeCacheTableError := program.WriteCacheTable(directory, table, testIdentity, program.CacheTableSections{Findings: true}, program.PathAnchor{}); writeCacheTableError != nil {
+	if writeCacheTableError := program.WriteCacheTable(
+		directory,
+		table,
+		testIdentity,
+		program.CacheTableSections{Findings: true},
+		program.PathAnchor{},
+	); writeCacheTableError != nil {
 		test.Fatalf("writing: %v", writeCacheTableError)
 	}
-	read, readCacheTableError := program.ReadCacheTable(directory, testIdentity, program.CacheTableSections{Findings: true}, program.PathAnchor{})
+	read, readCacheTableError := program.ReadCacheTable(
+		directory,
+		testIdentity,
+		program.CacheTableSections{Findings: true},
+		program.PathAnchor{},
+	)
 	if readCacheTableError != nil {
 		test.Fatalf("reading what we just wrote: %v", readCacheTableError)
 	}
@@ -132,7 +152,11 @@ func TestLintCacheRoundTripsEveryField(test *testing.T) {
 		test.Errorf("key did not survive: %x against %x", decoded.Key, original.Key)
 	}
 	if !reflect.DeepEqual(decoded.DesignSystem, original.DesignSystem) || original.DesignSystem == nil {
-		test.Errorf("the design system key did not survive: %+v against %+v", decoded.DesignSystem, original.DesignSystem)
+		test.Errorf(
+			"the design system key did not survive: %+v against %+v",
+			decoded.DesignSystem,
+			original.DesignSystem,
+		)
 	}
 	if len(decoded.Entries) != len(original.Entries) {
 		test.Fatalf("entries: %d back from %d", len(decoded.Entries), len(original.Entries))
@@ -168,10 +192,20 @@ func TestLintCacheRoundTripsEveryField(test *testing.T) {
 			test.Errorf("entry %d DerivedRules: %v against %v", index, got.DerivedRules, want.DerivedRules)
 		}
 		if got.DerivedFingerprint != want.DerivedFingerprint {
-			test.Errorf("entry %d DerivedFingerprint: %x against %x", index, got.DerivedFingerprint, want.DerivedFingerprint)
+			test.Errorf(
+				"entry %d DerivedFingerprint: %x against %x",
+				index,
+				got.DerivedFingerprint,
+				want.DerivedFingerprint,
+			)
 		}
 		if got.DesignFingerprint != want.DesignFingerprint {
-			test.Errorf("entry %d DesignFingerprint: %x against %x", index, got.DesignFingerprint, want.DesignFingerprint)
+			test.Errorf(
+				"entry %d DesignFingerprint: %x against %x",
+				index,
+				got.DesignFingerprint,
+				want.DesignFingerprint,
+			)
 		}
 		if strings.Join(got.Listening, ",") != strings.Join(want.Listening, ",") {
 			test.Errorf("entry %d Listening: %v against %v", index, got.Listening, want.Listening)
@@ -381,9 +415,24 @@ func TestLintCacheFindingHasNoUncheckedFields(test *testing.T) {
 func TestLintCacheEntryHasNoUncheckedFields(test *testing.T) {
 	test.Parallel()
 	compared := map[string]struct{}{
-		"Path": {}, "ContentHash": {}, "Rules": {}, "TypedRules": {}, "TypeFingerprint": {}, "Listening": {},
-		"VisitedNodes": {}, "Findings": {}, "ShapedRules": {}, "ShapeFingerprint": {}, "DesignRules": {}, "DesignFingerprint": {},
-		"DerivedRules": {}, "DerivedFingerprint": {}, "Notes": {}, "Adamic": {}, "Directives": {}, "Withheld": {},
+		"Path":               {},
+		"ContentHash":        {},
+		"Rules":              {},
+		"TypedRules":         {},
+		"TypeFingerprint":    {},
+		"Listening":          {},
+		"VisitedNodes":       {},
+		"Findings":           {},
+		"ShapedRules":        {},
+		"ShapeFingerprint":   {},
+		"DesignRules":        {},
+		"DesignFingerprint":  {},
+		"DerivedRules":       {},
+		"DerivedFingerprint": {},
+		"Notes":              {},
+		"Adamic":             {},
+		"Directives":         {},
+		"Withheld":           {},
 	}
 	entryType := reflect.TypeOf(program.LintCacheEntry{})
 	for index := range entryType.NumField() {
@@ -410,10 +459,12 @@ func TestLintCacheStoreReplacesRatherThanAppends(test *testing.T) {
 	rules := []string{"no-debugger"}
 
 	first := program.HashContent("debugger;\n")
-	cache.Store(program.LintCacheEntry{Path: path, ContentHash: first, Rules: rules, Findings: []program.LintCacheFinding{{
-		RuleName: "no-debugger", Start: 0, End: 9,
-		MessageId: "unexpectedDebugger", MessageDescription: "Unexpected debugger statement.",
-	}}})
+	cache.Store(
+		program.LintCacheEntry{Path: path, ContentHash: first, Rules: rules, Findings: []program.LintCacheFinding{{
+			RuleName: "no-debugger", Start: 0, End: 9,
+			MessageId: "unexpectedDebugger", MessageDescription: "Unexpected debugger statement.",
+		}}},
+	)
 
 	// The same file, edited clean. The second store must supersede the first.
 	second := program.HashContent("export const value = 1;\n")

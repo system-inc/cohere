@@ -155,7 +155,10 @@ func (provenance Provenance) String() string {
 	// Printed only when true, because "built from a clean tree" is the ordinary case and a line
 	// asserting it on every release would be noise that hides the one time it matters.
 	if provenance.SourceTreeModified {
-		lines = append(lines, "  source:         built from a tree with uncommitted changes, so no commit reproduces this binary")
+		lines = append(
+			lines,
+			"  source:         built from a tree with uncommitted changes, so no commit reproduces this binary",
+		)
 	}
 	if provenance.IsDevelopment() {
 		// A local build of a named commit with nothing uncommitted in it is reproducible from that
@@ -164,9 +167,15 @@ func (provenance Provenance) String() string {
 		// is decorative stops reading the one that is not: a `--dev` build, or any build from a
 		// dirty tree, still carries it.
 		if provenance.SelfCommit != "" && !provenance.SourceTreeModified {
-			lines = append(lines, "  note:           a local build of the commit above, with nothing uncommitted in it, so that commit reproduces it")
+			lines = append(
+				lines,
+				"  note:           a local build of the commit above, with nothing uncommitted in it, so that commit reproduces it",
+			)
 		} else {
-			lines = append(lines, "  note:           a local build, so the rules are whatever was on disk when it was compiled")
+			lines = append(
+				lines,
+				"  note:           a local build, so the rules are whatever was on disk when it was compiled",
+			)
 		}
 	}
 	return strings.Join(lines, "\n")

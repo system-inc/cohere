@@ -27,11 +27,15 @@ func settingsOf(namespaces map[string]string) rule.OptionsBase {
 func TestCheckSettingsAcceptsWhatTheRunReads(test *testing.T) {
 	test.Parallel()
 	accepted := map[string]rule.OptionsBase{
-		"no settings":                    {ConfigDirectory: "/repo"},
-		"our repositories' block":        settingsOf(map[string]string{"better-tailwindcss": ourTailwindSettings}),
-		"upstream's other spelling":      settingsOf(map[string]string{"eslint-plugin-better-tailwindcss": `{"callees": ["cn"]}`}),
-		"a key only one rule reads":      settingsOf(map[string]string{"better-tailwindcss": `{"order": "desc"}`}),
-		"every location key":             settingsOf(map[string]string{"better-tailwindcss": `{"entryPoint": "a.css", "tailwindConfig": "b.css", "cwd": "web"}`}),
+		"no settings":             {ConfigDirectory: "/repo"},
+		"our repositories' block": settingsOf(map[string]string{"better-tailwindcss": ourTailwindSettings}),
+		"upstream's other spelling": settingsOf(
+			map[string]string{"eslint-plugin-better-tailwindcss": `{"callees": ["cn"]}`},
+		),
+		"a key only one rule reads": settingsOf(map[string]string{"better-tailwindcss": `{"order": "desc"}`}),
+		"every location key": settingsOf(
+			map[string]string{"better-tailwindcss": `{"entryPoint": "a.css", "tailwindConfig": "b.css", "cwd": "web"}`},
+		),
 		"an empty block":                 settingsOf(map[string]string{"better-tailwindcss": `{}`}),
 		"an empty list replacing a kind": settingsOf(map[string]string{"better-tailwindcss": `{"callees": []}`}),
 	}
@@ -56,14 +60,20 @@ func TestCheckSettingsRefusesWhatWouldBeIgnored(test *testing.T) {
 			"better-tailwindcss":               `{}`,
 			"eslint-plugin-better-tailwindcss": `{}`,
 		}), []string{"both", "keep one"}},
-		{"an upstream option not ported yet", settingsOf(map[string]string{"better-tailwindcss": `{"messageStyle": "compact"}`}),
-			[]string{`"messageStyle"`, "ignored"}},
+		{
+			"an upstream option not ported yet",
+			settingsOf(map[string]string{"better-tailwindcss": `{"messageStyle": "compact"}`}),
+			[]string{`"messageStyle"`, "ignored"},
+		},
 		{"a key no rule reads", settingsOf(map[string]string{"better-tailwindcss": `{"calees": ["cn"]}`}),
 			[]string{`"calees"`}},
 		{"a value of the wrong type", settingsOf(map[string]string{"better-tailwindcss": `{"callees": "cn"}`}),
 			[]string{"better-tailwindcss/", "callees"}},
-		{"a value upstream's schema refuses", settingsOf(map[string]string{"better-tailwindcss": `{"order": "sideways"}`}),
-			[]string{"better-tailwindcss/enforce-consistent-class-order", "order"}},
+		{
+			"a value upstream's schema refuses",
+			settingsOf(map[string]string{"better-tailwindcss": `{"order": "sideways"}`}),
+			[]string{"better-tailwindcss/enforce-consistent-class-order", "order"},
+		},
 		{"null", settingsOf(map[string]string{"better-tailwindcss": `{"collapse": null}`}),
 			[]string{"collapse"}},
 	}
@@ -112,6 +122,9 @@ func TestSettingsReachARuleThroughTheRunsOptions(test *testing.T) {
 	}
 	if !strings.Contains(string(encoded), `"order":"asc"`) ||
 		!strings.Contains(string(encoded), `"callees":["mergeClassNames"]`) {
-		test.Fatalf("an options element decoded %s, want its own order over settings' and settings' callees kept", encoded)
+		test.Fatalf(
+			"an options element decoded %s, want its own order over settings' and settings' callees kept",
+			encoded,
+		)
 	}
 }

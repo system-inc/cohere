@@ -413,7 +413,12 @@ func TestRefsPointsAtTheAccess(test *testing.T) {
 			written := strings.TrimSpace(source) + "\n"
 			span := result.Diagnostics[0].Range
 			if span.Pos() < 0 || span.End() > len(written) || span.Pos() >= span.End() {
-				test.Fatalf("finding has range [%d,%d) outside the %d byte source", span.Pos(), span.End(), len(written))
+				test.Fatalf(
+					"finding has range [%d,%d) outside the %d byte source",
+					span.Pos(),
+					span.End(),
+					len(written),
+				)
 			}
 			if got := written[span.Pos():span.End()]; got != testCase.Want {
 				test.Errorf("finding spans %q, want %q", got, testCase.Want)
@@ -439,15 +444,30 @@ func TestRefsMessagesReadCorrectly(test *testing.T) {
 	}{
 		{refsFindingValueAccess, "refValueAccess", "Cannot access ref value during render.", "event handler"},
 		{refsFindingUpdate, "refUpdate", "Cannot update ref during render.", "event handler"},
-		{refsFindingPassedToFunction, "refPassedToFunction", "Passing a ref to a function may read its value during render.", "event handler"},
-		{refsFindingFunctionAccessesRef, "functionAccessesRef", "This function accesses a ref value, and calling it during render reads the ref.", "event handler"},
+		{
+			refsFindingPassedToFunction,
+			"refPassedToFunction",
+			"Passing a ref to a function may read its value during render.",
+			"event handler",
+		},
+		{
+			refsFindingFunctionAccessesRef,
+			"functionAccessesRef",
+			"This function accesses a ref value, and calling it during render reads the ref.",
+			"event handler",
+		},
 	} {
 		message := refsMessageFor(testCase.Kind)
 		if message.Id != testCase.WantId {
 			test.Errorf("kind %d has id %q, want %q", testCase.Kind, message.Id, testCase.WantId)
 		}
 		if !strings.HasPrefix(message.Description, testCase.WantPrefix) {
-			test.Errorf("kind %d description starts %q, want prefix %q", testCase.Kind, message.Description, testCase.WantPrefix)
+			test.Errorf(
+				"kind %d description starts %q, want prefix %q",
+				testCase.Kind,
+				message.Description,
+				testCase.WantPrefix,
+			)
 		}
 		if !strings.Contains(message.Description, testCase.WantMentions) {
 			test.Errorf("kind %d description never says where a ref MAY be read", testCase.Kind)
@@ -588,7 +608,10 @@ func TestRefsNameSignalWorksWithoutTheChecker(test *testing.T) {
 	source := "function Component(props) {\n  const value = props.ref.current;\n  return <div>{value}</div>;\n}\n"
 	result := rule_testing.RunTypedFiles(test, Refs, map[string]string{"c.tsx": source}, "c.tsx")
 	if len(result.Diagnostics) != 1 {
-		test.Fatalf("reported %d findings with no React types available, want 1 from the name signal", len(result.Diagnostics))
+		test.Fatalf(
+			"reported %d findings with no React types available, want 1 from the name signal",
+			len(result.Diagnostics),
+		)
 	}
 	if result.Diagnostics[0].Message.Id != messageRefsValueAccessId {
 		test.Errorf("reported %s, want %s", result.Diagnostics[0].Message.Id, messageRefsValueAccessId)
@@ -679,7 +702,12 @@ func TestRefsExemptsTheMergeRefsShape(test *testing.T) {
 		"  return <input ref={setInputReference} />;\n" +
 		"}\n"
 
-	result := rule_testing.RunTypedFiles(test, Refs, map[string]string{"c.tsx": source, "react.d.ts": declarations}, "c.tsx")
+	result := rule_testing.RunTypedFiles(
+		test,
+		Refs,
+		map[string]string{"c.tsx": source, "react.d.ts": declarations},
+		"c.tsx",
+	)
 	if len(result.Diagnostics) != 0 {
 		ids := []string{}
 		for _, diagnostic := range result.Diagnostics {
@@ -713,7 +741,12 @@ func TestRefsDoesNotTaintSiblingFieldsOfARefProp(test *testing.T) {
 		"  return <div style={{width}} data-guide={guide} />;\n" +
 		"}\n"
 
-	result := rule_testing.RunTypedFiles(test, Refs, map[string]string{"c.tsx": source, "react.d.ts": declarations}, "c.tsx")
+	result := rule_testing.RunTypedFiles(
+		test,
+		Refs,
+		map[string]string{"c.tsx": source, "react.d.ts": declarations},
+		"c.tsx",
+	)
 	if len(result.Diagnostics) != 0 {
 		ids := []string{}
 		for _, diagnostic := range result.Diagnostics {
@@ -730,9 +763,17 @@ func TestRefsDoesNotTaintSiblingFieldsOfARefProp(test *testing.T) {
 		"  const value = properties.guideElementReference.current;\n" +
 		"  return <div>{value}</div>;\n" +
 		"}\n"
-	readingResult := rule_testing.RunTypedFiles(test, Refs, map[string]string{"c.tsx": reading, "react.d.ts": declarations}, "c.tsx")
+	readingResult := rule_testing.RunTypedFiles(
+		test,
+		Refs,
+		map[string]string{"c.tsx": reading, "react.d.ts": declarations},
+		"c.tsx",
+	)
 	if len(readingResult.Diagnostics) != 1 {
-		test.Errorf("reading the ref field's current gave %d findings, want 1 \u2014 the rule has gone blind to refs on props", len(readingResult.Diagnostics))
+		test.Errorf(
+			"reading the ref field's current gave %d findings, want 1 \u2014 the rule has gone blind to refs on props",
+			len(readingResult.Diagnostics),
+		)
 	}
 }
 
@@ -822,13 +863,19 @@ export function Component({label}: {label: string}) {
 						if refsCannotHaveRefType(node) {
 							declined[node.Kind]++
 							if refsNodeHasRefType(ruleContext, node) {
-								test.Errorf("declined %s at %d, which the checker types as a ref", node.Kind, node.Pos())
+								test.Errorf(
+									"declined %s at %d, which the checker types as a ref",
+									node.Kind,
+									node.Pos(),
+								)
 							}
 						}
 						if node.Kind == ast.KindBinaryExpression || node.Kind == ast.KindConditionalExpression ||
 							node.Kind == ast.KindFunctionExpression {
 							text := ruleContext.SourceFile.Text()[node.Pos():node.End()]
-							asked[strings.TrimSpace(text)] = !refsCannotHaveRefType(node) && refsNodeHasRefType(ruleContext, node)
+							asked[strings.TrimSpace(
+								text,
+							)] = !refsCannotHaveRefType(node) && refsNodeHasRefType(ruleContext, node)
 						}
 						return node.ForEachChild(visit)
 					}

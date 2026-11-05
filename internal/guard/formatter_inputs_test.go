@@ -33,7 +33,10 @@ func TestFormatterInputsCoverWhatCanChangeTheOutput(test *testing.T) {
 	for _, input := range inputs {
 		names[input.Name] = true
 		if strings.Contains(input.Name, "/internal/lint/rules/") {
-			test.Errorf("a lint rule is a formatter input, so a rule commit would throw the record away: %s", input.Name)
+			test.Errorf(
+				"a lint rule is a formatter input, so a rule commit would throw the record away: %s",
+				input.Name,
+			)
 		}
 		if len(input.Sum) != 64 {
 			test.Errorf("%s has no content hash: %q", input.Name, input.Sum)

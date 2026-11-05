@@ -33,7 +33,10 @@ func formatOnlyUnchecked(summary edit.Summary, scope formatScope) []uncheckedFil
 	unchecked := []uncheckedFile{}
 	if scope.failure != nil {
 		// No file to name: the walk that would have named them failed, which is the finding.
-		unchecked = append(unchecked, uncheckedFile{Reason: fmt.Sprintf("the format walk failed, so no file was checked: %v", scope.failure)})
+		unchecked = append(
+			unchecked,
+			uncheckedFile{Reason: fmt.Sprintf("the format walk failed, so no file was checked: %v", scope.failure)},
+		)
 	}
 	for _, file := range summary.NotTransformed {
 		if file.Failed || file.Reason == unparseableSkipReason {
@@ -43,7 +46,10 @@ func formatOnlyUnchecked(summary edit.Summary, scope formatScope) []uncheckedFil
 	// A file the engine could not process at all never reached the formatter, and one whose formatted text
 	// did not parse was refused. Either way nothing about its formatting is known.
 	for _, fileName := range summary.FilesFailed {
-		unchecked = append(unchecked, uncheckedFile{FileName: fileName, Reason: "the file could not be processed, so the formatter never read it"})
+		unchecked = append(unchecked, uncheckedFile{
+			FileName: fileName,
+			Reason:   "the file could not be processed, so the formatter never read it",
+		})
 	}
 	for _, refused := range summary.FilesRefused {
 		unchecked = append(unchecked, uncheckedFile{FileName: refused.FileName, Reason: edit.ReasonParseFailure})
@@ -55,7 +61,10 @@ func formatOnlyUnchecked(summary edit.Summary, scope formatScope) []uncheckedFil
 func nestedUnchecked(check nestedDriftCheck) []uncheckedFile {
 	unchecked := make([]uncheckedFile, 0, len(check.Unchecked))
 	for _, file := range check.Unchecked {
-		unchecked = append(unchecked, uncheckedFile{FileName: file.FileName, Reason: fmt.Sprintf("in nested repository %s, %s", file.Repository, file.Reason)})
+		unchecked = append(unchecked, uncheckedFile{
+			FileName: file.FileName,
+			Reason:   fmt.Sprintf("in nested repository %s, %s", file.Repository, file.Reason),
+		})
 	}
 	return unchecked
 }
@@ -65,12 +74,29 @@ func printUnchecked(out *bufio.Writer, unchecked []uncheckedFile) {
 	for _, file := range unchecked {
 		if file.FileName == "" {
 			printFinding(out,
-				runFinding{Severity: "error", Rule: "format", MessageID: "unchecked", Message: "the formatter could not check this run: " + file.Reason},
+				runFinding{
+					Severity:  "error",
+					Rule:      "format",
+					MessageID: "unchecked",
+					Message:   "the formatter could not check this run: " + file.Reason,
+				},
 				fmt.Sprintf("cohere: the formatter could not check this run: %s [format/unchecked]\n", file.Reason))
 			continue
 		}
 		printFinding(out,
-			runFinding{Path: file.FileName, Line: 1, Column: 1, Severity: "error", Rule: "format", MessageID: "unchecked", Message: "the formatter could not check this file: " + file.Reason},
-			fmt.Sprintf("%s:1:1 - the formatter could not check this file: %s [format/unchecked]\n", file.FileName, file.Reason))
+			runFinding{
+				Path:      file.FileName,
+				Line:      1,
+				Column:    1,
+				Severity:  "error",
+				Rule:      "format",
+				MessageID: "unchecked",
+				Message:   "the formatter could not check this file: " + file.Reason,
+			},
+			fmt.Sprintf(
+				"%s:1:1 - the formatter could not check this file: %s [format/unchecked]\n",
+				file.FileName,
+				file.Reason,
+			))
 	}
 }

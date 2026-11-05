@@ -54,9 +54,15 @@ func TestConsistencyRequireTypeSuffixStaysSilent(test *testing.T) {
 		// These are the discriminating cases for the const-enum detector. Each is structurally
 		// `{ ... } as const` and none is an enum, so a detector that keyed on the wrapper alone
 		// would ask for a rename that would be wrong.
-		{"lookup table with unrelated values", "export const ClassNames = { small: 'text-sm', large: 'text-lg' } as const;\n"},
+		{
+			"lookup table with unrelated values",
+			"export const ClassNames = { small: 'text-sm', large: 'text-lg' } as const;\n",
+		},
 		{"one entry that does not match", "export const Operator = { Add: 'Add', Sub: 'Subtract' } as const;\n"},
-		{"computed keys are a map over an existing kind", "export const Labels = { [OperatorKind.Add]: 'Add' } as const;\n"},
+		{
+			"computed keys are a map over an existing kind",
+			"export const Labels = { [OperatorKind.Add]: 'Add' } as const;\n",
+		},
 		{"empty object", "export const Empty = {} as const;\n"},
 		{"non-string values", "export const Sizes = { Small: 1, Large: 2 } as const;\n"},
 

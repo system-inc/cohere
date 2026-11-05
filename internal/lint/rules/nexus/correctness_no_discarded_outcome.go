@@ -13,7 +13,10 @@ const correctnessNoDiscardedOutcomeId = "outcomeDiscarded"
 
 // correctnessNoDiscardedOutcomeText is the rule's message, whose wording lives in
 // `policy/messages/correctness-no-discarded-outcome.json`.
-var correctnessNoDiscardedOutcomeText = policy.MessageOf("nexus/correctness-no-discarded-outcome", correctnessNoDiscardedOutcomeId)
+var correctnessNoDiscardedOutcomeText = policy.MessageOf(
+	"nexus/correctness-no-discarded-outcome",
+	correctnessNoDiscardedOutcomeId,
+)
 
 func correctnessNoDiscardedOutcomeMessage(typeName string) rule.Message {
 	return rule.Message{
@@ -226,7 +229,9 @@ func correctnessNoDiscardedOutcomeAliasName(union *ast.Node) string {
 		return ""
 	}
 	declaration := alias.AsTypeAliasDeclaration()
-	if declaration.Name() == nil || declaration.Type == nil || correctnessNoDiscardedOutcomeSkipParenthesizedType(declaration.Type) != union {
+	if declaration.Name() == nil ||
+		declaration.Type == nil ||
+		correctnessNoDiscardedOutcomeSkipParenthesizedType(declaration.Type) != union {
 		return ""
 	}
 	if alias.Parent == nil || alias.Parent.Kind != ast.KindSourceFile {

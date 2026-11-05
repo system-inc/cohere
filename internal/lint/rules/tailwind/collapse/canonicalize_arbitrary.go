@@ -416,7 +416,9 @@ func arbitraryValueOf(candidate *ParsedCandidate) (string, bool) {
 	switch {
 	case candidate.Kind == ParsedCandidateKindArbitrary:
 		return candidate.PropertyValue, true
-	case candidate.Kind == ParsedCandidateKindFunctional && candidate.Value != nil && candidate.Value.Kind == ParsedValueKindArbitrary:
+	case candidate.Kind == ParsedCandidateKindFunctional &&
+		candidate.Value != nil &&
+		candidate.Value.Kind == ParsedValueKindArbitrary:
 		return candidate.Value.Value, true
 	}
 	return "", false
@@ -484,8 +486,12 @@ func (canonicalizer *Canonicalizer) calcToSpacingFunction(candidate ParsedCandid
 // optimizeArbitraryValueExpressions is upstream's pass of the same name for a functional utility's
 // arbitrary value: a lone `calc()` folded, a negative root's sign moved into the value, and a `* -1`
 // moved out into the root, each kept only when it signs the same as before.
-func (canonicalizer *Canonicalizer) optimizeArbitraryValueExpressions(candidate ParsedCandidate) (ParsedCandidate, bool) {
-	if candidate.Kind != ParsedCandidateKindFunctional || candidate.Value == nil || candidate.Value.Kind != ParsedValueKindArbitrary {
+func (canonicalizer *Canonicalizer) optimizeArbitraryValueExpressions(
+	candidate ParsedCandidate,
+) (ParsedCandidate, bool) {
+	if candidate.Kind != ParsedCandidateKindFunctional ||
+		candidate.Value == nil ||
+		candidate.Value.Kind != ParsedValueKindArbitrary {
 		return candidate, true
 	}
 	valueAst := ParseValue(candidate.Value.Value)
@@ -559,7 +565,10 @@ func (canonicalizer *Canonicalizer) optimizeArbitraryValueExpressions(candidate 
 // hasSameSignature is upstream's comparison through the exact-equal relation: true only when both sign
 // exactly and alike. Known is false when either signature is unknown, since upstream might answer
 // either way, and the caller then aborts.
-func (canonicalizer *Canonicalizer) hasSameSignature(left ParsedCandidate, right ParsedCandidate) (same bool, known bool) {
+func (canonicalizer *Canonicalizer) hasSameSignature(
+	left ParsedCandidate,
+	right ParsedCandidate,
+) (same bool, known bool) {
 	prefix := canonicalizer.system.Prefix()
 	leftSignature, leftState := canonicalizer.classSignature(PrintCandidate(left, prefix))
 	rightSignature, rightState := canonicalizer.classSignature(PrintCandidate(right, prefix))
@@ -630,7 +639,11 @@ func (canonicalizer *Canonicalizer) arbitraryUtilities(candidate ParsedCandidate
 // when it does not, and an abort when that cannot be told or the replacement is an arbitrary value, which
 // upstream's later passes arbitraryValueToBareValueUtility and dropUnnecessaryDataTypes, not ported, may
 // rewrite again.
-func (canonicalizer *Canonicalizer) replacedWith(candidate ParsedCandidate, value string, replacement string) (ParsedCandidate, bool) {
+func (canonicalizer *Canonicalizer) replacedWith(
+	candidate ParsedCandidate,
+	value string,
+	replacement string,
+) (ParsedCandidate, bool) {
 	used, known := canonicalizer.allVariablesAreUsed(value, replacement)
 	if !known {
 		return candidate, false
@@ -653,7 +666,12 @@ func (canonicalizer *Canonicalizer) replacedWith(candidate ParsedCandidate, valu
 // that signs alike winning. Upstream walks roots in registration order. This walks them in no order and
 // declines when two roots both match, or when any try it cannot sign could, so the winner never depends
 // on the order.
-func (canonicalizer *Canonicalizer) arbitraryFallback(candidate ParsedCandidate, value string, targetSignature string, properties map[string]bool) (ParsedCandidate, bool) {
+func (canonicalizer *Canonicalizer) arbitraryFallback(
+	candidate ParsedCandidate,
+	value string,
+	targetSignature string,
+	properties map[string]bool,
+) (ParsedCandidate, bool) {
 	index := canonicalizer.shared.classIndex()
 	compiler := index.compiler
 
@@ -663,7 +681,9 @@ func (canonicalizer *Canonicalizer) arbitraryFallback(candidate ParsedCandidate,
 		rootPrefix = "-"
 		multiplier = -multiplier
 	}
-	reasonable := hasMultiplier && isValidSpacingMultiplier(javaScriptNumberString(multiplier)) && index.isReasonableBareValue(multiplier)
+	reasonable := hasMultiplier &&
+		isValidSpacingMultiplier(javaScriptNumberString(multiplier)) &&
+		index.isReasonableBareValue(multiplier)
 
 	matched := ""
 	for _, registered := range index.roots {

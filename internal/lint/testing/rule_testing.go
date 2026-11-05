@@ -236,12 +236,18 @@ func ExpectFixedSource(test *testing.T, result Result, wantSource string) {
 	previousStart := len(source)
 	for _, fix := range fixes {
 		if fix.end > previousStart {
-			test.Fatalf("fixes overlap at [%d,%d): the engine resolves overlaps and a fixture must not guess which one wins",
-				fix.start, fix.end)
+			test.Fatalf(
+				"fixes overlap at [%d,%d): the engine resolves overlaps and a fixture must not guess which one wins",
+				fix.start,
+				fix.end,
+			)
 		}
 		if fix.start < 0 || fix.end > len(source) || fix.start > fix.end {
-			test.Fatalf("fix range [%d,%d) is outside the source, which is a defect in the rule rather than in the test",
-				fix.start, fix.end)
+			test.Fatalf(
+				"fix range [%d,%d) is outside the source, which is a defect in the rule rather than in the test",
+				fix.start,
+				fix.end,
+			)
 		}
 		source = source[:fix.start] + fix.text + source[fix.end:]
 		previousStart = fix.start

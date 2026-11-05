@@ -366,7 +366,11 @@ func TestMethodSignatureStyleFiresOnUpstreamFailCases(test *testing.T) {
 			configuration: "\"method\"",
 			sourceText:    "\ninterface Foo {\n  semi: (arg: string) => void;\n  comma: (arg: string) => void,\n  none: (arg: string) => void\n}\n      ",
 			wantIds:       []string{"errorProperty", "errorProperty", "errorProperty"},
-			wantSpans:     []string{"semi: (arg: string) => void;", "comma: (arg: string) => void,", "none: (arg: string) => void"},
+			wantSpans: []string{
+				"semi: (arg: string) => void;",
+				"comma: (arg: string) => void,",
+				"none: (arg: string) => void",
+			},
 			wantFixed:     "\ninterface Foo {\n  semi(arg: string): void;\n  comma(arg: string): void,\n  none(arg: string): void\n}\n      ",
 			wantSuggested: []string{"", "", ""},
 		},
@@ -374,7 +378,10 @@ func TestMethodSignatureStyleFiresOnUpstreamFailCases(test *testing.T) {
 			configuration: "",
 			sourceText:    "\ninterface Foo {\n  x(\n    args: Pick<\n      Bar,\n      'one' | 'two' | 'three'\n    >,\n  ): Baz;\n  y(\n    foo: string,\n    bar: number,\n  ): void;\n}\n      ",
 			wantIds:       []string{"errorMethod", "errorMethod"},
-			wantSpans:     []string{"x(\n    args: Pick<\n      Bar,\n      'one' | 'two' | 'three'\n    >,\n  ): Baz;", "y(\n    foo: string,\n    bar: number,\n  ): void;"},
+			wantSpans: []string{
+				"x(\n    args: Pick<\n      Bar,\n      'one' | 'two' | 'three'\n    >,\n  ): Baz;",
+				"y(\n    foo: string,\n    bar: number,\n  ): void;",
+			},
 			wantFixed:     "\ninterface Foo {\n  x: (\n    args: Pick<\n      Bar,\n      'one' | 'two' | 'three'\n    >,\n  ) => Baz;\n  y: (\n    foo: string,\n    bar: number,\n  ) => void;\n}\n      ",
 			wantSuggested: []string{"", ""},
 		},
@@ -398,7 +405,11 @@ func TestMethodSignatureStyleFiresOnUpstreamFailCases(test *testing.T) {
 			configuration: "",
 			sourceText:    "\ninterface Foo {\n  [foo](bar: string): one;\n  [foo](bar: number, baz: string): two;\n  [foo](): three;\n}\n      ",
 			wantIds:       []string{"errorMethod", "errorMethod", "errorMethod"},
-			wantSpans:     []string{"[foo](bar: string): one;", "[foo](bar: number, baz: string): two;", "[foo](): three;"},
+			wantSpans: []string{
+				"[foo](bar: string): one;",
+				"[foo](bar: number, baz: string): two;",
+				"[foo](): three;",
+			},
 			wantFixed:     "\ninterface Foo {\n  [foo]: ((bar: string) => one) & ((bar: number, baz: string) => two) & (() => three);\n}\n      ",
 			wantSuggested: []string{"", "", ""},
 		},
@@ -406,7 +417,13 @@ func TestMethodSignatureStyleFiresOnUpstreamFailCases(test *testing.T) {
 			configuration: "",
 			sourceText:    "\ninterface Foo {\n  [foo](bar: string): one;\n  [foo](bar: number, baz: string): two;\n  [foo](): three;\n  bar(arg: string): void;\n  bar(baz: number): Foo;\n}\n      ",
 			wantIds:       []string{"errorMethod", "errorMethod", "errorMethod", "errorMethod", "errorMethod"},
-			wantSpans:     []string{"[foo](bar: string): one;", "[foo](bar: number, baz: string): two;", "[foo](): three;", "bar(arg: string): void;", "bar(baz: number): Foo;"},
+			wantSpans: []string{
+				"[foo](bar: string): one;",
+				"[foo](bar: number, baz: string): two;",
+				"[foo](): three;",
+				"bar(arg: string): void;",
+				"bar(baz: number): Foo;",
+			},
 			wantFixed:     "\ninterface Foo {\n  [foo]: ((bar: string) => one) & ((bar: number, baz: string) => two) & (() => three);\n  bar: ((arg: string) => void) & ((baz: number) => Foo);\n}\n      ",
 			wantSuggested: []string{"", "", "", "", ""},
 		},
@@ -414,7 +431,10 @@ func TestMethodSignatureStyleFiresOnUpstreamFailCases(test *testing.T) {
 			configuration: "",
 			sourceText:    "\n        declare global {\n          namespace jest {\n            interface Matchers<R, T> {\n              // Add overloads specific to the DOM\n              toHaveProp<K extends keyof DomPropsOf<T>>(name: K, value?: DomPropsOf<T>[K]): R;\n              toHaveProps(props: Partial<DomPropsOf<T>>): R;\n            }\n          }\n        }\n      ",
 			wantIds:       []string{"errorMethod", "errorMethod"},
-			wantSpans:     []string{"toHaveProp<K extends keyof DomPropsOf<T>>(name: K, value?: DomPropsOf<T>[K]): R;", "toHaveProps(props: Partial<DomPropsOf<T>>): R;"},
+			wantSpans: []string{
+				"toHaveProp<K extends keyof DomPropsOf<T>>(name: K, value?: DomPropsOf<T>[K]): R;",
+				"toHaveProps(props: Partial<DomPropsOf<T>>): R;",
+			},
 			wantFixed:     "",
 			wantSuggested: []string{"", ""},
 		},
@@ -745,7 +765,9 @@ func TestMethodSignatureStyleDecoderResolvesTheStyle(test *testing.T) {
 	for index, testCase := range cases {
 		test.Run(methodSignatureStyleCaseName(index), func(test *testing.T) {
 			test.Parallel()
-			decoded, decodeMethodSignatureStyleOptionsError := DecodeMethodSignatureStyleOptions([]byte(testCase.configuration))
+			decoded, decodeMethodSignatureStyleOptionsError := DecodeMethodSignatureStyleOptions(
+				[]byte(testCase.configuration),
+			)
 			if decodeMethodSignatureStyleOptionsError != nil {
 				test.Fatalf("decoding %s: %v", testCase.configuration, decodeMethodSignatureStyleOptionsError)
 			}

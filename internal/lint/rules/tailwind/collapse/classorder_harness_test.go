@@ -32,14 +32,21 @@ func (source classOrderStubSource) Reading(className string) (Reading, bool) {
 
 // classOrderSyntheticPopulation builds a population large enough to clear the plausibility floors,
 // so a test can isolate the assertion it means to exercise instead of failing on volume.
-func classOrderSyntheticPopulation(registryCount, corpusCount, engineNullCount int) ([]SystemCases, map[string]Reading) {
+func classOrderSyntheticPopulation(
+	registryCount, corpusCount, engineNullCount int,
+) ([]SystemCases, map[string]Reading) {
 	readings := map[string]Reading{}
 	cases := make([]ClassCase, 0, registryCount+corpusCount)
 
 	for index := 0; index < registryCount; index++ {
 		className := "reg-" + itoa(index)
 		reading := Reading{Order: []int{index % 300}, Count: 1}
-		cases = append(cases, ClassCase{ClassName: className, Population: PopulationRegistry, EngineReading: reading, EngineAnswered: true})
+		cases = append(cases, ClassCase{
+			ClassName:      className,
+			Population:     PopulationRegistry,
+			EngineReading:  reading,
+			EngineAnswered: true,
+		})
 		readings[className] = reading
 	}
 	for index := 0; index < corpusCount; index++ {
@@ -84,7 +91,11 @@ func classOrderHealthyDivergence() SystemDivergence {
 // sees a perfectly clean run. Only the both-silent ceiling and the empty-denominator rule catch it.
 func TestClassOrderHarnessScoresMutualSilenceAsFailure(test *testing.T) {
 	test.Parallel()
-	systems, readings := classOrderSyntheticPopulation(minimumPlausibleRegistryClasses+1, minimumPlausibleCorpusClasses+1, 0)
+	systems, readings := classOrderSyntheticPopulation(
+		minimumPlausibleRegistryClasses+1,
+		minimumPlausibleCorpusClasses+1,
+		0,
+	)
 
 	// Silence both sides on the same classes: a tenth of the registry, well over the ceiling.
 	silenced := 0
@@ -101,7 +112,10 @@ func TestClassOrderHarnessScoresMutualSilenceAsFailure(test *testing.T) {
 		classOrderStubSource{name: "stub", readings: readings}, nil)
 
 	if disagreed := report.Populations[0].ByOutcome[OutcomeDisagreed]; disagreed != 0 {
-		test.Fatalf("the setup is wrong: %d disagreements, expected a run that is clean by every divergence count", disagreed)
+		test.Fatalf(
+			"the setup is wrong: %d disagreements, expected a run that is clean by every divergence count",
+			disagreed,
+		)
 	}
 	if silent := report.Populations[0].ByOutcome[OutcomeBothSilent]; silent != silenced {
 		test.Fatalf("expected %d both-silent classes, got %d", silenced, silent)
@@ -184,7 +198,11 @@ func TestClassOrderHarnessRefusesALostPopulation(test *testing.T) {
 // silence would still pass while testing nothing, and it would do so invisibly.
 func TestClassOrderHarnessRefusesAPopulationWithNoEngineNulls(test *testing.T) {
 	test.Parallel()
-	systems, readings := classOrderSyntheticPopulation(minimumPlausibleRegistryClasses+1, minimumPlausibleCorpusClasses+1, 0)
+	systems, readings := classOrderSyntheticPopulation(
+		minimumPlausibleRegistryClasses+1,
+		minimumPlausibleCorpusClasses+1,
+		0,
+	)
 	report := Compare("4.3.3", systems, classOrderHealthyDivergence(),
 		classOrderStubSource{name: "stub", readings: readings}, nil)
 
@@ -208,7 +226,11 @@ func TestClassOrderHarnessRefusesAPopulationWithNoEngineNulls(test *testing.T) {
 // the suite watches.
 func TestClassOrderHarnessRequiresBothSilentDirections(test *testing.T) {
 	test.Parallel()
-	systems, readings := classOrderSyntheticPopulation(minimumPlausibleRegistryClasses+1, minimumPlausibleCorpusClasses+1, 5)
+	systems, readings := classOrderSyntheticPopulation(
+		minimumPlausibleRegistryClasses+1,
+		minimumPlausibleCorpusClasses+1,
+		5,
+	)
 	honest := classOrderStubSource{name: "stub", readings: readings}
 
 	goSilentOnly := Control{
@@ -226,13 +248,31 @@ func TestClassOrderHarnessRequiresBothSilentDirections(test *testing.T) {
 		ExpectedOutcome: OutcomeEngineSilent, MinimumDetections: 1,
 	}
 
-	if report := Compare("4.3.3", systems, classOrderHealthyDivergence(), honest, []Control{goSilentOnly}); report.ControlsProven() {
+	if report := Compare(
+		"4.3.3",
+		systems,
+		classOrderHealthyDivergence(),
+		honest,
+		[]Control{goSilentOnly},
+	); report.ControlsProven() {
 		test.Error("a single go-silent control was accepted as proof of detection in both directions")
 	}
-	if report := Compare("4.3.3", systems, classOrderHealthyDivergence(), honest, []Control{engineSilentOnly}); report.ControlsProven() {
+	if report := Compare(
+		"4.3.3",
+		systems,
+		classOrderHealthyDivergence(),
+		honest,
+		[]Control{engineSilentOnly},
+	); report.ControlsProven() {
 		test.Error("a single engine-silent control was accepted as proof of detection in both directions")
 	}
-	report := Compare("4.3.3", systems, classOrderHealthyDivergence(), honest, []Control{goSilentOnly, engineSilentOnly})
+	report := Compare(
+		"4.3.3",
+		systems,
+		classOrderHealthyDivergence(),
+		honest,
+		[]Control{goSilentOnly, engineSilentOnly},
+	)
 	if !report.ControlsProven() {
 		test.Error("both directions were demonstrated and ControlsProven still said no")
 	}
@@ -258,7 +298,11 @@ func (classOrderAlwaysAnswers) Reading(string) (Reading, bool) {
 // detect anything, so the agreement figure it produced rests on nothing.
 func TestClassOrderHarnessRefusesAControlThatDidNotFire(test *testing.T) {
 	test.Parallel()
-	systems, readings := classOrderSyntheticPopulation(minimumPlausibleRegistryClasses+1, minimumPlausibleCorpusClasses+1, 5)
+	systems, readings := classOrderSyntheticPopulation(
+		minimumPlausibleRegistryClasses+1,
+		minimumPlausibleCorpusClasses+1,
+		5,
+	)
 
 	// A control whose corruption changes nothing: it hands back the honest source unchanged.
 	inert := Control{
@@ -292,7 +336,11 @@ func TestClassOrderHarnessRefusesAControlThatDidNotFire(test *testing.T) {
 // stopped saying anything, so the claim becoming trivially true has to fail.
 func TestClassOrderHarnessRefusesIdenticalDesignSystems(test *testing.T) {
 	test.Parallel()
-	systems, readings := classOrderSyntheticPopulation(minimumPlausibleRegistryClasses+1, minimumPlausibleCorpusClasses+1, 5)
+	systems, readings := classOrderSyntheticPopulation(
+		minimumPlausibleRegistryClasses+1,
+		minimumPlausibleCorpusClasses+1,
+		5,
+	)
 	honest := classOrderStubSource{name: "stub", readings: readings}
 
 	identical := Compare("4.3.3", systems, SystemDivergence{SharedRegistryClasses: 95134}, honest, nil)
@@ -302,11 +350,23 @@ func TestClassOrderHarnessRefusesIdenticalDesignSystems(test *testing.T) {
 
 	// Either axis alone is enough, and both must be recognised: the measured divergence today is
 	// membership-only, and a future Tailwind could move it to readings.
-	membershipOnly := Compare("4.3.3", systems, SystemDivergence{SharedRegistryClasses: 95134, UniqueToOneSystem: 462}, honest, nil)
+	membershipOnly := Compare(
+		"4.3.3",
+		systems,
+		SystemDivergence{SharedRegistryClasses: 95134, UniqueToOneSystem: 462},
+		honest,
+		nil,
+	)
 	if diverge, _ := membershipOnly.RepositoriesDiverge(); !diverge {
 		test.Error("divergence in registry membership alone was not recognised as divergence")
 	}
-	readingsOnly := Compare("4.3.3", systems, SystemDivergence{SharedRegistryClasses: 95134, DivergentReadings: 3}, honest, nil)
+	readingsOnly := Compare(
+		"4.3.3",
+		systems,
+		SystemDivergence{SharedRegistryClasses: 95134, DivergentReadings: 3},
+		honest,
+		nil,
+	)
 	if diverge, _ := readingsOnly.RepositoriesDiverge(); !diverge {
 		test.Error("divergence in readings alone was not recognised as divergence")
 	}
@@ -319,19 +379,26 @@ func TestClassOrderHarnessRefusesIdenticalDesignSystems(test *testing.T) {
 // they are counted apart and the actionable list holds only observations.
 func TestClassOrderHarnessDistinguishesPlantedFromObserved(test *testing.T) {
 	test.Parallel()
-	systems, readings := classOrderSyntheticPopulation(minimumPlausibleRegistryClasses+1, minimumPlausibleCorpusClasses+1, 5)
+	systems, readings := classOrderSyntheticPopulation(
+		minimumPlausibleRegistryClasses+1,
+		minimumPlausibleCorpusClasses+1,
+		5,
+	)
 
 	report := Compare("4.3.3", systems, classOrderHealthyDivergence(),
 		classOrderStubSource{name: "stub", readings: readings},
 		[]Control{{
 			Name: "shifts", Detail: "shifts every count",
 			Corrupt: func(honest ReadingSource) ReadingSource {
-				return classOrderCorruptedSource{honest: honest, transform: func(reading Reading, answered bool) (Reading, bool) {
-					if !answered {
-						return reading, answered
-					}
-					return Reading{Order: reading.Order, Count: reading.Count + 1}, true
-				}}
+				return classOrderCorruptedSource{
+					honest: honest,
+					transform: func(reading Reading, answered bool) (Reading, bool) {
+						if !answered {
+							return reading, answered
+						}
+						return Reading{Order: reading.Order, Count: reading.Count + 1}, true
+					},
+				}
 			},
 			ExpectedOutcome: OutcomeDisagreed, MinimumDetections: 1,
 		}})
@@ -343,12 +410,18 @@ func TestClassOrderHarnessDistinguishesPlantedFromObserved(test *testing.T) {
 		}
 	}
 	if planted == 0 {
-		test.Fatal("the control fired and planted no divergence, so the evidence of detection is invisible in the report")
+		test.Fatal(
+			"the control fired and planted no divergence, so the evidence of detection is invisible in the report",
+		)
 	}
 	for outcome, divergences := range report.DivergencesByOutcome() {
 		for _, divergence := range divergences {
 			if divergence.Planted {
-				test.Errorf("a planted divergence appeared in the actionable %s list for %s", outcome, divergence.ClassName)
+				test.Errorf(
+					"a planted divergence appeared in the actionable %s list for %s",
+					outcome,
+					divergence.ClassName,
+				)
 			}
 		}
 	}
@@ -410,7 +483,11 @@ func TestClassOrderUnresolvableAlphaPredicateIsNarrow(test *testing.T) {
 // cannot see an invented reading, whatever its go-silent control managed.
 func TestClassOrderHarnessRefusesAnUnfiredControlEvenWithBothDirections(test *testing.T) {
 	test.Parallel()
-	systems, readings := classOrderSyntheticPopulation(minimumPlausibleRegistryClasses+1, minimumPlausibleCorpusClasses+1, 5)
+	systems, readings := classOrderSyntheticPopulation(
+		minimumPlausibleRegistryClasses+1,
+		minimumPlausibleCorpusClasses+1,
+		5,
+	)
 	honest := classOrderStubSource{name: "stub", readings: readings}
 
 	firingGoSilent := Control{
@@ -454,14 +531,19 @@ func TestClassOrderHarnessRefusesAnUnfiredControlEvenWithBothDirections(test *te
 // refactor of ControlsProven could break without touching any line this file names.
 func TestClassOrderHarnessRefusesNoControlsWithNothingElseWrong(test *testing.T) {
 	test.Parallel()
-	systems, readings := classOrderSyntheticPopulation(minimumPlausibleRegistryClasses+1, minimumPlausibleCorpusClasses+1, 5)
+	systems, readings := classOrderSyntheticPopulation(
+		minimumPlausibleRegistryClasses+1,
+		minimumPlausibleCorpusClasses+1,
+		5,
+	)
 
 	report := Compare("4.3.3", systems, classOrderHealthyDivergence(),
 		classOrderStubSource{name: "stub", readings: readings}, nil)
 
 	// Everything else about this run is sound: the populations clear their floors, the engine
 	// declined classes, and both sides agreed on every class they both answered.
-	if population := report.Populations[0]; population.ByOutcome[OutcomeDisagreed] != 0 || population.EngineNullReadings == 0 {
+	if population := report.Populations[0]; population.ByOutcome[OutcomeDisagreed] != 0 ||
+		population.EngineNullReadings == 0 {
 		test.Fatalf("the setup is wrong: %d disagreements and %d engine nulls",
 			population.ByOutcome[OutcomeDisagreed], population.EngineNullReadings)
 	}
@@ -521,7 +603,11 @@ func TestClassOrderReadingEqualComparesBothAxes(test *testing.T) {
 // on the corpus floor while naming the wrong cause.
 func TestClassOrderHarnessRefusesAnUnknownPopulation(test *testing.T) {
 	test.Parallel()
-	systems, readings := classOrderSyntheticPopulation(minimumPlausibleRegistryClasses+1, minimumPlausibleCorpusClasses+1, 5)
+	systems, readings := classOrderSyntheticPopulation(
+		minimumPlausibleRegistryClasses+1,
+		minimumPlausibleCorpusClasses+1,
+		5,
+	)
 	systems[0].Cases = append(systems[0].Cases, ClassCase{
 		ClassName:      "mislabelled",
 		Population:     "registryy",

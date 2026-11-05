@@ -135,14 +135,22 @@ func (report Report) Check() error {
 		sum += report.Counts[verdict]
 	}
 	if sum != report.Considered {
-		return fmt.Errorf("report does not partition the corpus: considered %d but categories sum to %d", report.Considered, sum)
+		return fmt.Errorf(
+			"report does not partition the corpus: considered %d but categories sum to %d",
+			report.Considered,
+			sum,
+		)
 	}
 	if report.Considered != len(report.Fixtures) {
 		return fmt.Errorf("considered %d fixtures but recorded %d verdicts", report.Considered, len(report.Fixtures))
 	}
 	for _, fixtureVerdict := range report.Fixtures {
 		if fixtureVerdict.Verdict != VerdictPassed && fixtureVerdict.Reason == "" {
-			return fmt.Errorf("%s: %s with no reason; an unreasoned category is somewhere to hide a failure", fixtureVerdict.Name, fixtureVerdict.Verdict)
+			return fmt.Errorf(
+				"%s: %s with no reason; an unreasoned category is somewhere to hide a failure",
+				fixtureVerdict.Name,
+				fixtureVerdict.Verdict,
+			)
 		}
 	}
 	return nil
@@ -154,7 +162,13 @@ func (report Report) Check() error {
 // alone is the thing this whole file exists to stop anyone quoting.
 func (report Report) Summary() string {
 	var builder strings.Builder
-	fmt.Fprintf(&builder, "%d / %d passed against facebook/react@%s\n", report.Counts[VerdictPassed], report.Considered, UpstreamSha[:12])
+	fmt.Fprintf(
+		&builder,
+		"%d / %d passed against facebook/react@%s\n",
+		report.Counts[VerdictPassed],
+		report.Considered,
+		UpstreamSha[:12],
+	)
 	for _, verdict := range AllVerdicts {
 		fmt.Fprintf(&builder, "  %-30s %4d\n", verdict, report.Counts[verdict])
 	}

@@ -468,7 +468,10 @@ func requireOptimizationClassRange(ruleContext rule.Context, node *ast.Node) cor
 			if modifier.End() >= full.End() {
 				return full
 			}
-			return core.NewTextRange(requireOptimizationScanPastTrivia(ruleContext.SourceFile, modifier.End()), full.End())
+			return core.NewTextRange(
+				requireOptimizationScanPastTrivia(ruleContext.SourceFile, modifier.End()),
+				full.End(),
+			)
 		}
 	}
 

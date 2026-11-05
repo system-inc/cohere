@@ -11,7 +11,12 @@ func TestASlabSliceKeepsToItsOwnElements(test *testing.T) {
 	first := slab.Make(2)
 	second := slab.Make(2)
 	if len(first) != 0 || cap(first) != 2 || cap(second) != 2 {
-		test.Fatalf("Make(2) gave length %d and capacities %d and %d, want 0, 2 and 2", len(first), cap(first), cap(second))
+		test.Fatalf(
+			"Make(2) gave length %d and capacities %d and %d, want 0, 2 and 2",
+			len(first),
+			cap(first),
+			cap(second),
+		)
 	}
 	first = append(first, "a", "b")
 	second = append(second, "c")

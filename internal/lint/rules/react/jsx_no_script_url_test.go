@@ -97,7 +97,12 @@ func TestJsxNoScriptUrlFires(test *testing.T) {
 		{"self-closing anchor", `<a href="javascript:" />`, ``, 1},
 		// A legacy entry naming a component twice keeps the last entry's prop list. Measured both
 		// ways; the partner case in the silent table uses the first entry's prop and is clean.
-		{"repeated name keeps the last props", `<Foo to="javascript:"></Foo>`, `[[{"name":"Foo","props":["href"]},{"name":"Foo","props":["to"]}]]`, 1},
+		{
+			"repeated name keeps the last props",
+			`<Foo to="javascript:"></Foo>`,
+			`[[{"name":"Foo","props":["href"]},{"name":"Foo","props":["to"]}]]`,
+			1,
+		},
 		// An entry named `a` replaces the built-in href pair rather than adding to it, so the
 		// replacement's own prop reports. Its partner below shows `href` going clean.
 		{"an entry named a replaces the default", `<a to="javascript:"></a>`, `[[{"name":"a","props":["to"]}]]`, 1},
@@ -107,7 +112,13 @@ func TestJsxNoScriptUrlFires(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			options := jsxNoScriptUrlOptions(test, testCase.rawOptions)
-			result := rule_testing.RunWithOptions(test, JsxNoScriptUrl, jsxNoScriptUrlFile, testCase.sourceText, options)
+			result := rule_testing.RunWithOptions(
+				test,
+				JsxNoScriptUrl,
+				jsxNoScriptUrlFile,
+				testCase.sourceText,
+				options,
+			)
 			wantIds := make([]string, testCase.wantCount)
 			for index := range wantIds {
 				wantIds[index] = "noScriptURL"
@@ -169,7 +180,11 @@ func TestJsxNoScriptUrlStaysSilent(test *testing.T) {
 		// pair is gone and the same source goes clean.
 		{"an entry named a drops the built-in href", `<a href="javascript:"></a>`, `[[{"name":"a","props":["to"]}]]`},
 		// The partner to the repeated-name case: the first entry's prop no longer applies.
-		{"repeated name drops the first props", `<Foo href="javascript:"></Foo>`, `[[{"name":"Foo","props":["href"]},{"name":"Foo","props":["to"]}]]`},
+		{
+			"repeated name drops the first props",
+			`<Foo href="javascript:"></Foo>`,
+			`[[{"name":"Foo","props":["href"]},{"name":"Foo","props":["to"]}]]`,
+		},
 		// An empty prop list matches nothing.
 		{"empty props list", `<Foo href="javascript:"></Foo>`, `[[{"name":"Foo","props":[]}]]`},
 	}
@@ -178,7 +193,13 @@ func TestJsxNoScriptUrlStaysSilent(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			options := jsxNoScriptUrlOptions(test, testCase.rawOptions)
-			result := rule_testing.RunWithOptions(test, JsxNoScriptUrl, jsxNoScriptUrlFile, testCase.sourceText, options)
+			result := rule_testing.RunWithOptions(
+				test,
+				JsxNoScriptUrl,
+				jsxNoScriptUrlFile,
+				testCase.sourceText,
+				options,
+			)
 			rule_testing.ExpectClean(test, result)
 		})
 	}
@@ -195,7 +216,13 @@ func TestJsxNoScriptUrlReportsOnTheWholeAttribute(test *testing.T) {
 
 	const source = `<a href="javascript:void(0)"></a>`
 
-	result := rule_testing.RunWithOptions(test, JsxNoScriptUrl, jsxNoScriptUrlFile, source, jsxNoScriptUrlOptions(test, ``))
+	result := rule_testing.RunWithOptions(
+		test,
+		JsxNoScriptUrl,
+		jsxNoScriptUrlFile,
+		source,
+		jsxNoScriptUrlOptions(test, ``),
+	)
 	rule_testing.ExpectFindings(test, result, "noScriptURL")
 
 	// The harness does not trim for an untyped run, so the literal above and the file on disk are
@@ -215,7 +242,13 @@ func TestJsxNoScriptUrlReportsOnTheWholeAttribute(test *testing.T) {
 func TestJsxNoScriptUrlMessageText(test *testing.T) {
 	test.Parallel()
 
-	result := rule_testing.RunWithOptions(test, JsxNoScriptUrl, jsxNoScriptUrlFile, `<a href="javascript:"></a>`, jsxNoScriptUrlOptions(test, ``))
+	result := rule_testing.RunWithOptions(
+		test,
+		JsxNoScriptUrl,
+		jsxNoScriptUrlFile,
+		`<a href="javascript:"></a>`,
+		jsxNoScriptUrlOptions(test, ``),
+	)
 	rule_testing.ExpectFindings(test, result, "noScriptURL")
 
 	const want = "A future version of React will block javascript: URLs as a security precaution. " +
@@ -254,7 +287,13 @@ func TestJsxNoScriptUrlHasNoFileSuffixGate(test *testing.T) {
 	} {
 		test.Run(fileName, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, JsxNoScriptUrl, fileName, source, jsxNoScriptUrlOptions(test, ``))
+			result := rule_testing.RunWithOptions(
+				test,
+				JsxNoScriptUrl,
+				fileName,
+				source,
+				jsxNoScriptUrlOptions(test, ``),
+			)
 			rule_testing.ExpectFindings(test, result, "noScriptURL")
 		})
 	}
@@ -290,7 +329,9 @@ func TestDecodeJsxNoScriptUrlOptions(test *testing.T) {
 
 	test.Run("the array arm alone", func(test *testing.T) {
 		test.Parallel()
-		decoded, decodeJsxNoScriptUrlOptionsError := DecodeJsxNoScriptUrlOptions([]byte(`[[{"name":"Foo","props":["to","href"]}]]`))
+		decoded, decodeJsxNoScriptUrlOptionsError := DecodeJsxNoScriptUrlOptions(
+			[]byte(`[[{"name":"Foo","props":["to","href"]}]]`),
+		)
 		if decodeJsxNoScriptUrlOptionsError != nil {
 			test.Fatalf("decoding the array arm: %v", decodeJsxNoScriptUrlOptionsError)
 		}
@@ -308,7 +349,9 @@ func TestDecodeJsxNoScriptUrlOptions(test *testing.T) {
 
 	test.Run("the object arm alone, at its default", func(test *testing.T) {
 		test.Parallel()
-		decoded, decodeJsxNoScriptUrlOptionsError := DecodeJsxNoScriptUrlOptions([]byte(`[{"includeFromSettings":false}]`))
+		decoded, decodeJsxNoScriptUrlOptionsError := DecodeJsxNoScriptUrlOptions(
+			[]byte(`[{"includeFromSettings":false}]`),
+		)
 		if decodeJsxNoScriptUrlOptionsError != nil {
 			test.Fatalf("decoding the object arm: %v", decodeJsxNoScriptUrlOptionsError)
 		}
@@ -323,7 +366,9 @@ func TestDecodeJsxNoScriptUrlOptions(test *testing.T) {
 
 	test.Run("both arms in order", func(test *testing.T) {
 		test.Parallel()
-		decoded, decodeJsxNoScriptUrlOptionsError := DecodeJsxNoScriptUrlOptions([]byte(`[[{"name":"Bar","props":["link"]}],{"includeFromSettings":false}]`))
+		decoded, decodeJsxNoScriptUrlOptionsError := DecodeJsxNoScriptUrlOptions(
+			[]byte(`[[{"name":"Bar","props":["link"]}],{"includeFromSettings":false}]`),
+		)
 		if decodeJsxNoScriptUrlOptionsError != nil {
 			test.Fatalf("decoding both arms: %v", decodeJsxNoScriptUrlOptionsError)
 		}
@@ -341,10 +386,14 @@ func TestDecodeJsxNoScriptUrlOptions(test *testing.T) {
 		// `[[], {...}]` is upstream's own spelling in two corpus cases. An empty JSON array is the
 		// array arm, so the object must still be read from the second position: the refusal of
 		// `true` there is what proves it was read at all.
-		if _, decodeJsxNoScriptUrlOptionsError := DecodeJsxNoScriptUrlOptions([]byte(`[[],{"includeFromSettings":true}]`)); decodeJsxNoScriptUrlOptionsError == nil {
+		if _, decodeJsxNoScriptUrlOptionsError := DecodeJsxNoScriptUrlOptions(
+			[]byte(`[[],{"includeFromSettings":true}]`),
+		); decodeJsxNoScriptUrlOptionsError == nil {
 			test.Fatal("the object in the second position was not read, so its `true` was not refused")
 		}
-		if _, decodeJsxNoScriptUrlOptionsError := DecodeJsxNoScriptUrlOptions([]byte(`[[],{"includeFromSettings":false}]`)); decodeJsxNoScriptUrlOptionsError != nil {
+		if _, decodeJsxNoScriptUrlOptionsError := DecodeJsxNoScriptUrlOptions(
+			[]byte(`[[],{"includeFromSettings":false}]`),
+		); decodeJsxNoScriptUrlOptionsError != nil {
 			test.Fatalf("the same list at the default was refused: %v", decodeJsxNoScriptUrlOptionsError)
 		}
 	})
@@ -362,7 +411,9 @@ func TestDecodeJsxNoScriptUrlOptions(test *testing.T) {
 			`[[{"name":"Foo","prop":["to"]}]]`,
 			`[{"includeFromSetting":false}]`,
 		} {
-			if decoded, decodeJsxNoScriptUrlOptionsError := DecodeJsxNoScriptUrlOptions([]byte(raw)); decodeJsxNoScriptUrlOptionsError == nil {
+			if decoded, decodeJsxNoScriptUrlOptionsError := DecodeJsxNoScriptUrlOptions(
+				[]byte(raw),
+			); decodeJsxNoScriptUrlOptionsError == nil {
 				test.Errorf("%s decoded to %+v; it must be refused", raw, decoded)
 			}
 		}
@@ -387,7 +438,8 @@ func TestJsxNoScriptUrlRefusesIncludeFromSettings(test *testing.T) {
 		`[[{"name":"Bar","props":["link"]}],{"includeFromSettings":true}]`,      // invalid 8, two findings upstream
 	} {
 		_, decodeJsxNoScriptUrlOptionsError := DecodeJsxNoScriptUrlOptions([]byte(raw))
-		if decodeJsxNoScriptUrlOptionsError == nil || !strings.Contains(decodeJsxNoScriptUrlOptionsError.Error(), "includeFromSettings") {
+		if decodeJsxNoScriptUrlOptionsError == nil ||
+			!strings.Contains(decodeJsxNoScriptUrlOptionsError.Error(), "includeFromSettings") {
 			test.Errorf("%s: want a refusal naming includeFromSettings, got %v", raw, decodeJsxNoScriptUrlOptionsError)
 			continue
 		}

@@ -144,7 +144,10 @@ func emitFunctionalRoot(candidate *ParsedCandidate, resolution ValueResolution) 
 	root := strings.TrimPrefix(candidate.Root, "-")
 
 	if _, isGapRoot := gapEmitters[root]; isGapRoot {
-		return EmitGapRoot(root, UtilityBranchFor(candidate, gapTypeListFor(root), resolution.IsColor, resolution.Namespace))
+		return EmitGapRoot(
+			root,
+			UtilityBranchFor(candidate, gapTypeListFor(root), resolution.IsColor, resolution.Namespace),
+		)
 	}
 
 	// The two value-independent slices take a resolved value. They emit one list per root, so the

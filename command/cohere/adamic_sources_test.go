@@ -67,7 +67,9 @@ func TestAnAdamicProjectIsCheckedUnderItsOwnNames(test *testing.T) {
 	if alias := adamicAliasPattern.FindString(output); alias != "" {
 		test.Errorf("an Adamic file was printed as %q, a name that is not its own:\n%s", alias, output)
 	}
-	if strings.Contains(output, "libfoo") || strings.Contains(output, "geometry.a:") || strings.Contains(output, "main.a:1:1") {
+	if strings.Contains(output, "libfoo") ||
+		strings.Contains(output, "geometry.a:") ||
+		strings.Contains(output, "main.a:1:1") {
 		test.Errorf("a file with nothing to report was named, or the static library was read:\n%s", output)
 	}
 
@@ -100,7 +102,10 @@ func TestAnAdamicFileGitIgnoresIsANamedGap(test *testing.T) {
 	root := adamicProject(test, map[string]string{".gitignore": ".cache/\n*.a\n"})
 
 	output, _ := runCohere(test, binary, root, "--no-fix")
-	if !strings.Contains(output, "src/messy.a is in the program, but git's ignore rules leave it out of the format walk (.gitignore line 2, `*.a`): checked, not formatted") {
+	if !strings.Contains(
+		output,
+		"src/messy.a is in the program, but git's ignore rules leave it out of the format walk (.gitignore line 2, `*.a`): checked, not formatted",
+	) {
 		test.Errorf("the ignored Adamic file is not named with its ignore line:\n%s", output)
 	}
 	if !strings.Contains(output, "⚠ 4 .a files git ignores, not formatted") {
@@ -109,7 +114,12 @@ func TestAnAdamicFileGitIgnoresIsANamedGap(test *testing.T) {
 	if !strings.Contains(output, "TS2322") {
 		test.Errorf("the ignored files were not type-checked:\n%s", output)
 	}
-	if output, _ := runCohere(test, binary, root, "--format-only"); readForTest(test, filepath.Join(root, "src/messy.a")) != "export const   messy  =  1;\n" {
+	if output, _ := runCohere(
+		test,
+		binary,
+		root,
+		"--format-only",
+	); readForTest(test, filepath.Join(root, "src/messy.a")) != "export const   messy  =  1;\n" {
 		test.Errorf("a file git ignores was formatted:\n%s", output)
 	}
 
@@ -137,7 +147,12 @@ func TestTheScopeClaimsTheAdamicFilesTheProgramHolds(test *testing.T) {
 		return strings.Join(names, " ")
 	}
 
-	walked := formatScope{FileNames: []string{"/repo/a.ts"}, index: map[string]struct{}{"/repo/a.ts": {}}, adamic: admitted, adamicJoins: true}
+	walked := formatScope{
+		FileNames:   []string{"/repo/a.ts"},
+		index:       map[string]struct{}{"/repo/a.ts": {}},
+		adamic:      admitted,
+		adamicJoins: true,
+	}
 	claimedScope, claimed := walked.claimAdamic(held)
 	if got := scopeOf(claimedScope); got != "/repo/a.ts /repo/geometry.a /repo/messy.a" {
 		test.Errorf("a scope drawn from the walk became %q", got)
@@ -147,14 +162,21 @@ func TestTheScopeClaimsTheAdamicFilesTheProgramHolds(test *testing.T) {
 	}
 
 	walked.adamicUnrecorded = func(files []string) []string { return files[1:] }
-	if got := scopeOf(func() formatScope { scope, _ := walked.claimAdamic(held); return scope }()); got != "/repo/a.ts /repo/messy.a" {
+	if got := scopeOf(
+		func() formatScope { scope, _ := walked.claimAdamic(held); return scope }(),
+	); got != "/repo/a.ts /repo/messy.a" {
 		test.Errorf("the default scope took a file on record: %q", got)
 	}
 
 	named := formatScope{
 		FileNames: []string{"/repo/a.ts", "/repo/ignored.a", "/repo/lib/libfoo.a", "/repo/messy.a"},
-		index:     map[string]struct{}{"/repo/a.ts": {}, "/repo/ignored.a": {}, "/repo/lib/libfoo.a": {}, "/repo/messy.a": {}},
-		adamic:    admitted,
+		index: map[string]struct{}{
+			"/repo/a.ts":         {},
+			"/repo/ignored.a":    {},
+			"/repo/lib/libfoo.a": {},
+			"/repo/messy.a":      {},
+		},
+		adamic: admitted,
 	}
 	namedScope, _ := named.claimAdamic(held)
 	if got := scopeOf(namedScope); got != "/repo/a.ts /repo/messy.a" {
@@ -173,11 +195,29 @@ func TestAnEditorSaveFormatsOnlyTheAdamicFilesTheProgramHolds(test *testing.T) {
 	binary := buildCohere(test)
 	root := adamicProject(test, map[string]string{"scratch/notes.a": "export const   notes  =  1;\n"})
 
-	stdout, stderr, code := runCohereWithStdin(test, binary, root, "export const   messy  =  1;\n", "--fix", "--format", "--stdin-filepath", "src/messy.a")
+	stdout, stderr, code := runCohereWithStdin(
+		test,
+		binary,
+		root,
+		"export const   messy  =  1;\n",
+		"--fix",
+		"--format",
+		"--stdin-filepath",
+		"src/messy.a",
+	)
 	if code != 0 || stdout != "export const messy = 1;\n" {
 		test.Errorf("the save of a held .a answered %q, exit %d:\n%s", stdout, code, stderr)
 	}
-	stdout, stderr, code = runCohereWithStdin(test, binary, root, "export const   notes  =  1;\n", "--fix", "--format", "--stdin-filepath", "scratch/notes.a")
+	stdout, stderr, code = runCohereWithStdin(
+		test,
+		binary,
+		root,
+		"export const   notes  =  1;\n",
+		"--fix",
+		"--format",
+		"--stdin-filepath",
+		"scratch/notes.a",
+	)
 	if code != 0 || stdout != "export const   notes  =  1;\n" {
 		test.Errorf("the save of a .a outside the program answered %q, exit %d:\n%s", stdout, code, stderr)
 	}

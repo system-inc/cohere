@@ -76,14 +76,23 @@ func TestIncompatibleLibraryFiresOnUpstreamFixtures(test *testing.T) {
 	}{
 		// error.invalid-known-incompatible-function
 		// A plain function import, called directly. The entry's own message fires.
-		{"directFunctionCall", "import {knownIncompatible} from 'ReactCompilerKnownIncompatibleTest';\n\nfunction Component() {\n  const data = knownIncompatible();\n  return <div>Error</div>;\n}\n"},
+		{
+			"directFunctionCall",
+			"import {knownIncompatible} from 'ReactCompilerKnownIncompatibleTest';\n\nfunction Component() {\n  const data = knownIncompatible();\n  return <div>Error</div>;\n}\n",
+		},
 		// error.invalid-known-incompatible-hook
 		// The same shape under a hook-named import.
-		{"directHookCall", "import {useKnownIncompatible} from 'ReactCompilerKnownIncompatibleTest';\n\nfunction Component() {\n  const data = useKnownIncompatible();\n  return <div>Error</div>;\n}\n"},
+		{
+			"directHookCall",
+			"import {useKnownIncompatible} from 'ReactCompilerKnownIncompatibleTest';\n\nfunction Component() {\n  const data = useKnownIncompatible();\n  return <div>Error</div>;\n}\n",
+		},
 		// error.invalid-known-incompatible-hook-return-property
 		// The one level of indirection: destructure a property off a hook result, then call it.
 		// The hook itself is compatible; the property it hands back is not.
-		{"hookReturnProperty", "import {useKnownIncompatibleIndirect} from 'ReactCompilerKnownIncompatibleTest';\n\nfunction Component() {\n  const {incompatible} = useKnownIncompatibleIndirect();\n  return <div>{incompatible()}</div>;\n}\n"},
+		{
+			"hookReturnProperty",
+			"import {useKnownIncompatibleIndirect} from 'ReactCompilerKnownIncompatibleTest';\n\nfunction Component() {\n  const {incompatible} = useKnownIncompatibleIndirect();\n  return <div>{incompatible()}</div>;\n}\n",
+		},
 	}
 
 	for _, testCase := range cases {
@@ -111,10 +120,19 @@ func TestIncompatibleLibraryFiresOnTheRealDefaultTable(test *testing.T) {
 		name   string
 		source string
 	}{
-		{"tanstackTable", "import {useReactTable} from '@tanstack/react-table';\n\nfunction Component() {\n  const table = useReactTable();\n  return <div>{table}</div>;\n}\n"},
-		{"tanstackVirtual", "import {useVirtualizer} from '@tanstack/react-virtual';\n\nfunction Component() {\n  const rows = useVirtualizer();\n  return <div>{rows}</div>;\n}\n"},
+		{
+			"tanstackTable",
+			"import {useReactTable} from '@tanstack/react-table';\n\nfunction Component() {\n  const table = useReactTable();\n  return <div>{table}</div>;\n}\n",
+		},
+		{
+			"tanstackVirtual",
+			"import {useVirtualizer} from '@tanstack/react-virtual';\n\nfunction Component() {\n  const rows = useVirtualizer();\n  return <div>{rows}</div>;\n}\n",
+		},
 		// The nested entry. `useForm` itself is fine; the `watch` it returns is not.
-		{"reactHookFormWatch", "import {useForm} from 'react-hook-form';\n\nfunction Component() {\n  const {watch} = useForm();\n  return <div>{watch()}</div>;\n}\n"},
+		{
+			"reactHookFormWatch",
+			"import {useForm} from 'react-hook-form';\n\nfunction Component() {\n  const {watch} = useForm();\n  return <div>{watch()}</div>;\n}\n",
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -194,8 +212,16 @@ func TestIncompatibleLibraryFiresOnAMemberAccess(test *testing.T) {
 		source string
 		span   string
 	}{
-		{"boundResult", "import {useForm} from 'react-hook-form';\n\nfunction Component() {\n  const form = useForm();\n  return <div>{form.watch()}</div>;\n}\n", "form"},
-		{"chainedOffTheCall", "import {useForm} from 'react-hook-form';\n\nfunction Component() {\n  return <div>{useForm().watch()}</div>;\n}\n", "useForm()"},
+		{
+			"boundResult",
+			"import {useForm} from 'react-hook-form';\n\nfunction Component() {\n  const form = useForm();\n  return <div>{form.watch()}</div>;\n}\n",
+			"form",
+		},
+		{
+			"chainedOffTheCall",
+			"import {useForm} from 'react-hook-form';\n\nfunction Component() {\n  return <div>{useForm().watch()}</div>;\n}\n",
+			"useForm()",
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -250,8 +276,16 @@ func TestIncompatibleLibraryReportsOncePerFunction(test *testing.T) {
 		source string
 		span   string
 	}{
-		{"sameCallTwice", "import {useReactTable} from '@tanstack/react-table';\n\nfunction Component() {\n  const a = useReactTable();\n  const b = useReactTable();\n  return <div>{a}{b}</div>;\n}\n", "useReactTable"},
-		{"twoDifferentLibraries", "import {useReactTable} from '@tanstack/react-table';\nimport {useVirtualizer} from '@tanstack/react-virtual';\n\nfunction Component() {\n  const a = useReactTable();\n  const b = useVirtualizer();\n  return <div>{a}{b}</div>;\n}\n", "useReactTable"},
+		{
+			"sameCallTwice",
+			"import {useReactTable} from '@tanstack/react-table';\n\nfunction Component() {\n  const a = useReactTable();\n  const b = useReactTable();\n  return <div>{a}{b}</div>;\n}\n",
+			"useReactTable",
+		},
+		{
+			"twoDifferentLibraries",
+			"import {useReactTable} from '@tanstack/react-table';\nimport {useVirtualizer} from '@tanstack/react-virtual';\n\nfunction Component() {\n  const a = useReactTable();\n  const b = useVirtualizer();\n  return <div>{a}{b}</div>;\n}\n",
+			"useReactTable",
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -289,51 +323,99 @@ func TestIncompatibleLibraryStaysSilent(test *testing.T) {
 		{"oxcPassCase", "\nfunction Component(props) {\n  return <div>{props.text}</div>;\n}\n"},
 		// A module the table answers nothing for. This is the case every import on Kirk's tree
 		// takes, and it is why this rule finds nothing there.
-		{"unconfiguredModule", "import {useAnything} from 'some-other-module';\n\nfunction Component() {\n  const x = useAnything();\n  return <div>{x}</div>;\n}\n"},
+		{
+			"unconfiguredModule",
+			"import {useAnything} from 'some-other-module';\n\nfunction Component() {\n  const x = useAnything();\n  return <div>{x}</div>;\n}\n",
+		},
 		// The right name from the wrong module. The table is keyed by module, so the name alone is
 		// not enough, and a rule matching on callee name only would report here.
-		{"rightNameWrongModule", "import {useReactTable} from 'some-other-module';\n\nfunction Component() {\n  const t = useReactTable();\n  return <div>{t}</div>;\n}\n"},
+		{
+			"rightNameWrongModule",
+			"import {useReactTable} from 'some-other-module';\n\nfunction Component() {\n  const t = useReactTable();\n  return <div>{t}</div>;\n}\n",
+		},
 		// A property the configured module does not declare.
-		{"propertyNotInTable", "import {somethingElse} from '@tanstack/react-table';\n\nfunction Component() {\n  const x = somethingElse();\n  return <div>{x}</div>;\n}\n"},
+		{
+			"propertyNotInTable",
+			"import {somethingElse} from '@tanstack/react-table';\n\nfunction Component() {\n  const x = somethingElse();\n  return <div>{x}</div>;\n}\n",
+		},
 		// Imported and never called. The diagnostic is raised while inferring a call's effects, so
 		// an unused import is silent. Measured.
-		{"importedNotCalled", "import {useReactTable} from '@tanstack/react-table';\n\nfunction Component() {\n  return <div>hi</div>;\n}\n"},
+		{
+			"importedNotCalled",
+			"import {useReactTable} from '@tanstack/react-table';\n\nfunction Component() {\n  return <div>hi</div>;\n}\n",
+		},
 		// Passed onward as a value rather than called. Also measured silent upstream.
-		{"passedNotCalled", "import {useReactTable} from '@tanstack/react-table';\n\nfunction Component() {\n  return <div onClick={useReactTable}>hi</div>;\n}\n"},
+		{
+			"passedNotCalled",
+			"import {useReactTable} from '@tanstack/react-table';\n\nfunction Component() {\n  return <div onClick={useReactTable}>hi</div>;\n}\n",
+		},
 		// The component gate, three ways. A lowercase function is not a compilation root, so the
 		// identical call inside it is silent at upstream.
-		{"lowercaseHelper", "import {useReactTable} from '@tanstack/react-table';\n\nfunction helper() {\n  return useReactTable();\n}\n"},
+		{
+			"lowercaseHelper",
+			"import {useReactTable} from '@tanstack/react-table';\n\nfunction helper() {\n  return useReactTable();\n}\n",
+		},
 		{"topLevelCall", "import {useReactTable} from '@tanstack/react-table';\n\nconst table = useReactTable();\n"},
 		// A class method is not a compilation root either. Measured silent at React 7.1.1 even
 		// though the class name is capitalized and the method returns JSX.
-		{"classMethod", "import {useReactTable} from '@tanstack/react-table';\n\nclass Widget {\n  render() {\n    const t = useReactTable();\n    return <div>{t}</div>;\n  }\n}\n"},
+		{
+			"classMethod",
+			"import {useReactTable} from '@tanstack/react-table';\n\nclass Widget {\n  render() {\n    const t = useReactTable();\n    return <div>{t}</div>;\n  }\n}\n",
+		},
 		// The nested entry's hook, called without ever touching the incompatible property. `useForm`
 		// declares no message of its own, so this is silent. Measured.
-		{"hookWithoutTheProperty", "import {useForm} from 'react-hook-form';\n\nfunction Component() {\n  const form = useForm();\n  return <div>{form}</div>;\n}\n"},
+		{
+			"hookWithoutTheProperty",
+			"import {useForm} from 'react-hook-form';\n\nfunction Component() {\n  const form = useForm();\n  return <div>{form}</div>;\n}\n",
+		},
 		// A different property off the same hook result.
-		{"otherPropertyOfHookResult", "import {useForm} from 'react-hook-form';\n\nfunction Component() {\n  const {register} = useForm();\n  return <div>{register()}</div>;\n}\n"},
+		{
+			"otherPropertyOfHookResult",
+			"import {useForm} from 'react-hook-form';\n\nfunction Component() {\n  const {register} = useForm();\n  return <div>{register()}</div>;\n}\n",
+		},
 		// Destructured but never called.
-		{"propertyDestructuredNotCalled", "import {useForm} from 'react-hook-form';\n\nfunction Component() {\n  const {watch} = useForm();\n  return <div>hi</div>;\n}\n"},
+		{
+			"propertyDestructuredNotCalled",
+			"import {useForm} from 'react-hook-form';\n\nfunction Component() {\n  const {watch} = useForm();\n  return <div>hi</div>;\n}\n",
+		},
 		// Read off the result but never called. Measured silent at React 7.1.1: the diagnostic is
 		// raised while inferring a call's effects, so merely naming the property is fine.
-		{"propertyReadNotCalled", "import {useForm} from 'react-hook-form';\n\nfunction Component() {\n  const form = useForm();\n  return <div>{form.watch}</div>;\n}\n"},
+		{
+			"propertyReadNotCalled",
+			"import {useForm} from 'react-hook-form';\n\nfunction Component() {\n  const form = useForm();\n  return <div>{form.watch}</div>;\n}\n",
+		},
 		// The module name is compared exactly. Both of these are measured silent at React 7.1.1,
 		// and both would report under a lowercasing or prefix-matching comparison. `configuration.go`'s
 		// `isKnownReactModule` does lowercase, so this is the axis on which the two rules differ and
 		// a reader copying that helper here would introduce a false positive.
-		{"moduleNameCasing", "import {useReactTable} from '@TanStack/React-Table';\n\nfunction Component() {\n  const t = useReactTable();\n  return <div>{t}</div>;\n}\n"},
-		{"moduleSubpath", "import {useReactTable} from '@tanstack/react-table/core';\n\nfunction Component() {\n  const t = useReactTable();\n  return <div>{t}</div>;\n}\n"},
+		{
+			"moduleNameCasing",
+			"import {useReactTable} from '@TanStack/React-Table';\n\nfunction Component() {\n  const t = useReactTable();\n  return <div>{t}</div>;\n}\n",
+		},
+		{
+			"moduleSubpath",
+			"import {useReactTable} from '@tanstack/react-table/core';\n\nfunction Component() {\n  const t = useReactTable();\n  return <div>{t}</div>;\n}\n",
+		},
 		// A local alias defeats the rule at React too, measured, so this silence is upstream's
 		// rather than a gap introduced here.
-		{"localAliasVariable", "import {useReactTable} from '@tanstack/react-table';\n\nconst local = useReactTable;\n\nfunction Component() {\n  const t = local();\n  return <div>{t}</div>;\n}\n"},
+		{
+			"localAliasVariable",
+			"import {useReactTable} from '@tanstack/react-table';\n\nconst local = useReactTable;\n\nfunction Component() {\n  const t = local();\n  return <div>{t}</div>;\n}\n",
+		},
 		// A side-effect import binds nothing to call.
 		{"sideEffectImport", "import '@tanstack/react-table';\n\nfunction Component() {\n  return <div>hi</div>;\n}\n"},
 		// A default import from a configured module. The table declares no `default`, and measured
 		// silent upstream.
-		{"defaultImport", "import table from '@tanstack/react-table';\n\nfunction Component() {\n  const t = table();\n  return <div>{t}</div>;\n}\n"},
+		{
+			"defaultImport",
+			"import table from '@tanstack/react-table';\n\nfunction Component() {\n  const t = table();\n  return <div>{t}</div>;\n}\n",
+		},
 		// A module specifier that is not a string literal. Our parser recovers into an identifier
 		// whose Text() reads back as a usable name, so this consults nothing and is silent.
-		{"nonLiteralSpecifier", "import {useReactTable} from tanstack;\n\nfunction Component() {\n  const t = useReactTable();\n  return <div>{t}</div>;\n}\n"},
+		{
+			"nonLiteralSpecifier",
+			"import {useReactTable} from tanstack;\n\nfunction Component() {\n  const t = useReactTable();\n  return <div>{t}</div>;\n}\n",
+		},
 	}
 
 	for _, testCase := range cases {
@@ -375,10 +457,22 @@ func TestIncompatibleLibrarySurvivesAMalformedModuleSpecifier(test *testing.T) {
 		name   string
 		source string
 	}{
-		{"templateWithSubstitution", "import {useReactTable} from `@tanstack/${x}`;\n\nfunction Component() {\n  const t = useReactTable();\n  return <div>{t}</div>;\n}\n"},
-		{"memberExpressionSpecifier", "import {useReactTable} from a.b;\n\nfunction Component() {\n  const t = useReactTable();\n  return <div>{t}</div>;\n}\n"},
-		{"parenthesizedSpecifier", "import {useReactTable} from ('@tanstack/react-table');\n\nfunction Component() {\n  const t = useReactTable();\n  return <div>{t}</div>;\n}\n"},
-		{"numericSpecifier", "import {useReactTable} from 123;\n\nfunction Component() {\n  const t = useReactTable();\n  return <div>{t}</div>;\n}\n"},
+		{
+			"templateWithSubstitution",
+			"import {useReactTable} from `@tanstack/${x}`;\n\nfunction Component() {\n  const t = useReactTable();\n  return <div>{t}</div>;\n}\n",
+		},
+		{
+			"memberExpressionSpecifier",
+			"import {useReactTable} from a.b;\n\nfunction Component() {\n  const t = useReactTable();\n  return <div>{t}</div>;\n}\n",
+		},
+		{
+			"parenthesizedSpecifier",
+			"import {useReactTable} from ('@tanstack/react-table');\n\nfunction Component() {\n  const t = useReactTable();\n  return <div>{t}</div>;\n}\n",
+		},
+		{
+			"numericSpecifier",
+			"import {useReactTable} from 123;\n\nfunction Component() {\n  const t = useReactTable();\n  return <div>{t}</div>;\n}\n",
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -454,8 +548,16 @@ func TestIncompatibleLibraryMessageCarriesTheEntryText(test *testing.T) {
 		source string
 		want   string
 	}{
-		{"tanstackTable", "import {useReactTable} from '@tanstack/react-table';\n\nfunction Component() {\n  const t = useReactTable();\n  return <div>{t}</div>;\n}\n", "TanStack Table's `useReactTable()` API returns functions that cannot be memoized safely"},
-		{"reactHookForm", "import {useForm} from 'react-hook-form';\n\nfunction Component() {\n  const {watch} = useForm();\n  return <div>{watch()}</div>;\n}\n", "React Hook Form's `useForm()` API returns a `watch()` function which cannot be memoized safely."},
+		{
+			"tanstackTable",
+			"import {useReactTable} from '@tanstack/react-table';\n\nfunction Component() {\n  const t = useReactTable();\n  return <div>{t}</div>;\n}\n",
+			"TanStack Table's `useReactTable()` API returns functions that cannot be memoized safely",
+		},
+		{
+			"reactHookForm",
+			"import {useForm} from 'react-hook-form';\n\nfunction Component() {\n  const {watch} = useForm();\n  return <div>{watch()}</div>;\n}\n",
+			"React Hook Form's `useForm()` API returns a `watch()` function which cannot be memoized safely.",
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -468,7 +570,10 @@ func TestIncompatibleLibraryMessageCarriesTheEntryText(test *testing.T) {
 			if found.Message.Id != "incompatibleLibrary" {
 				test.Errorf("message id = %q, want %q", found.Message.Id, "incompatibleLibrary")
 			}
-			if !strings.HasPrefix(found.Message.Description, "This library's API returns functions that cannot be memoized without showing stale data.") {
+			if !strings.HasPrefix(
+				found.Message.Description,
+				"This library's API returns functions that cannot be memoized without showing stale data.",
+			) {
 				test.Errorf("message = %q, want it to open with the shared explanation", found.Message.Description)
 			}
 			if !strings.HasSuffix(found.Message.Description, testCase.want) {
@@ -494,9 +599,24 @@ func TestDefaultIncompatibleLibraryTableMatchesUpstream(test *testing.T) {
 		property string
 		want     string
 	}{
-		{"@tanstack/react-table", "useReactTable", "", "TanStack Table's `useReactTable()` API returns functions that cannot be memoized safely"},
-		{"@tanstack/react-virtual", "useVirtualizer", "", "TanStack Virtual's `useVirtualizer()` API returns functions that cannot be memoized safely"},
-		{"react-hook-form", "useForm", "watch", "React Hook Form's `useForm()` API returns a `watch()` function which cannot be memoized safely."},
+		{
+			"@tanstack/react-table",
+			"useReactTable",
+			"",
+			"TanStack Table's `useReactTable()` API returns functions that cannot be memoized safely",
+		},
+		{
+			"@tanstack/react-virtual",
+			"useVirtualizer",
+			"",
+			"TanStack Virtual's `useVirtualizer()` API returns functions that cannot be memoized safely",
+		},
+		{
+			"react-hook-form",
+			"useForm",
+			"watch",
+			"React Hook Form's `useForm()` API returns a `watch()` function which cannot be memoized safely.",
+		},
 	}
 	for _, testCase := range cases {
 		entries, configured := defaultIncompatibleLibraryTable(testCase.module)
@@ -518,7 +638,12 @@ func TestDefaultIncompatibleLibraryTableMatchesUpstream(test *testing.T) {
 
 	// Exact comparison, both directions. A lowercasing version would configure the first and a
 	// prefix-matching one would configure the second, and both were measured silent at React 7.1.1.
-	for _, moduleName := range []string{"@TanStack/React-Table", "@tanstack/react-table/core", "react-hook-form-extra", ""} {
+	for _, moduleName := range []string{
+		"@TanStack/React-Table",
+		"@tanstack/react-table/core",
+		"react-hook-form-extra",
+		"",
+	} {
 		if _, configured := defaultIncompatibleLibraryTable(moduleName); configured {
 			test.Errorf("defaultIncompatibleLibraryTable(%q) reported a configuration, want none", moduleName)
 		}

@@ -394,7 +394,10 @@ func isAtWordPlaceholderNode(node *estree.Node) bool {
 func isConfigurationNode(node *estree.Node, parentNode *estree.Node) bool {
 	if node.Child("open").String("value") != "(" ||
 		node.Child("close").String("value") != ")" ||
-		slices.ContainsFunc(node.List("groups"), func(group *estree.Node) bool { return group.Type() != "value-comma_group" }) {
+		slices.ContainsFunc(
+			node.List("groups"),
+			func(group *estree.Node) bool { return group.Type() != "value-comma_group" },
+		) {
 		return false
 	}
 	if parentNode.Type() == "value-comma_group" {

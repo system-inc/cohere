@@ -40,7 +40,10 @@ func TestNoAwaitInLoopFires(test *testing.T) {
 		{"an await in a do-while test", "async function foo() { do { } while (await bar); }"},
 		{"an await deep in a loop body", "async function foo() { while (true) { if (bar) { foo(await bar); } } }"},
 		{"an await deep in a loop condition", "async function foo() { while (xyz || 5 > await x) {  } }"},
-		{"an await in a while nested inside a for-await-of", "async function foo() { for await (var x of xs) { while (1) await f(x) } }"},
+		{
+			"an await in a while nested inside a for-await-of",
+			"async function foo() { for await (var x of xs) { while (1) await f(x) } }",
+		},
 		{"an await using in a while body", "while (true) { await using resource = getResource(); }"},
 		{"an await using in a for body", "for (;;) { await using resource = getResource(); }"},
 		{"an await using in a for-of left position", "for (await using resource of resources) {}"},
@@ -67,20 +70,35 @@ func TestNoAwaitInLoopStaysSilent(test *testing.T) {
 		{"an await on the for-of iterable", "async function foo() { for (var bar of await baz) { } }"},
 		{"an await on a for-await-of iterable", "async function foo() { for await (var bar of await baz) { } }"},
 		{"an await in a legacy for-in initializer", "async function foo() { for (var bar = await baz in qux) {} }"},
-		{"blocked by a function declaration", "async function foo() { while (true) { async function foo() { await bar; } } }"},
+		{
+			"blocked by a function declaration",
+			"async function foo() { while (true) { async function foo() { await bar; } } }",
+		},
 		{"an await in a for-loop initializer", "async function foo() { for (var i = await bar; i < n; i++) {  } }"},
 		{"a do-while with no await at all", "async function foo() { do { } while (bar); }"},
-		{"blocked by a function expression", "async function foo() { while (true) { var y = async function() { await bar; } } }"},
+		{
+			"blocked by a function expression",
+			"async function foo() { while (true) { var y = async function() { await bar; } } }",
+		},
 		{"blocked by a concise arrow", "async function foo() { while (true) { var y = async () => await foo; } }"},
-		{"blocked by a block-bodied arrow", "async function foo() { while (true) { var y = async () => { await foo; } } }"},
-		{"blocked by a class method", "async function foo() { while (true) { class Foo { async foo() { await bar; } } } }"},
+		{
+			"blocked by a block-bodied arrow",
+			"async function foo() { while (true) { var y = async () => { await foo; } } }",
+		},
+		{
+			"blocked by a class method",
+			"async function foo() { while (true) { class Foo { async foo() { await bar; } } } }",
+		},
 		{"a for-await-of that is not itself nested", "async function foo() { for await (var x of xs) { await f(x) } }"},
 		{"a const declaration in a loop", "while (true) { const value = 0; }"},
 		{"a let declaration in a loop", "while (true) { let value = 0; }"},
 		{"a var declaration in a loop", "while (true) { var value = 0; }"},
 		{"an await using outside any loop", "await using resource = getResource();"},
 		{"a plain using in a loop", "while (true) { using resource = getResource(); }"},
-		{"an await using blocked by a function declaration", "async function foo() { while (true) { async function foo() { await using resource = getResource(); } } }"},
+		{
+			"an await using blocked by a function declaration",
+			"async function foo() { while (true) { async function foo() { await using resource = getResource(); } } }",
+		},
 		{"an await using in a for-loop initializer", "for (await using resource = getResource(); ;) {}"},
 	}
 
@@ -114,11 +132,41 @@ func TestNoAwaitInLoopSpans(test *testing.T) {
 		wantEnd    int
 		wantText   string
 	}{
-		{"an await using statement keeps its semicolon", "while (true) { await using resource = getResource(); }", 15, 52, "await using resource = getResource();"},
-		{"an await using in a for body keeps its semicolon", "for (;;) { await using resource = getResource(); }", 11, 48, "await using resource = getResource();"},
-		{"an await using in a for-of header has no semicolon to keep", "for (await using resource of resources) {}", 5, 25, "await using resource"},
-		{"a plain await reports the await expression", "async function foo() { while (baz) { await bar; } }", 37, 46, "await bar"},
-		{"a nested for-await-of reports the loop", "async function foo() { while (baz) { for await (x of xs); } }", 37, 57, "for await (x of xs);"},
+		{
+			"an await using statement keeps its semicolon",
+			"while (true) { await using resource = getResource(); }",
+			15,
+			52,
+			"await using resource = getResource();",
+		},
+		{
+			"an await using in a for body keeps its semicolon",
+			"for (;;) { await using resource = getResource(); }",
+			11,
+			48,
+			"await using resource = getResource();",
+		},
+		{
+			"an await using in a for-of header has no semicolon to keep",
+			"for (await using resource of resources) {}",
+			5,
+			25,
+			"await using resource",
+		},
+		{
+			"a plain await reports the await expression",
+			"async function foo() { while (baz) { await bar; } }",
+			37,
+			46,
+			"await bar",
+		},
+		{
+			"a nested for-await-of reports the loop",
+			"async function foo() { while (baz) { for await (x of xs); } }",
+			37,
+			57,
+			"for await (x of xs);",
+		},
 	}
 
 	for _, testCase := range cases {
@@ -189,7 +237,10 @@ func TestNoAwaitInLoopBoundariesBeyondUpstreamsThree(test *testing.T) {
 		{"an async object method", "async function f(){ while (true) { var o = { async m() { await bar; } }; } }"},
 		{"an async class method", "async function f(){ while (true) { class C { async m() { await bar; } } } }"},
 		{"an async generator method", "async function f(){ while (true) { class C { async *m() { await bar; } } } }"},
-		{"an async arrow returned from a method", "async function f(){ while (true) { class C { m() { return async () => await bar; } } } }"},
+		{
+			"an async arrow returned from a method",
+			"async function f(){ while (true) { class C { m() { return async () => await bar; } } } }",
+		},
 
 		// These four are illegal source and are here for that reason rather than in spite of it.
 		// `await` is not allowed in a non-async constructor, accessor or static initialization
@@ -200,10 +251,22 @@ func TestNoAwaitInLoopBoundariesBeyondUpstreamsThree(test *testing.T) {
 		// of these reports; with them present, all four are clean and a firing control still
 		// reports. That is the grammar and the parser disagreeing, which is exactly the case a
 		// surviving mutant on an arm like this is telling you about.
-		{"an await in a constructor, which is illegal and recovered", "async function f(){ while (true) { class C { constructor() { foo(await bar); } } } }"},
-		{"an await in a getter, which is illegal and recovered", "async function f(){ while (true) { class C { get x() { return foo(await bar); } } } }"},
-		{"an await in a setter, which is illegal and recovered", "async function f(){ while (true) { class C { set x(v) { foo(await bar); } } } }"},
-		{"an await in a static block, which is illegal and recovered", "async function f(){ while (true) { class C { static { foo(await bar); } } } }"},
+		{
+			"an await in a constructor, which is illegal and recovered",
+			"async function f(){ while (true) { class C { constructor() { foo(await bar); } } } }",
+		},
+		{
+			"an await in a getter, which is illegal and recovered",
+			"async function f(){ while (true) { class C { get x() { return foo(await bar); } } } }",
+		},
+		{
+			"an await in a setter, which is illegal and recovered",
+			"async function f(){ while (true) { class C { set x(v) { foo(await bar); } } } }",
+		},
+		{
+			"an await in a static block, which is illegal and recovered",
+			"async function f(){ while (true) { class C { static { foo(await bar); } } } }",
+		},
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()

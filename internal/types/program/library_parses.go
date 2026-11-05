@@ -73,7 +73,10 @@ func (parses *LibraryParses) Len() int {
 
 // sourceFile answers a bundled file from the cache, parsing it on first use. It reports false for a file
 // that is not bundled or cannot be read, which the caller loads the ordinary way.
-func (parses *LibraryParses) sourceFile(options ast.SourceFileParseOptions, read func(string) (string, bool)) (*ast.SourceFile, bool) {
+func (parses *LibraryParses) sourceFile(
+	options ast.SourceFileParseOptions,
+	read func(string) (string, bool),
+) (*ast.SourceFile, bool) {
 	if !bundled.IsBundled(options.FileName.AsString()) {
 		return nil, false
 	}
@@ -92,7 +95,11 @@ func (parses *LibraryParses) sourceFile(options ast.SourceFileParseOptions, read
 		parses.mutex.Unlock()
 	}
 
-	key := libraryParseKey{options: options, scriptKind: core.EnsureScriptKindFromFileName(options.FileName), hash: hash}
+	key := libraryParseKey{
+		options:    options,
+		scriptKind: core.EnsureScriptKindFromFileName(options.FileName),
+		hash:       hash,
+	}
 	parses.mutex.Lock()
 	entry, found := parses.entries[key]
 	if !found {
@@ -122,7 +129,10 @@ type libraryParsesHost struct {
 }
 
 func (host *libraryParsesHost) GetSourceFile(options ast.SourceFileParseOptions) *ast.SourceFile {
-	if file, shared := host.parses.sourceFile(options, func(path string) (string, bool) { return host.FS().ReadFile(tspath.RootedFilePath(path)) }); shared {
+	if file, shared := host.parses.sourceFile(
+		options,
+		func(path string) (string, bool) { return host.FS().ReadFile(tspath.RootedFilePath(path)) },
+	); shared {
 		return file
 	}
 	return host.CompilerHost.GetSourceFile(options)

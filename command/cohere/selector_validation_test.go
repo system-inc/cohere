@@ -34,7 +34,11 @@ func TestPipelineRefusesAZeroMatchOverrideSelector(test *testing.T) {
 	writeSelectorValidationProject(test, directory, "**/*.ts")
 	command = exec.Command(binary, "--lint", "--no-fix", "--directory", directory)
 	if output, outputError := command.CombinedOutput(); outputError != nil {
-		test.Fatalf("the same project failed after its selector was changed to match index.ts: %v\n%s", outputError, output)
+		test.Fatalf(
+			"the same project failed after its selector was changed to match index.ts: %v\n%s",
+			outputError,
+			output,
+		)
 	}
 }
 

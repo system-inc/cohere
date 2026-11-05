@@ -65,18 +65,30 @@ func TestNoExtraneousClassStaysSilentOnUpstreamPassCases(test *testing.T) {
 		options    string
 	}{
 		{sourceText: "\nclass Foo {\n  public prop = 1;\n  constructor() {}\n}\n    ", options: ""},
-		{sourceText: "\nexport class CClass extends BaseClass {\n  public static helper(): void {}\n  private static privateHelper(): boolean {\n    return true;\n  }\n  constructor() {}\n}\n    ", options: ""},
+		{
+			sourceText: "\nexport class CClass extends BaseClass {\n  public static helper(): void {}\n  private static privateHelper(): boolean {\n    return true;\n  }\n  constructor() {}\n}\n    ",
+			options:    "",
+		},
 		{sourceText: "\nclass Foo {\n  constructor(public bar: string) {}\n}\n    ", options: ""},
 		{sourceText: "class Foo {}", options: "{\"allowEmpty\": true}"},
 		{sourceText: "\nclass Foo {\n  constructor() {}\n}\n      ", options: "{\"allowConstructorOnly\": true}"},
-		{sourceText: "\nexport class Bar {\n  public static helper(): void {}\n  private static privateHelper(): boolean {\n    return true;\n  }\n}\n      ", options: "{\"allowStaticOnly\": true}"},
+		{
+			sourceText: "\nexport class Bar {\n  public static helper(): void {}\n  private static privateHelper(): boolean {\n    return true;\n  }\n}\n      ",
+			options:    "{\"allowStaticOnly\": true}",
+		},
 		{sourceText: "\nexport default class {\n  hello() {\n    return 'I am foo!';\n  }\n}\n    ", options: ""},
 		{sourceText: "\n@FooDecorator\nclass Foo {}\n      ", options: "{\"allowWithDecorator\": true}"},
-		{sourceText: "\n@FooDecorator\nclass Foo {\n  constructor(foo: Foo) {\n    foo.subscribe(a => {\n      console.log(a);\n    });\n  }\n}\n      ", options: "{\"allowWithDecorator\": true}"},
+		{
+			sourceText: "\n@FooDecorator\nclass Foo {\n  constructor(foo: Foo) {\n    foo.subscribe(a => {\n      console.log(a);\n    });\n  }\n}\n      ",
+			options:    "{\"allowWithDecorator\": true}",
+		},
 		{sourceText: "\nabstract class Foo {\n  abstract property: string;\n}\n    ", options: ""},
 		{sourceText: "\nabstract class Foo {\n  abstract method(): string;\n}\n    ", options: ""},
 		{sourceText: "\nclass Foo {\n  accessor prop: string;\n}\n    ", options: ""},
-		{sourceText: "\nclass Foo {\n  accessor prop = 'bar';\n  static bar() {\n    return false;\n  }\n}\n    ", options: ""},
+		{
+			sourceText: "\nclass Foo {\n  accessor prop = 'bar';\n  static bar() {\n    return false;\n  }\n}\n    ",
+			options:    "",
+		},
 		{sourceText: "\nclass Foo {\n  [key: string]: string;\n}\n    ", options: ""},
 		{sourceText: "\nabstract class Foo {\n  accessor prop: string;\n}\n    ", options: ""},
 		{sourceText: "\nabstract class Foo {\n  abstract accessor prop: string;\n}\n    ", options: ""},
@@ -682,15 +694,30 @@ func TestNoExtraneousClassExemptsALoadBearingEmptyClass(test *testing.T) {
 		{"a base another class extends", "class Base {}\nclass Child extends Base {\n  value = 1;\n}\nnew Child();\n"},
 		{"a constructor-typed parameter", slots + "class Token {}\nregister(Token);\n"},
 		{"a set of constructors", slots + "class Unrelated {}\nscope.has(Unrelated);\n"},
-		{"every one of several uses is a constructor slot", slots + "class Token {}\nregister(Token);\nscope.has(Token);\n"},
-		{"a use as a type does not count against it", slots + "class Token {}\nregister(Token);\ndeclare const typed: Token;\n"},
-		{"a class expression inline where a constructor is expected", "declare function snapshot(entry: { target: new () => object }): void;\nsnapshot({ target: class Target {} });\n"},
-		{"a const-bound class expression handed only to constructor slots", slots + "const token = class Token {};\nregister(token);\n"},
+		{
+			"every one of several uses is a constructor slot",
+			slots + "class Token {}\nregister(Token);\nscope.has(Token);\n",
+		},
+		{
+			"a use as a type does not count against it",
+			slots + "class Token {}\nregister(Token);\ndeclare const typed: Token;\n",
+		},
+		{
+			"a class expression inline where a constructor is expected",
+			"declare function snapshot(entry: { target: new () => object }): void;\nsnapshot({ target: class Target {} });\n",
+		},
+		{
+			"a const-bound class expression handed only to constructor slots",
+			slots + "const token = class Token {};\nregister(token);\n",
+		},
 	}
 	for _, testCase := range silent {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoExtraneousClass, noExtraneousClassFile, testCase.source, nil))
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.RunTypedWithOptions(test, NoExtraneousClass, noExtraneousClassFile, testCase.source, nil),
+			)
 		})
 	}
 
@@ -700,23 +727,46 @@ func TestNoExtraneousClassExemptsALoadBearingEmptyClass(test *testing.T) {
 	}{
 		{"nothing references it", "class Foo {}\n"},
 		{"a value use that wants no constructor", "class Token {}\nconsole.log(Token);\n"},
-		{"one use in a constructor slot and one that is not", slots + "class Token {}\nregister(Token);\nconst alias = Token;\nconsole.log(alias);\n"},
+		{
+			"one use in a constructor slot and one that is not",
+			slots + "class Token {}\nregister(Token);\nconst alias = Token;\nconsole.log(alias);\n",
+		},
 		{"instantiated, which needs no class", "class Foo {}\nconsole.log(new Foo());\n"},
 		{"exported, so uses elsewhere decide it", slots + "export class Token {}\nregister(Token);\n"},
 		{"exported by a specifier", slots + "class Token {}\nregister(Token);\nexport { Token };\n"},
-		{"extended by an interface, which uses it only as a type", "class Shape {}\ninterface Square extends Shape {\n  side: number;\n}\ndeclare const square: Square;\nconsole.log(square);\n"},
-		{"a let-bound class expression that is reassigned, since the write wants no constructor", slots + "let token = class Token {};\nregister(token);\ntoken = class Other {};\n"},
-		{"a const-bound class expression also used otherwise", slots + "const token = class {};\nregister(token);\nconsole.log(token);\n"},
+		{
+			"extended by an interface, which uses it only as a type",
+			"class Shape {}\ninterface Square extends Shape {\n  side: number;\n}\ndeclare const square: Square;\nconsole.log(square);\n",
+		},
+		{
+			"a let-bound class expression that is reassigned, since the write wants no constructor",
+			slots + "let token = class Token {};\nregister(token);\ntoken = class Other {};\n",
+		},
+		{
+			"a const-bound class expression also used otherwise",
+			slots + "const token = class {};\nregister(token);\nconsole.log(token);\n",
+		},
 		{"a class expression inline where no constructor is expected", "console.log(class {});\n"},
 		{"an exported const-bound class expression", slots + "export const token = class {};\nregister(token);\n"},
-		{"a generic parameter, whose contextual type is inferred from the class itself", slots + "declare function rename<Target>(target: Target, name: string): Target;\nclass Token {}\nrename(Token, 'renamed');\n"},
-		{"a generic constrained to a constructor, which inference can't tell apart", slots + "class Token {}\nkey(Token);\n"},
-		{"implemented rather than extended", "class Shape {}\nclass Square implements Shape {\n  side = 1;\n}\nnew Square();\n"},
+		{"a generic parameter, whose contextual type is inferred from the class itself", slots +
+			"declare function rename<Target>(target: Target, name: string): Target;\nclass Token {}\nrename(Token, 'renamed');\n"},
+		{
+			"a generic constrained to a constructor, which inference can't tell apart",
+			slots + "class Token {}\nkey(Token);\n",
+		},
+		{
+			"implemented rather than extended",
+			"class Shape {}\nclass Square implements Shape {\n  side = 1;\n}\nnew Square();\n",
+		},
 	}
 	for _, testCase := range reported {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, NoExtraneousClass, noExtraneousClassFile, testCase.source, nil), "empty")
+			rule_testing.ExpectFindings(
+				test,
+				rule_testing.RunTypedWithOptions(test, NoExtraneousClass, noExtraneousClassFile, testCase.source, nil),
+				"empty",
+			)
 		})
 	}
 }

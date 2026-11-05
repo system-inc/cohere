@@ -74,7 +74,12 @@ func TestStylePropObjectFires(test *testing.T) {
         }
       `, ``, 1},
 		{"invalid 6", `<MyComponent style="myStyle" />`, `{"allow":["MyOtherComponent"]}`, 1},
-		{"invalid 7", `React.createElement(MyComponent, { style: "mySpecialStyle" })`, `{"allow":["MyOtherComponent"]}`, 1},
+		{
+			"invalid 7",
+			`React.createElement(MyComponent, { style: "mySpecialStyle" })`,
+			`{"allow":["MyOtherComponent"]}`,
+			1,
+		},
 
 		// Cases upstream's corpus does not write, each measured against the installed build.
 
@@ -115,7 +120,12 @@ func TestStylePropObjectFires(test *testing.T) {
 		{"a createElement shorthand property", "const style = 'x';\nReact.createElement(\"div\", { style });", ``, 1},
 
 		// A string first argument has no name, so the allow list cannot match it.
-		{"allowing div does not exempt the string element", `React.createElement("div", { style: "x" });`, `{"allow":["div"]}`, 1},
+		{
+			"allowing div does not exempt the string element",
+			`React.createElement("div", { style: "x" });`,
+			`{"allow":["div"]}`,
+			1,
+		},
 
 		// A member first argument is neither a name nor a match, so the element is examined.
 		{"a createElement member first argument", `React.createElement(a.b, { style: 'x' });`, ``, 1},
@@ -128,7 +138,13 @@ func TestStylePropObjectFires(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			options := stylePropObjectOptions(test, testCase.rawOptions)
-			result := rule_testing.RunTypedWithOptions(test, StylePropObject, stylePropObjectFile, testCase.sourceText, options)
+			result := rule_testing.RunTypedWithOptions(
+				test,
+				StylePropObject,
+				stylePropObjectFile,
+				testCase.sourceText,
+				options,
+			)
 			wantIds := make([]string, testCase.wantCount)
 			for index := range wantIds {
 				wantIds[index] = "stylePropNotObject"
@@ -290,7 +306,13 @@ func TestStylePropObjectStaysSilent(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			options := stylePropObjectOptions(test, testCase.rawOptions)
-			result := rule_testing.RunTypedWithOptions(test, StylePropObject, stylePropObjectFile, testCase.sourceText, options)
+			result := rule_testing.RunTypedWithOptions(
+				test,
+				StylePropObject,
+				stylePropObjectFile,
+				testCase.sourceText,
+				options,
+			)
 			rule_testing.ExpectClean(test, result)
 		})
 	}
@@ -320,7 +342,13 @@ func TestStylePropObjectAnchors(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(test, StylePropObject, stylePropObjectFile, testCase.sourceText, stylePropObjectOptions(test, ``))
+			result := rule_testing.RunTypedWithOptions(
+				test,
+				StylePropObject,
+				stylePropObjectFile,
+				testCase.sourceText,
+				stylePropObjectOptions(test, ``),
+			)
 			rule_testing.ExpectFindings(test, result, "stylePropNotObject")
 
 			// RunTyped trims the fixture and appends a newline, so the literal above and the file
@@ -342,7 +370,13 @@ func TestStylePropObjectAnchors(test *testing.T) {
 func TestStylePropObjectMessageText(test *testing.T) {
 	test.Parallel()
 
-	result := rule_testing.RunTypedWithOptions(test, StylePropObject, stylePropObjectFile, `<div style="x" />`, stylePropObjectOptions(test, ``))
+	result := rule_testing.RunTypedWithOptions(
+		test,
+		StylePropObject,
+		stylePropObjectFile,
+		`<div style="x" />`,
+		stylePropObjectOptions(test, ``),
+	)
 	rule_testing.ExpectFindings(test, result, "stylePropNotObject")
 
 	if got := stylePropObjectMessage.Description; got != "Style prop value must be an object" {
@@ -370,7 +404,13 @@ func TestStylePropObjectHasNoFileSuffixGate(test *testing.T) {
 	for _, suffix := range []string{".tsx", ".ts"} {
 		test.Run(suffix, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(test, StylePropObject, "/repository/source/SuffixProbe"+suffix, source, stylePropObjectOptions(test, ``))
+			result := rule_testing.RunTypedWithOptions(
+				test,
+				StylePropObject,
+				"/repository/source/SuffixProbe"+suffix,
+				source,
+				stylePropObjectOptions(test, ``),
+			)
 			rule_testing.ExpectFindings(test, result, "stylePropNotObject")
 		})
 	}
@@ -431,7 +471,13 @@ func TestStylePropObjectIsNonNullLiteral(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(test, StylePropObject, stylePropObjectFile, testCase.sourceText, stylePropObjectOptions(test, ``))
+			result := rule_testing.RunTypedWithOptions(
+				test,
+				StylePropObject,
+				stylePropObjectFile,
+				testCase.sourceText,
+				stylePropObjectOptions(test, ``),
+			)
 			if testCase.wantFires {
 				rule_testing.ExpectFindings(test, result, "stylePropNotObject")
 			} else {
@@ -462,7 +508,9 @@ func TestDecodeStylePropObjectOptions(test *testing.T) {
 
 	test.Run("a named allow list", func(test *testing.T) {
 		test.Parallel()
-		decoded, decodeStylePropertyObjectOptionsError := DecodeStylePropObjectOptions([]byte(`{"allow":["MyComponent","Other"]}`))
+		decoded, decodeStylePropertyObjectOptionsError := DecodeStylePropObjectOptions(
+			[]byte(`{"allow":["MyComponent","Other"]}`),
+		)
 		if decodeStylePropertyObjectOptionsError != nil {
 			test.Fatalf("decoding a named allow list: %v", decodeStylePropertyObjectOptionsError)
 		}

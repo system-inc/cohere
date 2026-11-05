@@ -72,15 +72,29 @@ func TestGitCheckIgnoreCorpus(test *testing.T) {
 		}
 		wantIgnored := want != "" && !strings.HasPrefix(expectation.pattern, "!")
 		if got != want || ignored != wantIgnored {
-			test.Errorf("t0008 line %d: %s: got %v by %q, git expects %v by %q", expectation.scriptLine, resolved, ignored, got, wantIgnored, want)
+			test.Errorf(
+				"t0008 line %d: %s: got %v by %q, git expects %v by %q",
+				expectation.scriptLine,
+				resolved,
+				ignored,
+				got,
+				wantIgnored,
+				want,
+			)
 		}
 		asserted++
 	}
 	if len(seen) < 25 {
 		test.Fatalf("read only %d distinct paths from t0008-ignores.sh; the reader has lost the corpus", len(seen))
 	}
-	test.Logf("t0008 at git %s: %d expectations asserted over %d distinct paths; not asserted: %d naming the global excludes file, %d about a tracked file under the index",
-		gitCommit(test, source), asserted, len(seen), skippedGlobal, skippedIndex)
+	test.Logf(
+		"t0008 at git %s: %d expectations asserted over %d distinct paths; not asserted: %d naming the global excludes file, %d about a tracked file under the index",
+		gitCommit(test, source),
+		asserted,
+		len(seen),
+		skippedGlobal,
+		skippedIndex,
+	)
 }
 
 // checkIgnoreExpectation is one verbose line t0008 expects check-ignore to print.
@@ -209,7 +223,10 @@ func checkIgnoreExpectations(test *testing.T, script []string) []checkIgnoreExpe
 
 		paths := []string{match[5]}
 		if strings.Contains(match[5], "${subdir}") {
-			paths = []string{strings.ReplaceAll(match[5], "${subdir}", ""), strings.ReplaceAll(match[5], "${subdir}", "a/")}
+			paths = []string{
+				strings.ReplaceAll(match[5], "${subdir}", ""),
+				strings.ReplaceAll(match[5], "${subdir}", "a/"),
+			}
 		}
 		for _, expectedPath := range paths {
 			if strings.HasPrefix(expectedPath, `"`) {
@@ -219,7 +236,12 @@ func checkIgnoreExpectations(test *testing.T, script []string) []checkIgnoreExpe
 				}
 				expectedPath = unquoted
 			}
-			expectation := checkIgnoreExpectation{path: expectedPath, directory: directory, indexMode: indexMode, scriptLine: index + 1}
+			expectation := checkIgnoreExpectation{
+				path:       expectedPath,
+				directory:  directory,
+				indexMode:  indexMode,
+				scriptLine: index + 1,
+			}
 			if match[1] != "::" {
 				expectation.file, expectation.line, expectation.pattern = match[2], match[3], match[4]
 				if strings.HasPrefix(expectation.file, "$") {
@@ -251,7 +273,10 @@ func buildCheckIgnoreFixture(test *testing.T, root string, script []string) {
 	}
 
 	mustMkdir := func(relative string) {
-		if createDirectoryError := os.MkdirAll(filepath.Join(root, filepath.FromSlash(relative)), 0o755); createDirectoryError != nil {
+		if createDirectoryError := os.MkdirAll(
+			filepath.Join(root, filepath.FromSlash(relative)),
+			0o755,
+		); createDirectoryError != nil {
 			test.Fatal(createDirectoryError)
 		}
 	}
@@ -269,7 +294,10 @@ func buildCheckIgnoreFixture(test *testing.T, root string, script []string) {
 			}
 		case strings.HasPrefix(line, "ln -s "):
 			fields := strings.Fields(line)
-			if symlinkError := os.Symlink(fields[2], filepath.Join(root, filepath.FromSlash(fields[3]))); symlinkError != nil {
+			if symlinkError := os.Symlink(
+				fields[2],
+				filepath.Join(root, filepath.FromSlash(fields[3])),
+			); symlinkError != nil {
 				test.Fatal(symlinkError)
 			}
 		case strings.HasPrefix(line, "cd "):

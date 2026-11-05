@@ -51,7 +51,10 @@ func TestNoLabelVarStaysSilent(test *testing.T) {
 		name       string
 		sourceText string
 	}{
-		{"a variable of the same name in a sibling function", "function bar() { q: for(;;) { break q; } } function foo () { var q = t; }"},
+		{
+			"a variable of the same name in a sibling function",
+			"function bar() { q: for(;;) { break q; } } function foo () { var q = t; }",
+		},
 		{"a variable of a different name in the same scope", "function bar() { var x = foo; q: for(;;) { break q; } }"},
 	}
 
@@ -191,7 +194,10 @@ func TestNoLabelVarMessage(test *testing.T) {
 	if got := result.Diagnostics[0].Message.Id; got != "identifierClashWithLabel" {
 		test.Errorf("message id is %q, want %q", got, "identifierClashWithLabel")
 	}
-	if got := result.Diagnostics[0].Message.Description; !strings.HasPrefix(got, "This label has the same name as a variable in scope") {
+	if got := result.Diagnostics[0].Message.Description; !strings.HasPrefix(
+		got,
+		"This label has the same name as a variable in scope",
+	) {
 		test.Errorf("message description starts %q, which is not the sentence this rule reports", got)
 	}
 }

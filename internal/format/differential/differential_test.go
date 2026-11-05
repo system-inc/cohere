@@ -111,8 +111,11 @@ func TestUnchangedCandidateIsCaughtOnRewrites(test *testing.T) {
 		test.Fatalf("identical %d different %d, want 3 and 2\n%s", total.Identical, total.Different, report.Summary())
 	}
 	if total.RewriteTotal != 2 || total.RewriteIdentical != 0 {
-		test.Fatalf("rewrite subset %d/%d, want 0/2: an unchanged candidate must score nothing where formatting happens",
-			total.RewriteIdentical, total.RewriteTotal)
+		test.Fatalf(
+			"rewrite subset %d/%d, want 0/2: an unchanged candidate must score nothing where formatting happens",
+			total.RewriteIdentical,
+			total.RewriteTotal,
+		)
 	}
 	for _, result := range report.Files {
 		if result.Outcome == Different && !strings.Contains(filepath.Base(result.Path), "messy") {
@@ -165,13 +168,27 @@ func TestCacheServesTheSameAnswerAndKeysOnIdentity(test *testing.T) {
 	calls := &atomic.Int64{}
 	oracle := factory(trimmingOracle{calls: calls})
 
-	first, err := Compare(root, files, oracle, factory(unchanged{}), 2, &OracleCache{Directory: directory, Identity: "bundles-1"})
+	first, err := Compare(
+		root,
+		files,
+		oracle,
+		factory(unchanged{}),
+		2,
+		&OracleCache{Directory: directory, Identity: "bundles-1"},
+	)
 	if err != nil {
 		test.Fatal(err)
 	}
 	afterFirst := calls.Load()
 
-	second, err := Compare(root, files, oracle, factory(unchanged{}), 2, &OracleCache{Directory: directory, Identity: "bundles-1"})
+	second, err := Compare(
+		root,
+		files,
+		oracle,
+		factory(unchanged{}),
+		2,
+		&OracleCache{Directory: directory, Identity: "bundles-1"},
+	)
 	if err != nil {
 		test.Fatal(err)
 	}
@@ -183,11 +200,21 @@ func TestCacheServesTheSameAnswerAndKeysOnIdentity(test *testing.T) {
 	}
 
 	beforeThird := calls.Load()
-	if _, compareError := Compare(root, files, oracle, factory(unchanged{}), 2, &OracleCache{Directory: directory, Identity: "bundles-2"}); compareError != nil {
+	if _, compareError := Compare(
+		root,
+		files,
+		oracle,
+		factory(unchanged{}),
+		2,
+		&OracleCache{Directory: directory, Identity: "bundles-2"},
+	); compareError != nil {
 		test.Fatal(compareError)
 	}
 	if missed := calls.Load() - beforeThird; missed != int64(len(files)) {
-		test.Fatalf("a different oracle identity reused %d cached answers, want every file recomputed", int64(len(files))-missed)
+		test.Fatalf(
+			"a different oracle identity reused %d cached answers, want every file recomputed",
+			int64(len(files))-missed,
+		)
 	}
 }
 

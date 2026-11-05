@@ -13,10 +13,16 @@ import (
 
 // performanceNoIndependentAwaitInLoopText is the rule's message, whose wording lives in
 // `policy/messages/performance-no-independent-await-in-loop.json`.
-var performanceNoIndependentAwaitInLoopText = policy.MessageOf("nexus/performance-no-independent-await-in-loop", "independentAwaitInLoop")
+var performanceNoIndependentAwaitInLoopText = policy.MessageOf(
+	"nexus/performance-no-independent-await-in-loop",
+	"independentAwaitInLoop",
+)
 
 func messagePerformanceNoIndependentAwaitInLoop() rule.Message {
-	return rule.Message{Id: performanceNoIndependentAwaitInLoopText.Id, Description: performanceNoIndependentAwaitInLoopText.Render(nil)}
+	return rule.Message{
+		Id:          performanceNoIndependentAwaitInLoopText.Id,
+		Description: performanceNoIndependentAwaitInLoopText.Render(nil),
+	}
 }
 
 // PerformanceNoIndependentAwaitInLoop reports a loop over a collection whose iterations wait on
@@ -145,7 +151,10 @@ var PerformanceNoIndependentAwaitInLoop = rule.Rule{
 			if analysis == nil || !analysis.isIndependent() {
 				return
 			}
-			ruleContext.ReportRange(independentAwaitLoopHeaderRange(ruleContext.SourceFile, node, analysis.body), messagePerformanceNoIndependentAwaitInLoop())
+			ruleContext.ReportRange(
+				independentAwaitLoopHeaderRange(ruleContext.SourceFile, node, analysis.body),
+				messagePerformanceNoIndependentAwaitInLoop(),
+			)
 		}
 
 		return rule.Listeners{
@@ -398,8 +407,10 @@ func (analysis *independentAwaitLoopAnalysis) awaitsTheItemItself(operand *ast.N
 		access := unwrapped.AsElementAccessExpression()
 		argument := independentAwaitLoopSkipWrappers(access.ArgumentExpression)
 		collection := independentAwaitLoopSegments(analysis.collection)
-		return argument.Kind == ast.KindIdentifier && analysis.symbolOf(argument) == analysis.indexSymbol &&
-			collection != nil && strings.Join(independentAwaitLoopSegments(access.Expression), ".") == strings.Join(collection, ".")
+		return argument.Kind == ast.KindIdentifier &&
+			analysis.symbolOf(argument) == analysis.indexSymbol &&
+			collection != nil &&
+			strings.Join(independentAwaitLoopSegments(access.Expression), ".") == strings.Join(collection, ".")
 	}
 	return false
 }
@@ -535,7 +546,8 @@ func (analysis *independentAwaitLoopAnalysis) bodyMakesOrderedCall(body *ast.Nod
 		if node.Kind == ast.KindCatchClause {
 			return
 		}
-		if node.Kind == ast.KindCallExpression && independentAwaitLoopIsCalleeOrderedCall(node.AsCallExpression().Expression) {
+		if node.Kind == ast.KindCallExpression &&
+			independentAwaitLoopIsCalleeOrderedCall(node.AsCallExpression().Expression) {
 			found = true
 			return
 		}
@@ -590,7 +602,16 @@ func independentAwaitLoopIsCalleeOrderedCall(callee *ast.Node) bool {
 	return independentAwaitLoopIsOrderedCall(unwrapped)
 }
 
-var independentAwaitLoopPacingPrefixes = []string{"sleep", "delay", "wait", "pause", "throttle", "backoff", "ratelimit", "print"}
+var independentAwaitLoopPacingPrefixes = []string{
+	"sleep",
+	"delay",
+	"wait",
+	"pause",
+	"throttle",
+	"backoff",
+	"ratelimit",
+	"print",
+}
 
 var independentAwaitLoopStreamWrites = map[string]bool{
 	"write": true, "writeSync": true, "appendFile": true, "appendFileSync": true,
@@ -756,7 +777,10 @@ func independentAwaitLoopIsSinkMethod(method string) bool {
 		return true
 	}
 	for _, verb := range []string{"add", "append", "insert"} {
-		if len(method) > len(verb) && strings.HasPrefix(method, verb) && method[len(verb)] >= 'A' && method[len(verb)] <= 'Z' {
+		if len(method) > len(verb) &&
+			strings.HasPrefix(method, verb) &&
+			method[len(verb)] >= 'A' &&
+			method[len(verb)] <= 'Z' {
 			return true
 		}
 	}
@@ -906,11 +930,17 @@ func (analysis *independentAwaitLoopAnalysis) carriesState() bool {
 				break
 			}
 			if analysis.isOuter(symbol) {
-				reads = append(reads, independentAwaitLoopPath{segments: independentAwaitLoopReadSegments(node), root: node})
+				reads = append(
+					reads,
+					independentAwaitLoopPath{segments: independentAwaitLoopReadSegments(node), root: node},
+				)
 			}
 
 		case ast.KindThisKeyword:
-			reads = append(reads, independentAwaitLoopPath{segments: independentAwaitLoopReadSegments(node), root: node})
+			reads = append(
+				reads,
+				independentAwaitLoopPath{segments: independentAwaitLoopReadSegments(node), root: node},
+			)
 		}
 
 		nextInsideFunction := insideFunction || independentAwaitLoopIsBoundary(node)
@@ -937,7 +967,10 @@ func (analysis *independentAwaitLoopAnalysis) carriesState() bool {
 		}
 		if node.Kind == ast.KindIdentifier && !independentAwaitLoopIsNameOnly(node) ||
 			node.Kind == ast.KindThisKeyword {
-			collectionReads = append(collectionReads, independentAwaitLoopPath{segments: independentAwaitLoopReadSegments(node), root: node})
+			collectionReads = append(
+				collectionReads,
+				independentAwaitLoopPath{segments: independentAwaitLoopReadSegments(node), root: node},
+			)
 		}
 		node.ForEachChild(func(child *ast.Node) bool {
 			collect(child)
@@ -966,7 +999,8 @@ func independentAwaitLoopReadSegments(root *ast.Node) []string {
 	current := root
 	for {
 		parent := current.Parent
-		for parent != nil && (parent.Kind == ast.KindParenthesizedExpression || parent.Kind == ast.KindNonNullExpression) {
+		for parent != nil &&
+			(parent.Kind == ast.KindParenthesizedExpression || parent.Kind == ast.KindNonNullExpression) {
 			current = parent
 			parent = current.Parent
 		}
@@ -1006,7 +1040,9 @@ func (analysis *independentAwaitLoopAnalysis) computeTaint() {
 				return
 			}
 			if node.Kind == ast.KindIdentifier {
-				if symbol := analysis.ctx.TypeChecker.GetSymbolAtLocation(node); symbol != nil && !analysis.taintedSymbols[symbol] {
+				if symbol := analysis.ctx.TypeChecker.GetSymbolAtLocation(
+					node,
+				); symbol != nil && !analysis.taintedSymbols[symbol] {
 					analysis.taintedSymbols[symbol] = true
 					changed = true
 				}
@@ -1046,7 +1082,8 @@ func (analysis *independentAwaitLoopAnalysis) computeTaint() {
 				}
 			case ast.KindCatchClause:
 				clause := node.AsCatchClause()
-				if clause.VariableDeclaration != nil && analysis.containsAwait(node.Parent.AsTryStatement().TryBlock, -1) {
+				if clause.VariableDeclaration != nil &&
+					analysis.containsAwait(node.Parent.AsTryStatement().TryBlock, -1) {
 					changed = taintNames(clause.VariableDeclaration.AsVariableDeclaration().Name()) || changed
 				}
 			case ast.KindForOfStatement, ast.KindForInStatement:
@@ -1148,7 +1185,8 @@ func (analysis *independentAwaitLoopAnalysis) exitsLoop(jump *ast.Node) bool {
 
 	case ast.KindThrowStatement:
 		// Caught inside the body, a throw is a jump to the handler, not out of the loop.
-		for child, parent := jump, jump.Parent; parent != nil && child != analysis.body; child, parent = parent, parent.Parent {
+		for child, parent := jump, jump.Parent; parent != nil &&
+			child != analysis.body; child, parent = parent, parent.Parent {
 			if parent.Kind == ast.KindTryStatement {
 				try := parent.AsTryStatement()
 				if try.TryBlock == child && try.CatchClause != nil {
@@ -1185,7 +1223,8 @@ func (analysis *independentAwaitLoopAnalysis) exitsLoop(jump *ast.Node) bool {
 				return false
 			}
 		}
-		for current := analysis.loop.Parent; current != nil && current.Kind == ast.KindLabeledStatement; current = current.Parent {
+		for current := analysis.loop.Parent; current != nil &&
+			current.Kind == ast.KindLabeledStatement; current = current.Parent {
 			if current.AsLabeledStatement().Label.Text() == label.Text() {
 				return isBreak
 			}
@@ -1199,7 +1238,11 @@ func (analysis *independentAwaitLoopAnalysis) exitsLoop(jump *ast.Node) bool {
 // isGuardedByTaint climbs from a jump to `limit`, asking at each step whether what decides that
 // the jump runs reads an awaited value. `withSiblings` also asks whether an earlier statement jumps
 // on such a value, which would decide whether this statement is reached at all.
-func (analysis *independentAwaitLoopAnalysis) isGuardedByTaint(jump *ast.Node, limit *ast.Node, withSiblings bool) bool {
+func (analysis *independentAwaitLoopAnalysis) isGuardedByTaint(
+	jump *ast.Node,
+	limit *ast.Node,
+	withSiblings bool,
+) bool {
 	switch jump.Kind {
 	case ast.KindReturnStatement:
 		if analysis.containsTaint(jump.AsReturnStatement().Expression) {
@@ -1261,7 +1304,8 @@ func (analysis *independentAwaitLoopAnalysis) isGuardedByTaint(jump *ast.Node, l
 			}
 		}
 		if parent.Kind == ast.KindCaseClause || parent.Kind == ast.KindDefaultClause {
-			if withSiblings && analysis.earlierSiblingJumpsOnTaint(parent.AsCaseOrDefaultClause().Statements.Nodes, child) {
+			if withSiblings &&
+				analysis.earlierSiblingJumpsOnTaint(parent.AsCaseOrDefaultClause().Statements.Nodes, child) {
 				return true
 			}
 		}

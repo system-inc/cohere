@@ -161,7 +161,15 @@ func AttachComments[N Node[N]](ast N, comments []N, options *Options[N]) {
 
 // decorateComment is upstream's decorateComment: binary-search the sorted children of node for the
 // nodes around comment, descending into a child that contains it.
-func decorateComment[N Node[N]](node N, comment N, options *Options[N], enclosing N, hasEnclosing bool, ancestors []N, cache map[N][]N) decorated[N] {
+func decorateComment[N Node[N]](
+	node N,
+	comment N,
+	options *Options[N],
+	enclosing N,
+	hasEnclosing bool,
+	ancestors []N,
+	cache map[N][]N,
+) decorated[N] {
 	printer := options.Printer
 	commentStart := printer.LocStart(comment)
 	commentEnd := printer.LocEnd(comment)
@@ -192,7 +200,14 @@ func decorateComment[N Node[N]](node N, comment N, options *Options[N], enclosin
 			right = middle
 			continue
 		}
-		panic(fmt.Sprintf("printing: comment at %d-%d overlaps a %s at %d-%d", commentStart, commentEnd, child.Type(), start, end))
+		panic(fmt.Sprintf(
+			"printing: comment at %d-%d overlaps a %s at %d-%d",
+			commentStart,
+			commentEnd,
+			child.Type(),
+			start,
+			end,
+		))
 	}
 
 	// Comments inside one expression of a template literal must not move to another expression.
@@ -291,7 +306,12 @@ func isAllEmptyAndNoLineBreak(text string) bool {
 }
 
 // isOwnLineComment is upstream's isOwnLineComment.
-func isOwnLineComment[N Node[N]](text string, options *Options[N], contexts []*CommentContext[N], commentIndex int) bool {
+func isOwnLineComment[N Node[N]](
+	text string,
+	options *Options[N],
+	contexts []*CommentContext[N],
+	commentIndex int,
+) bool {
 	current := contexts[commentIndex]
 	start := options.Printer.LocStart(current.Comment)
 	if current.HasPreceding {
@@ -309,7 +329,12 @@ func isOwnLineComment[N Node[N]](text string, options *Options[N], contexts []*C
 }
 
 // isEndOfLineComment is upstream's isEndOfLineComment.
-func isEndOfLineComment[N Node[N]](text string, options *Options[N], contexts []*CommentContext[N], commentIndex int) bool {
+func isEndOfLineComment[N Node[N]](
+	text string,
+	options *Options[N],
+	contexts []*CommentContext[N],
+	commentIndex int,
+) bool {
 	current := contexts[commentIndex]
 	end := options.Printer.LocEnd(current.Comment)
 	if current.HasFollowing {

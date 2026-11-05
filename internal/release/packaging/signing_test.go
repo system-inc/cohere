@@ -43,7 +43,13 @@ func TestVerifySignatureRefusesAnAdHocSignature(test *testing.T) {
 	}
 	// Ad hoc is what Go's linker leaves on every arm64 binary, so it is what a signing step that did
 	// nothing looks like.
-	if output, outputError := exec.Command("codesign", "--force", "--sign", "-", binaryPath).CombinedOutput(); outputError != nil {
+	if output, outputError := exec.Command(
+		"codesign",
+		"--force",
+		"--sign",
+		"-",
+		binaryPath,
+	).CombinedOutput(); outputError != nil {
 		test.Fatalf("signing the copy ad hoc: %v\n%s", outputError, output)
 	}
 
@@ -62,12 +68,16 @@ func TestVerifySignatureRefusesAnAdHocSignature(test *testing.T) {
 func TestReadNotaryVerdictReadsTheStatus(test *testing.T) {
 	test.Parallel()
 
-	accepted, err := readNotaryVerdict([]byte(`{"id":"2efe2717-52ef-43a5-96dc-0797e4ca1041","message":"Processing complete","status":"Accepted"}`))
+	accepted, err := readNotaryVerdict(
+		[]byte(`{"id":"2efe2717-52ef-43a5-96dc-0797e4ca1041","message":"Processing complete","status":"Accepted"}`),
+	)
 	if err != nil || accepted.Status != "Accepted" || accepted.Identifier != "2efe2717-52ef-43a5-96dc-0797e4ca1041" {
 		test.Fatalf("an Accepted answer read as %+v, %v", accepted, err)
 	}
 
-	invalid, err := readNotaryVerdict([]byte(`{"id":"8f1c2c55-0f5b-4a4e-9a9d-3d1f2b6a7e10","message":"Processing complete","status":"Invalid"}`))
+	invalid, err := readNotaryVerdict(
+		[]byte(`{"id":"8f1c2c55-0f5b-4a4e-9a9d-3d1f2b6a7e10","message":"Processing complete","status":"Invalid"}`),
+	)
 	if err != nil || invalid.Status != "Invalid" {
 		test.Fatalf("an Invalid answer read as %+v, %v", invalid, err)
 	}
@@ -82,7 +92,9 @@ func TestReadNotaryVerdictReadsTheStatus(test *testing.T) {
 func TestNotaryCredentialsNameTheKeychainOnlyWhenThereIsOne(test *testing.T) {
 	test.Parallel()
 
-	withKeychain := notaryCredentials(Signing{KeychainProfile: "cohere-notary", NotaryKeychain: "/runner/build.keychain-db"})
+	withKeychain := notaryCredentials(
+		Signing{KeychainProfile: "cohere-notary", NotaryKeychain: "/runner/build.keychain-db"},
+	)
 	if strings.Join(withKeychain, " ") != "--keychain-profile cohere-notary --keychain /runner/build.keychain-db" {
 		test.Fatalf("with a keychain: %q", withKeychain)
 	}

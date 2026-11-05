@@ -83,7 +83,8 @@ func IsReadonlyErrorLike(
 		checker.Type_alias(subtype).TypeArguments()
 		typeArgument := checker.Type_alias(subtype).TypeArguments()[0]
 
-		return IsErrorLike(program, typeChecker, typeArgument) || IsReadonlyErrorLike(program, typeChecker, typeArgument)
+		return IsErrorLike(program, typeChecker, typeArgument) ||
+			IsReadonlyErrorLike(program, typeChecker, typeArgument)
 	})
 }
 
@@ -147,7 +148,8 @@ func IsBuiltinSymbolLike(
 
 		actualSymbolName := symbol.Name
 
-		if Some(symbolNames, func(name string) bool { return actualSymbolName == name }) && rule.IsSymbolFromDefaultLibrary(program, symbol) {
+		if Some(symbolNames, func(name string) bool { return actualSymbolName == name }) &&
+			rule.IsSymbolFromDefaultLibrary(program, symbol) {
 			return builtinPredicateMatches_True
 		}
 

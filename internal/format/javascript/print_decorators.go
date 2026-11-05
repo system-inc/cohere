@@ -30,7 +30,8 @@ func printDecorators(path *Path, options *Options, print PrintFunc) Doc {
 	if len(decorators) == 0 || hasDecoratorsBeforeExport(parent) || isIgnored(path) {
 		return emptyDoc
 	}
-	shouldBreak := current.Is("ClassExpression", "ClassDeclaration") || hasNewlineBetweenOrAfterDecorators(current, options)
+	shouldBreak := current.Is("ClassExpression", "ClassDeclaration") ||
+		hasNewlineBetweenOrAfterDecorators(current, options)
 	var leading Doc = emptyDoc
 	switch {
 	case keyOf(path) == "declaration" && isExportDeclaration(parent):

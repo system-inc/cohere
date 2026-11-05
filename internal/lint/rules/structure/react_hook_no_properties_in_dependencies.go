@@ -10,12 +10,18 @@ import (
 
 // reactHookNoPropertiesInDependenciesText is the rule's message, whose wording lives in
 // `policy/messages/react-hook-no-properties-in-dependencies.json`.
-var reactHookNoPropertiesInDependenciesText = policy.MessageOf("structure/react-hook-no-properties-in-dependencies", "extractPropertiesFirst")
+var reactHookNoPropertiesInDependenciesText = policy.MessageOf(
+	"structure/react-hook-no-properties-in-dependencies",
+	"extractPropertiesFirst",
+)
 
 // messageExtractPropertiesFirst is the finding, rendered when it is reported so the text comes from
 // the current catalog.
 func messageExtractPropertiesFirst() rule.Message {
-	return rule.Message{Id: reactHookNoPropertiesInDependenciesText.Id, Description: reactHookNoPropertiesInDependenciesText.Render(nil)}
+	return rule.Message{
+		Id:          reactHookNoPropertiesInDependenciesText.Id,
+		Description: reactHookNoPropertiesInDependenciesText.Render(nil),
+	}
 }
 
 // hooksWithDependencies are the React hooks that take a dependency array.

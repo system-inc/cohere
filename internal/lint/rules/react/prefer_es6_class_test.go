@@ -135,7 +135,9 @@ func TestPreferEs6ClassStaysSilent(test *testing.T) {
 // `"never"`.
 func runPreferEs6Class(test *testing.T, mode PreferEs6ClassMode, sourceText string) rule_testing.Result {
 	test.Helper()
-	decoded, decodePreferEs6ClassOptionsError := DecodePreferEs6ClassOptions([]byte(`"` + strings.ToLower(string(mode)) + `"`))
+	decoded, decodePreferEs6ClassOptionsError := DecodePreferEs6ClassOptions(
+		[]byte(`"` + strings.ToLower(string(mode)) + `"`),
+	)
 	if decodePreferEs6ClassOptionsError != nil {
 		test.Fatalf("decoding mode %q: %v", mode, decodePreferEs6ClassOptionsError)
 	}
@@ -198,7 +200,11 @@ func TestPreferEs6ClassFactoryNames(test *testing.T) {
 	}{
 		// The control. If this stops reporting the rest of the table measures nothing.
 		{"the bare factory", `var H = createReactClass({ render() { return null; } });`, []string{"shouldUseES6Class"}},
-		{"the namespaced factory", `var H = React.createReactClass({ render() { return null; } });`, []string{"shouldUseES6Class"}},
+		{
+			"the namespaced factory",
+			`var H = React.createReactClass({ render() { return null; } });`,
+			[]string{"shouldUseES6Class"},
+		},
 
 		// The shelf accepts these two and upstream does not.
 		{"bare createClass", `var H = createClass({ render() { return null; } });`, nil},
@@ -213,9 +219,21 @@ func TestPreferEs6ClassFactoryNames(test *testing.T) {
 
 		// Parenthesised spellings, all measured reporting upstream. ESLint's tree does not
 		// materialise these, so upstream never thinks about them and the corpus writes none.
-		{"a parenthesised bare callee", `var H = (createReactClass)({ render() { return null; } });`, []string{"shouldUseES6Class"}},
-		{"a parenthesised namespaced callee", `var H = (React.createReactClass)({ render() { return null; } });`, []string{"shouldUseES6Class"}},
-		{"a parenthesised receiver", `var H = (React).createReactClass({ render() { return null; } });`, []string{"shouldUseES6Class"}},
+		{
+			"a parenthesised bare callee",
+			`var H = (createReactClass)({ render() { return null; } });`,
+			[]string{"shouldUseES6Class"},
+		},
+		{
+			"a parenthesised namespaced callee",
+			`var H = (React.createReactClass)({ render() { return null; } });`,
+			[]string{"shouldUseES6Class"},
+		},
+		{
+			"a parenthesised receiver",
+			`var H = (React).createReactClass({ render() { return null; } });`,
+			[]string{"shouldUseES6Class"},
+		},
 	}
 
 	for _, testCase := range cases {
@@ -516,7 +534,9 @@ func TestDecodePreferEs6ClassOptions(test *testing.T) {
 	for _, testCase := range refused {
 		test.Run(testCase.name+" is refused", func(test *testing.T) {
 			test.Parallel()
-			if _, decodePreferEs6ClassOptionsError := DecodePreferEs6ClassOptions([]byte(testCase.raw)); decodePreferEs6ClassOptionsError == nil {
+			if _, decodePreferEs6ClassOptionsError := DecodePreferEs6ClassOptions(
+				[]byte(testCase.raw),
+			); decodePreferEs6ClassOptionsError == nil {
 				test.Errorf("%s decoded; upstream's schema refuses it", testCase.raw)
 			}
 		})

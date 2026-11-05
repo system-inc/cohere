@@ -192,7 +192,11 @@ var AwaitThenable = rule.Rule{
 				}
 
 				for typePart := range type_checking.UnionTypePartsSeq(exprType) {
-					if type_checking.GetWellKnownSymbolPropertyOfType(typePart, "asyncIterator", ruleContext.TypeChecker) != nil {
+					if type_checking.GetWellKnownSymbolPropertyOfType(
+						typePart,
+						"asyncIterator",
+						ruleContext.TypeChecker,
+					) != nil {
 						return
 					}
 				}
@@ -243,7 +247,11 @@ var AwaitThenable = rule.Rule{
 						})
 					}
 
-					ruleContext.ReportNodeWithSuggestions(init, buildAwaitUsingOfNonAsyncDisposableMessage(), suggestions...)
+					ruleContext.ReportNodeWithSuggestions(
+						init,
+						buildAwaitUsingOfNonAsyncDisposableMessage(),
+						suggestions...,
+					)
 				}
 			},
 		}

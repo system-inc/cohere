@@ -59,7 +59,10 @@ func TestEmittedDeclarationsAgreeWithTheMeasuredProperty(test *testing.T) {
 		len(FrameworkFunctionalUtilities), agreed+len(disagreements), agreed, len(unported), len(disagreements))
 
 	if len(FrameworkFunctionalUtilities) != 33 {
-		test.Errorf("the table holds %d roots and this comparison was written against 33; the population moved and the assertions below were sized for the old one", len(FrameworkFunctionalUtilities))
+		test.Errorf(
+			"the table holds %d roots and this comparison was written against 33; the population moved and the assertions below were sized for the old one",
+			len(FrameworkFunctionalUtilities),
+		)
 	}
 	if agreed != 33 {
 		test.Errorf("%d of 33 roots agreed; the acceptance condition is every root, not a rate", agreed)
@@ -99,21 +102,35 @@ func TestEmittedPropertyNamesAreTheMeasuredOnes(test *testing.T) {
 			unknownToPropertyOrder++
 		}
 		if emitted[0].Property != utility.Property {
-			test.Errorf("%s: the ported handle declares %q, the measured table says %q", root, emitted[0].Property, utility.Property)
+			test.Errorf(
+				"%s: the ported handle declares %q, the measured table says %q",
+				root,
+				emitted[0].Property,
+				utility.Property,
+			)
 		}
 		if !emitted[0].ValuePresent {
-			test.Errorf("%s emitted a declaration with an absent value, which PropertySort skips entirely, so the root would read nothing", root)
+			test.Errorf(
+				"%s emitted a declaration with an absent value, which PropertySort skips entirely, so the root would read nothing",
+				root,
+			)
 		}
 	}
 
-	test.Logf("property names: %d roots compared, %d declare a property PropertyOrder does not know", compared, unknownToPropertyOrder)
+	test.Logf(
+		"property names: %d roots compared, %d declare a property PropertyOrder does not know",
+		compared,
+		unknownToPropertyOrder,
+	)
 	if compared != 33 {
 		test.Errorf("compared %d roots of 33", compared)
 	}
 	// Named rather than asserted loosely, because it is the reason this test exists beside the
 	// reading one. If it reaches zero, every root reads distinguishably and this test is redundant.
 	if unknownToPropertyOrder == 0 {
-		test.Error("no root declares a property outside PropertyOrder, so the reading comparison already covers every emitter and this test is measuring nothing")
+		test.Error(
+			"no root declares a property outside PropertyOrder, so the reading comparison already covers every emitter and this test is measuring nothing",
+		)
 	}
 }
 
@@ -131,17 +148,29 @@ func TestStaticValuesEmitTheirOwnProperty(test *testing.T) {
 		test.Fatal("order is not in the table")
 	}
 
-	static := utility.Emit("order", ResolvedUtilityValue{IsStaticValue: true, StaticValueName: "first", Value: "ignored"})
+	static := utility.Emit(
+		"order",
+		ResolvedUtilityValue{IsStaticValue: true, StaticValueName: "first", Value: "ignored"},
+	)
 	if len(static) != 1 || static[0].Property != "order" || static[0].Value != "-9999" {
-		test.Errorf("order-first emitted %s; upstream stores a single order declaration of -9999 under that name and returns it without the handle body running", describeDeclarations(static))
+		test.Errorf(
+			"order-first emitted %s; upstream stores a single order declaration of -9999 under that name and returns it without the handle body running",
+			describeDeclarations(static),
+		)
 	}
 
 	// An unrecognised static name is the fall-through, and it must reach the handle body rather than
 	// emit nothing. Upstream cannot produce this state, since resolution only sets IsStaticValue for
 	// a name the map holds; it is asserted here so the fall-through is not a silent nil.
-	fallen := utility.Emit("order", ResolvedUtilityValue{IsStaticValue: true, StaticValueName: "zznotastatic", Value: "7"})
+	fallen := utility.Emit(
+		"order",
+		ResolvedUtilityValue{IsStaticValue: true, StaticValueName: "zznotastatic", Value: "7"},
+	)
 	if len(fallen) != 1 || fallen[0].Property != "order" || fallen[0].Value != "7" {
-		test.Errorf("an unrecognised static name emitted %s; it should fall through to the handle body", describeDeclarations(fallen))
+		test.Errorf(
+			"an unrecognised static name emitted %s; it should fall through to the handle body",
+			describeDeclarations(fallen),
+		)
 	}
 }
 
@@ -176,6 +205,9 @@ func TestUnportedRootEmitsNothing(test *testing.T) {
 	// Reported through describeDeclarations rather than with %v, because a `[]*Node` formats as a
 	// pointer and a failure that names no property tells the next reader nothing about what fired.
 	if nodes := utility.Emit("zznotaroot", ResolvedUtilityValue{Value: "pointer"}); nodes != nil {
-		test.Errorf("an unported root emitted %s; a fallback to Property would make the acceptance test compare a field against itself", describeDeclarations(nodes))
+		test.Errorf(
+			"an unported root emitted %s; a fallback to Property would make the acceptance test compare a field against itself",
+			describeDeclarations(nodes),
+		)
 	}
 }

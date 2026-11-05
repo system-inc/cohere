@@ -91,18 +91,36 @@ func TestNoUselessConstructorFires(test *testing.T) {
 		{"class A extends B.C { constructor() { super(...arguments); } }", "class A extends B.C {  }"},
 		{"class A extends B { constructor(a, b, ...c) { super(...arguments); } }", "class A extends B {  }"},
 		{"class A extends B { constructor(a, b, ...c) { super(a, b, ...c); } }", "class A extends B {  }"},
-		{"class A {\n  foo = 'bar'\n  constructor() { }\n  [0]() { }\n}", "class A {\n  foo = 'bar'\n  ;\n  [0]() { }\n}"},
-		{"class A {\n  foo = 'bar'\n  constructor() { }\n  *baz() {}\n}", "class A {\n  foo = 'bar'\n  ;\n  *baz() {}\n}"},
+		{
+			"class A {\n  foo = 'bar'\n  constructor() { }\n  [0]() { }\n}",
+			"class A {\n  foo = 'bar'\n  ;\n  [0]() { }\n}",
+		},
+		{
+			"class A {\n  foo = 'bar'\n  constructor() { }\n  *baz() {}\n}",
+			"class A {\n  foo = 'bar'\n  ;\n  *baz() {}\n}",
+		},
 		{"class A {\n  foo = 'bar'\n  constructor() { }\n  in\n}", "class A {\n  foo = 'bar'\n  ;\n  in\n}"},
-		{"class A {\n  foo = 'bar'\n  constructor() { }\n  instanceof\n}", "class A {\n  foo = 'bar'\n  ;\n  instanceof\n}"},
-		{"class A {\n  foo = 'bar'\n  constructor() { }\n  #instanceof\n}", "class A {\n  foo = 'bar'\n  \n  #instanceof\n}"},
+		{
+			"class A {\n  foo = 'bar'\n  constructor() { }\n  instanceof\n}",
+			"class A {\n  foo = 'bar'\n  ;\n  instanceof\n}",
+		},
+		{
+			"class A {\n  foo = 'bar'\n  constructor() { }\n  #instanceof\n}",
+			"class A {\n  foo = 'bar'\n  \n  #instanceof\n}",
+		},
 		{"class A {\n  foo\n  constructor() { }\n  [0]() { }\n}", "class A {\n  foo\n  \n  [0]() { }\n}"},
 		{"class A {\n  \"foo\"\n  constructor() { }\n  [0]() { }\n}", "class A {\n  \"foo\"\n  \n  [0]() { }\n}"},
 		{"class A {\n  42\n  constructor() { }\n  [0]() { }\n}", "class A {\n  42\n  \n  [0]() { }\n}"},
 		{"class A {\n  [foo]\n  constructor() { }\n  [0]() { }\n}", "class A {\n  [foo]\n  \n  [0]() { }\n}"},
 		{"class A {\n  #foo\n  constructor() { }\n  [0]() { }\n}", "class A {\n  #foo\n  \n  [0]() { }\n}"},
-		{"\n            class A {\n                constructor() {}\n            }\n              ", "\n            class A {\n                \n            }\n              "},
-		{"\n            class A {\n                public constructor() {}\n            }\n        ", "\n            class A {\n                \n            }\n        "},
+		{
+			"\n            class A {\n                constructor() {}\n            }\n              ",
+			"\n            class A {\n                \n            }\n              ",
+		},
+		{
+			"\n            class A {\n                public constructor() {}\n            }\n        ",
+			"\n            class A {\n                \n            }\n        ",
+		},
 	}
 
 	for _, testCase := range cases {
@@ -118,7 +136,11 @@ func TestNoUselessConstructorFires(test *testing.T) {
 			if suggestions[0].Message.Id != "removeConstructor" {
 				test.Errorf("suggestion is %q, want %q", suggestions[0].Message.Id, "removeConstructor")
 			}
-			if got := applyUselessConstructorSuggestion(test, result.SourceFile.Text(), suggestions[0]); got != testCase.wantOutput {
+			if got := applyUselessConstructorSuggestion(
+				test,
+				result.SourceFile.Text(),
+				suggestions[0],
+			); got != testCase.wantOutput {
 				test.Errorf("applying the suggestion produced:\n  %q\nwant:\n  %q", got, testCase.wantOutput)
 			}
 		})

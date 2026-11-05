@@ -229,7 +229,9 @@ func (parser *Parser) next(source []uint16) {
 	tokenType := TokenType(source)
 	if tokenType == "" {
 		message := "Not a YAML token: " + string(utf16.Decode(source))
-		parser.pop(parser.Tokens.New(Token{Type: "error", Offset: parser.offset, Message: message, Source: source, indentAbsent: true}))
+		parser.pop(parser.Tokens.New(
+			Token{Type: "error", Offset: parser.offset, Message: message, Source: source, indentAbsent: true},
+		))
 		parser.offset += len(source)
 	} else if tokenType == "scalar" {
 		parser.atNewLine = false
@@ -343,7 +345,9 @@ func (parser *Parser) pop(errorToken *Token) {
 	if token == nil {
 		// should not happen
 		message := "Tried to pop an empty stack"
-		parser.emit(parser.Tokens.New(Token{Type: "error", Offset: parser.offset, Source: []uint16{}, Message: message, indentAbsent: true}))
+		parser.emit(parser.Tokens.New(
+			Token{Type: "error", Offset: parser.offset, Source: []uint16{}, Message: message, indentAbsent: true},
+		))
 	} else if len(parser.stack) == 0 {
 		parser.emit(token)
 	} else {
@@ -447,7 +451,9 @@ func everyCommentLessIndented(start []*Token, indent int) bool {
 func (parser *Parser) stream() {
 	switch parser.tokenType {
 	case "directive-line":
-		parser.emit(parser.Tokens.New(Token{Type: "directive", Offset: parser.offset, Source: parser.source, indentAbsent: true}))
+		parser.emit(parser.Tokens.New(
+			Token{Type: "directive", Offset: parser.offset, Source: parser.source, indentAbsent: true},
+		))
 		return
 	case "byte-order-mark", "space", "comment", "newline":
 		parser.emit(parser.sourceToken())

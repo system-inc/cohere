@@ -48,7 +48,9 @@ func sourceDirectory(file string, working string) (string, error) {
 		return "", fmt.Errorf("%s is neither a path on disk nor in %s", file, modulePath)
 	}
 	for directory := working; ; directory = filepath.Dir(directory) {
-		if contents, readError := os.ReadFile(filepath.Join(directory, "go.mod")); readError == nil && strings.HasPrefix(string(contents), "module "+modulePath+"\n") {
+		if contents, readError := os.ReadFile(
+			filepath.Join(directory, "go.mod"),
+		); readError == nil && strings.HasPrefix(string(contents), "module "+modulePath+"\n") {
 			return filepath.Join(directory, filepath.FromSlash(filepath.Dir(relative))), nil
 		}
 		if filepath.Dir(directory) == directory {

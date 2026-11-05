@@ -134,7 +134,11 @@ func correctnessNoProcessExitAfterOutputExpect(test *testing.T, result rule_test
 	for _, diagnostic := range diagnostics {
 		got = append(got, text[diagnostic.Range.Pos():diagnostic.Range.End()])
 		if len(diagnostic.Fixes) != 0 || len(diagnostic.Suggestions) != 0 {
-			test.Fatalf("expected no fix and no suggestion, got %d and %d", len(diagnostic.Fixes), len(diagnostic.Suggestions))
+			test.Fatalf(
+				"expected no fix and no suggestion, got %d and %d",
+				len(diagnostic.Fixes),
+				len(diagnostic.Suggestions),
+			)
 		}
 	}
 	if strings.Join(got, "\n") != strings.Join(want, "\n") {
@@ -237,13 +241,25 @@ func TestCorrectnessNoProcessExitAfterOutputRealSites(test *testing.T) {
 	}{
 		{"runStatement", correctnessNoProcessExitAfterOutputStatement, []string{"process.exit(result.exitCode)"}},
 		{"runSync", correctnessNoProcessExitAfterOutputSync, []string{"process.exit(result.allOk ? 0 : 1)"}},
-		{"runQuickBooksCardBalances", correctnessNoProcessExitAfterOutputCardBalances, []string{"process.exit(0)", "process.exit(0)"}},
-		{"godwordRequireInteractiveTerminal", correctnessNoProcessExitAfterOutputGodword, []string{"NodeProcess.exit(1)"}},
+		{
+			"runQuickBooksCardBalances",
+			correctnessNoProcessExitAfterOutputCardBalances,
+			[]string{"process.exit(0)", "process.exit(0)"},
+		},
+		{
+			"godwordRequireInteractiveTerminal",
+			correctnessNoProcessExitAfterOutputGodword,
+			[]string{"NodeProcess.exit(1)"},
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name+" as it stands", func(test *testing.T) {
 			test.Parallel()
-			correctnessNoProcessExitAfterOutputExpect(test, correctnessNoProcessExitAfterOutputRun(test, testCase.source(false)), testCase.want)
+			correctnessNoProcessExitAfterOutputExpect(
+				test,
+				correctnessNoProcessExitAfterOutputRun(test, testCase.source(false)),
+				testCase.want,
+			)
 		})
 		test.Run(testCase.name+" fixed", func(test *testing.T) {
 			test.Parallel()
@@ -331,7 +347,14 @@ func TestCorrectnessNoProcessExitAfterOutputFires(test *testing.T) {
 			"export function debug(): void { console.debug(output); process.exit(0); }",
 			"export function trace(): void { console.trace(output); process.exit(0); }",
 			"export function dirxml(): void { console.dirxml(output); process.exit(0); }",
-		}, []string{"process.exit(0)", "process.exit(0)", "process.exit(0)", "process.exit(0)", "process.exit(0)", "process.exit(0)"}},
+		}, []string{
+			"process.exit(0)",
+			"process.exit(0)",
+			"process.exit(0)",
+			"process.exit(0)",
+			"process.exit(0)",
+			"process.exit(0)",
+		}},
 		{"console reached by a quoted member", []string{
 			"export function main(): void {",
 			"    console['log'](output);",
@@ -419,7 +442,10 @@ func TestCorrectnessNoProcessExitAfterOutputFires(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			correctnessNoProcessExitAfterOutputExpect(test,
-				correctnessNoProcessExitAfterOutputRun(test, correctnessNoProcessExitAfterOutputSource(testCase.lines...)), testCase.want)
+				correctnessNoProcessExitAfterOutputRun(
+					test,
+					correctnessNoProcessExitAfterOutputSource(testCase.lines...),
+				), testCase.want)
 		})
 	}
 }
@@ -560,7 +586,10 @@ func TestCorrectnessNoProcessExitAfterOutputStaysSilent(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, correctnessNoProcessExitAfterOutputRun(test, correctnessNoProcessExitAfterOutputSource(testCase.lines...)))
+			rule_testing.ExpectClean(test, correctnessNoProcessExitAfterOutputRun(
+				test,
+				correctnessNoProcessExitAfterOutputSource(testCase.lines...),
+			))
 		})
 	}
 }
@@ -596,7 +625,11 @@ func correctnessNoProcessExitAfterOutputRunWithHelpers(test *testing.T, sourceTe
 	}, correctnessNoProcessExitAfterOutputFile, func(directory string) {
 		tsconfig := `{"compilerOptions": {"strict": true, "target": "ES2022", "lib": ["ES2022"], ` +
 			`"moduleDetection": "auto", "types": []}, "include": ["**/*.ts"]}`
-		if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(tsconfig), 0o644); writeError != nil {
+		if writeError := os.WriteFile(
+			filepath.Join(directory, "tsconfig.json"),
+			[]byte(tsconfig),
+			0o644,
+		); writeError != nil {
 			test.Fatalf("writing the tsconfig: %v", writeError)
 		}
 	})
@@ -650,7 +683,10 @@ func TestCorrectnessNoProcessExitAfterOutputReadsOneCallee(test *testing.T) {
 				exit = "process.exit(1)"
 			}
 			correctnessNoProcessExitAfterOutputExpect(test,
-				correctnessNoProcessExitAfterOutputRunWithHelpers(test, correctnessNoProcessExitAfterOutputSource(testCase.lines...)),
+				correctnessNoProcessExitAfterOutputRunWithHelpers(
+					test,
+					correctnessNoProcessExitAfterOutputSource(testCase.lines...),
+				),
 				[]string{exit})
 		})
 	}
@@ -700,7 +736,10 @@ func TestCorrectnessNoProcessExitAfterOutputReadsOneCallee(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			correctnessNoProcessExitAfterOutputExpect(test,
-				correctnessNoProcessExitAfterOutputRunWithHelpers(test, correctnessNoProcessExitAfterOutputSource(testCase.lines...)),
+				correctnessNoProcessExitAfterOutputRunWithHelpers(
+					test,
+					correctnessNoProcessExitAfterOutputSource(testCase.lines...),
+				),
 				testCase.want)
 		})
 	}

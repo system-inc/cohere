@@ -27,7 +27,11 @@ func TestNoDuplicateCaseReportsRepeatedTest(test *testing.T) {
 		{"negative number", `switch (a) { case -1: break; case -1: break; }`, 1},
 		{"template literal", "switch (a) { case `t${x}`: break; case `t${x}`: break; }", 1},
 		{"duplicate alongside a default clause", `switch (a) { case 1: break; case 1: break; default: break; }`, 1},
-		{"nested switch has its own duplicate", `switch (a) { case 1: switch (b) { case 2: break; case 2: break; } break; }`, 1},
+		{
+			"nested switch has its own duplicate",
+			`switch (a) { case 1: switch (b) { case 2: break; case 2: break; } break; }`,
+			1,
+		},
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
@@ -76,9 +80,15 @@ func TestNoDuplicateCaseAcceptsDistinctTests(test *testing.T) {
 		{"distinct strings", `switch (a) { case "a": break; case "b": break; }`},
 		{"distinct identifiers", `switch (a) { case a: break; case b: break; }`},
 		{"identifier and the number it holds", `switch (a) { case one: break; case 1: break; }`},
-		{"url inside a string is not a comment", `switch (a) { case "http://example.com": break; case "other": break; }`},
+		{
+			"url inside a string is not a comment",
+			`switch (a) { case "http://example.com": break; case "other": break; }`,
+		},
 		{"comment syntax inside a string is content", `switch (a) { case "a /* b */": break; case "a": break; }`},
-		{"strings differing only in whitespace", `switch (a) { case "hello  world": break; case "hello world": break; }`},
+		{
+			"strings differing only in whitespace",
+			`switch (a) { case "hello  world": break; case "hello world": break; }`,
+		},
 		{"distinct regexes", `switch (a) { case /foo/: break; case /bar/: break; }`},
 		{"same regex, different flags", `switch (a) { case /foo/i: break; case /foo/g: break; }`},
 		{"opposite signs", `switch (a) { case -1: break; case +1: break; }`},

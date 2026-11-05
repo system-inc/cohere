@@ -107,11 +107,17 @@ func TestAFixtureHasOneRootWhateverWasBuiltBeforeIt(test *testing.T) {
 		test.Fatal("the fixture was not evicted and built again, so this proves nothing about its root")
 	}
 	if want := memoryFixtureRoot + "/" + programCacheKey(files, "bound.ts", false); first != want || second != want {
-		test.Fatalf("a fixture's root is not its key alone: first build %s, after another fixture %s, want %s", first, second, want)
+		test.Fatalf(
+			"a fixture's root is not its key alone: first build %s, after another fixture %s, want %s",
+			first,
+			second,
+			want,
+		)
 	}
 	held := false
 	for _, sourceFile := range firstGraph.ProjectFiles() {
-		held = held || (sourceFile.FileName().AsString() == first+"/bound.ts" && strings.Contains(sourceFile.Text(), "planted100"))
+		held = held ||
+			(sourceFile.FileName().AsString() == first+"/bound.ts" && strings.Contains(sourceFile.Text(), "planted100"))
 	}
 	if !held {
 		test.Fatalf("the evicted graph no longer holds its own bound.ts under %s", first)

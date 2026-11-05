@@ -1312,7 +1312,10 @@ func functionName(node *ast.Node) string {
 		// `classifyFunction`, which asks whether it looks like a component or a hook, and a computed
 		// name is neither: `Symbol.for('nodejs.util.inspect.custom')` is not `Foo` and not `useFoo`.
 		// An anonymous function is already spelled this way here.
-		text, known := property.Name(name, property.Named|property.Quoted|property.Templated|property.Numeric|property.Private)
+		text, known := property.Name(
+			name,
+			property.Named|property.Quoted|property.Templated|property.Numeric|property.Private,
+		)
 		if !known {
 			return ""
 		}

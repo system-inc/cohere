@@ -23,7 +23,10 @@ func TestPrintConfigResolvesEveryRegisteredRuleForAFile(t *testing.T) {
 	config := &configuration.Config{
 		Root: "/repository",
 		Rules: map[string]configuration.RuleSetting{
-			"max-classes-per-file":               {Severity: configuration.SeverityError, Options: []json.RawMessage{json.RawMessage(`{"ignoreExpressions":true}`)}},
+			"max-classes-per-file": {
+				Severity: configuration.SeverityError,
+				Options:  []json.RawMessage{json.RawMessage(`{"ignoreExpressions":true}`)},
+			},
 			"@typescript-eslint/no-invalid-this": {Severity: configuration.SeverityError},
 			"no-var":                             {Severity: configuration.SeverityWarn},
 		},
@@ -38,7 +41,9 @@ func TestPrintConfigResolvesEveryRegisteredRuleForAFile(t *testing.T) {
 	}
 
 	source := printed("/repository/source/Thing.ts")
-	if got := source["max-classes-per-file"]; len(got) != 2 || string(got[0]) != "2" || compacted(t, got[1]) != `{"ignoreExpressions":true}` {
+	if got := source["max-classes-per-file"]; len(got) != 2 ||
+		string(got[0]) != "2" ||
+		compacted(t, got[1]) != `{"ignoreExpressions":true}` {
 		t.Errorf("max-classes-per-file printed as %s, want [2, {\"ignoreExpressions\":true}]", got)
 	}
 	if got := source["no-var"]; len(got) != 1 || string(got[0]) != "1" {
@@ -132,10 +137,15 @@ func TestPrintConfigExplainsAFile(test *testing.T) {
 	if decodeError := json.Unmarshal(doc["languageOptions"], &language); decodeError != nil {
 		test.Error(decodeError)
 	}
-	if language.SourceType != "module" || language.Target != "es2022" || language.Tsconfig != filepath.Join(root, "tsconfig.json") {
+	if language.SourceType != "module" ||
+		language.Target != "es2022" ||
+		language.Tsconfig != filepath.Join(root, "tsconfig.json") {
 		test.Errorf("language options = %+v", language)
 	}
-	if got := language.Globals["projectGlobal"]; !reflect.DeepEqual(got, []string{filepath.Join(root, "Globals.d.ts")}) {
+	if got := language.Globals["projectGlobal"]; !reflect.DeepEqual(
+		got,
+		[]string{filepath.Join(root, "Globals.d.ts")},
+	) {
 		test.Errorf("projectGlobal declarations = %v", got)
 	}
 	if _, ok := language.Globals["thing"]; ok {
@@ -152,14 +162,20 @@ func TestPrintConfigExplainsAFile(test *testing.T) {
 	}
 	if len(overrides) != 1 {
 		test.Errorf("overrides = %s", doc["overrides"])
-	} else if overrides[0].Index != 0 || overrides[0].Reason != "generated fixture" || overrides[0].File != filepath.Join(root, "CohereSettings.json") || !reflect.DeepEqual(overrides[0].Files, []string{"Thing.ts"}) || !reflect.DeepEqual(overrides[0].Rules["no-var"], []json.RawMessage{json.RawMessage("0")}) {
+	} else if overrides[0].Index != 0 ||
+		overrides[0].Reason != "generated fixture" ||
+		overrides[0].File != filepath.Join(root, "CohereSettings.json") ||
+		!reflect.DeepEqual(overrides[0].Files, []string{"Thing.ts"}) ||
+		!reflect.DeepEqual(overrides[0].Rules["no-var"], []json.RawMessage{json.RawMessage("0")}) {
 		test.Errorf("matched override = %+v", overrides[0])
 	}
 	var departures map[string]struct{ File, Reason string }
 	if decodeError := json.Unmarshal(doc["departures"], &departures); decodeError != nil {
 		test.Error(decodeError)
 	}
-	if len(departures) != 1 || departures["no-var"].Reason != "migration" || departures["no-var"].File != filepath.Join(root, "CohereSettings.json") {
+	if len(departures) != 1 ||
+		departures["no-var"].Reason != "migration" ||
+		departures["no-var"].File != filepath.Join(root, "CohereSettings.json") {
 		test.Errorf("departures = %s", doc["departures"])
 	}
 	var rules map[string][]json.RawMessage
@@ -170,9 +186,23 @@ func TestPrintConfigExplainsAFile(test *testing.T) {
 	if decodeError := json.Unmarshal(doc["ruleAliases"], &aliases); decodeError != nil {
 		test.Error(decodeError)
 	}
-	for _, name := range []string{"require-await", "no-use-before-define", "logical-assignment-operators", "no-implicit-coercion", "max-classes-per-file"} {
-		if len(rules[name]) == 0 || !reflect.DeepEqual(rules["nexus/"+name], rules[name]) || aliases["nexus/"+name] != name {
-			test.Errorf("alias nexus/%s = %s -> %q, core = %s", name, rules["nexus/"+name], aliases["nexus/"+name], rules[name])
+	for _, name := range []string{
+		"require-await",
+		"no-use-before-define",
+		"logical-assignment-operators",
+		"no-implicit-coercion",
+		"max-classes-per-file",
+	} {
+		if len(rules[name]) == 0 ||
+			!reflect.DeepEqual(rules["nexus/"+name], rules[name]) ||
+			aliases["nexus/"+name] != name {
+			test.Errorf(
+				"alias nexus/%s = %s -> %q, core = %s",
+				name,
+				rules["nexus/"+name],
+				aliases["nexus/"+name],
+				rules[name],
+			)
 		}
 	}
 	if got := rules["no-var"]; len(got) != 1 || string(got[0]) != "0" {
@@ -221,16 +251,19 @@ func TestPrintConfigSettingsReaders(test *testing.T) {
 		"future-plugin": json.RawMessage(`{"read":"yes","off":"no"}`),
 		"unregistered":  json.RawMessage(`{"ignored":true}`),
 	}}
-	registrations := []rule.SettingsRegistration{{Namespaces: []string{"future-plugin", "future-alias"}, Split: func(raw []byte) (map[string]json.RawMessage, error) {
-		var keys map[string]json.RawMessage
-		if decodeError := json.Unmarshal(raw, &keys); decodeError != nil {
-			return nil, decodeError
-		}
-		return map[string]json.RawMessage{
-			"future/read": json.RawMessage(`{"read":` + string(keys["read"]) + `}`),
-			"future/off":  json.RawMessage(`{"off":` + string(keys["off"]) + `}`),
-		}, nil
-	}}}
+	registrations := []rule.SettingsRegistration{{
+		Namespaces: []string{"future-plugin", "future-alias"},
+		Split: func(raw []byte) (map[string]json.RawMessage, error) {
+			var keys map[string]json.RawMessage
+			if decodeError := json.Unmarshal(raw, &keys); decodeError != nil {
+				return nil, decodeError
+			}
+			return map[string]json.RawMessage{
+				"future/read": json.RawMessage(`{"read":` + string(keys["read"]) + `}`),
+				"future/off":  json.RawMessage(`{"off":` + string(keys["off"]) + `}`),
+			}, nil
+		},
+	}}
 	resolved := configuration.Resolved{Rules: map[string]configuration.RuleSetting{
 		"future/read": {Severity: configuration.SeverityWarn},
 		"future/off":  {Severity: configuration.SeverityOff},
@@ -294,10 +327,23 @@ func TestPrintConfigAliasesAndUnusedDisable(test *testing.T) {
 		}
 	}
 	aliases, rules := read("Thing.ts")
-	if aliases["@typescript-eslint/no-invalid-this"] != "no-invalid-this" || !reflect.DeepEqual(rules.rules["@typescript-eslint/no-invalid-this"], rules.rules["no-invalid-this"]) {
-		test.Errorf("inherited twin alias = %v, rules = %s / %s", aliases, rules.rules["@typescript-eslint/no-invalid-this"], rules.rules["no-invalid-this"])
+	if aliases["@typescript-eslint/no-invalid-this"] != "no-invalid-this" ||
+		!reflect.DeepEqual(rules.rules["@typescript-eslint/no-invalid-this"], rules.rules["no-invalid-this"]) {
+		test.Errorf(
+			"inherited twin alias = %v, rules = %s / %s",
+			aliases,
+			rules.rules["@typescript-eslint/no-invalid-this"],
+			rules.rules["no-invalid-this"],
+		)
 	}
-	for _, absent := range []string{"nexus/require-await", "nexus/no-use-before-define", "nexus/logical-assignment-operators", "nexus/no-implicit-coercion", "nexus/max-classes-per-file", "nexus/no-debugger"} {
+	for _, absent := range []string{
+		"nexus/require-await",
+		"nexus/no-use-before-define",
+		"nexus/logical-assignment-operators",
+		"nexus/no-implicit-coercion",
+		"nexus/max-classes-per-file",
+		"nexus/no-debugger",
+	} {
 		if _, ok := aliases[absent]; ok {
 			test.Errorf("unconfigured alias %s printed", absent)
 		}
@@ -323,13 +369,21 @@ func TestPrintConfigAliasesAndUnusedDisable(test *testing.T) {
 		if fixture.level == "" {
 			changed = strings.Replace(settings, `"rules":{"unused-disable":"error"}`, `"rules":{}`, 1)
 		}
-		if writeError := os.WriteFile(filepath.Join(root, "CohereSettings.json"), []byte(changed), 0o644); writeError != nil {
+		if writeError := os.WriteFile(
+			filepath.Join(root, "CohereSettings.json"),
+			[]byte(changed),
+			0o644,
+		); writeError != nil {
 			test.Fatal(writeError)
 		}
 		_, rules = read("Thing.ts")
 		checkSeverity(rules, fixture.want)
 	}
-	if writeError := os.WriteFile(filepath.Join(root, "Base.json"), []byte(strings.Replace(base, "@typescript-eslint/no-invalid-this", "no-invalid-this", 1)), 0o644); writeError != nil {
+	if writeError := os.WriteFile(
+		filepath.Join(root, "Base.json"),
+		[]byte(strings.Replace(base, "@typescript-eslint/no-invalid-this", "no-invalid-this", 1)),
+		0o644,
+	); writeError != nil {
 		test.Fatal(writeError)
 	}
 	aliases, rules = read("Thing.ts")

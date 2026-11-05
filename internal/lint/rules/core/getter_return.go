@@ -114,7 +114,8 @@ var GetterReturn = rule.Rule{
 		}
 
 		isGlobal := func(identifier *ast.Node) bool {
-			return ruleContext.TypeChecker != nil && rule.IsDeclaredOnlyInDeclarationFiles(ruleContext.TypeChecker.GetSymbolAtLocation(identifier))
+			return ruleContext.TypeChecker != nil &&
+				rule.IsDeclaredOnlyInDeclarationFiles(ruleContext.TypeChecker.GetSymbolAtLocation(identifier))
 		}
 
 		check := func(node *ast.Node, body *ast.Node) {
@@ -151,7 +152,10 @@ var GetterReturn = rule.Rule{
 					return
 				}
 				function := ast.FindAncestor(node.Parent, ast.IsFunctionLike)
-				if function == nil || function.Body() == nil || function.Body().Kind != ast.KindBlock || !isGetterFunction(function, isGlobal) {
+				if function == nil ||
+					function.Body() == nil ||
+					function.Body().Kind != ast.KindBlock ||
+					!isGetterFunction(function, isGlobal) {
 					return
 				}
 				ruleContext.ReportNode(node, rule.Message{

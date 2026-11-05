@@ -51,7 +51,12 @@ func TestTokenRangeStartsWhereTheScannerDoes(test *testing.T) {
 		return TokenRange(sourceFile, node).Pos()
 	})
 	if len(disagreements) > 0 {
-		test.Errorf("TokenRange and the scanner disagree on %d of %d nodes, by kind: %s", total(disagreements), nodes, summary(disagreements))
+		test.Errorf(
+			"TokenRange and the scanner disagree on %d of %d nodes, by kind: %s",
+			total(disagreements),
+			nodes,
+			summary(disagreements),
+		)
 	}
 	test.Logf("%d nodes in %d files compared, %d disagreeing", nodes, len(files), total(disagreements))
 
@@ -88,7 +93,14 @@ func corpusFiles(test *testing.T, roots []string) []*ast.SourceFile {
 	test.Helper()
 	kinds := map[string]core.ScriptKind{".ts": core.ScriptKindTS, ".mts": core.ScriptKindTS, ".cts": core.ScriptKindTS,
 		".tsx": core.ScriptKindTSX, ".js": core.ScriptKindJS, ".jsx": core.ScriptKindJSX, ".mjs": core.ScriptKindJS}
-	skipped := map[string]bool{"node_modules": true, ".git": true, ".cache": true, ".next": true, "dist": true, "TypeScript": true}
+	skipped := map[string]bool{
+		"node_modules": true,
+		".git":         true,
+		".cache":       true,
+		".next":        true,
+		"dist":         true,
+		"TypeScript":   true,
+	}
 	var files []*ast.SourceFile
 	for _, root := range roots {
 		// Ignored: the callback skips every path it cannot read and never returns an error, so the walk has
@@ -112,7 +124,10 @@ func corpusFiles(test *testing.T, roots []string) []*ast.SourceFile {
 				return nil
 			}
 			fileName := tspath.NormalizePath(path)
-			if sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: tspath.RootedFilePath(fileName), PathKey: tspath.PathKey(fileName)},
+			if sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{
+				FileName: tspath.RootedFilePath(fileName),
+				PathKey:  tspath.PathKey(fileName),
+			},
 				string(contents), kind); sourceFile != nil {
 				files = append(files, sourceFile)
 			}

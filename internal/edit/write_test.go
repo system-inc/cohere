@@ -179,7 +179,10 @@ func TestTemporaryFileIsCreatedBesideTheTarget(test *testing.T) {
 		}
 	}
 	if !sawTemporary {
-		test.Fatalf("no temp file was ever observed beside the target; writes may not be going through temp+rename (saw: %v)", keysOf(seen))
+		test.Fatalf(
+			"no temp file was ever observed beside the target; writes may not be going through temp+rename (saw: %v)",
+			keysOf(seen),
+		)
 	}
 
 	// And none may survive.
@@ -274,7 +277,10 @@ func TestTheParseGuardJudgesAnAdamicFileAsTypeScript(test *testing.T) {
 	if !TypeScriptParsable("/repo/geometry.a") {
 		test.Fatal("an Adamic .a file is not TypeScript to the guard")
 	}
-	if parses, reason := Parses("/repo/geometry.a", "const widened = <number>value;\nexport const area = (width: number): number => width;\n"); !parses {
+	if parses, reason := Parses(
+		"/repo/geometry.a",
+		"const widened = <number>value;\nexport const area = (width: number): number => width;\n",
+	); !parses {
 		test.Fatalf("valid TypeScript in a .a file was refused: %s", reason)
 	}
 	parses, reason := Parses("/repo/geometry.a", "export function alpha( {\n")

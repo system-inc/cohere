@@ -69,10 +69,16 @@ func TestSharedReaderFindsWhatEachRuleFindsAlone(test *testing.T) {
 			test.Fatalf("writing %s: %v", name, writeError)
 		}
 	}
-	if createDirectoryError := os.MkdirAll(filepath.Join(directory, "node_modules"), 0o755); createDirectoryError != nil {
+	if createDirectoryError := os.MkdirAll(
+		filepath.Join(directory, "node_modules"),
+		0o755,
+	); createDirectoryError != nil {
 		test.Fatalf("creating node_modules: %v", createDirectoryError)
 	}
-	if symlinkError := os.Symlink(packageRoot, filepath.Join(directory, "node_modules", "tailwindcss")); symlinkError != nil {
+	if symlinkError := os.Symlink(
+		packageRoot,
+		filepath.Join(directory, "node_modules", "tailwindcss"),
+	); symlinkError != nil {
 		test.Fatalf("linking the installed tailwindcss: %v", symlinkError)
 	}
 
@@ -104,13 +110,19 @@ func TestSharedReaderFindsWhatEachRuleFindsAlone(test *testing.T) {
 	slices.Sort(alone)
 
 	for _, subject := range sharedReaderRules {
-		reported := slices.ContainsFunc(alone, func(line string) bool { return strings.HasPrefix(line, subject.Name+" ") })
+		reported := slices.ContainsFunc(
+			alone,
+			func(line string) bool { return strings.HasPrefix(line, subject.Name+" ") },
+		)
 		if !reported {
 			test.Errorf("%s reported nothing on the fixture, so the comparison cannot speak for it", subject.Name)
 		}
 	}
 	if !slices.Equal(shared, alone) {
-		test.Fatalf("the rules sharing a reader found something other than what each finds alone:\n  shared:\n    %s\n  alone:\n    %s",
-			strings.Join(shared, "\n    "), strings.Join(alone, "\n    "))
+		test.Fatalf(
+			"the rules sharing a reader found something other than what each finds alone:\n  shared:\n    %s\n  alone:\n    %s",
+			strings.Join(shared, "\n    "),
+			strings.Join(alone, "\n    "),
+		)
 	}
 }

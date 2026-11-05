@@ -76,7 +76,12 @@ func TestConsistencyNoSingleLineJsDocStaysSilent(test *testing.T) {
 func TestConsistencyNoSingleLineJsDocFixesWithOnlyWhitespaceAfter(test *testing.T) {
 	test.Parallel()
 
-	result := rule_testing.Run(test, ConsistencyNoSingleLineJsDoc, jsDocFile, "/** Does the thing. */  \t\nexport const value = 1;\n")
+	result := rule_testing.Run(
+		test,
+		ConsistencyNoSingleLineJsDoc,
+		jsDocFile,
+		"/** Does the thing. */  \t\nexport const value = 1;\n",
+	)
 	rule_testing.ExpectFindings(test, result, "useSimpleComment")
 	rule_testing.ExpectFixedSource(test, result, "// Does the thing.  \t\nexport const value = 1;\n")
 }
@@ -84,7 +89,12 @@ func TestConsistencyNoSingleLineJsDocFixesWithOnlyWhitespaceAfter(test *testing.
 func TestConsistencyNoSingleLineJsDocFixes(test *testing.T) {
 	test.Parallel()
 
-	result := rule_testing.Run(test, ConsistencyNoSingleLineJsDoc, jsDocFile, "/** Does the thing. */\nexport const value = 1;\n")
+	result := rule_testing.Run(
+		test,
+		ConsistencyNoSingleLineJsDoc,
+		jsDocFile,
+		"/** Does the thing. */\nexport const value = 1;\n",
+	)
 	rule_testing.ExpectFindings(test, result, "useSimpleComment")
 
 	fixes := result.Diagnostics[0].Fixes

@@ -82,7 +82,10 @@ func TestConsistencyNoMultilineArrowFunctionStaysSilent(test *testing.T) {
 		// false finding on the ahra tree, in a fixture list of non-constructible values where
 		// converting it to a function expression would have given it a prototype and flipped the
 		// assertion it exists to make.
-		{"single-line arrow inside a multi-line array", "const values = [\n    SimpleClass,\n    () => {},\n    42,\n];\n"},
+		{
+			"single-line arrow inside a multi-line array",
+			"const values = [\n    SimpleClass,\n    () => {},\n    42,\n];\n",
+		},
 		{"single-line arrow as a multi-line call argument", "register(\n    'name',\n    () => {},\n);\n"},
 	}
 	for _, testCase := range cases {
@@ -105,7 +108,11 @@ func TestConsistencyNoMultilineArrowFunctionReportsEachArrowOnce(test *testing.T
 		wantId     string
 	}{
 		{"react hook", "React.useEffect(() => {\n    run();\n}, []);\n", "reactHookArrow"},
-		{"addEventListener", "element.addEventListener('click', (event) => {\n    run(event);\n});\n", "addEventListenerArrow"},
+		{
+			"addEventListener",
+			"element.addEventListener('click', (event) => {\n    run(event);\n});\n",
+			"addEventListenerArrow",
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -228,7 +235,12 @@ func TestConsistencyNoMultilineArrowFunctionFixes(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.Run(test, ConsistencyNoMultilineArrowFunction, testCase.fileName, testCase.sourceText)
+			result := rule_testing.Run(
+				test,
+				ConsistencyNoMultilineArrowFunction,
+				testCase.fileName,
+				testCase.sourceText,
+			)
 			if len(result.Diagnostics) != 1 {
 				test.Fatalf("expected one finding, got %v", result.MessageIds())
 			}
@@ -251,12 +263,36 @@ func TestConsistencyNoMultilineArrowFunctionDeclinesAFixThatRebinds(test *testin
 		wantId     string
 	}{
 		{"this in a hook argument", "React.useEffect(() => {\n    this.run();\n}, []);\n", "reactHookArrow"},
-		{"this in a listener argument", "element.addEventListener('click', () => {\n    this.run();\n});\n", "addEventListenerArrow"},
-		{"arguments", "function outer() {\n    const f = () => {\n        return arguments[0];\n    };\n}\n", "multilineArrow"},
-		{"arguments in a nested arrow", "function outer() {\n    const f = () => {\n        return [1].map(() => arguments[0]);\n    };\n}\n", "multilineArrow"},
-		{"new.target", "function Outer() {\n    const f = () => {\n        return new.target;\n    };\n}\n", "multilineArrow"},
-		{"super", "class B extends A {\n    method() {\n        const f = () => {\n            return super.method();\n        };\n    }\n}\n", "multilineArrow"},
-		{"this in a parameter default", "React.useCallback((value = this.fallback) => {\n    run(value);\n}, []);\n", "reactHookArrow"},
+		{
+			"this in a listener argument",
+			"element.addEventListener('click', () => {\n    this.run();\n});\n",
+			"addEventListenerArrow",
+		},
+		{
+			"arguments",
+			"function outer() {\n    const f = () => {\n        return arguments[0];\n    };\n}\n",
+			"multilineArrow",
+		},
+		{
+			"arguments in a nested arrow",
+			"function outer() {\n    const f = () => {\n        return [1].map(() => arguments[0]);\n    };\n}\n",
+			"multilineArrow",
+		},
+		{
+			"new.target",
+			"function Outer() {\n    const f = () => {\n        return new.target;\n    };\n}\n",
+			"multilineArrow",
+		},
+		{
+			"super",
+			"class B extends A {\n    method() {\n        const f = () => {\n            return super.method();\n        };\n    }\n}\n",
+			"multilineArrow",
+		},
+		{
+			"this in a parameter default",
+			"React.useCallback((value = this.fallback) => {\n    run(value);\n}, []);\n",
+			"reactHookArrow",
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {

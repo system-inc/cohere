@@ -7,7 +7,13 @@ import (
 )
 
 // provenanceForTest is a provenance record any test stream can open with.
-var provenanceForTest = ProvenanceRecord{Contract: Version, Engine: "cohere-go", Version: "0.1.0", Commit: "dev", Toolchain: "go1.27"}
+var provenanceForTest = ProvenanceRecord{
+	Contract:  Version,
+	Engine:    "cohere-go",
+	Version:   "0.1.0",
+	Commit:    "dev",
+	Toolchain: "go1.27",
+}
 
 // TestWriterRefusesARecordBeforeProvenance holds the first line of every stream to provenance.
 func TestWriterRefusesARecordBeforeProvenance(test *testing.T) {
@@ -49,7 +55,11 @@ func TestWriterRefusesEveryRecordAfterTheSummary(test *testing.T) {
 	test.Parallel()
 	var output bytes.Buffer
 	writer := NewWriter(&output)
-	for _, record := range []Record{provenanceForTest, PhaseRecord{Name: PhaseFix, Outcome: OutcomeRan}, SummaryRecord{Complete: true}} {
+	for _, record := range []Record{
+		provenanceForTest,
+		PhaseRecord{Name: PhaseFix, Outcome: OutcomeRan},
+		SummaryRecord{Complete: true},
+	} {
 		if writeError := writer.Write(record); writeError != nil {
 			test.Fatalf("%s: %v", record.kind(), writeError)
 		}
@@ -79,8 +89,16 @@ func TestWriterWritesOneLinePerRecordWithKindFirst(test *testing.T) {
 	writer := NewWriter(&output)
 	records := []Record{
 		provenanceForTest,
-		FindingRecord{Source: SourceRule, File: "/project/a.go", Line: 1, Column: 1, Severity: SeverityError, Rule: "cohere-go/printf",
-			MessageId: "printf", Message: "a <- b & c\nsecond line"},
+		FindingRecord{
+			Source:    SourceRule,
+			File:      "/project/a.go",
+			Line:      1,
+			Column:    1,
+			Severity:  SeverityError,
+			Rule:      "cohere-go/printf",
+			MessageId: "printf",
+			Message:   "a <- b & c\nsecond line",
+		},
 		SummaryRecord{Findings: 1, Complete: true, ExitCode: 1},
 	}
 	for _, record := range records {

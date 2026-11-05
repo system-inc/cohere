@@ -5,7 +5,11 @@ import (
 	"github.com/system-inc/cohere/static_single_assignment"
 )
 
-func hasReadOnlyClosureEffectsForCaptures(function *Function, captures []Place, kinds map[static_single_assignment.IdentifierId]mutation_aliasing.EffectValueKind) bool {
+func hasReadOnlyClosureEffectsForCaptures(
+	function *Function,
+	captures []Place,
+	kinds map[static_single_assignment.IdentifierId]mutation_aliasing.EffectValueKind,
+) bool {
 	if hasReadOnlyClosureEffects(function, map[*Function]bool{}) {
 		return true
 	}
@@ -45,11 +49,21 @@ func hasReadOnlyClosureEffectsForCaptures(function *Function, captures []Place, 
 				return false
 			}
 		case *MethodCall:
-			if _, known := lookupSignature(function, calleeProducers, instruction, calleeName(function, instruction, value.Property)); !known {
+			if _, known := lookupSignature(
+				function,
+				calleeProducers,
+				instruction,
+				calleeName(function, instruction, value.Property),
+			); !known {
 				return false
 			}
 		case *CallExpression:
-			if _, known := lookupSignature(function, calleeProducers, instruction, calleeName(function, instruction, value.Callee)); !known {
+			if _, known := lookupSignature(
+				function,
+				calleeProducers,
+				instruction,
+				calleeName(function, instruction, value.Callee),
+			); !known {
 				if _, global := producers[value.Callee.Identifier].(*LoadGlobal); !global {
 					return false
 				}
@@ -81,11 +95,15 @@ func hasReadOnlyClosureEffects(function *Function, seen map[*Function]bool) bool
 		case *Await, *StoreGlobal, *StoreContext, *ObjectMethod:
 			return false
 		case *FunctionExpression:
-			if int(value.Function) >= len(function.Functions) || !hasReadOnlyClosureEffects(function.Functions[value.Function], seen) {
+			if int(value.Function) >= len(function.Functions) ||
+				!hasReadOnlyClosureEffects(function.Functions[value.Function], seen) {
 				return false
 			}
 		case *LoadGlobal:
-			if nested := nestedFunctionHeldBy(function, instruction.LValue.Identifier); nested != nil && !hasReadOnlyClosureEffects(nested, seen) {
+			if nested := nestedFunctionHeldBy(
+				function,
+				instruction.LValue.Identifier,
+			); nested != nil && !hasReadOnlyClosureEffects(nested, seen) {
 				return false
 			}
 		}

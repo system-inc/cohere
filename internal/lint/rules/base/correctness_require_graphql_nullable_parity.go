@@ -292,28 +292,43 @@ func typeIncludesNull(subjectType *checker.Type) bool {
 
 // The rule's messages, whose wording lives in `policy/messages/correctness-require-graphql-nullable-parity.json`.
 var (
-	graphQlNullableParityDecoratorNullableButInputExcludesNullText = policy.MessageOf("base/correctness-require-graphql-nullable-parity", "decoratorNullableButInputExcludesNull")
-	graphQlNullableParityDecoratorNullableButTypeNotText           = policy.MessageOf("base/correctness-require-graphql-nullable-parity", "decoratorNullableButTypeNot")
-	graphQlNullableParityTypeNullableButDecoratorNotText           = policy.MessageOf("base/correctness-require-graphql-nullable-parity", "typeNullableButDecoratorNot")
+	graphQlNullableParityDecoratorNullableButInputExcludesNullText = policy.MessageOf(
+		"base/correctness-require-graphql-nullable-parity",
+		"decoratorNullableButInputExcludesNull",
+	)
+	graphQlNullableParityDecoratorNullableButTypeNotText = policy.MessageOf(
+		"base/correctness-require-graphql-nullable-parity",
+		"decoratorNullableButTypeNot",
+	)
+	graphQlNullableParityTypeNullableButDecoratorNotText = policy.MessageOf(
+		"base/correctness-require-graphql-nullable-parity",
+		"typeNullableButDecoratorNot",
+	)
 )
 
 func buildDecoratorNullableButInputExcludesNullMessage(typeText string) rule.Message {
 	return rule.Message{
-		Id:          graphQlNullableParityDecoratorNullableButInputExcludesNullText.Id,
-		Description: graphQlNullableParityDecoratorNullableButInputExcludesNullText.Render(map[string]string{"typeText": typeText}),
+		Id: graphQlNullableParityDecoratorNullableButInputExcludesNullText.Id,
+		Description: graphQlNullableParityDecoratorNullableButInputExcludesNullText.Render(
+			map[string]string{"typeText": typeText},
+		),
 	}
 }
 
 func buildDecoratorNullableButTypeNotMessage(typeText string) rule.Message {
 	return rule.Message{
-		Id:          graphQlNullableParityDecoratorNullableButTypeNotText.Id,
-		Description: graphQlNullableParityDecoratorNullableButTypeNotText.Render(map[string]string{"typeText": typeText}),
+		Id: graphQlNullableParityDecoratorNullableButTypeNotText.Id,
+		Description: graphQlNullableParityDecoratorNullableButTypeNotText.Render(
+			map[string]string{"typeText": typeText},
+		),
 	}
 }
 
 func buildTypeNullableButDecoratorNotMessage(typeText string) rule.Message {
 	return rule.Message{
-		Id:          graphQlNullableParityTypeNullableButDecoratorNotText.Id,
-		Description: graphQlNullableParityTypeNullableButDecoratorNotText.Render(map[string]string{"typeText": typeText}),
+		Id: graphQlNullableParityTypeNullableButDecoratorNotText.Id,
+		Description: graphQlNullableParityTypeNullableButDecoratorNotText.Render(
+			map[string]string{"typeText": typeText},
+		),
 	}
 }

@@ -30,7 +30,8 @@
 //
 // `-check` regenerates and fails when the committed fixture disagrees, which is what makes a
 // Tailwind upgrade that changes utility evaluation show up as a failing gate instead of a silent
-// behavior change. Like the other internal/lint/rules/tailwind/tools/generate_* tools, nothing invokes it automatically.
+// behavior change. Like the other internal/lint/rules/tailwind/tools/generate_* tools, nothing invokes it
+// automatically.
 //
 // Node is required to run it and never to use the result.
 package main
@@ -46,8 +47,16 @@ import (
 )
 
 func main() {
-	theme := flag.String("theme", "", "path to the repository's theme entry point (the CSS file that imports tailwindcss)")
-	output := flag.String("output", filepath.Join("internal", "tailwind", "testdata", "utility_fixtures.json"), "where to write the fixture")
+	theme := flag.String(
+		"theme",
+		"",
+		"path to the repository's theme entry point (the CSS file that imports tailwindcss)",
+	)
+	output := flag.String(
+		"output",
+		filepath.Join("internal", "tailwind", "testdata", "utility_fixtures.json"),
+		"where to write the fixture",
+	)
 	check := flag.Bool("check", false, "regenerate and fail if the committed fixture disagrees")
 	flag.Parse()
 

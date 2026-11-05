@@ -217,7 +217,9 @@ var NoImpliedEval = rule.Rule{
 				return node.AsIdentifier().Text
 			}
 
-			if ast.IsAccessExpression(node) && ast.IsIdentifier(node.Expression()) && slices.Contains(globalCandidates, node.Expression().AsIdentifier().Text) {
+			if ast.IsAccessExpression(node) &&
+				ast.IsIdentifier(node.Expression()) &&
+				slices.Contains(globalCandidates, node.Expression().AsIdentifier().Text) {
 				if ast.IsPropertyAccessExpression(node) {
 					if ast.IsIdentifier(node.Name()) {
 						return node.Name().AsIdentifier().Text
@@ -285,7 +287,12 @@ var NoImpliedEval = rule.Rule{
 				symbol := checker.Type_symbol(t)
 
 				if symbol != nil {
-					if type_checking.IsBuiltinSymbolLike(ruleContext.Program, ruleContext.TypeChecker, t, "FunctionConstructor") {
+					if type_checking.IsBuiltinSymbolLike(
+						ruleContext.Program,
+						ruleContext.TypeChecker,
+						t,
+						"FunctionConstructor",
+					) {
 						ruleContext.ReportNode(node, buildNoFunctionConstructorMessage())
 						return
 					}

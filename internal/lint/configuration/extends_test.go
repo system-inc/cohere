@@ -45,7 +45,12 @@ func refusedWith(test *testing.T, path string, want string) {
 		test.Fatalf("loading %s succeeded; it must be refused (%s)", path, want)
 	}
 	if !strings.Contains(loadError.Error(), want) {
-		test.Fatalf("loading %s was refused, but not for the reason under test.\n  got:  %v\n  want: %s", path, loadError, want)
+		test.Fatalf(
+			"loading %s was refused, but not for the reason under test.\n  got:  %v\n  want: %s",
+			path,
+			loadError,
+			want,
+		)
 	}
 }
 
@@ -210,17 +215,34 @@ func TestADepartureCannotHideBehindAnotherSpelling(test *testing.T) {
 		written string
 		dropped string
 	}{
-		{"bare over qualified", "nexus/consistency-no-enum", "consistency-no-enum", "consistency-no-enum", "nexus/consistency-no-enum"},
-		{"qualified over bare", "consistency-no-enum", "nexus/consistency-no-enum", "nexus/consistency-no-enum", "consistency-no-enum"},
+		{
+			"bare over qualified",
+			"nexus/consistency-no-enum",
+			"consistency-no-enum",
+			"consistency-no-enum",
+			"nexus/consistency-no-enum",
+		},
+		{
+			"qualified over bare",
+			"consistency-no-enum",
+			"nexus/consistency-no-enum",
+			"nexus/consistency-no-enum",
+			"consistency-no-enum",
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			undeclared := writeConfigs(test, map[string]string{
-				"base.json":           `{"extends": "cohere:system-inc/test", "rules": {"` + testCase.base + `": "error"}}`,
+				"base.json": `{"extends": "cohere:system-inc/test", "rules": {"` +
+					testCase.base +
+					`": "error"}}`,
 				"CohereSettings.json": `{"extends": "./base.json", "rules": {"` + testCase.project + `": "off"}}`,
 			})
-			if _, loadForError := LoadFor(filepath.Join(undeclared, "CohereSettings.json"), registered); loadForError == nil ||
+			if _, loadForError := LoadFor(
+				filepath.Join(undeclared, "CohereSettings.json"),
+				registered,
+			); loadForError == nil ||
 				!strings.Contains(loadForError.Error(), "differently") {
 				test.Fatalf("a respelled departure with no reason loaded: %v", loadForError)
 			}
@@ -237,7 +259,11 @@ func TestADepartureCannotHideBehindAnotherSpelling(test *testing.T) {
 			}
 			// One key per ruling, or the resolver holds two spellings and calls the rule ambiguous.
 			if _, kept := loaded.Rules[testCase.dropped]; kept {
-				test.Errorf("the inherited spelling %q is still in the merged rules beside %q", testCase.dropped, testCase.written)
+				test.Errorf(
+					"the inherited spelling %q is still in the merged rules beside %q",
+					testCase.dropped,
+					testCase.written,
+				)
 			}
 			if loaded.Resolve("source/File.ts").Enabled("consistency-no-enum") {
 				test.Error("the project's off did not reach the rule")
@@ -310,7 +336,9 @@ func TestOverridesAndIgnorePatternsConcatenateBaseFirst(test *testing.T) {
 		test.Errorf("ignorePatterns are %v, want the base's first", loaded.IgnorePatterns)
 	}
 	// The format walk reads the same list without decoding rules, and must read it identically.
-	if shared, ignorePatternsOfError := IgnorePatternsOf(filepath.Join(directory, "CohereSettings.json")); ignorePatternsOfError != nil || strings.Join(shared, ",") != strings.Join(loaded.IgnorePatterns, ",") {
+	if shared, ignorePatternsOfError := IgnorePatternsOf(
+		filepath.Join(directory, "CohereSettings.json"),
+	); ignorePatternsOfError != nil || strings.Join(shared, ",") != strings.Join(loaded.IgnorePatterns, ",") {
 		test.Errorf("IgnorePatternsOf = %v (%v), want Load's %v", shared, ignorePatternsOfError, loaded.IgnorePatterns)
 	}
 	if loaded.Root != directory {
@@ -469,7 +497,12 @@ func TestAWholeTreeOverrideDepartsLikeATopLevelRule(test *testing.T) {
 
 	// The other side, and the one a too-broad check would break: scoped overrides are a project's own
 	// business and need no reason, or every generated-code or test-file block would have to explain itself.
-	for _, files := range []string{`["**/generated/**/*.{ts,tsx}"]`, `["**/*.test.ts"]`, `["source/**/*.ts"]`, `["modules/**"]`} {
+	for _, files := range []string{
+		`["**/generated/**/*.{ts,tsx}"]`,
+		`["**/*.test.ts"]`,
+		`["source/**/*.ts"]`,
+		`["modules/**"]`,
+	} {
 		test.Run("a scoped override needs no reason: "+files, func(test *testing.T) {
 			test.Parallel()
 			directory := writeConfigs(test, map[string]string{
@@ -477,7 +510,10 @@ func TestAWholeTreeOverrideDepartsLikeATopLevelRule(test *testing.T) {
 				"CohereSettings.json": `{"extends": "./base.json",
 					"overrides": [{"files": ` + files + `, "rules": {"no-const-assign": "off"}}]}`,
 			})
-			if loaded := loadOrFail(test, filepath.Join(directory, "CohereSettings.json")); len(loaded.Departures) != 0 {
+			if loaded := loadOrFail(
+				test,
+				filepath.Join(directory, "CohereSettings.json"),
+			); len(loaded.Departures) != 0 {
 				test.Errorf("a scoped override was recorded as a departure: %+v", loaded.Departures)
 			}
 		})

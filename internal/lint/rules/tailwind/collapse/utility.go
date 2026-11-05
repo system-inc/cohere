@@ -438,7 +438,10 @@ func (state *utilityEvaluation) modifierAsValue() *ParsedValue {
 // --percentage-translate-*)` tries `--percentage` first, so `translate-full` resolves through
 // `--percentage` and never reaches the second argument. Which one wins does not change this
 // declaration's survival, but the general rule does decide which theme value is substituted.
-func (state *utilityEvaluation) resolveValueFunction(value *ParsedValue, function *ValueNode) ([]ValueNode, bool, bool) {
+func (state *utilityEvaluation) resolveValueFunction(
+	value *ParsedValue,
+	function *ValueNode,
+) ([]ValueNode, bool, bool) {
 	// No value at all: only `--default(…)` can answer, and it is the utility's own opt-in to the
 	// bare form. A definition without one does not compile bare, which is why `slide-in-from-top`
 	// is a separate static `@utility` block rather than a fallback of the functional one.

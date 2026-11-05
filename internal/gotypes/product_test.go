@@ -16,7 +16,11 @@ func keyFixture(test *testing.T, root string, source string) *listing {
 	if createDirectoryError := os.MkdirAll(shim, 0o755); createDirectoryError != nil {
 		test.Fatal(createDirectoryError)
 	}
-	if writeError := os.WriteFile(filepath.Join(shim, "go.mod"), []byte("module example.com/shim/ast\n\ngo 1.27\n"), 0o644); writeError != nil {
+	if writeError := os.WriteFile(
+		filepath.Join(shim, "go.mod"),
+		[]byte("module example.com/shim/ast\n\ngo 1.27\n"),
+		0o644,
+	); writeError != nil {
 		test.Fatal(writeError)
 	}
 	if writeError := os.WriteFile(filepath.Join(shim, "ast.go"), []byte(source), 0o644); writeError != nil {
@@ -25,7 +29,11 @@ func keyFixture(test *testing.T, root string, source string) *listing {
 	packages := []*listedPackage{
 		{ImportPath: "strings", Name: "strings", Standard: true, GoFiles: []string{"builder.go", "strings.go"}},
 		{ImportPath: "golang.org/x/sync/errgroup", Name: "errgroup", GoFiles: []string{"errgroup.go"},
-			Module: &listedModule{Path: "golang.org/x/sync", Version: "v0.17.0", Dir: filepath.Join(test.TempDir(), "mod", "golang.org", "x", "sync@v0.17.0")}},
+			Module: &listedModule{
+				Path:    "golang.org/x/sync",
+				Version: "v0.17.0",
+				Dir:     filepath.Join(test.TempDir(), "mod", "golang.org", "x", "sync@v0.17.0"),
+			}},
 		{ImportPath: "example.com/shim/ast", Name: "ast", Dir: shim, GoFiles: []string{"ast.go"},
 			Module: &listedModule{Path: "example.com/shim/ast", Dir: shim, GoMod: filepath.Join(shim, "go.mod")}},
 	}
@@ -47,16 +55,34 @@ func TestAProductKeysTheSameFromAnotherCheckoutPath(test *testing.T) {
 
 	product := Product{Name: "fixture", Patterns: []string{"./..."}}
 	first, second := test.TempDir(), test.TempDir()
-	firstKey, firstDescription, err := productKey(product, first, keyEnvironment, keyFixture(test, first, "package ast\n"), everyPackage)
+	firstKey, firstDescription, err := productKey(
+		product,
+		first,
+		keyEnvironment,
+		keyFixture(test, first, "package ast\n"),
+		everyPackage,
+	)
 	if err != nil {
 		test.Fatal(err)
 	}
-	secondKey, secondDescription, err := productKey(product, second, keyEnvironment, keyFixture(test, second, "package ast\n"), everyPackage)
+	secondKey, secondDescription, err := productKey(
+		product,
+		second,
+		keyEnvironment,
+		keyFixture(test, second, "package ast\n"),
+		everyPackage,
+	)
 	if err != nil {
 		test.Fatal(err)
 	}
 	if firstKey != secondKey || firstDescription != secondDescription {
-		test.Fatalf("one tree at two paths keyed %s and %s:\n%s\n%s", firstKey, secondKey, firstDescription, secondDescription)
+		test.Fatalf(
+			"one tree at two paths keyed %s and %s:\n%s\n%s",
+			firstKey,
+			secondKey,
+			firstDescription,
+			secondDescription,
+		)
 	}
 	if strings.Contains(firstDescription, first) {
 		test.Fatalf("the description names the checkout path %s:\n%s", first, firstDescription)
@@ -70,33 +96,59 @@ func TestAProductKeyMovesWithWhatChangesItsExportData(test *testing.T) {
 
 	product := Product{Name: "fixture", Patterns: []string{"./..."}}
 	root := test.TempDir()
-	baseKey, baseDescription, err := productKey(product, root, keyEnvironment, keyFixture(test, root, "package ast\n"), everyPackage)
+	baseKey, baseDescription, err := productKey(
+		product,
+		root,
+		keyEnvironment,
+		keyFixture(test, root, "package ast\n"),
+		everyPackage,
+	)
 	if err != nil {
 		test.Fatal(err)
 	}
 
 	edited := test.TempDir()
-	editedKey, editedDescription, err := productKey(product, edited, keyEnvironment, keyFixture(test, edited, "package ast\n\nvar Planted int\n"), everyPackage)
+	editedKey, editedDescription, err := productKey(
+		product,
+		edited,
+		keyEnvironment,
+		keyFixture(test, edited, "package ast\n\nvar Planted int\n"),
+		everyPackage,
+	)
 	if err != nil {
 		test.Fatal(err)
 	}
 	if editedKey == baseKey {
 		test.Error("an edited repository file kept the product's key")
 	}
-	if baseLine, editedLine := packageLine(baseDescription, "example.com/shim/ast"), packageLine(editedDescription, "example.com/shim/ast"); baseLine == editedLine {
+	if baseLine, editedLine := packageLine(
+		baseDescription,
+		"example.com/shim/ast",
+	), packageLine(editedDescription, "example.com/shim/ast"); baseLine == editedLine {
 		test.Errorf("the description's line for the edited package did not move: %q", baseLine)
 	}
 	if packageLine(baseDescription, "strings") != packageLine(editedDescription, "strings") {
 		test.Error("the description's line for a package nothing changed moved")
 	}
 
-	for name, value := range map[string]string{"GOVERSION": "go1.27.1", "GOOS": "darwin", "GOARCH": "arm64", "GOEXPERIMENT": "nosynchashtriemap"} {
+	for name, value := range map[string]string{
+		"GOVERSION":    "go1.27.1",
+		"GOOS":         "darwin",
+		"GOARCH":       "arm64",
+		"GOEXPERIMENT": "nosynchashtriemap",
+	} {
 		environment := map[string]string{}
 		for key, original := range keyEnvironment {
 			environment[key] = original
 		}
 		environment[name] = value
-		key, _, productKeyError := productKey(product, root, environment, keyFixture(test, root, "package ast\n"), everyPackage)
+		key, _, productKeyError := productKey(
+			product,
+			root,
+			environment,
+			keyFixture(test, root, "package ast\n"),
+			everyPackage,
+		)
 		if productKeyError != nil {
 			test.Fatal(productKeyError)
 		}
@@ -140,7 +192,11 @@ func TestExportDataStandsOnlyForWhatImportsNothingOfTheSource(test *testing.T) {
 		{ImportPath: "example.com/outside/leaf", Module: outside, Deps: []string{"fmt"}},
 		{ImportPath: "example.com/cohere/rule", Module: source, Deps: []string{"example.com/outside/leaf", "fmt"}},
 		{ImportPath: "example.com/outside/adapter", Module: outside, Deps: []string{"example.com/cohere/rule", "fmt"}},
-		{ImportPath: "example.com/cohere/rules", Module: source, Deps: []string{"example.com/outside/adapter", "example.com/cohere/rule"}},
+		{
+			ImportPath: "example.com/cohere/rules",
+			Module:     source,
+			Deps:       []string{"example.com/outside/adapter", "example.com/cohere/rule"},
+		},
 	}
 	listed := &listing{packages: packages}
 	exported := exportSet(listed, "example.com/cohere")
@@ -180,15 +236,28 @@ func TestAMissingProductNamesTheKeyTheCacheHoldsInstead(test *testing.T) {
 
 	cache := test.TempDir()
 	theirs := "name go types fixture\npatterns ./...\ngo go1.27.0 linux/amd64 GOEXPERIMENT=\npackage strings standard 0123456789ab\n"
-	if writeError := os.WriteFile(filepath.Join(cache, strings.Repeat("a", 64)+".inputs"), []byte(theirs), 0o644); writeError != nil {
+	if writeError := os.WriteFile(
+		filepath.Join(cache, strings.Repeat("a", 64)+".inputs"),
+		[]byte(theirs),
+		0o644,
+	); writeError != nil {
 		test.Fatal(writeError)
 	}
-	if writeError := os.WriteFile(filepath.Join(cache, strings.Repeat("b", 64)+".inputs"), []byte("name go types another\n"), 0o644); writeError != nil {
+	if writeError := os.WriteFile(
+		filepath.Join(cache, strings.Repeat("b", 64)+".inputs"),
+		[]byte("name go types another\n"),
+		0o644,
+	); writeError != nil {
 		test.Fatal(writeError)
 	}
 	ours := strings.Replace(theirs, "linux/amd64", "darwin/arm64", 1)
-	named := otherKeys(Product{Name: "fixture"}, &productState{key: strings.Repeat("c", 64), description: ours, cache: cache})
-	if !strings.Contains(named, "aaaaaaaaaaaa") || !strings.Contains(named, "linux/amd64") || !strings.Contains(named, "darwin/arm64") {
+	named := otherKeys(
+		Product{Name: "fixture"},
+		&productState{key: strings.Repeat("c", 64), description: ours, cache: cache},
+	)
+	if !strings.Contains(named, "aaaaaaaaaaaa") ||
+		!strings.Contains(named, "linux/amd64") ||
+		!strings.Contains(named, "darwin/arm64") {
 		test.Fatalf("the other key and the fact it keyed differently were not named: %q", named)
 	}
 	if strings.Contains(named, "bbbbbbbbbbbb") {

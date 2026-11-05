@@ -23,15 +23,26 @@ func TestNoEmptyObjectTypeFiresOnInterfaces(test *testing.T) {
 		{"an empty interface", "export interface Base {}\n", "noEmptyInterface"},
 		// Extending exactly one name is the supertype under a second name, flagged under the default
 		// `allowInterfaces: never` with its own message.
-		{"extending a single name", "interface Base {\n    name: string;\n}\nexport interface Derived extends Base {}\n", "noEmptyInterfaceWithSuper"},
+		{
+			"extending a single name",
+			"interface Base {\n    name: string;\n}\nexport interface Derived extends Base {}\n",
+			"noEmptyInterfaceWithSuper",
+		},
 		{"extending a generic", "export interface Base extends Array<number> {}\n", "noEmptyInterfaceWithSuper"},
-		{"a generic extending a generic", "interface Derived<T> {\n    value: T;\n}\nexport interface Base<T> extends Derived<T> {}\n", "noEmptyInterfaceWithSuper"},
+		{
+			"a generic extending a generic",
+			"interface Derived<T> {\n    value: T;\n}\nexport interface Base<T> extends Derived<T> {}\n",
+			"noEmptyInterfaceWithSuper",
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectFindings(test, rule_testing.Run(test, NoEmptyObjectType, emptyObjectFile, testCase.sourceText),
-				testCase.id)
+			rule_testing.ExpectFindings(
+				test,
+				rule_testing.Run(test, NoEmptyObjectType, emptyObjectFile, testCase.sourceText),
+				testCase.id,
+			)
 		})
 	}
 }
@@ -51,8 +62,11 @@ func TestNoEmptyObjectTypeFiresOnObjectTypes(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectFindings(test, rule_testing.Run(test, NoEmptyObjectType, emptyObjectFile, testCase.sourceText),
-				"noEmptyObject")
+			rule_testing.ExpectFindings(
+				test,
+				rule_testing.Run(test, NoEmptyObjectType, emptyObjectFile, testCase.sourceText),
+				"noEmptyObject",
+			)
 		})
 	}
 }
@@ -112,8 +126,14 @@ func TestNoEmptyObjectTypeStaysSilent(test *testing.T) {
 		// The case the whole rule turns on: extending multiple interfaces is how a reader expresses an
 		// intersection of named types where a union would be wrong. Two or more is allowed; exactly one
 		// is not.
-		{"extending two names", "interface Base {\n    name: string;\n}\ninterface Derived {\n    age: number;\n}\nexport interface Both extends Base, Derived {}\n"},
-		{"extending three names", "interface A {\n    a: string;\n}\ninterface B {\n    b: string;\n}\ninterface C {\n    c: string;\n}\nexport interface All extends A, B, C {}\n"},
+		{
+			"extending two names",
+			"interface Base {\n    name: string;\n}\ninterface Derived {\n    age: number;\n}\nexport interface Both extends Base, Derived {}\n",
+		},
+		{
+			"extending three names",
+			"interface A {\n    a: string;\n}\ninterface B {\n    b: string;\n}\ninterface C {\n    c: string;\n}\nexport interface All extends A, B, C {}\n",
+		},
 		// `Base & {}` inside an intersection is exempt: the empty half is doing real work there.
 		{"inside an intersection", "interface Base {\n    name: string;\n}\nexport type Expanded = Base & {};\n"},
 		// A non-empty object type is not this rule's concern in either position.
@@ -128,7 +148,10 @@ func TestNoEmptyObjectTypeStaysSilent(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.Run(test, NoEmptyObjectType, emptyObjectFile, testCase.sourceText))
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.Run(test, NoEmptyObjectType, emptyObjectFile, testCase.sourceText),
+			)
 		})
 	}
 }

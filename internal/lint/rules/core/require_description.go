@@ -178,7 +178,12 @@ func reportRequireDescription(ruleContext rule.Context, options RequireDescripti
 
 		kind, isDirective := "", false
 		if requireDescriptionCouldBeUpstream(interior, options.AdditionalDirectives) {
-			kind, isDirective = requireDescriptionUpstreamKind(comment, interior, options.AdditionalDirectives, additional)
+			kind, isDirective = requireDescriptionUpstreamKind(
+				comment,
+				interior,
+				options.AdditionalDirectives,
+				additional,
+			)
 		}
 		if !isDirective {
 			kind, isDirective = directives.Recognize(comment.Text)

@@ -156,17 +156,33 @@ func TestForbidDomPropsFires(test *testing.T) {
 		{"a numeric expression value", `<div someProp={5} />`, `{"forbid":["someProp"]}`, 1},
 		// A repeated prop name keeps the last entry's restriction. Measured both ways; its partner
 		// in the silent table uses the first entry's tag and is clean.
-		{"repeated propName keeps the last restriction", `<span className="x" />`, `{"forbid":[{"propName":"className","disallowedFor":["div"]},{"propName":"className","disallowedFor":["span"]}]}`, 1},
+		{
+			"repeated propName keeps the last restriction",
+			`<span className="x" />`,
+			`{"forbid":[{"propName":"className","disallowedFor":["div"]},{"propName":"className","disallowedFor":["span"]}]}`,
+			1,
+		},
 		// An empty message string is falsy upstream, so the default text is used rather than an
 		// empty finding. Measured. The message-text assertion below pins the text itself.
-		{"an empty message falls back to the default text", `<div className="x" />`, `{"forbid":[{"propName":"className","message":""}]}`, 1},
+		{
+			"an empty message falls back to the default text",
+			`<div className="x" />`,
+			`{"forbid":[{"propName":"className","message":""}]}`,
+			1,
+		},
 	}
 
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			options := forbidDomPropsOptions(test, testCase.rawOptions)
-			result := rule_testing.RunWithOptions(test, ForbidDomProps, forbidDomPropsFile, testCase.sourceText, options)
+			result := rule_testing.RunWithOptions(
+				test,
+				ForbidDomProps,
+				forbidDomPropsFile,
+				testCase.sourceText,
+				options,
+			)
 			wantIds := make([]string, testCase.wantCount)
 			for index := range wantIds {
 				wantIds[index] = "propIsForbidden"
@@ -249,7 +265,11 @@ func TestForbidDomPropsStaysSilent(test *testing.T) {
 
 		// An empty disallowedFor list is truthy upstream and matches no tag, which is not the same
 		// as an absent list meaning every tag. Its partner in the firing table omits the key.
-		{"an empty disallowedFor matches no tag", `<div className="x" />`, `{"forbid":[{"propName":"className","disallowedFor":[]}]}`},
+		{
+			"an empty disallowedFor matches no tag",
+			`<div className="x" />`,
+			`{"forbid":[{"propName":"className","disallowedFor":[]}]}`,
+		},
 		// The DOM-node test asks whether the first character changes under upper-casing, not
 		// whether it is lowercase. An underscore upper-cases to itself, so this is clean. Measured,
 		// and no corpus case writes it.
@@ -262,14 +282,24 @@ func TestForbidDomPropsStaysSilent(test *testing.T) {
 		{"no options at all", `<div className="x" />`, ``},
 		{"an empty forbid list", `<div className="x" />`, `{"forbid":[]}`},
 		// The partner to the repeated-name case: the first entry's tag no longer applies.
-		{"repeated propName drops the first restriction", `<div className="x" />`, `{"forbid":[{"propName":"className","disallowedFor":["div"]},{"propName":"className","disallowedFor":["span"]}]}`},
+		{
+			"repeated propName drops the first restriction",
+			`<div className="x" />`,
+			`{"forbid":[{"propName":"className","disallowedFor":["div"]},{"propName":"className","disallowedFor":["span"]}]}`,
+		},
 	}
 
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			options := forbidDomPropsOptions(test, testCase.rawOptions)
-			result := rule_testing.RunWithOptions(test, ForbidDomProps, forbidDomPropsFile, testCase.sourceText, options)
+			result := rule_testing.RunWithOptions(
+				test,
+				ForbidDomProps,
+				forbidDomPropsFile,
+				testCase.sourceText,
+				options,
+			)
 			rule_testing.ExpectClean(test, result)
 		})
 	}
@@ -285,7 +315,13 @@ func TestForbidDomPropsReportsOnTheWholeAttribute(test *testing.T) {
 
 	const source = `<div className="foo" />`
 
-	result := rule_testing.RunWithOptions(test, ForbidDomProps, forbidDomPropsFile, source, forbidDomPropsOptions(test, `{"forbid":["className"]}`))
+	result := rule_testing.RunWithOptions(
+		test,
+		ForbidDomProps,
+		forbidDomPropsFile,
+		source,
+		forbidDomPropsOptions(test, `{"forbid":["className"]}`),
+	)
 	rule_testing.ExpectFindings(test, result, "propIsForbidden")
 
 	span := result.Diagnostics[0].Range
@@ -329,7 +365,13 @@ func TestForbidDomPropsMessageText(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, ForbidDomProps, forbidDomPropsFile, `<div className="foo" />`, forbidDomPropsOptions(test, testCase.rawOptions))
+			result := rule_testing.RunWithOptions(
+				test,
+				ForbidDomProps,
+				forbidDomPropsFile,
+				`<div className="foo" />`,
+				forbidDomPropsOptions(test, testCase.rawOptions),
+			)
 			rule_testing.ExpectFindings(test, result, "propIsForbidden")
 			if got := result.Diagnostics[0].Message.Description; got != testCase.want {
 				test.Fatalf("message is %q, want %q", got, testCase.want)
@@ -358,7 +400,13 @@ func TestForbidDomPropsHasNoFileSuffixGate(test *testing.T) {
 	} {
 		test.Run(fileName, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, ForbidDomProps, fileName, source, forbidDomPropsOptions(test, `{"forbid":["className"]}`))
+			result := rule_testing.RunWithOptions(
+				test,
+				ForbidDomProps,
+				fileName,
+				source,
+				forbidDomPropsOptions(test, `{"forbid":["className"]}`),
+			)
 			rule_testing.ExpectFindings(test, result, "propIsForbidden")
 		})
 	}
@@ -389,7 +437,9 @@ func TestDecodeForbidDomPropsOptions(test *testing.T) {
 
 	test.Run("the string arm", func(test *testing.T) {
 		test.Parallel()
-		decoded, decodeForbidDomPropertiesOptionsError := DecodeForbidDomPropsOptions([]byte(`{"forbid":["id","style"]}`))
+		decoded, decodeForbidDomPropertiesOptionsError := DecodeForbidDomPropsOptions(
+			[]byte(`{"forbid":["id","style"]}`),
+		)
 		if decodeForbidDomPropertiesOptionsError != nil {
 			test.Fatalf("decoding the string arm: %v", decodeForbidDomPropertiesOptionsError)
 		}
@@ -409,7 +459,9 @@ func TestDecodeForbidDomPropsOptions(test *testing.T) {
 
 	test.Run("an absent disallowedFor means every tag", func(test *testing.T) {
 		test.Parallel()
-		decoded, decodeForbidDomPropertiesOptionsError := DecodeForbidDomPropsOptions([]byte(`{"forbid":[{"propName":"className"}]}`))
+		decoded, decodeForbidDomPropertiesOptionsError := DecodeForbidDomPropsOptions(
+			[]byte(`{"forbid":[{"propName":"className"}]}`),
+		)
 		if decodeForbidDomPropertiesOptionsError != nil {
 			test.Fatalf("decoding an absent disallowedFor: %v", decodeForbidDomPropertiesOptionsError)
 		}
@@ -427,7 +479,9 @@ func TestDecodeForbidDomPropsOptions(test *testing.T) {
 
 	test.Run("an empty disallowedFor means no tag", func(test *testing.T) {
 		test.Parallel()
-		decoded, decodeForbidDomPropertiesOptionsError := DecodeForbidDomPropsOptions([]byte(`{"forbid":[{"propName":"className","disallowedFor":[]}]}`))
+		decoded, decodeForbidDomPropertiesOptionsError := DecodeForbidDomPropsOptions(
+			[]byte(`{"forbid":[{"propName":"className","disallowedFor":[]}]}`),
+		)
 		if decodeForbidDomPropertiesOptionsError != nil {
 			test.Fatalf("decoding an empty disallowedFor: %v", decodeForbidDomPropertiesOptionsError)
 		}
@@ -445,7 +499,9 @@ func TestDecodeForbidDomPropsOptions(test *testing.T) {
 
 	test.Run("a named disallowedFor matches only those tags", func(test *testing.T) {
 		test.Parallel()
-		decoded, decodeForbidDomPropertiesOptionsError := DecodeForbidDomPropsOptions([]byte(`{"forbid":[{"propName":"className","disallowedFor":["div","span"]}]}`))
+		decoded, decodeForbidDomPropertiesOptionsError := DecodeForbidDomPropsOptions(
+			[]byte(`{"forbid":[{"propName":"className","disallowedFor":["div","span"]}]}`),
+		)
 		if decodeForbidDomPropertiesOptionsError != nil {
 			test.Fatalf("decoding a named disallowedFor: %v", decodeForbidDomPropertiesOptionsError)
 		}

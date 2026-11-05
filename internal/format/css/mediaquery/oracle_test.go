@@ -331,7 +331,12 @@ func TestParseAgreesWithPostcssMediaQueryParser(test *testing.T) {
 		switch {
 		case oracleRefused && dumpMediaQueryError != nil:
 			if dumpMediaQueryError.Error() != wantError {
-				fail("%s: both refuse, with different messages:\n  library %s\n  Go      %s", name, wantError, dumpMediaQueryError.Error())
+				fail(
+					"%s: both refuse, with different messages:\n  library %s\n  Go      %s",
+					name,
+					wantError,
+					dumpMediaQueryError.Error(),
+				)
 				continue
 			}
 			refusedByBoth++
@@ -350,8 +355,17 @@ func TestParseAgreesWithPostcssMediaQueryParser(test *testing.T) {
 			identical++
 		}
 	}
-	test.Logf("%d compared (%d params from %d corpus files, %d fixtures): %d identical, %d refused by both with the same message, %d different; %d corpus params refused",
-		len(records), corpusParameters, corpusFiles, fixturesSeen, identical, refusedByBoth, different, corpusRefused)
+	test.Logf(
+		"%d compared (%d params from %d corpus files, %d fixtures): %d identical, %d refused by both with the same message, %d different; %d corpus params refused",
+		len(records),
+		corpusParameters,
+		corpusFiles,
+		fixturesSeen,
+		identical,
+		refusedByBoth,
+		different,
+		corpusRefused,
+	)
 	if fixturesSeen != len(mediaQueryFixtures) {
 		test.Errorf("the oracle answered %d of %d fixtures", fixturesSeen, len(mediaQueryFixtures))
 	}
@@ -359,7 +373,11 @@ func TestParseAgreesWithPostcssMediaQueryParser(test *testing.T) {
 		test.Errorf("the corpus reached parseMediaQuery with no params; the comparison rests on fixtures alone")
 	}
 	if corpusRefused > corpusParameters/10 {
-		test.Errorf("the library refused %d of %d corpus params; the comparison is thinner than it looks", corpusRefused, corpusParameters)
+		test.Errorf(
+			"the library refused %d of %d corpus params; the comparison is thinner than it looks",
+			corpusRefused,
+			corpusParameters,
+		)
 	}
 }
 
@@ -459,7 +477,14 @@ func firstMediaQueryDifference(want any, got any, path string) string {
 			wantValue, wantPresent := typed[key]
 			gotValue, gotPresent := other[key]
 			if wantPresent != gotPresent {
-				return fmt.Sprintf("%s.%s: present in the library %v, in Go %v (%v)", path, key, wantPresent, gotPresent, typed["type"])
+				return fmt.Sprintf(
+					"%s.%s: present in the library %v, in Go %v (%v)",
+					path,
+					key,
+					wantPresent,
+					gotPresent,
+					typed["type"],
+				)
 			}
 			if difference := firstMediaQueryDifference(wantValue, gotValue, path+"."+key); difference != "" {
 				return difference
@@ -472,7 +497,11 @@ func firstMediaQueryDifference(want any, got any, path string) string {
 			return fmt.Sprintf("%s: want %d elements, got %v", path, len(typed), got)
 		}
 		for index := range typed {
-			if difference := firstMediaQueryDifference(typed[index], other[index], fmt.Sprintf("%s[%d]", path, index)); difference != "" {
+			if difference := firstMediaQueryDifference(
+				typed[index],
+				other[index],
+				fmt.Sprintf("%s[%d]", path, index),
+			); difference != "" {
 				return difference
 			}
 		}

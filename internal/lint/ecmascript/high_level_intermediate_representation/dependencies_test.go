@@ -664,7 +664,11 @@ func TestDeclarationOriginDiffersFromHoldingScope(test *testing.T) {
 
 	total, known, differing := 0, 0, 0
 
-	forEachCorpusFunction(test, 200, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(test, 200, func(
+		function *Function,
+		ranges *mutation_aliasing.MutableRanges,
+		scopes *ReactiveScopes,
+	) {
 		aligned, merged := AlignThenMergeReactiveScopes(function, scopes)
 		identity := MergedScopeIdentity{Aligned: aligned, Merged: merged}
 		BuildReactiveScopeTerminals(function, scopes, identity)
@@ -713,7 +717,11 @@ func TestDeclarationOriginDiffersFromHoldingScope(test *testing.T) {
 	// contained within -- or equal to -- that scope's range. An origin naming an enclosing scope is
 	// the outermost-entry bug; an origin naming an unrelated scope is the holding-scope bug.
 	containmentViolations := 0
-	forEachCorpusFunction(test, 200, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(test, 200, func(
+		function *Function,
+		ranges *mutation_aliasing.MutableRanges,
+		scopes *ReactiveScopes,
+	) {
 		aligned, merged := AlignThenMergeReactiveScopes(function, scopes)
 		identity := MergedScopeIdentity{Aligned: aligned, Merged: merged}
 		BuildReactiveScopeTerminals(function, scopes, identity)
@@ -782,7 +790,9 @@ func TestPruneDeclarationsLastUsedBefore(test *testing.T) {
 			dependencies := &ScopeDependencies{
 				declarations: map[ScopeId][]static_single_assignment.IdentifierId{1: {1}},
 			}
-			usage := &LastUsage{byDeclaration: map[static_single_assignment.DeclarationId]static_single_assignment.EvaluationOrder{}}
+			usage := &LastUsage{
+				byDeclaration: map[static_single_assignment.DeclarationId]static_single_assignment.EvaluationOrder{},
+			}
 			if testCase.recorded {
 				usage.byDeclaration[declaration] = testCase.lastUsedAt
 			}

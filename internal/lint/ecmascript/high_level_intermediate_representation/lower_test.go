@@ -1016,7 +1016,9 @@ func TestFallthroughIsNotAnEdge(test *testing.T) {
 		}
 		for _, predecessor := range join.Predecessors {
 			if predecessor == block.Id {
-				test.Error("the block holding the If is a predecessor of the join; the fallthrough leaked in as an edge")
+				test.Error(
+					"the block holding the If is a predecessor of the join; the fallthrough leaked in as an edge",
+				)
 			}
 		}
 	}

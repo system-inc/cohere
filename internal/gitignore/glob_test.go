@@ -63,7 +63,14 @@ func TestGlobFollowsTheDocumentedRules(test *testing.T) {
 	for _, testCase := range cases {
 		compiled := compileGlob(testCase.pattern, testCase.path)
 		if got := compiled.matches(testCase.text, testCase.path); got != testCase.want {
-			test.Errorf("%q against %q (path %v): got %v, want %v", testCase.pattern, testCase.text, testCase.path, got, testCase.want)
+			test.Errorf(
+				"%q against %q (path %v): got %v, want %v",
+				testCase.pattern,
+				testCase.text,
+				testCase.path,
+				got,
+				testCase.want,
+			)
 		}
 	}
 }
@@ -94,7 +101,14 @@ func TestGitWildmatchCorpus(test *testing.T) {
 			}
 			compiled := compileGlob(pattern, path)
 			if got := compiled.matches(text, path); got != (want == "1") {
-				test.Errorf("t3070: %q against %q with path %v: got %v, git expects %v", pattern, text, path, got, want == "1")
+				test.Errorf(
+					"t3070: %q against %q with path %v: got %v, git expects %v",
+					pattern,
+					text,
+					path,
+					got,
+					want == "1",
+				)
 			}
 			asserted++
 		}

@@ -32,14 +32,23 @@ func TestClassLiteralsAgreeWithUpstream(test *testing.T) {
 	cases := readClassLiteralCases(test)
 	oracle := readClassLiteralOracle(test)
 	if len(oracle.Cases) != len(cases) {
-		test.Fatalf("upstream.json holds %d cases and cases.json %d: run tools/generate_class_literals", len(oracle.Cases), len(cases))
+		test.Fatalf(
+			"upstream.json holds %d cases and cases.json %d: run tools/generate_class_literals",
+			len(oracle.Cases),
+			len(cases),
+		)
 	}
 	decode := tailwindDecoders(test)[NoDuplicateClasses.Name]
 
 	for index, testCase := range cases {
 		expected := oracle.Cases[index]
 		if expected.Name != testCase.Name {
-			test.Fatalf("case %d is %q in cases.json and %q in upstream.json: run tools/generate_class_literals", index, testCase.Name, expected.Name)
+			test.Fatalf(
+				"case %d is %q in cases.json and %q in upstream.json: run tools/generate_class_literals",
+				index,
+				testCase.Name,
+				expected.Name,
+			)
 		}
 		test.Run(testCase.Name, func(test *testing.T) {
 			test.Parallel()
@@ -61,13 +70,21 @@ func TestClassLiteralsAgreeWithUpstream(test *testing.T) {
 			got := readEveryClassLiteral(test, reader, code)
 			want := make([]string, 0, len(expected.Literals))
 			for _, literal := range expected.Literals {
-				want = append(want, upstreamLiteral{literal.Start, literal.End, literal.ConcatenatedLeft, literal.ConcatenatedRight}.describe(code))
+				want = append(want, upstreamLiteral{
+					literal.Start,
+					literal.End,
+					literal.ConcatenatedLeft,
+					literal.ConcatenatedRight,
+				}.describe(code))
 			}
 
 			agrees := slices.Equal(got, want)
 			if testCase.Pending != "" {
 				if agrees {
-					test.Fatalf("pending on %s, yet the reader now agrees with upstream: unmark the case", testCase.Pending)
+					test.Fatalf(
+						"pending on %s, yet the reader now agrees with upstream: unmark the case",
+						testCase.Pending,
+					)
 				}
 				return
 			}

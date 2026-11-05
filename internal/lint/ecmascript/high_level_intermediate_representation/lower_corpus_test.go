@@ -33,8 +33,8 @@ import (
 // It is a checkout rather than vendored files because vendoring would freeze the corpus, and the value
 // here is precisely that the code keeps changing under the lowering. Structure is private, so the
 // checkout is the structure corpus (corpus.Structure, COHERE_CORPUS_STRUCTURE), and the test SKIPS where
-// it is not set, naming the variable, and the gate counts it as not covered (#sycrdr6). A skipping test proves nothing on
-// CI, and that is accepted deliberately: this test is a development instrument for finding the
+// it is not set, naming the variable, and the gate counts it as not covered (#sycrdr6). A skipping test proves nothing
+// on CI, and that is accepted deliberately: this test is a development instrument for finding the
 // constructs a hand-written suite forgot, and every defect it finds gets a hand-written test of its
 // own. Two such defects were found on the first run and both are pinned in lower_test.go.
 // The whole library rather than one subdirectory. The first version pointed at `utilities/` and
@@ -168,7 +168,12 @@ func readPinnedCorpus(repository string, count int) (paths []string, contents ma
 		header, err := reader.ReadString('\n')
 		fields := strings.Fields(header)
 		if err != nil || len(fields) != 3 || fields[1] != "blob" {
-			return nil, nil, fmt.Sprintf("reading %s at %s: git answered %q", path, pinnedCorpusCommit, strings.TrimSpace(header))
+			return nil, nil, fmt.Sprintf(
+				"reading %s at %s: git answered %q",
+				path,
+				pinnedCorpusCommit,
+				strings.TrimSpace(header),
+			)
 		}
 		size, err := strconv.Atoi(fields[2])
 		if err != nil {

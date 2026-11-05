@@ -114,7 +114,9 @@ var NoUndefInit = rule.Rule{
 					return
 				}
 
-				message := buildNoUndefInitMessage(ruleContext.SourceFile.Text()[rule.TokenRange(ruleContext.SourceFile, name).Pos():name.End()])
+				message := buildNoUndefInitMessage(
+					ruleContext.SourceFile.Text()[rule.TokenRange(ruleContext.SourceFile, name).Pos():name.End()],
+				)
 				if fix, offered := noUndefInitFix(ruleContext, node, name); offered {
 					ruleContext.ReportNodeWithFixes(node, message, fix)
 					return

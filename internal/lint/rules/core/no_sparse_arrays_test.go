@@ -26,8 +26,11 @@ func TestNoSparseArraysFires(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectFindings(test, rule_testing.Run(test, NoSparseArrays, sparseArrayFile, testCase.sourceText),
-				"unexpectedSparseArray")
+			rule_testing.ExpectFindings(
+				test,
+				rule_testing.Run(test, NoSparseArrays, sparseArrayFile, testCase.sourceText),
+				"unexpectedSparseArray",
+			)
 		})
 	}
 }
@@ -70,7 +73,10 @@ func TestNoSparseArraysSkipsDestructuringTargets(test *testing.T) {
 		sourceText string
 	}{
 		// excalidraw packages/element/src/image.ts:138, verbatim
-		{"an assignment target", "declare const match: string[];\nlet width = '';\nlet height = '';\n[, width, height] = match;\n"},
+		{
+			"an assignment target",
+			"declare const match: string[];\nlet width = '';\nlet height = '';\n[, width, height] = match;\n",
+		},
 		{"a target nested in a target", "declare const x: string[][];\nlet a = '';\n[[, a]] = x;\n"},
 		{"a target under an object property", "declare const y: { p: string[] };\nlet b = '';\n({ p: [, b] } = y);\n"},
 		{"a for-of head", "declare const z: string[][];\nlet c = '';\nfor([, c] of z) {}\n"},
@@ -103,8 +109,11 @@ func TestNoSparseArraysStillFiresBesideDestructuring(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectFindings(test, rule_testing.Run(test, NoSparseArrays, sparseArrayFile, testCase.sourceText),
-				"unexpectedSparseArray")
+			rule_testing.ExpectFindings(
+				test,
+				rule_testing.Run(test, NoSparseArrays, sparseArrayFile, testCase.sourceText),
+				"unexpectedSparseArray",
+			)
 		})
 	}
 }

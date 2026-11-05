@@ -47,7 +47,13 @@ func TestASequenceIsTheConcatOfItsParts(test *testing.T) {
 		}
 		for _, question := range questions {
 			if got, want := question.ask(sequences()), question.ask(concats()); got != want {
-				test.Fatalf("case %d: %s of the sequences is\n%s\nand of the concats\n%s", index, question.name, got, want)
+				test.Fatalf(
+					"case %d: %s of the sequences is\n%s\nand of the concats\n%s",
+					index,
+					question.name,
+					got,
+					want,
+				)
 			}
 		}
 	}
@@ -138,7 +144,10 @@ func arrayTypeChecks(test *testing.T, path string, source string) []string {
 		}
 	}
 	for _, declaration := range file.Decls {
-		if function, isFunction := declaration.(*ast.FuncDecl); isFunction && function.Recv == nil && function.Name.Name == "Parts" && file.Name.Name == "doc" {
+		if function, isFunction := declaration.(*ast.FuncDecl); isFunction &&
+			function.Recv == nil &&
+			function.Name.Name == "Parts" &&
+			file.Name.Name == "doc" {
 			continue
 		}
 		ast.Inspect(declaration, func(node ast.Node) bool {

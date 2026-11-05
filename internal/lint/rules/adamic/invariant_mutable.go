@@ -100,7 +100,8 @@ var InvariantMutable = rule.Rule{
 			// under strictFunctionTypes, so only a method's are judged here. The parameter is judged whole, as tsc
 			// judges a function's, and the walk goes no further into it: below a callback parameter is the value it is
 			// called with, and Promise's `then` read every promise's value as a slot written through the wider type,
-			// about a hundred findings on fresh values, an async function's literal or `Promise.resolve([])` (#bbtfx99).
+			// about a hundred findings on fresh values, an async function's literal or `Promise.resolve([])`
+			// (#bbtfx99).
 			if pair.MethodParameter {
 				return !walker.IsAssignableToParameter(pair.Source, pair.Target, pair.Defaulted), false
 			}
@@ -164,7 +165,9 @@ func readonlyMadeWritable(program rule.Program, pair flow.Pair) bool {
 		return false
 	}
 	for _, declaration := range pair.SourceProperty.Declarations {
-		if file := ast.GetSourceFileOfNode(declaration); file != nil && program != nil && rule.IsSourceFileDefaultLibrary(program, file) {
+		if file := ast.GetSourceFileOfNode(
+			declaration,
+		); file != nil && program != nil && rule.IsSourceFileDefaultLibrary(program, file) {
 			return false
 		}
 	}

@@ -23,8 +23,14 @@ func TestNoUnsafeDeclarationMergingFires(test *testing.T) {
 		sourceText string
 	}{
 		{"an interface then a class", "\n            interface Foo {}\n            class Foo {}\n                  "},
-		{"a class then an interface", "\n                     class Foo {}\n                     interface Foo {}\n                           "},
-		{"an interface and a class inside declare global", "\n                     declare global {\n                       interface Foo {}\n                       class Foo {}\n                     }\n                           "},
+		{
+			"a class then an interface",
+			"\n                     class Foo {}\n                     interface Foo {}\n                           ",
+		},
+		{
+			"an interface and a class inside declare global",
+			"\n                     declare global {\n                       interface Foo {}\n                       class Foo {}\n                     }\n                           ",
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -50,14 +56,35 @@ func TestNoUnsafeDeclarationMergingStaysSilent(test *testing.T) {
 		name       string
 		sourceText string
 	}{
-		{"an interface implemented by a differently named class", "\n            interface Foo {}\n            class Bar implements Foo {}\n                "},
-		{"two namespaces", "\n                     namespace Foo {}\n                     namespace Foo {}\n                         "},
-		{"an enum and a namespace", "\n                     enum Foo {}\n                     namespace Foo {}\n                         "},
-		{"a namespace and a differently named function", "\n                     namespace Fooo {}\n                     function Foo() {}\n                         "},
+		{
+			"an interface implemented by a differently named class",
+			"\n            interface Foo {}\n            class Bar implements Foo {}\n                ",
+		},
+		{
+			"two namespaces",
+			"\n                     namespace Foo {}\n                     namespace Foo {}\n                         ",
+		},
+		{
+			"an enum and a namespace",
+			"\n                     enum Foo {}\n                     namespace Foo {}\n                         ",
+		},
+		{
+			"a namespace and a differently named function",
+			"\n                     namespace Fooo {}\n                     function Foo() {}\n                         ",
+		},
 		{"an anonymous class expression", "\n                     const Foo = class {};\n                         "},
-		{"a class returned from a function body", "\n                     interface Foo {\n                       props: string;\n                     }\n\n                     function bar() {\n                       return class Foo {};\n                     }\n                         "},
-		{"a class inside an immediately invoked function", "\n                     interface Foo {\n                       props: string;\n                     }\n\n                     (function bar() {\n                       class Foo {}\n                     })();\n                         "},
-		{"an interface in declare global and a class outside it", "\n                     declare global {\n                       interface Foo {}\n                     }\n\n                     class Foo {}\n                         "},
+		{
+			"a class returned from a function body",
+			"\n                     interface Foo {\n                       props: string;\n                     }\n\n                     function bar() {\n                       return class Foo {};\n                     }\n                         ",
+		},
+		{
+			"a class inside an immediately invoked function",
+			"\n                     interface Foo {\n                       props: string;\n                     }\n\n                     (function bar() {\n                       class Foo {}\n                     })();\n                         ",
+		},
+		{
+			"an interface in declare global and a class outside it",
+			"\n                     declare global {\n                       interface Foo {}\n                     }\n\n                     class Foo {}\n                         ",
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -122,8 +149,14 @@ func TestNoUnsafeDeclarationMergingGoesSilentWhenAThirdKindIsFirst(test *testing
 		name       string
 		sourceText string
 	}{
-		{"a namespace declared first", "namespace Foo { export const value = 1; }\ninterface Foo {}\nclass Foo {}\nexport { Foo };\n"},
-		{"an import declared first", "import { Foo } from './Other';\ninterface Foo {}\nclass Foo {}\nexport { Foo };\n"},
+		{
+			"a namespace declared first",
+			"namespace Foo { export const value = 1; }\ninterface Foo {}\nclass Foo {}\nexport { Foo };\n",
+		},
+		{
+			"an import declared first",
+			"import { Foo } from './Other';\ninterface Foo {}\nclass Foo {}\nexport { Foo };\n",
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -190,7 +223,12 @@ func TestNoUnsafeDeclarationMergingPointsAtTheName(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTyped(test, NoUnsafeDeclarationMerging, unsafeDeclarationMergingFile, testCase.sourceText)
+			result := rule_testing.RunTyped(
+				test,
+				NoUnsafeDeclarationMerging,
+				unsafeDeclarationMergingFile,
+				testCase.sourceText,
+			)
 			if len(result.Diagnostics) != len(testCase.wantReported) {
 				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantReported))
 			}
@@ -238,7 +276,12 @@ func TestNoUnsafeDeclarationMergingPointsAtTheFirstDeclaration(test *testing.T) 
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTyped(test, NoUnsafeDeclarationMerging, unsafeDeclarationMergingFile, testCase.sourceText)
+			result := rule_testing.RunTyped(
+				test,
+				NoUnsafeDeclarationMerging,
+				unsafeDeclarationMergingFile,
+				testCase.sourceText,
+			)
 			if len(result.Diagnostics) != 1 {
 				test.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 			}
@@ -264,10 +307,23 @@ func TestNoUnsafeDeclarationMergingNeedsTheTypedHarness(test *testing.T) {
 		test.Fatal("the rule resolves through the checker and must declare NeedsTypeChecker")
 	}
 	const sourceText = "interface Foo {}\nclass Foo {}\nexport { Foo };\n"
-	if result := rule_testing.Run(test, NoUnsafeDeclarationMerging, unsafeDeclarationMergingFile, sourceText); len(result.Diagnostics) != 0 {
-		test.Fatalf("the untyped harness produced %d findings, so the nil-checker guard is not being taken", len(result.Diagnostics))
+	if result := rule_testing.Run(
+		test,
+		NoUnsafeDeclarationMerging,
+		unsafeDeclarationMergingFile,
+		sourceText,
+	); len(result.Diagnostics) != 0 {
+		test.Fatalf(
+			"the untyped harness produced %d findings, so the nil-checker guard is not being taken",
+			len(result.Diagnostics),
+		)
 	}
-	if result := rule_testing.RunTyped(test, NoUnsafeDeclarationMerging, unsafeDeclarationMergingFile, sourceText); len(result.Diagnostics) != 1 {
+	if result := rule_testing.RunTyped(
+		test,
+		NoUnsafeDeclarationMerging,
+		unsafeDeclarationMergingFile,
+		sourceText,
+	); len(result.Diagnostics) != 1 {
 		test.Fatalf("the typed harness produced %d findings, want 1", len(result.Diagnostics))
 	}
 }

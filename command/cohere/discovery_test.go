@@ -216,7 +216,12 @@ func TestDiscoveryNeverEntersWhatItMustNot(test *testing.T) {
 	}
 	// node_modules, .build, .cache and testdata; the root's own .git is passed over without counting.
 	if found.NeverDescended != 4 || found.Ignored != 2 || found.Submodules != 1 {
-		test.Errorf("never descended %d (want 4), ignored %d (want 2: one by the root .gitignore, one by apps/.gitignore), submodules %d (want 1)", found.NeverDescended, found.Ignored, found.Submodules)
+		test.Errorf(
+			"never descended %d (want 4), ignored %d (want 2: one by the root .gitignore, one by apps/.gitignore), submodules %d (want 1)",
+			found.NeverDescended,
+			found.Ignored,
+			found.Submodules,
+		)
 	}
 	if want := []string{"clone"}; !reflect.DeepEqual(found.NestedRepositories, want) {
 		test.Errorf("nested repositories %v, want %v", found.NestedRepositories, want)
@@ -244,7 +249,10 @@ func TestDiscoveryNeverEntersWhatItMustNot(test *testing.T) {
 		"generated/gocode",
 	} {
 		if !directories[planted] {
-			test.Errorf("with the refusals lifted, %s was still not found, so its refusal above proves nothing", planted)
+			test.Errorf(
+				"with the refusals lifted, %s was still not found, so its refusal above proves nothing",
+				planted,
+			)
 		}
 	}
 }
@@ -267,14 +275,21 @@ func TestDiscoveryRootIsTheRepositoryTheCallerStandsIn(test *testing.T) {
 	start := filepath.Join(repository, "docs")
 	location, locateError := locateProject(locationRequest{WorkingDirectory: start, ConfigFileName: projectMarker})
 	if locateError == nil {
-		test.Fatalf("the walk up found %s, so this does not test a repository with no project above the caller", location.Root)
+		test.Fatalf(
+			"the walk up found %s, so this does not test a repository with no project above the caller",
+			location.Root,
+		)
 	}
 	if root := discoveryRoot(location, locateError, start); root != repository {
 		test.Errorf("discovery starts at %s, want the repository %s", root, repository)
 	}
 
 	outer := test.TempDir()
-	writeTree(test, outer, map[string]string{"tsconfig.json": discoveryTsconfig, "inner/swift/Package.swift": discoveryPackage})
+	writeTree(
+		test,
+		outer,
+		map[string]string{"tsconfig.json": discoveryTsconfig, "inner/swift/Package.swift": discoveryPackage},
+	)
 	inner := filepath.Join(outer, "inner")
 	if createDirectoryError := os.Mkdir(filepath.Join(inner, ".git"), 0o755); createDirectoryError != nil {
 		test.Fatal(createDirectoryError)
@@ -307,7 +322,15 @@ func TestDiscoveryAppliesOnlyToARunThatNamesNoProject(test *testing.T) {
 	if !discoveryApplies(map[string]bool{"lint-config": true}, nil) {
 		test.Error("a run naming --lint-config does not discover")
 	}
-	for _, named := range []string{"directory", "tsconfig", "rules", "print-config", "explain", "stdin-filepath", "version"} {
+	for _, named := range []string{
+		"directory",
+		"tsconfig",
+		"rules",
+		"print-config",
+		"explain",
+		"stdin-filepath",
+		"version",
+	} {
 		if discoveryApplies(map[string]bool{named: true}, nil) {
 			test.Errorf("a run naming --%s discovers", named)
 		}

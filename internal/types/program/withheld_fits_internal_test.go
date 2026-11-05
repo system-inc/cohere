@@ -23,7 +23,9 @@ func TestAnEntryWhoseWithheldFindingsDoNotFitIsAMiss(test *testing.T) {
 		_, hits := reuse.lookup(subject.Path, keys, text)
 		return hits.pure
 	}
-	if !lookup(entry(LintCacheWithheld{RuleName: "no-var", Directive: 0}, LintCacheWithheld{RuleName: "no-var", Directive: 1})) {
+	if !lookup(
+		entry(LintCacheWithheld{RuleName: "no-var", Directive: 0}, LintCacheWithheld{RuleName: "no-var", Directive: 1}),
+	) {
 		test.Fatal("an entry whose withheld findings fit missed, so the misses below prove nothing")
 	}
 	for _, doubt := range []struct {

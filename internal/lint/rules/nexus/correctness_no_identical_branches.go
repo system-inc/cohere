@@ -14,10 +14,16 @@ const correctnessNoIdenticalBranchesId = "identicalBranches"
 
 // correctnessNoIdenticalBranchesText is the rule's message, whose wording lives in
 // `policy/messages/correctness-no-identical-branches.json`.
-var correctnessNoIdenticalBranchesText = policy.MessageOf("nexus/correctness-no-identical-branches", correctnessNoIdenticalBranchesId)
+var correctnessNoIdenticalBranchesText = policy.MessageOf(
+	"nexus/correctness-no-identical-branches",
+	correctnessNoIdenticalBranchesId,
+)
 
 func correctnessNoIdenticalBranchesMessage() rule.Message {
-	return rule.Message{Id: correctnessNoIdenticalBranchesId, Description: correctnessNoIdenticalBranchesText.Render(nil)}
+	return rule.Message{
+		Id:          correctnessNoIdenticalBranchesId,
+		Description: correctnessNoIdenticalBranchesText.Render(nil),
+	}
 }
 
 // CorrectnessNoIdenticalBranches reports a conditional whose every branch is the same code, so the
@@ -123,7 +129,11 @@ var CorrectnessNoIdenticalBranches = rule.Rule{
 			ast.KindConditionalExpression: func(node *ast.Node) {
 				conditional := node.AsConditionalExpression()
 				whenTrue := ast.SkipParentheses(conditional.WhenTrue)
-				if !correctnessNoIdenticalBranchesSame(ruleContext, whenTrue, ast.SkipParentheses(conditional.WhenFalse)) {
+				if !correctnessNoIdenticalBranchesSame(
+					ruleContext,
+					whenTrue,
+					ast.SkipParentheses(conditional.WhenFalse),
+				) {
 					return
 				}
 				anchor := node
@@ -136,7 +146,11 @@ var CorrectnessNoIdenticalBranches = rule.Rule{
 					if ast.SkipParentheses(parentConditional.WhenFalse) != anchor {
 						break
 					}
-					if !correctnessNoIdenticalBranchesSame(ruleContext, ast.SkipParentheses(parentConditional.WhenTrue), whenTrue) {
+					if !correctnessNoIdenticalBranchesSame(
+						ruleContext,
+						ast.SkipParentheses(parentConditional.WhenTrue),
+						whenTrue,
+					) {
 						break
 					}
 					anchor = parent
@@ -154,7 +168,8 @@ var CorrectnessNoIdenticalBranches = rule.Rule{
 				// last `if` and reaches back up through the widening below.
 				thenBranch := correctnessNoIdenticalBranchesUnwrapBlock(ifStatement.ThenStatement)
 				elseBranch := correctnessNoIdenticalBranchesUnwrapBlock(ifStatement.ElseStatement)
-				if correctnessNoIdenticalBranchesIsEmpty(thenBranch) || correctnessNoIdenticalBranchesIsEmpty(elseBranch) {
+				if correctnessNoIdenticalBranchesIsEmpty(thenBranch) ||
+					correctnessNoIdenticalBranchesIsEmpty(elseBranch) {
 					return
 				}
 				if !correctnessNoIdenticalBranchesSame(ruleContext, thenBranch, elseBranch) {
@@ -163,10 +178,16 @@ var CorrectnessNoIdenticalBranches = rule.Rule{
 				anchor := node
 				for {
 					parent := anchor.Parent
-					if parent == nil || parent.Kind != ast.KindIfStatement || parent.AsIfStatement().ElseStatement != anchor {
+					if parent == nil ||
+						parent.Kind != ast.KindIfStatement ||
+						parent.AsIfStatement().ElseStatement != anchor {
 						break
 					}
-					if !correctnessNoIdenticalBranchesSame(ruleContext, correctnessNoIdenticalBranchesUnwrapBlock(parent.AsIfStatement().ThenStatement), thenBranch) {
+					if !correctnessNoIdenticalBranchesSame(
+						ruleContext,
+						correctnessNoIdenticalBranchesUnwrapBlock(parent.AsIfStatement().ThenStatement),
+						thenBranch,
+					) {
 						break
 					}
 					anchor = parent
@@ -258,7 +279,13 @@ func correctnessNoIdenticalBranchesSameTokens(sourceFile *ast.SourceFile, left *
 	rightRange := rule.TokenRange(sourceFile, right)
 	if len(leftChildren) == 0 {
 		if correctnessNoIdenticalBranchesIsPunctuationLeaf(left) {
-			return correctnessNoIdenticalBranchesSameGap(sourceFile, leftRange.Pos(), leftRange.End(), rightRange.Pos(), rightRange.End())
+			return correctnessNoIdenticalBranchesSameGap(
+				sourceFile,
+				leftRange.Pos(),
+				leftRange.End(),
+				rightRange.Pos(),
+				rightRange.End(),
+			)
 		}
 		text := sourceFile.Text()
 		return text[leftRange.Pos():leftRange.End()] == text[rightRange.Pos():rightRange.End()]
@@ -268,7 +295,13 @@ func correctnessNoIdenticalBranchesSameTokens(sourceFile *ast.SourceFile, left *
 	for index := range leftChildren {
 		leftChildRange := rule.TokenRange(sourceFile, leftChildren[index])
 		rightChildRange := rule.TokenRange(sourceFile, rightChildren[index])
-		if !correctnessNoIdenticalBranchesSameGap(sourceFile, leftCursor, leftChildRange.Pos(), rightCursor, rightChildRange.Pos()) {
+		if !correctnessNoIdenticalBranchesSameGap(
+			sourceFile,
+			leftCursor,
+			leftChildRange.Pos(),
+			rightCursor,
+			rightChildRange.Pos(),
+		) {
 			return false
 		}
 		if !correctnessNoIdenticalBranchesSameTokens(sourceFile, leftChildren[index], rightChildren[index]) {
@@ -293,7 +326,13 @@ func correctnessNoIdenticalBranchesIsPunctuationLeaf(node *ast.Node) bool {
 
 // correctnessNoIdenticalBranchesSameGap says whether two source ranges hold the same tokens,
 // ignoring the whitespace and comments between them.
-func correctnessNoIdenticalBranchesSameGap(sourceFile *ast.SourceFile, leftStart int, leftEnd int, rightStart int, rightEnd int) bool {
+func correctnessNoIdenticalBranchesSameGap(
+	sourceFile *ast.SourceFile,
+	leftStart int,
+	leftEnd int,
+	rightStart int,
+	rightEnd int,
+) bool {
 	leftTokens := correctnessNoIdenticalBranchesTokens(sourceFile, leftStart, leftEnd)
 	rightTokens := correctnessNoIdenticalBranchesTokens(sourceFile, rightStart, rightEnd)
 	if len(leftTokens) != len(rightTokens) {
@@ -388,8 +427,16 @@ func correctnessNoIdenticalBranchesSameTypes(ruleContext rule.Context, left *ast
 		}
 	case ast.KindBinaryExpression:
 		if correctnessNoIdenticalBranchesTypedOperators[left.AsBinaryExpression().OperatorToken.Kind] &&
-			(!correctnessNoIdenticalBranchesSameTypeAt(ruleContext, left.AsBinaryExpression().Left, right.AsBinaryExpression().Left) ||
-				!correctnessNoIdenticalBranchesSameTypeAt(ruleContext, left.AsBinaryExpression().Right, right.AsBinaryExpression().Right)) {
+			(!correctnessNoIdenticalBranchesSameTypeAt(
+				ruleContext,
+				left.AsBinaryExpression().Left,
+				right.AsBinaryExpression().Left,
+			) ||
+				!correctnessNoIdenticalBranchesSameTypeAt(
+					ruleContext,
+					left.AsBinaryExpression().Right,
+					right.AsBinaryExpression().Right,
+				)) {
 			return false
 		}
 	}
@@ -411,7 +458,8 @@ func correctnessNoIdenticalBranchesSameTypeAt(ruleContext rule.Context, left *as
 	if leftType == rightType {
 		return true
 	}
-	return type_checking.IsTypeFlagSet(leftType, checker.TypeFlagsNever) || type_checking.IsTypeFlagSet(rightType, checker.TypeFlagsNever)
+	return type_checking.IsTypeFlagSet(leftType, checker.TypeFlagsNever) ||
+		type_checking.IsTypeFlagSet(rightType, checker.TypeFlagsNever)
 }
 
 // correctnessNoIdenticalBranchesArguments lists a call's or a construction's arguments.

@@ -44,44 +44,56 @@ function useEverything(properties: { items: number[]; flag: boolean }) {
   return [value, x, doubled, properties.flag ? total : 0];
 }`
 	visited := 0
-	probe := rule.Rule{Name: "clone", NeedsTypeChecker: true, Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
-			forEachFunctionLike(node, func(node *ast.Node) {
-				original := Lower(node, ruleContext.TypeChecker)
-				if original == nil {
-					return
-				}
-				Construct(original)
-				untouched := Lower(node, ruleContext.TypeChecker)
-				Construct(untouched)
-				forgetIdentifierSlabs(original)
-				forgetIdentifierSlabs(untouched)
-				if !reflect.DeepEqual(original, untouched) {
-					test.Fatal("two lowerings of one function differ, so this test cannot tell a shared write from noise")
-				}
+	probe := rule.Rule{
+		Name:             "clone",
+		NeedsTypeChecker: true,
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+			return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
+				forEachFunctionLike(node, func(node *ast.Node) {
+					original := Lower(node, ruleContext.TypeChecker)
+					if original == nil {
+						return
+					}
+					Construct(original)
+					untouched := Lower(node, ruleContext.TypeChecker)
+					Construct(untouched)
+					forgetIdentifierSlabs(original)
+					forgetIdentifierSlabs(untouched)
+					if !reflect.DeepEqual(original, untouched) {
+						test.Fatal(
+							"two lowerings of one function differ, so this test cannot tell a shared write from noise",
+						)
+					}
 
-				clone := CloneFunction(original)
-				if !reflect.DeepEqual(clone, original) {
-					test.Fatal("the copy differs from the function it copies")
-				}
-				fromClone := AnalyzePreservedManualMemoization(clone, ruleContext.TypeChecker)
+					clone := CloneFunction(original)
+					if !reflect.DeepEqual(clone, original) {
+						test.Fatal("the copy differs from the function it copies")
+					}
+					fromClone := AnalyzePreservedManualMemoization(clone, ruleContext.TypeChecker)
 
-				if !reflect.DeepEqual(original, untouched) {
-					test.Error("the pipeline run over the copy changed the original")
-				}
-				direct := Lower(node, ruleContext.TypeChecker)
-				Construct(direct)
-				fromLowering := AnalyzePreservedManualMemoization(direct, ruleContext.TypeChecker)
-				if len(fromLowering) == 0 {
-					test.Error("the fixture produced no finding, so the comparison below proves nothing about the copy")
-				}
-				if !reflect.DeepEqual(fromClone, fromLowering) {
-					test.Errorf("findings from the copy %v differ from a fresh lowering's %v", fromClone, fromLowering)
-				}
-				visited++
-			})
-		}}
-	}}
+					if !reflect.DeepEqual(original, untouched) {
+						test.Error("the pipeline run over the copy changed the original")
+					}
+					direct := Lower(node, ruleContext.TypeChecker)
+					Construct(direct)
+					fromLowering := AnalyzePreservedManualMemoization(direct, ruleContext.TypeChecker)
+					if len(fromLowering) == 0 {
+						test.Error(
+							"the fixture produced no finding, so the comparison below proves nothing about the copy",
+						)
+					}
+					if !reflect.DeepEqual(fromClone, fromLowering) {
+						test.Errorf(
+							"findings from the copy %v differ from a fresh lowering's %v",
+							fromClone,
+							fromLowering,
+						)
+					}
+					visited++
+				})
+			}}
+		},
+	}
 	rule_testing.RunTypedFiles(test, probe, map[string]string{
 		"/react.d.ts": reactiveDeclarations + `
 declare module 'react' {

@@ -277,8 +277,8 @@ func TestPreferFunctionTypeFires(test *testing.T) {
 		},
 
 		{
-			// Measured, not imported. A `declare` modifier does not change the judgment or the repair, and the rebuilt alias correctly
-			// drops it, which is what upstream produces.
+			// Measured, not imported. A `declare` modifier does not change the judgment or the repair, and the rebuilt
+			// alias correctly drops it, which is what upstream produces.
 			sourceText: "declare interface Foo {\n  (): string;\n}\n",
 			wantFindings: []preferFunctionTypeFinding{
 				{
@@ -290,9 +290,9 @@ func TestPreferFunctionTypeFires(test *testing.T) {
 			wantOutput: "type Foo = () => string;\n",
 		},
 		{
-			// Measured, not imported. A comment above the interface is not a comment on the member and must not be moved. It survives
-			// here because it sits outside the declaration's token range; an earlier version of this rule
-			// filtered on `node.Pos()`, which reaches back over leading trivia, and duplicated it.
+			// Measured, not imported. A comment above the interface is not a comment on the member and must not be
+			// moved. It survives here because it sits outside the declaration's token range; an earlier version of this
+			// rule filtered on `node.Pos()`, which reaches back over leading trivia, and duplicated it.
 			sourceText: "/** docs */\ninterface Foo {\n  (): string;\n}\n",
 			wantFindings: []preferFunctionTypeFinding{
 				{
@@ -304,9 +304,9 @@ func TestPreferFunctionTypeFires(test *testing.T) {
 			wantOutput: "/** docs */\ntype Foo = () => string;\n",
 		},
 		{
-			// Measured, not imported. Export, generics, and a moved comment at once. The comment goes above the `export` because it
-			// cannot sit between `export` and `type`, and the type parameter list survives with its closing
-			// angle bracket, which sits one byte past what the parameter list's own End reports.
+			// Measured, not imported. Export, generics, and a moved comment at once. The comment goes above the
+			// `export` because it cannot sit between `export` and `type`, and the type parameter list survives with its
+			// closing angle bracket, which sits one byte past what the parameter list's own End reports.
 			sourceText: "export interface Foo<T> {\n  // c\n  (a: T): T;\n}\n",
 			wantFindings: []preferFunctionTypeFinding{
 				{
@@ -318,9 +318,9 @@ func TestPreferFunctionTypeFires(test *testing.T) {
 			wantOutput: "// c\nexport type Foo<T> = (a: T) => T;\n",
 		},
 		{
-			// Measured, not imported. A construct signature alone is reported and rewritten to a constructor type. Upstream's corpus
-			// only writes a construct signature beside a call signature, where it is a passing case, so
-			// nothing imported exercises the reporting half.
+			// Measured, not imported. A construct signature alone is reported and rewritten to a constructor type.
+			// Upstream's corpus only writes a construct signature beside a call signature, where it is a passing case,
+			// so nothing imported exercises the reporting half.
 			sourceText: "interface Foo {\n  new (): string;\n}\n",
 			wantFindings: []preferFunctionTypeFinding{
 				{
@@ -332,8 +332,8 @@ func TestPreferFunctionTypeFires(test *testing.T) {
 			wantOutput: "type Foo = new () => string;\n",
 		},
 		{
-			// Measured, not imported. An array type wraps, like a union and an intersection. The corpus writes the other two and not
-			// this one, so the third arm of the wrapping test was unexercised.
+			// Measured, not imported. An array type wraps, like a union and an intersection. The corpus writes the
+			// other two and not this one, so the third arm of the wrapping test was unexercised.
 			sourceText: "type X = { (): void }[];\n",
 			wantFindings: []preferFunctionTypeFinding{
 				{
@@ -345,8 +345,8 @@ func TestPreferFunctionTypeFires(test *testing.T) {
 			wantOutput: "type X = (() => void)[];\n",
 		},
 		{
-			// Measured, not imported. The call signature carries its own type parameters while the interface has none, which is a
-			// different path through the alias rebuild than an interface with type parameters.
+			// Measured, not imported. The call signature carries its own type parameters while the interface has none,
+			// which is a different path through the alias rebuild than an interface with type parameters.
 			sourceText: "interface Foo {\n  <T>(a: T): T;\n}\n",
 			wantFindings: []preferFunctionTypeFinding{
 				{
@@ -358,8 +358,8 @@ func TestPreferFunctionTypeFires(test *testing.T) {
 			wantOutput: "type Foo = <T>(a: T) => T;\n",
 		},
 		{
-			// Measured, not imported. No separator at all after the member. The semicolon strip has nothing to remove and the alias
-			// still ends correctly.
+			// Measured, not imported. No separator at all after the member. The semicolon strip has nothing to remove
+			// and the alias still ends correctly.
 			sourceText: "type Foo = {\n  (): string\n};\n",
 			wantFindings: []preferFunctionTypeFinding{
 				{
@@ -371,8 +371,8 @@ func TestPreferFunctionTypeFires(test *testing.T) {
 			wantOutput: "type Foo = () => string;\n",
 		},
 		{
-			// Measured, not imported. An exported interface nested in a namespace, which is where most exported interfaces in this
-			// tree actually live.
+			// Measured, not imported. An exported interface nested in a namespace, which is where most exported
+			// interfaces in this tree actually live.
 			sourceText: "namespace N {\n  export interface Foo {\n    (): string;\n  }\n}\n",
 			wantFindings: []preferFunctionTypeFinding{
 				{
@@ -384,9 +384,9 @@ func TestPreferFunctionTypeFires(test *testing.T) {
 			wantOutput: "namespace N {\n  export type Foo = () => string;\n}\n",
 		},
 		{
-			// Measured, not imported. The shape this rule actually finds in the tree, taken from the audit's first violation site. A
-			// construct signature returning a type literal, exported. Every piece of the fixer is exercised
-			// at once and the output is upstream's byte for byte.
+			// Measured, not imported. The shape this rule actually finds in the tree, taken from the audit's first
+			// violation site. A construct signature returning a type literal, exported. Every piece of the fixer is
+			// exercised at once and the output is upstream's byte for byte.
 			sourceText: "export interface UseEyeDropperOptions {\n  new (): {\n    open(): Promise<{ sRGBHex: string }>;\n  };\n}\n",
 			wantFindings: []preferFunctionTypeFinding{
 				{

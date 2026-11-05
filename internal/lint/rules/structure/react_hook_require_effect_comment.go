@@ -13,12 +13,18 @@ import (
 
 // reactHookRequireEffectCommentText is the rule's message, whose wording lives in
 // `policy/messages/react-hook-require-effect-comment.json`.
-var reactHookRequireEffectCommentText = policy.MessageOf("structure/react-hook-require-effect-comment", "missingEffectComment")
+var reactHookRequireEffectCommentText = policy.MessageOf(
+	"structure/react-hook-require-effect-comment",
+	"missingEffectComment",
+)
 
 // messageMissingEffectComment is the finding, rendered when it is reported so the text comes from
 // the current catalog.
 func messageMissingEffectComment() rule.Message {
-	return rule.Message{Id: reactHookRequireEffectCommentText.Id, Description: reactHookRequireEffectCommentText.Render(nil)}
+	return rule.Message{
+		Id:          reactHookRequireEffectCommentText.Id,
+		Description: reactHookRequireEffectCommentText.Render(nil),
+	}
 }
 
 // effectCommentPrefix is what the first line of the comment must start with.

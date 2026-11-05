@@ -55,7 +55,11 @@ type correctnessNoCollectionMisuseFinding struct {
 
 // correctnessNoCollectionMisuseExpect asserts the findings in source order, and that none carries a
 // fix.
-func correctnessNoCollectionMisuseExpect(test *testing.T, result rule_testing.Result, want []correctnessNoCollectionMisuseFinding) {
+func correctnessNoCollectionMisuseExpect(
+	test *testing.T,
+	result rule_testing.Result,
+	want []correctnessNoCollectionMisuseFinding,
+) {
 	test.Helper()
 	// A silent case goes through the shared assertion that the rule stays quiet.
 	if len(want) == 0 {
@@ -75,12 +79,19 @@ func correctnessNoCollectionMisuseExpect(test *testing.T, result rule_testing.Re
 	rule_testing.ExpectFindings(test, sorted, wantIds...)
 	text := result.SourceFile.Text()
 	for index, diagnostic := range diagnostics {
-		got := correctnessNoCollectionMisuseFinding{diagnostic.Message.Id, text[diagnostic.Range.Pos():diagnostic.Range.End()]}
+		got := correctnessNoCollectionMisuseFinding{
+			diagnostic.Message.Id,
+			text[diagnostic.Range.Pos():diagnostic.Range.End()],
+		}
 		if got != want[index] {
 			test.Fatalf("finding %d is %v, want %v", index, got, want[index])
 		}
 		if len(diagnostic.Fixes) != 0 || len(diagnostic.Suggestions) != 0 {
-			test.Fatalf("expected no fix and no suggestion, got %d and %d", len(diagnostic.Fixes), len(diagnostic.Suggestions))
+			test.Fatalf(
+				"expected no fix and no suggestion, got %d and %d",
+				len(diagnostic.Fixes),
+				len(diagnostic.Suggestions),
+			)
 		}
 	}
 }

@@ -88,7 +88,10 @@ func DecodeNoShadowOptions(raw []byte) (any, error) {
 		case "all", "functions", "functions-and-types", "never", "types":
 			options.Hoist = *wire.Hoist
 		default:
-			return options, fmt.Errorf("hoist is %q, and upstream takes all, functions, functions-and-types, never or types", *wire.Hoist)
+			return options, fmt.Errorf(
+				"hoist is %q, and upstream takes all, functions, functions-and-types, never or types",
+				*wire.Hoist,
+			)
 		}
 	}
 	if wire.IgnoreFunctionTypeParameterNameValueShadow != nil {
@@ -439,7 +442,13 @@ func checkFileForShadowing(ruleContext rule.Context, sourceFile *ast.Node, setti
 }
 
 // reportIfShadowing finds the nearest enclosing binding of the same name and reports if one exists.
-func reportIfShadowing(ruleContext rule.Context, settings NoShadowOptions, scopes []shadowScope, scopeIndex int, binding shadowBinding) {
+func reportIfShadowing(
+	ruleContext rule.Context,
+	settings NoShadowOptions,
+	scopes []shadowScope,
+	scopeIndex int,
+	binding shadowBinding,
+) {
 	// A `this` parameter is a pseudo-parameter that cannot be shadowed. Upstream skips it by name
 	// and definition type; here the parameter's name node is the `this` keyword.
 	if binding.name == "this" {
@@ -533,7 +542,8 @@ func reportIfShadowing(ruleContext rule.Context, settings NoShadowOptions, scope
 		return
 	}
 
-	if settings.IgnoreOnInitialization && bindingIsInitializedThrough(ruleContext, binding, shadowed, shadowedContainer) {
+	if settings.IgnoreOnInitialization &&
+		bindingIsInitializedThrough(ruleContext, binding, shadowed, shadowedContainer) {
 		return
 	}
 
@@ -621,7 +631,11 @@ func noShadowReportRange(ruleContext rule.Context, identifier *ast.Node) core.Te
 // The container returned is the scope the shadowed binding was found in, which
 // ignoreOnInitialization compares against; nil for an expression name found in the binding's own
 // scope, which stands for a scope of its own that no container is.
-func findEnclosingBinding(scopes []shadowScope, scopeIndex int, binding shadowBinding) (shadowBinding, *ast.Node, bool) {
+func findEnclosingBinding(
+	scopes []shadowScope,
+	scopeIndex int,
+	binding shadowBinding,
+) (shadowBinding, *ast.Node, bool) {
 	inner := scopes[scopeIndex].container
 	for candidateIndex := scopeIndex - 1; candidateIndex >= 0; candidateIndex-- {
 		candidate := &scopes[candidateIndex]
@@ -1173,7 +1187,12 @@ func bindingIsAStaticMethodGenericOverAClassGeneric(binding shadowBinding, shado
 //	const a = wrap(class { m() { let a; } });   reports, the method's outer scope is the class
 //
 // A method is a function expression to upstream, which nests it under a MethodDefinition.
-func bindingIsInitializedThrough(ruleContext rule.Context, binding shadowBinding, shadowed shadowBinding, shadowedContainer *ast.Node) bool {
+func bindingIsInitializedThrough(
+	ruleContext rule.Context,
+	binding shadowBinding,
+	shadowed shadowBinding,
+	shadowedContainer *ast.Node,
+) bool {
 	if shadowed.global || shadowed.symbol == nil || shadowed.identifier == nil || shadowedContainer == nil {
 		return false
 	}
@@ -1203,7 +1222,9 @@ func bindingIsInitializedThrough(ruleContext rule.Context, binding shadowBinding
 			if spans(current.AsVariableDeclaration().Initializer) {
 				return true
 			}
-			if list := current.Parent; list != nil && list.Kind == ast.KindVariableDeclarationList && list.Parent != nil &&
+			if list := current.Parent; list != nil &&
+				list.Kind == ast.KindVariableDeclarationList &&
+				list.Parent != nil &&
 				(list.Parent.Kind == ast.KindForInStatement || list.Parent.Kind == ast.KindForOfStatement) {
 				return spans(list.Parent.AsForInOrOfStatement().Expression)
 			}

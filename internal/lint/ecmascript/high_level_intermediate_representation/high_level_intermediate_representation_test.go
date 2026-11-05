@@ -279,7 +279,9 @@ func TestPlaceStringIsStableAcrossIdenticalValues(test *testing.T) {
 	second := Place{Identifier: identifier.Id, Effect: EffectMutate}
 
 	if function.PlaceString(first) != function.PlaceString(second) {
-		test.Error("two places naming one identifier must print alike; the effect is a property of the reference, not the value")
+		test.Error(
+			"two places naming one identifier must print alike; the effect is a property of the reference, not the value",
+		)
 	}
 	if first.Identifier != second.Identifier {
 		test.Error("places naming one value must share an identifier")

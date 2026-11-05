@@ -275,7 +275,10 @@ func sameDoc(left Doc, right Doc) bool {
 	leftParts, leftIsArray := Parts(left)
 	rightParts, rightIsArray := Parts(right)
 	if leftIsArray || rightIsArray {
-		return leftIsArray && rightIsArray && (leftParts == nil) == (rightParts == nil) && sameParts(leftParts, rightParts)
+		return leftIsArray &&
+			rightIsArray &&
+			(leftParts == nil) == (rightParts == nil) &&
+			sameParts(leftParts, rightParts)
 	}
 	return left == right
 }

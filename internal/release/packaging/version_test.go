@@ -73,7 +73,12 @@ func TestVersionSaysWhenItIsALocalBuild(test *testing.T) {
 		test.Errorf("a dev build does not say so:\n%s", local.String())
 	}
 
-	released := Provenance{Version: "1.2.3", CompilerCommit: "abc123", GoToolchain: "go1.27.0", Platform: "darwin/arm64"}
+	released := Provenance{
+		Version:        "1.2.3",
+		CompilerCommit: "abc123",
+		GoToolchain:    "go1.27.0",
+		Platform:       "darwin/arm64",
+	}
 	if released.IsDevelopment() {
 		test.Fatalf("a released build identified as development")
 	}

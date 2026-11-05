@@ -12,7 +12,10 @@ const consistencyNoIsoStringDateCutId = "isoStringCutToDate"
 
 // consistencyNoIsoStringDateCutText is the rule's message, whose wording lives in
 // `policy/messages/consistency-no-iso-string-date-cut.json`.
-var consistencyNoIsoStringDateCutText = policy.MessageOf("nexus/consistency-no-iso-string-date-cut", consistencyNoIsoStringDateCutId)
+var consistencyNoIsoStringDateCutText = policy.MessageOf(
+	"nexus/consistency-no-iso-string-date-cut",
+	consistencyNoIsoStringDateCutId,
+)
 
 func consistencyNoIsoStringDateCutMessage() rule.Message {
 	return rule.Message{Id: consistencyNoIsoStringDateCutId, Description: consistencyNoIsoStringDateCutText.Render(nil)}
@@ -205,7 +208,8 @@ func consistencyNoIsoStringDateCutIsSplitOnT(ruleContext rule.Context, node *ast
 		return false
 	}
 	separator := arguments[0]
-	if (separator.Kind != ast.KindStringLiteral && separator.Kind != ast.KindNoSubstitutionTemplateLiteral) || separator.Text() != "T" {
+	if (separator.Kind != ast.KindStringLiteral && separator.Kind != ast.KindNoSubstitutionTemplateLiteral) ||
+		separator.Text() != "T" {
 		return false
 	}
 	return consistencyNoIsoStringDateCutIsIsoString(ruleContext, receiver)
@@ -252,12 +256,16 @@ func consistencyNoIsoStringDateCutConstInitializer(ruleContext rule.Context, ide
 		return nil
 	}
 	declaration := symbol.Declarations[0]
-	if ast.GetSourceFileOfNode(declaration) != ruleContext.SourceFile || declaration.Kind != ast.KindVariableDeclaration ||
-		declaration.Name() == nil || declaration.Name().Kind != ast.KindIdentifier {
+	if ast.GetSourceFileOfNode(declaration) != ruleContext.SourceFile ||
+		declaration.Kind != ast.KindVariableDeclaration ||
+		declaration.Name() == nil ||
+		declaration.Name().Kind != ast.KindIdentifier {
 		return nil
 	}
 	list := declaration.Parent
-	if list == nil || list.Kind != ast.KindVariableDeclarationList || list.Flags&ast.NodeFlagsBlockScoped != ast.NodeFlagsConst {
+	if list == nil ||
+		list.Kind != ast.KindVariableDeclarationList ||
+		list.Flags&ast.NodeFlagsBlockScoped != ast.NodeFlagsConst {
 		return nil
 	}
 	return declaration.AsVariableDeclaration().Initializer
@@ -272,7 +280,10 @@ func consistencyNoIsoStringDateCutIsDateMember(ruleContext rule.Context, name *a
 	}
 	for _, declaration := range symbol.Declarations {
 		parent := declaration.Parent
-		if parent != nil && parent.Kind == ast.KindInterfaceDeclaration && parent.Name() != nil && parent.Name().Text() == "Date" {
+		if parent != nil &&
+			parent.Kind == ast.KindInterfaceDeclaration &&
+			parent.Name() != nil &&
+			parent.Name().Text() == "Date" {
 			return true
 		}
 	}

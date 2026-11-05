@@ -90,7 +90,12 @@ func TestTheCacheLivesInTheProjectAndNoCacheTouchesNone(test *testing.T) {
 	}
 	for attempt := 1; attempt <= 2; attempt++ {
 		if output, stderr := run(first, "--no-fix"); !strings.HasPrefix(output, "cached: ") {
-			test.Fatalf("replay %d missed with the table inside the project:\n%s\n--- stderr\n%s", attempt, output, stderr)
+			test.Fatalf(
+				"replay %d missed with the table inside the project:\n%s\n--- stderr\n%s",
+				attempt,
+				output,
+				stderr,
+			)
 		}
 	}
 
@@ -125,8 +130,13 @@ func TestTheCacheLivesInTheProjectAndNoCacheTouchesNone(test *testing.T) {
 	findings := func(output string) string {
 		kept := []string{}
 		for _, line := range strings.Split(output, "\n") {
-			if strings.Contains(line, " - ") || strings.HasPrefix(line, "lint: ") || strings.HasPrefix(line, "types: ") {
-				kept = append(kept, foldNodeCounts(replayedClause.ReplaceAllString(durations.ReplaceAllString(line, "T"), "")))
+			if strings.Contains(line, " - ") ||
+				strings.HasPrefix(line, "lint: ") ||
+				strings.HasPrefix(line, "types: ") {
+				kept = append(
+					kept,
+					foldNodeCounts(replayedClause.ReplaceAllString(durations.ReplaceAllString(line, "T"), "")),
+				)
 			}
 		}
 		return strings.Join(kept, "\n")
@@ -137,7 +147,13 @@ func TestTheCacheLivesInTheProjectAndNoCacheTouchesNone(test *testing.T) {
 	cached, _ := run(first, "--format", "--no-fix")
 	// The writing shape goes last: it fixes and formats the tree, which the comparison before it must not
 	// see.
-	for _, arguments := range [][]string{{"--no-cache", "--no-fix", "--format"}, {"--no-cache", "--no-fix"}, {"--no-cache", "--lint"}, {"--no-cache", "--types"}, {"--no-cache", "--fix", "--format"}} {
+	for _, arguments := range [][]string{
+		{"--no-cache", "--no-fix", "--format"},
+		{"--no-cache", "--no-fix"},
+		{"--no-cache", "--lint"},
+		{"--no-cache", "--types"},
+		{"--no-cache", "--fix", "--format"},
+	} {
 		before := snapshot()
 		output, stderr := run(first, arguments...)
 		after := snapshot()

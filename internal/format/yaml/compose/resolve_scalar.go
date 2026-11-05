@@ -255,7 +255,12 @@ var escapeCodes = map[int]uint16{
 	'\t': '\t',
 }
 
-func parseCharCode(source []uint16, offset int, length int, onError func(rel int, code string, message string)) []uint16 {
+func parseCharCode(
+	source []uint16,
+	offset int,
+	length int,
+	onError func(rel int, code string, message string),
+) []uint16 {
 	cc := substr(source, offset, length)
 	ok := len(cc) == length
 	for _, unit := range cc {
@@ -327,7 +332,12 @@ func resolveBlockScalar(composition *composeContext, scalar *cst.Token, onError 
 		if len(scalar.Source) > 0 {
 			end += len(scalar.Source)
 		}
-		return scalarResolution{value: value, scalarType: scalarType, comment: header.comment, valueRange: []int{start, end, end}}
+		return scalarResolution{
+			value:      value,
+			scalarType: scalarType,
+			comment:    header.comment,
+			valueRange: []int{start, end, end},
+		}
 	}
 	// find the indentation level to trim from start
 	trimIndent := scalar.Indent + header.indent
@@ -430,7 +440,12 @@ func resolveBlockScalar(composition *composeContext, scalar *cst.Token, onError 
 		value = append(value, '\n')
 	}
 	end := start + header.length + len(scalar.Source)
-	return scalarResolution{value: value, scalarType: scalarType, comment: header.comment, valueRange: []int{start, end, end}}
+	return scalarResolution{
+		value:      value,
+		scalarType: scalarType,
+		comment:    header.comment,
+		valueRange: []int{start, end, end},
+	}
 }
 
 func parseBlockScalarHeader(scalar *cst.Token, strict bool, onError onErrorFunc) *blockScalarHeader {
@@ -463,7 +478,12 @@ func parseBlockScalarHeader(scalar *cst.Token, strict bool, onError onErrorFunc)
 		}
 	}
 	if errorOffset != -1 {
-		onError(errorOffset, "UNEXPECTED_TOKEN", "Block scalar header includes extra characters: "+unitsToString(source), false)
+		onError(
+			errorOffset,
+			"UNEXPECTED_TOKEN",
+			"Block scalar header includes extra characters: "+unitsToString(source),
+			false,
+		)
 	}
 	hasSpace := false
 	comment := ""

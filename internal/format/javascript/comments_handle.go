@@ -249,9 +249,19 @@ func handleClassComments(context *commentContext) bool {
 
 // isPropertyLikeNode is upstream's createTypeCheckFunction of that name.
 func isPropertyLikeNode(node Node) bool {
-	return node.Is("ClassMethod", "ClassProperty", "PropertyDefinition", "TSAbstractPropertyDefinition",
-		"TSAbstractMethodDefinition", "TSDeclareMethod", "MethodDefinition", "ClassAccessorProperty", "AccessorProperty",
-		"TSAbstractAccessorProperty", "TSParameterProperty")
+	return node.Is(
+		"ClassMethod",
+		"ClassProperty",
+		"PropertyDefinition",
+		"TSAbstractPropertyDefinition",
+		"TSAbstractMethodDefinition",
+		"TSDeclareMethod",
+		"MethodDefinition",
+		"ClassAccessorProperty",
+		"AccessorProperty",
+		"TSAbstractAccessorProperty",
+		"TSParameterProperty",
+	)
 }
 
 // handleMethodNameComments is upstream's handleMethodNameComments.

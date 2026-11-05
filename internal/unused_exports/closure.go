@@ -74,7 +74,11 @@ type declarationRecord struct {
 // no pass count to tune. The pass count is reported anyway — as the longest chain the marking
 // followed — because that number is the one that says whether the graph is deep or the closure quit
 // early.
-func computeIslands(index *referenceIndex, inventory []declarationRecord, rootSymbols map[*ast.Symbol]bool) ([]Island, int) {
+func computeIslands(
+	index *referenceIndex,
+	inventory []declarationRecord,
+	rootSymbols map[*ast.Symbol]bool,
+) ([]Island, int) {
 	if len(inventory) == 0 {
 		return nil, 0
 	}

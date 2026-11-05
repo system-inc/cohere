@@ -248,7 +248,9 @@ func (set *DisjointSet) Find(item static_single_assignment.IdentifierId) (static
 // (line 43011), written once here so that every consumer does not re-derive the fallback. A value
 // that was never unified is its own representative, which is the answer that lets a caller key a map
 // on the result without first asking whether the value is a member.
-func (set *DisjointSet) RepresentativeOf(item static_single_assignment.IdentifierId) static_single_assignment.IdentifierId {
+func (set *DisjointSet) RepresentativeOf(
+	item static_single_assignment.IdentifierId,
+) static_single_assignment.IdentifierId {
 	if root, ok := set.Find(item); ok {
 		return root
 	}
@@ -416,9 +418,25 @@ func FindDisjointMutableValuesWithRanges(function *Function, ranges *mutation_al
 			case *DeclareContext:
 				declareIdentifier(value.LValue)
 			case *StoreLocal:
-				operands = appendStore(function, ranges, instruction, declareIdentifier, operands, value.LValue, value.Value)
+				operands = appendStore(
+					function,
+					ranges,
+					instruction,
+					declareIdentifier,
+					operands,
+					value.LValue,
+					value.Value,
+				)
 			case *StoreContext:
-				operands = appendStore(function, ranges, instruction, declareIdentifier, operands, value.LValue, value.Value)
+				operands = appendStore(
+					function,
+					ranges,
+					instruction,
+					declareIdentifier,
+					operands,
+					value.LValue,
+					value.Value,
+				)
 			case *Destructure:
 				// Upstream walks `eachPatternOperand` of the pattern, declaring each bound place and
 				// adding the ones whose range is wider than one. `Destructure` here carries both a
@@ -530,7 +548,10 @@ func appendMutableOperands(
 // answers zero, which groups every such value together -- acceptable because the only consumer is
 // the `declarations` map, whose entries are written from real places and read for phis of real
 // bindings.
-func declarationOf(function *Function, id static_single_assignment.IdentifierId) static_single_assignment.DeclarationId {
+func declarationOf(
+	function *Function,
+	id static_single_assignment.IdentifierId,
+) static_single_assignment.DeclarationId {
 	if function == nil {
 		return 0
 	}

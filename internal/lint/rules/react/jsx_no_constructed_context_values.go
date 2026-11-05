@@ -493,7 +493,11 @@ func jsxNoConstructedContextValuesConstructionOf(
 
 	case ast.KindConditionalExpression:
 		conditional := node.AsConditionalExpression()
-		if found := jsxNoConstructedContextValuesConstructionOf(ruleContext, conditional.WhenTrue, depth+1); found != nil {
+		if found := jsxNoConstructedContextValuesConstructionOf(
+			ruleContext,
+			conditional.WhenTrue,
+			depth+1,
+		); found != nil {
 			return found
 		}
 		return jsxNoConstructedContextValuesConstructionOf(ruleContext, conditional.WhenFalse, depth+1)
@@ -603,7 +607,9 @@ func jsxNoConstructedContextValuesFollowIdentifier(
 	// used by a provider inside an `if` block, which is a true positive upstream misses because the
 	// block is its own scope. cohere compares functions rather than scopes, so it stays silent on the
 	// first three and reports the fourth. The divergence is recorded in the rule's `.md`.
-	if jsxNoConstructedContextValuesNearestFunction(declaration) != jsxNoConstructedContextValuesNearestFunction(identifier) {
+	if jsxNoConstructedContextValuesNearestFunction(
+		declaration,
+	) != jsxNoConstructedContextValuesNearestFunction(identifier) {
 		return nil
 	}
 

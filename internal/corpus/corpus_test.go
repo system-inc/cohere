@@ -53,7 +53,9 @@ func writeConfig(test *testing.T, contents string) string {
 // A config fills only what the environment leaves unset, so a run can still point one corpus elsewhere.
 func TestEnvironmentFillsOnlyUnsetVariables(test *testing.T) {
 	test.Parallel()
-	configuration, readConfigurationError := ReadConfig(writeConfig(test, `{"ahra": "/checkouts/ahra", "structure": "/checkouts/structure"}`))
+	configuration, readConfigurationError := ReadConfig(
+		writeConfig(test, `{"ahra": "/checkouts/ahra", "structure": "/checkouts/structure"}`),
+	)
 	if readConfigurationError != nil {
 		test.Fatal(readConfigurationError)
 	}
@@ -67,7 +69,9 @@ func TestEnvironmentFillsOnlyUnsetVariables(test *testing.T) {
 // quietly uncovered.
 func TestReadConfigRefusesWhatWouldLoseACorpus(test *testing.T) {
 	test.Parallel()
-	if configuration, readConfigurationError := ReadConfig(filepath.Join(test.TempDir(), "absent.json")); readConfigurationError != nil || len(configuration) != 0 {
+	if configuration, readConfigurationError := ReadConfig(
+		filepath.Join(test.TempDir(), "absent.json"),
+	); readConfigurationError != nil || len(configuration) != 0 {
 		test.Errorf("a missing file read as %v, %v", configuration, readConfigurationError)
 	}
 	for name, contents := range map[string]string{
@@ -125,10 +129,22 @@ func TestSpelledSplitsOnlyCorpusSpellings(test *testing.T) {
 	} {
 		corpus, inside, spelled, spelledError := Spelled(spelling)
 		if spelledError != nil || corpus != want.corpus || inside != want.inside || spelled != want.spelled {
-			test.Errorf("Spelled(%q) = %v, %q, %v, %v; want %v, %q, %v", spelling, corpus, inside, spelled, spelledError, want.corpus, want.inside, want.spelled)
+			test.Errorf(
+				"Spelled(%q) = %v, %q, %v, %v; want %v, %q, %v",
+				spelling,
+				corpus,
+				inside,
+				spelled,
+				spelledError,
+				want.corpus,
+				want.inside,
+				want.spelled,
+			)
 		}
 	}
-	if _, _, spelled, spelledError := Spelled("arha:app/_theme/styles/theme.css"); !spelled || spelledError == nil || !strings.Contains(spelledError.Error(), "no corpus") {
+	if _, _, spelled, spelledError := Spelled(
+		"arha:app/_theme/styles/theme.css",
+	); !spelled || spelledError == nil || !strings.Contains(spelledError.Error(), "no corpus") {
 		test.Errorf("a misspelled corpus read as %v, %v; want it refused", spelled, spelledError)
 	}
 }
@@ -164,10 +180,14 @@ func TestResolveSkipsWhenUnsetAndFailsWhenWrong(test *testing.T) {
 		"missing from the corpus": {spelling: "ahra:app/styles/absent.css", value: root, want: "--- FAIL"},
 		"no corpus, set":          {spelling: "arha:app/styles/theme.css", value: root, want: "--- FAIL"},
 		"no corpus, unset":        {spelling: "arha:app/styles/theme.css", want: "--- FAIL"},
-		"an absolute path":        {spelling: filepath.Join(root, "app", "styles", "theme.css"), value: root, want: "--- FAIL"},
-		"not in the repository":   {spelling: "app/styles/theme.css", want: "--- FAIL"},
-		"in the repository":       {spelling: "internal/corpus/corpus.go", want: "--- PASS"},
-		"out of the repository":   {spelling: "..", want: "--- FAIL"},
+		"an absolute path": {
+			spelling: filepath.Join(root, "app", "styles", "theme.css"),
+			value:    root,
+			want:     "--- FAIL",
+		},
+		"not in the repository": {spelling: "app/styles/theme.css", want: "--- FAIL"},
+		"in the repository":     {spelling: "internal/corpus/corpus.go", want: "--- PASS"},
+		"out of the repository": {spelling: "..", want: "--- FAIL"},
 	} {
 		output := runProbe(test, "TestResolveSkipsWhenUnsetAndFailsWhenWrong", testCase.spelling, testCase.value)
 		if !strings.Contains(output, testCase.want) {
@@ -223,7 +243,11 @@ func TestLocateReadsTheVariableThenTheCorporaFile(test *testing.T) {
 		variables map[string]string
 		want      string
 	}{
-		"from the variable":     {spelling: "ahra:app/theme.css", variables: map[string]string{Ahra.Variable: "/elsewhere/ahra"}, want: "/elsewhere/ahra/app/theme.css"},
+		"from the variable": {
+			spelling:  "ahra:app/theme.css",
+			variables: map[string]string{Ahra.Variable: "/elsewhere/ahra"},
+			want:      "/elsewhere/ahra/app/theme.css",
+		},
 		"from the corpora file": {spelling: "ahra:app/theme.css", want: "/checkouts/ahra/app/theme.css"},
 		"the root":              {spelling: "ahra:", want: "/checkouts/ahra"},
 		"a path":                {spelling: "/checkouts/other/theme.css", want: "/checkouts/other/theme.css"},
@@ -233,7 +257,11 @@ func TestLocateReadsTheVariableThenTheCorporaFile(test *testing.T) {
 			test.Errorf("%s: located %q, %v; want %q", name, got, locateError, testCase.want)
 		}
 	}
-	if _, locateError := locate("connected:app/theme.css", lookupFrom(nil), fromConfiguration); locateError == nil || !strings.Contains(locateError.Error(), Connected.Variable) {
+	if _, locateError := locate(
+		"connected:app/theme.css",
+		lookupFrom(nil),
+		fromConfiguration,
+	); locateError == nil || !strings.Contains(locateError.Error(), Connected.Variable) {
 		test.Errorf("a corpus named nowhere located with %v; want an error naming %s", locateError, Connected.Variable)
 	}
 	if _, locateError := locate("arha:app/theme.css", lookupFrom(nil), fromConfiguration); locateError == nil {

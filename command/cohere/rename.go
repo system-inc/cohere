@@ -49,11 +49,23 @@ const renameVerbName = "rename"
 // nobody read, and those are not comparable.
 func runRenameVerb(arguments []string) error {
 	flags := flag.NewFlagSet(renameVerbName, flag.ContinueOnError)
-	configurationFileName := flags.String("tsconfig", "tsconfig.json", "the tsconfig that defines the program, relative to --directory")
-	directory := flags.String("directory", "", "the working directory paths resolve against (default: the process's own)")
+	configurationFileName := flags.String(
+		"tsconfig",
+		"tsconfig.json",
+		"the tsconfig that defines the program, relative to --directory",
+	)
+	directory := flags.String(
+		"directory",
+		"",
+		"the working directory paths resolve against (default: the process's own)",
+	)
 	singleThreaded := flags.Bool("single-threaded", false, "use one checker instead of several")
 	write := flags.Bool("write", false, "apply the rename; without it nothing is written")
-	dryRun := flags.Bool("dry-run", false, "print the plan and write nothing (the default; accepted so it can be stated explicitly)")
+	dryRun := flags.Bool(
+		"dry-run",
+		false,
+		"print the plan and write nothing (the default; accepted so it can be stated explicitly)",
+	)
 	// The flag set's own lines, its defaults and a refused flag, go through the stream its usage does, so they
 	// arrive in the order they were written.
 	flags.SetOutput(streams.Errors)
@@ -79,11 +91,16 @@ func runRenameVerb(arguments []string) error {
 	// Naming both is a contradiction the user should hear about rather than have silently resolved,
 	// exactly as `--fix` and `--no-fix` are handled in the main pipeline.
 	if *write && *dryRun {
-		return fmt.Errorf("--write and --dry-run contradict each other: --dry-run writes nothing, --write applies the rename")
+		return fmt.Errorf(
+			"--write and --dry-run contradict each other: --dry-run writes nothing, --write applies the rename",
+		)
 	}
 
 	if !rename.IsValidIdentifier(newName) {
-		return fmt.Errorf("%q cannot be written as an identifier, so the rename would produce source that does not parse", newName)
+		return fmt.Errorf(
+			"%q cannot be written as an identifier, so the rename would produce source that does not parse",
+			newName,
+		)
 	}
 
 	graph, err := program.Build(program.Options{

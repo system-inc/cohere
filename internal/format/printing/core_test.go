@@ -154,7 +154,12 @@ func toyPrinter() *Printer[*toyNode] {
 		}
 		return nil
 	}
-	printer.CanAttachComment = func(node *toyNode, _ []*toyNode) bool { return node.Kind == "Atom" || node.Kind == "List" }
+	printer.CanAttachComment = func(
+		node *toyNode,
+		_ []*toyNode,
+	) bool {
+		return node.Kind == "Atom" || node.Kind == "List"
+	}
 	printer.IsBlockComment = func(comment *toyNode) bool { return comment.Kind == "Block" }
 	// A handler, so the hooks are exercised and placement is observable: an end-of-line block comment
 	// inside a list dangles on that list. Without one, a mutation that misclassified end-of-line comments
@@ -176,14 +181,23 @@ func toyPrinter() *Printer[*toyNode] {
 		children := Map(path, func(*AstPath[*toyNode], int, any) doc.Doc { return print(nil, nil) }, "children")
 		switch node.Kind {
 		case "Program":
-			return doc.Concat{doc.Join(doc.Hardline, children), PrintDanglingComments(path, options, DanglingOptions[*toyNode]{}), doc.Hardline}
+			return doc.Concat{
+				doc.Join(doc.Hardline, children),
+				PrintDanglingComments(path, options, DanglingOptions[*toyNode]{}),
+				doc.Hardline,
+			}
 		case "List":
 			var label doc.Doc = doc.Text("")
 			if node.Label != nil {
 				label = doc.Concat{print("label", nil), doc.Text(" ")}
 			}
 			if len(children) == 0 {
-				return doc.Concat{doc.Text("("), label, PrintDanglingComments(path, options, DanglingOptions[*toyNode]{}), doc.Text(")")}
+				return doc.Concat{
+					doc.Text("("),
+					label,
+					PrintDanglingComments(path, options, DanglingOptions[*toyNode]{}),
+					doc.Text(")"),
+				}
 			}
 			return doc.NewGroup(doc.Concat{
 				doc.Text("("), label,
@@ -352,7 +366,11 @@ func TestCoreAgreesWithUpstream(test *testing.T) {
 			}
 			continue
 		}
-		options := &Options[*toyNode]{Printer: toyPrinter(), OriginalText: testCase.Text, EmbeddedLanguageFormatting: "off"}
+		options := &Options[*toyNode]{
+			Printer:                    toyPrinter(),
+			OriginalText:               testCase.Text,
+			EmbeddedLanguageFormatting: "off",
+		}
 		printed, printAstToDocError := PrintAstToDoc(testCase.Ast, testCase.Comments, options)
 		if printAstToDocError != nil {
 			test.Errorf("case %d: %v\ntext %q", index, printAstToDocError, testCase.Text)
@@ -365,19 +383,35 @@ func TestCoreAgreesWithUpstream(test *testing.T) {
 		if string(attachedGo) != string(attachedUpstream) {
 			attachMismatches++
 			if attachMismatches <= 3 {
-				test.Errorf("case %d attachment\ntext %q\nwant %s\ngot  %s", index, testCase.Text, attachedUpstream, attachedGo)
+				test.Errorf(
+					"case %d attachment\ntext %q\nwant %s\ngot  %s",
+					index,
+					testCase.Text,
+					attachedUpstream,
+					attachedGo,
+				)
 			}
 		}
 		if formatted != upstream[index].Formatted {
 			textMismatches++
 			if textMismatches <= 3 {
-				test.Errorf("case %d output\ntext %q\nwant %q\ngot  %q", index, testCase.Text, upstream[index].Formatted, formatted)
+				test.Errorf(
+					"case %d output\ntext %q\nwant %q\ngot  %q",
+					index,
+					testCase.Text,
+					upstream[index].Formatted,
+					formatted,
+				)
 			}
 		}
 	}
 	test.Logf("%d programs, %d comments, %d upstream refused, %d attachment mismatches, %d output mismatches",
 		count, commentsTotal, upstreamErrors, attachMismatches, textMismatches)
 	if upstreamErrors > count/10 {
-		test.Errorf("upstream refused %d of %d programs, so the comparison is thinner than it looks", upstreamErrors, count)
+		test.Errorf(
+			"upstream refused %d of %d programs, so the comparison is thinner than it looks",
+			upstreamErrors,
+			count,
+		)
 	}
 }

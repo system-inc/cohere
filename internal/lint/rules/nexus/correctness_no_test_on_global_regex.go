@@ -13,7 +13,10 @@ const correctnessNoTestOnGlobalRegexId = "globalRegexTest"
 
 // correctnessNoTestOnGlobalRegexText is the rule's message, whose wording lives in
 // `policy/messages/correctness-no-test-on-global-regex.json`.
-var correctnessNoTestOnGlobalRegexText = policy.MessageOf("nexus/correctness-no-test-on-global-regex", correctnessNoTestOnGlobalRegexId)
+var correctnessNoTestOnGlobalRegexText = policy.MessageOf(
+	"nexus/correctness-no-test-on-global-regex",
+	correctnessNoTestOnGlobalRegexId,
+)
 
 func correctnessNoTestOnGlobalRegexMessage() rule.Message {
 	return rule.Message{
@@ -142,7 +145,10 @@ func correctnessNoTestOnGlobalRegexIsRegExpMember(ruleContext rule.Context, symb
 	}
 	for _, declaration := range symbol.Declarations {
 		owner := declaration.Parent
-		if owner == nil || owner.Kind != ast.KindInterfaceDeclaration || owner.Name() == nil || owner.Name().Text() != "RegExp" {
+		if owner == nil ||
+			owner.Kind != ast.KindInterfaceDeclaration ||
+			owner.Name() == nil ||
+			owner.Name().Text() != "RegExp" {
 			return false
 		}
 		file := ast.GetSourceFileOfNode(declaration)
@@ -184,7 +190,8 @@ func correctnessNoTestOnGlobalRegexRegex(ruleContext rule.Context, receiver *ast
 		}
 		initializer = declaration.AsVariableDeclaration().Initializer
 	case ast.KindPropertyDeclaration:
-		if receiver.Kind != ast.KindPropertyAccessExpression || !ast.HasSyntacticModifier(declaration, ast.ModifierFlagsReadonly) {
+		if receiver.Kind != ast.KindPropertyAccessExpression ||
+			!ast.HasSyntacticModifier(declaration, ast.ModifierFlagsReadonly) {
 			return nil, nil
 		}
 		initializer = declaration.AsPropertyDeclaration().Initializer
@@ -213,7 +220,10 @@ func correctnessNoTestOnGlobalRegexFlags(ruleContext rule.Context, creation *ast
 		newExpression := creation.AsNewExpression()
 		constructor := ast.SkipParentheses(newExpression.Expression)
 		if constructor.Kind != ast.KindIdentifier || constructor.Text() != "RegExp" ||
-			!rule.IsSymbolFromDefaultLibrary(ruleContext.Program, ruleContext.TypeChecker.GetSymbolAtLocation(constructor)) {
+			!rule.IsSymbolFromDefaultLibrary(
+				ruleContext.Program,
+				ruleContext.TypeChecker.GetSymbolAtLocation(constructor),
+			) {
 			return "", false
 		}
 		if newExpression.Arguments == nil || len(newExpression.Arguments.Nodes) != 2 {
@@ -317,7 +327,9 @@ func correctnessNoTestOnGlobalRegexIsPositioned(ruleContext rule.Context, symbol
 					name = receiver.AsPropertyAccessExpression().Name()
 				}
 				value := ast.SkipParentheses(binary.Right)
-				isZero := binary.OperatorToken.Kind == ast.KindEqualsToken && value.Kind == ast.KindNumericLiteral && value.Text() == "0"
+				isZero := binary.OperatorToken.Kind == ast.KindEqualsToken &&
+					value.Kind == ast.KindNumericLiteral &&
+					value.Text() == "0"
 				if name != nil && !isZero && ruleContext.TypeChecker.GetSymbolAtLocation(name) == symbol {
 					positioned = true
 					return true

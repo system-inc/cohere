@@ -40,7 +40,9 @@ func TestOfRefusesADirectoryWithoutTheFile(test *testing.T) {
 	if directory, toolDirectoryOfError := Of(filepath.Join(test.TempDir(), "caller.go")); toolDirectoryOfError == nil {
 		test.Errorf("a directory without the caller's file was accepted: %s", directory)
 	}
-	if directory, toolDirectoryOfError := Of("github.com/system-inc/cohere/no/such/package/caller.go"); toolDirectoryOfError == nil {
+	if directory, toolDirectoryOfError := Of(
+		"github.com/system-inc/cohere/no/such/package/caller.go",
+	); toolDirectoryOfError == nil {
 		test.Errorf("an import path that resolves nowhere was accepted: %s", directory)
 	}
 }

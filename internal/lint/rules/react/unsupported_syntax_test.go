@@ -79,7 +79,10 @@ func TestUnsupportedSyntaxStaysSilentOnUpstreamCorpus(test *testing.T) {
 	if !strings.Contains(string(sourceBytes), "class Bar {") {
 		test.Fatal("the vendored kitchensink fixture no longer declares an inline class, so this case tests nothing")
 	}
-	rule_testing.ExpectClean(test, rule_testing.RunTyped(test, UnsupportedSyntax, unsupportedSyntaxFile, string(sourceBytes)))
+	rule_testing.ExpectClean(
+		test,
+		rule_testing.RunTyped(test, UnsupportedSyntax, unsupportedSyntaxFile, string(sourceBytes)),
+	)
 }
 
 // TestUnsupportedSyntaxFires covers the reporting cases upstream does not ship.

@@ -32,14 +32,25 @@ func ReadProjectConfig(configurationFileName string) (ProjectConfig, error) {
 	if !fileSystem.FileExists(tspath.RootedFilePath(configurationFileName)) {
 		return ProjectConfig{}, fmt.Errorf("no tsconfig at %s", configurationFileName)
 	}
-	configuration, configurationErrors := tsoptions.GetParsedCommandLineOfConfigFile(tspath.RootedFilePath(configurationFileName), &core.CompilerOptions{}, nil, fileSystem, nil)
+	configuration, configurationErrors := tsoptions.GetParsedCommandLineOfConfigFile(
+		tspath.RootedFilePath(configurationFileName),
+		&core.CompilerOptions{},
+		nil,
+		fileSystem,
+		nil,
+	)
 	if len(configurationErrors) > 0 {
-		return ProjectConfig{}, fmt.Errorf("reading %s: %w", configurationFileName, joinDiagnostics(configurationErrors))
+		return ProjectConfig{}, fmt.Errorf(
+			"reading %s: %w",
+			configurationFileName,
+			joinDiagnostics(configurationErrors),
+		)
 	}
 	if configuration == nil {
 		return ProjectConfig{}, fmt.Errorf("reading %s: the config parsed to nothing", configurationFileName)
 	}
-	if diagnostics := configuration.GetConfigFileParsingDiagnostics(); len(diagnostics) > 0 && !onlyOptionValueDiagnostics(diagnostics) {
+	if diagnostics := configuration.GetConfigFileParsingDiagnostics(); len(diagnostics) > 0 &&
+		!onlyOptionValueDiagnostics(diagnostics) {
 		return ProjectConfig{}, fmt.Errorf("reading %s: %w", configurationFileName, joinDiagnostics(diagnostics))
 	}
 	read := ProjectConfig{}

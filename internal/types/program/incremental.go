@@ -87,7 +87,10 @@ func (session *IncrementalSession) DiagnosticParts(ctx context.Context) TypeDiag
 	if len(syntactic) > 0 {
 		return TypeDiagnosticParts{Syntactic: syntactic}
 	}
-	return TypeDiagnosticParts{Bind: session.graph.Program.GetBindDiagnostics(ctx, nil), Semantic: session.program.GetSemanticDiagnostics(ctx, nil)}
+	return TypeDiagnosticParts{
+		Bind:     session.graph.Program.GetBindDiagnostics(ctx, nil),
+		Semantic: session.program.GetSemanticDiagnostics(ctx, nil),
+	}
 }
 
 // Write persists what the next run needs to tell changed files from unchanged ones.

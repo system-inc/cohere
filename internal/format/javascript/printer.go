@@ -50,14 +50,25 @@ func Format(fileName string, text string, options formatoptions.Options, textToD
 // FormatParsed is Format with a tree of the text someone already parsed, which the formatter takes rather
 // than parsing the file again where it is the tree a parse here would build (estree.ParseTypeScriptFrom).
 // parsed may be nil.
-func FormatParsed(fileName string, text string, parsed *ast.SourceFile, options formatoptions.Options, textToDoc printing.TextToDoc) (string, error) {
+func FormatParsed(
+	fileName string,
+	text string,
+	parsed *ast.SourceFile,
+	options formatoptions.Options,
+	textToDoc printing.TextToDoc,
+) (string, error) {
 	return format(fileName, text, parsed, options, "typescript", textToDoc)
 }
 
 // FormatJavaScript is Prettier's format for a .js, .mjs, .cjs or .jsx file, which upstream parses with
 // babel. The parser name matters to the printer only in print/key.js: under babel a numeric string
 // key unquotes (`{ "1": a }` prints `{ 1: a }`), which TypeScript forbids.
-func FormatJavaScript(fileName string, text string, options formatoptions.Options, textToDoc printing.TextToDoc) (string, error) {
+func FormatJavaScript(
+	fileName string,
+	text string,
+	options formatoptions.Options,
+	textToDoc printing.TextToDoc,
+) (string, error) {
 	return format(fileName, text, nil, options, "babel", textToDoc)
 }
 
@@ -80,7 +91,14 @@ func JSONParser(fileName string) string {
 
 // format parses, prints and lays out one file. Byte order marks and line endings, main/core.js's part,
 // are normalized by the caller, native.Formatter, once for every printer.
-func format(fileName string, text string, parsed *ast.SourceFile, options formatoptions.Options, parser string, textToDoc printing.TextToDoc) (string, error) {
+func format(
+	fileName string,
+	text string,
+	parsed *ast.SourceFile,
+	options formatoptions.Options,
+	parser string,
+	textToDoc printing.TextToDoc,
+) (string, error) {
 	// The tree lives until the doc is laid out, and not a moment longer, so its nodes come from an arena
 	// released once the text is printed (#fyw36kf).
 	nodes := estree.AcquireArena()
@@ -92,8 +110,11 @@ func format(fileName string, text string, parsed *ast.SourceFile, options format
 	if printToDocError != nil {
 		return "", printToDocError
 	}
-	return doc.Print(document, doc.Options{PrintWidth: options.PrintWidth, TabWidth: options.TabWidth, UseTabs: options.UseTabs,
-		ExpectedLength: len(text)}), nil
+	return doc.Print(
+		document,
+		doc.Options{PrintWidth: options.PrintWidth, TabWidth: options.TabWidth, UseTabs: options.UseTabs,
+			ExpectedLength: len(text)},
+	), nil
 }
 
 // PrintToDoc is upstream's textToDoc (src/main/multiparser.js) for a JavaScript-family parser: the doc
@@ -116,8 +137,17 @@ func PrintToDoc(fileName string, text string, options formatoptions.Options, par
 // that passes them releases them only once the doc is laid out, since the doc is printed from the tree and
 // is made of those parts. parsed is a tree of the text from the caller, or nil; the typescript parser takes
 // it only where it is the tree it would build.
-func printToDoc(fileName string, text string, parsed *ast.SourceFile, options formatoptions.Options, parser string, parentParser string,
-	textToDoc printing.TextToDoc, nodes *estree.Arena, docs *docMemory) (document doc.Doc, err error) {
+func printToDoc(
+	fileName string,
+	text string,
+	parsed *ast.SourceFile,
+	options formatoptions.Options,
+	parser string,
+	parentParser string,
+	textToDoc printing.TextToDoc,
+	nodes *estree.Arena,
+	docs *docMemory,
+) (document doc.Doc, err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			document, err = nil, fmt.Errorf("formatting %s: %v", fileName, recovered)
@@ -147,9 +177,16 @@ func printToDoc(fileName string, text string, parsed *ast.SourceFile, options fo
 		return nil, err
 	}
 	printOptions := &Options{
-		Printer:                    printer,
-		OriginalText:               text,
-		Settings:                   &settings{Options: options, FilePath: fileName, Parser: parser, ParentParser: parentParser, docs: docs, strippedText: strippedText},
+		Printer:      printer,
+		OriginalText: text,
+		Settings: &settings{
+			Options:      options,
+			FilePath:     fileName,
+			Parser:       parser,
+			ParentParser: parentParser,
+			docs:         docs,
+			strippedText: strippedText,
+		},
 		EmbeddedLanguageFormatting: "auto",
 		TextToDoc:                  textToDoc,
 		NodeCount:                  nodes.Len(),

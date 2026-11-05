@@ -553,10 +553,15 @@ func TestAnInterpolationIsLexedAsCode(test *testing.T) {
 			index := Build(source)
 
 			if !index.Suppresses("nexus/consistency-no-enum", offsetOfLine(source, 3)) {
-				test.Fatal("the control failed: the block disable does not cover its own body, so nothing below proves anything")
+				test.Fatal(
+					"the control failed: the block disable does not cover its own body, so nothing below proves anything",
+				)
 			}
 			if index.Suppresses("nexus/consistency-no-enum", offsetOfLine(source, 5)) {
-				test.Errorf("the block enable was lost after the interpolation, so the disable ran past it: %+v", index.Directives())
+				test.Errorf(
+					"the block enable was lost after the interpolation, so the disable ran past it: %+v",
+					index.Directives(),
+				)
 			}
 			if !index.Suppresses("nexus/performance-no-independent-await-in-loop", offsetOfLine(source, 7)) {
 				test.Errorf("the next-line disable after the interpolation was lost: %+v", index.Directives())
@@ -588,6 +593,9 @@ func TestAnInterpolationClosesOnItsOwnBrace(test *testing.T) {
 
 	index := Build(source)
 	if !index.Suppresses("nexus/consistency-no-enum", offsetOfLine(source, 1)) {
-		test.Fatalf("a comment after an object literal inside an interpolation was read as template text: %+v", index.Directives())
+		test.Fatalf(
+			"a comment after an object literal inside an interpolation was read as template text: %+v",
+			index.Directives(),
+		)
 	}
 }

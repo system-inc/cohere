@@ -69,7 +69,12 @@ func securityNoInterpolatedShellCommandRun(test *testing.T, sourceText string) r
 	}, securityNoInterpolatedShellCommandFile)
 }
 
-func securityNoInterpolatedShellCommandExpectSpans(test *testing.T, result rule_testing.Result, sourceText string, wantSpans []string) {
+func securityNoInterpolatedShellCommandExpectSpans(
+	test *testing.T,
+	result rule_testing.Result,
+	sourceText string,
+	wantSpans []string,
+) {
 	test.Helper()
 	wantIds := make([]string, 0, len(wantSpans))
 	for range wantSpans {
@@ -85,7 +90,11 @@ func securityNoInterpolatedShellCommandExpectSpans(test *testing.T, result rule_
 			test.Fatalf("message is %q", diagnostic.Message.Description)
 		}
 		if len(diagnostic.Fixes) != 0 || len(diagnostic.Suggestions) != 0 {
-			test.Fatalf("expected no fix and no suggestion, got %d and %d", len(diagnostic.Fixes), len(diagnostic.Suggestions))
+			test.Fatalf(
+				"expected no fix and no suggestion, got %d and %d",
+				len(diagnostic.Fixes),
+				len(diagnostic.Suggestions),
+			)
 		}
 	}
 }
@@ -134,9 +143,16 @@ func securityNoInterpolatedShellCommandContactsApi(runLine string) string {
 func TestSecurityNoInterpolatedShellCommandFiresOnContactsApi(test *testing.T) {
 	test.Parallel()
 
-	sourceText := securityNoInterpolatedShellCommandContactsApi("const result = NodeChildProcess.execSync(`sqlite3 \"${databasePath}\" \"${query}\"`, {")
+	sourceText := securityNoInterpolatedShellCommandContactsApi(
+		"const result = NodeChildProcess.execSync(`sqlite3 \"${databasePath}\" \"${query}\"`, {",
+	)
 	result := securityNoInterpolatedShellCommandRun(test, sourceText)
-	securityNoInterpolatedShellCommandExpectSpans(test, result, sourceText, []string{"`sqlite3 \"${databasePath}\" \"${query}\"`"})
+	securityNoInterpolatedShellCommandExpectSpans(
+		test,
+		result,
+		sourceText,
+		[]string{"`sqlite3 \"${databasePath}\" \"${query}\"`"},
+	)
 }
 
 // The same search after the fix: `sqlite3` gets the path and the query as its own arguments, no
@@ -144,7 +160,9 @@ func TestSecurityNoInterpolatedShellCommandFiresOnContactsApi(test *testing.T) {
 func TestSecurityNoInterpolatedShellCommandStaysSilentOnFixedContactsApi(test *testing.T) {
 	test.Parallel()
 
-	result := securityNoInterpolatedShellCommandRun(test, securityNoInterpolatedShellCommandContactsApi("const result = NodeChildProcess.execFileSync('sqlite3', [databasePath, query], {"))
+	result := securityNoInterpolatedShellCommandRun(test, securityNoInterpolatedShellCommandContactsApi(
+		"const result = NodeChildProcess.execFileSync('sqlite3', [databasePath, query], {",
+	))
 	rule_testing.ExpectClean(test, result)
 }
 
@@ -212,17 +230,23 @@ func TestSecurityNoInterpolatedShellCommandFires(test *testing.T) {
 		}, []string{"`python3 -c '${pythonScript.replace(/'/g, \"'\\\\''\")}'`"}},
 		// `ConversationsBackup.ts:78`: JSON quoting escapes `\"` but leaves `$` and backticks live
 		// inside the double quotes it adds.
-		{"a JSON-quoted path", []string{
-			"import * as NodeChildProcess from 'node:child_process';",
-			"const compressionLevel = '-19';",
-			"export function archive(destinationPath: string) {",
-			"    NodeChildProcess.execSync(",
-			"        `tar -cf - . ` +",
-			"            `| zstd ${compressionLevel} -q -o ${JSON.stringify(destinationPath)}`,",
-			"        { shell: '/bin/zsh' },",
-			"    );",
-			"}",
-		}, []string{"`tar -cf - . ` +\n            `| zstd ${compressionLevel} -q -o ${JSON.stringify(destinationPath)}`"}},
+		{
+			"a JSON-quoted path",
+			[]string{
+				"import * as NodeChildProcess from 'node:child_process';",
+				"const compressionLevel = '-19';",
+				"export function archive(destinationPath: string) {",
+				"    NodeChildProcess.execSync(",
+				"        `tar -cf - . ` +",
+				"            `| zstd ${compressionLevel} -q -o ${JSON.stringify(destinationPath)}`,",
+				"        { shell: '/bin/zsh' },",
+				"    );",
+				"}",
+			},
+			[]string{
+				"`tar -cf - . ` +\n            `| zstd ${compressionLevel} -q -o ${JSON.stringify(destinationPath)}`",
+			},
+		},
 		// `PlanetScaleApi.ts:380`: the SQL sits in a quoted heredoc and is safe there, but the
 		// database and branch are spliced unquoted into the opener line.
 		{"values on a heredoc's opener line", []string{
@@ -254,19 +278,31 @@ func TestSecurityNoInterpolatedShellCommandFires(test *testing.T) {
 		}, []string{"`cat <<-'EOSQL' > /tmp/query.sql\\n${sql}\\n\\tEOSQL\\nmv /tmp/query.sql ${outputPath}`"}},
 		// The closing line is a `const` holding the delimiter, read as its literal text, so the
 		// value after it is outside the body.
-		{"a value after a heredoc closed by a literal constant", []string{
-			"import * as NodeChildProcess from 'node:child_process';",
-			"const delimiter = 'EOSQL';",
-			"export function query(sql: string, outputPath: string) {",
-			"    return NodeChildProcess.execSync(`cat <<'${delimiter}' > /tmp/query.sql\\n${sql}\\n${delimiter}\\nmv /tmp/query.sql ${outputPath}`);",
-			"}",
-		}, []string{"`cat <<'${delimiter}' > /tmp/query.sql\\n${sql}\\n${delimiter}\\nmv /tmp/query.sql ${outputPath}`"}},
-		{"a value after a heredoc closed by a literal-typed parameter", []string{
-			"import * as NodeChildProcess from 'node:child_process';",
-			"export function query(delimiter: 'EOSQL', sql: string, outputPath: string) {",
-			"    return NodeChildProcess.execSync(`cat <<'${delimiter}' > /tmp/query.sql\\n${sql}\\n${delimiter}\\nmv /tmp/query.sql ${outputPath}`);",
-			"}",
-		}, []string{"`cat <<'${delimiter}' > /tmp/query.sql\\n${sql}\\n${delimiter}\\nmv /tmp/query.sql ${outputPath}`"}},
+		{
+			"a value after a heredoc closed by a literal constant",
+			[]string{
+				"import * as NodeChildProcess from 'node:child_process';",
+				"const delimiter = 'EOSQL';",
+				"export function query(sql: string, outputPath: string) {",
+				"    return NodeChildProcess.execSync(`cat <<'${delimiter}' > /tmp/query.sql\\n${sql}\\n${delimiter}\\nmv /tmp/query.sql ${outputPath}`);",
+				"}",
+			},
+			[]string{
+				"`cat <<'${delimiter}' > /tmp/query.sql\\n${sql}\\n${delimiter}\\nmv /tmp/query.sql ${outputPath}`",
+			},
+		},
+		{
+			"a value after a heredoc closed by a literal-typed parameter",
+			[]string{
+				"import * as NodeChildProcess from 'node:child_process';",
+				"export function query(delimiter: 'EOSQL', sql: string, outputPath: string) {",
+				"    return NodeChildProcess.execSync(`cat <<'${delimiter}' > /tmp/query.sql\\n${sql}\\n${delimiter}\\nmv /tmp/query.sql ${outputPath}`);",
+				"}",
+			},
+			[]string{
+				"`cat <<'${delimiter}' > /tmp/query.sql\\n${sql}\\n${delimiter}\\nmv /tmp/query.sql ${outputPath}`",
+			},
+		},
 		// A here-string's word is parsed by the shell like any other.
 		{"a value in a here-string", []string{
 			"import * as NodeChildProcess from 'node:child_process';",
@@ -530,7 +566,10 @@ func TestSecurityNoInterpolatedShellCommandStaysSilent(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := securityNoInterpolatedShellCommandRun(test, securityNoInterpolatedShellCommandSource(testCase.lines...))
+			result := securityNoInterpolatedShellCommandRun(
+				test,
+				securityNoInterpolatedShellCommandSource(testCase.lines...),
+			)
 			rule_testing.ExpectClean(test, result)
 		})
 	}
@@ -553,7 +592,12 @@ func TestSecurityNoInterpolatedShellCommandResolvesTheOlderModuleLayout(test *te
 		securityNoInterpolatedShellCommandFile:     sourceText,
 		securityNoInterpolatedShellCommandNodeFile: securityNoInterpolatedShellCommandOlderNodeTypes,
 	}, securityNoInterpolatedShellCommandFile)
-	securityNoInterpolatedShellCommandExpectSpans(test, result, sourceText, []string{"`open ${url}`", "`open -g ${url}`"})
+	securityNoInterpolatedShellCommandExpectSpans(
+		test,
+		result,
+		sourceText,
+		[]string{"`open ${url}`", "`open -g ${url}`"},
+	)
 }
 
 // The rule declares the checker and declines a file without one, rather than matching `exec` by

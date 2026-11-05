@@ -64,42 +64,99 @@ type parseFixture struct {
 var parseFixtures = []parseFixture{
 	// Executable definitions.
 	{name: "shorthand query", text: "{ a }"},
-	{name: "operations of every type", text: "query { a } mutation M { b } subscription S @live { c } query Q($a: Int, $b: [String!]! = [\"x\"] @d) @e { f }"},
-	{name: "fields", text: "{ alias: field(a: 1, b: \"two\", c: THREE, d: null, e: true, f: false, g: 1.5e3, h: $v, i: [1, 2], j: {k: 1, l: {m: 2}}) @include(if: $x) @skip(if: false) { nested { deeper } } }"},
-	{name: "fragments", text: "{ ...Spread @defer ... on Type { x } ... @include(if: true) { y } ... { z } }\nfragment Spread on Type @dir { a }"},
-	{name: "fragment arguments", text: "fragment F($a: Int = 1, $b: String @deprecated) on T @dir { f(a: $a) ...G(x: $a, y: {z: [$b]}) }\nquery { ...F(a: 2, b: \"x\") @skip(if: false) ...F }"},
-	{name: "descriptions on executable definitions and variables", text: "\"operation\" query Q(\"variable\" $a: Int, \"\"\"block variable\"\"\" $b: Int) { a }\n\"\"\"fragment\"\"\" fragment F on T { a }"},
-	{name: "values", text: "{ a(l: [], o: {}, n: {a: [{b: 1}], c: {}}, m: [[1], []], neg: -0, f1: 0.0, f2: 1E-3, f3: -12.5e+10, i: 1234567890123456789012) }"},
+	{
+		name: "operations of every type",
+		text: "query { a } mutation M { b } subscription S @live { c } query Q($a: Int, $b: [String!]! = [\"x\"] @d) @e { f }",
+	},
+	{
+		name: "fields",
+		text: "{ alias: field(a: 1, b: \"two\", c: THREE, d: null, e: true, f: false, g: 1.5e3, h: $v, i: [1, 2], j: {k: 1, l: {m: 2}}) @include(if: $x) @skip(if: false) { nested { deeper } } }",
+	},
+	{
+		name: "fragments",
+		text: "{ ...Spread @defer ... on Type { x } ... @include(if: true) { y } ... { z } }\nfragment Spread on Type @dir { a }",
+	},
+	{
+		name: "fragment arguments",
+		text: "fragment F($a: Int = 1, $b: String @deprecated) on T @dir { f(a: $a) ...G(x: $a, y: {z: [$b]}) }\nquery { ...F(a: 2, b: \"x\") @skip(if: false) ...F }",
+	},
+	{
+		name: "descriptions on executable definitions and variables",
+		text: "\"operation\" query Q(\"variable\" $a: Int, \"\"\"block variable\"\"\" $b: Int) { a }\n\"\"\"fragment\"\"\" fragment F on T { a }",
+	},
+	{
+		name: "values",
+		text: "{ a(l: [], o: {}, n: {a: [{b: 1}], c: {}}, m: [[1], []], neg: -0, f1: 0.0, f2: 1E-3, f3: -12.5e+10, i: 1234567890123456789012) }",
+	},
 	{name: "types", text: "query($a: [[Int!]!]!, $b: T, $c: [T]) { a }"},
 	{name: "commas and whitespace are ignored", text: ",,,{\ta,,b\t,c}\t,"},
 
 	// Type system definitions.
-	{name: "schema definition", text: "\"schema description\" schema @a { query: Query mutation: Mutation subscription: Subscription }"},
+	{
+		name: "schema definition",
+		text: "\"schema description\" schema @a { query: Query mutation: Mutation subscription: Subscription }",
+	},
 	{name: "scalar", text: "\"\"\"scalar\"\"\" scalar Date @specifiedBy(url: \"https://example.com\")"},
-	{name: "object type", text: "type Query implements A & B @key(fields: \"id\") { \"field\" field(\"argument\" a: Int = 1 @d, b: [String!]!): String! @deprecated(reason: \"no\") other: Int }\ntype Empty\ntype Leading implements & A & B { a: Int }"},
+	{
+		name: "object type",
+		text: "type Query implements A & B @key(fields: \"id\") { \"field\" field(\"argument\" a: Int = 1 @d, b: [String!]!): String! @deprecated(reason: \"no\") other: Int }\ntype Empty\ntype Leading implements & A & B { a: Int }",
+	},
 	{name: "interface implementing interfaces", text: "interface I implements J & K @d { a: Int }\ninterface Bare"},
 	{name: "union", text: "union U = | A | B\nunion V @d = A\nunion Lone"},
 	{name: "enum", text: "enum E { \"value\" A @h B C_D }\nenum Bare"},
 	{name: "input", text: "input In { a: Int = 1 b: In2! @f c: [In] = [{a: 1}] }"},
-	{name: "directive definition", text: "\"\"\"directive\"\"\" directive @dir(a: Int = 1, b: String) repeatable on | FIELD | FRAGMENT_SPREAD | INLINE_FRAGMENT\ndirective @plain on QUERY\ndirective @all @meta on FRAGMENT_VARIABLE_DEFINITION | VARIABLE_DEFINITION | SCHEMA | SCALAR | OBJECT | FIELD_DEFINITION | ARGUMENT_DEFINITION | INTERFACE | UNION | ENUM | ENUM_VALUE | INPUT_OBJECT | INPUT_FIELD_DEFINITION | DIRECTIVE_DEFINITION | MUTATION | SUBSCRIPTION | FRAGMENT_DEFINITION"},
-	{name: "every extension", text: "extend schema @b\nextend schema { query: Q }\nextend scalar Date @c\nextend type Query implements C { added: Int }\nextend type Query @e\nextend type Query implements D\nextend interface I @g { b: Int }\nextend interface I implements J\nextend union U = C\nextend union U @u\nextend enum E { C }\nextend enum E @x\nextend input In { c: String }\nextend input In @y\nextend directive @dir @i"},
-	{name: "keywords as names", text: "type type { query: query fragment(on: on): extend schema: scalar }\n{ on: on query mutation }"},
+	{
+		name: "directive definition",
+		text: "\"\"\"directive\"\"\" directive @dir(a: Int = 1, b: String) repeatable on | FIELD | FRAGMENT_SPREAD | INLINE_FRAGMENT\ndirective @plain on QUERY\ndirective @all @meta on FRAGMENT_VARIABLE_DEFINITION | VARIABLE_DEFINITION | SCHEMA | SCALAR | OBJECT | FIELD_DEFINITION | ARGUMENT_DEFINITION | INTERFACE | UNION | ENUM | ENUM_VALUE | INPUT_OBJECT | INPUT_FIELD_DEFINITION | DIRECTIVE_DEFINITION | MUTATION | SUBSCRIPTION | FRAGMENT_DEFINITION",
+	},
+	{
+		name: "every extension",
+		text: "extend schema @b\nextend schema { query: Q }\nextend scalar Date @c\nextend type Query implements C { added: Int }\nextend type Query @e\nextend type Query implements D\nextend interface I @g { b: Int }\nextend interface I implements J\nextend union U = C\nextend union U @u\nextend enum E { C }\nextend enum E @x\nextend input In { c: String }\nextend input In @y\nextend directive @dir @i",
+	},
+	{
+		name: "keywords as names",
+		text: "type type { query: query fragment(on: on): extend schema: scalar }\n{ on: on query mutation }",
+	},
 
 	// Strings.
 	{name: "string escapes", text: `{ a(s: "quote\" backslash\\ slash\/ b\b f\f n\n r\r t\t") }`},
-	{name: "unicode escapes", text: `{ a(fixed: "\u00e9\u0041\uFFFF", variable: "\u{1F600}\u{0}\u{10FFFF}\u{000041}", pair: "\uD83D\uDE00", lower: "\ud83d\ude00", mixed: "x\u{1f600}y") }`},
-	{name: "literal non-ASCII", text: "\"descripción ✓ 😀 日本語\" type T { \"emoji 😀 then more\" a(x: String = \"😀😀\"): Int } # comment 😀 after\n{ a(b: \"é\") }"},
-	{name: "block string indentation", text: "type T {\n  \"\"\"\n    first\n      indented\n\n    last\n  \"\"\"\n  a: Int\n}"},
+	{
+		name: "unicode escapes",
+		text: `{ a(fixed: "\u00e9\u0041\uFFFF", variable: "\u{1F600}\u{0}\u{10FFFF}\u{000041}", pair: "\uD83D\uDE00", lower: "\ud83d\ude00", mixed: "x\u{1f600}y") }`,
+	},
+	{
+		name: "literal non-ASCII",
+		text: "\"descripción ✓ 😀 日本語\" type T { \"emoji 😀 then more\" a(x: String = \"😀😀\"): Int } # comment 😀 after\n{ a(b: \"é\") }",
+	},
+	{
+		name: "block string indentation",
+		text: "type T {\n  \"\"\"\n    first\n      indented\n\n    last\n  \"\"\"\n  a: Int\n}",
+	},
 	{name: "block string first line kept", text: "{ a(s: \"\"\"  first line\n      second\n    third\n  \"\"\") }"},
-	{name: "block string escaped triple quote", text: "{ a(s: \"\"\"has \\\"\"\" triple and \\\"\"\"\"\"\") b(s: \"\"\"\\\"\"\"\"\"\") }"},
-	{name: "block string blank lines and tabs", text: "{ a(s: \"\"\"\n\n\t\tx\n\t  \n\t\ty\n\n   \n\"\"\") b(s: \"\"\"   \"\"\") c(s: \"\"\"\"\"\") d(s: \"\"\"\n\"\"\") }"},
-	{name: "block string with CRLF and CR", text: "{ a(s: \"\"\"\r\n  one\r\n  two\r  three\r\n\"\"\") }\r\n# comment\r\n{ b }"},
+	{
+		name: "block string escaped triple quote",
+		text: "{ a(s: \"\"\"has \\\"\"\" triple and \\\"\"\"\"\"\") b(s: \"\"\"\\\"\"\"\"\"\") }",
+	},
+	{
+		name: "block string blank lines and tabs",
+		text: "{ a(s: \"\"\"\n\n\t\tx\n\t  \n\t\ty\n\n   \n\"\"\") b(s: \"\"\"   \"\"\") c(s: \"\"\"\"\"\") d(s: \"\"\"\n\"\"\") }",
+	},
+	{
+		name: "block string with CRLF and CR",
+		text: "{ a(s: \"\"\"\r\n  one\r\n  two\r  three\r\n\"\"\") }\r\n# comment\r\n{ b }",
+	},
 	{name: "block string backslashes stay raw", text: "{ a(s: \"\"\"\\n \\u0041 \\\\ \\\"\"\" \"\"\") }"},
 	{name: "block string with non-ASCII", text: "\"\"\"\n  😀 first\n    é second\n\"\"\" scalar S"},
 
 	// Comments.
-	{name: "comments everywhere", text: "# leading\nquery # after keyword\nQ # after name\n( # in variables\n$a # after variable\n: # after colon\nInt # after type\n) # after variables\n{ # in selection\na # after field\n( # in arguments\nb: # after argument name\n1 # after value\n) # after arguments\n} # trailing\n# last"},
-	{name: "comments in type system", text: "# schema\ntype T # name\n{ # open\n  # before field\n  a: Int # after field\n  # before close\n} # after\nenum E { # e\n A # a\n}"},
+	{
+		name: "comments everywhere",
+		text: "# leading\nquery # after keyword\nQ # after name\n( # in variables\n$a # after variable\n: # after colon\nInt # after type\n) # after variables\n{ # in selection\na # after field\n( # in arguments\nb: # after argument name\n1 # after value\n) # after arguments\n} # trailing\n# last",
+	},
+	{
+		name: "comments in type system",
+		text: "# schema\ntype T # name\n{ # open\n  # before field\n  a: Int # after field\n  # before close\n} # after\nenum E { # e\n A # a\n}",
+	},
 	{name: "comment at end of file without newline", text: "{ a } #end"},
 	{name: "empty comment and comment only lines", text: "#\n{ a }\n#\n#\n"},
 	{name: "comment with a carriage return", text: "# one\r{ a }\r# two\r"},
@@ -283,7 +340,12 @@ func TestParseAgreesWithGraphqlJs(test *testing.T) {
 		switch {
 		case oracleRefused && dumpParseError != nil:
 			if dumpParseError.Error() != wantError {
-				fail("%s: both refuse, with different messages:\n  graphql-js %s\n  Go         %s", each.Name, wantError, dumpParseError.Error())
+				fail(
+					"%s: both refuse, with different messages:\n  graphql-js %s\n  Go         %s",
+					each.Name,
+					wantError,
+					dumpParseError.Error(),
+				)
 				continue
 			}
 			refusedByBoth++
@@ -295,7 +357,8 @@ func TestParseAgreesWithGraphqlJs(test *testing.T) {
 		case dumpParseError != nil:
 			fail("%s: graphql-js parses it and Go refused: %v", each.Name, dumpParseError)
 		default:
-			difference := firstParseDifference(want["ast"], got["ast"], "ast") + firstParseDifference(want["comments"], got["comments"], "comments")
+			difference := firstParseDifference(want["ast"], got["ast"], "ast") +
+				firstParseDifference(want["comments"], got["comments"], "comments")
 			if difference != "" {
 				fail("%s: %s", each.Name, difference)
 				continue
@@ -303,10 +366,22 @@ func TestParseAgreesWithGraphqlJs(test *testing.T) {
 			identical++
 		}
 	}
-	test.Logf("%d compared (%d corpus files, %d fixtures): %d identical, %d refused by both with the same message, %d different; %d corpus files refused",
-		len(inputs), corpusFiles, len(parseFixtures), identical, refusedByBoth, different, corpusRefused)
+	test.Logf(
+		"%d compared (%d corpus files, %d fixtures): %d identical, %d refused by both with the same message, %d different; %d corpus files refused",
+		len(inputs),
+		corpusFiles,
+		len(parseFixtures),
+		identical,
+		refusedByBoth,
+		different,
+		corpusRefused,
+	)
 	if corpusRefused > corpusFiles/10 {
-		test.Errorf("graphql-js refused %d of %d corpus files; the comparison is thinner than it looks", corpusRefused, corpusFiles)
+		test.Errorf(
+			"graphql-js refused %d of %d corpus files; the comparison is thinner than it looks",
+			corpusRefused,
+			corpusFiles,
+		)
 	}
 }
 
@@ -405,7 +480,14 @@ func firstParseDifference(want any, got any, path string) string {
 			wantValue, wantPresent := typed[key]
 			gotValue, gotPresent := other[key]
 			if wantPresent != gotPresent {
-				return fmt.Sprintf("%s.%s: present in graphql-js %v, in Go %v (%v)", path, key, wantPresent, gotPresent, typed["kind"])
+				return fmt.Sprintf(
+					"%s.%s: present in graphql-js %v, in Go %v (%v)",
+					path,
+					key,
+					wantPresent,
+					gotPresent,
+					typed["kind"],
+				)
 			}
 			if difference := firstParseDifference(wantValue, gotValue, path+"."+key); difference != "" {
 				return difference
@@ -418,7 +500,11 @@ func firstParseDifference(want any, got any, path string) string {
 			return fmt.Sprintf("%s: want %d elements, got %v", path, len(typed), got)
 		}
 		for index := range typed {
-			if difference := firstParseDifference(typed[index], other[index], fmt.Sprintf("%s[%d]", path, index)); difference != "" {
+			if difference := firstParseDifference(
+				typed[index],
+				other[index],
+				fmt.Sprintf("%s[%d]", path, index),
+			); difference != "" {
 				return difference
 			}
 		}

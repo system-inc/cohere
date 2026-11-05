@@ -33,66 +33,302 @@ func TestStaticPropertyPlacementStaysSilent(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct{ name, sourceText, rawOptions string }{
-		{"upstream valid 0", "\n        var MyComponent = createReactClass({\n          childContextTypes: {\n            something: PropTypes.bool\n          },\n\n          contextTypes: {\n            something: PropTypes.bool\n          },\n\n          getDefaultProps: function() {\n            name: 'Bob'\n          },\n\n          displayName: 'Hello',\n\n          propTypes: {\n            something: PropTypes.bool\n          },\n\n          render: function() {\n            return null;\n          },\n        });\n      ", "[\"property assignment\"]"},
-		{"upstream valid 1", "\n        var MyComponent = React.createClass({\n          childContextTypes: {\n            something: PropTypes.bool\n          },\n\n          contextTypes: {\n            something: PropTypes.bool\n          },\n\n          getDefaultProps: function() {\n            name: 'Bob'\n          },\n\n          displayName: 'Hello',\n\n          propTypes: {\n            something: PropTypes.bool\n          },\n\n          render: function() {\n            return null;\n          },\n        });\n      ", "[\"property assignment\"]"},
-		{"upstream valid 2", "\n        const MyComponent = () => {\n            return <div>Hello</div>;\n        };\n\n        MyComponent.childContextTypes = {\n          something: PropTypes.bool\n        };\n\n        MyComponent.contextTypes = {\n          something: PropTypes.bool\n        };\n\n        MyComponent.defaultProps = {\n          something: 'Bob'\n        };\n\n        MyComponent.displayName = 'Hello';\n\n        MyComponent.propTypes = {\n          something: PropTypes.bool\n        };\n      ", ""},
-		{"upstream valid 3", "\n        const MyComponent = () => (<div>Hello</div>);\n\n        MyComponent.childContextTypes = {\n          something: PropTypes.bool\n        };\n\n        MyComponent.contextTypes = {\n          something: PropTypes.bool\n        };\n\n        MyComponent.defaultProps = {\n          something: 'Bob'\n        };\n\n        MyComponent.displayName = 'Hello';\n\n        MyComponent.propTypes = {\n          something: PropTypes.bool\n        };\n      ", ""},
-		{"upstream valid 4", "\n        export function MyComponent () {\n            return <div>Hello</div>;\n        };\n\n        MyComponent.childContextTypes = {\n          something: PropTypes.bool\n        };\n\n        MyComponent.contextTypes = {\n          something: PropTypes.bool\n        };\n\n        MyComponent.defaultProps = {\n          something: 'Bob'\n        };\n\n        MyComponent.displayName = 'Hello';\n\n        MyComponent.propTypes = {\n          something: PropTypes.bool\n        };\n      ", ""},
+		{
+			"upstream valid 0",
+			"\n        var MyComponent = createReactClass({\n          childContextTypes: {\n            something: PropTypes.bool\n          },\n\n          contextTypes: {\n            something: PropTypes.bool\n          },\n\n          getDefaultProps: function() {\n            name: 'Bob'\n          },\n\n          displayName: 'Hello',\n\n          propTypes: {\n            something: PropTypes.bool\n          },\n\n          render: function() {\n            return null;\n          },\n        });\n      ",
+			"[\"property assignment\"]",
+		},
+		{
+			"upstream valid 1",
+			"\n        var MyComponent = React.createClass({\n          childContextTypes: {\n            something: PropTypes.bool\n          },\n\n          contextTypes: {\n            something: PropTypes.bool\n          },\n\n          getDefaultProps: function() {\n            name: 'Bob'\n          },\n\n          displayName: 'Hello',\n\n          propTypes: {\n            something: PropTypes.bool\n          },\n\n          render: function() {\n            return null;\n          },\n        });\n      ",
+			"[\"property assignment\"]",
+		},
+		{
+			"upstream valid 2",
+			"\n        const MyComponent = () => {\n            return <div>Hello</div>;\n        };\n\n        MyComponent.childContextTypes = {\n          something: PropTypes.bool\n        };\n\n        MyComponent.contextTypes = {\n          something: PropTypes.bool\n        };\n\n        MyComponent.defaultProps = {\n          something: 'Bob'\n        };\n\n        MyComponent.displayName = 'Hello';\n\n        MyComponent.propTypes = {\n          something: PropTypes.bool\n        };\n      ",
+			"",
+		},
+		{
+			"upstream valid 3",
+			"\n        const MyComponent = () => (<div>Hello</div>);\n\n        MyComponent.childContextTypes = {\n          something: PropTypes.bool\n        };\n\n        MyComponent.contextTypes = {\n          something: PropTypes.bool\n        };\n\n        MyComponent.defaultProps = {\n          something: 'Bob'\n        };\n\n        MyComponent.displayName = 'Hello';\n\n        MyComponent.propTypes = {\n          something: PropTypes.bool\n        };\n      ",
+			"",
+		},
+		{
+			"upstream valid 4",
+			"\n        export function MyComponent () {\n            return <div>Hello</div>;\n        };\n\n        MyComponent.childContextTypes = {\n          something: PropTypes.bool\n        };\n\n        MyComponent.contextTypes = {\n          something: PropTypes.bool\n        };\n\n        MyComponent.defaultProps = {\n          something: 'Bob'\n        };\n\n        MyComponent.displayName = 'Hello';\n\n        MyComponent.propTypes = {\n          something: PropTypes.bool\n        };\n      ",
+			"",
+		},
 		{"upstream valid 5", "\n        class Foo {\n          static get propTypes() {}\n        }\n      ", ""},
-		{"upstream valid 6", "\n        class Foo {\n          static propTypes = {}\n        }\n      ", "[\"property assignment\"]"},
-		{"upstream valid 7", "\n        class MyComponent extends React.Component {\n          render() {\n            return null;\n          }\n        }\n      ", ""},
-		{"upstream valid 8", "\n        class MyComponent extends React.Component {\n          static randomlyNamed = {\n            name: 'random'\n          }\n        }\n      ", ""},
-		{"upstream valid 9", "\n        class MyComponent extends React.Component {\n          static randomlyNamed = {\n            name: 'random'\n          }\n        }\n      ", "[\"property assignment\"]"},
-		{"upstream valid 10", "\n        class MyComponent extends React.Component {\n          render() {\n            return null;\n          }\n        }\n\n        MyComponent.randomlyNamed = {\n          name: 'random'\n        }\n      ", "[\"property assignment\"]"},
-		{"upstream valid 11", "\n        class MyComponent extends React.Component {\n          render() {\n            return null;\n          }\n        }\n\n        MyComponent.randomlyNamed = {\n          name: 'random'\n        }\n      ", ""},
-		{"upstream valid 12", "\n        class MyComponent extends React.Component {\n          static childContextTypes = {\n            something: PropTypes.bool\n          };\n        }\n      ", ""},
-		{"upstream valid 13", "\n        class MyComponent extends React.Component {\n          static childContextTypes = {\n            something: PropTypes.bool\n          };\n        }\n      ", "[\"property assignment\", {\"childContextTypes\": \"static public field\"}]"},
-		{"upstream valid 14", "\n        class MyComponent extends React.Component {\n          static get childContextTypes() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n        }\n      ", "[\"static getter\"]"},
-		{"upstream valid 15", "\n        class MyComponent extends React.Component {\n          static get childContextTypes() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n        }\n      ", "[\"property assignment\", {\"childContextTypes\": \"static getter\"}]"},
-		{"upstream valid 16", "\n        class MyComponent extends React.Component {\n          render() {\n            return null;\n          }\n        }\n\n        MyComponent.childContextTypes = {\n          name: PropTypes.string.isRequired\n        }\n      ", "[\"property assignment\"]"},
-		{"upstream valid 17", "\n        class MyComponent extends React.Component {\n          render() {\n            return null;\n          }\n        }\n\n        MyComponent.childContextTypes = {\n          name: PropTypes.string.isRequired\n        }\n      ", "[\"static public field\", {\"childContextTypes\": \"property assignment\"}]"},
-		{"upstream valid 18", "\n        class MyComponent extends React.Component {\n          static contextTypes = {\n            something: PropTypes.bool\n          };\n        }\n      ", ""},
-		{"upstream valid 19", "\n        class MyComponent extends React.Component {\n          static contextTypes = {\n            something: PropTypes.bool\n          };\n        }\n      ", "[\"property assignment\", {\"contextTypes\": \"static public field\"}]"},
-		{"upstream valid 20", "\n        class MyComponent extends React.Component {\n          static get contextTypes() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n        }\n      ", "[\"static getter\"]"},
-		{"upstream valid 21", "\n        class MyComponent extends React.Component {\n          static get contextTypes() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n        }\n      ", "[\"property assignment\", {\"contextTypes\": \"static getter\"}]"},
-		{"upstream valid 22", "\n        class MyComponent extends React.Component {\n          render() {\n            return null;\n          }\n        }\n\n        MyComponent.contextTypes = {\n          name: PropTypes.string.isRequired\n        }\n      ", "[\"property assignment\"]"},
-		{"upstream valid 23", "\n        class MyComponent extends React.Component {\n          render() {\n            return null;\n          }\n        }\n\n        MyComponent.contextTypes = {\n          name: PropTypes.string.isRequired\n        }\n      ", "[\"static public field\", {\"contextTypes\": \"property assignment\"}]"},
-		{"upstream valid 24", "\n        class MyComponent extends React.Component {\n          static contextType = MyContext;\n        }\n      ", ""},
-		{"upstream valid 25", "\n        class MyComponent extends React.Component {\n          static contextType = MyContext;\n        }\n      ", "[\"property assignment\", {\"contextType\": \"static public field\"}]"},
-		{"upstream valid 26", "\n        class MyComponent extends React.Component {\n          static get contextType() {\n             return MyContext;\n          }\n        }\n      ", "[\"static getter\"]"},
-		{"upstream valid 27", "\n        class MyComponent extends React.Component {\n          static get contextType() {\n             return MyContext;\n          }\n        }\n      ", "[\"property assignment\", {\"contextType\": \"static getter\"}]"},
-		{"upstream valid 28", "\n        class MyComponent extends React.Component {\n          render() {\n            return null;\n          }\n        }\n\n        MyComponent.contextType = MyContext;\n      ", "[\"property assignment\"]"},
-		{"upstream valid 29", "\n        class MyComponent extends React.Component {\n          render() {\n            return null;\n          }\n        }\n\n        MyComponent.contextType = MyContext;\n      ", "[\"static public field\", {\"contextType\": \"property assignment\"}]"},
-		{"upstream valid 30", "\n        class MyComponent extends React.Component {\n          static displayName = \"Hello\";\n        }\n      ", ""},
-		{"upstream valid 31", "\n        class MyComponent extends React.Component {\n          static displayName = \"Hello\";\n        }\n      ", "[\"property assignment\", {\"displayName\": \"static public field\"}]"},
-		{"upstream valid 32", "\n        class MyComponent extends React.Component {\n          static get displayName() {\n            return \"Hello\";\n          }\n        }\n      ", "[\"static getter\"]"},
-		{"upstream valid 33", "\n        class MyComponent extends React.Component {\n          static get displayName() {\n            return \"Hello\";\n          }\n        }\n      ", "[\"property assignment\", {\"displayName\": \"static getter\"}]"},
-		{"upstream valid 34", "\n        class MyComponent extends React.Component {\n          render() {\n            return null;\n          }\n        }\n\n        MyComponent.displayName = \"Hello\";\n      ", "[\"property assignment\"]"},
-		{"upstream valid 35", "\n        class MyComponent extends React.Component {\n          render() {\n            return null;\n          }\n        }\n\n        MyComponent.displayName = \"Hello\";\n      ", "[\"static public field\", {\"displayName\": \"property assignment\"}]"},
-		{"upstream valid 36", "\n        class MyComponent extends React.Component {\n          static defaultProps = {\n            something: 'Bob'\n          };\n        }\n      ", ""},
-		{"upstream valid 37", "\n        class MyComponent extends React.Component {\n          static defaultProps = {\n            something: 'Bob'\n          };\n        }\n      ", "[\"property assignment\", {\"defaultProps\": \"static public field\"}]"},
-		{"upstream valid 38", "\n        class MyComponent extends React.Component {\n          static get defaultProps() {\n            return {\n              something: 'Bob'\n            };\n          }\n        }\n      ", "[\"static getter\"]"},
-		{"upstream valid 39", "\n        class MyComponent extends React.Component {\n          static get defaultProps() {\n            return {\n              something: 'Bob'\n            };\n          }\n        }\n      ", "[\"property assignment\", {\"defaultProps\": \"static getter\"}]"},
-		{"upstream valid 40", "\n        class MyComponent extends React.Component {\n          render() {\n            return null;\n          }\n        }\n\n        MyComponent.defaultProps = {\n          name: 'Bob'\n        }\n      ", "[\"property assignment\"]"},
-		{"upstream valid 41", "\n        class MyComponent extends React.Component {\n          render() {\n            return null;\n          }\n        }\n\n        MyComponent.defaultProps = {\n          name: 'Bob'\n        }\n      ", "[\"static public field\", {\"defaultProps\": \"property assignment\"}]"},
-		{"upstream valid 42", "\n        class MyComponent extends React.Component {\n          static propTypes = {\n            something: PropTypes.bool\n          };\n        }\n      ", ""},
-		{"upstream valid 43", "\n        class MyComponent extends React.Component {\n          static propTypes = {\n            something: PropTypes.bool\n          };\n        }\n      ", "[\"property assignment\", {\"propTypes\": \"static public field\"}]"},
-		{"upstream valid 44", "\n        class MyComponent extends React.Component {\n          static get propTypes() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n        }\n      ", "[\"static getter\"]"},
-		{"upstream valid 45", "\n        class MyComponent extends React.Component {\n          static get propTypes() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n        }\n      ", "[\"property assignment\", {\"propTypes\": \"static getter\"}]"},
-		{"upstream valid 46", "\n        class MyComponent extends React.Component {\n          render() {\n            return null;\n          }\n        }\n\n        MyComponent.propTypes = {\n          name: PropTypes.string.isRequired\n        }\n      ", "[\"property assignment\"]"},
-		{"upstream valid 47", "\n        class MyComponent extends React.Component {\n          render() {\n            return null;\n          }\n        }\n\n        MyComponent.propTypes = {\n          name: PropTypes.string.isRequired\n        }\n      ", "[\"static public field\", {\"propTypes\": \"property assignment\"}]"},
-		{"upstream valid 48", "\n        class MyComponent extends React.Component {\n          static childContextTypes = {\n            something: PropTypes.bool\n          };\n\n          static contextTypes = {\n            something: PropTypes.bool\n          };\n\n          static contextType = MyContext;\n\n          static displayName = \"Hello\";\n\n          static defaultProps = {\n            something: 'Bob'\n          };\n\n          static propTypes = {\n            something: PropTypes.bool\n          };\n        }\n      ", ""},
-		{"upstream valid 49", "\n        class MyComponent extends React.Component {\n          static childContextTypes = {\n            something: PropTypes.bool\n          };\n\n          static contextTypes = {\n            something: PropTypes.bool\n          };\n\n          static contextType = MyContext;\n\n          static displayName = \"Hello\";\n\n          static defaultProps = {\n            something: 'Bob'\n          };\n\n          static propTypes = {\n            something: PropTypes.bool\n          };\n        }\n      ", "[\"property assignment\", {\"childContextTypes\": \"static public field\", \"contextTypes\": \"static public field\", \"contextType\": \"static public field\", \"displayName\": \"static public field\", \"defaultProps\": \"static public field\", \"propTypes\": \"static public field\"}]"},
-		{"upstream valid 50", "\n        class MyComponent extends React.Component {\n          static get childContextTypes() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n\n          static get contextTypes() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n\n          static get contextType() {\n            return MyContext;\n          }\n\n          static get displayName() {\n            return \"Hello\";\n          }\n\n          static get defaultProps() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n\n          static get propTypes() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n        }\n      ", "[\"static getter\"]"},
-		{"upstream valid 51", "\n        class MyComponent extends React.Component {\n          static get childContextTypes() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n\n          static get contextTypes() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n\n          static get contextType() {\n            return MyContext;\n          }\n\n          static get displayName() {\n            return \"Hello\";\n          }\n\n          static get defaultProps() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n\n          static get propTypes() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n        }\n      ", "[\"property assignment\", {\"childContextTypes\": \"static getter\", \"contextTypes\": \"static getter\", \"contextType\": \"static getter\", \"displayName\": \"static getter\", \"defaultProps\": \"static getter\", \"propTypes\": \"static getter\"}]"},
-		{"upstream valid 52", "\n        class MyComponent extends React.Component {\n          render() {\n            return null;\n          }\n        }\n\n        MyComponent.childContextTypes = {\n          name: PropTypes.string.isRequired\n        }\n\n        MyComponent.contextTypes = {\n          name: PropTypes.string.isRequired\n        }\n\n        MyComponent.displayName = \"Hello\";\n\n        MyComponent.defaultProps = {\n          name: 'Bob'\n        }\n\n        MyComponent.propTypes = {\n          name: PropTypes.string.isRequired\n        }\n      ", "[\"property assignment\"]"},
-		{"upstream valid 53", "\n        class MyComponent extends React.Component {\n          render() {\n            return null;\n          }\n        }\n\n        MyComponent.childContextTypes = {\n          name: PropTypes.string.isRequired\n        }\n\n        MyComponent.contextTypes = {\n          name: PropTypes.string.isRequired\n        }\n\n        MyComponent.displayName = \"Hello\";\n\n        MyComponent.defaultProps = {\n          name: 'Bob'\n        }\n\n        MyComponent.propTypes = {\n          name: PropTypes.string.isRequired\n        }\n      ", "[\"static public field\", {\"childContextTypes\": \"property assignment\", \"contextTypes\": \"property assignment\", \"displayName\": \"property assignment\", \"defaultProps\": \"property assignment\", \"propTypes\": \"property assignment\"}]"},
-		{"upstream valid 54", "\n        class MyComponent extends React.Component {\n          static childContextTypes = {\n            name: PropTypes.string.isRequired\n          }\n\n          static contextTypes = {\n            name: PropTypes.string.isRequired\n          }\n\n          static get displayName() {\n            return \"Hello\"\n          }\n        }\n\n        MyComponent.defaultProps = {\n          name: 'Bob'\n        }\n\n        MyComponent.propTypes = {\n          name: PropTypes.string.isRequired\n        }\n      ", "[\"static public field\", {\"displayName\": \"static getter\", \"defaultProps\": \"property assignment\", \"propTypes\": \"property assignment\"}]"},
-		{"upstream valid 55", "\n        class MyComponent extends React.Component {\n          static childContextTypes = {\n            name: PropTypes.string.isRequired\n          }\n\n          static contextTypes = {\n            name: PropTypes.string.isRequired\n          }\n\n          static get displayName() {\n            return \"Hello\"\n          }\n        }\n\n        MyComponent.defaultProps = {\n          name: 'Bob'\n        }\n\n        MyComponent.propTypes = {\n          name: PropTypes.string.isRequired\n        }\n      ", "[\"property assignment\", {\"childContextTypes\": \"static public field\", \"contextTypes\": \"static public field\", \"displayName\": \"static getter\"}]"},
-		{"upstream valid 56", "\n        class MyComponent extends React.Component {\n          static childContextTypes = {\n            name: PropTypes.string.isRequired\n          }\n\n          static contextTypes = {\n            name: PropTypes.string.isRequired\n          }\n\n          static displayName = \"Hello\";\n        }\n\n        const OtherComponent = () => (<div>Hello</div>);\n\n        OtherComponent.defaultProps = {\n          name: 'Bob'\n        }\n\n        OtherComponent.propTypes = {\n          name: PropTypes.string.isRequired\n        }\n      ", ""},
-		{"upstream valid 57", "\n        class MyComponent extends React.Component {\n          static childContextTypes = {\n            name: PropTypes.string.isRequired\n          }\n\n          static contextTypes = {\n            name: PropTypes.string.isRequired\n          }\n\n          static displayName = \"Hello\";\n        }\n\n        class OtherComponent extends React.Component {\n          static defaultProps = {\n            name: 'Bob'\n          }\n\n          static propTypes = {\n            name: PropTypes.string.isRequired\n          }\n        }\n      ", ""},
-		{"upstream valid 58", "\n        class MyComponent extends React.Component {\n          static displayName = \"Hello\";\n\n          myMethod() {\n            console.log(MyComponent.displayName);\n          }\n        }\n      ", "[\"static public field\"]"},
-		{"upstream valid 59", "\n        class MyComponent extends React.Component {\n          static displayName = \"Hello\";\n\n          myMethod() {\n            MyComponent.displayName = \"Bonjour\";\n          }\n        }\n      ", "[\"static public field\"]"},
+		{
+			"upstream valid 6",
+			"\n        class Foo {\n          static propTypes = {}\n        }\n      ",
+			"[\"property assignment\"]",
+		},
+		{
+			"upstream valid 7",
+			"\n        class MyComponent extends React.Component {\n          render() {\n            return null;\n          }\n        }\n      ",
+			"",
+		},
+		{
+			"upstream valid 8",
+			"\n        class MyComponent extends React.Component {\n          static randomlyNamed = {\n            name: 'random'\n          }\n        }\n      ",
+			"",
+		},
+		{
+			"upstream valid 9",
+			"\n        class MyComponent extends React.Component {\n          static randomlyNamed = {\n            name: 'random'\n          }\n        }\n      ",
+			"[\"property assignment\"]",
+		},
+		{
+			"upstream valid 10",
+			"\n        class MyComponent extends React.Component {\n          render() {\n            return null;\n          }\n        }\n\n        MyComponent.randomlyNamed = {\n          name: 'random'\n        }\n      ",
+			"[\"property assignment\"]",
+		},
+		{
+			"upstream valid 11",
+			"\n        class MyComponent extends React.Component {\n          render() {\n            return null;\n          }\n        }\n\n        MyComponent.randomlyNamed = {\n          name: 'random'\n        }\n      ",
+			"",
+		},
+		{
+			"upstream valid 12",
+			"\n        class MyComponent extends React.Component {\n          static childContextTypes = {\n            something: PropTypes.bool\n          };\n        }\n      ",
+			"",
+		},
+		{
+			"upstream valid 13",
+			"\n        class MyComponent extends React.Component {\n          static childContextTypes = {\n            something: PropTypes.bool\n          };\n        }\n      ",
+			"[\"property assignment\", {\"childContextTypes\": \"static public field\"}]",
+		},
+		{
+			"upstream valid 14",
+			"\n        class MyComponent extends React.Component {\n          static get childContextTypes() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n        }\n      ",
+			"[\"static getter\"]",
+		},
+		{
+			"upstream valid 15",
+			"\n        class MyComponent extends React.Component {\n          static get childContextTypes() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n        }\n      ",
+			"[\"property assignment\", {\"childContextTypes\": \"static getter\"}]",
+		},
+		{
+			"upstream valid 16",
+			"\n        class MyComponent extends React.Component {\n          render() {\n            return null;\n          }\n        }\n\n        MyComponent.childContextTypes = {\n          name: PropTypes.string.isRequired\n        }\n      ",
+			"[\"property assignment\"]",
+		},
+		{
+			"upstream valid 17",
+			"\n        class MyComponent extends React.Component {\n          render() {\n            return null;\n          }\n        }\n\n        MyComponent.childContextTypes = {\n          name: PropTypes.string.isRequired\n        }\n      ",
+			"[\"static public field\", {\"childContextTypes\": \"property assignment\"}]",
+		},
+		{
+			"upstream valid 18",
+			"\n        class MyComponent extends React.Component {\n          static contextTypes = {\n            something: PropTypes.bool\n          };\n        }\n      ",
+			"",
+		},
+		{
+			"upstream valid 19",
+			"\n        class MyComponent extends React.Component {\n          static contextTypes = {\n            something: PropTypes.bool\n          };\n        }\n      ",
+			"[\"property assignment\", {\"contextTypes\": \"static public field\"}]",
+		},
+		{
+			"upstream valid 20",
+			"\n        class MyComponent extends React.Component {\n          static get contextTypes() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n        }\n      ",
+			"[\"static getter\"]",
+		},
+		{
+			"upstream valid 21",
+			"\n        class MyComponent extends React.Component {\n          static get contextTypes() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n        }\n      ",
+			"[\"property assignment\", {\"contextTypes\": \"static getter\"}]",
+		},
+		{
+			"upstream valid 22",
+			"\n        class MyComponent extends React.Component {\n          render() {\n            return null;\n          }\n        }\n\n        MyComponent.contextTypes = {\n          name: PropTypes.string.isRequired\n        }\n      ",
+			"[\"property assignment\"]",
+		},
+		{
+			"upstream valid 23",
+			"\n        class MyComponent extends React.Component {\n          render() {\n            return null;\n          }\n        }\n\n        MyComponent.contextTypes = {\n          name: PropTypes.string.isRequired\n        }\n      ",
+			"[\"static public field\", {\"contextTypes\": \"property assignment\"}]",
+		},
+		{
+			"upstream valid 24",
+			"\n        class MyComponent extends React.Component {\n          static contextType = MyContext;\n        }\n      ",
+			"",
+		},
+		{
+			"upstream valid 25",
+			"\n        class MyComponent extends React.Component {\n          static contextType = MyContext;\n        }\n      ",
+			"[\"property assignment\", {\"contextType\": \"static public field\"}]",
+		},
+		{
+			"upstream valid 26",
+			"\n        class MyComponent extends React.Component {\n          static get contextType() {\n             return MyContext;\n          }\n        }\n      ",
+			"[\"static getter\"]",
+		},
+		{
+			"upstream valid 27",
+			"\n        class MyComponent extends React.Component {\n          static get contextType() {\n             return MyContext;\n          }\n        }\n      ",
+			"[\"property assignment\", {\"contextType\": \"static getter\"}]",
+		},
+		{
+			"upstream valid 28",
+			"\n        class MyComponent extends React.Component {\n          render() {\n            return null;\n          }\n        }\n\n        MyComponent.contextType = MyContext;\n      ",
+			"[\"property assignment\"]",
+		},
+		{
+			"upstream valid 29",
+			"\n        class MyComponent extends React.Component {\n          render() {\n            return null;\n          }\n        }\n\n        MyComponent.contextType = MyContext;\n      ",
+			"[\"static public field\", {\"contextType\": \"property assignment\"}]",
+		},
+		{
+			"upstream valid 30",
+			"\n        class MyComponent extends React.Component {\n          static displayName = \"Hello\";\n        }\n      ",
+			"",
+		},
+		{
+			"upstream valid 31",
+			"\n        class MyComponent extends React.Component {\n          static displayName = \"Hello\";\n        }\n      ",
+			"[\"property assignment\", {\"displayName\": \"static public field\"}]",
+		},
+		{
+			"upstream valid 32",
+			"\n        class MyComponent extends React.Component {\n          static get displayName() {\n            return \"Hello\";\n          }\n        }\n      ",
+			"[\"static getter\"]",
+		},
+		{
+			"upstream valid 33",
+			"\n        class MyComponent extends React.Component {\n          static get displayName() {\n            return \"Hello\";\n          }\n        }\n      ",
+			"[\"property assignment\", {\"displayName\": \"static getter\"}]",
+		},
+		{
+			"upstream valid 34",
+			"\n        class MyComponent extends React.Component {\n          render() {\n            return null;\n          }\n        }\n\n        MyComponent.displayName = \"Hello\";\n      ",
+			"[\"property assignment\"]",
+		},
+		{
+			"upstream valid 35",
+			"\n        class MyComponent extends React.Component {\n          render() {\n            return null;\n          }\n        }\n\n        MyComponent.displayName = \"Hello\";\n      ",
+			"[\"static public field\", {\"displayName\": \"property assignment\"}]",
+		},
+		{
+			"upstream valid 36",
+			"\n        class MyComponent extends React.Component {\n          static defaultProps = {\n            something: 'Bob'\n          };\n        }\n      ",
+			"",
+		},
+		{
+			"upstream valid 37",
+			"\n        class MyComponent extends React.Component {\n          static defaultProps = {\n            something: 'Bob'\n          };\n        }\n      ",
+			"[\"property assignment\", {\"defaultProps\": \"static public field\"}]",
+		},
+		{
+			"upstream valid 38",
+			"\n        class MyComponent extends React.Component {\n          static get defaultProps() {\n            return {\n              something: 'Bob'\n            };\n          }\n        }\n      ",
+			"[\"static getter\"]",
+		},
+		{
+			"upstream valid 39",
+			"\n        class MyComponent extends React.Component {\n          static get defaultProps() {\n            return {\n              something: 'Bob'\n            };\n          }\n        }\n      ",
+			"[\"property assignment\", {\"defaultProps\": \"static getter\"}]",
+		},
+		{
+			"upstream valid 40",
+			"\n        class MyComponent extends React.Component {\n          render() {\n            return null;\n          }\n        }\n\n        MyComponent.defaultProps = {\n          name: 'Bob'\n        }\n      ",
+			"[\"property assignment\"]",
+		},
+		{
+			"upstream valid 41",
+			"\n        class MyComponent extends React.Component {\n          render() {\n            return null;\n          }\n        }\n\n        MyComponent.defaultProps = {\n          name: 'Bob'\n        }\n      ",
+			"[\"static public field\", {\"defaultProps\": \"property assignment\"}]",
+		},
+		{
+			"upstream valid 42",
+			"\n        class MyComponent extends React.Component {\n          static propTypes = {\n            something: PropTypes.bool\n          };\n        }\n      ",
+			"",
+		},
+		{
+			"upstream valid 43",
+			"\n        class MyComponent extends React.Component {\n          static propTypes = {\n            something: PropTypes.bool\n          };\n        }\n      ",
+			"[\"property assignment\", {\"propTypes\": \"static public field\"}]",
+		},
+		{
+			"upstream valid 44",
+			"\n        class MyComponent extends React.Component {\n          static get propTypes() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n        }\n      ",
+			"[\"static getter\"]",
+		},
+		{
+			"upstream valid 45",
+			"\n        class MyComponent extends React.Component {\n          static get propTypes() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n        }\n      ",
+			"[\"property assignment\", {\"propTypes\": \"static getter\"}]",
+		},
+		{
+			"upstream valid 46",
+			"\n        class MyComponent extends React.Component {\n          render() {\n            return null;\n          }\n        }\n\n        MyComponent.propTypes = {\n          name: PropTypes.string.isRequired\n        }\n      ",
+			"[\"property assignment\"]",
+		},
+		{
+			"upstream valid 47",
+			"\n        class MyComponent extends React.Component {\n          render() {\n            return null;\n          }\n        }\n\n        MyComponent.propTypes = {\n          name: PropTypes.string.isRequired\n        }\n      ",
+			"[\"static public field\", {\"propTypes\": \"property assignment\"}]",
+		},
+		{
+			"upstream valid 48",
+			"\n        class MyComponent extends React.Component {\n          static childContextTypes = {\n            something: PropTypes.bool\n          };\n\n          static contextTypes = {\n            something: PropTypes.bool\n          };\n\n          static contextType = MyContext;\n\n          static displayName = \"Hello\";\n\n          static defaultProps = {\n            something: 'Bob'\n          };\n\n          static propTypes = {\n            something: PropTypes.bool\n          };\n        }\n      ",
+			"",
+		},
+		{
+			"upstream valid 49",
+			"\n        class MyComponent extends React.Component {\n          static childContextTypes = {\n            something: PropTypes.bool\n          };\n\n          static contextTypes = {\n            something: PropTypes.bool\n          };\n\n          static contextType = MyContext;\n\n          static displayName = \"Hello\";\n\n          static defaultProps = {\n            something: 'Bob'\n          };\n\n          static propTypes = {\n            something: PropTypes.bool\n          };\n        }\n      ",
+			"[\"property assignment\", {\"childContextTypes\": \"static public field\", \"contextTypes\": \"static public field\", \"contextType\": \"static public field\", \"displayName\": \"static public field\", \"defaultProps\": \"static public field\", \"propTypes\": \"static public field\"}]",
+		},
+		{
+			"upstream valid 50",
+			"\n        class MyComponent extends React.Component {\n          static get childContextTypes() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n\n          static get contextTypes() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n\n          static get contextType() {\n            return MyContext;\n          }\n\n          static get displayName() {\n            return \"Hello\";\n          }\n\n          static get defaultProps() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n\n          static get propTypes() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n        }\n      ",
+			"[\"static getter\"]",
+		},
+		{
+			"upstream valid 51",
+			"\n        class MyComponent extends React.Component {\n          static get childContextTypes() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n\n          static get contextTypes() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n\n          static get contextType() {\n            return MyContext;\n          }\n\n          static get displayName() {\n            return \"Hello\";\n          }\n\n          static get defaultProps() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n\n          static get propTypes() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n        }\n      ",
+			"[\"property assignment\", {\"childContextTypes\": \"static getter\", \"contextTypes\": \"static getter\", \"contextType\": \"static getter\", \"displayName\": \"static getter\", \"defaultProps\": \"static getter\", \"propTypes\": \"static getter\"}]",
+		},
+		{
+			"upstream valid 52",
+			"\n        class MyComponent extends React.Component {\n          render() {\n            return null;\n          }\n        }\n\n        MyComponent.childContextTypes = {\n          name: PropTypes.string.isRequired\n        }\n\n        MyComponent.contextTypes = {\n          name: PropTypes.string.isRequired\n        }\n\n        MyComponent.displayName = \"Hello\";\n\n        MyComponent.defaultProps = {\n          name: 'Bob'\n        }\n\n        MyComponent.propTypes = {\n          name: PropTypes.string.isRequired\n        }\n      ",
+			"[\"property assignment\"]",
+		},
+		{
+			"upstream valid 53",
+			"\n        class MyComponent extends React.Component {\n          render() {\n            return null;\n          }\n        }\n\n        MyComponent.childContextTypes = {\n          name: PropTypes.string.isRequired\n        }\n\n        MyComponent.contextTypes = {\n          name: PropTypes.string.isRequired\n        }\n\n        MyComponent.displayName = \"Hello\";\n\n        MyComponent.defaultProps = {\n          name: 'Bob'\n        }\n\n        MyComponent.propTypes = {\n          name: PropTypes.string.isRequired\n        }\n      ",
+			"[\"static public field\", {\"childContextTypes\": \"property assignment\", \"contextTypes\": \"property assignment\", \"displayName\": \"property assignment\", \"defaultProps\": \"property assignment\", \"propTypes\": \"property assignment\"}]",
+		},
+		{
+			"upstream valid 54",
+			"\n        class MyComponent extends React.Component {\n          static childContextTypes = {\n            name: PropTypes.string.isRequired\n          }\n\n          static contextTypes = {\n            name: PropTypes.string.isRequired\n          }\n\n          static get displayName() {\n            return \"Hello\"\n          }\n        }\n\n        MyComponent.defaultProps = {\n          name: 'Bob'\n        }\n\n        MyComponent.propTypes = {\n          name: PropTypes.string.isRequired\n        }\n      ",
+			"[\"static public field\", {\"displayName\": \"static getter\", \"defaultProps\": \"property assignment\", \"propTypes\": \"property assignment\"}]",
+		},
+		{
+			"upstream valid 55",
+			"\n        class MyComponent extends React.Component {\n          static childContextTypes = {\n            name: PropTypes.string.isRequired\n          }\n\n          static contextTypes = {\n            name: PropTypes.string.isRequired\n          }\n\n          static get displayName() {\n            return \"Hello\"\n          }\n        }\n\n        MyComponent.defaultProps = {\n          name: 'Bob'\n        }\n\n        MyComponent.propTypes = {\n          name: PropTypes.string.isRequired\n        }\n      ",
+			"[\"property assignment\", {\"childContextTypes\": \"static public field\", \"contextTypes\": \"static public field\", \"displayName\": \"static getter\"}]",
+		},
+		{
+			"upstream valid 56",
+			"\n        class MyComponent extends React.Component {\n          static childContextTypes = {\n            name: PropTypes.string.isRequired\n          }\n\n          static contextTypes = {\n            name: PropTypes.string.isRequired\n          }\n\n          static displayName = \"Hello\";\n        }\n\n        const OtherComponent = () => (<div>Hello</div>);\n\n        OtherComponent.defaultProps = {\n          name: 'Bob'\n        }\n\n        OtherComponent.propTypes = {\n          name: PropTypes.string.isRequired\n        }\n      ",
+			"",
+		},
+		{
+			"upstream valid 57",
+			"\n        class MyComponent extends React.Component {\n          static childContextTypes = {\n            name: PropTypes.string.isRequired\n          }\n\n          static contextTypes = {\n            name: PropTypes.string.isRequired\n          }\n\n          static displayName = \"Hello\";\n        }\n\n        class OtherComponent extends React.Component {\n          static defaultProps = {\n            name: 'Bob'\n          }\n\n          static propTypes = {\n            name: PropTypes.string.isRequired\n          }\n        }\n      ",
+			"",
+		},
+		{
+			"upstream valid 58",
+			"\n        class MyComponent extends React.Component {\n          static displayName = \"Hello\";\n\n          myMethod() {\n            console.log(MyComponent.displayName);\n          }\n        }\n      ",
+			"[\"static public field\"]",
+		},
+		{
+			"upstream valid 59",
+			"\n        class MyComponent extends React.Component {\n          static displayName = \"Hello\";\n\n          myMethod() {\n            MyComponent.displayName = \"Bonjour\";\n          }\n        }\n      ",
+			"[\"static public field\"]",
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -112,23 +348,215 @@ func TestStaticPropertyPlacementFires(test *testing.T) {
 		name, sourceText, rawOptions string
 		messageIds                   []string
 	}{
-		{"upstream invalid 0", "\n        class MyComponent extends React.Component {\n          render() {\n            return null;\n          }\n        }\n\n        MyComponent.childContextTypes = {\n          name: PropTypes.string.isRequired\n        }\n\n        MyComponent.contextTypes = {\n          name: PropTypes.string.isRequired\n        }\n\n        MyComponent.contextType = MyContext;\n\n        MyComponent.displayName = \"Hello\";\n\n        MyComponent.defaultProps = {\n          name: 'Bob'\n        }\n\n        MyComponent.propTypes = {\n          name: PropTypes.string.isRequired\n        }\n      ", "", []string{"notStaticClassProp", "notStaticClassProp", "notStaticClassProp", "notStaticClassProp", "notStaticClassProp", "notStaticClassProp"}},
-		{"upstream invalid 1", "\n        class MyComponent extends React.Component {\n          render() {\n            return null;\n          }\n        }\n\n        MyComponent.childContextTypes = {\n          name: PropTypes.string.isRequired\n        }\n\n        MyComponent.contextTypes = {\n          name: PropTypes.string.isRequired\n        }\n\n        MyComponent.contextType = MyContext;\n\n        MyComponent.displayName = \"Hello\";\n\n        MyComponent.defaultProps = {\n          name: 'Bob'\n        }\n\n        MyComponent.propTypes = {\n          name: PropTypes.string.isRequired\n        }\n      ", "[\"property assignment\", {\"childContextTypes\": \"static public field\", \"contextTypes\": \"static public field\", \"contextType\": \"static public field\", \"displayName\": \"static public field\", \"defaultProps\": \"static public field\", \"propTypes\": \"static public field\"}]", []string{"notStaticClassProp", "notStaticClassProp", "notStaticClassProp", "notStaticClassProp", "notStaticClassProp", "notStaticClassProp"}},
-		{"upstream invalid 2", "\n        class MyComponent extends React.Component {\n          static get childContextTypes() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n\n          static get contextTypes() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n\n          static get contextType() {\n            return MyContext;\n          }\n\n          static get displayName() {\n            return \"Hello\";\n          }\n\n          static get defaultProps() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n\n          static get propTypes() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n        }\n      ", "", []string{"notStaticClassProp", "notStaticClassProp", "notStaticClassProp", "notStaticClassProp", "notStaticClassProp", "notStaticClassProp"}},
-		{"upstream invalid 3", "\n        class MyComponent extends React.Component {\n          static get childContextTypes() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n\n          static get contextTypes() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n\n          static get contextType() {\n            return MyContext;\n          }\n\n          static get displayName() {\n            return \"Hello\";\n          }\n\n          static get defaultProps() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n\n          static get propTypes() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n        }\n      ", "[\"property assignment\", {\"childContextTypes\": \"static public field\", \"contextTypes\": \"static public field\", \"contextType\": \"static public field\", \"displayName\": \"static public field\", \"defaultProps\": \"static public field\", \"propTypes\": \"static public field\"}]", []string{"notStaticClassProp", "notStaticClassProp", "notStaticClassProp", "notStaticClassProp", "notStaticClassProp", "notStaticClassProp"}},
-		{"upstream invalid 4", "\n        class MyComponent extends React.Component {\n          static childContextTypes = {\n            something: PropTypes.bool\n          };\n\n          static contextTypes = {\n            something: PropTypes.bool\n          };\n\n          static contextType = MyContext;\n\n          static displayName = \"Hello\";\n\n          static defaultProps = {\n            something: 'Bob'\n          };\n\n          static propTypes = {\n            something: PropTypes.bool\n          };\n        }\n      ", "[\"property assignment\"]", []string{"declareOutsideClass", "declareOutsideClass", "declareOutsideClass", "declareOutsideClass", "declareOutsideClass", "declareOutsideClass"}},
-		{"upstream invalid 5", "\n        class MyComponent extends React.Component {\n          static childContextTypes = {\n            something: PropTypes.bool\n          };\n\n          static contextTypes = {\n            something: PropTypes.bool\n          };\n\n          static contextType = MyContext;\n\n          static displayName = \"Hello\";\n\n          static defaultProps = {\n            something: 'Bob'\n          };\n\n          static propTypes = {\n            something: PropTypes.bool\n          };\n        }\n      ", "[\"static public field\", {\"childContextTypes\": \"property assignment\", \"contextTypes\": \"property assignment\", \"contextType\": \"property assignment\", \"displayName\": \"property assignment\", \"defaultProps\": \"property assignment\", \"propTypes\": \"property assignment\"}]", []string{"declareOutsideClass", "declareOutsideClass", "declareOutsideClass", "declareOutsideClass", "declareOutsideClass", "declareOutsideClass"}},
-		{"upstream invalid 6", "\n        class MyComponent extends React.Component {\n          static get childContextTypes() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n\n          static get contextTypes() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n\n          static get contextType() {\n            return MyContext;\n          }\n\n          static get displayName() {\n            return \"Hello\";\n          }\n\n          static get defaultProps() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n\n          static get propTypes() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n        }\n      ", "[\"property assignment\"]", []string{"declareOutsideClass", "declareOutsideClass", "declareOutsideClass", "declareOutsideClass", "declareOutsideClass", "declareOutsideClass"}},
-		{"upstream invalid 7", "\n        class MyComponent extends React.Component {\n          static get childContextTypes() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n\n          static get contextTypes() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n\n          static get contextType() {\n            return MyContext;\n          }\n\n          static get displayName() {\n            return \"Hello\";\n          }\n\n          static get defaultProps() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n\n          static get propTypes() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n        }\n      ", "[\"static getter\", {\"childContextTypes\": \"property assignment\", \"contextTypes\": \"property assignment\", \"contextType\": \"property assignment\", \"displayName\": \"property assignment\", \"defaultProps\": \"property assignment\", \"propTypes\": \"property assignment\"}]", []string{"declareOutsideClass", "declareOutsideClass", "declareOutsideClass", "declareOutsideClass", "declareOutsideClass", "declareOutsideClass"}},
-		{"upstream invalid 8", "\n        class MyComponent extends React.Component {\n          static childContextTypes = {\n            something: PropTypes.bool\n          };\n\n          static contextTypes = {\n            something: PropTypes.bool\n          };\n\n          static contextType = MyContext;\n\n          static displayName = \"Hello\";\n\n          static defaultProps = {\n            something: 'Bob'\n          };\n\n          static propTypes = {\n            something: PropTypes.bool\n          };\n        }\n      ", "[\"static getter\"]", []string{"notGetterClassFunc", "notGetterClassFunc", "notGetterClassFunc", "notGetterClassFunc", "notGetterClassFunc", "notGetterClassFunc"}},
-		{"upstream invalid 9", "\n        class MyComponent extends React.Component {\n          static childContextTypes = {\n            something: PropTypes.bool\n          };\n\n          static contextTypes = {\n            something: PropTypes.bool\n          };\n\n          static contextType = MyContext;\n\n          static displayName = \"Hello\";\n\n          static defaultProps = {\n            something: 'Bob'\n          };\n\n          static propTypes = {\n            something: PropTypes.bool\n          };\n        }\n      ", "[\"static public field\", {\"childContextTypes\": \"static getter\", \"contextTypes\": \"static getter\", \"contextType\": \"static getter\", \"displayName\": \"static getter\", \"defaultProps\": \"static getter\", \"propTypes\": \"static getter\"}]", []string{"notGetterClassFunc", "notGetterClassFunc", "notGetterClassFunc", "notGetterClassFunc", "notGetterClassFunc", "notGetterClassFunc"}},
-		{"upstream invalid 10", "\n        class MyComponent extends React.Component {\n          render() {\n            return null;\n          }\n        }\n\n        MyComponent.childContextTypes = {\n          name: PropTypes.string.isRequired\n        }\n\n        MyComponent.contextTypes = {\n          name: PropTypes.string.isRequired\n        }\n\n        MyComponent.contextType = MyContext;\n\n        MyComponent.displayName = \"Hello\";\n\n        MyComponent.defaultProps = {\n          name: 'Bob'\n        }\n\n        MyComponent.propTypes = {\n          name: PropTypes.string.isRequired\n        }\n      ", "[\"static getter\"]", []string{"notGetterClassFunc", "notGetterClassFunc", "notGetterClassFunc", "notGetterClassFunc", "notGetterClassFunc", "notGetterClassFunc"}},
-		{"upstream invalid 11", "\n        class MyComponent extends React.Component {\n          render() {\n            return null;\n          }\n        }\n\n        MyComponent.childContextTypes = {\n          name: PropTypes.string.isRequired\n        }\n\n        MyComponent.contextTypes = {\n          name: PropTypes.string.isRequired\n        }\n\n        MyComponent.contextType = MyContext;\n\n        MyComponent.displayName = \"Hello\";\n\n        MyComponent.defaultProps = {\n          name: 'Bob'\n        }\n\n        MyComponent.propTypes = {\n          name: PropTypes.string.isRequired\n        }\n      ", "[\"property assignment\", {\"childContextTypes\": \"static getter\", \"contextTypes\": \"static getter\", \"contextType\": \"static getter\", \"displayName\": \"static getter\", \"defaultProps\": \"static getter\", \"propTypes\": \"static getter\"}]", []string{"notGetterClassFunc", "notGetterClassFunc", "notGetterClassFunc", "notGetterClassFunc", "notGetterClassFunc", "notGetterClassFunc"}},
-		{"upstream invalid 12", "\n        class MyComponent extends React.Component {\n          static childContextTypes = {\n            name: PropTypes.string.isRequired\n          }\n\n          static contextTypes = {\n            name: PropTypes.string.isRequired\n          }\n\n          static contextType = MyContext;\n\n          static get displayName() {\n            return \"Hello\";\n          }\n        }\n\n        MyComponent.defaultProps = {\n          name: 'Bob'\n        }\n\n        MyComponent.propTypes = {\n          name: PropTypes.string.isRequired\n        }\n      ", "[\"property assignment\", {\"defaultProps\": \"static getter\", \"propTypes\": \"static public field\", \"displayName\": \"static public field\"}]", []string{"declareOutsideClass", "declareOutsideClass", "declareOutsideClass", "notStaticClassProp", "notGetterClassFunc", "notStaticClassProp"}},
-		{"upstream invalid 13", "\n        class MyComponent extends React.Component {\n          static childContextTypes = {\n            name: PropTypes.string.isRequired\n          }\n\n          static contextTypes = {\n            name: PropTypes.string.isRequired\n          }\n\n          static contextType = MyContext;\n\n          static get displayName() {\n            return \"Hello\";\n          }\n        }\n\n        MyComponent.defaultProps = {\n          name: 'Bob'\n        }\n\n        MyComponent.propTypes = {\n          name: PropTypes.string.isRequired\n        }\n      ", "[\"static getter\", {\"childContextTypes\": \"property assignment\", \"contextTypes\": \"property assignment\", \"contextType\": \"property assignment\", \"displayName\": \"property assignment\"}]", []string{"declareOutsideClass", "declareOutsideClass", "declareOutsideClass", "declareOutsideClass", "notGetterClassFunc", "notGetterClassFunc"}},
-		{"upstream invalid 14", "\n        class MyComponent extends React.Component {\n          static childContextTypes = {\n            name: PropTypes.string.isRequired\n          }\n\n          static contextTypes = {\n            name: PropTypes.string.isRequired\n          }\n\n          static contextType = MyContext;\n\n          static get displayName() {\n            return \"Hello\";\n          }\n        }\n\n        const OtherComponent = () => (<div>Hello</div>);\n\n        OtherComponent.defaultProps = {\n          name: 'Bob'\n        }\n\n        OtherComponent.propTypes = {\n          name: PropTypes.string.isRequired\n        }\n      ", "[\"property assignment\", {\"defaultProps\": \"static public field\", \"propTypes\": \"static getter\"}]", []string{"declareOutsideClass", "declareOutsideClass", "declareOutsideClass", "declareOutsideClass"}},
-		{"upstream invalid 15", "\n        class MyComponent extends React.Component {\n          static childContextTypes = {\n            name: PropTypes.string.isRequired\n          }\n\n          static contextTypes = {\n            name: PropTypes.string.isRequired\n          }\n\n          static contextType = MyContext;\n\n          static displayName = \"Hello\";\n        }\n\n        class OtherComponent extends React.Component {\n          static contextTypes = {\n            name: PropTypes.string.isRequired\n          }\n\n          static defaultProps = {\n            name: 'Bob'\n          }\n\n          static propTypes = {\n            name: PropTypes.string.isRequired\n          }\n\n          static get displayName() {\n            return \"Hello\";\n          }\n        }\n      ", "[\"property assignment\"]", []string{"declareOutsideClass", "declareOutsideClass", "declareOutsideClass", "declareOutsideClass", "declareOutsideClass", "declareOutsideClass", "declareOutsideClass", "declareOutsideClass"}},
-		{"upstream invalid 16", "\n        class MyComponent extends React.Component {\n          displayName = 'Foo';\n        }\n      ", "[\"static public field\"]", []string{"notStaticClassProp"}},
+		{
+			"upstream invalid 0",
+			"\n        class MyComponent extends React.Component {\n          render() {\n            return null;\n          }\n        }\n\n        MyComponent.childContextTypes = {\n          name: PropTypes.string.isRequired\n        }\n\n        MyComponent.contextTypes = {\n          name: PropTypes.string.isRequired\n        }\n\n        MyComponent.contextType = MyContext;\n\n        MyComponent.displayName = \"Hello\";\n\n        MyComponent.defaultProps = {\n          name: 'Bob'\n        }\n\n        MyComponent.propTypes = {\n          name: PropTypes.string.isRequired\n        }\n      ",
+			"",
+			[]string{
+				"notStaticClassProp",
+				"notStaticClassProp",
+				"notStaticClassProp",
+				"notStaticClassProp",
+				"notStaticClassProp",
+				"notStaticClassProp",
+			},
+		},
+		{
+			"upstream invalid 1",
+			"\n        class MyComponent extends React.Component {\n          render() {\n            return null;\n          }\n        }\n\n        MyComponent.childContextTypes = {\n          name: PropTypes.string.isRequired\n        }\n\n        MyComponent.contextTypes = {\n          name: PropTypes.string.isRequired\n        }\n\n        MyComponent.contextType = MyContext;\n\n        MyComponent.displayName = \"Hello\";\n\n        MyComponent.defaultProps = {\n          name: 'Bob'\n        }\n\n        MyComponent.propTypes = {\n          name: PropTypes.string.isRequired\n        }\n      ",
+			"[\"property assignment\", {\"childContextTypes\": \"static public field\", \"contextTypes\": \"static public field\", \"contextType\": \"static public field\", \"displayName\": \"static public field\", \"defaultProps\": \"static public field\", \"propTypes\": \"static public field\"}]",
+			[]string{
+				"notStaticClassProp",
+				"notStaticClassProp",
+				"notStaticClassProp",
+				"notStaticClassProp",
+				"notStaticClassProp",
+				"notStaticClassProp",
+			},
+		},
+		{
+			"upstream invalid 2",
+			"\n        class MyComponent extends React.Component {\n          static get childContextTypes() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n\n          static get contextTypes() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n\n          static get contextType() {\n            return MyContext;\n          }\n\n          static get displayName() {\n            return \"Hello\";\n          }\n\n          static get defaultProps() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n\n          static get propTypes() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n        }\n      ",
+			"",
+			[]string{
+				"notStaticClassProp",
+				"notStaticClassProp",
+				"notStaticClassProp",
+				"notStaticClassProp",
+				"notStaticClassProp",
+				"notStaticClassProp",
+			},
+		},
+		{
+			"upstream invalid 3",
+			"\n        class MyComponent extends React.Component {\n          static get childContextTypes() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n\n          static get contextTypes() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n\n          static get contextType() {\n            return MyContext;\n          }\n\n          static get displayName() {\n            return \"Hello\";\n          }\n\n          static get defaultProps() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n\n          static get propTypes() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n        }\n      ",
+			"[\"property assignment\", {\"childContextTypes\": \"static public field\", \"contextTypes\": \"static public field\", \"contextType\": \"static public field\", \"displayName\": \"static public field\", \"defaultProps\": \"static public field\", \"propTypes\": \"static public field\"}]",
+			[]string{
+				"notStaticClassProp",
+				"notStaticClassProp",
+				"notStaticClassProp",
+				"notStaticClassProp",
+				"notStaticClassProp",
+				"notStaticClassProp",
+			},
+		},
+		{
+			"upstream invalid 4",
+			"\n        class MyComponent extends React.Component {\n          static childContextTypes = {\n            something: PropTypes.bool\n          };\n\n          static contextTypes = {\n            something: PropTypes.bool\n          };\n\n          static contextType = MyContext;\n\n          static displayName = \"Hello\";\n\n          static defaultProps = {\n            something: 'Bob'\n          };\n\n          static propTypes = {\n            something: PropTypes.bool\n          };\n        }\n      ",
+			"[\"property assignment\"]",
+			[]string{
+				"declareOutsideClass",
+				"declareOutsideClass",
+				"declareOutsideClass",
+				"declareOutsideClass",
+				"declareOutsideClass",
+				"declareOutsideClass",
+			},
+		},
+		{
+			"upstream invalid 5",
+			"\n        class MyComponent extends React.Component {\n          static childContextTypes = {\n            something: PropTypes.bool\n          };\n\n          static contextTypes = {\n            something: PropTypes.bool\n          };\n\n          static contextType = MyContext;\n\n          static displayName = \"Hello\";\n\n          static defaultProps = {\n            something: 'Bob'\n          };\n\n          static propTypes = {\n            something: PropTypes.bool\n          };\n        }\n      ",
+			"[\"static public field\", {\"childContextTypes\": \"property assignment\", \"contextTypes\": \"property assignment\", \"contextType\": \"property assignment\", \"displayName\": \"property assignment\", \"defaultProps\": \"property assignment\", \"propTypes\": \"property assignment\"}]",
+			[]string{
+				"declareOutsideClass",
+				"declareOutsideClass",
+				"declareOutsideClass",
+				"declareOutsideClass",
+				"declareOutsideClass",
+				"declareOutsideClass",
+			},
+		},
+		{
+			"upstream invalid 6",
+			"\n        class MyComponent extends React.Component {\n          static get childContextTypes() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n\n          static get contextTypes() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n\n          static get contextType() {\n            return MyContext;\n          }\n\n          static get displayName() {\n            return \"Hello\";\n          }\n\n          static get defaultProps() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n\n          static get propTypes() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n        }\n      ",
+			"[\"property assignment\"]",
+			[]string{
+				"declareOutsideClass",
+				"declareOutsideClass",
+				"declareOutsideClass",
+				"declareOutsideClass",
+				"declareOutsideClass",
+				"declareOutsideClass",
+			},
+		},
+		{
+			"upstream invalid 7",
+			"\n        class MyComponent extends React.Component {\n          static get childContextTypes() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n\n          static get contextTypes() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n\n          static get contextType() {\n            return MyContext;\n          }\n\n          static get displayName() {\n            return \"Hello\";\n          }\n\n          static get defaultProps() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n\n          static get propTypes() {\n            return {\n              something: PropTypes.bool\n            };\n          }\n        }\n      ",
+			"[\"static getter\", {\"childContextTypes\": \"property assignment\", \"contextTypes\": \"property assignment\", \"contextType\": \"property assignment\", \"displayName\": \"property assignment\", \"defaultProps\": \"property assignment\", \"propTypes\": \"property assignment\"}]",
+			[]string{
+				"declareOutsideClass",
+				"declareOutsideClass",
+				"declareOutsideClass",
+				"declareOutsideClass",
+				"declareOutsideClass",
+				"declareOutsideClass",
+			},
+		},
+		{
+			"upstream invalid 8",
+			"\n        class MyComponent extends React.Component {\n          static childContextTypes = {\n            something: PropTypes.bool\n          };\n\n          static contextTypes = {\n            something: PropTypes.bool\n          };\n\n          static contextType = MyContext;\n\n          static displayName = \"Hello\";\n\n          static defaultProps = {\n            something: 'Bob'\n          };\n\n          static propTypes = {\n            something: PropTypes.bool\n          };\n        }\n      ",
+			"[\"static getter\"]",
+			[]string{
+				"notGetterClassFunc",
+				"notGetterClassFunc",
+				"notGetterClassFunc",
+				"notGetterClassFunc",
+				"notGetterClassFunc",
+				"notGetterClassFunc",
+			},
+		},
+		{
+			"upstream invalid 9",
+			"\n        class MyComponent extends React.Component {\n          static childContextTypes = {\n            something: PropTypes.bool\n          };\n\n          static contextTypes = {\n            something: PropTypes.bool\n          };\n\n          static contextType = MyContext;\n\n          static displayName = \"Hello\";\n\n          static defaultProps = {\n            something: 'Bob'\n          };\n\n          static propTypes = {\n            something: PropTypes.bool\n          };\n        }\n      ",
+			"[\"static public field\", {\"childContextTypes\": \"static getter\", \"contextTypes\": \"static getter\", \"contextType\": \"static getter\", \"displayName\": \"static getter\", \"defaultProps\": \"static getter\", \"propTypes\": \"static getter\"}]",
+			[]string{
+				"notGetterClassFunc",
+				"notGetterClassFunc",
+				"notGetterClassFunc",
+				"notGetterClassFunc",
+				"notGetterClassFunc",
+				"notGetterClassFunc",
+			},
+		},
+		{
+			"upstream invalid 10",
+			"\n        class MyComponent extends React.Component {\n          render() {\n            return null;\n          }\n        }\n\n        MyComponent.childContextTypes = {\n          name: PropTypes.string.isRequired\n        }\n\n        MyComponent.contextTypes = {\n          name: PropTypes.string.isRequired\n        }\n\n        MyComponent.contextType = MyContext;\n\n        MyComponent.displayName = \"Hello\";\n\n        MyComponent.defaultProps = {\n          name: 'Bob'\n        }\n\n        MyComponent.propTypes = {\n          name: PropTypes.string.isRequired\n        }\n      ",
+			"[\"static getter\"]",
+			[]string{
+				"notGetterClassFunc",
+				"notGetterClassFunc",
+				"notGetterClassFunc",
+				"notGetterClassFunc",
+				"notGetterClassFunc",
+				"notGetterClassFunc",
+			},
+		},
+		{
+			"upstream invalid 11",
+			"\n        class MyComponent extends React.Component {\n          render() {\n            return null;\n          }\n        }\n\n        MyComponent.childContextTypes = {\n          name: PropTypes.string.isRequired\n        }\n\n        MyComponent.contextTypes = {\n          name: PropTypes.string.isRequired\n        }\n\n        MyComponent.contextType = MyContext;\n\n        MyComponent.displayName = \"Hello\";\n\n        MyComponent.defaultProps = {\n          name: 'Bob'\n        }\n\n        MyComponent.propTypes = {\n          name: PropTypes.string.isRequired\n        }\n      ",
+			"[\"property assignment\", {\"childContextTypes\": \"static getter\", \"contextTypes\": \"static getter\", \"contextType\": \"static getter\", \"displayName\": \"static getter\", \"defaultProps\": \"static getter\", \"propTypes\": \"static getter\"}]",
+			[]string{
+				"notGetterClassFunc",
+				"notGetterClassFunc",
+				"notGetterClassFunc",
+				"notGetterClassFunc",
+				"notGetterClassFunc",
+				"notGetterClassFunc",
+			},
+		},
+		{
+			"upstream invalid 12",
+			"\n        class MyComponent extends React.Component {\n          static childContextTypes = {\n            name: PropTypes.string.isRequired\n          }\n\n          static contextTypes = {\n            name: PropTypes.string.isRequired\n          }\n\n          static contextType = MyContext;\n\n          static get displayName() {\n            return \"Hello\";\n          }\n        }\n\n        MyComponent.defaultProps = {\n          name: 'Bob'\n        }\n\n        MyComponent.propTypes = {\n          name: PropTypes.string.isRequired\n        }\n      ",
+			"[\"property assignment\", {\"defaultProps\": \"static getter\", \"propTypes\": \"static public field\", \"displayName\": \"static public field\"}]",
+			[]string{
+				"declareOutsideClass",
+				"declareOutsideClass",
+				"declareOutsideClass",
+				"notStaticClassProp",
+				"notGetterClassFunc",
+				"notStaticClassProp",
+			},
+		},
+		{
+			"upstream invalid 13",
+			"\n        class MyComponent extends React.Component {\n          static childContextTypes = {\n            name: PropTypes.string.isRequired\n          }\n\n          static contextTypes = {\n            name: PropTypes.string.isRequired\n          }\n\n          static contextType = MyContext;\n\n          static get displayName() {\n            return \"Hello\";\n          }\n        }\n\n        MyComponent.defaultProps = {\n          name: 'Bob'\n        }\n\n        MyComponent.propTypes = {\n          name: PropTypes.string.isRequired\n        }\n      ",
+			"[\"static getter\", {\"childContextTypes\": \"property assignment\", \"contextTypes\": \"property assignment\", \"contextType\": \"property assignment\", \"displayName\": \"property assignment\"}]",
+			[]string{
+				"declareOutsideClass",
+				"declareOutsideClass",
+				"declareOutsideClass",
+				"declareOutsideClass",
+				"notGetterClassFunc",
+				"notGetterClassFunc",
+			},
+		},
+		{
+			"upstream invalid 14",
+			"\n        class MyComponent extends React.Component {\n          static childContextTypes = {\n            name: PropTypes.string.isRequired\n          }\n\n          static contextTypes = {\n            name: PropTypes.string.isRequired\n          }\n\n          static contextType = MyContext;\n\n          static get displayName() {\n            return \"Hello\";\n          }\n        }\n\n        const OtherComponent = () => (<div>Hello</div>);\n\n        OtherComponent.defaultProps = {\n          name: 'Bob'\n        }\n\n        OtherComponent.propTypes = {\n          name: PropTypes.string.isRequired\n        }\n      ",
+			"[\"property assignment\", {\"defaultProps\": \"static public field\", \"propTypes\": \"static getter\"}]",
+			[]string{"declareOutsideClass", "declareOutsideClass", "declareOutsideClass", "declareOutsideClass"},
+		},
+		{
+			"upstream invalid 15",
+			"\n        class MyComponent extends React.Component {\n          static childContextTypes = {\n            name: PropTypes.string.isRequired\n          }\n\n          static contextTypes = {\n            name: PropTypes.string.isRequired\n          }\n\n          static contextType = MyContext;\n\n          static displayName = \"Hello\";\n        }\n\n        class OtherComponent extends React.Component {\n          static contextTypes = {\n            name: PropTypes.string.isRequired\n          }\n\n          static defaultProps = {\n            name: 'Bob'\n          }\n\n          static propTypes = {\n            name: PropTypes.string.isRequired\n          }\n\n          static get displayName() {\n            return \"Hello\";\n          }\n        }\n      ",
+			"[\"property assignment\"]",
+			[]string{
+				"declareOutsideClass",
+				"declareOutsideClass",
+				"declareOutsideClass",
+				"declareOutsideClass",
+				"declareOutsideClass",
+				"declareOutsideClass",
+				"declareOutsideClass",
+				"declareOutsideClass",
+			},
+		},
+		{
+			"upstream invalid 16",
+			"\n        class MyComponent extends React.Component {\n          displayName = 'Foo';\n        }\n      ",
+			"[\"static public field\"]",
+			[]string{"notStaticClassProp"},
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -445,7 +873,9 @@ func TestDecodeStaticPropertyPlacementOptions(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, decodeStaticPropertyPlacementOptionsError := DecodeStaticPropertyPlacementOptions([]byte(testCase.raw))
+			decoded, decodeStaticPropertyPlacementOptionsError := DecodeStaticPropertyPlacementOptions(
+				[]byte(testCase.raw),
+			)
 			if decodeStaticPropertyPlacementOptionsError != nil {
 				test.Fatalf("decode returned %v", decodeStaticPropertyPlacementOptionsError)
 			}
@@ -481,7 +911,9 @@ func TestDecodeStaticPropertyPlacementOptionsRefusesWhatUpstreamRefuses(test *te
 		// A bare string, which the config layer never delivers to a list rule.
 		`"static getter"`,
 	} {
-		if decoded, decodeStaticPropertyPlacementOptionsError := DecodeStaticPropertyPlacementOptions([]byte(raw)); decodeStaticPropertyPlacementOptionsError == nil {
+		if decoded, decodeStaticPropertyPlacementOptionsError := DecodeStaticPropertyPlacementOptions(
+			[]byte(raw),
+		); decodeStaticPropertyPlacementOptionsError == nil {
 			test.Errorf("%s decoded to %+v; it must be refused", raw, decoded)
 		}
 	}

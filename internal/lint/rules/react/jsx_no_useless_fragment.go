@@ -155,7 +155,11 @@ var JsxNoUselessFragment = rule.Rule{
 			if jsxNoUselessFragmentHasLessThanTwoChildren(children) &&
 				!jsxNoUselessFragmentIsOnlyTextAndNotChild(node, children) &&
 				!(settings.AllowExpressions && jsxNoUselessFragmentIsSingleExpression(children)) {
-				jsxNoUselessFragmentReport(ruleContext, node, messageJsxNoUselessFragmentNeedsMoreChildren(ruleContext, children))
+				jsxNoUselessFragmentReport(
+					ruleContext,
+					node,
+					messageJsxNoUselessFragmentNeedsMoreChildren(ruleContext, children),
+				)
 			}
 
 			if jsxNoUselessFragmentIsChildOfHtmlElement(node) {

@@ -99,7 +99,12 @@ func runStdin(ctx context.Context, request stdinRequest, input io.Reader, output
 // stdinTransform is the gate's format transform for one named file: the same engine, the same ignore
 // layers, the same scope a run naming this path would have. A file outside it comes back skipped, and so
 // does an Adamic `.a` file the program does not hold (held is the program's `.a` files; see claimAdamic).
-func stdinTransform(formatter formatEngine, location projectLocation, path string, held map[string]struct{}) (edit.Transform, error) {
+func stdinTransform(
+	formatter formatEngine,
+	location projectLocation,
+	path string,
+	held map[string]struct{},
+) (edit.Transform, error) {
 	if formatter == nil {
 		return nil, nil
 	}
@@ -124,7 +129,12 @@ func stdinTransform(formatter formatEngine, location projectLocation, path strin
 // exactly as applyProposedFixes does. A file outside the program has no rules, so nothing is proposed
 // and only the format transform applies, which is what the gate does with a .md or a .css. held is the
 // program's Adamic `.a` files, for the format transform to know whether this one is source.
-func stdinProposals(ctx context.Context, request stdinRequest, path string, text string) (edit.Propose, map[string]struct{}, error) {
+func stdinProposals(
+	ctx context.Context,
+	request stdinRequest,
+	path string,
+	text string,
+) (edit.Propose, map[string]struct{}, error) {
 	none := func(string, string) ([]edit.Proposal, error) { return nil, nil }
 	if !edit.TypeScriptParsable(path) {
 		return none, nil, nil
@@ -163,7 +173,9 @@ func stdinProposals(ctx context.Context, request stdinRequest, path string, text
 	}
 	var firstPass []edit.Proposal
 	for _, diagnostic := range walk.Diagnostics {
-		if diagnostic.SourceFile == nil || len(diagnostic.Fixes) == 0 || diagnostic.SourceFile.FileName().AsString() != normalized {
+		if diagnostic.SourceFile == nil ||
+			len(diagnostic.Fixes) == 0 ||
+			diagnostic.SourceFile.FileName().AsString() != normalized {
 			continue
 		}
 		for _, proposed := range diagnostic.Fixes {
@@ -183,4 +195,6 @@ func stdinProposals(ctx context.Context, request stdinRequest, path string, text
 
 // errStdinNeedsFix is the refusal for --stdin-filepath without --fix: the mode answers what --fix
 // writes, and any other phase reports rather than writes, so there is nothing for it to answer.
-var errStdinNeedsFix = errors.New("--stdin-filepath answers what --fix writes for one file: pass --fix, and --format to format")
+var errStdinNeedsFix = errors.New(
+	"--stdin-filepath answers what --fix writes for one file: pass --fix, and --format to format",
+)

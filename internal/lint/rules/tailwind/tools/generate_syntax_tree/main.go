@@ -33,8 +33,16 @@ import (
 )
 
 func main() {
-	packageRoot := flag.String("package-root", "", "path to the tailwindcss package root (the directory holding package.json)")
-	output := flag.String("output", filepath.Join("internal", "tailwind", "testdata", "ast_fixtures.json"), "where to write the fixture")
+	packageRoot := flag.String(
+		"package-root",
+		"",
+		"path to the tailwindcss package root (the directory holding package.json)",
+	)
+	output := flag.String(
+		"output",
+		filepath.Join("internal", "tailwind", "testdata", "ast_fixtures.json"),
+		"where to write the fixture",
+	)
 	check := flag.Bool("check", false, "regenerate and fail if the committed fixture disagrees")
 	flag.Parse()
 

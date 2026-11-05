@@ -22,18 +22,39 @@ var (
 // The rule's messages, whose wording lives in `policy/messages/consistency-no-ambiguous-identifier.json`.
 // An `e` finding says which way the rule guessed, as one of the `context` phrase's options.
 var (
-	consistencyNoAmbiguousIdentifierAmbiguousEText   = policy.MessageOf("nexus/consistency-no-ambiguous-identifier", "noAmbiguousE")
-	consistencyNoAmbiguousIdentifierErrorContext     = consistencyNoAmbiguousIdentifierAmbiguousEText.Option("context", "error")
-	consistencyNoAmbiguousIdentifierEventContext     = consistencyNoAmbiguousIdentifierAmbiguousEText.Option("context", "event")
-	consistencyNoAmbiguousIdentifierUnclearContext   = consistencyNoAmbiguousIdentifierAmbiguousEText.Option("context", "unclear")
-	consistencyNoAmbiguousIdentifierSingleLetterText = policy.MessageOf("nexus/consistency-no-ambiguous-identifier", "noSingleLetter")
-	consistencyNoAmbiguousIdentifierUnderscoreText   = policy.MessageOf("nexus/consistency-no-ambiguous-identifier", "noUnderscore")
+	consistencyNoAmbiguousIdentifierAmbiguousEText = policy.MessageOf(
+		"nexus/consistency-no-ambiguous-identifier",
+		"noAmbiguousE",
+	)
+	consistencyNoAmbiguousIdentifierErrorContext = consistencyNoAmbiguousIdentifierAmbiguousEText.Option(
+		"context",
+		"error",
+	)
+	consistencyNoAmbiguousIdentifierEventContext = consistencyNoAmbiguousIdentifierAmbiguousEText.Option(
+		"context",
+		"event",
+	)
+	consistencyNoAmbiguousIdentifierUnclearContext = consistencyNoAmbiguousIdentifierAmbiguousEText.Option(
+		"context",
+		"unclear",
+	)
+	consistencyNoAmbiguousIdentifierSingleLetterText = policy.MessageOf(
+		"nexus/consistency-no-ambiguous-identifier",
+		"noSingleLetter",
+	)
+	consistencyNoAmbiguousIdentifierUnderscoreText = policy.MessageOf(
+		"nexus/consistency-no-ambiguous-identifier",
+		"noUnderscore",
+	)
 )
 
 func messageNoAmbiguousE(context policy.MessageOption, suggestedName string) rule.Message {
 	return rule.Message{
-		Id:          consistencyNoAmbiguousIdentifierAmbiguousEText.Id,
-		Description: consistencyNoAmbiguousIdentifierAmbiguousEText.Render(map[string]string{"suggestedName": suggestedName}, context),
+		Id: consistencyNoAmbiguousIdentifierAmbiguousEText.Id,
+		Description: consistencyNoAmbiguousIdentifierAmbiguousEText.Render(
+			map[string]string{"suggestedName": suggestedName},
+			context,
+		),
 	}
 }
 

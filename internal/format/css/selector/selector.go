@@ -19,7 +19,9 @@ import (
 // namespace bar followed by something other than a word or `*` (`a| b`, `:is(a|)`),
 // where parser.js's namespace() returns without consuming the bar and every caller comes straight
 // back to it. Prettier would hang on such a selector; the port refuses it instead.
-var ErrLoopsForever = errors.New("postcss-selector-parser 2.2.3 never returns on this selector: a namespace bar it does not consume")
+var ErrLoopsForever = errors.New(
+	"postcss-selector-parser 2.2.3 never returns on this selector: a namespace bar it does not consume",
+)
 
 // Parse is processor.js's process(selector) with Prettier's callback: the root the parser builds, or
 // the error it throws, marked printing.Syntax. Upstream's own errors keep their messages ("Unclosed

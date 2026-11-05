@@ -42,9 +42,17 @@ func TestAProgramViewAdmitsExactlyTheDeclaredReads(test *testing.T) {
 		{"Options", ReadsCompilerOptions, func(view Program) { view.Options() }},
 		{"GetCurrentDirectory", ReadsCompilerOptions, func(view Program) { view.GetCurrentDirectory() }},
 		{"UseCaseSensitiveFileNames", ReadsCompilerOptions, func(view Program) { view.UseCaseSensitiveFileNames() }},
-		{"IsSourceFileDefaultLibrary", ReadsDefaultLibrary, func(view Program) { view.IsSourceFileDefaultLibrary("lib.d.ts") }},
+		{
+			"IsSourceFileDefaultLibrary",
+			ReadsDefaultLibrary,
+			func(view Program) { view.IsSourceFileDefaultLibrary("lib.d.ts") },
+		},
 		{"DefaultLibraryPath", ReadsDefaultLibrary, func(view Program) { view.DefaultLibraryPath() }},
-		{"GetSourceFileForResolvedModule", ReadsOtherFiles, func(view Program) { view.GetSourceFileForResolvedModule("other.ts") }},
+		{
+			"GetSourceFileForResolvedModule",
+			ReadsOtherFiles,
+			func(view Program) { view.GetSourceFileForResolvedModule("other.ts") },
+		},
 		{"SourceFiles", ReadsOtherFiles, func(view Program) { view.SourceFiles() }},
 		{"GetSourceFile", ReadsOtherFiles, func(view Program) { view.GetSourceFile("other.ts") }},
 		{"FS", ReadsOtherFiles, func(view Program) { view.FS() }},
@@ -55,13 +63,28 @@ func TestAProgramViewAdmitsExactlyTheDeclaredReads(test *testing.T) {
 		test.Run(method.name, func(test *testing.T) {
 			test.Parallel()
 			refused := refusalOf(func() { method.call(ViewProgram(program, nil, Rule{Name: "probe"})) })
-			if !strings.Contains(refused, "rule probe called Program."+method.name) || !strings.Contains(refused, programReadNames[method.read]) {
+			if !strings.Contains(refused, "rule probe called Program."+method.name) ||
+				!strings.Contains(refused, programReadNames[method.read]) {
 				test.Errorf("an undeclared %s was not refused by name and kind: %q", method.name, refused)
 			}
-			for _, other := range []ProgramRead{ReadsCompilerOptions, ReadsDefaultLibrary, ReadsModuleResolution, ReadsOtherFiles, ReadsDesignSystem} {
-				refused := refusalOf(func() { method.call(ViewProgram(program, nil, Rule{Name: "probe", ProgramReads: other})) })
+			for _, other := range []ProgramRead{
+				ReadsCompilerOptions,
+				ReadsDefaultLibrary,
+				ReadsModuleResolution,
+				ReadsOtherFiles,
+				ReadsDesignSystem,
+			} {
+				refused := refusalOf(
+					func() { method.call(ViewProgram(program, nil, Rule{Name: "probe", ProgramReads: other})) },
+				)
 				if admitted := refused == ""; admitted != (other == method.read) {
-					test.Errorf("%s under a declaration of %s: admitted %v, want %v", method.name, other, admitted, other == method.read)
+					test.Errorf(
+						"%s under a declaration of %s: admitted %v, want %v",
+						method.name,
+						other,
+						admitted,
+						other == method.read,
+					)
 				}
 			}
 		})
@@ -79,7 +102,9 @@ func TestResolvingAnotherFilesImportsIsAReadOfOtherFiles(test *testing.T) {
 		test.Errorf("resolving another file's imports under ReadsModuleResolution alone was not refused: %q", refused)
 	}
 	both := Rule{Name: "probe", ProgramReads: ReadsModuleResolution | ReadsOtherFiles}
-	if refused := refusalOf(func() { ViewProgram(program, nil, both).ResolveModule(fileNamed("other.ts"), nil) }); refused != "" {
+	if refused := refusalOf(
+		func() { ViewProgram(program, nil, both).ResolveModule(fileNamed("other.ts"), nil) },
+	); refused != "" {
 		test.Errorf("resolving another file's imports was refused although ReadsOtherFiles is declared: %q", refused)
 	}
 }
@@ -118,7 +143,10 @@ func endedOf(call func()) (ended string) {
 func TestASlotViewKeptPastItsFileFailsOnEveryRead(test *testing.T) {
 	test.Parallel()
 	program := new(compiler.Program)
-	everything := Rule{Name: "keeps-its-program", ProgramReads: ReadsCompilerOptions | ReadsDefaultLibrary | ReadsModuleResolution | ReadsOtherFiles | ReadsDesignSystem}
+	everything := Rule{
+		Name:         "keeps-its-program",
+		ProgramReads: ReadsCompilerOptions | ReadsDefaultLibrary | ReadsModuleResolution | ReadsOtherFiles | ReadsDesignSystem,
+	}
 	reads := map[string]func(Program){
 		"Options":                        func(view Program) { view.Options() },
 		"GetCurrentDirectory":            func(view Program) { view.GetCurrentDirectory() },

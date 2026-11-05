@@ -19,11 +19,15 @@ import (
 )
 
 var (
-	declarationBeforePattern       = regexp.MustCompile(`[` + javaScriptWhitespaceCharacters + `;]`)
-	importantPattern               = regexp.MustCompile(`(?i)` + javaScriptWhitespaceClass + `*!` + javaScriptWhitespaceClass + `*important`)
-	scssDefaultPattern             = regexp.MustCompile(`(?i)` + javaScriptWhitespaceClass + `*!default`)
-	scssGlobalPattern              = regexp.MustCompile(`(?i)` + javaScriptWhitespaceClass + `*!global`)
-	afterNameTwoNewlinesPattern    = regexp.MustCompile(`^` + javaScriptWhitespaceClass + `*\n` + javaScriptWhitespaceClass + `*\n`)
+	declarationBeforePattern = regexp.MustCompile(`[` + javaScriptWhitespaceCharacters + `;]`)
+	importantPattern         = regexp.MustCompile(
+		`(?i)` + javaScriptWhitespaceClass + `*!` + javaScriptWhitespaceClass + `*important`,
+	)
+	scssDefaultPattern          = regexp.MustCompile(`(?i)` + javaScriptWhitespaceClass + `*!default`)
+	scssGlobalPattern           = regexp.MustCompile(`(?i)` + javaScriptWhitespaceClass + `*!global`)
+	afterNameTwoNewlinesPattern = regexp.MustCompile(
+		`^` + javaScriptWhitespaceClass + `*\n` + javaScriptWhitespaceClass + `*\n`,
+	)
 	afterNameNewlinePattern        = regexp.MustCompile(`^` + javaScriptWhitespaceClass + `*\n`)
 	mediaFeatureSpacesPattern      = regexp.MustCompile(` +`)
 	mediaURLOpeningPattern         = regexp.MustCompile(`(?i)^url\(` + javaScriptWhitespaceClass + `+`)
@@ -254,7 +258,10 @@ func genericPrint(path *astPath, options *printerOptions, print printing.PrintFu
 			choose(len(node.List("nodes")) > 0, func() doc.Doc {
 				return doc.NewGroup(doc.Concat{
 					doc.Text("("),
-					doc.NewIndent(doc.Concat{doc.Softline, doc.Join(doc.Concat{doc.Text(","), doc.LineDoc}, printAll(path, print, "nodes"))}),
+					doc.NewIndent(doc.Concat{
+						doc.Softline,
+						doc.Join(doc.Concat{doc.Text(","), doc.LineDoc}, printAll(path, print, "nodes")),
+					}),
 					doc.Softline,
 					doc.Text(")"),
 				}, doc.GroupOptions{})
@@ -287,7 +294,10 @@ func genericPrint(path *astPath, options *printerOptions, print printing.PrintFu
 	case "value-func":
 		return doc.Concat{
 			doc.Text(node.String("value")),
-			choose(insideAtRuleNode(path, "supports") && isMediaAndSupportsKeywords(node), func() doc.Doc { return doc.Text(" ") }),
+			choose(
+				insideAtRuleNode(path, "supports") && isMediaAndSupportsKeywords(node),
+				func() doc.Doc { return doc.Text(" ") },
+			),
 			print("group", nil),
 		}
 
@@ -377,7 +387,9 @@ func printDeclaration(path *astPath, options *printerOptions, print printing.Pri
 			// node.value.group.group reads without optional chaining, a TypeError upstream where a
 			// link is missing (mustNode); only .groups?.[0] is guarded.
 			(isAtWordPlaceholderNode(mustNode(node.Child("value").Child("group")).Child("group")) ||
-				isAtWordPlaceholderNode(firstNode(mustNode(node.Child("value").Child("group").Child("group")).List("groups"))))) {
+				isAtWordPlaceholderNode(
+					firstNode(mustNode(node.Child("value").Child("group").Child("group")).List("groups")),
+				))) {
 		space = doc.Text("")
 	}
 

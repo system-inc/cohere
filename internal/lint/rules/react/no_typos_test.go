@@ -50,58 +50,467 @@ func TestNoTyposFires(test *testing.T) {
 		wantIds    []string
 		wantTexts  []string
 	}{
-		{"upstream invalid-0", "\n        class Component extends React.Component {\n          static PropTypes = {};\n        }\n      ", []string{"typoStaticClassProp"}, []string{"Typo in static class property declaration"}},
-		{"upstream invalid-1", "\n        class Component extends React.Component {}\n        Component.PropTypes = {}\n      ", []string{"typoStaticClassProp"}, []string{"Typo in static class property declaration"}},
-		{"upstream invalid-2", "\n        function MyComponent() { return (<div>{this.props.myProp}</div>) }\n        MyComponent.PropTypes = {}\n      ", []string{"typoStaticClassProp"}, []string{"Typo in static class property declaration"}},
-		{"upstream invalid-3", "\n        class Component extends React.Component {\n          static proptypes = {};\n        }\n      ", []string{"typoStaticClassProp"}, []string{"Typo in static class property declaration"}},
-		{"upstream invalid-4", "\n        class Component extends React.Component {}\n        Component.proptypes = {}\n      ", []string{"typoStaticClassProp"}, []string{"Typo in static class property declaration"}},
-		{"upstream invalid-5", "\n        function MyComponent() { return (<div>{this.props.myProp}</div>) }\n        MyComponent.proptypes = {}\n      ", []string{"typoStaticClassProp"}, []string{"Typo in static class property declaration"}},
-		{"upstream invalid-6", "\n        class Component extends React.Component {\n          static ContextTypes = {};\n        }\n      ", []string{"typoStaticClassProp"}, []string{"Typo in static class property declaration"}},
-		{"upstream invalid-7", "\n        class Component extends React.Component {}\n        Component.ContextTypes = {}\n      ", []string{"typoStaticClassProp"}, []string{"Typo in static class property declaration"}},
-		{"upstream invalid-8", "\n        function MyComponent() { return (<div>{this.props.myProp}</div>) }\n        MyComponent.ContextTypes = {}\n      ", []string{"typoStaticClassProp"}, []string{"Typo in static class property declaration"}},
-		{"upstream invalid-9", "\n        class Component extends React.Component {\n          static contexttypes = {};\n        }\n      ", []string{"typoStaticClassProp"}, []string{"Typo in static class property declaration"}},
-		{"upstream invalid-10", "\n        class Component extends React.Component {}\n        Component.contexttypes = {}\n      ", []string{"typoStaticClassProp"}, []string{"Typo in static class property declaration"}},
-		{"upstream invalid-11", "\n        function MyComponent() { return (<div>{this.props.myProp}</div>) }\n        MyComponent.contexttypes = {}\n      ", []string{"typoStaticClassProp"}, []string{"Typo in static class property declaration"}},
-		{"upstream invalid-12", "\n        class Component extends React.Component {\n          static ChildContextTypes = {};\n        }\n      ", []string{"typoStaticClassProp"}, []string{"Typo in static class property declaration"}},
-		{"upstream invalid-13", "\n        class Component extends React.Component {}\n        Component.ChildContextTypes = {}\n      ", []string{"typoStaticClassProp"}, []string{"Typo in static class property declaration"}},
-		{"upstream invalid-14", "\n        function MyComponent() { return (<div>{this.props.myProp}</div>) }\n        MyComponent.ChildContextTypes = {}\n      ", []string{"typoStaticClassProp"}, []string{"Typo in static class property declaration"}},
-		{"upstream invalid-15", "\n        class Component extends React.Component {\n          static childcontexttypes = {};\n        }\n      ", []string{"typoStaticClassProp"}, []string{"Typo in static class property declaration"}},
-		{"upstream invalid-16", "\n        class Component extends React.Component {}\n        Component.childcontexttypes = {}\n      ", []string{"typoStaticClassProp"}, []string{"Typo in static class property declaration"}},
-		{"upstream invalid-17", "\n        function MyComponent() { return (<div>{this.props.myProp}</div>) }\n        MyComponent.childcontexttypes = {}\n      ", []string{"typoStaticClassProp"}, []string{"Typo in static class property declaration"}},
-		{"upstream invalid-18", "\n        class Component extends React.Component {\n          static DefaultProps = {};\n        }\n      ", []string{"typoStaticClassProp"}, []string{"Typo in static class property declaration"}},
-		{"upstream invalid-19", "\n        class Component extends React.Component {}\n        Component.DefaultProps = {}\n      ", []string{"typoStaticClassProp"}, []string{"Typo in static class property declaration"}},
-		{"upstream invalid-20", "\n        function MyComponent() { return (<div>{this.props.myProp}</div>) }\n        MyComponent.DefaultProps = {}\n      ", []string{"typoStaticClassProp"}, []string{"Typo in static class property declaration"}},
-		{"upstream invalid-21", "\n        class Component extends React.Component {\n          static defaultprops = {};\n        }\n      ", []string{"typoStaticClassProp"}, []string{"Typo in static class property declaration"}},
-		{"upstream invalid-22", "\n        class Component extends React.Component {}\n        Component.defaultprops = {}\n      ", []string{"typoStaticClassProp"}, []string{"Typo in static class property declaration"}},
-		{"upstream invalid-23", "\n        function MyComponent() { return (<div>{this.props.myProp}</div>) }\n        MyComponent.defaultprops = {}\n      ", []string{"typoStaticClassProp"}, []string{"Typo in static class property declaration"}},
-		{"upstream invalid-24", "\n        Component.defaultprops = {}\n        class Component extends React.Component {}\n      ", []string{"typoStaticClassProp"}, []string{"Typo in static class property declaration"}},
-		{"upstream invalid-26", "\n        class Hello extends React.Component {\n          static GetDerivedStateFromProps()  { }\n          ComponentWillMount() { }\n          UNSAFE_ComponentWillMount() { }\n          ComponentDidMount() { }\n          ComponentWillReceiveProps() { }\n          UNSAFE_ComponentWillReceiveProps() { }\n          ShouldComponentUpdate() { }\n          ComponentWillUpdate() { }\n          UNSAFE_ComponentWillUpdate() { }\n          GetSnapshotBeforeUpdate() { }\n          ComponentDidUpdate() { }\n          ComponentDidCatch() { }\n          ComponentWillUnmount() { }\n          render() {\n            return <div>Hello {this.props.name}</div>;\n          }\n        }\n      ", []string{"typoLifecycleMethod", "typoLifecycleMethod", "typoLifecycleMethod", "typoLifecycleMethod", "typoLifecycleMethod", "typoLifecycleMethod", "typoLifecycleMethod", "typoLifecycleMethod", "typoLifecycleMethod", "typoLifecycleMethod", "typoLifecycleMethod", "typoLifecycleMethod", "typoLifecycleMethod"}, []string{"Typo in component lifecycle method declaration: GetDerivedStateFromProps should be getDerivedStateFromProps", "Typo in component lifecycle method declaration: ComponentWillMount should be componentWillMount", "Typo in component lifecycle method declaration: UNSAFE_ComponentWillMount should be UNSAFE_componentWillMount", "Typo in component lifecycle method declaration: ComponentDidMount should be componentDidMount", "Typo in component lifecycle method declaration: ComponentWillReceiveProps should be componentWillReceiveProps", "Typo in component lifecycle method declaration: UNSAFE_ComponentWillReceiveProps should be UNSAFE_componentWillReceiveProps", "Typo in component lifecycle method declaration: ShouldComponentUpdate should be shouldComponentUpdate", "Typo in component lifecycle method declaration: ComponentWillUpdate should be componentWillUpdate", "Typo in component lifecycle method declaration: UNSAFE_ComponentWillUpdate should be UNSAFE_componentWillUpdate", "Typo in component lifecycle method declaration: GetSnapshotBeforeUpdate should be getSnapshotBeforeUpdate", "Typo in component lifecycle method declaration: ComponentDidUpdate should be componentDidUpdate", "Typo in component lifecycle method declaration: ComponentDidCatch should be componentDidCatch", "Typo in component lifecycle method declaration: ComponentWillUnmount should be componentWillUnmount"}},
-		{"upstream invalid-27", "\n        class Hello extends React.Component {\n          static Getderivedstatefromprops() { }\n          Componentwillmount() { }\n          UNSAFE_Componentwillmount() { }\n          Componentdidmount() { }\n          Componentwillreceiveprops() { }\n          UNSAFE_Componentwillreceiveprops() { }\n          Shouldcomponentupdate() { }\n          Componentwillupdate() { }\n          UNSAFE_Componentwillupdate() { }\n          Getsnapshotbeforeupdate() { }\n          Componentdidupdate() { }\n          Componentdidcatch() { }\n          Componentwillunmount() { }\n          Render() {\n            return <div>Hello {this.props.name}</div>;\n          }\n        }\n      ", []string{"typoLifecycleMethod", "typoLifecycleMethod", "typoLifecycleMethod", "typoLifecycleMethod", "typoLifecycleMethod", "typoLifecycleMethod", "typoLifecycleMethod", "typoLifecycleMethod", "typoLifecycleMethod", "typoLifecycleMethod", "typoLifecycleMethod", "typoLifecycleMethod", "typoLifecycleMethod", "typoLifecycleMethod"}, []string{"Typo in component lifecycle method declaration: Getderivedstatefromprops should be getDerivedStateFromProps", "Typo in component lifecycle method declaration: Componentwillmount should be componentWillMount", "Typo in component lifecycle method declaration: UNSAFE_Componentwillmount should be UNSAFE_componentWillMount", "Typo in component lifecycle method declaration: Componentdidmount should be componentDidMount", "Typo in component lifecycle method declaration: Componentwillreceiveprops should be componentWillReceiveProps", "Typo in component lifecycle method declaration: UNSAFE_Componentwillreceiveprops should be UNSAFE_componentWillReceiveProps", "Typo in component lifecycle method declaration: Shouldcomponentupdate should be shouldComponentUpdate", "Typo in component lifecycle method declaration: Componentwillupdate should be componentWillUpdate", "Typo in component lifecycle method declaration: UNSAFE_Componentwillupdate should be UNSAFE_componentWillUpdate", "Typo in component lifecycle method declaration: Getsnapshotbeforeupdate should be getSnapshotBeforeUpdate", "Typo in component lifecycle method declaration: Componentdidupdate should be componentDidUpdate", "Typo in component lifecycle method declaration: Componentdidcatch should be componentDidCatch", "Typo in component lifecycle method declaration: Componentwillunmount should be componentWillUnmount", "Typo in component lifecycle method declaration: Render should be render"}},
-		{"upstream invalid-28", "\n        class Hello extends React.Component {\n          static getderivedstatefromprops() { }\n          componentwillmount() { }\n          unsafe_componentwillmount() { }\n          componentdidmount() { }\n          componentwillreceiveprops() { }\n          unsafe_componentwillreceiveprops() { }\n          shouldcomponentupdate() { }\n          componentwillupdate() { }\n          unsafe_componentwillupdate() { }\n          getsnapshotbeforeupdate() { }\n          componentdidupdate() { }\n          componentdidcatch() { }\n          componentwillunmount() { }\n          render() {\n            return <div>Hello {this.props.name}</div>;\n          }\n        }\n      ", []string{"typoLifecycleMethod", "typoLifecycleMethod", "typoLifecycleMethod", "typoLifecycleMethod", "typoLifecycleMethod", "typoLifecycleMethod", "typoLifecycleMethod", "typoLifecycleMethod", "typoLifecycleMethod", "typoLifecycleMethod", "typoLifecycleMethod", "typoLifecycleMethod", "typoLifecycleMethod"}, []string{"Typo in component lifecycle method declaration: getderivedstatefromprops should be getDerivedStateFromProps", "Typo in component lifecycle method declaration: componentwillmount should be componentWillMount", "Typo in component lifecycle method declaration: unsafe_componentwillmount should be UNSAFE_componentWillMount", "Typo in component lifecycle method declaration: componentdidmount should be componentDidMount", "Typo in component lifecycle method declaration: componentwillreceiveprops should be componentWillReceiveProps", "Typo in component lifecycle method declaration: unsafe_componentwillreceiveprops should be UNSAFE_componentWillReceiveProps", "Typo in component lifecycle method declaration: shouldcomponentupdate should be shouldComponentUpdate", "Typo in component lifecycle method declaration: componentwillupdate should be componentWillUpdate", "Typo in component lifecycle method declaration: unsafe_componentwillupdate should be UNSAFE_componentWillUpdate", "Typo in component lifecycle method declaration: getsnapshotbeforeupdate should be getSnapshotBeforeUpdate", "Typo in component lifecycle method declaration: componentdidupdate should be componentDidUpdate", "Typo in component lifecycle method declaration: componentdidcatch should be componentDidCatch", "Typo in component lifecycle method declaration: componentwillunmount should be componentWillUnmount"}},
-		{"upstream invalid-29", "\n        import PropTypes from \"prop-types\";\n        class Component extends React.Component {};\n        Component.propTypes = {\n            a: PropTypes.Number.isRequired\n        }\n      ", []string{"typoPropType"}, []string{"Typo in declared prop type: Number"}},
-		{"upstream invalid-30", "\n        import PropTypes from \"prop-types\";\n        class Component extends React.Component {};\n        Component.propTypes = {\n            a: PropTypes.number.isrequired\n        }\n      ", []string{"typoPropTypeChain"}, []string{"Typo in prop type chain qualifier: isrequired"}},
-		{"upstream invalid-31", "\n        import PropTypes from \"prop-types\";\n        class Component extends React.Component {\n          static propTypes = {\n            a: PropTypes.number.isrequired\n          }\n        };\n      ", []string{"typoPropTypeChain"}, []string{"Typo in prop type chain qualifier: isrequired"}},
-		{"upstream invalid-32", "\n        import PropTypes from \"prop-types\";\n        class Component extends React.Component {\n          static propTypes = {\n            a: PropTypes.Number\n          }\n        };\n      ", []string{"typoPropType"}, []string{"Typo in declared prop type: Number"}},
-		{"upstream invalid-33", "\n        import PropTypes from \"prop-types\";\n        class Component extends React.Component {};\n        Component.propTypes = {\n            a: PropTypes.Number\n        }\n      ", []string{"typoPropType"}, []string{"Typo in declared prop type: Number"}},
-		{"upstream invalid-34", "\n        import PropTypes from \"prop-types\";\n        class Component extends React.Component {};\n        Component.propTypes = {\n          a: PropTypes.shape({\n            b: PropTypes.String,\n            c: PropTypes.number.isRequired,\n          })\n        }\n      ", []string{"typoPropType"}, []string{"Typo in declared prop type: String"}},
-		{"upstream invalid-35", "\n        import PropTypes from \"prop-types\";\n        class Component extends React.Component {};\n        Component.propTypes = {\n          a: PropTypes.oneOfType([\n            PropTypes.bools,\n            PropTypes.number,\n          ])\n        }\n      ", []string{"typoPropType"}, []string{"Typo in declared prop type: bools"}},
-		{"upstream invalid-36", "\n        import PropTypes from \"prop-types\";\n        class Component extends React.Component {};\n        Component.propTypes = {\n          a: PropTypes.bools,\n          b: PropTypes.Array,\n          c: PropTypes.function,\n          d: PropTypes.objectof,\n        }\n      ", []string{"typoPropType", "typoPropType", "typoPropType", "typoPropType"}, []string{"Typo in declared prop type: bools", "Typo in declared prop type: Array", "Typo in declared prop type: function", "Typo in declared prop type: objectof"}},
-		{"upstream invalid-37", "\n        import PropTypes from \"prop-types\";\n        class Component extends React.Component {};\n        Component.childContextTypes = {\n          a: PropTypes.bools,\n          b: PropTypes.Array,\n          c: PropTypes.function,\n          d: PropTypes.objectof,\n        }\n      ", []string{"typoPropType", "typoPropType", "typoPropType", "typoPropType"}, []string{"Typo in declared prop type: bools", "Typo in declared prop type: Array", "Typo in declared prop type: function", "Typo in declared prop type: objectof"}},
-		{"upstream invalid-38", "\n        import PropTypes from 'prop-types';\n        class Component extends React.Component {};\n        Component.childContextTypes = {\n          a: PropTypes.bools,\n          b: PropTypes.Array,\n          c: PropTypes.function,\n          d: PropTypes.objectof,\n        }\n      ", []string{"typoPropType", "typoPropType", "typoPropType", "typoPropType"}, []string{"Typo in declared prop type: bools", "Typo in declared prop type: Array", "Typo in declared prop type: function", "Typo in declared prop type: objectof"}},
-		{"upstream invalid-39", "\n        import PropTypes from 'prop-types';\n        class Component extends React.Component {};\n        Component.propTypes = {\n          a: PropTypes.string.isrequired,\n          b: PropTypes.shape({\n            c: PropTypes.number\n          }).isrequired\n        }\n      ", []string{"typoPropTypeChain", "typoPropTypeChain"}, []string{"Typo in prop type chain qualifier: isrequired", "Typo in prop type chain qualifier: isrequired"}},
-		{"upstream invalid-40", "\n        import RealPropTypes from 'prop-types';\n        class Component extends React.Component {};\n        Component.childContextTypes = {\n          a: RealPropTypes.bools,\n          b: RealPropTypes.Array,\n          c: RealPropTypes.function,\n          d: RealPropTypes.objectof,\n        }\n      ", []string{"typoPropType", "typoPropType", "typoPropType", "typoPropType"}, []string{"Typo in declared prop type: bools", "Typo in declared prop type: Array", "Typo in declared prop type: function", "Typo in declared prop type: objectof"}},
-		{"upstream invalid-41", "\n      import React from 'react';\n      class Component extends React.Component {};\n      Component.propTypes = {\n        a: React.PropTypes.string.isrequired,\n        b: React.PropTypes.shape({\n          c: React.PropTypes.number\n        }).isrequired\n      }\n    ", []string{"typoPropTypeChain", "typoPropTypeChain"}, []string{"Typo in prop type chain qualifier: isrequired", "Typo in prop type chain qualifier: isrequired"}},
-		{"upstream invalid-42", "\n        import React from 'react';\n        class Component extends React.Component {};\n        Component.childContextTypes = {\n          a: React.PropTypes.bools,\n          b: React.PropTypes.Array,\n          c: React.PropTypes.function,\n          d: React.PropTypes.objectof,\n        }\n      ", []string{"typoPropType", "typoPropType", "typoPropType", "typoPropType"}, []string{"Typo in declared prop type: bools", "Typo in declared prop type: Array", "Typo in declared prop type: function", "Typo in declared prop type: objectof"}},
-		{"upstream invalid-43", "\n      import { PropTypes } from 'react';\n      class Component extends React.Component {};\n      Component.propTypes = {\n        a: PropTypes.string.isrequired,\n        b: PropTypes.shape({\n          c: PropTypes.number\n        }).isrequired\n      }\n    ", []string{"typoPropTypeChain", "typoPropTypeChain"}, []string{"Typo in prop type chain qualifier: isrequired", "Typo in prop type chain qualifier: isrequired"}},
-		{"upstream invalid-44", "\n      import 'react';\n      class Component extends React.Component {};\n    ", []string{"noReactBinding"}, []string{"`'react'` imported without a local `React` binding."}},
-		{"upstream invalid-45", "\n        import { PropTypes } from 'react';\n        class Component extends React.Component {};\n        Component.childContextTypes = {\n          a: PropTypes.bools,\n          b: PropTypes.Array,\n          c: PropTypes.function,\n          d: PropTypes.objectof,\n        }\n      ", []string{"typoPropType", "typoPropType", "typoPropType", "typoPropType"}, []string{"Typo in declared prop type: bools", "Typo in declared prop type: Array", "Typo in declared prop type: function", "Typo in declared prop type: objectof"}},
-		{"upstream invalid-46", "\n      import PropTypes from 'prop-types';\n      class Component extends React.Component {};\n      Component.propTypes = {\n        a: PropTypes.string.isrequired,\n        b: PropTypes.shape({\n          c: PropTypes.number\n        }).isrequired\n      }\n      ", []string{"typoPropTypeChain", "typoPropTypeChain"}, []string{"Typo in prop type chain qualifier: isrequired", "Typo in prop type chain qualifier: isrequired"}},
-		{"upstream invalid-47", "\n      import PropTypes from 'prop-types';\n      class Component extends React.Component {};\n      Component.propTypes = {\n        a: PropTypes.string.isrequired,\n        b: PropTypes.shape({\n          c: PropTypes.number\n        }).isrequired\n      }\n    ", []string{"typoPropTypeChain", "typoPropTypeChain"}, []string{"Typo in prop type chain qualifier: isrequired", "Typo in prop type chain qualifier: isrequired"}},
-		{"upstream invalid-48", "\n        import React from 'react';\n        import PropTypes from 'prop-types';\n        const Component = React.createReactClass({\n          propTypes: {\n            a: PropTypes.string.isrequired,\n            b: PropTypes.shape({\n              c: PropTypes.number\n            }).isrequired\n          }\n        });\n      ", []string{"typoPropTypeChain", "typoPropTypeChain"}, []string{"Typo in prop type chain qualifier: isrequired", "Typo in prop type chain qualifier: isrequired"}},
-		{"upstream invalid-49", "\n        import React from 'react';\n        import PropTypes from 'prop-types';\n        const Component = React.createReactClass({\n          childContextTypes: {\n            a: PropTypes.bools,\n            b: PropTypes.Array,\n            c: PropTypes.function,\n            d: PropTypes.objectof,\n          }\n        });\n      ", []string{"typoPropType", "typoPropType", "typoPropType", "typoPropType"}, []string{"Typo in declared prop type: bools", "Typo in declared prop type: Array", "Typo in declared prop type: function", "Typo in declared prop type: objectof"}},
-		{"upstream invalid-50", "\n        import React from 'react';\n        const Component = React.createReactClass({\n          proptypes: {},\n          childcontexttypes: {},\n          contexttypes: {},\n          getdefaultProps() { },\n          getinitialState() { },\n          getChildcontext() { },\n          ComponentWillMount() { },\n          ComponentDidMount() { },\n          ComponentWillReceiveProps() { },\n          ShouldComponentUpdate() { },\n          ComponentWillUpdate() { },\n          ComponentDidUpdate() { },\n          ComponentWillUnmount() { },\n          render() {\n            return <div>Hello {this.props.name}</div>;\n          }\n        });\n      ", []string{"typoPropDeclaration", "typoPropDeclaration", "typoPropDeclaration", "typoLifecycleMethod", "typoLifecycleMethod", "typoLifecycleMethod", "typoLifecycleMethod", "typoLifecycleMethod", "typoLifecycleMethod", "typoLifecycleMethod", "typoLifecycleMethod", "typoLifecycleMethod", "typoLifecycleMethod"}, []string{"Typo in property declaration", "Typo in property declaration", "Typo in property declaration", "Typo in component lifecycle method declaration: getdefaultProps should be getDefaultProps", "Typo in component lifecycle method declaration: getinitialState should be getInitialState", "Typo in component lifecycle method declaration: getChildcontext should be getChildContext", "Typo in component lifecycle method declaration: ComponentWillMount should be componentWillMount", "Typo in component lifecycle method declaration: ComponentDidMount should be componentDidMount", "Typo in component lifecycle method declaration: ComponentWillReceiveProps should be componentWillReceiveProps", "Typo in component lifecycle method declaration: ShouldComponentUpdate should be shouldComponentUpdate", "Typo in component lifecycle method declaration: ComponentWillUpdate should be componentWillUpdate", "Typo in component lifecycle method declaration: ComponentDidUpdate should be componentDidUpdate", "Typo in component lifecycle method declaration: ComponentWillUnmount should be componentWillUnmount"}},
-		{"upstream invalid-51", "\n        class Hello extends React.Component {\n          getDerivedStateFromProps() { }\n        }\n      ", []string{"staticLifecycleMethod"}, []string{"Lifecycle method should be static: getDerivedStateFromProps"}},
-		{"upstream invalid-52", "\n        import 'prop-types'\n      ", []string{"noPropTypesBinding"}, []string{"`'prop-types'` imported without a local `PropTypes` binding."}},
+		{
+			"upstream invalid-0",
+			"\n        class Component extends React.Component {\n          static PropTypes = {};\n        }\n      ",
+			[]string{"typoStaticClassProp"},
+			[]string{"Typo in static class property declaration"},
+		},
+		{
+			"upstream invalid-1",
+			"\n        class Component extends React.Component {}\n        Component.PropTypes = {}\n      ",
+			[]string{"typoStaticClassProp"},
+			[]string{"Typo in static class property declaration"},
+		},
+		{
+			"upstream invalid-2",
+			"\n        function MyComponent() { return (<div>{this.props.myProp}</div>) }\n        MyComponent.PropTypes = {}\n      ",
+			[]string{"typoStaticClassProp"},
+			[]string{"Typo in static class property declaration"},
+		},
+		{
+			"upstream invalid-3",
+			"\n        class Component extends React.Component {\n          static proptypes = {};\n        }\n      ",
+			[]string{"typoStaticClassProp"},
+			[]string{"Typo in static class property declaration"},
+		},
+		{
+			"upstream invalid-4",
+			"\n        class Component extends React.Component {}\n        Component.proptypes = {}\n      ",
+			[]string{"typoStaticClassProp"},
+			[]string{"Typo in static class property declaration"},
+		},
+		{
+			"upstream invalid-5",
+			"\n        function MyComponent() { return (<div>{this.props.myProp}</div>) }\n        MyComponent.proptypes = {}\n      ",
+			[]string{"typoStaticClassProp"},
+			[]string{"Typo in static class property declaration"},
+		},
+		{
+			"upstream invalid-6",
+			"\n        class Component extends React.Component {\n          static ContextTypes = {};\n        }\n      ",
+			[]string{"typoStaticClassProp"},
+			[]string{"Typo in static class property declaration"},
+		},
+		{
+			"upstream invalid-7",
+			"\n        class Component extends React.Component {}\n        Component.ContextTypes = {}\n      ",
+			[]string{"typoStaticClassProp"},
+			[]string{"Typo in static class property declaration"},
+		},
+		{
+			"upstream invalid-8",
+			"\n        function MyComponent() { return (<div>{this.props.myProp}</div>) }\n        MyComponent.ContextTypes = {}\n      ",
+			[]string{"typoStaticClassProp"},
+			[]string{"Typo in static class property declaration"},
+		},
+		{
+			"upstream invalid-9",
+			"\n        class Component extends React.Component {\n          static contexttypes = {};\n        }\n      ",
+			[]string{"typoStaticClassProp"},
+			[]string{"Typo in static class property declaration"},
+		},
+		{
+			"upstream invalid-10",
+			"\n        class Component extends React.Component {}\n        Component.contexttypes = {}\n      ",
+			[]string{"typoStaticClassProp"},
+			[]string{"Typo in static class property declaration"},
+		},
+		{
+			"upstream invalid-11",
+			"\n        function MyComponent() { return (<div>{this.props.myProp}</div>) }\n        MyComponent.contexttypes = {}\n      ",
+			[]string{"typoStaticClassProp"},
+			[]string{"Typo in static class property declaration"},
+		},
+		{
+			"upstream invalid-12",
+			"\n        class Component extends React.Component {\n          static ChildContextTypes = {};\n        }\n      ",
+			[]string{"typoStaticClassProp"},
+			[]string{"Typo in static class property declaration"},
+		},
+		{
+			"upstream invalid-13",
+			"\n        class Component extends React.Component {}\n        Component.ChildContextTypes = {}\n      ",
+			[]string{"typoStaticClassProp"},
+			[]string{"Typo in static class property declaration"},
+		},
+		{
+			"upstream invalid-14",
+			"\n        function MyComponent() { return (<div>{this.props.myProp}</div>) }\n        MyComponent.ChildContextTypes = {}\n      ",
+			[]string{"typoStaticClassProp"},
+			[]string{"Typo in static class property declaration"},
+		},
+		{
+			"upstream invalid-15",
+			"\n        class Component extends React.Component {\n          static childcontexttypes = {};\n        }\n      ",
+			[]string{"typoStaticClassProp"},
+			[]string{"Typo in static class property declaration"},
+		},
+		{
+			"upstream invalid-16",
+			"\n        class Component extends React.Component {}\n        Component.childcontexttypes = {}\n      ",
+			[]string{"typoStaticClassProp"},
+			[]string{"Typo in static class property declaration"},
+		},
+		{
+			"upstream invalid-17",
+			"\n        function MyComponent() { return (<div>{this.props.myProp}</div>) }\n        MyComponent.childcontexttypes = {}\n      ",
+			[]string{"typoStaticClassProp"},
+			[]string{"Typo in static class property declaration"},
+		},
+		{
+			"upstream invalid-18",
+			"\n        class Component extends React.Component {\n          static DefaultProps = {};\n        }\n      ",
+			[]string{"typoStaticClassProp"},
+			[]string{"Typo in static class property declaration"},
+		},
+		{
+			"upstream invalid-19",
+			"\n        class Component extends React.Component {}\n        Component.DefaultProps = {}\n      ",
+			[]string{"typoStaticClassProp"},
+			[]string{"Typo in static class property declaration"},
+		},
+		{
+			"upstream invalid-20",
+			"\n        function MyComponent() { return (<div>{this.props.myProp}</div>) }\n        MyComponent.DefaultProps = {}\n      ",
+			[]string{"typoStaticClassProp"},
+			[]string{"Typo in static class property declaration"},
+		},
+		{
+			"upstream invalid-21",
+			"\n        class Component extends React.Component {\n          static defaultprops = {};\n        }\n      ",
+			[]string{"typoStaticClassProp"},
+			[]string{"Typo in static class property declaration"},
+		},
+		{
+			"upstream invalid-22",
+			"\n        class Component extends React.Component {}\n        Component.defaultprops = {}\n      ",
+			[]string{"typoStaticClassProp"},
+			[]string{"Typo in static class property declaration"},
+		},
+		{
+			"upstream invalid-23",
+			"\n        function MyComponent() { return (<div>{this.props.myProp}</div>) }\n        MyComponent.defaultprops = {}\n      ",
+			[]string{"typoStaticClassProp"},
+			[]string{"Typo in static class property declaration"},
+		},
+		{
+			"upstream invalid-24",
+			"\n        Component.defaultprops = {}\n        class Component extends React.Component {}\n      ",
+			[]string{"typoStaticClassProp"},
+			[]string{"Typo in static class property declaration"},
+		},
+		{
+			"upstream invalid-26",
+			"\n        class Hello extends React.Component {\n          static GetDerivedStateFromProps()  { }\n          ComponentWillMount() { }\n          UNSAFE_ComponentWillMount() { }\n          ComponentDidMount() { }\n          ComponentWillReceiveProps() { }\n          UNSAFE_ComponentWillReceiveProps() { }\n          ShouldComponentUpdate() { }\n          ComponentWillUpdate() { }\n          UNSAFE_ComponentWillUpdate() { }\n          GetSnapshotBeforeUpdate() { }\n          ComponentDidUpdate() { }\n          ComponentDidCatch() { }\n          ComponentWillUnmount() { }\n          render() {\n            return <div>Hello {this.props.name}</div>;\n          }\n        }\n      ",
+			[]string{
+				"typoLifecycleMethod",
+				"typoLifecycleMethod",
+				"typoLifecycleMethod",
+				"typoLifecycleMethod",
+				"typoLifecycleMethod",
+				"typoLifecycleMethod",
+				"typoLifecycleMethod",
+				"typoLifecycleMethod",
+				"typoLifecycleMethod",
+				"typoLifecycleMethod",
+				"typoLifecycleMethod",
+				"typoLifecycleMethod",
+				"typoLifecycleMethod",
+			},
+			[]string{
+				"Typo in component lifecycle method declaration: GetDerivedStateFromProps should be getDerivedStateFromProps",
+				"Typo in component lifecycle method declaration: ComponentWillMount should be componentWillMount",
+				"Typo in component lifecycle method declaration: UNSAFE_ComponentWillMount should be UNSAFE_componentWillMount",
+				"Typo in component lifecycle method declaration: ComponentDidMount should be componentDidMount",
+				"Typo in component lifecycle method declaration: ComponentWillReceiveProps should be componentWillReceiveProps",
+				"Typo in component lifecycle method declaration: UNSAFE_ComponentWillReceiveProps should be UNSAFE_componentWillReceiveProps",
+				"Typo in component lifecycle method declaration: ShouldComponentUpdate should be shouldComponentUpdate",
+				"Typo in component lifecycle method declaration: ComponentWillUpdate should be componentWillUpdate",
+				"Typo in component lifecycle method declaration: UNSAFE_ComponentWillUpdate should be UNSAFE_componentWillUpdate",
+				"Typo in component lifecycle method declaration: GetSnapshotBeforeUpdate should be getSnapshotBeforeUpdate",
+				"Typo in component lifecycle method declaration: ComponentDidUpdate should be componentDidUpdate",
+				"Typo in component lifecycle method declaration: ComponentDidCatch should be componentDidCatch",
+				"Typo in component lifecycle method declaration: ComponentWillUnmount should be componentWillUnmount",
+			},
+		},
+		{
+			"upstream invalid-27",
+			"\n        class Hello extends React.Component {\n          static Getderivedstatefromprops() { }\n          Componentwillmount() { }\n          UNSAFE_Componentwillmount() { }\n          Componentdidmount() { }\n          Componentwillreceiveprops() { }\n          UNSAFE_Componentwillreceiveprops() { }\n          Shouldcomponentupdate() { }\n          Componentwillupdate() { }\n          UNSAFE_Componentwillupdate() { }\n          Getsnapshotbeforeupdate() { }\n          Componentdidupdate() { }\n          Componentdidcatch() { }\n          Componentwillunmount() { }\n          Render() {\n            return <div>Hello {this.props.name}</div>;\n          }\n        }\n      ",
+			[]string{
+				"typoLifecycleMethod",
+				"typoLifecycleMethod",
+				"typoLifecycleMethod",
+				"typoLifecycleMethod",
+				"typoLifecycleMethod",
+				"typoLifecycleMethod",
+				"typoLifecycleMethod",
+				"typoLifecycleMethod",
+				"typoLifecycleMethod",
+				"typoLifecycleMethod",
+				"typoLifecycleMethod",
+				"typoLifecycleMethod",
+				"typoLifecycleMethod",
+				"typoLifecycleMethod",
+			},
+			[]string{
+				"Typo in component lifecycle method declaration: Getderivedstatefromprops should be getDerivedStateFromProps",
+				"Typo in component lifecycle method declaration: Componentwillmount should be componentWillMount",
+				"Typo in component lifecycle method declaration: UNSAFE_Componentwillmount should be UNSAFE_componentWillMount",
+				"Typo in component lifecycle method declaration: Componentdidmount should be componentDidMount",
+				"Typo in component lifecycle method declaration: Componentwillreceiveprops should be componentWillReceiveProps",
+				"Typo in component lifecycle method declaration: UNSAFE_Componentwillreceiveprops should be UNSAFE_componentWillReceiveProps",
+				"Typo in component lifecycle method declaration: Shouldcomponentupdate should be shouldComponentUpdate",
+				"Typo in component lifecycle method declaration: Componentwillupdate should be componentWillUpdate",
+				"Typo in component lifecycle method declaration: UNSAFE_Componentwillupdate should be UNSAFE_componentWillUpdate",
+				"Typo in component lifecycle method declaration: Getsnapshotbeforeupdate should be getSnapshotBeforeUpdate",
+				"Typo in component lifecycle method declaration: Componentdidupdate should be componentDidUpdate",
+				"Typo in component lifecycle method declaration: Componentdidcatch should be componentDidCatch",
+				"Typo in component lifecycle method declaration: Componentwillunmount should be componentWillUnmount",
+				"Typo in component lifecycle method declaration: Render should be render",
+			},
+		},
+		{
+			"upstream invalid-28",
+			"\n        class Hello extends React.Component {\n          static getderivedstatefromprops() { }\n          componentwillmount() { }\n          unsafe_componentwillmount() { }\n          componentdidmount() { }\n          componentwillreceiveprops() { }\n          unsafe_componentwillreceiveprops() { }\n          shouldcomponentupdate() { }\n          componentwillupdate() { }\n          unsafe_componentwillupdate() { }\n          getsnapshotbeforeupdate() { }\n          componentdidupdate() { }\n          componentdidcatch() { }\n          componentwillunmount() { }\n          render() {\n            return <div>Hello {this.props.name}</div>;\n          }\n        }\n      ",
+			[]string{
+				"typoLifecycleMethod",
+				"typoLifecycleMethod",
+				"typoLifecycleMethod",
+				"typoLifecycleMethod",
+				"typoLifecycleMethod",
+				"typoLifecycleMethod",
+				"typoLifecycleMethod",
+				"typoLifecycleMethod",
+				"typoLifecycleMethod",
+				"typoLifecycleMethod",
+				"typoLifecycleMethod",
+				"typoLifecycleMethod",
+				"typoLifecycleMethod",
+			},
+			[]string{
+				"Typo in component lifecycle method declaration: getderivedstatefromprops should be getDerivedStateFromProps",
+				"Typo in component lifecycle method declaration: componentwillmount should be componentWillMount",
+				"Typo in component lifecycle method declaration: unsafe_componentwillmount should be UNSAFE_componentWillMount",
+				"Typo in component lifecycle method declaration: componentdidmount should be componentDidMount",
+				"Typo in component lifecycle method declaration: componentwillreceiveprops should be componentWillReceiveProps",
+				"Typo in component lifecycle method declaration: unsafe_componentwillreceiveprops should be UNSAFE_componentWillReceiveProps",
+				"Typo in component lifecycle method declaration: shouldcomponentupdate should be shouldComponentUpdate",
+				"Typo in component lifecycle method declaration: componentwillupdate should be componentWillUpdate",
+				"Typo in component lifecycle method declaration: unsafe_componentwillupdate should be UNSAFE_componentWillUpdate",
+				"Typo in component lifecycle method declaration: getsnapshotbeforeupdate should be getSnapshotBeforeUpdate",
+				"Typo in component lifecycle method declaration: componentdidupdate should be componentDidUpdate",
+				"Typo in component lifecycle method declaration: componentdidcatch should be componentDidCatch",
+				"Typo in component lifecycle method declaration: componentwillunmount should be componentWillUnmount",
+			},
+		},
+		{
+			"upstream invalid-29",
+			"\n        import PropTypes from \"prop-types\";\n        class Component extends React.Component {};\n        Component.propTypes = {\n            a: PropTypes.Number.isRequired\n        }\n      ",
+			[]string{"typoPropType"},
+			[]string{"Typo in declared prop type: Number"},
+		},
+		{
+			"upstream invalid-30",
+			"\n        import PropTypes from \"prop-types\";\n        class Component extends React.Component {};\n        Component.propTypes = {\n            a: PropTypes.number.isrequired\n        }\n      ",
+			[]string{"typoPropTypeChain"},
+			[]string{"Typo in prop type chain qualifier: isrequired"},
+		},
+		{
+			"upstream invalid-31",
+			"\n        import PropTypes from \"prop-types\";\n        class Component extends React.Component {\n          static propTypes = {\n            a: PropTypes.number.isrequired\n          }\n        };\n      ",
+			[]string{"typoPropTypeChain"},
+			[]string{"Typo in prop type chain qualifier: isrequired"},
+		},
+		{
+			"upstream invalid-32",
+			"\n        import PropTypes from \"prop-types\";\n        class Component extends React.Component {\n          static propTypes = {\n            a: PropTypes.Number\n          }\n        };\n      ",
+			[]string{"typoPropType"},
+			[]string{"Typo in declared prop type: Number"},
+		},
+		{
+			"upstream invalid-33",
+			"\n        import PropTypes from \"prop-types\";\n        class Component extends React.Component {};\n        Component.propTypes = {\n            a: PropTypes.Number\n        }\n      ",
+			[]string{"typoPropType"},
+			[]string{"Typo in declared prop type: Number"},
+		},
+		{
+			"upstream invalid-34",
+			"\n        import PropTypes from \"prop-types\";\n        class Component extends React.Component {};\n        Component.propTypes = {\n          a: PropTypes.shape({\n            b: PropTypes.String,\n            c: PropTypes.number.isRequired,\n          })\n        }\n      ",
+			[]string{"typoPropType"},
+			[]string{"Typo in declared prop type: String"},
+		},
+		{
+			"upstream invalid-35",
+			"\n        import PropTypes from \"prop-types\";\n        class Component extends React.Component {};\n        Component.propTypes = {\n          a: PropTypes.oneOfType([\n            PropTypes.bools,\n            PropTypes.number,\n          ])\n        }\n      ",
+			[]string{"typoPropType"},
+			[]string{"Typo in declared prop type: bools"},
+		},
+		{
+			"upstream invalid-36",
+			"\n        import PropTypes from \"prop-types\";\n        class Component extends React.Component {};\n        Component.propTypes = {\n          a: PropTypes.bools,\n          b: PropTypes.Array,\n          c: PropTypes.function,\n          d: PropTypes.objectof,\n        }\n      ",
+			[]string{"typoPropType", "typoPropType", "typoPropType", "typoPropType"},
+			[]string{
+				"Typo in declared prop type: bools",
+				"Typo in declared prop type: Array",
+				"Typo in declared prop type: function",
+				"Typo in declared prop type: objectof",
+			},
+		},
+		{
+			"upstream invalid-37",
+			"\n        import PropTypes from \"prop-types\";\n        class Component extends React.Component {};\n        Component.childContextTypes = {\n          a: PropTypes.bools,\n          b: PropTypes.Array,\n          c: PropTypes.function,\n          d: PropTypes.objectof,\n        }\n      ",
+			[]string{"typoPropType", "typoPropType", "typoPropType", "typoPropType"},
+			[]string{
+				"Typo in declared prop type: bools",
+				"Typo in declared prop type: Array",
+				"Typo in declared prop type: function",
+				"Typo in declared prop type: objectof",
+			},
+		},
+		{
+			"upstream invalid-38",
+			"\n        import PropTypes from 'prop-types';\n        class Component extends React.Component {};\n        Component.childContextTypes = {\n          a: PropTypes.bools,\n          b: PropTypes.Array,\n          c: PropTypes.function,\n          d: PropTypes.objectof,\n        }\n      ",
+			[]string{"typoPropType", "typoPropType", "typoPropType", "typoPropType"},
+			[]string{
+				"Typo in declared prop type: bools",
+				"Typo in declared prop type: Array",
+				"Typo in declared prop type: function",
+				"Typo in declared prop type: objectof",
+			},
+		},
+		{
+			"upstream invalid-39",
+			"\n        import PropTypes from 'prop-types';\n        class Component extends React.Component {};\n        Component.propTypes = {\n          a: PropTypes.string.isrequired,\n          b: PropTypes.shape({\n            c: PropTypes.number\n          }).isrequired\n        }\n      ",
+			[]string{"typoPropTypeChain", "typoPropTypeChain"},
+			[]string{"Typo in prop type chain qualifier: isrequired", "Typo in prop type chain qualifier: isrequired"},
+		},
+		{
+			"upstream invalid-40",
+			"\n        import RealPropTypes from 'prop-types';\n        class Component extends React.Component {};\n        Component.childContextTypes = {\n          a: RealPropTypes.bools,\n          b: RealPropTypes.Array,\n          c: RealPropTypes.function,\n          d: RealPropTypes.objectof,\n        }\n      ",
+			[]string{"typoPropType", "typoPropType", "typoPropType", "typoPropType"},
+			[]string{
+				"Typo in declared prop type: bools",
+				"Typo in declared prop type: Array",
+				"Typo in declared prop type: function",
+				"Typo in declared prop type: objectof",
+			},
+		},
+		{
+			"upstream invalid-41",
+			"\n      import React from 'react';\n      class Component extends React.Component {};\n      Component.propTypes = {\n        a: React.PropTypes.string.isrequired,\n        b: React.PropTypes.shape({\n          c: React.PropTypes.number\n        }).isrequired\n      }\n    ",
+			[]string{"typoPropTypeChain", "typoPropTypeChain"},
+			[]string{"Typo in prop type chain qualifier: isrequired", "Typo in prop type chain qualifier: isrequired"},
+		},
+		{
+			"upstream invalid-42",
+			"\n        import React from 'react';\n        class Component extends React.Component {};\n        Component.childContextTypes = {\n          a: React.PropTypes.bools,\n          b: React.PropTypes.Array,\n          c: React.PropTypes.function,\n          d: React.PropTypes.objectof,\n        }\n      ",
+			[]string{"typoPropType", "typoPropType", "typoPropType", "typoPropType"},
+			[]string{
+				"Typo in declared prop type: bools",
+				"Typo in declared prop type: Array",
+				"Typo in declared prop type: function",
+				"Typo in declared prop type: objectof",
+			},
+		},
+		{
+			"upstream invalid-43",
+			"\n      import { PropTypes } from 'react';\n      class Component extends React.Component {};\n      Component.propTypes = {\n        a: PropTypes.string.isrequired,\n        b: PropTypes.shape({\n          c: PropTypes.number\n        }).isrequired\n      }\n    ",
+			[]string{"typoPropTypeChain", "typoPropTypeChain"},
+			[]string{"Typo in prop type chain qualifier: isrequired", "Typo in prop type chain qualifier: isrequired"},
+		},
+		{
+			"upstream invalid-44",
+			"\n      import 'react';\n      class Component extends React.Component {};\n    ",
+			[]string{"noReactBinding"},
+			[]string{"`'react'` imported without a local `React` binding."},
+		},
+		{
+			"upstream invalid-45",
+			"\n        import { PropTypes } from 'react';\n        class Component extends React.Component {};\n        Component.childContextTypes = {\n          a: PropTypes.bools,\n          b: PropTypes.Array,\n          c: PropTypes.function,\n          d: PropTypes.objectof,\n        }\n      ",
+			[]string{"typoPropType", "typoPropType", "typoPropType", "typoPropType"},
+			[]string{
+				"Typo in declared prop type: bools",
+				"Typo in declared prop type: Array",
+				"Typo in declared prop type: function",
+				"Typo in declared prop type: objectof",
+			},
+		},
+		{
+			"upstream invalid-46",
+			"\n      import PropTypes from 'prop-types';\n      class Component extends React.Component {};\n      Component.propTypes = {\n        a: PropTypes.string.isrequired,\n        b: PropTypes.shape({\n          c: PropTypes.number\n        }).isrequired\n      }\n      ",
+			[]string{"typoPropTypeChain", "typoPropTypeChain"},
+			[]string{"Typo in prop type chain qualifier: isrequired", "Typo in prop type chain qualifier: isrequired"},
+		},
+		{
+			"upstream invalid-47",
+			"\n      import PropTypes from 'prop-types';\n      class Component extends React.Component {};\n      Component.propTypes = {\n        a: PropTypes.string.isrequired,\n        b: PropTypes.shape({\n          c: PropTypes.number\n        }).isrequired\n      }\n    ",
+			[]string{"typoPropTypeChain", "typoPropTypeChain"},
+			[]string{"Typo in prop type chain qualifier: isrequired", "Typo in prop type chain qualifier: isrequired"},
+		},
+		{
+			"upstream invalid-48",
+			"\n        import React from 'react';\n        import PropTypes from 'prop-types';\n        const Component = React.createReactClass({\n          propTypes: {\n            a: PropTypes.string.isrequired,\n            b: PropTypes.shape({\n              c: PropTypes.number\n            }).isrequired\n          }\n        });\n      ",
+			[]string{"typoPropTypeChain", "typoPropTypeChain"},
+			[]string{"Typo in prop type chain qualifier: isrequired", "Typo in prop type chain qualifier: isrequired"},
+		},
+		{
+			"upstream invalid-49",
+			"\n        import React from 'react';\n        import PropTypes from 'prop-types';\n        const Component = React.createReactClass({\n          childContextTypes: {\n            a: PropTypes.bools,\n            b: PropTypes.Array,\n            c: PropTypes.function,\n            d: PropTypes.objectof,\n          }\n        });\n      ",
+			[]string{"typoPropType", "typoPropType", "typoPropType", "typoPropType"},
+			[]string{
+				"Typo in declared prop type: bools",
+				"Typo in declared prop type: Array",
+				"Typo in declared prop type: function",
+				"Typo in declared prop type: objectof",
+			},
+		},
+		{
+			"upstream invalid-50",
+			"\n        import React from 'react';\n        const Component = React.createReactClass({\n          proptypes: {},\n          childcontexttypes: {},\n          contexttypes: {},\n          getdefaultProps() { },\n          getinitialState() { },\n          getChildcontext() { },\n          ComponentWillMount() { },\n          ComponentDidMount() { },\n          ComponentWillReceiveProps() { },\n          ShouldComponentUpdate() { },\n          ComponentWillUpdate() { },\n          ComponentDidUpdate() { },\n          ComponentWillUnmount() { },\n          render() {\n            return <div>Hello {this.props.name}</div>;\n          }\n        });\n      ",
+			[]string{
+				"typoPropDeclaration",
+				"typoPropDeclaration",
+				"typoPropDeclaration",
+				"typoLifecycleMethod",
+				"typoLifecycleMethod",
+				"typoLifecycleMethod",
+				"typoLifecycleMethod",
+				"typoLifecycleMethod",
+				"typoLifecycleMethod",
+				"typoLifecycleMethod",
+				"typoLifecycleMethod",
+				"typoLifecycleMethod",
+				"typoLifecycleMethod",
+			},
+			[]string{
+				"Typo in property declaration",
+				"Typo in property declaration",
+				"Typo in property declaration",
+				"Typo in component lifecycle method declaration: getdefaultProps should be getDefaultProps",
+				"Typo in component lifecycle method declaration: getinitialState should be getInitialState",
+				"Typo in component lifecycle method declaration: getChildcontext should be getChildContext",
+				"Typo in component lifecycle method declaration: ComponentWillMount should be componentWillMount",
+				"Typo in component lifecycle method declaration: ComponentDidMount should be componentDidMount",
+				"Typo in component lifecycle method declaration: ComponentWillReceiveProps should be componentWillReceiveProps",
+				"Typo in component lifecycle method declaration: ShouldComponentUpdate should be shouldComponentUpdate",
+				"Typo in component lifecycle method declaration: ComponentWillUpdate should be componentWillUpdate",
+				"Typo in component lifecycle method declaration: ComponentDidUpdate should be componentDidUpdate",
+				"Typo in component lifecycle method declaration: ComponentWillUnmount should be componentWillUnmount",
+			},
+		},
+		{
+			"upstream invalid-51",
+			"\n        class Hello extends React.Component {\n          getDerivedStateFromProps() { }\n        }\n      ",
+			[]string{"staticLifecycleMethod"},
+			[]string{"Lifecycle method should be static: getDerivedStateFromProps"},
+		},
+		{
+			"upstream invalid-52",
+			"\n        import 'prop-types'\n      ",
+			[]string{"noPropTypesBinding"},
+			[]string{"`'prop-types'` imported without a local `PropTypes` binding."},
+		},
 	}
 
 	for _, testCase := range cases {
@@ -121,49 +530,178 @@ func TestNoTyposStaysSilent(test *testing.T) {
 		name       string
 		sourceText string
 	}{
-		{"upstream valid-0", "\n          import createReactClass from 'create-react-class'\n          function hello (extra = {}) {\n            return createReactClass({\n              noteType: 'hello',\n              renderItem () {\n                return null\n              },\n              ...extra\n            })\n          }\n      "},
-		{"upstream valid-1", "\n        class First {\n          static PropTypes = {key: \"myValue\"};\n          static ContextTypes = {key: \"myValue\"};\n          static ChildContextTypes = {key: \"myValue\"};\n          static DefaultProps = {key: \"myValue\"};\n        }\n      "},
-		{"upstream valid-2", "\n        class First {}\n        First.PropTypes = {key: \"myValue\"};\n        First.ContextTypes = {key: \"myValue\"};\n        First.ChildContextTypes = {key: \"myValue\"};\n        First.DefaultProps = {key: \"myValue\"};\n      "},
-		{"upstream valid-3", "\n        class First extends React.Component {\n          static propTypes = {key: \"myValue\"};\n          static contextTypes = {key: \"myValue\"};\n          static childContextTypes = {key: \"myValue\"};\n          static defaultProps = {key: \"myValue\"};\n        }\n      "},
-		{"upstream valid-4", "\n        class First extends React.Component {}\n        First.propTypes = {key: \"myValue\"};\n        First.contextTypes = {key: \"myValue\"};\n        First.childContextTypes = {key: \"myValue\"};\n        First.defaultProps = {key: \"myValue\"};\n      "},
-		{"upstream valid-5", "\n        class MyClass {\n          propTypes = {key: \"myValue\"};\n          contextTypes = {key: \"myValue\"};\n          childContextTypes = {key: \"myValue\"};\n          defaultProps = {key: \"myValue\"};\n        }\n      "},
-		{"upstream valid-6", "\n        class MyClass {\n          PropTypes = {key: \"myValue\"};\n          ContextTypes = {key: \"myValue\"};\n          ChildContextTypes = {key: \"myValue\"};\n          DefaultProps = {key: \"myValue\"};\n        }\n      "},
-		{"upstream valid-7", "\n        class MyClass {\n          proptypes = {key: \"myValue\"};\n          contexttypes = {key: \"myValue\"};\n          childcontextypes = {key: \"myValue\"};\n          defaultprops = {key: \"myValue\"};\n        }\n      "},
-		{"upstream valid-8", "\n        class MyClass {\n          static PropTypes() {};\n          static ContextTypes() {};\n          static ChildContextTypes() {};\n          static DefaultProps() {};\n        }\n      "},
-		{"upstream valid-9", "\n        class MyClass {\n          static proptypes() {};\n          static contexttypes() {};\n          static childcontexttypes() {};\n          static defaultprops() {};\n        }\n      "},
-		{"upstream valid-10", "\n        class MyClass {}\n        MyClass.prototype.PropTypes = function() {};\n        MyClass.prototype.ContextTypes = function() {};\n        MyClass.prototype.ChildContextTypes = function() {};\n        MyClass.prototype.DefaultProps = function() {};\n      "},
-		{"upstream valid-11", "\n        class MyClass {}\n        MyClass.PropTypes = function() {};\n        MyClass.ContextTypes = function() {};\n        MyClass.ChildContextTypes = function() {};\n        MyClass.DefaultProps = function() {};\n      "},
-		{"upstream valid-12", "\n        function MyRandomFunction() {}\n        MyRandomFunction.PropTypes = {};\n        MyRandomFunction.ContextTypes = {};\n        MyRandomFunction.ChildContextTypes = {};\n        MyRandomFunction.DefaultProps = {};\n      "},
-		{"upstream valid-13", "\n        class First extends React.Component {}\n        First[\"prop\" + \"Types\"] = {};\n        First[\"context\" + \"Types\"] = {};\n        First[\"childContext\" + \"Types\"] = {};\n        First[\"default\" + \"Props\"] = {};\n      "},
-		{"upstream valid-14", "\n        class First extends React.Component {}\n        First[\"PROP\" + \"TYPES\"] = {};\n        First[\"CONTEXT\" + \"TYPES\"] = {};\n        First[\"CHILDCONTEXT\" + \"TYPES\"] = {};\n        First[\"DEFAULT\" + \"PROPS\"] = {};\n      "},
-		{"upstream valid-15", "\n        const propTypes = \"PROPTYPES\"\n        const contextTypes = \"CONTEXTTYPES\"\n        const childContextTypes = \"CHILDCONTEXTTYPES\"\n        const defaultProps = \"DEFAULTPROPS\"\n\n        class First extends React.Component {}\n        First[propTypes] = {};\n        First[contextTypes] = {};\n        First[childContextTypes] = {};\n        First[defaultProps] = {};\n      "},
-		{"upstream valid-16", "\n        class Hello extends React.Component {\n          static getDerivedStateFromProps() { }\n          componentWillMount() { }\n          componentDidMount() { }\n          componentWillReceiveProps() { }\n          shouldComponentUpdate() { }\n          componentWillUpdate() { }\n          componentDidUpdate() { }\n          componentWillUnmount() { }\n          render() {\n            return <div>Hello {this.props.name}</div>;\n          }\n        }\n      "},
-		{"upstream valid-17", "\n        class Hello extends React.Component {\n          \"componentDidMount\"() { }\n          \"my-method\"() { }\n        }\n      "},
-		{"upstream valid-18", "\n        class MyClass {\n          componentWillMount() { }\n          componentDidMount() { }\n          componentWillReceiveProps() { }\n          shouldComponentUpdate() { }\n          componentWillUpdate() { }\n          componentDidUpdate() { }\n          componentWillUnmount() { }\n          render() { }\n        }\n      "},
-		{"upstream valid-19", "\n        class MyClass {\n          componentwillmount() { }\n          componentdidmount() { }\n          componentwillreceiveprops() { }\n          shouldcomponentupdate() { }\n          componentwillupdate() { }\n          componentdidupdate() { }\n          componentwillUnmount() { }\n          render() { }\n        }\n      "},
-		{"upstream valid-20", "\n        class MyClass {\n          Componentwillmount() { }\n          Componentdidmount() { }\n          Componentwillreceiveprops() { }\n          Shouldcomponentupdate() { }\n          Componentwillupdate() { }\n          Componentdidupdate() { }\n          ComponentwillUnmount() { }\n          Render() { }\n        }\n      "},
-		{"upstream valid-21", "\n        function test(b) {\n          return a.bind(b);\n        }\n        function a() {}\n      "},
-		{"upstream valid-22", "\n        import PropTypes from \"prop-types\";\n        class Component extends React.Component {};\n        Component.propTypes = {\n          a: PropTypes.number.isRequired\n        }\n      "},
-		{"upstream valid-23", "\n        import PropTypes from \"prop-types\";\n        class Component extends React.Component {};\n        Component.propTypes = {\n          e: PropTypes.shape({\n            ea: PropTypes.string,\n          })\n        }\n      "},
-		{"upstream valid-24", "\n        import PropTypes from \"prop-types\";\n        class Component extends React.Component {};\n        Component.propTypes = {\n          a: PropTypes.string,\n          b: PropTypes.string.isRequired,\n          c: PropTypes.shape({\n            d: PropTypes.string,\n            e: PropTypes.number.isRequired,\n          }).isRequired\n        }\n      "},
-		{"upstream valid-25", "\n        import PropTypes from \"prop-types\";\n        class Component extends React.Component {};\n        Component.propTypes = {\n          a: PropTypes.oneOfType([\n            PropTypes.string,\n            PropTypes.number\n          ])\n        }\n      "},
-		{"upstream valid-26", "\n        import PropTypes from \"prop-types\";\n        class Component extends React.Component {};\n        Component.propTypes = {\n          a: PropTypes.oneOf([\n            'hello',\n            'hi'\n          ])\n        }\n      "},
-		{"upstream valid-27", "\n        import PropTypes from \"prop-types\";\n        class Component extends React.Component {};\n        Component.childContextTypes = {\n          a: PropTypes.string,\n          b: PropTypes.string.isRequired,\n          c: PropTypes.shape({\n            d: PropTypes.string,\n            e: PropTypes.number.isRequired,\n          }).isRequired\n        }\n      "},
-		{"upstream valid-28", "\n        import PropTypes from \"prop-types\";\n        class Component extends React.Component {};\n        Component.contextTypes = {\n          a: PropTypes.string,\n          b: PropTypes.string.isRequired,\n          c: PropTypes.shape({\n            d: PropTypes.string,\n            e: PropTypes.number.isRequired,\n          }).isRequired\n        }\n      "},
-		{"upstream valid-29", "\n        import PropTypes from 'prop-types'\n        import * as MyPropTypes from 'lib/my-prop-types'\n        class Component extends React.Component {};\n        Component.propTypes = {\n          a: PropTypes.string,\n          b: MyPropTypes.MYSTRING,\n          c: MyPropTypes.MYSTRING.isRequired,\n        }\n      "},
-		{"upstream valid-30", "\n        import PropTypes from \"prop-types\"\n        import * as MyPropTypes from 'lib/my-prop-types'\n        class Component extends React.Component {};\n        Component.propTypes = {\n          b: PropTypes.string,\n          a: MyPropTypes.MYSTRING,\n        }\n      "},
-		{"upstream valid-31", "\n        import CustomReact from \"react\"\n        class Component extends React.Component {};\n        Component.propTypes = {\n          b: CustomReact.PropTypes.string,\n        }\n      "},
-		{"upstream valid-32", "\n        class Component extends React.Component {};\n        Component.propTypes = {\n          a: PropTypes.shape(),\n        };\n        Component.contextTypes = {\n          a: PropTypes.shape(),\n        };\n      "},
-		{"upstream valid-33", "\n        const fn = (err, res) => {\n          const { body: data = {} } = { ...res };\n          data.time = data.time || {};\n        };\n      "},
-		{"upstream valid-34", "\n        class Component extends React.Component {};\n        Component.propTypes = {\n          b: string.isRequired,\n          c: PropTypes.shape({\n            d: number.isRequired,\n          }).isRequired\n        }\n      "},
-		{"upstream valid-35", "\n        import React from 'react';\n        import PropTypes from 'prop-types';\n        const Component = React.createReactClass({\n          propTypes: {\n            a: PropTypes.string.isRequired,\n            b: PropTypes.shape({\n              c: PropTypes.number\n            }).isRequired\n          }\n        });\n      "},
-		{"upstream valid-36", "\n        import React from 'react';\n        import PropTypes from 'prop-types';\n        const Component = React.createReactClass({\n          childContextTypes: {\n            a: PropTypes.bool,\n            b: PropTypes.array,\n            c: PropTypes.func,\n            d: PropTypes.object,\n          }\n        });\n      "},
-		{"upstream valid-37", "\n        import React from 'react';\n        const Component = React.createReactClass({\n          propTypes: {},\n          childContextTypes: {},\n          contextTypes: {},\n          componentWillMount() { },\n          componentDidMount() { },\n          componentWillReceiveProps() { },\n          shouldComponentUpdate() { },\n          componentWillUpdate() { },\n          componentDidUpdate() { },\n          componentWillUnmount() { },\n          render() {\n            return <div>Hello {this.props.name}</div>;\n          }\n        });\n      "},
-		{"upstream valid-38", "\n        import { string, element } from \"prop-types\";\n\n        class Sample extends React.Component {\n          render() { return null; }\n        }\n\n        Sample.propTypes = {\n          title: string.isRequired,\n          body: element.isRequired\n        };\n      "},
-		{"upstream valid-39", "\n        import React from 'react';\n\n        const A = { B: 'C' };\n\n        export default class MyComponent extends React.Component {\n          [A.B] () {\n            return null\n          }\n        }\n      "},
-		{"upstream valid-40", "\n        const MyComponent = React.forwardRef((props, ref) => <div />);\n        MyComponent.defaultProps = { value: \"\" };\n      "},
-		{"upstream valid-41", "\n        import styled from \"styled-components\";\n\n        const MyComponent = styled.div;\n        MyComponent.defaultProps = { value: \"\" };\n      "},
-		{"upstream valid-42", "\n        class Editor extends React.Component {\n            #somethingPrivate() {\n              // ...\n            }\n\n            render() {\n            const { value = '' } = this.props;\n\n            return (\n              <textarea>\n                {value}\n              </textarea>\n            );\n          }\n        }\n      "},
+		{
+			"upstream valid-0",
+			"\n          import createReactClass from 'create-react-class'\n          function hello (extra = {}) {\n            return createReactClass({\n              noteType: 'hello',\n              renderItem () {\n                return null\n              },\n              ...extra\n            })\n          }\n      ",
+		},
+		{
+			"upstream valid-1",
+			"\n        class First {\n          static PropTypes = {key: \"myValue\"};\n          static ContextTypes = {key: \"myValue\"};\n          static ChildContextTypes = {key: \"myValue\"};\n          static DefaultProps = {key: \"myValue\"};\n        }\n      ",
+		},
+		{
+			"upstream valid-2",
+			"\n        class First {}\n        First.PropTypes = {key: \"myValue\"};\n        First.ContextTypes = {key: \"myValue\"};\n        First.ChildContextTypes = {key: \"myValue\"};\n        First.DefaultProps = {key: \"myValue\"};\n      ",
+		},
+		{
+			"upstream valid-3",
+			"\n        class First extends React.Component {\n          static propTypes = {key: \"myValue\"};\n          static contextTypes = {key: \"myValue\"};\n          static childContextTypes = {key: \"myValue\"};\n          static defaultProps = {key: \"myValue\"};\n        }\n      ",
+		},
+		{
+			"upstream valid-4",
+			"\n        class First extends React.Component {}\n        First.propTypes = {key: \"myValue\"};\n        First.contextTypes = {key: \"myValue\"};\n        First.childContextTypes = {key: \"myValue\"};\n        First.defaultProps = {key: \"myValue\"};\n      ",
+		},
+		{
+			"upstream valid-5",
+			"\n        class MyClass {\n          propTypes = {key: \"myValue\"};\n          contextTypes = {key: \"myValue\"};\n          childContextTypes = {key: \"myValue\"};\n          defaultProps = {key: \"myValue\"};\n        }\n      ",
+		},
+		{
+			"upstream valid-6",
+			"\n        class MyClass {\n          PropTypes = {key: \"myValue\"};\n          ContextTypes = {key: \"myValue\"};\n          ChildContextTypes = {key: \"myValue\"};\n          DefaultProps = {key: \"myValue\"};\n        }\n      ",
+		},
+		{
+			"upstream valid-7",
+			"\n        class MyClass {\n          proptypes = {key: \"myValue\"};\n          contexttypes = {key: \"myValue\"};\n          childcontextypes = {key: \"myValue\"};\n          defaultprops = {key: \"myValue\"};\n        }\n      ",
+		},
+		{
+			"upstream valid-8",
+			"\n        class MyClass {\n          static PropTypes() {};\n          static ContextTypes() {};\n          static ChildContextTypes() {};\n          static DefaultProps() {};\n        }\n      ",
+		},
+		{
+			"upstream valid-9",
+			"\n        class MyClass {\n          static proptypes() {};\n          static contexttypes() {};\n          static childcontexttypes() {};\n          static defaultprops() {};\n        }\n      ",
+		},
+		{
+			"upstream valid-10",
+			"\n        class MyClass {}\n        MyClass.prototype.PropTypes = function() {};\n        MyClass.prototype.ContextTypes = function() {};\n        MyClass.prototype.ChildContextTypes = function() {};\n        MyClass.prototype.DefaultProps = function() {};\n      ",
+		},
+		{
+			"upstream valid-11",
+			"\n        class MyClass {}\n        MyClass.PropTypes = function() {};\n        MyClass.ContextTypes = function() {};\n        MyClass.ChildContextTypes = function() {};\n        MyClass.DefaultProps = function() {};\n      ",
+		},
+		{
+			"upstream valid-12",
+			"\n        function MyRandomFunction() {}\n        MyRandomFunction.PropTypes = {};\n        MyRandomFunction.ContextTypes = {};\n        MyRandomFunction.ChildContextTypes = {};\n        MyRandomFunction.DefaultProps = {};\n      ",
+		},
+		{
+			"upstream valid-13",
+			"\n        class First extends React.Component {}\n        First[\"prop\" + \"Types\"] = {};\n        First[\"context\" + \"Types\"] = {};\n        First[\"childContext\" + \"Types\"] = {};\n        First[\"default\" + \"Props\"] = {};\n      ",
+		},
+		{
+			"upstream valid-14",
+			"\n        class First extends React.Component {}\n        First[\"PROP\" + \"TYPES\"] = {};\n        First[\"CONTEXT\" + \"TYPES\"] = {};\n        First[\"CHILDCONTEXT\" + \"TYPES\"] = {};\n        First[\"DEFAULT\" + \"PROPS\"] = {};\n      ",
+		},
+		{
+			"upstream valid-15",
+			"\n        const propTypes = \"PROPTYPES\"\n        const contextTypes = \"CONTEXTTYPES\"\n        const childContextTypes = \"CHILDCONTEXTTYPES\"\n        const defaultProps = \"DEFAULTPROPS\"\n\n        class First extends React.Component {}\n        First[propTypes] = {};\n        First[contextTypes] = {};\n        First[childContextTypes] = {};\n        First[defaultProps] = {};\n      ",
+		},
+		{
+			"upstream valid-16",
+			"\n        class Hello extends React.Component {\n          static getDerivedStateFromProps() { }\n          componentWillMount() { }\n          componentDidMount() { }\n          componentWillReceiveProps() { }\n          shouldComponentUpdate() { }\n          componentWillUpdate() { }\n          componentDidUpdate() { }\n          componentWillUnmount() { }\n          render() {\n            return <div>Hello {this.props.name}</div>;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid-17",
+			"\n        class Hello extends React.Component {\n          \"componentDidMount\"() { }\n          \"my-method\"() { }\n        }\n      ",
+		},
+		{
+			"upstream valid-18",
+			"\n        class MyClass {\n          componentWillMount() { }\n          componentDidMount() { }\n          componentWillReceiveProps() { }\n          shouldComponentUpdate() { }\n          componentWillUpdate() { }\n          componentDidUpdate() { }\n          componentWillUnmount() { }\n          render() { }\n        }\n      ",
+		},
+		{
+			"upstream valid-19",
+			"\n        class MyClass {\n          componentwillmount() { }\n          componentdidmount() { }\n          componentwillreceiveprops() { }\n          shouldcomponentupdate() { }\n          componentwillupdate() { }\n          componentdidupdate() { }\n          componentwillUnmount() { }\n          render() { }\n        }\n      ",
+		},
+		{
+			"upstream valid-20",
+			"\n        class MyClass {\n          Componentwillmount() { }\n          Componentdidmount() { }\n          Componentwillreceiveprops() { }\n          Shouldcomponentupdate() { }\n          Componentwillupdate() { }\n          Componentdidupdate() { }\n          ComponentwillUnmount() { }\n          Render() { }\n        }\n      ",
+		},
+		{
+			"upstream valid-21",
+			"\n        function test(b) {\n          return a.bind(b);\n        }\n        function a() {}\n      ",
+		},
+		{
+			"upstream valid-22",
+			"\n        import PropTypes from \"prop-types\";\n        class Component extends React.Component {};\n        Component.propTypes = {\n          a: PropTypes.number.isRequired\n        }\n      ",
+		},
+		{
+			"upstream valid-23",
+			"\n        import PropTypes from \"prop-types\";\n        class Component extends React.Component {};\n        Component.propTypes = {\n          e: PropTypes.shape({\n            ea: PropTypes.string,\n          })\n        }\n      ",
+		},
+		{
+			"upstream valid-24",
+			"\n        import PropTypes from \"prop-types\";\n        class Component extends React.Component {};\n        Component.propTypes = {\n          a: PropTypes.string,\n          b: PropTypes.string.isRequired,\n          c: PropTypes.shape({\n            d: PropTypes.string,\n            e: PropTypes.number.isRequired,\n          }).isRequired\n        }\n      ",
+		},
+		{
+			"upstream valid-25",
+			"\n        import PropTypes from \"prop-types\";\n        class Component extends React.Component {};\n        Component.propTypes = {\n          a: PropTypes.oneOfType([\n            PropTypes.string,\n            PropTypes.number\n          ])\n        }\n      ",
+		},
+		{
+			"upstream valid-26",
+			"\n        import PropTypes from \"prop-types\";\n        class Component extends React.Component {};\n        Component.propTypes = {\n          a: PropTypes.oneOf([\n            'hello',\n            'hi'\n          ])\n        }\n      ",
+		},
+		{
+			"upstream valid-27",
+			"\n        import PropTypes from \"prop-types\";\n        class Component extends React.Component {};\n        Component.childContextTypes = {\n          a: PropTypes.string,\n          b: PropTypes.string.isRequired,\n          c: PropTypes.shape({\n            d: PropTypes.string,\n            e: PropTypes.number.isRequired,\n          }).isRequired\n        }\n      ",
+		},
+		{
+			"upstream valid-28",
+			"\n        import PropTypes from \"prop-types\";\n        class Component extends React.Component {};\n        Component.contextTypes = {\n          a: PropTypes.string,\n          b: PropTypes.string.isRequired,\n          c: PropTypes.shape({\n            d: PropTypes.string,\n            e: PropTypes.number.isRequired,\n          }).isRequired\n        }\n      ",
+		},
+		{
+			"upstream valid-29",
+			"\n        import PropTypes from 'prop-types'\n        import * as MyPropTypes from 'lib/my-prop-types'\n        class Component extends React.Component {};\n        Component.propTypes = {\n          a: PropTypes.string,\n          b: MyPropTypes.MYSTRING,\n          c: MyPropTypes.MYSTRING.isRequired,\n        }\n      ",
+		},
+		{
+			"upstream valid-30",
+			"\n        import PropTypes from \"prop-types\"\n        import * as MyPropTypes from 'lib/my-prop-types'\n        class Component extends React.Component {};\n        Component.propTypes = {\n          b: PropTypes.string,\n          a: MyPropTypes.MYSTRING,\n        }\n      ",
+		},
+		{
+			"upstream valid-31",
+			"\n        import CustomReact from \"react\"\n        class Component extends React.Component {};\n        Component.propTypes = {\n          b: CustomReact.PropTypes.string,\n        }\n      ",
+		},
+		{
+			"upstream valid-32",
+			"\n        class Component extends React.Component {};\n        Component.propTypes = {\n          a: PropTypes.shape(),\n        };\n        Component.contextTypes = {\n          a: PropTypes.shape(),\n        };\n      ",
+		},
+		{
+			"upstream valid-33",
+			"\n        const fn = (err, res) => {\n          const { body: data = {} } = { ...res };\n          data.time = data.time || {};\n        };\n      ",
+		},
+		{
+			"upstream valid-34",
+			"\n        class Component extends React.Component {};\n        Component.propTypes = {\n          b: string.isRequired,\n          c: PropTypes.shape({\n            d: number.isRequired,\n          }).isRequired\n        }\n      ",
+		},
+		{
+			"upstream valid-35",
+			"\n        import React from 'react';\n        import PropTypes from 'prop-types';\n        const Component = React.createReactClass({\n          propTypes: {\n            a: PropTypes.string.isRequired,\n            b: PropTypes.shape({\n              c: PropTypes.number\n            }).isRequired\n          }\n        });\n      ",
+		},
+		{
+			"upstream valid-36",
+			"\n        import React from 'react';\n        import PropTypes from 'prop-types';\n        const Component = React.createReactClass({\n          childContextTypes: {\n            a: PropTypes.bool,\n            b: PropTypes.array,\n            c: PropTypes.func,\n            d: PropTypes.object,\n          }\n        });\n      ",
+		},
+		{
+			"upstream valid-37",
+			"\n        import React from 'react';\n        const Component = React.createReactClass({\n          propTypes: {},\n          childContextTypes: {},\n          contextTypes: {},\n          componentWillMount() { },\n          componentDidMount() { },\n          componentWillReceiveProps() { },\n          shouldComponentUpdate() { },\n          componentWillUpdate() { },\n          componentDidUpdate() { },\n          componentWillUnmount() { },\n          render() {\n            return <div>Hello {this.props.name}</div>;\n          }\n        });\n      ",
+		},
+		{
+			"upstream valid-38",
+			"\n        import { string, element } from \"prop-types\";\n\n        class Sample extends React.Component {\n          render() { return null; }\n        }\n\n        Sample.propTypes = {\n          title: string.isRequired,\n          body: element.isRequired\n        };\n      ",
+		},
+		{
+			"upstream valid-39",
+			"\n        import React from 'react';\n\n        const A = { B: 'C' };\n\n        export default class MyComponent extends React.Component {\n          [A.B] () {\n            return null\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid-40",
+			"\n        const MyComponent = React.forwardRef((props, ref) => <div />);\n        MyComponent.defaultProps = { value: \"\" };\n      ",
+		},
+		{
+			"upstream valid-41",
+			"\n        import styled from \"styled-components\";\n\n        const MyComponent = styled.div;\n        MyComponent.defaultProps = { value: \"\" };\n      ",
+		},
+		{
+			"upstream valid-42",
+			"\n        class Editor extends React.Component {\n            #somethingPrivate() {\n              // ...\n            }\n\n            render() {\n            const { value = '' } = this.props;\n\n            return (\n              <textarea>\n                {value}\n              </textarea>\n            );\n          }\n        }\n      ",
+		},
 	}
 
 	for _, testCase := range cases {
@@ -314,30 +852,80 @@ func TestNoTyposReturningJsxDecidesTheMemberArm(test *testing.T) {
 		sourceText string
 		wantIds    []string
 	}{
-		{"a function returning JSX counts", preamble + "function Foo() { return <div/>; }\nFoo.PropTypes = {};\n", []string{"typoStaticClassProp"}},
-		{"an arrow with an implicit JSX body counts", preamble + "const Foo = () => <div/>;\nFoo.PropTypes = {};\n", []string{"typoStaticClassProp"}},
-		{"a function returning null does NOT count", preamble + "function Foo() { return null; }\nFoo.PropTypes = {};\n", nil},
-		{"a function returning a string does NOT count", preamble + "function Foo() { return 'x'; }\nFoo.PropTypes = {};\n", nil},
+		{
+			"a function returning JSX counts",
+			preamble + "function Foo() { return <div/>; }\nFoo.PropTypes = {};\n",
+			[]string{"typoStaticClassProp"},
+		},
+		{
+			"an arrow with an implicit JSX body counts",
+			preamble + "const Foo = () => <div/>;\nFoo.PropTypes = {};\n",
+			[]string{"typoStaticClassProp"},
+		},
+		{
+			"a function returning null does NOT count",
+			preamble + "function Foo() { return null; }\nFoo.PropTypes = {};\n",
+			nil,
+		},
+		{
+			"a function returning a string does NOT count",
+			preamble + "function Foo() { return 'x'; }\nFoo.PropTypes = {};\n",
+			nil,
+		},
 		{"a function returning nothing does NOT count", preamble + "function Foo() { }\nFoo.PropTypes = {};\n", nil},
-		{"there is no name gate, lowercase counts too", preamble + "function foo() { return <div/>; }\nfoo.PropTypes = {};\n", []string{"typoStaticClassProp"}},
-		{"a nested return counts", preamble + "declare const x: boolean;\nfunction Foo() { if(x) { return <div/>; } return null; }\nFoo.PropTypes = {};\n", []string{"typoStaticClassProp"}},
+		{
+			"there is no name gate, lowercase counts too",
+			preamble + "function foo() { return <div/>; }\nfoo.PropTypes = {};\n",
+			[]string{"typoStaticClassProp"},
+		},
+		{
+			"a nested return counts",
+			preamble +
+				"declare const x: boolean;\nfunction Foo() { if(x) { return <div/>; } return null; }\nFoo.PropTypes = {};\n",
+			[]string{"typoStaticClassProp"},
+		},
 		// Parenthesized returns. Upstream's parser folds parentheses away so these reach its JSX
 		// test as bare elements; ours keeps them, and without an unwrapping loop eight of the
 		// corpus's own reporting cases went silent, because wrapping a returned element in
 		// parentheses is how a multi-line component is ordinarily written. The double form is why
 		// the unwrap is a loop rather than one step.
-		{"a parenthesized JSX return counts", preamble + "function Foo() { return (<div/>); }\nFoo.PropTypes = {};\n", []string{"typoStaticClassProp"}},
-		{"a doubly parenthesized JSX return counts", preamble + "function Foo() { return ((<div/>)); }\nFoo.PropTypes = {};\n", []string{"typoStaticClassProp"}},
-		{"a parenthesized non-JSX return still does not", preamble + "function Foo() { return (null); }\nFoo.PropTypes = {};\n", nil},
-		{"JSX only inside a callback does NOT count", preamble + "function Foo() { items.map(() => <div/>); return null; }\nFoo.PropTypes = {};\n", nil},
+		{
+			"a parenthesized JSX return counts",
+			preamble + "function Foo() { return (<div/>); }\nFoo.PropTypes = {};\n",
+			[]string{"typoStaticClassProp"},
+		},
+		{
+			"a doubly parenthesized JSX return counts",
+			preamble + "function Foo() { return ((<div/>)); }\nFoo.PropTypes = {};\n",
+			[]string{"typoStaticClassProp"},
+		},
+		{
+			"a parenthesized non-JSX return still does not",
+			preamble + "function Foo() { return (null); }\nFoo.PropTypes = {};\n",
+			nil,
+		},
+		{
+			"JSX only inside a callback does NOT count",
+			preamble + "function Foo() { items.map(() => <div/>); return null; }\nFoo.PropTypes = {};\n",
+			nil,
+		},
 		// The row above cannot see the nested-function skip, and a mutant removing it survived: an
 		// arrow's JSX is a concise body rather than a return statement, so the walk never meets a
 		// return there and both versions reach silence. These two carry an explicit `return` inside
 		// a nested function, which is the only shape where the skip alone decides. Both measured
 		// silent on the installed build.
-		{"a nested function DECLARATION returning JSX does not count", preamble + "function Foo() { function Inner() { return <div/>; } return null; }\nFoo.PropTypes = {};\n", nil},
-		{"a nested function EXPRESSION returning JSX does not count", preamble + "function Foo() { const f = function() { return <div/>; }; return null; }\nFoo.PropTypes = {};\n", nil},
-		{"a correct spelling is clean either way", preamble + "function Foo() { return <div/>; }\nFoo.propTypes = {};\n", nil},
+		{
+			"a nested function DECLARATION returning JSX does not count",
+			preamble + "function Foo() { function Inner() { return <div/>; } return null; }\nFoo.PropTypes = {};\n",
+			nil,
+		},
+		{"a nested function EXPRESSION returning JSX does not count", preamble +
+			"function Foo() { const f = function() { return <div/>; }; return null; }\nFoo.PropTypes = {};\n", nil},
+		{
+			"a correct spelling is clean either way",
+			preamble + "function Foo() { return <div/>; }\nFoo.propTypes = {};\n",
+			nil,
+		},
 		{"a plain object is not a component", preamble + "const foo = { a: 1 };\nfoo.PropTypes = {};\n", nil},
 	}
 
@@ -396,21 +984,53 @@ func TestNoTyposRecursesThroughShapeAndOneOfType(test *testing.T) {
 		sourceText string
 		wantIds    []string
 	}{
-		{"a typo inside shape reports", preamble + "Foo.propTypes = { a: PropTypes.shape({ b: PropTypes.strng }) };\n", []string{"typoPropType"}},
-		{"a typo inside oneOfType reports", preamble + "Foo.propTypes = { a: PropTypes.oneOfType([PropTypes.strng]) };\n", []string{"typoPropType"}},
-		{"a typo nested two deep reports", preamble + "Foo.propTypes = { a: PropTypes.shape({ b: PropTypes.shape({ c: PropTypes.strng }) }) };\n", []string{"typoPropType"}},
+		{
+			"a typo inside shape reports",
+			preamble + "Foo.propTypes = { a: PropTypes.shape({ b: PropTypes.strng }) };\n",
+			[]string{"typoPropType"},
+		},
+		{
+			"a typo inside oneOfType reports",
+			preamble + "Foo.propTypes = { a: PropTypes.oneOfType([PropTypes.strng]) };\n",
+			[]string{"typoPropType"},
+		},
+		{
+			"a typo nested two deep reports",
+			preamble + "Foo.propTypes = { a: PropTypes.shape({ b: PropTypes.shape({ c: PropTypes.strng }) }) };\n",
+			[]string{"typoPropType"},
+		},
 		// Only three property names have their object walked, and `defaultProps` is deliberately
 		// not among them: it holds values rather than validators, so a name that looks like a
 		// misspelled prop type there is just data. A mutant widening the gate to every property
 		// survived the rest of this suite until this row existed. Measured silent on the installed
 		// build, with the three walked names beside it as controls.
 		{"a defaultProps object is NOT walked", preamble + "Foo.defaultProps = { a: PropTypes.strng };\n", nil},
-		{"a contextTypes object IS walked", preamble + "Foo.contextTypes = { a: PropTypes.strng };\n", []string{"typoPropType"}},
-		{"a childContextTypes object IS walked", preamble + "Foo.childContextTypes = { a: PropTypes.strng };\n", []string{"typoPropType"}},
+		{
+			"a contextTypes object IS walked",
+			preamble + "Foo.contextTypes = { a: PropTypes.strng };\n",
+			[]string{"typoPropType"},
+		},
+		{
+			"a childContextTypes object IS walked",
+			preamble + "Foo.childContextTypes = { a: PropTypes.strng };\n",
+			[]string{"typoPropType"},
+		},
 		{"another call is not walked", preamble + "Foo.propTypes = { a: PropTypes.instanceOf(Thing) };\n", nil},
-		{"oneOf is not walked, its arguments are values", preamble + "Foo.propTypes = { a: PropTypes.oneOf(['strng']) };\n", nil},
-		{"a chain qualifier after shape reports", preamble + "Foo.propTypes = { a: PropTypes.shape({}).isRequird };\n", []string{"typoPropTypeChain"}},
-		{"a correct chain after shape is clean", preamble + "Foo.propTypes = { a: PropTypes.shape({}).isRequired };\n", nil},
+		{
+			"oneOf is not walked, its arguments are values",
+			preamble + "Foo.propTypes = { a: PropTypes.oneOf(['strng']) };\n",
+			nil,
+		},
+		{
+			"a chain qualifier after shape reports",
+			preamble + "Foo.propTypes = { a: PropTypes.shape({}).isRequird };\n",
+			[]string{"typoPropTypeChain"},
+		},
+		{
+			"a correct chain after shape is clean",
+			preamble + "Foo.propTypes = { a: PropTypes.shape({}).isRequired };\n",
+			nil,
+		},
 	}
 
 	for _, testCase := range cases {
@@ -584,7 +1204,10 @@ func TestNoTyposMessagesReadAsWritten(test *testing.T) {
 	static := runNoTypos(test,
 		"declare const React: any;\nclass Foo extends React.Component { getDerivedStateFromProps() {} }\n")
 	rule_testing.ExpectFindings(test, static, "staticLifecycleMethod")
-	if !strings.Contains(static.Diagnostics[0].Message.Description, "`getDerivedStateFromProps` is a static lifecycle method") {
+	if !strings.Contains(
+		static.Diagnostics[0].Message.Description,
+		"`getDerivedStateFromProps` is a static lifecycle method",
+	) {
 		test.Errorf("staticLifecycleMethod reads %q", static.Diagnostics[0].Message.Description)
 	}
 }
@@ -603,19 +1226,51 @@ func TestNoTyposComponentGate(test *testing.T) {
 		wantIds    []string
 	}{
 		{"a class with no heritage is not a component", "class Foo { static PropTypes = {}; }\n", nil},
-		{"a foreign base is not a component", "declare const Other: any;\nclass Foo extends Other.Component { static PropTypes = {}; }\n", nil},
-		{"a React.Component class is", "declare const React: any;\nclass Foo extends React.Component { static PropTypes = {}; }\n", []string{"typoStaticClassProp"}},
-		{"a bare Component class is", "declare const Component: any;\nclass Foo extends Component { static PropTypes = {}; }\n", []string{"typoStaticClassProp"}},
-		{"createReactClass counts", "declare function createReactClass(spec: any): any;\ncreateReactClass({ PropTypes: {} });\n", []string{"typoPropDeclaration"}},
-		{"a bare createClass does not", "declare function createClass(spec: any): any;\ncreateClass({ PropTypes: {} });\n", nil},
+		{
+			"a foreign base is not a component",
+			"declare const Other: any;\nclass Foo extends Other.Component { static PropTypes = {}; }\n",
+			nil,
+		},
+		{
+			"a React.Component class is",
+			"declare const React: any;\nclass Foo extends React.Component { static PropTypes = {}; }\n",
+			[]string{"typoStaticClassProp"},
+		},
+		{
+			"a bare Component class is",
+			"declare const Component: any;\nclass Foo extends Component { static PropTypes = {}; }\n",
+			[]string{"typoStaticClassProp"},
+		},
+		{
+			"createReactClass counts",
+			"declare function createReactClass(spec: any): any;\ncreateReactClass({ PropTypes: {} });\n",
+			[]string{"typoPropDeclaration"},
+		},
+		{
+			"a bare createClass does not",
+			"declare function createClass(spec: any): any;\ncreateClass({ PropTypes: {} });\n",
+			nil,
+		},
 		{"React.createClass does not", "declare const React: any;\nReact.createClass({ PropTypes: {} });\n", nil},
 		// The namespaced form of the pragma does count, and this port was silent on it at first.
 		// Eleven corpus cases are written this way and every one of them caught it. The row below it
 		// is the control that keeps the namespace load-bearing.
-		{"React.createReactClass counts", "declare const React: any;\nReact.createReactClass({ PropTypes: {} });\n", []string{"typoPropDeclaration"}},
-		{"a foreign namespace on the pragma does not", "declare const Other: any;\nOther.createReactClass({ PropTypes: {} });\n", nil},
+		{
+			"React.createReactClass counts",
+			"declare const React: any;\nReact.createReactClass({ PropTypes: {} });\n",
+			[]string{"typoPropDeclaration"},
+		},
+		{
+			"a foreign namespace on the pragma does not",
+			"declare const Other: any;\nOther.createReactClass({ PropTypes: {} });\n",
+			nil,
+		},
 		{"a bare object literal is not a component", "const x = { PropTypes: {} };\n", nil},
-		{"a non-static class property is not checked", "declare const React: any;\nclass Foo extends React.Component { PropTypes = {}; }\n", nil},
+		{
+			"a non-static class property is not checked",
+			"declare const React: any;\nclass Foo extends React.Component { PropTypes = {}; }\n",
+			nil,
+		},
 	}
 
 	for _, testCase := range cases {
@@ -728,7 +1383,11 @@ func TestNoTyposMemberArmAssignmentShapes(test *testing.T) {
 		wantIds    []string
 	}{
 		{"a plain assignment reports", preamble + "Foo.PropTypes = {};\n", []string{"typoStaticClassProp"}},
-		{"a member on the RIGHT of an assignment also reports", preamble + "target = Foo.PropTypes;\n", []string{"typoStaticClassProp"}},
+		{
+			"a member on the RIGHT of an assignment also reports",
+			preamble + "target = Foo.PropTypes;\n",
+			[]string{"typoStaticClassProp"},
+		},
 		{"a compound assignment reports", preamble + "Foo.PropTypes ||= {};\n", []string{"typoStaticClassProp"}},
 		{"a nullish assignment reports", preamble + "Foo.PropTypes ??= {};\n", []string{"typoStaticClassProp"}},
 		{"a bare read is silent", preamble + "Foo.PropTypes;\n", nil},

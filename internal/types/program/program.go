@@ -370,7 +370,11 @@ func classifyMissingRoots(missing []string, inspect func(string) rootState) root
 func (graph *Graph) verifyProjectFiles(inspect func(string) rootState) (rootsVerdict, []string) {
 	rootPaths := make(map[tspath.PathKey]string, len(graph.Config.FileNames()))
 	for _, fileName := range graph.Config.FileNames() {
-		rootPaths[toPath(fileName.AsString(), graph.Anchor.Root(), graph.Config.CaseSensitivity())] = fileName.AsString()
+		rootPaths[toPath(
+			fileName.AsString(),
+			graph.Anchor.Root(),
+			graph.Config.CaseSensitivity(),
+		)] = fileName.AsString()
 	}
 
 	files := make([]*ast.SourceFile, 0, len(rootPaths))
@@ -493,7 +497,13 @@ func buildOnce(options Options) (*Graph, error) {
 
 	// A nil extended-config cache is supported upstream and correct for a one-shot build: the cache
 	// only pays off across repeated parses of the same `extends` chain within one process.
-	config, configurationErrors := tsoptions.GetParsedCommandLineOfConfigFile(tspath.RootedFilePath(configurationFileName), &core.CompilerOptions{}, nil, fileSystem, nil)
+	config, configurationErrors := tsoptions.GetParsedCommandLineOfConfigFile(
+		tspath.RootedFilePath(configurationFileName),
+		&core.CompilerOptions{},
+		nil,
+		fileSystem,
+		nil,
+	)
 	if len(configurationErrors) > 0 {
 		return nil, fmt.Errorf("reading %s: %w", configurationFileName, joinDiagnostics(configurationErrors))
 	}
@@ -510,7 +520,9 @@ func buildOnce(options Options) (*Graph, error) {
 	// Except a diagnostic about one option's name or value, an option TypeScript 7 no longer knows above
 	// all: the graph builds over it, and it is reported with the program's own diagnostics (they include
 	// the config's), so the options are never silently wrong. See configParsingOptionCodes.
-	if configurationFileDiagnostics := config.GetConfigFileParsingDiagnostics(); len(configurationFileDiagnostics) > 0 && !onlyOptionValueDiagnostics(configurationFileDiagnostics) {
+	if configurationFileDiagnostics := config.GetConfigFileParsingDiagnostics(); len(
+		configurationFileDiagnostics,
+	) > 0 && !onlyOptionValueDiagnostics(configurationFileDiagnostics) {
 		return nil, fmt.Errorf("reading %s: %w", configurationFileName, joinDiagnostics(configurationFileDiagnostics))
 	}
 
@@ -743,7 +755,10 @@ func (graph *Graph) AllDiagnosticParts(ctx context.Context) TypeDiagnosticParts 
 	if len(syntactic) > 0 {
 		return TypeDiagnosticParts{Syntactic: syntactic}
 	}
-	return TypeDiagnosticParts{Bind: graph.Program.GetBindDiagnostics(ctx, nil), Semantic: graph.Program.GetSemanticDiagnostics(ctx, nil)}
+	return TypeDiagnosticParts{
+		Bind:     graph.Program.GetBindDiagnostics(ctx, nil),
+		Semantic: graph.Program.GetSemanticDiagnostics(ctx, nil),
+	}
 }
 
 // ConfigDiagnostics returns findings about the configuration itself rather than about any file:
@@ -843,7 +858,9 @@ func checkerCountFor(cores int) int {
 // toPath normalizes a file name the way the compiler keys its file table, so a lookup by path finds
 // the file the compiler stored rather than a near-miss that differs only in case or separators.
 func toPath(fileName string, currentDirectory string, caseSensitivity tspath.CaseSensitivity) tspath.PathKey {
-	return caseSensitivity.PathKey(tspath.RootedPath(tspath.GetNormalizedAbsolutePath(fileName, tspath.RootedDirectoryPath(currentDirectory))))
+	return caseSensitivity.PathKey(
+		tspath.RootedPath(tspath.GetNormalizedAbsolutePath(fileName, tspath.RootedDirectoryPath(currentDirectory))),
+	)
 }
 
 // joinDiagnostics turns compiler diagnostics into one error, capped so a config with a hundred

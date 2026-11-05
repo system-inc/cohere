@@ -433,7 +433,8 @@ var ConsistentIndexedObjectStyle = rule.Rule{
 				replacement := "{ [key: " + textOf(keyArgument) + "]: " + textOf(valueArgument) + " }"
 				fix := rule.ReplaceRange(rule.TokenRange(ruleContext.SourceFile, node), replacement)
 
-				if repairIsSafe && !hasUnpreservedComments(rule.TokenRange(ruleContext.SourceFile, node), keyArgument, valueArgument) {
+				if repairIsSafe &&
+					!hasUnpreservedComments(rule.TokenRange(ruleContext.SourceFile, node), keyArgument, valueArgument) {
 					ruleContext.ReportNodeWithFixes(node, buildPreferIndexSignatureMessage(), fix)
 					return
 				}
@@ -459,7 +460,10 @@ var ConsistentIndexedObjectStyle = rule.Rule{
 			if node.Modifiers() != nil && len(node.Modifiers().Nodes) != 0 {
 				last := node.Modifiers().Nodes[len(node.Modifiers().Nodes)-1]
 				return core.NewTextRange(
-					scanner.SkipTrivia(ruleContext.SourceFile.Text(), rule.TokenRange(ruleContext.SourceFile, last).End()),
+					scanner.SkipTrivia(
+						ruleContext.SourceFile.Text(),
+						rule.TokenRange(ruleContext.SourceFile, last).End(),
+					),
 					nodeRange.End())
 			}
 			return nodeRange
@@ -725,7 +729,10 @@ func buildPreferRecordMessage() rule.Message {
 }
 
 func buildPreferRecordSuggestionMessage() rule.Message {
-	return rule.Message{Id: "preferRecordSuggestion", Description: "Change into a record instead of an index signature."}
+	return rule.Message{
+		Id:          "preferRecordSuggestion",
+		Description: "Change into a record instead of an index signature.",
+	}
 }
 
 func buildPreferIndexSignatureMessage() rule.Message {
@@ -733,5 +740,8 @@ func buildPreferIndexSignatureMessage() rule.Message {
 }
 
 func buildPreferIndexSignatureSuggestionMessage() rule.Message {
-	return rule.Message{Id: "preferIndexSignatureSuggestion", Description: "Change into an index signature instead of a record."}
+	return rule.Message{
+		Id:          "preferIndexSignatureSuggestion",
+		Description: "Change into an index signature instead of a record.",
+	}
 }

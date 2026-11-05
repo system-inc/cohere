@@ -38,15 +38,25 @@ lint: 1 findings — 22 rules over 3407 files, 2098253 nodes visited, in 1.036s
 		test.Fatalf("parsing real cohere output: %v", parseCohereError)
 	}
 	if len(result.Findings) != 1 {
-		test.Fatalf("want 1 finding from real output, got %d (unparsed: %v)", len(result.Findings), result.UnparsedLines)
+		test.Fatalf(
+			"want 1 finding from real output, got %d (unparsed: %v)",
+			len(result.Findings),
+			result.UnparsedLines,
+		)
 	}
 	if len(result.UnparsedLines) != 0 {
-		test.Errorf("real output produced unparsed lines, each of which is a finding the harness cannot see: %v", result.UnparsedLines)
+		test.Errorf(
+			"real output produced unparsed lines, each of which is a finding the harness cannot see: %v",
+			result.UnparsedLines,
+		)
 	}
 
 	finding := result.Findings[0]
 	if finding.File != "modules/mcp/McpApi.ts" {
-		test.Errorf("path is %q, want it relative to the tree root — an absolute-versus-relative mismatch makes every finding look one-sided", finding.File)
+		test.Errorf(
+			"path is %q, want it relative to the tree root — an absolute-versus-relative mismatch makes every finding look one-sided",
+			finding.File,
+		)
 	}
 	if finding.Rule != "consistency-no-abbreviated-identifier" {
 		test.Errorf("rule is %q, want the bare name with the message id stripped", finding.Rule)
@@ -68,7 +78,11 @@ libraries/structure/source/components/files/FileCarousel.tsx:36:8: error structu
 		test.Fatalf("parsing real gate output: %v", parseGateError)
 	}
 	if len(result.Findings) != 2 {
-		test.Fatalf("want 2 findings from real output, got %d (unparsed: %v)", len(result.Findings), result.UnparsedLines)
+		test.Fatalf(
+			"want 2 findings from real output, got %d (unparsed: %v)",
+			len(result.Findings),
+			result.UnparsedLines,
+		)
 	}
 	if len(result.UnparsedLines) != 0 {
 		test.Errorf("real output produced unparsed lines: %v", result.UnparsedLines)
@@ -111,8 +125,11 @@ func TestTheTwoGatesAgreeOnOneFindingAfterParsing(test *testing.T) {
 	}
 
 	if cohereResult.Findings[0].Key() != gateResult.Findings[0].Key() {
-		test.Fatalf("the same defect keyed differently across the two formats:\n  cohere %q\n  gate   %q\nnormalization is wrong, and this presents as total disagreement rather than as an error",
-			cohereResult.Findings[0].Key(), gateResult.Findings[0].Key())
+		test.Fatalf(
+			"the same defect keyed differently across the two formats:\n  cohere %q\n  gate   %q\nnormalization is wrong, and this presents as total disagreement rather than as an error",
+			cohereResult.Findings[0].Key(),
+			gateResult.Findings[0].Key(),
+		)
 	}
 
 	report := Compare(Inputs{
@@ -124,7 +141,11 @@ func TestTheTwoGatesAgreeOnOneFindingAfterParsing(test *testing.T) {
 		ConfiguredRules:  map[string]bool{"react-component-no-multiple-primary": true},
 	})
 	if len(report.Differences) != 0 {
-		test.Errorf("one defect reported in both formats produced %d differences, want 0: %+v", len(report.Differences), report.Differences)
+		test.Errorf(
+			"one defect reported in both formats produced %d differences, want 0: %+v",
+			len(report.Differences),
+			report.Differences,
+		)
 	}
 }
 
@@ -140,7 +161,9 @@ func TestUnparsedLinesAreSurfacedNotDropped(test *testing.T) {
 		test.Fatalf("invented %d findings from an unrecognized line", len(result.Findings))
 	}
 	if len(result.UnparsedLines) != 1 {
-		test.Error("an unrecognized line was dropped silently — a finding the harness cannot read must not look like a finding that is not there")
+		test.Error(
+			"an unrecognized line was dropped silently — a finding the harness cannot read must not look like a finding that is not there",
+		)
 	}
 }
 

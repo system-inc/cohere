@@ -179,7 +179,12 @@ func Summarize(modes []Mode, runs []Run) map[Mode]ModeSummary {
 		sort.Float64s(loaded)
 		summary := ModeSummary{LoadedVerdictSeconds: loaded}
 		if len(quiet) > 0 {
-			summary.Quiet = &QuietSummary{Count: len(quiet), Best: quiet[0], Median: quiet[(len(quiet)-1)/2], Worst: quiet[len(quiet)-1]}
+			summary.Quiet = &QuietSummary{
+				Count:  len(quiet),
+				Best:   quiet[0],
+				Median: quiet[(len(quiet)-1)/2],
+				Worst:  quiet[len(quiet)-1],
+			}
 		}
 		summaries[mode] = summary
 	}
@@ -208,7 +213,11 @@ func Validate(record Record) error {
 		return fmt.Errorf("cohere %s was built from a modified tree, which no commit reproduces", record.Cohere.Commit)
 	}
 	if len(record.Cohere.Commit) != 40 || len(record.Project.Commit) != 40 {
-		return fmt.Errorf("cohere commit %q and project commit %q must each be a full commit", record.Cohere.Commit, record.Project.Commit)
+		return fmt.Errorf(
+			"cohere commit %q and project commit %q must each be a full commit",
+			record.Cohere.Commit,
+			record.Project.Commit,
+		)
 	}
 	byLoad := record.Schema == loadSchemaVersion
 	if record.Rounds < 1 {
@@ -225,7 +234,11 @@ func Validate(record Record) error {
 		return knownModesError
 	}
 	if measures(measured, ModeEdit) != (record.Edit != "") {
-		return fmt.Errorf("the record names edit file %q, and Edit measured is %v", record.Edit, measures(measured, ModeEdit))
+		return fmt.Errorf(
+			"the record names edit file %q, and Edit measured is %v",
+			record.Edit,
+			measures(measured, ModeEdit),
+		)
 	}
 	if !byLoad && record.Band < 0 {
 		return fmt.Errorf("a band of %g%%", record.Band)
@@ -242,14 +255,28 @@ func Validate(record Record) error {
 		if byLoad {
 			quiet := run.LoadBefore <= record.LoadCeiling && run.LoadAfter <= record.LoadCeiling
 			if run.Quiet != quiet {
-				return fmt.Errorf("%s round %d is marked quiet %v at loads %g and %g against a ceiling of %g", run.Mode, run.Round,
-					run.Quiet, run.LoadBefore, run.LoadAfter, record.LoadCeiling)
+				return fmt.Errorf(
+					"%s round %d is marked quiet %v at loads %g and %g against a ceiling of %g",
+					run.Mode,
+					run.Round,
+					run.Quiet,
+					run.LoadBefore,
+					run.LoadAfter,
+					record.LoadCeiling,
+				)
 			}
 		} else {
 			quiet := run.IdleBefore >= record.IdleFloor && run.IdleAfter >= record.IdleFloor
 			if run.Quiet != quiet {
-				return fmt.Errorf("%s round %d is marked quiet %v at %g%% and %g%% idle against a floor of %g%%", run.Mode, run.Round,
-					run.Quiet, run.IdleBefore, run.IdleAfter, record.IdleFloor)
+				return fmt.Errorf(
+					"%s round %d is marked quiet %v at %g%% and %g%% idle against a floor of %g%%",
+					run.Mode,
+					run.Round,
+					run.Quiet,
+					run.IdleBefore,
+					run.IdleAfter,
+					record.IdleFloor,
+				)
 			}
 		}
 		if run.VerdictSeconds <= 0 || run.SettledSeconds < run.VerdictSeconds {
@@ -260,8 +287,15 @@ func Validate(record Record) error {
 			return fmt.Errorf("%s round %d has no engine seconds, so its output was not read", run.Mode, run.Round)
 		}
 		if run.Primes < primesFloor || run.Primes > primesCeiling {
-			return fmt.Errorf("%s round %d needed %d primes, and a round measuring %v runs %d to %d", run.Mode, run.Round, run.Primes,
-				measured, primesFloor, primesCeiling)
+			return fmt.Errorf(
+				"%s round %d needed %d primes, and a round measuring %v runs %d to %d",
+				run.Mode,
+				run.Round,
+				run.Primes,
+				measured,
+				primesFloor,
+				primesCeiling,
+			)
 		}
 		if primes, seen := primesByRound[run.Round]; seen && primes != run.Primes {
 			return fmt.Errorf("round %d's runs disagree on its primes, %d and %d", run.Round, primes, run.Primes)
@@ -313,7 +347,14 @@ func agree(summaries map[Mode]ModeSummary, measured []Mode, band float64) error 
 			return fmt.Errorf("%s has fewer than %d quiet runs", mode, Agreement)
 		}
 		if quiet.Worst-quiet.Best > quiet.Median*band/100 {
-			return fmt.Errorf("%s's quiet runs spread %gs to %gs, more than %g%% of %gs", mode, quiet.Best, quiet.Worst, band, quiet.Median)
+			return fmt.Errorf(
+				"%s's quiet runs spread %gs to %gs, more than %g%% of %gs",
+				mode,
+				quiet.Best,
+				quiet.Worst,
+				band,
+				quiet.Median,
+			)
 		}
 	}
 	return nil

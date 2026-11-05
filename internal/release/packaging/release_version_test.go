@@ -11,7 +11,17 @@ import (
 func TestReleaseVersionFloor(test *testing.T) {
 	test.Parallel()
 
-	for _, version := range []string{"0.1.0", "0.1.0-rc.1", "0.3.1", "0.12.0", "1.0.0", "1.0.0-rc.1", "1.2.3", "12.0.0", "2.10.31-beta.2"} {
+	for _, version := range []string{
+		"0.1.0",
+		"0.1.0-rc.1",
+		"0.3.1",
+		"0.12.0",
+		"1.0.0",
+		"1.0.0-rc.1",
+		"1.2.3",
+		"12.0.0",
+		"2.10.31-beta.2",
+	} {
 		if requireReleaseVersionError := requireReleaseVersion(version); requireReleaseVersionError != nil {
 			test.Errorf("%s was refused: %v", version, requireReleaseVersionError)
 		}

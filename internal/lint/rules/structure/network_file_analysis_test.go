@@ -54,16 +54,20 @@ func TestNetworkFileAnalysisFindsHooks(test *testing.T) {
 				"export const useThingRequest = () => networkService.useGraphQlQuery('q');\n", 1,
 		},
 		{
-			"a function expression hook", networkImport +
-				"export const useThingRequest = function () {\n    return networkService.useGraphQlMutation('m');\n};\n", 1,
+			"a function expression hook",
+			networkImport +
+				"export const useThingRequest = function () {\n    return networkService.useGraphQlMutation('m');\n};\n",
+			1,
 		},
 		// A call inside a callback still counts: the hook is what the caller sees, so the walk does
 		// not stop at nested function boundaries. This is the opposite of the JSX walk's rule and
 		// the difference is deliberate.
 		{
-			"a call nested inside a callback", networkImport +
+			"a call nested inside a callback",
+			networkImport +
 				"declare function wrap(callback: () => unknown): unknown;\n" +
-				"export function useThingRequest() {\n    return wrap(() => networkService.graphQlRequest('q'));\n}\n", 1,
+				"export function useThingRequest() {\n    return wrap(() => networkService.graphQlRequest('q'));\n}\n",
+			1,
 		},
 		{
 			"two hooks in one file", networkImport +
@@ -133,7 +137,10 @@ func TestNetworkFileAnalysisStaysEmpty(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.Run(test, networkAnalysisProbe, networkFile, testCase.sourceText))
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.Run(test, networkAnalysisProbe, networkFile, testCase.sourceText),
+			)
 		})
 	}
 }

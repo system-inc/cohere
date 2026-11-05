@@ -29,7 +29,10 @@ func TestNotesAreCountedPerFilePerRulePerKey(test *testing.T) {
 			},
 		}
 	}
-	byName := notingEachDeclaration("test-by-name", func(declaration *ast.Node) string { return declaration.Name().Text() })
+	byName := notingEachDeclaration(
+		"test-by-name",
+		func(declaration *ast.Node) string { return declaration.Name().Text() },
+	)
 	constant := notingEachDeclaration("test-constant", func(declaration *ast.Node) string { return "a" })
 
 	directory := writeProject(test, map[string]string{
@@ -89,7 +92,11 @@ func TestTheCallerDataRuleNotesEachProcessStateExemption(test *testing.T) {
 	if err != nil {
 		test.Fatalf("loading the config: %v", err)
 	}
-	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{nexus.CorrectnessNoCallerDataMutation})
+	result, err := graph.Walk(
+		context.Background(),
+		graph.ProjectFiles(),
+		[]rule.Rule{nexus.CorrectnessNoCallerDataMutation},
+	)
 	if err != nil {
 		test.Fatalf("walking: %v", err)
 	}
@@ -102,7 +109,11 @@ func TestTheCallerDataRuleNotesEachProcessStateExemption(test *testing.T) {
 		test.Errorf("notes are %v, want %v", result.Notes, want)
 	}
 	if len(result.Diagnostics) != 1 {
-		test.Errorf("%d findings, want the one write through the untagged type: %v", len(result.Diagnostics), result.Diagnostics)
+		test.Errorf(
+			"%d findings, want the one write through the untagged type: %v",
+			len(result.Diagnostics),
+			result.Diagnostics,
+		)
 	}
 }
 
@@ -133,19 +144,29 @@ func TestTheCallerDataRuleNotesEachOutParameterContract(test *testing.T) {
 	if err != nil {
 		test.Fatalf("loading the config: %v", err)
 	}
-	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{nexus.CorrectnessNoCallerDataMutation})
+	result, err := graph.Walk(
+		context.Background(),
+		graph.ProjectFiles(),
+		[]rule.Rule{nexus.CorrectnessNoCallerDataMutation},
+	)
 	if err != nil {
 		test.Fatalf("walking: %v", err)
 	}
 
 	job := filepath.Join(directory, "job.ts")
 	want := map[string]program.RuleNotes{
-		job: {"nexus/correctness-no-caller-data-mutation": {"ScheduledExecutable.run(entity) in " + filepath.Join(directory, "base.ts"): 2}},
+		job: {"nexus/correctness-no-caller-data-mutation": {
+			"ScheduledExecutable.run(entity) in " + filepath.Join(directory, "base.ts"): 2,
+		}},
 	}
 	if !reflect.DeepEqual(result.Notes, want) {
 		test.Errorf("notes are %v, want %v", result.Notes, want)
 	}
 	if len(result.Diagnostics) != 1 {
-		test.Errorf("%d findings, want the one write through the untagged parameter: %v", len(result.Diagnostics), result.Diagnostics)
+		test.Errorf(
+			"%d findings, want the one write through the untagged parameter: %v",
+			len(result.Diagnostics),
+			result.Diagnostics,
+		)
 	}
 }

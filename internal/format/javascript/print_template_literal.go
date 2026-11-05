@@ -177,7 +177,9 @@ func printJestEachTemplateLiteral(path *Path, options *Options, print PrintFunc)
 				if row.hasLineBreak {
 					cellDocs[index] = doc.Text(cell)
 				} else {
-					cellDocs[index] = doc.Text(cell + strings.Repeat(" ", maximumColumnWidths[index]-doc.StringWidth(cell)))
+					cellDocs[index] = doc.Text(
+						cell + strings.Repeat(" ", maximumColumnWidths[index]-doc.StringWidth(cell)),
+					)
 				}
 			}
 			rowDocs[rowIndex] = join(" | ", cellDocs)

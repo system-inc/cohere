@@ -212,7 +212,9 @@ func preferObjectHasOwnUnwrap(node *ast.Node) *ast.Node {
 // The question is about the code the fix would produce rather than the code that is there, so it is
 // asked by resolving the name at the site the replacement would occupy.
 func preferObjectHasOwnGlobalObjectIsInScopeAt(ruleContext rule.Context, at *ast.Node) bool {
-	return rule.IsDeclaredOnlyInDeclarationFiles(ruleContext.TypeChecker.ResolveName("Object", at, ast.SymbolFlagsValue, false))
+	return rule.IsDeclaredOnlyInDeclarationFiles(
+		ruleContext.TypeChecker.ResolveName("Object", at, ast.SymbolFlagsValue, false),
+	)
 }
 
 // preferObjectHasOwnResolvesToTheGlobalObject answers upstream's scope question through the

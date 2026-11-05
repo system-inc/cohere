@@ -65,9 +65,18 @@ func TestNoRedeclareUpstreamCorpus(test *testing.T) {
 			invalid++
 		}
 	}
-	if valid != noRedeclareCorpusUpstreamValid || invalid != noRedeclareCorpusUpstreamInvalid || pinned != noRedeclareCorpusUpstreamPinned {
-		test.Fatalf("the corpus holds %d valid, %d invalid and %d pinned upstream rows, and upstream has %d, %d and %d",
-			valid, invalid, pinned, noRedeclareCorpusUpstreamValid, noRedeclareCorpusUpstreamInvalid, noRedeclareCorpusUpstreamPinned)
+	if valid != noRedeclareCorpusUpstreamValid ||
+		invalid != noRedeclareCorpusUpstreamInvalid ||
+		pinned != noRedeclareCorpusUpstreamPinned {
+		test.Fatalf(
+			"the corpus holds %d valid, %d invalid and %d pinned upstream rows, and upstream has %d, %d and %d",
+			valid,
+			invalid,
+			pinned,
+			noRedeclareCorpusUpstreamValid,
+			noRedeclareCorpusUpstreamInvalid,
+			noRedeclareCorpusUpstreamPinned,
+		)
 	}
 
 	for _, row := range noRedeclareCorpus {
@@ -82,9 +91,15 @@ func TestNoRedeclareUpstreamCorpus(test *testing.T) {
 				test.Fatalf("decoding %q: %v", row.options, decodeNoRedeclareOptionsError)
 			}
 			configuration := noRedeclareTsconfig(test, row.lib)
-			result := rule_testing.RunTypedFilesWithSetupAndOptions(test, NoRedeclare, map[string]string{"file.ts": row.source}, "file.ts", options,
+			result := rule_testing.RunTypedFilesWithSetupAndOptions(test, NoRedeclare, map[string]string{
+				"file.ts": row.source,
+			}, "file.ts", options,
 				func(directory string) {
-					if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration), 0o644); writeError != nil {
+					if writeError := os.WriteFile(
+						filepath.Join(directory, "tsconfig.json"),
+						[]byte(configuration),
+						0o644,
+					); writeError != nil {
 						test.Fatal(writeError)
 					}
 				})
@@ -162,7 +177,10 @@ func TestNoRedeclareScopesUpstreamNeverExamines(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoRedeclare, redeclareFile, testCase.sourceText, nil))
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.RunTypedWithOptions(test, NoRedeclare, redeclareFile, testCase.sourceText, nil),
+			)
 		})
 	}
 
@@ -256,7 +274,13 @@ func TestNoRedeclareDefaultsToIgnoringDeclarationMerge(test *testing.T) {
 	rule_testing.ExpectClean(test,
 		rule_testing.RunTypedWithOptions(test, NoRedeclare, redeclareFile, "interface A {}\ninterface A {}", nil))
 	rule_testing.ExpectFindings(test,
-		rule_testing.RunTypedWithOptions(test, NoRedeclare, redeclareFile, "interface A {}\ninterface A {}", redeclareOptions(false)),
+		rule_testing.RunTypedWithOptions(
+			test,
+			NoRedeclare,
+			redeclareFile,
+			"interface A {}\ninterface A {}",
+			redeclareOptions(false),
+		),
 		"redeclared")
 }
 
@@ -290,13 +314,24 @@ func TestNoRedeclareSpans(test *testing.T) {
 		// The class, not the namespace beside it: the namespace is a legitimate merge partner.
 		{"the extra class only", "class Alpha {}\nclass Alpha {}\nnamespace Alpha {}", nil, []string{"Alpha"}},
 		// With merging off, both the class and the namespace report, in source order.
-		{"merging off reports both", "function Beta() {}\nclass Beta {}\nnamespace Beta {}", redeclareOptions(false), []string{"Beta", "Beta"}},
+		{
+			"merging off reports both",
+			"function Beta() {}\nclass Beta {}\nnamespace Beta {}",
+			redeclareOptions(false),
+			[]string{"Beta", "Beta"},
+		},
 	}
 
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(test, NoRedeclare, redeclareFile, testCase.sourceText, testCase.options)
+			result := rule_testing.RunTypedWithOptions(
+				test,
+				NoRedeclare,
+				redeclareFile,
+				testCase.sourceText,
+				testCase.options,
+			)
 			if len(result.Diagnostics) != len(testCase.wantTexts) {
 				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.wantTexts))
 			}
@@ -328,7 +363,8 @@ func TestNoRedeclareMessage(test *testing.T) {
 		test.Errorf("message id = %q, want %q", got, wantIdentifier)
 	}
 	const wantPrefix = "This name is already declared in the same scope."
-	if got := result.Diagnostics[0].Message.Description; len(got) < len(wantPrefix) || got[:len(wantPrefix)] != wantPrefix {
+	if got := result.Diagnostics[0].Message.Description; len(got) < len(wantPrefix) ||
+		got[:len(wantPrefix)] != wantPrefix {
 		test.Errorf("message description = %q, want it to begin %q", got, wantPrefix)
 	}
 }

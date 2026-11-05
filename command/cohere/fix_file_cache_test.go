@@ -40,11 +40,19 @@ func TestTheFixPathsReLintComputesEachDerivationOncePerText(test *testing.T) {
 		}}
 	}
 	text := "const first = second;\nconst third = first + second;\n"
-	if _, proposalsForTextError := proposalsForText("/Probe.ts", text, &program.Graph{}, []rule.Rule{asking("probe-a"), asking("probe-b")}); proposalsForTextError != nil {
+	if _, proposalsForTextError := proposalsForText(
+		"/Probe.ts",
+		text,
+		&program.Graph{},
+		[]rule.Rule{asking("probe-a"), asking("probe-b")},
+	); proposalsForTextError != nil {
 		test.Fatalf("proposalsForText: %v", proposalsForTextError)
 	}
 	if computed != 1 {
-		test.Errorf("the derivation was computed %d times for one text asked at every identifier by two rules, want once", computed)
+		test.Errorf(
+			"the derivation was computed %d times for one text asked at every identifier by two rules, want once",
+			computed,
+		)
 	}
 }
 
@@ -54,7 +62,13 @@ func bundle(count int) string {
 	var text strings.Builder
 	text.WriteString("\"use strict\";\n(() => {\n")
 	for index := range count {
-		fmt.Fprintf(&text, "  // module %d\n  var module%d = function() {\n    /* the module's body */\n    return this.value%d;\n  };\n", index, index, index)
+		fmt.Fprintf(
+			&text,
+			"  // module %d\n  var module%d = function() {\n    /* the module's body */\n    return this.value%d;\n  };\n",
+			index,
+			index,
+			index,
+		)
 	}
 	text.WriteString("})();\n")
 	return text.String()
@@ -70,15 +84,24 @@ func TestTheFixPathsReLintGrowsLinearlyOnABundle(test *testing.T) {
 	allocations := func(count int) float64 {
 		text := bundle(count)
 		return testing.AllocsPerRun(3, func() {
-			if _, proposalsForTextError := proposalsForText("/main.js", text, &program.Graph{}, rules); proposalsForTextError != nil {
+			if _, proposalsForTextError := proposalsForText(
+				"/main.js",
+				text,
+				&program.Graph{},
+				rules,
+			); proposalsForTextError != nil {
 				test.Fatalf("proposalsForText: %v", proposalsForTextError)
 			}
 		})
 	}
 	small, large := allocations(100), allocations(400)
 	if ratio := large / small; ratio > 6 {
-		test.Errorf("four times the bundle allocated %.1f times as much (%.0f against %.0f objects), want about four: the re-lint is quadratic in the file",
-			ratio, large, small)
+		test.Errorf(
+			"four times the bundle allocated %.1f times as much (%.0f against %.0f objects), want about four: the re-lint is quadratic in the file",
+			ratio,
+			large,
+			small,
+		)
 	}
 }
 
@@ -109,14 +132,21 @@ func TestAFileStillInTheFixPhaseIsNamedWhileItRuns(test *testing.T) {
 		after, takes time.Duration
 		named        bool
 	}{
-		"a file that outlasts the notice is named": {after: time.Millisecond, takes: 200 * time.Millisecond, named: true},
-		"a file that finishes first says nothing":  {after: time.Minute, takes: 0, named: false},
+		"a file that outlasts the notice is named": {
+			after: time.Millisecond,
+			takes: 200 * time.Millisecond,
+			named: true,
+		},
+		"a file that finishes first says nothing": {after: time.Minute, takes: 0, named: false},
 	} {
 		test.Run(name, func(test *testing.T) {
 			test.Parallel()
 			out := &lockedBuffer{}
 			seenWhileRunning := false
-			result, watchedFileError := watchedFile(out, testCase.after, "/bundle/main.js", func() (edit.FileResult, error) {
+			result, watchedFileError := watchedFile(out, testCase.after, "/bundle/main.js", func() (
+				edit.FileResult,
+				error,
+			) {
 				time.Sleep(testCase.takes)
 				seenWhileRunning = strings.Contains(out.String(), "/bundle/main.js")
 				return edit.FileResult{FileName: "/bundle/main.js"}, nil

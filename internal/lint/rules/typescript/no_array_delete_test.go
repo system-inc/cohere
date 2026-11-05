@@ -35,13 +35,31 @@ func TestNoArrayDeleteStaysSilent(test *testing.T) {
 		name       string
 		sourceText string
 	}{
-		{"a property access on a plain object", "\n      declare const obj: { a: 1; b: 2 };\n      delete obj.a;\n    "},
-		{"a computed string key on a plain object", "\n      declare const obj: { a: 1; b: 2 };\n      delete obj['a'];\n    "},
-		{"a property access under four array levels", "\n      declare const arr: { a: 1; b: 2 }[][][][];\n      delete arr[0][0][0][0].a;\n    "},
+		{
+			"a property access on a plain object",
+			"\n      declare const obj: { a: 1; b: 2 };\n      delete obj.a;\n    ",
+		},
+		{
+			"a computed string key on a plain object",
+			"\n      declare const obj: { a: 1; b: 2 };\n      delete obj['a'];\n    ",
+		},
+		{
+			"a property access under four array levels",
+			"\n      declare const arr: { a: 1; b: 2 }[][][][];\n      delete arr[0][0][0][0].a;\n    ",
+		},
 		{"an element access on any", "\n      declare const maybeArray: any;\n      delete maybeArray[0];\n    "},
-		{"an element access on unknown", "\n      declare const maybeArray: unknown;\n      delete maybeArray[0];\n    "},
-		{"a property access on a constrained generic object", "\n      declare function getObject<T extends { a: 1; b: 2 }>(): T;\n      delete getObject().a;\n    "},
-		{"a property access on an object with a generic member", "\n      declare function getObject<T extends number>(): { a: T; b: 2 };\n      delete getObject().a;\n    "},
+		{
+			"an element access on unknown",
+			"\n      declare const maybeArray: unknown;\n      delete maybeArray[0];\n    ",
+		},
+		{
+			"a property access on a constrained generic object",
+			"\n      declare function getObject<T extends { a: 1; b: 2 }>(): T;\n      delete getObject().a;\n    ",
+		},
+		{
+			"a property access on an object with a generic member",
+			"\n      declare function getObject<T extends number>(): { a: T; b: 2 };\n      delete getObject().a;\n    ",
+		},
 		{"an element access on never", "\n      declare const test: never;\n      delete test[0];\n    "},
 		{"a call expression rather than an access", "\n      delete console.log();\n    "},
 
@@ -85,7 +103,10 @@ func TestNoArrayDeleteStaysSilent(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoArrayDelete, noArrayDeleteFile, testCase.sourceText))
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.RunTyped(test, NoArrayDelete, noArrayDeleteFile, testCase.sourceText),
+			)
 		})
 	}
 }
@@ -107,28 +128,85 @@ func TestNoArrayDeleteFires(test *testing.T) {
 		name       string
 		sourceText string
 	}{
-		{"a numeric literal index on a number array", "\n        declare const arr: number[];\n        delete arr[0];\n      "},
-		{"a variable index", "\n        declare const arr: number[];\n        declare const key: number;\n        delete arr[key];\n      "},
-		{"an enum member index", "\n        declare const arr: number[];\n\n        enum Keys {\n          A,\n          B,\n        }\n\n        delete arr[Keys.A];\n      "},
-		{"a sequence expression index", "\n        declare const arr: number[];\n        declare function doWork(): void;\n        delete arr[(doWork(), 1)];\n      "},
+		{
+			"a numeric literal index on a number array",
+			"\n        declare const arr: number[];\n        delete arr[0];\n      ",
+		},
+		{
+			"a variable index",
+			"\n        declare const arr: number[];\n        declare const key: number;\n        delete arr[key];\n      ",
+		},
+		{
+			"an enum member index",
+			"\n        declare const arr: number[];\n\n        enum Keys {\n          A,\n          B,\n        }\n\n        delete arr[Keys.A];\n      ",
+		},
+		{
+			"a sequence expression index",
+			"\n        declare const arr: number[];\n        declare function doWork(): void;\n        delete arr[(doWork(), 1)];\n      ",
+		},
 		{"the Array generic spelling", "\n        declare const arr: Array<number>;\n        delete arr[0];\n      "},
 		{"an array literal receiver", "delete [1, 2, 3][0];"},
-		{"a conditional expression index on an unknown array", "\n        declare const arr: unknown[];\n        delete arr[Math.random() ? 0 : 1];\n      "},
-		{"a union whose every member is an array", "\n        declare const arr: number[] | string[] | boolean[];\n        delete arr[0];\n      "},
-		{"an intersection with unknown", "\n        declare const arr: number[] & unknown;\n        delete arr[0];\n      "},
-		{"an array of a union element type", "\n        declare const arr: (number | string)[];\n        delete arr[0];\n      "},
-		{"a nested property path ending in an array", "\n        declare const obj: { a: { b: { c: number[] } } };\n        delete obj.a.b.c[0];\n      "},
-		{"a generic constrained to an array", "\n        declare function getArray<T extends number[]>(): T;\n        delete getArray()[0];\n      "},
-		{"an array of a constrained generic", "\n        declare function getArray<T extends number>(): T[];\n        delete getArray()[0];\n      "},
-		{"a parameter typed as an array", "\n        function deleteFromArray(a: number[]) {\n          delete a[0];\n        }\n      "},
-		{"a parameter typed as an array of a constrained generic", "\n        function deleteFromArray<T extends number>(a: T[]) {\n          delete a[0];\n        }\n      "},
-		{"a parameter whose generic is constrained to an array", "\n        function deleteFromArray<T extends number[]>(a: T) {\n          delete a[0];\n        }\n      "},
+		{
+			"a conditional expression index on an unknown array",
+			"\n        declare const arr: unknown[];\n        delete arr[Math.random() ? 0 : 1];\n      ",
+		},
+		{
+			"a union whose every member is an array",
+			"\n        declare const arr: number[] | string[] | boolean[];\n        delete arr[0];\n      ",
+		},
+		{
+			"an intersection with unknown",
+			"\n        declare const arr: number[] & unknown;\n        delete arr[0];\n      ",
+		},
+		{
+			"an array of a union element type",
+			"\n        declare const arr: (number | string)[];\n        delete arr[0];\n      ",
+		},
+		{
+			"a nested property path ending in an array",
+			"\n        declare const obj: { a: { b: { c: number[] } } };\n        delete obj.a.b.c[0];\n      ",
+		},
+		{
+			"a generic constrained to an array",
+			"\n        declare function getArray<T extends number[]>(): T;\n        delete getArray()[0];\n      ",
+		},
+		{
+			"an array of a constrained generic",
+			"\n        declare function getArray<T extends number>(): T[];\n        delete getArray()[0];\n      ",
+		},
+		{
+			"a parameter typed as an array",
+			"\n        function deleteFromArray(a: number[]) {\n          delete a[0];\n        }\n      ",
+		},
+		{
+			"a parameter typed as an array of a constrained generic",
+			"\n        function deleteFromArray<T extends number>(a: T[]) {\n          delete a[0];\n        }\n      ",
+		},
+		{
+			"a parameter whose generic is constrained to an array",
+			"\n        function deleteFromArray<T extends number[]>(a: T) {\n          delete a[0];\n        }\n      ",
+		},
 		{"a tuple receiver", "\n        declare const tuple: [number, string];\n        delete tuple[0];\n      "},
-		{"a spread array literal receiver", "\n        declare const a: number[];\n        declare const b: number;\n\n        delete [...a, ...a][b];\n      "},
-		{"comments inside and around the expression", "\n        declare const a: number[];\n        declare const b: number;\n\n        // before expression\n        delete /** multi\n        line */ a[((\n        // single-line\n        b /* inline */ /* another-inline */ )\n        ) /* another-one */ ] /* before semicolon */; /* after semicolon */\n        // after expression\n      "},
-		{"doubled parentheses around the whole access", "\n        declare const a: number[];\n        declare const b: number;\n\n        delete ((a[((b))]));\n      "},
-		{"an arithmetic index with its own parentheses", "\n        declare const a: number[];\n        declare const b: number;\n\n        delete a[(b + 1) * (b + 2)];\n      "},
-		{"an intersection of a string and an array", "\n        declare const arr: string & Array<number>;\n        delete arr[0];\n      "},
+		{
+			"a spread array literal receiver",
+			"\n        declare const a: number[];\n        declare const b: number;\n\n        delete [...a, ...a][b];\n      ",
+		},
+		{
+			"comments inside and around the expression",
+			"\n        declare const a: number[];\n        declare const b: number;\n\n        // before expression\n        delete /** multi\n        line */ a[((\n        // single-line\n        b /* inline */ /* another-inline */ )\n        ) /* another-one */ ] /* before semicolon */; /* after semicolon */\n        // after expression\n      ",
+		},
+		{
+			"doubled parentheses around the whole access",
+			"\n        declare const a: number[];\n        declare const b: number;\n\n        delete ((a[((b))]));\n      ",
+		},
+		{
+			"an arithmetic index with its own parentheses",
+			"\n        declare const a: number[];\n        declare const b: number;\n\n        delete a[(b + 1) * (b + 2)];\n      ",
+		},
+		{
+			"an intersection of a string and an array",
+			"\n        declare const arr: string & Array<number>;\n        delete arr[0];\n      ",
+		},
 
 		// Beyond upstream's corpus, and each one measured through the @typescript-eslint Linter API
 		// on a real program before being written here rather than reasoned about from the source.
@@ -164,7 +242,11 @@ func TestNoArrayDeleteFires(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoArrayDelete, noArrayDeleteFile, testCase.sourceText), "noArrayDelete")
+			rule_testing.ExpectFindings(
+				test,
+				rule_testing.RunTyped(test, NoArrayDelete, noArrayDeleteFile, testCase.sourceText),
+				"noArrayDelete",
+			)
 		})
 	}
 }
@@ -196,28 +278,112 @@ func TestNoArrayDeleteSuggestions(test *testing.T) {
 		sourceText string
 		wantOutput string
 	}{
-		{"a numeric literal index on a number array", "\n        declare const arr: number[];\n        delete arr[0];\n      ", "\n        declare const arr: number[];\n         arr.splice(0, 1);\n      "},
-		{"a variable index", "\n        declare const arr: number[];\n        declare const key: number;\n        delete arr[key];\n      ", "\n        declare const arr: number[];\n        declare const key: number;\n         arr.splice(key, 1);\n      "},
-		{"an enum member index", "\n        declare const arr: number[];\n\n        enum Keys {\n          A,\n          B,\n        }\n\n        delete arr[Keys.A];\n      ", "\n        declare const arr: number[];\n\n        enum Keys {\n          A,\n          B,\n        }\n\n         arr.splice(Keys.A, 1);\n      "},
-		{"a sequence expression index keeps its own parentheses", "\n        declare const arr: number[];\n        declare function doWork(): void;\n        delete arr[(doWork(), 1)];\n      ", "\n        declare const arr: number[];\n        declare function doWork(): void;\n         arr.splice((doWork(), 1), 1);\n      "},
-		{"the Array generic spelling", "\n        declare const arr: Array<number>;\n        delete arr[0];\n      ", "\n        declare const arr: Array<number>;\n         arr.splice(0, 1);\n      "},
+		{
+			"a numeric literal index on a number array",
+			"\n        declare const arr: number[];\n        delete arr[0];\n      ",
+			"\n        declare const arr: number[];\n         arr.splice(0, 1);\n      ",
+		},
+		{
+			"a variable index",
+			"\n        declare const arr: number[];\n        declare const key: number;\n        delete arr[key];\n      ",
+			"\n        declare const arr: number[];\n        declare const key: number;\n         arr.splice(key, 1);\n      ",
+		},
+		{
+			"an enum member index",
+			"\n        declare const arr: number[];\n\n        enum Keys {\n          A,\n          B,\n        }\n\n        delete arr[Keys.A];\n      ",
+			"\n        declare const arr: number[];\n\n        enum Keys {\n          A,\n          B,\n        }\n\n         arr.splice(Keys.A, 1);\n      ",
+		},
+		{
+			"a sequence expression index keeps its own parentheses",
+			"\n        declare const arr: number[];\n        declare function doWork(): void;\n        delete arr[(doWork(), 1)];\n      ",
+			"\n        declare const arr: number[];\n        declare function doWork(): void;\n         arr.splice((doWork(), 1), 1);\n      ",
+		},
+		{
+			"the Array generic spelling",
+			"\n        declare const arr: Array<number>;\n        delete arr[0];\n      ",
+			"\n        declare const arr: Array<number>;\n         arr.splice(0, 1);\n      ",
+		},
 		{"an array literal receiver", "delete [1, 2, 3][0];", " [1, 2, 3].splice(0, 1);"},
-		{"a conditional expression index on an unknown array", "\n        declare const arr: unknown[];\n        delete arr[Math.random() ? 0 : 1];\n      ", "\n        declare const arr: unknown[];\n         arr.splice(Math.random() ? 0 : 1, 1);\n      "},
-		{"a union whose every member is an array", "\n        declare const arr: number[] | string[] | boolean[];\n        delete arr[0];\n      ", "\n        declare const arr: number[] | string[] | boolean[];\n         arr.splice(0, 1);\n      "},
-		{"an intersection with unknown", "\n        declare const arr: number[] & unknown;\n        delete arr[0];\n      ", "\n        declare const arr: number[] & unknown;\n         arr.splice(0, 1);\n      "},
-		{"an array of a union element type", "\n        declare const arr: (number | string)[];\n        delete arr[0];\n      ", "\n        declare const arr: (number | string)[];\n         arr.splice(0, 1);\n      "},
-		{"a nested property path ending in an array", "\n        declare const obj: { a: { b: { c: number[] } } };\n        delete obj.a.b.c[0];\n      ", "\n        declare const obj: { a: { b: { c: number[] } } };\n         obj.a.b.c.splice(0, 1);\n      "},
-		{"a generic constrained to an array", "\n        declare function getArray<T extends number[]>(): T;\n        delete getArray()[0];\n      ", "\n        declare function getArray<T extends number[]>(): T;\n         getArray().splice(0, 1);\n      "},
-		{"an array of a constrained generic", "\n        declare function getArray<T extends number>(): T[];\n        delete getArray()[0];\n      ", "\n        declare function getArray<T extends number>(): T[];\n         getArray().splice(0, 1);\n      "},
-		{"a parameter typed as an array", "\n        function deleteFromArray(a: number[]) {\n          delete a[0];\n        }\n      ", "\n        function deleteFromArray(a: number[]) {\n           a.splice(0, 1);\n        }\n      "},
-		{"a parameter typed as an array of a constrained generic", "\n        function deleteFromArray<T extends number>(a: T[]) {\n          delete a[0];\n        }\n      ", "\n        function deleteFromArray<T extends number>(a: T[]) {\n           a.splice(0, 1);\n        }\n      "},
-		{"a parameter whose generic is constrained to an array", "\n        function deleteFromArray<T extends number[]>(a: T) {\n          delete a[0];\n        }\n      ", "\n        function deleteFromArray<T extends number[]>(a: T) {\n           a.splice(0, 1);\n        }\n      "},
-		{"a tuple receiver", "\n        declare const tuple: [number, string];\n        delete tuple[0];\n      ", "\n        declare const tuple: [number, string];\n         tuple.splice(0, 1);\n      "},
-		{"a spread array literal receiver", "\n        declare const a: number[];\n        declare const b: number;\n\n        delete [...a, ...a][b];\n      ", "\n        declare const a: number[];\n        declare const b: number;\n\n         [...a, ...a].splice(b, 1);\n      "},
-		{"comments stay exactly where they were", "\n        declare const a: number[];\n        declare const b: number;\n\n        // before expression\n        delete /** multi\n        line */ a[((\n        // single-line\n        b /* inline */ /* another-inline */ )\n        ) /* another-one */ ] /* before semicolon */; /* after semicolon */\n        // after expression\n      ", "\n        declare const a: number[];\n        declare const b: number;\n\n        // before expression\n         /** multi\n        line */ a.splice(((\n        // single-line\n        b /* inline */ /* another-inline */ )\n        ) /* another-one */ , 1) /* before semicolon */; /* after semicolon */\n        // after expression\n      "},
-		{"doubled parentheses around the whole access survive", "\n        declare const a: number[];\n        declare const b: number;\n\n        delete ((a[((b))]));\n      ", "\n        declare const a: number[];\n        declare const b: number;\n\n         ((a.splice(((b)), 1)));\n      "},
-		{"an arithmetic index with its own parentheses", "\n        declare const a: number[];\n        declare const b: number;\n\n        delete a[(b + 1) * (b + 2)];\n      ", "\n        declare const a: number[];\n        declare const b: number;\n\n         a.splice((b + 1) * (b + 2), 1);\n      "},
-		{"an intersection of a string and an array", "\n        declare const arr: string & Array<number>;\n        delete arr[0];\n      ", "\n        declare const arr: string & Array<number>;\n         arr.splice(0, 1);\n      "},
+		{
+			"a conditional expression index on an unknown array",
+			"\n        declare const arr: unknown[];\n        delete arr[Math.random() ? 0 : 1];\n      ",
+			"\n        declare const arr: unknown[];\n         arr.splice(Math.random() ? 0 : 1, 1);\n      ",
+		},
+		{
+			"a union whose every member is an array",
+			"\n        declare const arr: number[] | string[] | boolean[];\n        delete arr[0];\n      ",
+			"\n        declare const arr: number[] | string[] | boolean[];\n         arr.splice(0, 1);\n      ",
+		},
+		{
+			"an intersection with unknown",
+			"\n        declare const arr: number[] & unknown;\n        delete arr[0];\n      ",
+			"\n        declare const arr: number[] & unknown;\n         arr.splice(0, 1);\n      ",
+		},
+		{
+			"an array of a union element type",
+			"\n        declare const arr: (number | string)[];\n        delete arr[0];\n      ",
+			"\n        declare const arr: (number | string)[];\n         arr.splice(0, 1);\n      ",
+		},
+		{
+			"a nested property path ending in an array",
+			"\n        declare const obj: { a: { b: { c: number[] } } };\n        delete obj.a.b.c[0];\n      ",
+			"\n        declare const obj: { a: { b: { c: number[] } } };\n         obj.a.b.c.splice(0, 1);\n      ",
+		},
+		{
+			"a generic constrained to an array",
+			"\n        declare function getArray<T extends number[]>(): T;\n        delete getArray()[0];\n      ",
+			"\n        declare function getArray<T extends number[]>(): T;\n         getArray().splice(0, 1);\n      ",
+		},
+		{
+			"an array of a constrained generic",
+			"\n        declare function getArray<T extends number>(): T[];\n        delete getArray()[0];\n      ",
+			"\n        declare function getArray<T extends number>(): T[];\n         getArray().splice(0, 1);\n      ",
+		},
+		{
+			"a parameter typed as an array",
+			"\n        function deleteFromArray(a: number[]) {\n          delete a[0];\n        }\n      ",
+			"\n        function deleteFromArray(a: number[]) {\n           a.splice(0, 1);\n        }\n      ",
+		},
+		{
+			"a parameter typed as an array of a constrained generic",
+			"\n        function deleteFromArray<T extends number>(a: T[]) {\n          delete a[0];\n        }\n      ",
+			"\n        function deleteFromArray<T extends number>(a: T[]) {\n           a.splice(0, 1);\n        }\n      ",
+		},
+		{
+			"a parameter whose generic is constrained to an array",
+			"\n        function deleteFromArray<T extends number[]>(a: T) {\n          delete a[0];\n        }\n      ",
+			"\n        function deleteFromArray<T extends number[]>(a: T) {\n           a.splice(0, 1);\n        }\n      ",
+		},
+		{
+			"a tuple receiver",
+			"\n        declare const tuple: [number, string];\n        delete tuple[0];\n      ",
+			"\n        declare const tuple: [number, string];\n         tuple.splice(0, 1);\n      ",
+		},
+		{
+			"a spread array literal receiver",
+			"\n        declare const a: number[];\n        declare const b: number;\n\n        delete [...a, ...a][b];\n      ",
+			"\n        declare const a: number[];\n        declare const b: number;\n\n         [...a, ...a].splice(b, 1);\n      ",
+		},
+		{
+			"comments stay exactly where they were",
+			"\n        declare const a: number[];\n        declare const b: number;\n\n        // before expression\n        delete /** multi\n        line */ a[((\n        // single-line\n        b /* inline */ /* another-inline */ )\n        ) /* another-one */ ] /* before semicolon */; /* after semicolon */\n        // after expression\n      ",
+			"\n        declare const a: number[];\n        declare const b: number;\n\n        // before expression\n         /** multi\n        line */ a.splice(((\n        // single-line\n        b /* inline */ /* another-inline */ )\n        ) /* another-one */ , 1) /* before semicolon */; /* after semicolon */\n        // after expression\n      ",
+		},
+		{
+			"doubled parentheses around the whole access survive",
+			"\n        declare const a: number[];\n        declare const b: number;\n\n        delete ((a[((b))]));\n      ",
+			"\n        declare const a: number[];\n        declare const b: number;\n\n         ((a.splice(((b)), 1)));\n      ",
+		},
+		{
+			"an arithmetic index with its own parentheses",
+			"\n        declare const a: number[];\n        declare const b: number;\n\n        delete a[(b + 1) * (b + 2)];\n      ",
+			"\n        declare const a: number[];\n        declare const b: number;\n\n         a.splice((b + 1) * (b + 2), 1);\n      ",
+		},
+		{
+			"an intersection of a string and an array",
+			"\n        declare const arr: string & Array<number>;\n        delete arr[0];\n      ",
+			"\n        declare const arr: string & Array<number>;\n         arr.splice(0, 1);\n      ",
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -238,7 +404,10 @@ func TestNoArrayDeleteSuggestions(test *testing.T) {
 			// proposal independently, so a repair that lost one of the three would still apply the
 			// other two and leave source that parses.
 			if len(suggestions[0].Fixes) != 3 {
-				test.Errorf("the suggestion carries %d fixes, want three: the delete token, the open bracket, and the close bracket", len(suggestions[0].Fixes))
+				test.Errorf(
+					"the suggestion carries %d fixes, want three: the delete token, the open bracket, and the close bracket",
+					len(suggestions[0].Fixes),
+				)
 			}
 			// The harness trims the fixture before building the program, so offsets are against
 			// the trimmed text rather than against the literal written above, and the expected
@@ -262,7 +431,9 @@ func TestNoArrayDeleteSuggestions(test *testing.T) {
 			// repair leaves behind is not part of the input's prefix at all.
 			source := strings.TrimSpace(testCase.sourceText) + "\n"
 			got := applyNoArrayDeleteSuggestion(test, source, suggestions[0])
-			leadingTrivia := testCase.sourceText[:len(testCase.sourceText)-len(strings.TrimLeft(testCase.sourceText, " \t\n"))]
+			leadingTrivia := testCase.sourceText[:len(
+				testCase.sourceText,
+			)-len(strings.TrimLeft(testCase.sourceText, " \t\n"))]
 			want := strings.TrimRight(strings.TrimPrefix(testCase.wantOutput, leadingTrivia), " \t\n") + "\n"
 			if got != want {
 				test.Errorf("applying the suggestion produced\n%q\nwant\n%q", got, want)
@@ -317,24 +488,92 @@ func TestNoArrayDeleteSpans(test *testing.T) {
 		sourceText string
 		wantText   string
 	}{
-		{"a numeric literal index", "\n        declare const arr: number[];\n        delete arr[0];\n      ", "delete arr[0]"},
-		{"a variable index", "\n        declare const arr: number[];\n        declare const key: number;\n        delete arr[key];\n      ", "delete arr[key]"},
-		{"an enum member index", "\n        declare const arr: number[];\n\n        enum Keys {\n          A,\n          B,\n        }\n\n        delete arr[Keys.A];\n      ", "delete arr[Keys.A]"},
-		{"a sequence expression index", "\n        declare const arr: number[];\n        declare function doWork(): void;\n        delete arr[(doWork(), 1)];\n      ", "delete arr[(doWork(), 1)]"},
-		{"the Array generic spelling", "\n        declare const arr: Array<number>;\n        delete arr[0];\n      ", "delete arr[0]"},
+		{
+			"a numeric literal index",
+			"\n        declare const arr: number[];\n        delete arr[0];\n      ",
+			"delete arr[0]",
+		},
+		{
+			"a variable index",
+			"\n        declare const arr: number[];\n        declare const key: number;\n        delete arr[key];\n      ",
+			"delete arr[key]",
+		},
+		{
+			"an enum member index",
+			"\n        declare const arr: number[];\n\n        enum Keys {\n          A,\n          B,\n        }\n\n        delete arr[Keys.A];\n      ",
+			"delete arr[Keys.A]",
+		},
+		{
+			"a sequence expression index",
+			"\n        declare const arr: number[];\n        declare function doWork(): void;\n        delete arr[(doWork(), 1)];\n      ",
+			"delete arr[(doWork(), 1)]",
+		},
+		{
+			"the Array generic spelling",
+			"\n        declare const arr: Array<number>;\n        delete arr[0];\n      ",
+			"delete arr[0]",
+		},
 		{"an array literal receiver", "delete [1, 2, 3][0];", "delete [1, 2, 3][0]"},
-		{"a conditional expression index", "\n        declare const arr: unknown[];\n        delete arr[Math.random() ? 0 : 1];\n      ", "delete arr[Math.random() ? 0 : 1]"},
-		{"a union of arrays", "\n        declare const arr: number[] | string[] | boolean[];\n        delete arr[0];\n      ", "delete arr[0]"},
-		{"an intersection with unknown", "\n        declare const arr: number[] & unknown;\n        delete arr[0];\n      ", "delete arr[0]"},
-		{"an array of a union element type", "\n        declare const arr: (number | string)[];\n        delete arr[0];\n      ", "delete arr[0]"},
-		{"a nested property path", "\n        declare const obj: { a: { b: { c: number[] } } };\n        delete obj.a.b.c[0];\n      ", "delete obj.a.b.c[0]"},
-		{"a generic constrained to an array", "\n        declare function getArray<T extends number[]>(): T;\n        delete getArray()[0];\n      ", "delete getArray()[0]"},
-		{"an array of a constrained generic", "\n        declare function getArray<T extends number>(): T[];\n        delete getArray()[0];\n      ", "delete getArray()[0]"},
-		{"a parameter typed as an array", "\n        function deleteFromArray(a: number[]) {\n          delete a[0];\n        }\n      ", "delete a[0]"},
-		{"a parameter of an array of a constrained generic", "\n        function deleteFromArray<T extends number>(a: T[]) {\n          delete a[0];\n        }\n      ", "delete a[0]"},
-		{"a parameter whose generic is constrained to an array", "\n        function deleteFromArray<T extends number[]>(a: T) {\n          delete a[0];\n        }\n      ", "delete a[0]"},
-		{"a tuple receiver", "\n        declare const tuple: [number, string];\n        delete tuple[0];\n      ", "delete tuple[0]"},
-		{"an intersection of a string and an array", "\n        declare const arr: string & Array<number>;\n        delete arr[0];\n      ", "delete arr[0]"},
+		{
+			"a conditional expression index",
+			"\n        declare const arr: unknown[];\n        delete arr[Math.random() ? 0 : 1];\n      ",
+			"delete arr[Math.random() ? 0 : 1]",
+		},
+		{
+			"a union of arrays",
+			"\n        declare const arr: number[] | string[] | boolean[];\n        delete arr[0];\n      ",
+			"delete arr[0]",
+		},
+		{
+			"an intersection with unknown",
+			"\n        declare const arr: number[] & unknown;\n        delete arr[0];\n      ",
+			"delete arr[0]",
+		},
+		{
+			"an array of a union element type",
+			"\n        declare const arr: (number | string)[];\n        delete arr[0];\n      ",
+			"delete arr[0]",
+		},
+		{
+			"a nested property path",
+			"\n        declare const obj: { a: { b: { c: number[] } } };\n        delete obj.a.b.c[0];\n      ",
+			"delete obj.a.b.c[0]",
+		},
+		{
+			"a generic constrained to an array",
+			"\n        declare function getArray<T extends number[]>(): T;\n        delete getArray()[0];\n      ",
+			"delete getArray()[0]",
+		},
+		{
+			"an array of a constrained generic",
+			"\n        declare function getArray<T extends number>(): T[];\n        delete getArray()[0];\n      ",
+			"delete getArray()[0]",
+		},
+		{
+			"a parameter typed as an array",
+			"\n        function deleteFromArray(a: number[]) {\n          delete a[0];\n        }\n      ",
+			"delete a[0]",
+		},
+		{
+			"a parameter of an array of a constrained generic",
+			"\n        function deleteFromArray<T extends number>(a: T[]) {\n          delete a[0];\n        }\n      ",
+			"delete a[0]",
+		},
+		{
+			"a parameter whose generic is constrained to an array",
+			"\n        function deleteFromArray<T extends number[]>(a: T) {\n          delete a[0];\n        }\n      ",
+			"delete a[0]",
+		},
+		{
+			"a tuple receiver",
+			"\n        declare const tuple: [number, string];\n        delete tuple[0];\n      ",
+			"delete tuple[0]",
+		},
+		{
+			"an intersection of a string and an array",
+			"\n        declare const arr: string & Array<number>;\n        delete arr[0];\n      ",
+			"delete arr[0]",
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -361,7 +600,10 @@ func TestNoArrayDeleteSpans(test *testing.T) {
 				test.Errorf("the message reads %q", finding.Message.Description)
 			}
 			if finding.RuleName != "@typescript-eslint/no-array-delete" {
-				test.Errorf("the finding reports under %q, and a name that is not the registered one is unsuppressable by the comment its author wrote", finding.RuleName)
+				test.Errorf(
+					"the finding reports under %q, and a name that is not the registered one is unsuppressable by the comment its author wrote",
+					finding.RuleName,
+				)
 			}
 			if len(finding.Suggestions) != 1 {
 				test.Fatalf("want one suggestion, got %d", len(finding.Suggestions))
@@ -373,7 +615,10 @@ func TestNoArrayDeleteSpans(test *testing.T) {
 			// engine applies a fix unattended, and splice reindexes the array where delete does not,
 			// so this repair changing arms from suggestion to fix would silently rewrite behavior.
 			if len(finding.Fixes) != 0 {
-				test.Errorf("the finding carries %d fixes, and this repair must be a suggestion because splice reindexes the array", len(finding.Fixes))
+				test.Errorf(
+					"the finding carries %d fixes, and this repair must be a suggestion because splice reindexes the array",
+					len(finding.Fixes),
+				)
 			}
 		})
 	}
@@ -396,10 +641,15 @@ func TestNoArrayDeleteRequiresTheTypedHarness(test *testing.T) {
 	test.Parallel()
 
 	if !NoArrayDelete.NeedsTypeChecker {
-		test.Fatal("the rule stopped declaring NeedsTypeChecker, so every typed fixture would run against a nil checker")
+		test.Fatal(
+			"the rule stopped declaring NeedsTypeChecker, so every typed fixture would run against a nil checker",
+		)
 	}
 	if NoArrayDelete.Name != "@typescript-eslint/no-array-delete" {
-		test.Errorf("the registered name is %q, and the inventory writes typescript/no-array-delete", NoArrayDelete.Name)
+		test.Errorf(
+			"the registered name is %q, and the inventory writes typescript/no-array-delete",
+			NoArrayDelete.Name,
+		)
 	}
 
 	// A finding the typed harness produces and the untyped one cannot.

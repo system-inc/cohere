@@ -58,7 +58,10 @@ type glueParseFixture struct {
 var glueParseFixtures = []glueParseFixture{
 	// Rules, selectors and declarations.
 	{name: "rule and declarations", text: "a { color: red; background: blue }\nb{c:d}"},
-	{name: "selector forms", text: "a > b + c ~ d e, .x#y[z=\"1\" i]:hover::before, *|*, ns|a, :not(.a, .b) :is(a) :where(b), a:nth-child(2n + 1 of .x), :root {}"},
+	{
+		name: "selector forms",
+		text: "a > b + c ~ d e, .x#y[z=\"1\" i]:hover::before, *|*, ns|a, :not(.a, .b) :is(a) :where(b), a:nth-child(2n + 1 of .x), :root {}",
+	},
 	{name: "css nesting", text: "a { &:hover { b: c } .d & { e: f } & > g { h: i } }"},
 	{name: "selector with a comment", text: "a /* c */ b { x: y }"},
 	{name: "selector with a line comment", text: "a // c\nb { x: y }"},
@@ -70,46 +73,107 @@ var glueParseFixtures = []glueParseFixture{
 	{name: "semicolons and hacks", text: "a{;b:c;;*zoom:1;_height:1px}"},
 	{name: "declaration value comments", text: "a { margin: 1px /* c */ 2px; color: red/* x */; padding:/* y */0 }"},
 	{name: "important", text: "a { color: red !important; margin: 0 ! important; padding: 0!IMPORTANT }"},
-	{name: "scss directives read by the css parser", text: "a { x: 1 !default; y: 2!global; z: 3 !default !global; w: 4 !default\n ; v: 5 !defaults }"},
-	{name: "progid", text: "a { filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#000', endColorstr='#fff'); }"},
-	{name: "multi-line values", text: "a {\n  grid-template-columns:\n    [full-start] minmax(1em, 1fr)\n    [main-start] minmax(0, 40em);\n  box-shadow:\n    0 0 0 1px red,\n    0 1px 2px blue;\n}"},
+	{
+		name: "scss directives read by the css parser",
+		text: "a { x: 1 !default; y: 2!global; z: 3 !default !global; w: 4 !default\n ; v: 5 !defaults }",
+	},
+	{
+		name: "progid",
+		text: "a { filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#000', endColorstr='#fff'); }",
+	},
+	{
+		name: "multi-line values",
+		text: "a {\n  grid-template-columns:\n    [full-start] minmax(1em, 1fr)\n    [main-start] minmax(0, 40em);\n  box-shadow:\n    0 0 0 1px red,\n    0 1px 2px blue;\n}",
+	},
 
 	// Custom properties.
-	{name: "custom properties", text: ":root { --a: 1px; --b: { color: red; margin: 0 }; --c: {}; --d:{a:b}; --e: ; --f: {/* c */ a: b}; --g: [x] }"},
+	{
+		name: "custom properties",
+		text: ":root { --a: 1px; --b: { color: red; margin: 0 }; --c: {}; --d:{a:b}; --e: ; --f: {/* c */ a: b}; --g: [x] }",
+	},
 	{name: "custom property block nested in rules", text: "a { b { --x: { c: d } } }\n:root{--y:{}}"},
 	{name: "custom property that is not a block", text: ":root { --x: {a} b }", malformed: true},
 	{name: "custom property block that does not parse", text: ":root { --x: {a} }", malformed: true},
 	{name: "custom property block with a comment that does not parse", text: ":root { --x: {/* c */ a} }"},
 
 	// At-rules.
-	{name: "import and namespace", text: "@charset \"utf-8\";\n@import url(foo.css) screen;\n@import \"bar.css\" layer(x);\n@IMPORT url(x);\n@import url(\"a.css\") supports(display: grid) screen;\n@namespace svg url(http://www.w3.org/2000/svg);"},
-	{name: "font face", text: "@font-face { font-family: X; src: url(a.woff2) format(\"woff2\"), url('b.woff'); unicode-range: U+0000-00FF, U+0131, u+4??; font-display: swap }"},
-	{name: "page and layer", text: "@page :first { margin: 1in }\n@layer base, components;\n@layer base { a { b: c } }"},
-	{name: "media", text: "@media screen and (min-width: 100px), print and (orientation: landscape) { a { b: c } }\n@media (100px <= width <= 200px) {}\n@custom-media --small (max-width: 30em);\n@media not all and (monochrome) {}\n@MEDIA screen {}\n@media (min-width:100px) and (max-width:200px){}"},
+	{
+		name: "import and namespace",
+		text: "@charset \"utf-8\";\n@import url(foo.css) screen;\n@import \"bar.css\" layer(x);\n@IMPORT url(x);\n@import url(\"a.css\") supports(display: grid) screen;\n@namespace svg url(http://www.w3.org/2000/svg);",
+	},
+	{
+		name: "font face",
+		text: "@font-face { font-family: X; src: url(a.woff2) format(\"woff2\"), url('b.woff'); unicode-range: U+0000-00FF, U+0131, u+4??; font-display: swap }",
+	},
+	{
+		name: "page and layer",
+		text: "@page :first { margin: 1in }\n@layer base, components;\n@layer base { a { b: c } }",
+	},
+	{
+		name: "media",
+		text: "@media screen and (min-width: 100px), print and (orientation: landscape) { a { b: c } }\n@media (100px <= width <= 200px) {}\n@custom-media --small (max-width: 30em);\n@media not all and (monochrome) {}\n@MEDIA screen {}\n@media (min-width:100px) and (max-width:200px){}",
+	},
 	{name: "media with interpolation", text: "@media screen, \"#{\" { a { b: c } }"},
 	{name: "media interpolation that postcss refuses", text: "@media #{$q} { a { b: c } }", malformed: true},
 	{name: "media with a comment", text: "@media /* c */ screen { }\n@media screen /* d */ { }"},
-	{name: "supports", text: "@supports (display: grid) and (not (display: inline-grid)) { a { b: c } }\n@supports selector(a > b) { }\n@supports not selector(:is(a, b)) {}\n@Supports (x: y) {}"},
-	{name: "custom selector", text: "@custom-selector :--heading h1, h2, h3;\n@custom-selector :--enter  :hover,:focus ;"},
+	{
+		name: "supports",
+		text: "@supports (display: grid) and (not (display: inline-grid)) { a { b: c } }\n@supports selector(a > b) { }\n@supports not selector(:is(a, b)) {}\n@Supports (x: y) {}",
+	},
+	{
+		name: "custom selector",
+		text: "@custom-selector :--heading h1, h2, h3;\n@custom-selector :--enter  :hover,:focus ;",
+	},
 	{name: "custom selector without a name", text: "@custom-selector foo;", malformed: true},
-	{name: "extend nest at-root warn error", text: "a { @extend .b; @nest & > c { d: e } }\n@at-root (without: media) { }\n@at-root .x { }\n@at-root (with: rule) {}\n@warn \"x\";\n@error \"y\";"},
-	{name: "scss-like directives", text: "@include foo (1, 2);\n@mixin bar ($a...) {}\n@include baz($args ...);\n@if $a == 1 { }\n@else if ($b) { }\n@each $x in a, b { }\n@function f($a) { @return $a; }\n@debug \"x\";\n@define-mixin m $a { }\n@add-mixin m 1;"},
-	{name: "tailwind", text: "@import \"tailwindcss\";\n@theme { --color-x: oklch(0.5 0.1 200); --font-sans: \"Inter\", sans-serif; --spacing: 0.25rem }\n@theme inline { --x: var(--y) }\n@utility tab-4 { tab-size: 4; }\n@utility scroll-* { --x: --value(--spacing-*) }\n@custom-variant dark (&:where(.dark, .dark *));\n@layer components { .btn { @apply flex items-center px-4 hover:bg-red-500; } }\n@variant hover { a { b: c } }\n@source \"../node_modules\";\n@plugin \"x\";\n@config \"./t.js\";"},
-	{name: "keyframes", text: "@keyframes spin { from { transform: rotate(0deg) } 50% { opacity: .5 } to { transform: rotate(360deg) } }"},
+	{
+		name: "extend nest at-root warn error",
+		text: "a { @extend .b; @nest & > c { d: e } }\n@at-root (without: media) { }\n@at-root .x { }\n@at-root (with: rule) {}\n@warn \"x\";\n@error \"y\";",
+	},
+	{
+		name: "scss-like directives",
+		text: "@include foo (1, 2);\n@mixin bar ($a...) {}\n@include baz($args ...);\n@if $a == 1 { }\n@else if ($b) { }\n@each $x in a, b { }\n@function f($a) { @return $a; }\n@debug \"x\";\n@define-mixin m $a { }\n@add-mixin m 1;",
+	},
+	{
+		name: "tailwind",
+		text: "@import \"tailwindcss\";\n@theme { --color-x: oklch(0.5 0.1 200); --font-sans: \"Inter\", sans-serif; --spacing: 0.25rem }\n@theme inline { --x: var(--y) }\n@utility tab-4 { tab-size: 4; }\n@utility scroll-* { --x: --value(--spacing-*) }\n@custom-variant dark (&:where(.dark, .dark *));\n@layer components { .btn { @apply flex items-center px-4 hover:bg-red-500; } }\n@variant hover { a { b: c } }\n@source \"../node_modules\";\n@plugin \"x\";\n@config \"./t.js\";",
+	},
+	{
+		name: "keyframes",
+		text: "@keyframes spin { from { transform: rotate(0deg) } 50% { opacity: .5 } to { transform: rotate(360deg) } }",
+	},
 	{name: "at-rule without params", text: "a { @foo; }\n@bar;\n@baz { }"},
 	{name: "at-rule at the end of the file", text: "a {}\n@foo"},
 	{name: "at-rule with a colon", text: "@foo:bar;\n@baz :qux;"},
 	{name: "unknown at-rule with params", text: "@foo bar baz { a: b }\n@foo   spaced   ;"},
 
 	// Values.
-	{name: "value words and numbers", text: "a { margin: -1px -2px --3px; b: --x; c: -; d: --; e: -webkit-calc(1px); f: 10PX 1.5e-3em +.5 1e3 +2 -.5 }"},
-	{name: "value functions", text: "a { width: calc(100% - (2 * var(--x, 10px))); transition: all .3s cubic-bezier(.1,.2,.3,.4); color: rgb(0 0 0 / 50%); x: a,b , c; y: f(a, /* c */); z: f(1, /* c */) }"},
-	{name: "value strings and operators", text: "a { grid-template-areas: \"a b\" \"c d\"; font: 12px/1.5 a, b; color: #fff; content: \"\\201C\"; w: @foo d; v: U+26; filter: alpha(opacity: 50) }"},
-	{name: "url forms", text: "a { b: url(); c: url( x.png ); d: url(\"q.png\"); e: url(a b); f: url(var(--x)); g: url(data:image/png;base64,AAA=); i: URL(x); j: url(a, b) }"},
-	{name: "url with an escaped parenthesis, which Prettier cannot balance", text: "a { h: url(a\\)) }", malformed: true},
+	{
+		name: "value words and numbers",
+		text: "a { margin: -1px -2px --3px; b: --x; c: -; d: --; e: -webkit-calc(1px); f: 10PX 1.5e-3em +.5 1e3 +2 -.5 }",
+	},
+	{
+		name: "value functions",
+		text: "a { width: calc(100% - (2 * var(--x, 10px))); transition: all .3s cubic-bezier(.1,.2,.3,.4); color: rgb(0 0 0 / 50%); x: a,b , c; y: f(a, /* c */); z: f(1, /* c */) }",
+	},
+	{
+		name: "value strings and operators",
+		text: "a { grid-template-areas: \"a b\" \"c d\"; font: 12px/1.5 a, b; color: #fff; content: \"\\201C\"; w: @foo d; v: U+26; filter: alpha(opacity: 50) }",
+	},
+	{
+		name: "url forms",
+		text: "a { b: url(); c: url( x.png ); d: url(\"q.png\"); e: url(a b); f: url(var(--x)); g: url(data:image/png;base64,AAA=); i: URL(x); j: url(a, b) }",
+	},
+	{
+		name:      "url with an escaped parenthesis, which Prettier cannot balance",
+		text:      "a { h: url(a\\)) }",
+		malformed: true,
+	},
 	{name: "unbalanced value", text: "a { b: f(1; c: 1) }"},
 	{name: "value with braces that postcss refuses", text: "a { b: { c } }", malformed: true},
-	{name: "value with interpolation, which only a custom property lets through", text: ":root { --d: a #{e} f; --f: url(#{g}) url(x#{h}y); --g: url(\"a\" #{b}); --h: url(f(1) x#{y}) }"},
+	{
+		name: "value with interpolation, which only a custom property lets through",
+		text: ":root { --d: a #{e} f; --f: url(#{g}) url(x#{h}y); --g: url(\"a\" #{b}); --h: url(f(1) x#{y}) }",
+	},
 	{name: "empty comma groups", text: "a { b: f(,a); c: f(a,,b); d: f(a,); e: (,) }"},
 
 	// Front matter.
@@ -122,7 +186,10 @@ var glueParseFixtures = []glueParseFixture{
 	{name: "whitespace only", text: "  \n\t\n"},
 	{name: "comment only", text: "/* a */"},
 	{name: "comments around rules", text: "/* a */\na { /* b */ c: d; /* e */ }\n/* f */"},
-	{name: "non-ASCII", text: "a::before { content: \"\xc3\xa9\xe2\x86\x92\xf0\x9f\x98\x80\"; }\n.\xc3\xa9\xf0\x9f\x98\x80 > b { font-family: \"\xc3\x9cn\xc3\xafcode\", \xf0\x9f\x98\x80; margin: 1px \xc3\xa9 2px }\n/* \xe6\x97\xa5\xe6\x9c\xac */ b { c: url(\xc3\xa9.png) }\n@media (min-width: 1px) and \xc3\xa9 { }"},
+	{
+		name: "non-ASCII",
+		text: "a::before { content: \"\xc3\xa9\xe2\x86\x92\xf0\x9f\x98\x80\"; }\n.\xc3\xa9\xf0\x9f\x98\x80 > b { font-family: \"\xc3\x9cn\xc3\xafcode\", \xf0\x9f\x98\x80; margin: 1px \xc3\xa9 2px }\n/* \xe6\x97\xa5\xe6\x9c\xac */ b { c: url(\xc3\xa9.png) }\n@media (min-width: 1px) and \xc3\xa9 { }",
+	},
 	{name: "non-ASCII before a custom property block", text: "/* \xf0\x9f\x98\x80 */\n:root { --x: { a: \xc3\xa9 } }"},
 
 	// Malformed: postcss refuses each.
@@ -279,10 +346,23 @@ func TestParseAgreesWithPrettierCssParser(test *testing.T) {
 			identical++
 		}
 	}
-	test.Logf("%d compared (%d corpus files, %d fixtures): %d identical, %d refused by both, %d different; %d corpus files refused; %d nodes with a null endOffset",
-		len(inputs), corpusFiles, len(glueParseFixtures), identical, refusedByBoth, different, corpusRefused, nullEnds)
+	test.Logf(
+		"%d compared (%d corpus files, %d fixtures): %d identical, %d refused by both, %d different; %d corpus files refused; %d nodes with a null endOffset",
+		len(inputs),
+		corpusFiles,
+		len(glueParseFixtures),
+		identical,
+		refusedByBoth,
+		different,
+		corpusRefused,
+		nullEnds,
+	)
 	if corpusRefused > corpusFiles/10 {
-		test.Errorf("the fork refused %d of %d corpus files; the comparison is thinner than it looks", corpusRefused, corpusFiles)
+		test.Errorf(
+			"the fork refused %d of %d corpus files; the comparison is thinner than it looks",
+			corpusRefused,
+			corpusFiles,
+		)
 	}
 }
 
@@ -522,7 +602,16 @@ func firstGlueDifference(want any, got any, path string) string {
 			wantValue, wantPresent := typed[key]
 			gotValue, gotPresent := other[key]
 			if wantPresent != gotPresent {
-				return fmt.Sprintf("%s.%s: present in the fork %v (%v), in Go %v (%v); node type %v", path, key, wantPresent, wantValue, gotPresent, gotValue, typed["type"])
+				return fmt.Sprintf(
+					"%s.%s: present in the fork %v (%v), in Go %v (%v); node type %v",
+					path,
+					key,
+					wantPresent,
+					wantValue,
+					gotPresent,
+					gotValue,
+					typed["type"],
+				)
 			}
 			if difference := firstGlueDifference(wantValue, gotValue, path+"."+key); difference != "" {
 				return difference
@@ -535,7 +624,11 @@ func firstGlueDifference(want any, got any, path string) string {
 			return fmt.Sprintf("%s: want %d elements, got %v", path, len(typed), got)
 		}
 		for index := range typed {
-			if difference := firstGlueDifference(typed[index], other[index], fmt.Sprintf("%s[%d]", path, index)); difference != "" {
+			if difference := firstGlueDifference(
+				typed[index],
+				other[index],
+				fmt.Sprintf("%s[%d]", path, index),
+			); difference != "" {
 				return difference
 			}
 		}

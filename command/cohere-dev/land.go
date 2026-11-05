@@ -34,7 +34,10 @@ const landAttempts = 3
 // land lands the commit the working directory's worktree is at onto main, and returns its exit code.
 func land(arguments []string) int {
 	if len(arguments) > 0 {
-		fmt.Fprintln(streams.Errors, "cohere-dev: land takes no arguments: it lands the commit this worktree is at onto main")
+		fmt.Fprintln(
+			streams.Errors,
+			"cohere-dev: land takes no arguments: it lands the commit this worktree is at onto main",
+		)
 		return 2
 	}
 	worktree, err := gitOutput("", "rev-parse", "--show-toplevel")
@@ -52,7 +55,12 @@ func land(arguments []string) int {
 		return 1
 	}
 	if changes != "" {
-		fmt.Fprintf(streams.Errors, "cohere-dev: land lands commits, and %s has changes that are not committed:\n%s\n", worktree, changes)
+		fmt.Fprintf(
+			streams.Errors,
+			"cohere-dev: land lands commits, and %s has changes that are not committed:\n%s\n",
+			worktree,
+			changes,
+		)
 		return 2
 	}
 	if checkSubmodulesError := checkSubmodules(worktree); checkSubmodulesError != nil {
@@ -65,7 +73,10 @@ func land(arguments []string) int {
 		return 1
 	}
 	if mainCheckout == worktree {
-		fmt.Fprintln(streams.Errors, "cohere-dev: land runs in the worktree being landed, not in the checkout of main itself")
+		fmt.Fprintln(
+			streams.Errors,
+			"cohere-dev: land runs in the worktree being landed, not in the checkout of main itself",
+		)
 		return 2
 	}
 
@@ -78,7 +89,10 @@ func land(arguments []string) int {
 	// merge, and a head that can't be read stops the landing there.
 	head, _ := gitOutput(worktree, "rev-parse", "--short", "HEAD")
 	held, err := waitInLine(directory, 1, "landing "+head+" from "+worktree, "land lock", func() {
-		fmt.Fprintln(streams.Errors, "cohere-dev: waiting to land; one landing runs at a time, merge to fast-forward, and this one holds it:")
+		fmt.Fprintln(
+			streams.Errors,
+			"cohere-dev: waiting to land; one landing runs at a time, merge to fast-forward, and this one holds it:",
+		)
 	})
 	if err != nil {
 		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", err)
@@ -98,7 +112,12 @@ func land(arguments []string) int {
 		}
 		// The merge may have moved a pin, and the gate must build against what it lands.
 		if checkSubmodulesError := checkSubmodules(worktree); checkSubmodulesError != nil {
-			fmt.Fprintf(streams.Errors, "cohere-dev: after merging main at %s: %v\n", shortCommit(mainCommit), checkSubmodulesError)
+			fmt.Fprintf(
+				streams.Errors,
+				"cohere-dev: after merging main at %s: %v\n",
+				shortCommit(mainCommit),
+				checkSubmodulesError,
+			)
 			return 2
 		}
 		landing, gitOutputError := gitOutput(worktree, "rev-parse", "HEAD")
@@ -108,28 +127,51 @@ func land(arguments []string) int {
 			return 1
 		}
 		if code := gate(worktree, landing); code != 0 {
-			fmt.Fprintf(streams.Errors, "cohere-dev: the gate failed, so nothing landed; %s is merged with main at %s for you to fix\n",
-				worktree, shortCommit(mainCommit))
+			fmt.Fprintf(
+				streams.Errors,
+				"cohere-dev: the gate failed, so nothing landed; %s is merged with main at %s for you to fix\n",
+				worktree,
+				shortCommit(mainCommit),
+			)
 			return code
 		}
 		// git refuses a fast-forward when main has moved since the merge, which is the test that nothing
 		// landed outside this lock during the gate.
-		if output, gitCombinedError := gitCombined(mainCheckout, "merge", "--ff-only", landing); gitCombinedError != nil {
+		if output, gitCombinedError := gitCombined(
+			mainCheckout,
+			"merge",
+			"--ff-only",
+			landing,
+		); gitCombinedError != nil {
 			// Ignored: a main that can't be read reads as moved, and the next attempt reads it again and stops
 			// there with git's error.
 			moved, _ := gitOutput(worktree, "rev-parse", "main")
 			if moved != mainCommit {
-				fmt.Fprintf(streams.Errors, "cohere-dev: main moved outside land during the gate, %s to %s; merging and gating again\n",
-					shortCommit(mainCommit), shortCommit(moved))
+				fmt.Fprintf(
+					streams.Errors,
+					"cohere-dev: main moved outside land during the gate, %s to %s; merging and gating again\n",
+					shortCommit(mainCommit),
+					shortCommit(moved),
+				)
 				continue
 			}
-			fmt.Fprintf(streams.Errors, "cohere-dev: fast-forwarding main in %s: %v\n%s\n", mainCheckout, gitCombinedError, output)
+			fmt.Fprintf(
+				streams.Errors,
+				"cohere-dev: fast-forwarding main in %s: %v\n%s\n",
+				mainCheckout,
+				gitCombinedError,
+				output,
+			)
 			return 1
 		}
 		fmt.Fprintf(streams.Errors, "cohere-dev: landed %s on main\n", shortCommit(landing))
 		return 0
 	}
-	fmt.Fprintf(streams.Errors, "cohere-dev: main moved outside land during each of %d gates, so nothing landed\n", landAttempts)
+	fmt.Fprintf(
+		streams.Errors,
+		"cohere-dev: main moved outside land during each of %d gates, so nothing landed\n",
+		landAttempts,
+	)
 	return 1
 }
 
@@ -145,8 +187,12 @@ func checkSubmodules(worktree string) error {
 	for _, link := range links {
 		pin, path := link.Pin, link.Path
 		directory := filepath.Join(worktree, path)
-		notCheckedOut := fmt.Errorf("%s's submodule %s is not checked out, so the gate could not build against its pin %s",
-			worktree, path, shortCommit(pin))
+		notCheckedOut := fmt.Errorf(
+			"%s's submodule %s is not checked out, so the gate could not build against its pin %s",
+			worktree,
+			path,
+			shortCommit(pin),
+		)
 		// An empty directory is a submodule never checked out, and git run in it answers for the repository
 		// around it, so its top level has to be the submodule's own path, symlinks resolved.
 		top, err := gitOutput(directory, "rev-parse", "--show-toplevel")
@@ -203,10 +249,23 @@ func checkoutOfMain(worktree string) (string, error) {
 // mergeMain merges main into the worktree, unless it already holds it. A merge that conflicts is undone,
 // leaving the worktree as it was, and says which files conflicted.
 func mergeMain(worktree string, mainCommit string) error {
-	if _, gitOutputError := gitOutput(worktree, "merge-base", "--is-ancestor", mainCommit, "HEAD"); gitOutputError == nil {
+	if _, gitOutputError := gitOutput(
+		worktree,
+		"merge-base",
+		"--is-ancestor",
+		mainCommit,
+		"HEAD",
+	); gitOutputError == nil {
 		return nil
 	}
-	output, gitCombinedError := gitCombined(worktree, "merge", "--no-edit", "-m", "Merge main into the work being landed", mainCommit)
+	output, gitCombinedError := gitCombined(
+		worktree,
+		"merge",
+		"--no-edit",
+		"-m",
+		"Merge main into the work being landed",
+		mainCommit,
+	)
 	if gitCombinedError == nil {
 		return nil
 	}
@@ -251,7 +310,10 @@ func gate(worktree string, commit string) int {
 		if runError := vet.Run(); runError != nil {
 			return exitCodeOf(runError)
 		}
-		if code := checkRuleCPU(worktree, func() []string { return gateEnvironment(step("the rule CPU budget check")) }); code != 0 {
+		if code := checkRuleCPU(
+			worktree,
+			func() []string { return gateEnvironment(step("the rule CPU budget check")) },
+		); code != 0 {
 			return code
 		}
 		// The same environment cohere-dev test gives the module's tests, corpora included (corpora.go).
@@ -294,7 +356,15 @@ func checkRuleCPU(worktree string, environment func() []string) int {
 	started := time.Now()
 	// Uncached: the budget is thread CPU measured on this machine now, which the cache does not key on, so a
 	// cached pass would replay an old measurement as this landing's.
-	check := exec.Command("go", "test", "-count=1", "-timeout=30s", "-run=^TestRegisteredRuleCPUBudget$", "-v", "./"+filepath.ToSlash(filepath.Dir(ruleCPUCheck)))
+	check := exec.Command(
+		"go",
+		"test",
+		"-count=1",
+		"-timeout=30s",
+		"-run=^TestRegisteredRuleCPUBudget$",
+		"-v",
+		"./"+filepath.ToSlash(filepath.Dir(ruleCPUCheck)),
+	)
 	check.Dir, check.Env = worktree, environment()
 	check.Stdout, check.Stderr = os.Stdout, os.Stderr
 	// The command writes to the terminal itself, so what this run said first is delivered first.
@@ -329,8 +399,12 @@ func checkDocsData(worktree string, environment func() []string) int {
 	streams.Show(streams.Output)
 	streams.Show(streams.Errors)
 	if runError := check.Run(); runError != nil {
-		fmt.Fprintf(streams.Errors, "cohere-dev: the docs data is stale, so nothing landed: recapture it with `%s`, commit docs/data, "+
-			"and land again\n", docsDataRecapture)
+		fmt.Fprintf(
+			streams.Errors,
+			"cohere-dev: the docs data is stale, so nothing landed: recapture it with `%s`, commit docs/data, "+
+				"and land again\n",
+			docsDataRecapture,
+		)
 		return exitCodeOf(runError)
 	}
 	fmt.Fprintf(streams.Errors, "cohere-dev: the docs data is current (%s)\n", time.Since(started).Round(time.Second))
@@ -383,7 +457,12 @@ func gitOutput(directory string, arguments ...string) (string, error) {
 	command.Stderr = &standardError
 	output, outputError := command.Output()
 	if outputError != nil {
-		return strings.TrimSpace(string(output)), fmt.Errorf("git %s: %w: %s", strings.Join(arguments, " "), outputError, strings.TrimSpace(standardError.String()))
+		return strings.TrimSpace(string(output)), fmt.Errorf(
+			"git %s: %w: %s",
+			strings.Join(arguments, " "),
+			outputError,
+			strings.TrimSpace(standardError.String()),
+		)
 	}
 	return strings.TrimSpace(string(output)), nil
 }

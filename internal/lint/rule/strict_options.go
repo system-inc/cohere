@@ -77,8 +77,11 @@ func checkKeyCase(value any, valueType reflect.Type, path string) error {
 						continue
 					}
 					if candidate.tagged {
-						return fmt.Errorf("option %q is spelled %q: keys are matched exactly, as upstream's schema matches them",
-							path+key, path+declared)
+						return fmt.Errorf(
+							"option %q is spelled %q: keys are matched exactly, as upstream's schema matches them",
+							path+key,
+							path+declared,
+						)
 					}
 					field, exact = candidate, true
 				}
@@ -96,7 +99,11 @@ func checkKeyCase(value any, valueType reflect.Type, path string) error {
 			return nil
 		}
 		for index, element := range list {
-			if checkKeyCaseError := checkKeyCase(element, baseType.Elem(), fmt.Sprintf("%s%d.", path, index)); checkKeyCaseError != nil {
+			if checkKeyCaseError := checkKeyCase(
+				element,
+				baseType.Elem(),
+				fmt.Sprintf("%s%d.", path, index),
+			); checkKeyCaseError != nil {
 				return checkKeyCaseError
 			}
 		}

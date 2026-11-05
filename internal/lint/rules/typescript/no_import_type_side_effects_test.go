@@ -24,10 +24,26 @@ func TestNoImportTypeSideEffectsFires(test *testing.T) {
 		source string
 		fixed  string
 	}{
-		{name: "a single type specifier", source: "import { type A } from 'mod';", fixed: "import type { A } from 'mod';"},
-		{name: "a renamed type specifier", source: "import { type A as AA } from 'mod';", fixed: "import type { A as AA } from 'mod';"},
-		{name: "two type specifiers", source: "import { type A, type B } from 'mod';", fixed: "import type { A, B } from 'mod';"},
-		{name: "two renamed type specifiers", source: "import { type A as AA, type B as BB } from 'mod';", fixed: "import type { A as AA, B as BB } from 'mod';"},
+		{
+			name:   "a single type specifier",
+			source: "import { type A } from 'mod';",
+			fixed:  "import type { A } from 'mod';",
+		},
+		{
+			name:   "a renamed type specifier",
+			source: "import { type A as AA } from 'mod';",
+			fixed:  "import type { A as AA } from 'mod';",
+		},
+		{
+			name:   "two type specifiers",
+			source: "import { type A, type B } from 'mod';",
+			fixed:  "import type { A, B } from 'mod';",
+		},
+		{
+			name:   "two renamed type specifiers",
+			source: "import { type A as AA, type B as BB } from 'mod';",
+			fixed:  "import type { A as AA, B as BB } from 'mod';",
+		},
 	}
 
 	for _, testCase := range cases {

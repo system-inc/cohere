@@ -1332,7 +1332,11 @@ func (parser *parser) any(openKind tokenKind, parseFn func() *estree.Node, close
 // token is missing otherwise it will always return non-empty list that begins with a lex token of
 // openKind and ends with a lex token of closeKind. Advances the parser to the next lex token after the
 // closing token.
-func (parser *parser) optionalMany(openKind tokenKind, parseFn func() *estree.Node, closeKind tokenKind) []*estree.Node {
+func (parser *parser) optionalMany(
+	openKind tokenKind,
+	parseFn func() *estree.Node,
+	closeKind tokenKind,
+) []*estree.Node {
 	if parser.expectOptionalToken(openKind) {
 		nodes := []*estree.Node{}
 		for {

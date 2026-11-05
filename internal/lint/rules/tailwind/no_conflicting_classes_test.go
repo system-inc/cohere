@@ -513,7 +513,10 @@ func TestSelectorShapeCannotProduceAWrongFinding(test *testing.T) {
 	if createDirectoryError := os.MkdirAll(filepath.Join(staging, "node_modules"), 0o755); createDirectoryError != nil {
 		test.Fatalf("creating the staging node_modules: %v", createDirectoryError)
 	}
-	if symlinkError := os.Symlink(packageRoot, filepath.Join(staging, "node_modules", "tailwindcss")); symlinkError != nil {
+	if symlinkError := os.Symlink(
+		packageRoot,
+		filepath.Join(staging, "node_modules", "tailwindcss"),
+	); symlinkError != nil {
 		test.Fatalf("linking the installed tailwindcss: %v", symlinkError)
 	}
 

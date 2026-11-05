@@ -86,7 +86,11 @@ func upstreamOutputs(test *testing.T, inputs []oracleInput) []string {
 	root := forkRoot(test)
 	directory := test.TempDir()
 	script := filepath.Join(directory, "oracle.mjs")
-	if writeError := os.WriteFile(script, []byte(strings.ReplaceAll(oracleScript, "FORK", root)), 0o644); writeError != nil {
+	if writeError := os.WriteFile(
+		script,
+		[]byte(strings.ReplaceAll(oracleScript, "FORK", root)),
+		0o644,
+	); writeError != nil {
 		test.Fatal(writeError)
 	}
 	var outputs []string
@@ -443,7 +447,11 @@ func TestYamlTestSuiteMatchesUpstream(test *testing.T) {
 const inputs = [];
 for (const test of suite) for (const testCase of test.cases) if (typeof testCase.yaml === "string") inputs.push(testCase.yaml);
 process.stdout.write(JSON.stringify(inputs));`
-	if writeError := os.WriteFile(script, []byte(strings.ReplaceAll(source, "SUITE", suite)), 0o644); writeError != nil {
+	if writeError := os.WriteFile(
+		script,
+		[]byte(strings.ReplaceAll(source, "SUITE", suite)),
+		0o644,
+	); writeError != nil {
 		test.Fatal(writeError)
 	}
 	output, outputError := exec.Command("node", script).Output()

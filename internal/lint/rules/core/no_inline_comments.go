@@ -96,7 +96,9 @@ var NoInlineComments = rule.Rule{
 	Name: "no-inline-comments",
 	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		var ignorePattern *esregexp.RegExp
-		if resolved, isNoInlineCommentsOptions := rule.OptionsAs[NoInlineCommentsOptions](options); isNoInlineCommentsOptions &&
+		if resolved, isNoInlineCommentsOptions := rule.OptionsAs[NoInlineCommentsOptions](
+			options,
+		); isNoInlineCommentsOptions &&
 			resolved.IgnorePattern != "" {
 			// Upstream's `new RegExp(ignorePattern, "u")`, read as JavaScript reads it: RE2 refuses a
 			// lookaround or a backreference its user wrote, and reads `\s` and `\b` differently

@@ -22,7 +22,11 @@ func TestReactComponentNoConstAssignmentFires(test *testing.T) {
 		{"an exported arrow component", "export const Thing = () => <div />;\n", 1},
 		{"an exported function expression", "export const Thing = function () {\n    return <div />;\n};\n", 1},
 		{"an unexported arrow component", "const Thing = () => <div />;\nexport default Thing;\n", 1},
-		{"an unexported function expression", "const Thing = function () {\n    return <div />;\n};\nexport default Thing;\n", 1},
+		{
+			"an unexported function expression",
+			"const Thing = function () {\n    return <div />;\n};\nexport default Thing;\n",
+			1,
+		},
 		// A block-bodied arrow, which is the shape the original's fix handles differently from an
 		// expression body. It reports the same either way.
 		{"a block-bodied arrow", "export const Thing = () => {\n    return <div />;\n};\n", 1},
@@ -46,7 +50,11 @@ func TestReactComponentNoConstAssignmentFires(test *testing.T) {
 		// The tree has zero instances either way, so nothing but the original decides this, and the
 		// original decides it by which selector it registered rather than by an argument. Recorded
 		// because the opposite reading is the intuitive one and a later reader will have it too.
-		{"an arrow inside a function body", "export function Outer() {\n    const Inner = () => <div />;\n    return <Inner />;\n}\n", 1},
+		{
+			"an arrow inside a function body",
+			"export function Outer() {\n    const Inner = () => <div />;\n    return <Inner />;\n}\n",
+			1,
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -71,11 +79,23 @@ func TestReactComponentNoConstAssignmentStaysSilent(test *testing.T) {
 	}{
 		// The shape the rule is asking for, which is what the whole tree already looks like.
 		{"a function declaration", constAssignmentFile, "export function Thing() {\n    return <div />;\n}\n"},
-		{"an unexported function declaration", constAssignmentFile, "function Thing() {\n    return <div />;\n}\nexport default Thing;\n"},
+		{
+			"an unexported function declaration",
+			constAssignmentFile,
+			"function Thing() {\n    return <div />;\n}\nexport default Thing;\n",
+		},
 		// forwardRef has to be a const, because the value is what the call returns. Both spellings,
 		// since the original checks the callee shape explicitly.
-		{"a namespaced forwardRef", constAssignmentFile, "export const Thing = React.forwardRef(function (properties, reference) {\n    return <div ref={reference} />;\n});\n"},
-		{"a bare forwardRef", constAssignmentFile, "export const Thing = forwardRef(function (properties, reference) {\n    return <div ref={reference} />;\n});\n"},
+		{
+			"a namespaced forwardRef",
+			constAssignmentFile,
+			"export const Thing = React.forwardRef(function (properties, reference) {\n    return <div ref={reference} />;\n});\n",
+		},
+		{
+			"a bare forwardRef",
+			constAssignmentFile,
+			"export const Thing = forwardRef(function (properties, reference) {\n    return <div ref={reference} />;\n});\n",
+		},
 		// A capitalized const that is not a function. Each of these would report if the rule keyed
 		// on the capital alone, and they are the population the rule runs over.
 		{"a capitalized object constant", constAssignmentFile, "export const Colors = { primary: 'red' };\n"},

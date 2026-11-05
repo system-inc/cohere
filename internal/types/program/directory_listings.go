@@ -91,7 +91,9 @@ func (listingFS *listingFS) GetAccessibleEntries(directory tspath.RootedDirector
 			continue
 		}
 		if entry.Type()&fs.ModeSymlink != 0 {
-			if information := listingFS.FS.Stat(tspath.RootedPath(directory.AsString() + "/" + entry.Name())); information != nil {
+			if information := listingFS.FS.Stat(
+				tspath.RootedPath(directory.AsString() + "/" + entry.Name()),
+			); information != nil {
 				add(entry.Name(), information.Mode(), true)
 			}
 		}

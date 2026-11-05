@@ -699,7 +699,9 @@ func TestAnEntryWithPredecessorsIsReportedAndRefused(test *testing.T) {
 	finalize(f)
 
 	violations := ssa.VerifySSA(testGraph{}, f)
-	if len(violations) == 0 || violations[0].Kind != ssa.SSAViolationEntryHasPredecessors || violations[0].Block != entry.id {
+	if len(violations) == 0 ||
+		violations[0].Kind != ssa.SSAViolationEntryHasPredecessors ||
+		violations[0].Block != entry.id {
 		test.Fatalf("violations are %v, want the entry's predecessors first", violations)
 	}
 
@@ -710,7 +712,11 @@ func TestAnEntryWithPredecessorsIsReportedAndRefused(test *testing.T) {
 		ssa.Construct(testGraph{}, f)
 		return "no refusal"
 	}()
-	if want := fmt.Sprintf("the entry block bb%d has predecessors [%d]", entry.id, b.id); !strings.Contains(refusal, want) {
+	if want := fmt.Sprintf(
+		"the entry block bb%d has predecessors [%d]",
+		entry.id,
+		b.id,
+	); !strings.Contains(refusal, want) {
 		test.Fatalf("Construct gives %q, want a refusal naming %q", refusal, want)
 	}
 }

@@ -143,7 +143,10 @@ var NoDeprecated = rule.Rule{
 					if parent.AsExportSpecifier().Name() != node {
 						return
 					}
-					if _, tagged := deprecationOnSymbol(ruleContext, ruleContext.TypeChecker.GetSymbolAtLocation(node)); tagged {
+					if _, tagged := deprecationOnSymbol(
+						ruleContext,
+						ruleContext.TypeChecker.GetSymbolAtLocation(node),
+					); tagged {
 						return
 					}
 				}
@@ -608,7 +611,10 @@ func checkDeprecatedElementAccess(
 	if objectType == nil {
 		return
 	}
-	reason, found := deprecationOnSymbol(ruleContext, ruleContext.TypeChecker.GetPropertyOfType(objectType, propertyName))
+	reason, found := deprecationOnSymbol(
+		ruleContext,
+		ruleContext.TypeChecker.GetPropertyOfType(objectType, propertyName),
+	)
 	if !found {
 		return
 	}

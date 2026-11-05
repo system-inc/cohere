@@ -380,7 +380,9 @@ var NoInvalidHtmlAttribute = rule.Rule{
 	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		// The only list besides the default is the empty one, which checks nothing, so the default
 		// check below is the whole rule whenever any attribute is configured.
-		if settings, configured := rule.OptionsAs[NoInvalidHtmlAttributeOptions](options); configured && len(settings.Attributes) == 0 {
+		if settings, configured := rule.OptionsAs[NoInvalidHtmlAttributeOptions](
+			options,
+		); configured && len(settings.Attributes) == 0 {
 			return rule.Listeners{}
 		}
 		return rule.Listeners{
@@ -483,7 +485,12 @@ func noInvalidHtmlAttributeCheckJsxAttribute(ruleContext rule.Context, node *ast
 //
 // Four passes over one attribute value, in upstream's order, and each can report independently, so
 // one attribute can produce several findings.
-func noInvalidHtmlAttributeCheckLiteralValue(ruleContext rule.Context, attributeName string, node *ast.Node, elementName string) {
+func noInvalidHtmlAttributeCheckLiteralValue(
+	ruleContext rule.Context,
+	attributeName string,
+	node *ast.Node,
+	elementName string,
+) {
 	attributeValue := node.Text()
 
 	if text.TrimWhitespace(attributeValue) == "" {
@@ -690,7 +697,12 @@ func noInvalidHtmlAttributeCheckCreateElement(ruleContext rule.Context, node *as
 }
 
 // noInvalidHtmlAttributeCheckCreateProps is upstream's `checkCreateProps`.
-func noInvalidHtmlAttributeCheckCreateProps(ruleContext rule.Context, call *ast.CallExpression, attributeName string, elementName string) {
+func noInvalidHtmlAttributeCheckCreateProps(
+	ruleContext rule.Context,
+	call *ast.CallExpression,
+	attributeName string,
+	elementName string,
+) {
 	if len(call.Arguments.Nodes) < 2 {
 		return
 	}
@@ -761,7 +773,12 @@ func noInvalidHtmlAttributeCheckCreateProps(ruleContext rule.Context, call *ast.
 // `neverValid` naming the entire string, where the JSX spelling of the same value reports one
 // finding for the bad token alone. Corpus cases invalid[4] through invalid[8] pin both halves of
 // that asymmetry.
-func noInvalidHtmlAttributeCheckPropValue(ruleContext rule.Context, value *ast.Node, attributeName string, elementName string) {
+func noInvalidHtmlAttributeCheckPropValue(
+	ruleContext rule.Context,
+	value *ast.Node,
+	attributeName string,
+	elementName string,
+) {
 	// Upstream's `value.type !== 'Literal'` declines anything it cannot read, including a template
 	// literal, an identifier and a nested call.
 	if !noInvalidHtmlAttributeIsLiteral(value) {

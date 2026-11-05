@@ -42,184 +42,737 @@ func TestExhaustiveDepsFires(test *testing.T) {
 		sourceText string
 		wantIds    []string
 	}{
-		{"function Foo2() { useEffect(() => { foo() }, []); const foo = () => { bar() }; function bar () { foo() } }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent(props) {\n          const value = props.flag ? {} : {};\n          useCallback(() => {\n            return value;\n          }, [value]);\n        }", []string{"exhaustiveDepsConstruction"}},
-		{"function MyComponent(props) {\n          const value = props.cached || {};\n          useCallback(() => {\n            return value;\n          }, [value]);\n        }", []string{"exhaustiveDepsConstruction"}},
-		{"function MyComponent(props) {\n          useCallback(() => {\n            console.log(props.foo?.toString());\n          }, []);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent(props) {\n          useCallback(() => {\n            console.log(props.foo?.bar.baz);\n          }, []);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent(props) {\n          useCallback(() => {\n            console.log(props.foo?.bar?.baz);\n          }, []);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent(props) {\n          useCallback(() => {\n            console.log(props.foo?.bar.toString());\n          }, []);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent() {\n          const local = someFunc();\n          useEffect(() => {\n            console.log(local);\n          }, []);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function Counter(unstableProp) {\n          let [count, setCount] = useState(0);\n          setCount = unstableProp\n          useEffect(() => {\n            let id = setInterval(() => {\n              setCount(c => c + 1);\n            }, 1000);\n            return () => clearInterval(id);\n          }, []);\n\n          return <h1>{count}</h1>;\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent() {\n          let local = 42;\n          useEffect(() => {\n            console.log(local);\n          }, []);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent() {\n          const local = /foo/;\n          useEffect(() => {\n            console.log(local);\n          }, []);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent(props) {\n          const value = useMemo(() => { return 2*2; });\n          const fn = useCallback(() => { alert('foo'); });\n        }", []string{"exhaustiveDepsUselessWithoutDependencies", "exhaustiveDepsUselessWithoutDependencies"}},
-		{"function MyComponent({ fn1, fn2 }) {\n          const value = useMemo(fn1);\n          const fn = useCallback(fn2);\n        }", []string{"exhaustiveDepsUselessWithoutDependencies", "exhaustiveDepsUselessWithoutDependencies"}},
-		{"function MyComponent() {\n          useEffect()\n          useLayoutEffect()\n          useCallback()\n          useMemo()\n        }", []string{"exhaustiveDepsMissingCallback", "exhaustiveDepsMissingCallback", "exhaustiveDepsMissingCallback", "exhaustiveDepsMissingCallback"}},
-		{"function MyComponent() {\n          const local = someFunc();\n          useEffect(() => {\n            if (true) {\n              console.log(local);\n            }\n          }, []);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent() {\n          const local = {};\n          useEffect(() => {\n            try {\n              console.log(local);\n            } finally {}\n          }, []);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent() {\n          const local = {};\n          useEffect(() => {\n            function inner() {\n              console.log(local);\n            }\n            inner();\n          }, []);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent() {\n          const local1 = someFunc();\n          {\n            const local2 = someFunc();\n            useEffect(() => {\n              console.log(local1);\n              console.log(local2);\n            }, []);\n          }\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent() {\n          const local1 = {};\n          const local2 = {};\n          useEffect(() => {\n            console.log(local1);\n            console.log(local2);\n          }, [local1]);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent() {\n          const local1 = {};\n          const local2 = {};\n          useMemo(() => {\n            console.log(local1);\n          }, [local1, local2]);\n        }", []string{"exhaustiveDepsUnnecessary"}},
-		{"function MyComponent() {\n          const local1 = someFunc();\n          function MyNestedComponent() {\n            const local2 = {};\n            useCallback(() => {\n              console.log(local1);\n              console.log(local2);\n            }, [local1]);\n          }\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent() {\n          const local = {};\n          useEffect(() => {\n            console.log(local);\n            console.log(local);\n          }, []);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent() {\n          const local = {};\n          useEffect(() => {\n            console.log(local);\n            console.log(local);\n          }, [local, local]);\n        }", []string{"exhaustiveDepsDuplicate"}},
-		{"function MyComponent() {\n          useCallback(() => {}, [window]);\n        }", []string{"exhaustiveDepsUnnecessary"}},
-		{"function MyComponent(props) {\n          let local = props.foo;\n          useCallback(() => {}, [local]);\n        }", []string{"exhaustiveDepsUnnecessary"}},
-		{"function MyComponent({ history }) {\n          useEffect(() => {\n            return history.listen();\n          }, []);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent({ history }) {\n          useEffect(() => {\n            return [\n              history.foo.bar[2].dobedo.listen(),\n              history.foo.bar().dobedo.listen[2]\n            ];\n          }, []);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent({ history }) {\n          useEffect(() => {\n            return [\n              history?.foo\n            ];\n          }, []);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent() {\n          useEffect(() => {}, ['foo']);\n        }", []string{"exhaustiveDepsLiteral"}},
-		{"function MyComponent({ foo, bar, baz }) {\n          useEffect(() => {\n            console.log(foo, bar, baz);\n          }, ['foo', 'bar']);\n        }", []string{"exhaustiveDepsMissing", "exhaustiveDepsLiteral", "exhaustiveDepsLiteral"}},
-		{"function MyComponent({ foo, bar, baz }) {\n          useEffect(() => {\n            console.log(foo, bar, baz);\n          }, [42, false, null]);\n        }", []string{"exhaustiveDepsMissing", "exhaustiveDepsLiteral", "exhaustiveDepsLiteral", "exhaustiveDepsLiteral"}},
-		{"function MyComponent() {\n          const dependencies = [];\n          useEffect(() => {}, dependencies);\n        }", []string{"exhaustiveDepsNotArrayLiteral"}},
-		{"function MyComponent() {\n          const local = {};\n          const dependencies = [local];\n          useEffect(() => {\n            console.log(local);\n          }, dependencies);\n        }", []string{"exhaustiveDepsMissing", "exhaustiveDepsNotArrayLiteral"}},
-		{"function MyComponent() {\n          const local = {};\n          const dependencies = [local];\n          useEffect(() => {\n            console.log(local);\n          }, [...dependencies]);\n        }", []string{"exhaustiveDepsMissing", "exhaustiveDepsSpread"}},
-		{"function MyComponent() {\n          const local = someFunc();\n          useEffect(() => {\n            console.log(local);\n          }, [local, ...dependencies]);\n        }", []string{"exhaustiveDepsSpread"}},
-		{"function MyComponent() {\n          const local = {};\n          useEffect(() => {\n            console.log(local);\n          }, [computeCacheKey(local)]);\n        }", []string{"exhaustiveDepsMissing", "exhaustiveDepsComplexExpression"}},
-		{"function MyComponent(props) {\n          useEffect(() => {\n            console.log(props.items[0]);\n          }, [props.items[0]]);\n        }", []string{"exhaustiveDepsMissing", "exhaustiveDepsComplexExpression"}},
-		{"function MyComponent(props) {\n          useEffect(() => {\n            console.log(props.items[0]);\n          }, [props.items, props.items[0]]);\n        }", []string{"exhaustiveDepsComplexExpression"}},
-		{"function MyComponent({ items }) {\n          useEffect(() => {\n            console.log(items[0]);\n          }, [items[0]]);\n        }", []string{"exhaustiveDepsMissing", "exhaustiveDepsComplexExpression"}},
-		{"function MyComponent({ items }) {\n          useEffect(() => {\n            console.log(items[0]);\n          }, [items, items[0]]);\n        }", []string{"exhaustiveDepsComplexExpression"}},
-		{"function MyComponent(props) {\n          const local = {};\n          useCallback(() => {\n            console.log(props.foo);\n            console.log(props.bar);\n          }, [props, props.foo]);\n        }", []string{"exhaustiveDepsUnnecessary"}},
-		{"function MyComponent(props) {\n          const local = {};\n          useCallback(() => {\n            console.log(props.foo);\n            console.log(props.bar);\n          }, [props.foo, props]);\n        }", []string{"exhaustiveDepsUnnecessary"}},
-		{"function MyComponent(props) {\n          const local = {};\n          useCallback(() => {\n            console.log(props.foo);\n            console.log(props.bar);\n          }, []);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent(props) {\n          useCallback(() => {\n            const { foo } = props;\n            console.log(foo);\n          }, [props.bar]);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent(props) {\n          useCallback(() => {\n            const { foo: { bar } } = props;\n            console.log(bar);\n          }, [props.foo.bar]);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent(props) {\n          const foo = props.foo;\n          useEffect(() => {\n            const { bar } = foo();\n            console.log(bar);\n          }, [props.foo.bar]);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent() {\n          const local = {id: 42};\n          useEffect(() => {\n            console.log(local);\n          }, [local.id]);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent() {\n          const local = {id: 42};\n          const fn = useCallback(() => {\n            console.log(local);\n          }, [local.id]);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent() {\n          const local = {id: 42};\n          const fn = useCallback(() => {\n            console.log(local);\n          }, [local.id, local]);\n        }", []string{"exhaustiveDepsUnnecessary"}},
-		{"function MyComponent(props) {\n          const fn = useCallback(() => {\n            console.log(props.foo.bar.baz);\n          }, []);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent(props) {\n          let color = {}\n          const fn = useCallback(() => {\n            console.log(props.foo.bar.baz);\n            console.log(color);\n          }, [props.foo, props.foo.bar.baz]);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent(props) {\n          const fn = useCallback(() => {\n            console.log(props.foo.bar.baz);\n          }, [props.foo.bar.baz, props.foo]);\n        }", []string{"exhaustiveDepsUnnecessary"}},
-		{"function MyComponent(props) {\n          const fn = useCallback(() => {\n            console.log(props.foo.bar.baz);\n            console.log(props.foo.fizz.bizz);\n          }, []);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent(props) {\n          const fn = useCallback(() => {\n            console.log(props.foo.bar);\n          }, [props.foo.bar.baz]);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent(props) {\n          const fn = useCallback(() => {\n            console.log(props);\n            console.log(props.hello);\n          }, [props.foo.bar.baz]);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent() {\n          const local = {};\n          useEffect(() => {\n            console.log(local);\n          }, [local, local]);\n        }", []string{"exhaustiveDepsDuplicate"}},
-		{"function MyComponent() {\n          const local1 = {};\n          useCallback(() => {\n            const local1 = {};\n            console.log(local1);\n          }, [local1]);\n        }", []string{"exhaustiveDepsUnnecessary"}},
-		{"function MyComponent() {\n          const local1 = {};\n          useCallback(() => {}, [local1]);\n        }", []string{"exhaustiveDepsUnnecessary"}},
-		{"function MyComponent(props) {\n          useEffect(() => {\n            console.log(props.foo);\n          }, []);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent(props) {\n          useEffect(() => {\n            console.log(props.foo);\n            console.log(props.bar);\n          }, []);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent(props) {\n          let a, b, c, d, e, f, g;\n          useEffect(() => {\n            console.log(b, e, d, c, a, g, f);\n          }, [c, a, g]);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent(props) {\n          let a, b, c, d, e, f, g;\n          useEffect(() => {\n            console.log(b, e, d, c, a, g, f);\n          }, [a, c, g]);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent(props) {\n          let a, b, c, d, e, f, g;\n          useEffect(() => {\n            console.log(b, e, d, c, a, g, f);\n          }, []);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent(props) {\n          const local = {};\n          useEffect(() => {\n            console.log(props.foo);\n            console.log(props.bar);\n            console.log(local);\n          }, []);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent(props) {\n          const local = {};\n          useEffect(() => {\n            console.log(props.foo);\n            console.log(props.bar);\n            console.log(local);\n          }, [props]);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent(props) {\n          useEffect(() => {\n            console.log(props.foo);\n          }, []);\n          useCallback(() => {\n            console.log(props.foo);\n          }, []);\n          useMemo(() => {\n            console.log(props.foo);\n          }, []);\n          React.useEffect(() => {\n            console.log(props.foo);\n          }, []);\n          React.useCallback(() => {\n            console.log(props.foo);\n          }, []);\n          React.useMemo(() => {\n            console.log(props.foo);\n          }, []);\n          React.notReactiveHook(() => {\n            console.log(props.foo);\n          }, []);\n        }", []string{"exhaustiveDepsMissing", "exhaustiveDepsMissing", "exhaustiveDepsMissing", "exhaustiveDepsMissing", "exhaustiveDepsMissing", "exhaustiveDepsMissing"}},
-		{"function MyComponent(props) {\n          useCustomEffect(() => {\n            console.log(props.foo);\n          }, []);\n          useEffect(() => {\n            console.log(props.foo);\n          }, []);\n          React.useEffect(() => {\n            console.log(props.foo);\n          }, []);\n          React.useCustomEffect(() => {\n            console.log(props.foo);\n          }, []);\n        }", []string{"exhaustiveDepsMissing", "exhaustiveDepsMissing"}},
-		{"function MyComponent() {\n          const local = {};\n          useEffect(() => {\n            console.log(local);\n          }, [a ? local : b]);\n        }", []string{"exhaustiveDepsMissing", "exhaustiveDepsComplexExpression"}},
-		{"function MyComponent() {\n          const local = {};\n          useEffect(() => {\n            console.log(local);\n          }, [a && local]);\n        }", []string{"exhaustiveDepsMissing", "exhaustiveDepsComplexExpression"}},
-		{"function MyComponent(props) {\n          useEffect(() => {}, [props?.attribute.method()]);\n        }", []string{"exhaustiveDepsComplexExpression"}},
-		{"function MyComponent(props) {\n          useEffect(() => {}, [props.method()]);\n        }", []string{"exhaustiveDepsComplexExpression"}},
-		{"function MyComponent() {\n          const ref = useRef();\n          const [state, setState] = useState();\n          useEffect(() => {\n            ref.current = {};\n            setState(state + 1);\n          }, []);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent() {\n          const ref = useRef();\n          const [state, setState] = useState();\n          useEffect(() => {\n            ref.current = {};\n            setState(state + 1);\n          }, [ref]);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent(props) {\n          const ref1 = useRef();\n          const ref2 = useRef();\n          useEffect(() => {\n            ref1.current.focus();\n            console.log(ref2.current.textContent);\n            alert(props.someOtherRefs.current.innerHTML);\n            fetch(props.color);\n          }, []);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent(props) {\n          const ref1 = useRef();\n          const ref2 = useRef();\n          useEffect(() => {\n            ref1.current.focus();\n            console.log(ref2.current.textContent);\n            alert(props.someOtherRefs.current.innerHTML);\n            fetch(props.color);\n          }, [ref1.current, ref2.current, props.someOtherRefs, props.color]);\n        }", []string{"exhaustiveDepsUnnecessary"}},
-		{"function MyComponent(props) {\n          const ref1 = useRef();\n          const ref2 = useRef();\n          useEffect(() => {\n            ref1?.current?.focus();\n            console.log(ref2?.current?.textContent);\n            alert(props.someOtherRefs.current.innerHTML);\n            fetch(props.color);\n          }, [ref1?.current, ref2?.current, props.someOtherRefs, props.color]);\n        }", []string{"exhaustiveDepsUnnecessary"}},
-		{"function MyComponent() {\n          const ref = useRef();\n          useEffect(() => {\n            console.log(ref.current);\n          }, [ref.current]);\n        }", []string{"exhaustiveDepsUnnecessary"}},
-		{"function MyComponent({ activeTab }) {\n          const ref1 = useRef();\n          const ref2 = useRef();\n          useEffect(() => {\n            ref1.current.scrollTop = 0;\n            ref2.current.scrollTop = 0;\n          }, [ref1.current, ref2.current, activeTab]);\n        }", []string{"exhaustiveDepsUnnecessary"}},
-		{"function MyComponent({ activeTab, initY }) {\n          const ref1 = useRef();\n          const ref2 = useRef();\n          const fn = useCallback(() => {\n            ref1.current.scrollTop = initY;\n            ref2.current.scrollTop = initY;\n          }, [ref1.current, ref2.current, activeTab, initY]);\n        }", []string{"exhaustiveDepsUnnecessary"}},
-		{"function MyComponent() {\n          const ref = useRef();\n          useEffect(() => {\n            console.log(ref.current);\n          }, [ref.current, ref]);\n        }", []string{"exhaustiveDepsUnnecessary"}},
-		{"const MyComponent = forwardRef((props, ref) => {\n          useImperativeHandle(ref, () => ({\n            focus() {\n              alert(props.hello);\n            }\n          }), [])\n        });", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent(props) {\n          useEffect(() => {\n            if (props.onChange) {\n              props.onChange();\n            }\n          }, []);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent(props) {\n          useEffect(() => {\n            if (props?.onChange) {\n              props?.onChange();\n            }\n          }, []);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent(props) {\n          useEffect(() => {\n            function play() {\n              props.onPlay();\n            }\n            function pause() {\n              props.onPause();\n            }\n          }, []);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent(props) {\n          useEffect(() => {\n            if (props.foo.onChange) {\n              props.foo.onChange();\n            }\n          }, []);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent(props) {\n          useEffect(() => {\n            props.onChange();\n            if (props.foo.onChange) {\n              props.foo.onChange();\n            }\n          }, []);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent(props) {\n          const [skillsCount] = useState();\n          useEffect(() => {\n            if (skillsCount === 0 && !props.isEditMode) {\n              props.toggleEditMode();\n            }\n          }, [skillsCount, props.isEditMode, props.toggleEditMode]);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent(props) {\n          const [skillsCount] = useState();\n          useEffect(() => {\n            if (skillsCount === 0 && !props.isEditMode) {\n              props.toggleEditMode();\n            }\n          }, []);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent(props) {\n          useEffect(() => {\n            externalCall(props);\n            props.onChange();\n          }, []);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent(props) {\n          useEffect(() => {\n            props.onChange();\n            externalCall(props);\n          }, []);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent() {\n          const local1 = 42;\n          const local2 = '42';\n          const local3 = null;\n          const local4 = {};\n          useEffect(() => {\n            console.log(local1);\n            console.log(local2);\n            console.log(local3);\n            console.log(local4);\n          }, [local1, local3]);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent() {\n          useEffect(() => {\n            window.scrollTo(0, 0);\n          }, [window]);\n        }", []string{"exhaustiveDepsUnnecessary"}},
-		{"import MutableStore from 'store';\n        function MyComponent() {\n          useEffect(() => {\n            console.log(MutableStore.hello);\n          }, [MutableStore.hello]);\n        }", []string{"exhaustiveDepsUnnecessary"}},
-		{"import MutableStore from 'store';\n        let z = {};\n\n        function MyComponent(props) {\n          let x = props.foo;\n          {\n            let y = props.bar;\n            useEffect(() => {\n              console.log(MutableStore.hello.world, props.foo, x, y, z, global.stuff);\n            }, [MutableStore.hello.world, props.foo, x, y, z, global.stuff]);\n          }\n        }", []string{"exhaustiveDepsUnnecessary"}},
-		{"import MutableStore from 'store';\n        let z = {};\n\n        function MyComponent(props) {\n          let x = props.foo;\n          {\n            let y = props.bar;\n            useEffect(() => {\n              // nothing\n            }, [MutableStore.hello.world, props.foo, x, y, z, global.stuff]);\n          }\n        }", []string{"exhaustiveDepsUnnecessary"}},
-		{"import MutableStore from 'store';\n        let z = {};\n\n        function MyComponent(props) {\n          let x = props.foo;\n          {\n            let y = props.bar;\n            const fn = useCallback(() => {\n              // nothing\n            }, [MutableStore.hello.world, props.foo, x, y, z, global.stuff]);\n          }\n        }", []string{"exhaustiveDepsUnnecessary"}},
-		{"import MutableStore from 'store';\n        let z = {};\n\n        function MyComponent(props) {\n          let x = props.foo;\n          {\n            let y = props.bar;\n            const fn = useCallback(() => {\n              // nothing\n            }, [MutableStore?.hello?.world, props.foo, x, y, z, global?.stuff]);\n          }\n        }", []string{"exhaustiveDepsUnnecessary"}},
-		{"function MyComponent(props) {\n          let [, setState] = useState();\n          let [, dispatch] = React.useReducer();\n          let taint = props.foo;\n\n          function handleNext1(value) {\n            let value2 = value * taint;\n            setState(value2);\n            console.log('hello');\n          }\n          const handleNext2 = (value) => {\n            setState(taint(value));\n            console.log('hello');\n          };\n          let handleNext3 = function(value) {\n            setTimeout(() => console.log(taint));\n            dispatch({ type: 'x', value });\n          };\n          useEffect(() => {\n            return Store.subscribe(handleNext1);\n          }, []);\n          useLayoutEffect(() => {\n            return Store.subscribe(handleNext2);\n          }, []);\n          useMemo(() => {\n            return Store.subscribe(handleNext3);\n          }, []);\n        }", []string{"exhaustiveDepsMissing", "exhaustiveDepsMissing", "exhaustiveDepsMissing"}},
-		{"function MyComponent(props) {\n          let [, setState] = useState();\n          let [, dispatch] = React.useReducer();\n          let taint = props.foo;\n\n          // Shouldn't affect anything\n          function handleChange() {}\n\n          function handleNext1(value) {\n            let value2 = value * taint;\n            setState(value2);\n            console.log('hello');\n          }\n          const handleNext2 = (value) => {\n            setState(taint(value));\n            console.log('hello');\n          };\n          let handleNext3 = function(value) {\n            console.log(taint);\n            dispatch({ type: 'x', value });\n          };\n          useEffect(() => {\n            return Store.subscribe(handleNext1);\n          }, []);\n          useLayoutEffect(() => {\n            return Store.subscribe(handleNext2);\n          }, []);\n          useMemo(() => {\n            return Store.subscribe(handleNext3);\n          }, []);\n        }", []string{"exhaustiveDepsMissing", "exhaustiveDepsMissing", "exhaustiveDepsMissing"}},
-		{"function MyComponent(props) {\n          let [, setState] = useState();\n          let [, dispatch] = React.useReducer();\n          let taint = props.foo;\n\n          // Shouldn't affect anything\n          const handleChange = () => {};\n\n          function handleNext1(value) {\n            let value2 = value * taint;\n            setState(value2);\n            console.log('hello');\n          }\n          const handleNext2 = (value) => {\n            setState(taint(value));\n            console.log('hello');\n          };\n          let handleNext3 = function(value) {\n            console.log(taint);\n            dispatch({ type: 'x', value });\n          };\n          useEffect(() => {\n            return Store.subscribe(handleNext1);\n          }, []);\n          useLayoutEffect(() => {\n            return Store.subscribe(handleNext2);\n          }, []);\n          useMemo(() => {\n            return Store.subscribe(handleNext3);\n          }, []);\n        }", []string{"exhaustiveDepsMissing", "exhaustiveDepsMissing", "exhaustiveDepsMissing"}},
-		{"function MyComponent(props) {\n          let [, setState] = useState();\n\n          function handleNext(value) {\n            setState(value);\n          }\n\n          useEffect(() => {\n            return Store.subscribe(handleNext);\n          }, [handleNext]);\n        }", []string{"exhaustiveDepsConstruction"}},
-		{"function MyComponent(props) {\n          let [, setState] = useState();\n\n          const handleNext = (value) => {\n            setState(value);\n          };\n\n          useEffect(() => {\n            return Store.subscribe(handleNext);\n          }, [handleNext]);\n        }", []string{"exhaustiveDepsConstruction"}},
-		{"function MyComponent(props) {\n          let [, setState] = useState();\n\n          const handleNext = (value) => {\n            setState(value);\n          };\n\n          useEffect(() => {\n            return Store.subscribe(handleNext);\n          }, [handleNext]);\n\n          return <div onClick={handleNext} />;\n        }", []string{"exhaustiveDepsConstruction"}},
-		{"function MyComponent(props) {\n          function handleNext1() {\n            console.log('hello');\n          }\n          const handleNext2 = () => {\n            console.log('hello');\n          };\n          let handleNext3 = function() {\n            console.log('hello');\n          };\n          useEffect(() => {\n            return Store.subscribe(handleNext1);\n          }, [handleNext1]);\n          useLayoutEffect(() => {\n            return Store.subscribe(handleNext2);\n          }, [handleNext2]);\n          useMemo(() => {\n            return Store.subscribe(handleNext3);\n          }, [handleNext3]);\n        }", []string{"exhaustiveDepsConstruction", "exhaustiveDepsConstruction", "exhaustiveDepsConstruction"}},
-		{"function MyComponent(props) {\n          function handleNext1() {\n            console.log('hello');\n          }\n          const handleNext2 = () => {\n            console.log('hello');\n          };\n          let handleNext3 = function() {\n            console.log('hello');\n          };\n          useEffect(() => {\n            handleNext1();\n            return Store.subscribe(() => handleNext1());\n          }, [handleNext1]);\n          useLayoutEffect(() => {\n            handleNext2();\n            return Store.subscribe(() => handleNext2());\n          }, [handleNext2]);\n          useMemo(() => {\n            handleNext3();\n            return Store.subscribe(() => handleNext3());\n          }, [handleNext3]);\n        }", []string{"exhaustiveDepsConstruction", "exhaustiveDepsConstruction", "exhaustiveDepsConstruction"}},
-		{"function MyComponent(props) {\n          function handleNext1() {\n            console.log('hello');\n          }\n          const handleNext2 = () => {\n            console.log('hello');\n          };\n          let handleNext3 = function() {\n            console.log('hello');\n          };\n          useEffect(() => {\n            handleNext1();\n            return Store.subscribe(() => handleNext1());\n          }, [handleNext1]);\n          useLayoutEffect(() => {\n            handleNext2();\n            return Store.subscribe(() => handleNext2());\n          }, [handleNext2]);\n          useMemo(() => {\n            handleNext3();\n            return Store.subscribe(() => handleNext3());\n          }, [handleNext3]);\n          return (\n            <div\n              onClick={() => {\n                handleNext1();\n                setTimeout(handleNext2);\n                setTimeout(() => {\n                  handleNext3();\n                });\n              }}\n            />\n          );\n        }", []string{"exhaustiveDepsConstruction", "exhaustiveDepsConstruction", "exhaustiveDepsConstruction"}},
-		{"function MyComponent(props) {\n          const handleNext1 = () => {\n            console.log('hello');\n          };\n          function handleNext2() {\n            console.log('hello');\n          }\n          useEffect(() => {\n            return Store.subscribe(handleNext1);\n            return Store.subscribe(handleNext2);\n          }, [handleNext1, handleNext2]);\n          useEffect(() => {\n            return Store.subscribe(handleNext1);\n            return Store.subscribe(handleNext2);\n          }, [handleNext1, handleNext2]);\n        }", []string{"exhaustiveDepsConstruction", "exhaustiveDepsConstruction", "exhaustiveDepsConstruction", "exhaustiveDepsConstruction"}},
-		{"function MyComponent(props) {\n          let handleNext = () => {\n            console.log('hello');\n          };\n          if (props.foo) {\n            handleNext = () => {\n              console.log('hello');\n            };\n          }\n          useEffect(() => {\n            return Store.subscribe(handleNext);\n          }, [handleNext]);\n        }", []string{"exhaustiveDepsConstruction"}},
-		{"function MyComponent(props) {\n          let [, setState] = useState();\n          let taint = props.foo;\n\n          function handleNext(value) {\n            let value2 = value * taint;\n            setState(value2);\n            console.log('hello');\n          }\n\n          useEffect(() => {\n            return Store.subscribe(handleNext);\n          }, [handleNext]);\n        }", []string{"exhaustiveDepsConstruction"}},
-		{"function Counter() {\n          let [count, setCount] = useState(0);\n\n          useEffect(() => {\n            let id = setInterval(() => {\n              setCount(count + 1);\n            }, 1000);\n            return () => clearInterval(id);\n          }, []);\n\n          return <h1>{count}</h1>;\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function Counter() {\n          let [count, setCount] = useState(0);\n          let [increment, setIncrement] = useState(0);\n\n          useEffect(() => {\n            let id = setInterval(() => {\n              setCount(count + increment);\n            }, 1000);\n            return () => clearInterval(id);\n          }, []);\n\n          return <h1>{count}</h1>;\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function Counter() {\n          let [count, setCount] = useState(0);\n          let [increment, setIncrement] = useState(0);\n\n          useEffect(() => {\n            let id = setInterval(() => {\n              setCount(count => count + increment);\n            }, 1000);\n            return () => clearInterval(id);\n          }, []);\n\n           return <h1>{count}</h1>;\n         }", []string{"exhaustiveDepsMissing"}},
-		{"function Counter() {\n          let [count, setCount] = useState(0);\n          let increment = useCustomHook();\n\n          useEffect(() => {\n            let id = setInterval(() => {\n              setCount(count => count + increment);\n            }, 1000);\n            return () => clearInterval(id);\n          }, []);\n\n          return <h1>{count}</h1>;\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function Counter({ step }) {\n          let [count, setCount] = useState(0);\n\n          function increment(x) {\n            return x + step;\n          }\n\n          useEffect(() => {\n            let id = setInterval(() => {\n              setCount(count => increment(count));\n            }, 1000);\n            return () => clearInterval(id);\n          }, []);\n\n          return <h1>{count}</h1>;\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function Counter({ step }) {\n          let [count, setCount] = useState(0);\n\n          function increment(x) {\n            return x + step;\n          }\n\n          useEffect(() => {\n            let id = setInterval(() => {\n              setCount(count => increment(count));\n            }, 1000);\n            return () => clearInterval(id);\n          }, [increment]);\n\n          return <h1>{count}</h1>;\n        }", []string{"exhaustiveDepsConstruction"}},
-		{"function Counter({ increment }) {\n          let [count, setCount] = useState(0);\n\n          useEffect(() => {\n            let id = setInterval(() => {\n              setCount(count => count + increment);\n            }, 1000);\n            return () => clearInterval(id);\n          }, []);\n\n          return <h1>{count}</h1>;\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function Counter() {\n          const [count, setCount] = useState(0);\n\n          function tick() {\n            setCount(count + 1);\n          }\n\n          useEffect(() => {\n            let id = setInterval(() => {\n              tick();\n            }, 1000);\n            return () => clearInterval(id);\n          }, []);\n\n          return <h1>{count}</h1>;\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function Podcasts() {\n          useEffect(() => {\n            alert(podcasts);\n          }, []);\n          let [podcasts, setPodcasts] = useState(null);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function Podcasts({ fetchPodcasts, id }) {\n          let [podcasts, setPodcasts] = useState(null);\n          useEffect(() => {\n            fetchPodcasts(id).then(setPodcasts);\n          }, [id]);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function Podcasts({ api: { fetchPodcasts }, id }) {\n          let [podcasts, setPodcasts] = useState(null);\n          useEffect(() => {\n            fetchPodcasts(id).then(setPodcasts);\n          }, [id]);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function Podcasts({ fetchPodcasts, fetchPodcasts2, id }) {\n          let [podcasts, setPodcasts] = useState(null);\n          useEffect(() => {\n            setTimeout(() => {\n              console.log(id);\n              fetchPodcasts(id).then(setPodcasts);\n              fetchPodcasts2(id).then(setPodcasts);\n            });\n          }, [id]);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function Podcasts({ fetchPodcasts, id }) {\n          let [podcasts, setPodcasts] = useState(null);\n          useEffect(() => {\n            console.log(fetchPodcasts);\n            fetchPodcasts(id).then(setPodcasts);\n          }, [id]);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function Podcasts({ fetchPodcasts, id }) {\n          let [podcasts, setPodcasts] = useState(null);\n          useEffect(() => {\n            console.log(fetchPodcasts);\n            fetchPodcasts?.(id).then(setPodcasts);\n          }, [id]);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function Hello() {\n          const [state, setState] = useState(0);\n          useEffect(() => {\n            setState({});\n          });\n        }", []string{"exhaustiveDepsSetStateNoDependencies"}},
-		{"function Hello() {\n          const [data, setData] = useState(0);\n          useEffect(() => {\n            fetchData.then(setData);\n          });\n        }", []string{"exhaustiveDepsSetStateNoDependencies"}},
-		{"function Hello({ country }) {\n          const [data, setData] = useState(0);\n          useEffect(() => {\n            fetchData(country).then(setData);\n          });\n        }", []string{"exhaustiveDepsSetStateNoDependencies"}},
-		{"function Hello({ prop1, prop2 }) {\n          const [state, setState] = useState(0);\n          useEffect(() => {\n            if (prop1) {\n              setState(prop2);\n            }\n          });\n        }", []string{"exhaustiveDepsSetStateNoDependencies"}},
-		{"function Thing() {\n          useEffect(async () => {}, []);\n        }", []string{"exhaustiveDepsAsyncEffect"}},
+		{
+			"function Foo2() { useEffect(() => { foo() }, []); const foo = () => { bar() }; function bar () { foo() } }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent(props) {\n          const value = props.flag ? {} : {};\n          useCallback(() => {\n            return value;\n          }, [value]);\n        }",
+			[]string{"exhaustiveDepsConstruction"},
+		},
+		{
+			"function MyComponent(props) {\n          const value = props.cached || {};\n          useCallback(() => {\n            return value;\n          }, [value]);\n        }",
+			[]string{"exhaustiveDepsConstruction"},
+		},
+		{
+			"function MyComponent(props) {\n          useCallback(() => {\n            console.log(props.foo?.toString());\n          }, []);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent(props) {\n          useCallback(() => {\n            console.log(props.foo?.bar.baz);\n          }, []);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent(props) {\n          useCallback(() => {\n            console.log(props.foo?.bar?.baz);\n          }, []);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent(props) {\n          useCallback(() => {\n            console.log(props.foo?.bar.toString());\n          }, []);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent() {\n          const local = someFunc();\n          useEffect(() => {\n            console.log(local);\n          }, []);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function Counter(unstableProp) {\n          let [count, setCount] = useState(0);\n          setCount = unstableProp\n          useEffect(() => {\n            let id = setInterval(() => {\n              setCount(c => c + 1);\n            }, 1000);\n            return () => clearInterval(id);\n          }, []);\n\n          return <h1>{count}</h1>;\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent() {\n          let local = 42;\n          useEffect(() => {\n            console.log(local);\n          }, []);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent() {\n          const local = /foo/;\n          useEffect(() => {\n            console.log(local);\n          }, []);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent(props) {\n          const value = useMemo(() => { return 2*2; });\n          const fn = useCallback(() => { alert('foo'); });\n        }",
+			[]string{"exhaustiveDepsUselessWithoutDependencies", "exhaustiveDepsUselessWithoutDependencies"},
+		},
+		{
+			"function MyComponent({ fn1, fn2 }) {\n          const value = useMemo(fn1);\n          const fn = useCallback(fn2);\n        }",
+			[]string{"exhaustiveDepsUselessWithoutDependencies", "exhaustiveDepsUselessWithoutDependencies"},
+		},
+		{
+			"function MyComponent() {\n          useEffect()\n          useLayoutEffect()\n          useCallback()\n          useMemo()\n        }",
+			[]string{
+				"exhaustiveDepsMissingCallback",
+				"exhaustiveDepsMissingCallback",
+				"exhaustiveDepsMissingCallback",
+				"exhaustiveDepsMissingCallback",
+			},
+		},
+		{
+			"function MyComponent() {\n          const local = someFunc();\n          useEffect(() => {\n            if (true) {\n              console.log(local);\n            }\n          }, []);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent() {\n          const local = {};\n          useEffect(() => {\n            try {\n              console.log(local);\n            } finally {}\n          }, []);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent() {\n          const local = {};\n          useEffect(() => {\n            function inner() {\n              console.log(local);\n            }\n            inner();\n          }, []);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent() {\n          const local1 = someFunc();\n          {\n            const local2 = someFunc();\n            useEffect(() => {\n              console.log(local1);\n              console.log(local2);\n            }, []);\n          }\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent() {\n          const local1 = {};\n          const local2 = {};\n          useEffect(() => {\n            console.log(local1);\n            console.log(local2);\n          }, [local1]);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent() {\n          const local1 = {};\n          const local2 = {};\n          useMemo(() => {\n            console.log(local1);\n          }, [local1, local2]);\n        }",
+			[]string{"exhaustiveDepsUnnecessary"},
+		},
+		{
+			"function MyComponent() {\n          const local1 = someFunc();\n          function MyNestedComponent() {\n            const local2 = {};\n            useCallback(() => {\n              console.log(local1);\n              console.log(local2);\n            }, [local1]);\n          }\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent() {\n          const local = {};\n          useEffect(() => {\n            console.log(local);\n            console.log(local);\n          }, []);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent() {\n          const local = {};\n          useEffect(() => {\n            console.log(local);\n            console.log(local);\n          }, [local, local]);\n        }",
+			[]string{"exhaustiveDepsDuplicate"},
+		},
+		{
+			"function MyComponent() {\n          useCallback(() => {}, [window]);\n        }",
+			[]string{"exhaustiveDepsUnnecessary"},
+		},
+		{
+			"function MyComponent(props) {\n          let local = props.foo;\n          useCallback(() => {}, [local]);\n        }",
+			[]string{"exhaustiveDepsUnnecessary"},
+		},
+		{
+			"function MyComponent({ history }) {\n          useEffect(() => {\n            return history.listen();\n          }, []);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent({ history }) {\n          useEffect(() => {\n            return [\n              history.foo.bar[2].dobedo.listen(),\n              history.foo.bar().dobedo.listen[2]\n            ];\n          }, []);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent({ history }) {\n          useEffect(() => {\n            return [\n              history?.foo\n            ];\n          }, []);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent() {\n          useEffect(() => {}, ['foo']);\n        }",
+			[]string{"exhaustiveDepsLiteral"},
+		},
+		{
+			"function MyComponent({ foo, bar, baz }) {\n          useEffect(() => {\n            console.log(foo, bar, baz);\n          }, ['foo', 'bar']);\n        }",
+			[]string{"exhaustiveDepsMissing", "exhaustiveDepsLiteral", "exhaustiveDepsLiteral"},
+		},
+		{
+			"function MyComponent({ foo, bar, baz }) {\n          useEffect(() => {\n            console.log(foo, bar, baz);\n          }, [42, false, null]);\n        }",
+			[]string{
+				"exhaustiveDepsMissing",
+				"exhaustiveDepsLiteral",
+				"exhaustiveDepsLiteral",
+				"exhaustiveDepsLiteral",
+			},
+		},
+		{
+			"function MyComponent() {\n          const dependencies = [];\n          useEffect(() => {}, dependencies);\n        }",
+			[]string{"exhaustiveDepsNotArrayLiteral"},
+		},
+		{
+			"function MyComponent() {\n          const local = {};\n          const dependencies = [local];\n          useEffect(() => {\n            console.log(local);\n          }, dependencies);\n        }",
+			[]string{"exhaustiveDepsMissing", "exhaustiveDepsNotArrayLiteral"},
+		},
+		{
+			"function MyComponent() {\n          const local = {};\n          const dependencies = [local];\n          useEffect(() => {\n            console.log(local);\n          }, [...dependencies]);\n        }",
+			[]string{"exhaustiveDepsMissing", "exhaustiveDepsSpread"},
+		},
+		{
+			"function MyComponent() {\n          const local = someFunc();\n          useEffect(() => {\n            console.log(local);\n          }, [local, ...dependencies]);\n        }",
+			[]string{"exhaustiveDepsSpread"},
+		},
+		{
+			"function MyComponent() {\n          const local = {};\n          useEffect(() => {\n            console.log(local);\n          }, [computeCacheKey(local)]);\n        }",
+			[]string{"exhaustiveDepsMissing", "exhaustiveDepsComplexExpression"},
+		},
+		{
+			"function MyComponent(props) {\n          useEffect(() => {\n            console.log(props.items[0]);\n          }, [props.items[0]]);\n        }",
+			[]string{"exhaustiveDepsMissing", "exhaustiveDepsComplexExpression"},
+		},
+		{
+			"function MyComponent(props) {\n          useEffect(() => {\n            console.log(props.items[0]);\n          }, [props.items, props.items[0]]);\n        }",
+			[]string{"exhaustiveDepsComplexExpression"},
+		},
+		{
+			"function MyComponent({ items }) {\n          useEffect(() => {\n            console.log(items[0]);\n          }, [items[0]]);\n        }",
+			[]string{"exhaustiveDepsMissing", "exhaustiveDepsComplexExpression"},
+		},
+		{
+			"function MyComponent({ items }) {\n          useEffect(() => {\n            console.log(items[0]);\n          }, [items, items[0]]);\n        }",
+			[]string{"exhaustiveDepsComplexExpression"},
+		},
+		{
+			"function MyComponent(props) {\n          const local = {};\n          useCallback(() => {\n            console.log(props.foo);\n            console.log(props.bar);\n          }, [props, props.foo]);\n        }",
+			[]string{"exhaustiveDepsUnnecessary"},
+		},
+		{
+			"function MyComponent(props) {\n          const local = {};\n          useCallback(() => {\n            console.log(props.foo);\n            console.log(props.bar);\n          }, [props.foo, props]);\n        }",
+			[]string{"exhaustiveDepsUnnecessary"},
+		},
+		{
+			"function MyComponent(props) {\n          const local = {};\n          useCallback(() => {\n            console.log(props.foo);\n            console.log(props.bar);\n          }, []);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent(props) {\n          useCallback(() => {\n            const { foo } = props;\n            console.log(foo);\n          }, [props.bar]);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent(props) {\n          useCallback(() => {\n            const { foo: { bar } } = props;\n            console.log(bar);\n          }, [props.foo.bar]);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent(props) {\n          const foo = props.foo;\n          useEffect(() => {\n            const { bar } = foo();\n            console.log(bar);\n          }, [props.foo.bar]);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent() {\n          const local = {id: 42};\n          useEffect(() => {\n            console.log(local);\n          }, [local.id]);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent() {\n          const local = {id: 42};\n          const fn = useCallback(() => {\n            console.log(local);\n          }, [local.id]);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent() {\n          const local = {id: 42};\n          const fn = useCallback(() => {\n            console.log(local);\n          }, [local.id, local]);\n        }",
+			[]string{"exhaustiveDepsUnnecessary"},
+		},
+		{
+			"function MyComponent(props) {\n          const fn = useCallback(() => {\n            console.log(props.foo.bar.baz);\n          }, []);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent(props) {\n          let color = {}\n          const fn = useCallback(() => {\n            console.log(props.foo.bar.baz);\n            console.log(color);\n          }, [props.foo, props.foo.bar.baz]);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent(props) {\n          const fn = useCallback(() => {\n            console.log(props.foo.bar.baz);\n          }, [props.foo.bar.baz, props.foo]);\n        }",
+			[]string{"exhaustiveDepsUnnecessary"},
+		},
+		{
+			"function MyComponent(props) {\n          const fn = useCallback(() => {\n            console.log(props.foo.bar.baz);\n            console.log(props.foo.fizz.bizz);\n          }, []);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent(props) {\n          const fn = useCallback(() => {\n            console.log(props.foo.bar);\n          }, [props.foo.bar.baz]);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent(props) {\n          const fn = useCallback(() => {\n            console.log(props);\n            console.log(props.hello);\n          }, [props.foo.bar.baz]);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent() {\n          const local = {};\n          useEffect(() => {\n            console.log(local);\n          }, [local, local]);\n        }",
+			[]string{"exhaustiveDepsDuplicate"},
+		},
+		{
+			"function MyComponent() {\n          const local1 = {};\n          useCallback(() => {\n            const local1 = {};\n            console.log(local1);\n          }, [local1]);\n        }",
+			[]string{"exhaustiveDepsUnnecessary"},
+		},
+		{
+			"function MyComponent() {\n          const local1 = {};\n          useCallback(() => {}, [local1]);\n        }",
+			[]string{"exhaustiveDepsUnnecessary"},
+		},
+		{
+			"function MyComponent(props) {\n          useEffect(() => {\n            console.log(props.foo);\n          }, []);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent(props) {\n          useEffect(() => {\n            console.log(props.foo);\n            console.log(props.bar);\n          }, []);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent(props) {\n          let a, b, c, d, e, f, g;\n          useEffect(() => {\n            console.log(b, e, d, c, a, g, f);\n          }, [c, a, g]);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent(props) {\n          let a, b, c, d, e, f, g;\n          useEffect(() => {\n            console.log(b, e, d, c, a, g, f);\n          }, [a, c, g]);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent(props) {\n          let a, b, c, d, e, f, g;\n          useEffect(() => {\n            console.log(b, e, d, c, a, g, f);\n          }, []);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent(props) {\n          const local = {};\n          useEffect(() => {\n            console.log(props.foo);\n            console.log(props.bar);\n            console.log(local);\n          }, []);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent(props) {\n          const local = {};\n          useEffect(() => {\n            console.log(props.foo);\n            console.log(props.bar);\n            console.log(local);\n          }, [props]);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent(props) {\n          useEffect(() => {\n            console.log(props.foo);\n          }, []);\n          useCallback(() => {\n            console.log(props.foo);\n          }, []);\n          useMemo(() => {\n            console.log(props.foo);\n          }, []);\n          React.useEffect(() => {\n            console.log(props.foo);\n          }, []);\n          React.useCallback(() => {\n            console.log(props.foo);\n          }, []);\n          React.useMemo(() => {\n            console.log(props.foo);\n          }, []);\n          React.notReactiveHook(() => {\n            console.log(props.foo);\n          }, []);\n        }",
+			[]string{
+				"exhaustiveDepsMissing",
+				"exhaustiveDepsMissing",
+				"exhaustiveDepsMissing",
+				"exhaustiveDepsMissing",
+				"exhaustiveDepsMissing",
+				"exhaustiveDepsMissing",
+			},
+		},
+		{
+			"function MyComponent(props) {\n          useCustomEffect(() => {\n            console.log(props.foo);\n          }, []);\n          useEffect(() => {\n            console.log(props.foo);\n          }, []);\n          React.useEffect(() => {\n            console.log(props.foo);\n          }, []);\n          React.useCustomEffect(() => {\n            console.log(props.foo);\n          }, []);\n        }",
+			[]string{"exhaustiveDepsMissing", "exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent() {\n          const local = {};\n          useEffect(() => {\n            console.log(local);\n          }, [a ? local : b]);\n        }",
+			[]string{"exhaustiveDepsMissing", "exhaustiveDepsComplexExpression"},
+		},
+		{
+			"function MyComponent() {\n          const local = {};\n          useEffect(() => {\n            console.log(local);\n          }, [a && local]);\n        }",
+			[]string{"exhaustiveDepsMissing", "exhaustiveDepsComplexExpression"},
+		},
+		{
+			"function MyComponent(props) {\n          useEffect(() => {}, [props?.attribute.method()]);\n        }",
+			[]string{"exhaustiveDepsComplexExpression"},
+		},
+		{
+			"function MyComponent(props) {\n          useEffect(() => {}, [props.method()]);\n        }",
+			[]string{"exhaustiveDepsComplexExpression"},
+		},
+		{
+			"function MyComponent() {\n          const ref = useRef();\n          const [state, setState] = useState();\n          useEffect(() => {\n            ref.current = {};\n            setState(state + 1);\n          }, []);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent() {\n          const ref = useRef();\n          const [state, setState] = useState();\n          useEffect(() => {\n            ref.current = {};\n            setState(state + 1);\n          }, [ref]);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent(props) {\n          const ref1 = useRef();\n          const ref2 = useRef();\n          useEffect(() => {\n            ref1.current.focus();\n            console.log(ref2.current.textContent);\n            alert(props.someOtherRefs.current.innerHTML);\n            fetch(props.color);\n          }, []);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent(props) {\n          const ref1 = useRef();\n          const ref2 = useRef();\n          useEffect(() => {\n            ref1.current.focus();\n            console.log(ref2.current.textContent);\n            alert(props.someOtherRefs.current.innerHTML);\n            fetch(props.color);\n          }, [ref1.current, ref2.current, props.someOtherRefs, props.color]);\n        }",
+			[]string{"exhaustiveDepsUnnecessary"},
+		},
+		{
+			"function MyComponent(props) {\n          const ref1 = useRef();\n          const ref2 = useRef();\n          useEffect(() => {\n            ref1?.current?.focus();\n            console.log(ref2?.current?.textContent);\n            alert(props.someOtherRefs.current.innerHTML);\n            fetch(props.color);\n          }, [ref1?.current, ref2?.current, props.someOtherRefs, props.color]);\n        }",
+			[]string{"exhaustiveDepsUnnecessary"},
+		},
+		{
+			"function MyComponent() {\n          const ref = useRef();\n          useEffect(() => {\n            console.log(ref.current);\n          }, [ref.current]);\n        }",
+			[]string{"exhaustiveDepsUnnecessary"},
+		},
+		{
+			"function MyComponent({ activeTab }) {\n          const ref1 = useRef();\n          const ref2 = useRef();\n          useEffect(() => {\n            ref1.current.scrollTop = 0;\n            ref2.current.scrollTop = 0;\n          }, [ref1.current, ref2.current, activeTab]);\n        }",
+			[]string{"exhaustiveDepsUnnecessary"},
+		},
+		{
+			"function MyComponent({ activeTab, initY }) {\n          const ref1 = useRef();\n          const ref2 = useRef();\n          const fn = useCallback(() => {\n            ref1.current.scrollTop = initY;\n            ref2.current.scrollTop = initY;\n          }, [ref1.current, ref2.current, activeTab, initY]);\n        }",
+			[]string{"exhaustiveDepsUnnecessary"},
+		},
+		{
+			"function MyComponent() {\n          const ref = useRef();\n          useEffect(() => {\n            console.log(ref.current);\n          }, [ref.current, ref]);\n        }",
+			[]string{"exhaustiveDepsUnnecessary"},
+		},
+		{
+			"const MyComponent = forwardRef((props, ref) => {\n          useImperativeHandle(ref, () => ({\n            focus() {\n              alert(props.hello);\n            }\n          }), [])\n        });",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent(props) {\n          useEffect(() => {\n            if (props.onChange) {\n              props.onChange();\n            }\n          }, []);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent(props) {\n          useEffect(() => {\n            if (props?.onChange) {\n              props?.onChange();\n            }\n          }, []);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent(props) {\n          useEffect(() => {\n            function play() {\n              props.onPlay();\n            }\n            function pause() {\n              props.onPause();\n            }\n          }, []);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent(props) {\n          useEffect(() => {\n            if (props.foo.onChange) {\n              props.foo.onChange();\n            }\n          }, []);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent(props) {\n          useEffect(() => {\n            props.onChange();\n            if (props.foo.onChange) {\n              props.foo.onChange();\n            }\n          }, []);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent(props) {\n          const [skillsCount] = useState();\n          useEffect(() => {\n            if (skillsCount === 0 && !props.isEditMode) {\n              props.toggleEditMode();\n            }\n          }, [skillsCount, props.isEditMode, props.toggleEditMode]);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent(props) {\n          const [skillsCount] = useState();\n          useEffect(() => {\n            if (skillsCount === 0 && !props.isEditMode) {\n              props.toggleEditMode();\n            }\n          }, []);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent(props) {\n          useEffect(() => {\n            externalCall(props);\n            props.onChange();\n          }, []);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent(props) {\n          useEffect(() => {\n            props.onChange();\n            externalCall(props);\n          }, []);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent() {\n          const local1 = 42;\n          const local2 = '42';\n          const local3 = null;\n          const local4 = {};\n          useEffect(() => {\n            console.log(local1);\n            console.log(local2);\n            console.log(local3);\n            console.log(local4);\n          }, [local1, local3]);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent() {\n          useEffect(() => {\n            window.scrollTo(0, 0);\n          }, [window]);\n        }",
+			[]string{"exhaustiveDepsUnnecessary"},
+		},
+		{
+			"import MutableStore from 'store';\n        function MyComponent() {\n          useEffect(() => {\n            console.log(MutableStore.hello);\n          }, [MutableStore.hello]);\n        }",
+			[]string{"exhaustiveDepsUnnecessary"},
+		},
+		{
+			"import MutableStore from 'store';\n        let z = {};\n\n        function MyComponent(props) {\n          let x = props.foo;\n          {\n            let y = props.bar;\n            useEffect(() => {\n              console.log(MutableStore.hello.world, props.foo, x, y, z, global.stuff);\n            }, [MutableStore.hello.world, props.foo, x, y, z, global.stuff]);\n          }\n        }",
+			[]string{"exhaustiveDepsUnnecessary"},
+		},
+		{
+			"import MutableStore from 'store';\n        let z = {};\n\n        function MyComponent(props) {\n          let x = props.foo;\n          {\n            let y = props.bar;\n            useEffect(() => {\n              // nothing\n            }, [MutableStore.hello.world, props.foo, x, y, z, global.stuff]);\n          }\n        }",
+			[]string{"exhaustiveDepsUnnecessary"},
+		},
+		{
+			"import MutableStore from 'store';\n        let z = {};\n\n        function MyComponent(props) {\n          let x = props.foo;\n          {\n            let y = props.bar;\n            const fn = useCallback(() => {\n              // nothing\n            }, [MutableStore.hello.world, props.foo, x, y, z, global.stuff]);\n          }\n        }",
+			[]string{"exhaustiveDepsUnnecessary"},
+		},
+		{
+			"import MutableStore from 'store';\n        let z = {};\n\n        function MyComponent(props) {\n          let x = props.foo;\n          {\n            let y = props.bar;\n            const fn = useCallback(() => {\n              // nothing\n            }, [MutableStore?.hello?.world, props.foo, x, y, z, global?.stuff]);\n          }\n        }",
+			[]string{"exhaustiveDepsUnnecessary"},
+		},
+		{
+			"function MyComponent(props) {\n          let [, setState] = useState();\n          let [, dispatch] = React.useReducer();\n          let taint = props.foo;\n\n          function handleNext1(value) {\n            let value2 = value * taint;\n            setState(value2);\n            console.log('hello');\n          }\n          const handleNext2 = (value) => {\n            setState(taint(value));\n            console.log('hello');\n          };\n          let handleNext3 = function(value) {\n            setTimeout(() => console.log(taint));\n            dispatch({ type: 'x', value });\n          };\n          useEffect(() => {\n            return Store.subscribe(handleNext1);\n          }, []);\n          useLayoutEffect(() => {\n            return Store.subscribe(handleNext2);\n          }, []);\n          useMemo(() => {\n            return Store.subscribe(handleNext3);\n          }, []);\n        }",
+			[]string{"exhaustiveDepsMissing", "exhaustiveDepsMissing", "exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent(props) {\n          let [, setState] = useState();\n          let [, dispatch] = React.useReducer();\n          let taint = props.foo;\n\n          // Shouldn't affect anything\n          function handleChange() {}\n\n          function handleNext1(value) {\n            let value2 = value * taint;\n            setState(value2);\n            console.log('hello');\n          }\n          const handleNext2 = (value) => {\n            setState(taint(value));\n            console.log('hello');\n          };\n          let handleNext3 = function(value) {\n            console.log(taint);\n            dispatch({ type: 'x', value });\n          };\n          useEffect(() => {\n            return Store.subscribe(handleNext1);\n          }, []);\n          useLayoutEffect(() => {\n            return Store.subscribe(handleNext2);\n          }, []);\n          useMemo(() => {\n            return Store.subscribe(handleNext3);\n          }, []);\n        }",
+			[]string{"exhaustiveDepsMissing", "exhaustiveDepsMissing", "exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent(props) {\n          let [, setState] = useState();\n          let [, dispatch] = React.useReducer();\n          let taint = props.foo;\n\n          // Shouldn't affect anything\n          const handleChange = () => {};\n\n          function handleNext1(value) {\n            let value2 = value * taint;\n            setState(value2);\n            console.log('hello');\n          }\n          const handleNext2 = (value) => {\n            setState(taint(value));\n            console.log('hello');\n          };\n          let handleNext3 = function(value) {\n            console.log(taint);\n            dispatch({ type: 'x', value });\n          };\n          useEffect(() => {\n            return Store.subscribe(handleNext1);\n          }, []);\n          useLayoutEffect(() => {\n            return Store.subscribe(handleNext2);\n          }, []);\n          useMemo(() => {\n            return Store.subscribe(handleNext3);\n          }, []);\n        }",
+			[]string{"exhaustiveDepsMissing", "exhaustiveDepsMissing", "exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent(props) {\n          let [, setState] = useState();\n\n          function handleNext(value) {\n            setState(value);\n          }\n\n          useEffect(() => {\n            return Store.subscribe(handleNext);\n          }, [handleNext]);\n        }",
+			[]string{"exhaustiveDepsConstruction"},
+		},
+		{
+			"function MyComponent(props) {\n          let [, setState] = useState();\n\n          const handleNext = (value) => {\n            setState(value);\n          };\n\n          useEffect(() => {\n            return Store.subscribe(handleNext);\n          }, [handleNext]);\n        }",
+			[]string{"exhaustiveDepsConstruction"},
+		},
+		{
+			"function MyComponent(props) {\n          let [, setState] = useState();\n\n          const handleNext = (value) => {\n            setState(value);\n          };\n\n          useEffect(() => {\n            return Store.subscribe(handleNext);\n          }, [handleNext]);\n\n          return <div onClick={handleNext} />;\n        }",
+			[]string{"exhaustiveDepsConstruction"},
+		},
+		{
+			"function MyComponent(props) {\n          function handleNext1() {\n            console.log('hello');\n          }\n          const handleNext2 = () => {\n            console.log('hello');\n          };\n          let handleNext3 = function() {\n            console.log('hello');\n          };\n          useEffect(() => {\n            return Store.subscribe(handleNext1);\n          }, [handleNext1]);\n          useLayoutEffect(() => {\n            return Store.subscribe(handleNext2);\n          }, [handleNext2]);\n          useMemo(() => {\n            return Store.subscribe(handleNext3);\n          }, [handleNext3]);\n        }",
+			[]string{"exhaustiveDepsConstruction", "exhaustiveDepsConstruction", "exhaustiveDepsConstruction"},
+		},
+		{
+			"function MyComponent(props) {\n          function handleNext1() {\n            console.log('hello');\n          }\n          const handleNext2 = () => {\n            console.log('hello');\n          };\n          let handleNext3 = function() {\n            console.log('hello');\n          };\n          useEffect(() => {\n            handleNext1();\n            return Store.subscribe(() => handleNext1());\n          }, [handleNext1]);\n          useLayoutEffect(() => {\n            handleNext2();\n            return Store.subscribe(() => handleNext2());\n          }, [handleNext2]);\n          useMemo(() => {\n            handleNext3();\n            return Store.subscribe(() => handleNext3());\n          }, [handleNext3]);\n        }",
+			[]string{"exhaustiveDepsConstruction", "exhaustiveDepsConstruction", "exhaustiveDepsConstruction"},
+		},
+		{
+			"function MyComponent(props) {\n          function handleNext1() {\n            console.log('hello');\n          }\n          const handleNext2 = () => {\n            console.log('hello');\n          };\n          let handleNext3 = function() {\n            console.log('hello');\n          };\n          useEffect(() => {\n            handleNext1();\n            return Store.subscribe(() => handleNext1());\n          }, [handleNext1]);\n          useLayoutEffect(() => {\n            handleNext2();\n            return Store.subscribe(() => handleNext2());\n          }, [handleNext2]);\n          useMemo(() => {\n            handleNext3();\n            return Store.subscribe(() => handleNext3());\n          }, [handleNext3]);\n          return (\n            <div\n              onClick={() => {\n                handleNext1();\n                setTimeout(handleNext2);\n                setTimeout(() => {\n                  handleNext3();\n                });\n              }}\n            />\n          );\n        }",
+			[]string{"exhaustiveDepsConstruction", "exhaustiveDepsConstruction", "exhaustiveDepsConstruction"},
+		},
+		{
+			"function MyComponent(props) {\n          const handleNext1 = () => {\n            console.log('hello');\n          };\n          function handleNext2() {\n            console.log('hello');\n          }\n          useEffect(() => {\n            return Store.subscribe(handleNext1);\n            return Store.subscribe(handleNext2);\n          }, [handleNext1, handleNext2]);\n          useEffect(() => {\n            return Store.subscribe(handleNext1);\n            return Store.subscribe(handleNext2);\n          }, [handleNext1, handleNext2]);\n        }",
+			[]string{
+				"exhaustiveDepsConstruction",
+				"exhaustiveDepsConstruction",
+				"exhaustiveDepsConstruction",
+				"exhaustiveDepsConstruction",
+			},
+		},
+		{
+			"function MyComponent(props) {\n          let handleNext = () => {\n            console.log('hello');\n          };\n          if (props.foo) {\n            handleNext = () => {\n              console.log('hello');\n            };\n          }\n          useEffect(() => {\n            return Store.subscribe(handleNext);\n          }, [handleNext]);\n        }",
+			[]string{"exhaustiveDepsConstruction"},
+		},
+		{
+			"function MyComponent(props) {\n          let [, setState] = useState();\n          let taint = props.foo;\n\n          function handleNext(value) {\n            let value2 = value * taint;\n            setState(value2);\n            console.log('hello');\n          }\n\n          useEffect(() => {\n            return Store.subscribe(handleNext);\n          }, [handleNext]);\n        }",
+			[]string{"exhaustiveDepsConstruction"},
+		},
+		{
+			"function Counter() {\n          let [count, setCount] = useState(0);\n\n          useEffect(() => {\n            let id = setInterval(() => {\n              setCount(count + 1);\n            }, 1000);\n            return () => clearInterval(id);\n          }, []);\n\n          return <h1>{count}</h1>;\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function Counter() {\n          let [count, setCount] = useState(0);\n          let [increment, setIncrement] = useState(0);\n\n          useEffect(() => {\n            let id = setInterval(() => {\n              setCount(count + increment);\n            }, 1000);\n            return () => clearInterval(id);\n          }, []);\n\n          return <h1>{count}</h1>;\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function Counter() {\n          let [count, setCount] = useState(0);\n          let [increment, setIncrement] = useState(0);\n\n          useEffect(() => {\n            let id = setInterval(() => {\n              setCount(count => count + increment);\n            }, 1000);\n            return () => clearInterval(id);\n          }, []);\n\n           return <h1>{count}</h1>;\n         }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function Counter() {\n          let [count, setCount] = useState(0);\n          let increment = useCustomHook();\n\n          useEffect(() => {\n            let id = setInterval(() => {\n              setCount(count => count + increment);\n            }, 1000);\n            return () => clearInterval(id);\n          }, []);\n\n          return <h1>{count}</h1>;\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function Counter({ step }) {\n          let [count, setCount] = useState(0);\n\n          function increment(x) {\n            return x + step;\n          }\n\n          useEffect(() => {\n            let id = setInterval(() => {\n              setCount(count => increment(count));\n            }, 1000);\n            return () => clearInterval(id);\n          }, []);\n\n          return <h1>{count}</h1>;\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function Counter({ step }) {\n          let [count, setCount] = useState(0);\n\n          function increment(x) {\n            return x + step;\n          }\n\n          useEffect(() => {\n            let id = setInterval(() => {\n              setCount(count => increment(count));\n            }, 1000);\n            return () => clearInterval(id);\n          }, [increment]);\n\n          return <h1>{count}</h1>;\n        }",
+			[]string{"exhaustiveDepsConstruction"},
+		},
+		{
+			"function Counter({ increment }) {\n          let [count, setCount] = useState(0);\n\n          useEffect(() => {\n            let id = setInterval(() => {\n              setCount(count => count + increment);\n            }, 1000);\n            return () => clearInterval(id);\n          }, []);\n\n          return <h1>{count}</h1>;\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function Counter() {\n          const [count, setCount] = useState(0);\n\n          function tick() {\n            setCount(count + 1);\n          }\n\n          useEffect(() => {\n            let id = setInterval(() => {\n              tick();\n            }, 1000);\n            return () => clearInterval(id);\n          }, []);\n\n          return <h1>{count}</h1>;\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function Podcasts() {\n          useEffect(() => {\n            alert(podcasts);\n          }, []);\n          let [podcasts, setPodcasts] = useState(null);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function Podcasts({ fetchPodcasts, id }) {\n          let [podcasts, setPodcasts] = useState(null);\n          useEffect(() => {\n            fetchPodcasts(id).then(setPodcasts);\n          }, [id]);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function Podcasts({ api: { fetchPodcasts }, id }) {\n          let [podcasts, setPodcasts] = useState(null);\n          useEffect(() => {\n            fetchPodcasts(id).then(setPodcasts);\n          }, [id]);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function Podcasts({ fetchPodcasts, fetchPodcasts2, id }) {\n          let [podcasts, setPodcasts] = useState(null);\n          useEffect(() => {\n            setTimeout(() => {\n              console.log(id);\n              fetchPodcasts(id).then(setPodcasts);\n              fetchPodcasts2(id).then(setPodcasts);\n            });\n          }, [id]);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function Podcasts({ fetchPodcasts, id }) {\n          let [podcasts, setPodcasts] = useState(null);\n          useEffect(() => {\n            console.log(fetchPodcasts);\n            fetchPodcasts(id).then(setPodcasts);\n          }, [id]);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function Podcasts({ fetchPodcasts, id }) {\n          let [podcasts, setPodcasts] = useState(null);\n          useEffect(() => {\n            console.log(fetchPodcasts);\n            fetchPodcasts?.(id).then(setPodcasts);\n          }, [id]);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function Hello() {\n          const [state, setState] = useState(0);\n          useEffect(() => {\n            setState({});\n          });\n        }",
+			[]string{"exhaustiveDepsSetStateNoDependencies"},
+		},
+		{
+			"function Hello() {\n          const [data, setData] = useState(0);\n          useEffect(() => {\n            fetchData.then(setData);\n          });\n        }",
+			[]string{"exhaustiveDepsSetStateNoDependencies"},
+		},
+		{
+			"function Hello({ country }) {\n          const [data, setData] = useState(0);\n          useEffect(() => {\n            fetchData(country).then(setData);\n          });\n        }",
+			[]string{"exhaustiveDepsSetStateNoDependencies"},
+		},
+		{
+			"function Hello({ prop1, prop2 }) {\n          const [state, setState] = useState(0);\n          useEffect(() => {\n            if (prop1) {\n              setState(prop2);\n            }\n          });\n        }",
+			[]string{"exhaustiveDepsSetStateNoDependencies"},
+		},
+		{
+			"function Thing() {\n          useEffect(async () => {}, []);\n        }",
+			[]string{"exhaustiveDepsAsyncEffect"},
+		},
 		{"function Thing() {\n          useEffect(async () => {});\n        }", []string{"exhaustiveDepsAsyncEffect"}},
-		{"function Example({ prop }) {\n          const foo = useCallback(() => {\n            prop.hello(foo);\n          }, [foo]);\n          const bar = useCallback(() => {\n            foo();\n          }, [foo]);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent() {\n          const local = {};\n          function myEffect() {\n            console.log(local);\n          }\n          useEffect(myEffect, []);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent() {\n          const local = {};\n          const myEffect = () => {\n            console.log(local);\n          };\n          useEffect(myEffect, []);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent() {\n          const local = {};\n          const myEffect = function() {\n            console.log(local);\n          };\n          useEffect(myEffect, []);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent() {\n          const local = {};\n          const myEffect = () => {\n            otherThing();\n          };\n          const otherThing = () => {\n            console.log(local);\n          };\n          useEffect(myEffect, []);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent() {\n          const local = {};\n          const myEffect = debounce(() => {\n            console.log(local);\n          }, delay);\n\n          useEffect(myEffect, []);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent() {\n          const local = {};\n          const myEffect = debounce(() => {\n            console.log(local);\n          }, delay);\n          useEffect(myEffect, [local]);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent({myEffect}) {\n          useEffect(myEffect, []);\n        }", []string{"exhaustiveDepsUnknownDependencies"}},
-		{"function MyComponent() {\n          const local = {};\n          useEffect(debounce(() => {\n            console.log(local);\n          }, delay), []);\n        }", []string{"exhaustiveDepsUnknownDependencies"}},
-		{"function MyComponent() {\n          const local = {};\n          useEffect(() => {\n            console.log(local);\n          }, []);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent(props) {\n          let foo = {}\n          useEffect(() => {\n            foo.bar.baz = 43;\n            props.foo.bar.baz = 1;\n          }, []);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function Component() {\n          const foo = {};\n          useMemo(() => foo, [foo]);\n        }", []string{"exhaustiveDepsConstruction"}},
-		{"function Component() {\n          const foo = [];\n          useMemo(() => foo, [foo]);\n        }", []string{"exhaustiveDepsConstruction"}},
-		{"function Component() {\n          const foo = () => {};\n          useMemo(() => foo, [foo]);\n        }", []string{"exhaustiveDepsConstruction"}},
-		{"function Component() {\n          const foo = function bar(){};\n          useMemo(() => foo, [foo]);\n        }", []string{"exhaustiveDepsConstruction"}},
-		{"function Component() {\n          const foo = class {};\n          useMemo(() => foo, [foo]);\n        }", []string{"exhaustiveDepsConstruction"}},
-		{"function Component() {\n          const foo = true ? {} : 'fine';\n          useMemo(() => foo, [foo]);\n        }", []string{"exhaustiveDepsConstruction"}},
-		{"function Component() {\n          const foo = bar || {};\n          useMemo(() => foo, [foo]);\n        }", []string{"exhaustiveDepsConstruction"}},
-		{"function Component() {\n          const foo = bar ?? {};\n          useMemo(() => foo, [foo]);\n        }", []string{"exhaustiveDepsConstruction"}},
-		{"function Component() {\n          const foo = bar && {};\n          useMemo(() => foo, [foo]);\n        }", []string{"exhaustiveDepsConstruction"}},
-		{"function Component() {\n          const foo = bar ? baz ? {} : null : null;\n          useMemo(() => foo, [foo]);\n        }", []string{"exhaustiveDepsConstruction"}},
-		{"function Component() {\n          let foo = {};\n          useMemo(() => foo, [foo]);\n        }", []string{"exhaustiveDepsConstruction"}},
-		{"function Component() {\n          var foo = {};\n          useMemo(() => foo, [foo]);\n        }", []string{"exhaustiveDepsConstruction"}},
-		{"function Component() {\n          const foo = {};\n          useCallback(() => {\n            console.log(foo);\n          }, [foo]);\n        }", []string{"exhaustiveDepsConstruction"}},
-		{"function Component() {\n          const foo = {};\n          useEffect(() => {\n            console.log(foo);\n          }, [foo]);\n        }", []string{"exhaustiveDepsConstruction"}},
-		{"function Component() {\n          const foo = {};\n          useLayoutEffect(() => {\n            console.log(foo);\n          }, [foo]);\n        }", []string{"exhaustiveDepsConstruction"}},
-		{"function Component() {\n          const foo = {};\n          useImperativeHandle(\n            ref,\n            () => {\n               console.log(foo);\n            },\n            [foo]\n          );\n        }", []string{"exhaustiveDepsConstruction"}},
-		{"function Foo(section) {\n          const foo = section.section_components?.edges ?? [];\n          useEffect(() => {\n            console.log(foo);\n          }, [foo]);\n        }", []string{"exhaustiveDepsConstruction"}},
-		{"function Foo(section) {\n          const foo = {};\n          console.log(foo);\n          useMemo(() => {\n            console.log(foo);\n          }, [foo]);\n        }", []string{"exhaustiveDepsConstruction"}},
-		{"function Foo() {\n          const foo = <>Hi!</>;\n          useMemo(() => {\n            console.log(foo);\n          }, [foo]);\n        }", []string{"exhaustiveDepsConstruction"}},
-		{"function Foo() {\n          const foo = <div>Hi!</div>;\n          useMemo(() => {\n            console.log(foo);\n          }, [foo]);\n        }", []string{"exhaustiveDepsConstruction"}},
-		{"function Foo() {\n          const foo = bar = {};\n          useMemo(() => {\n            console.log(foo);\n          }, [foo]);\n        }", []string{"exhaustiveDepsConstruction"}},
-		{"function Foo() {\n          const foo = new String('foo'); // Note 'foo' will be boxed, and thus an object and thus compared by reference.\n          useMemo(() => {\n            console.log(foo);\n          }, [foo]);\n        }", []string{"exhaustiveDepsConstruction"}},
-		{"function Foo() {\n          const foo = new Map([]);\n          useMemo(() => {\n            console.log(foo);\n          }, [foo]);\n        }", []string{"exhaustiveDepsConstruction"}},
-		{"function Foo() {\n          const foo = /reg/;\n          useMemo(() => {\n            console.log(foo);\n          }, [foo]);\n        }", []string{"exhaustiveDepsConstruction"}},
-		{"function Foo() {\n          class Bar {};\n          useMemo(() => {\n            console.log(new Bar());\n          }, [Bar]);\n        }", []string{"exhaustiveDepsConstruction"}},
-		{"function Foo() {\n          const foo = {};\n          useLayoutEffect(() => {\n            console.log(foo);\n          }, [foo]);\n          useEffect(() => {\n            console.log(foo);\n          }, [foo]);\n        }", []string{"exhaustiveDepsConstruction", "exhaustiveDepsConstruction"}},
-		{"import { useEffect } from 'react'\n\n        export const Test = () => {\n          const handleFrame = () => {\n            setTimeout(handleFrame)\n          }\n\n          useEffect(() => {\n            setTimeout(handleFrame)\n          }, [])\n\n          return (\n            <></>\n          )\n        }", []string{"exhaustiveDepsMissing"}},
-		{"import { useCallback, useEffect } from \"react\";\n\n        function Component({ foo }) {\n          const log = useCallback(() => {\n          console.log(foo);\n        }, [foo]);\n        useEffect(() => {\n          log();\n        }, []);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent({ theme }) {\n          const onStuff = useEffectEvent(() => {\n            showNotification(theme);\n          });\n          useEffect(() => {\n            onStuff();\n          }, [onStuff]);\n          React.useEffect(() => {\n            onStuff();\n          }, [onStuff]);\n        }", []string{"exhaustiveDepsEffectEvent", "exhaustiveDepsEffectEvent"}},
-		{"function MyComponent(props) {\n          if (props.ok) {\n            const callback = () => props.value;\n            useMemo(callback, []);\n          }\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent({ myRef }) {\n    useCallback(() => { console.log(myRef.current); }, [myRef.current]);\n    // React Hook useCallback has a missing dependency: 'myRef'. Either include it or remove the dependency array. Mutable values like 'myRef.current' aren't valid dependencies because mutating them doesn't re-render the component.\n}", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent2({ myRef }) {\n    useCallback(() => { console.log(myRef.current); }, []);\n    // React Hook useCallback has a missing dependency: 'myRef'. Either include it or remove the dependency array.\n}", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent({ obj, flag }) {\n          return useMemo(() => {\n            return (() => {\n              return flag ? obj.a : obj.b;\n            })();\n          }, []);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"import React from 'react';\n        export function useThing(context: { paramsLoader: () => void }) {\n          return React.useCallback(() => {\n            const { paramsLoader } = context;\n            paramsLoader();\n          }, [context.paramsLoader]);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent(props) {\n          useEffect(() => {\n            const { foo, bar } = props;\n            console.log(foo);\n            console.log(bar);\n          }, [props.foo, props.bar]);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent(props) {\n          useEffect(() => {\n            const { bar } = props.foo;\n            console.log(bar);\n          }, [props.foo.bar]);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent(props) {\n          useEffect(() => {\n            const { foo: { bar } } = props;\n            console.log(bar);\n          }, [props.foo]);\n        }", []string{"exhaustiveDepsMissing"}},
-		{"function MyComponent() {\n          const [, setState] = useState(0);\n          useCallback(() => setState(1), [setState.foo]);\n        }", []string{"exhaustiveDepsUnnecessary"}},
+		{
+			"function Example({ prop }) {\n          const foo = useCallback(() => {\n            prop.hello(foo);\n          }, [foo]);\n          const bar = useCallback(() => {\n            foo();\n          }, [foo]);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent() {\n          const local = {};\n          function myEffect() {\n            console.log(local);\n          }\n          useEffect(myEffect, []);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent() {\n          const local = {};\n          const myEffect = () => {\n            console.log(local);\n          };\n          useEffect(myEffect, []);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent() {\n          const local = {};\n          const myEffect = function() {\n            console.log(local);\n          };\n          useEffect(myEffect, []);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent() {\n          const local = {};\n          const myEffect = () => {\n            otherThing();\n          };\n          const otherThing = () => {\n            console.log(local);\n          };\n          useEffect(myEffect, []);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent() {\n          const local = {};\n          const myEffect = debounce(() => {\n            console.log(local);\n          }, delay);\n\n          useEffect(myEffect, []);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent() {\n          const local = {};\n          const myEffect = debounce(() => {\n            console.log(local);\n          }, delay);\n          useEffect(myEffect, [local]);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent({myEffect}) {\n          useEffect(myEffect, []);\n        }",
+			[]string{"exhaustiveDepsUnknownDependencies"},
+		},
+		{
+			"function MyComponent() {\n          const local = {};\n          useEffect(debounce(() => {\n            console.log(local);\n          }, delay), []);\n        }",
+			[]string{"exhaustiveDepsUnknownDependencies"},
+		},
+		{
+			"function MyComponent() {\n          const local = {};\n          useEffect(() => {\n            console.log(local);\n          }, []);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent(props) {\n          let foo = {}\n          useEffect(() => {\n            foo.bar.baz = 43;\n            props.foo.bar.baz = 1;\n          }, []);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function Component() {\n          const foo = {};\n          useMemo(() => foo, [foo]);\n        }",
+			[]string{"exhaustiveDepsConstruction"},
+		},
+		{
+			"function Component() {\n          const foo = [];\n          useMemo(() => foo, [foo]);\n        }",
+			[]string{"exhaustiveDepsConstruction"},
+		},
+		{
+			"function Component() {\n          const foo = () => {};\n          useMemo(() => foo, [foo]);\n        }",
+			[]string{"exhaustiveDepsConstruction"},
+		},
+		{
+			"function Component() {\n          const foo = function bar(){};\n          useMemo(() => foo, [foo]);\n        }",
+			[]string{"exhaustiveDepsConstruction"},
+		},
+		{
+			"function Component() {\n          const foo = class {};\n          useMemo(() => foo, [foo]);\n        }",
+			[]string{"exhaustiveDepsConstruction"},
+		},
+		{
+			"function Component() {\n          const foo = true ? {} : 'fine';\n          useMemo(() => foo, [foo]);\n        }",
+			[]string{"exhaustiveDepsConstruction"},
+		},
+		{
+			"function Component() {\n          const foo = bar || {};\n          useMemo(() => foo, [foo]);\n        }",
+			[]string{"exhaustiveDepsConstruction"},
+		},
+		{
+			"function Component() {\n          const foo = bar ?? {};\n          useMemo(() => foo, [foo]);\n        }",
+			[]string{"exhaustiveDepsConstruction"},
+		},
+		{
+			"function Component() {\n          const foo = bar && {};\n          useMemo(() => foo, [foo]);\n        }",
+			[]string{"exhaustiveDepsConstruction"},
+		},
+		{
+			"function Component() {\n          const foo = bar ? baz ? {} : null : null;\n          useMemo(() => foo, [foo]);\n        }",
+			[]string{"exhaustiveDepsConstruction"},
+		},
+		{
+			"function Component() {\n          let foo = {};\n          useMemo(() => foo, [foo]);\n        }",
+			[]string{"exhaustiveDepsConstruction"},
+		},
+		{
+			"function Component() {\n          var foo = {};\n          useMemo(() => foo, [foo]);\n        }",
+			[]string{"exhaustiveDepsConstruction"},
+		},
+		{
+			"function Component() {\n          const foo = {};\n          useCallback(() => {\n            console.log(foo);\n          }, [foo]);\n        }",
+			[]string{"exhaustiveDepsConstruction"},
+		},
+		{
+			"function Component() {\n          const foo = {};\n          useEffect(() => {\n            console.log(foo);\n          }, [foo]);\n        }",
+			[]string{"exhaustiveDepsConstruction"},
+		},
+		{
+			"function Component() {\n          const foo = {};\n          useLayoutEffect(() => {\n            console.log(foo);\n          }, [foo]);\n        }",
+			[]string{"exhaustiveDepsConstruction"},
+		},
+		{
+			"function Component() {\n          const foo = {};\n          useImperativeHandle(\n            ref,\n            () => {\n               console.log(foo);\n            },\n            [foo]\n          );\n        }",
+			[]string{"exhaustiveDepsConstruction"},
+		},
+		{
+			"function Foo(section) {\n          const foo = section.section_components?.edges ?? [];\n          useEffect(() => {\n            console.log(foo);\n          }, [foo]);\n        }",
+			[]string{"exhaustiveDepsConstruction"},
+		},
+		{
+			"function Foo(section) {\n          const foo = {};\n          console.log(foo);\n          useMemo(() => {\n            console.log(foo);\n          }, [foo]);\n        }",
+			[]string{"exhaustiveDepsConstruction"},
+		},
+		{
+			"function Foo() {\n          const foo = <>Hi!</>;\n          useMemo(() => {\n            console.log(foo);\n          }, [foo]);\n        }",
+			[]string{"exhaustiveDepsConstruction"},
+		},
+		{
+			"function Foo() {\n          const foo = <div>Hi!</div>;\n          useMemo(() => {\n            console.log(foo);\n          }, [foo]);\n        }",
+			[]string{"exhaustiveDepsConstruction"},
+		},
+		{
+			"function Foo() {\n          const foo = bar = {};\n          useMemo(() => {\n            console.log(foo);\n          }, [foo]);\n        }",
+			[]string{"exhaustiveDepsConstruction"},
+		},
+		{
+			"function Foo() {\n          const foo = new String('foo'); // Note 'foo' will be boxed, and thus an object and thus compared by reference.\n          useMemo(() => {\n            console.log(foo);\n          }, [foo]);\n        }",
+			[]string{"exhaustiveDepsConstruction"},
+		},
+		{
+			"function Foo() {\n          const foo = new Map([]);\n          useMemo(() => {\n            console.log(foo);\n          }, [foo]);\n        }",
+			[]string{"exhaustiveDepsConstruction"},
+		},
+		{
+			"function Foo() {\n          const foo = /reg/;\n          useMemo(() => {\n            console.log(foo);\n          }, [foo]);\n        }",
+			[]string{"exhaustiveDepsConstruction"},
+		},
+		{
+			"function Foo() {\n          class Bar {};\n          useMemo(() => {\n            console.log(new Bar());\n          }, [Bar]);\n        }",
+			[]string{"exhaustiveDepsConstruction"},
+		},
+		{
+			"function Foo() {\n          const foo = {};\n          useLayoutEffect(() => {\n            console.log(foo);\n          }, [foo]);\n          useEffect(() => {\n            console.log(foo);\n          }, [foo]);\n        }",
+			[]string{"exhaustiveDepsConstruction", "exhaustiveDepsConstruction"},
+		},
+		{
+			"import { useEffect } from 'react'\n\n        export const Test = () => {\n          const handleFrame = () => {\n            setTimeout(handleFrame)\n          }\n\n          useEffect(() => {\n            setTimeout(handleFrame)\n          }, [])\n\n          return (\n            <></>\n          )\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"import { useCallback, useEffect } from \"react\";\n\n        function Component({ foo }) {\n          const log = useCallback(() => {\n          console.log(foo);\n        }, [foo]);\n        useEffect(() => {\n          log();\n        }, []);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent({ theme }) {\n          const onStuff = useEffectEvent(() => {\n            showNotification(theme);\n          });\n          useEffect(() => {\n            onStuff();\n          }, [onStuff]);\n          React.useEffect(() => {\n            onStuff();\n          }, [onStuff]);\n        }",
+			[]string{"exhaustiveDepsEffectEvent", "exhaustiveDepsEffectEvent"},
+		},
+		{
+			"function MyComponent(props) {\n          if (props.ok) {\n            const callback = () => props.value;\n            useMemo(callback, []);\n          }\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent({ myRef }) {\n    useCallback(() => { console.log(myRef.current); }, [myRef.current]);\n    // React Hook useCallback has a missing dependency: 'myRef'. Either include it or remove the dependency array. Mutable values like 'myRef.current' aren't valid dependencies because mutating them doesn't re-render the component.\n}",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent2({ myRef }) {\n    useCallback(() => { console.log(myRef.current); }, []);\n    // React Hook useCallback has a missing dependency: 'myRef'. Either include it or remove the dependency array.\n}",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent({ obj, flag }) {\n          return useMemo(() => {\n            return (() => {\n              return flag ? obj.a : obj.b;\n            })();\n          }, []);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"import React from 'react';\n        export function useThing(context: { paramsLoader: () => void }) {\n          return React.useCallback(() => {\n            const { paramsLoader } = context;\n            paramsLoader();\n          }, [context.paramsLoader]);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent(props) {\n          useEffect(() => {\n            const { foo, bar } = props;\n            console.log(foo);\n            console.log(bar);\n          }, [props.foo, props.bar]);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent(props) {\n          useEffect(() => {\n            const { bar } = props.foo;\n            console.log(bar);\n          }, [props.foo.bar]);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent(props) {\n          useEffect(() => {\n            const { foo: { bar } } = props;\n            console.log(bar);\n          }, [props.foo]);\n        }",
+			[]string{"exhaustiveDepsMissing"},
+		},
+		{
+			"function MyComponent() {\n          const [, setState] = useState(0);\n          useCallback(() => setState(1), [setState.foo]);\n        }",
+			[]string{"exhaustiveDepsUnnecessary"},
+		},
 	}
 
 	for index, testCase := range cases {
@@ -417,22 +970,38 @@ func TestExhaustiveDepsScopeIsStated(test *testing.T) {
 		sourceText string
 		reason     string
 	}{
-		{"function MyComponent(props) {\n          let value;\n          let value2;\n          let value3;\n          let value4;\n          let asyncValue;\n          useEffect(() => {\n            if (value4) {\n              value = {};\n            }\n            value2 = 100;\n            value = 43;\n            value4 = true;\n            console.log(value2);\n            console.log(value3);\n            setTimeout(() => {\n              asyncValue = 100;\n            });\n          }, []);\n        }",
-			"asserts only unported kinds"},
-		{"function MyComponent(props) {\n          let value;\n          let value2;\n          let value3;\n          let asyncValue;\n          useEffect(() => {\n            value = {};\n            value2 = 100;\n            value = 43;\n            console.log(value2);\n            console.log(value3);\n            setTimeout(() => {\n              asyncValue = 100;\n            });\n          }, [value, value2, value3]);\n        }",
-			"asserts only unported kinds"},
-		{"function MyComponent() {\n          const myRef = useRef();\n          useEffect(() => {\n            const handleMove = () => {};\n            myRef.current.addEventListener('mousemove', handleMove);\n            return () => myRef.current.removeEventListener('mousemove', handleMove);\n          }, []);\n          return <div ref={myRef} />;\n        }",
-			"asserts only unported kinds"},
-		{"function MyComponent() {\n          const myRef = useRef();\n          useEffect(() => {\n            const handleMove = () => {};\n            myRef?.current?.addEventListener('mousemove', handleMove);\n            return () => myRef?.current?.removeEventListener('mousemove', handleMove);\n          }, []);\n          return <div ref={myRef} />;\n        }",
-			"asserts only unported kinds"},
-		{"function MyComponent() {\n          const myRef = useRef();\n          useEffect(() => {\n            const handleMove = () => {};\n            myRef.current.addEventListener('mousemove', handleMove);\n            return () => myRef.current.removeEventListener('mousemove', handleMove);\n          });\n          return <div ref={myRef} />;\n        }",
-			"asserts only unported kinds"},
-		{"function useMyThing(myRef) {\n          useEffect(() => {\n            const handleMove = () => {};\n            myRef.current.addEventListener('mousemove', handleMove);\n            return () => myRef.current.removeEventListener('mousemove', handleMove);\n          }, [myRef]);\n        }",
-			"asserts only unported kinds"},
-		{"function useMyThing(myRef) {\n          useEffect(() => {\n            const handleMouse = () => {};\n            myRef.current.addEventListener('mousemove', handleMouse);\n            myRef.current.addEventListener('mousein', handleMouse);\n            return function() {\n              setTimeout(() => {\n                myRef.current.removeEventListener('mousemove', handleMouse);\n                myRef.current.removeEventListener('mousein', handleMouse);\n              });\n            }\n          }, [myRef]);\n        }",
-			"asserts only unported kinds"},
-		{"function useMyThing(myRef, active) {\n          useEffect(() => {\n            const handleMove = () => {};\n            if (active) {\n              myRef.current.addEventListener('mousemove', handleMove);\n              return function() {\n                setTimeout(() => {\n                  myRef.current.removeEventListener('mousemove', handleMove);\n                });\n              }\n            }\n          }, [myRef, active]);\n        }",
-			"asserts only unported kinds"},
+		{
+			"function MyComponent(props) {\n          let value;\n          let value2;\n          let value3;\n          let value4;\n          let asyncValue;\n          useEffect(() => {\n            if (value4) {\n              value = {};\n            }\n            value2 = 100;\n            value = 43;\n            value4 = true;\n            console.log(value2);\n            console.log(value3);\n            setTimeout(() => {\n              asyncValue = 100;\n            });\n          }, []);\n        }",
+			"asserts only unported kinds",
+		},
+		{
+			"function MyComponent(props) {\n          let value;\n          let value2;\n          let value3;\n          let asyncValue;\n          useEffect(() => {\n            value = {};\n            value2 = 100;\n            value = 43;\n            console.log(value2);\n            console.log(value3);\n            setTimeout(() => {\n              asyncValue = 100;\n            });\n          }, [value, value2, value3]);\n        }",
+			"asserts only unported kinds",
+		},
+		{
+			"function MyComponent() {\n          const myRef = useRef();\n          useEffect(() => {\n            const handleMove = () => {};\n            myRef.current.addEventListener('mousemove', handleMove);\n            return () => myRef.current.removeEventListener('mousemove', handleMove);\n          }, []);\n          return <div ref={myRef} />;\n        }",
+			"asserts only unported kinds",
+		},
+		{
+			"function MyComponent() {\n          const myRef = useRef();\n          useEffect(() => {\n            const handleMove = () => {};\n            myRef?.current?.addEventListener('mousemove', handleMove);\n            return () => myRef?.current?.removeEventListener('mousemove', handleMove);\n          }, []);\n          return <div ref={myRef} />;\n        }",
+			"asserts only unported kinds",
+		},
+		{
+			"function MyComponent() {\n          const myRef = useRef();\n          useEffect(() => {\n            const handleMove = () => {};\n            myRef.current.addEventListener('mousemove', handleMove);\n            return () => myRef.current.removeEventListener('mousemove', handleMove);\n          });\n          return <div ref={myRef} />;\n        }",
+			"asserts only unported kinds",
+		},
+		{
+			"function useMyThing(myRef) {\n          useEffect(() => {\n            const handleMove = () => {};\n            myRef.current.addEventListener('mousemove', handleMove);\n            return () => myRef.current.removeEventListener('mousemove', handleMove);\n          }, [myRef]);\n        }",
+			"asserts only unported kinds",
+		},
+		{
+			"function useMyThing(myRef) {\n          useEffect(() => {\n            const handleMouse = () => {};\n            myRef.current.addEventListener('mousemove', handleMouse);\n            myRef.current.addEventListener('mousein', handleMouse);\n            return function() {\n              setTimeout(() => {\n                myRef.current.removeEventListener('mousemove', handleMouse);\n                myRef.current.removeEventListener('mousein', handleMouse);\n              });\n            }\n          }, [myRef]);\n        }",
+			"asserts only unported kinds",
+		},
+		{
+			"function useMyThing(myRef, active) {\n          useEffect(() => {\n            const handleMove = () => {};\n            if (active) {\n              myRef.current.addEventListener('mousemove', handleMove);\n              return function() {\n                setTimeout(() => {\n                  myRef.current.removeEventListener('mousemove', handleMove);\n                });\n              }\n            }\n          }, [myRef, active]);\n        }",
+			"asserts only unported kinds",
+		},
 	}
 
 	for index, testCase := range cases {
@@ -492,7 +1061,12 @@ func TestExhaustiveDepsRequiresTheTypedHarness(test *testing.T) {
 		test.Fatalf("the untyped harness produced %d findings, so this test is not measuring what it claims",
 			len(findings.Diagnostics))
 	}
-	if findings := rule_testing.RunTyped(test, ExhaustiveDeps, exhaustiveDepsFile, source); len(findings.Diagnostics) != 1 {
+	if findings := rule_testing.RunTyped(
+		test,
+		ExhaustiveDeps,
+		exhaustiveDepsFile,
+		source,
+	); len(findings.Diagnostics) != 1 {
 		test.Fatalf("the typed harness produced %d findings, want 1", len(findings.Diagnostics))
 	}
 }
@@ -673,7 +1247,10 @@ func TestExhaustiveDepsProposesNoAutomaticFix(test *testing.T) {
 		test.Fatalf("want one finding, got %d", len(result.Diagnostics))
 	}
 	if fixes := len(result.Diagnostics[0].Fixes); fixes != 0 {
-		test.Errorf("this rule proposes %d automatic fixes and must propose none: a wrong dependency array applied unattended is an infinite render loop", fixes)
+		test.Errorf(
+			"this rule proposes %d automatic fixes and must propose none: a wrong dependency array applied unattended is an infinite render loop",
+			fixes,
+		)
 	}
 	if suggestions := len(result.Diagnostics[0].Suggestions); suggestions != 1 {
 		test.Errorf("the corrected array must still be offered as a suggestion, got %d", suggestions)

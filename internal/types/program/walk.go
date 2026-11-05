@@ -223,7 +223,10 @@ type RuleNotes map[string]map[string]int
 // checker that owns it and there is no use in more workers than there are checkers.
 func (graph *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.Rule) (Result, error) {
 	if len(files) == 0 {
-		return Result{}, fmt.Errorf("nothing to walk: the file set is empty (the program holds %d files)", len(graph.Program.GetSourceFiles()))
+		return Result{}, fmt.Errorf(
+			"nothing to walk: the file set is empty (the program holds %d files)",
+			len(graph.Program.GetSourceFiles()),
+		)
 	}
 	if len(rules) == 0 {
 		return Result{}, fmt.Errorf("nothing to run: no rules were given for %d files", len(files))
@@ -363,7 +366,13 @@ func (graph *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []r
 
 				// Configuration is consulted before a checker is acquired, because an ignored file
 				// should cost nothing at all rather than cost a checker and then be discarded.
-				selection, resolution := graph.rulesFor(sourceFile.FileName().AsString(), rules, localSelections, localScopedOff, localUnconfigured)
+				selection, resolution := graph.rulesFor(
+					sourceFile.FileName().AsString(),
+					rules,
+					localSelections,
+					localScopedOff,
+					localUnconfigured,
+				)
 				if resolution.Ignored {
 					localIgnored++
 					return
@@ -414,13 +423,26 @@ func (graph *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []r
 						design:           classes.design,
 						derived:          classes.derived,
 					}
-					keys.derivedFingerprint = derivedKey(classes, graph.programFingerprints(selection, programFingerprints), keys.typeFingerprint)
-					if entry, found := reuse.lookup(sourceFile.FileName().AsString(), keys, sourceFile.Text()); found.pure {
+					keys.derivedFingerprint = derivedKey(
+						classes,
+						graph.programFingerprints(selection, programFingerprints),
+						keys.typeFingerprint,
+					)
+					if entry, found := reuse.lookup(
+						sourceFile.FileName().AsString(),
+						keys,
+						sourceFile.Text(),
+					); found.pure {
 						replayed = &entry
 						hits = found
 						replays = make(map[string]bool, len(selection.applicable))
-						for _, names := range [][]string{keys.pure, classIf(hits.typed, keys.typed), classIf(hits.shaped, keys.shaped),
-							classIf(hits.design, keys.design), classIf(hits.derived, keys.derived)} {
+						for _, names := range [][]string{
+							keys.pure,
+							classIf(hits.typed, keys.typed),
+							classIf(hits.shaped, keys.shaped),
+							classIf(hits.design, keys.design),
+							classIf(hits.derived, keys.derived),
+						} {
 							for _, name := range names {
 								replays[name] = true
 							}
@@ -447,7 +469,15 @@ func (graph *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []r
 						if !hits.derived && len(keys.derived) > 0 {
 							localDerivedRerun++
 						}
-						replayedNotes = replayEntry(entry, hits, sourceFile, &localDiagnostics, localReporting, localOffered, localListening)
+						replayedNotes = replayEntry(
+							entry,
+							hits,
+							sourceFile,
+							&localDiagnostics,
+							localReporting,
+							localOffered,
+							localListening,
+						)
 						if graph.Readiness != nil {
 							replayedRecord = replayedAdamic(entry, hits)
 						}
@@ -516,7 +546,8 @@ func (graph *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []r
 				// A file being recorded counts its listening and offered rules into maps of its own, so
 				// the entry can say which cacheable rules listened on this file; they are merged into the
 				// worker's totals at once, before the crash check, exactly as passing the totals in did.
-				recording := reuse != nil && (replayed == nil || !hits.typed || !hits.shaped || !hits.design || !hits.derived)
+				recording := reuse != nil &&
+					(replayed == nil || !hits.typed || !hits.shaped || !hits.design || !hits.derived)
 				listeningTarget, offeredTarget := localListening, localOffered
 				var fileListening map[string]int
 				var fileOffered map[string]int
@@ -527,11 +558,23 @@ func (graph *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []r
 				}
 				diagnosticsBefore := len(localDiagnostics)
 				if replayed != nil {
-					dispatcher.replayed = &directiveReplay{withheld: withheldBy(replayed.Withheld, replays), rules: selection.applicable}
+					dispatcher.replayed = &directiveReplay{
+						withheld: withheldBy(replayed.Withheld, replays),
+						rules:    selection.applicable,
+					}
 				}
-				visited, silenced, fileNotes, ruleCrashes, fileAdamic, crashed := dispatcher.dispatchFileSafely(sourceFile, report,
-					walkRules, walkSlots, fileChecker, listeningTarget, offeredTarget, selection.options, selection.measureOnly,
-					resolution)
+				visited, silenced, fileNotes, ruleCrashes, fileAdamic, crashed := dispatcher.dispatchFileSafely(
+					sourceFile,
+					report,
+					walkRules,
+					walkSlots,
+					fileChecker,
+					listeningTarget,
+					offeredTarget,
+					selection.options,
+					selection.measureOnly,
+					resolution,
+				)
 
 				release()
 
@@ -555,7 +598,10 @@ func (graph *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []r
 					// Named rather than counted, and never swallowed. A file the linter could not
 					// process is not a file with nothing to report, and the whole coverage line exists
 					// to keep those two apart.
-					localCrashes = append(localCrashes, FileCrash{FileName: sourceFile.FileName().AsString(), Cause: crashed})
+					localCrashes = append(
+						localCrashes,
+						FileCrash{FileName: sourceFile.FileName().AsString(), Cause: crashed},
+					)
 					return
 				}
 
@@ -591,14 +637,30 @@ func (graph *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []r
 				}
 
 				if recording && replayed == nil {
-					if entry, eligible := recordableEntry(sourceFile, keys,
-						localDiagnostics[diagnosticsBefore:], fileListening, fileNotes, walkedRecord, visited, silenced); eligible {
+					if entry, eligible := recordableEntry(
+						sourceFile,
+						keys,
+						localDiagnostics[diagnosticsBefore:],
+						fileListening,
+						fileNotes,
+						walkedRecord,
+						visited,
+						silenced,
+					); eligible {
 						reuse.keep(entry)
 					}
 				}
 				if recording && replayed != nil {
-					if entry, eligible := refreshClasses(*replayed, keys, hits,
-						localDiagnostics[diagnosticsBefore:], fileListening, fileNotes, walkedRecord, silenced); eligible {
+					if entry, eligible := refreshClasses(
+						*replayed,
+						keys,
+						hits,
+						localDiagnostics[diagnosticsBefore:],
+						fileListening,
+						fileNotes,
+						walkedRecord,
+						silenced,
+					); eligible {
 						reuse.keep(entry)
 					}
 				}
@@ -909,12 +971,20 @@ type ruleContainment struct {
 // recover answers only in a function called by the deferral itself.
 func (containment *ruleContainment) recoverPanic() {
 	if recovered := recover(); recovered != nil && containment.crash == nil {
-		containment.crash = &RuleCrash{RuleName: containment.ruleName, FileName: containment.fileName, Cause: fmt.Errorf("%v", recovered)}
+		containment.crash = &RuleCrash{
+			RuleName: containment.ruleName,
+			FileName: containment.fileName,
+			Cause:    fmt.Errorf("%v", recovered),
+		}
 	}
 }
 
 // run calls the rule's Run inside the boundary.
-func (containment *ruleContainment) run(subject rule.Rule, context rule.Context, options any) (listeners rule.Listeners) {
+func (containment *ruleContainment) run(
+	subject rule.Rule,
+	context rule.Context,
+	options any,
+) (listeners rule.Listeners) {
 	defer containment.recoverPanic()
 	return subject.Run(context, options)
 }
@@ -1074,8 +1144,14 @@ func (dispatcher *fileDispatcher) slotFor(ruleName string) *ruleSlot {
 			return
 		}
 
-		if directive := dispatcher.directives.SuppressedBy(diagnostic.RuleName, diagnostic.Range.Pos()); directive >= 0 {
-			dispatcher.withheld = append(dispatcher.withheld, LintCacheWithheld{RuleName: diagnostic.RuleName, Directive: int32(directive)})
+		if directive := dispatcher.directives.SuppressedBy(
+			diagnostic.RuleName,
+			diagnostic.Range.Pos(),
+		); directive >= 0 {
+			dispatcher.withheld = append(
+				dispatcher.withheld,
+				LintCacheWithheld{RuleName: diagnostic.RuleName, Directive: int32(directive)},
+			)
 			return
 		}
 
@@ -1147,7 +1223,14 @@ func (dispatcher *fileDispatcher) dispatchFileSafely(
 	ruleOptions map[string]any,
 	measureOnly map[string]bool,
 	resolution configuration.Resolved,
-) (visited int, silenced suppressionTally, notes RuleNotes, ruleCrashes []RuleCrash, readiness *fileReadiness, crashed error) {
+) (
+	visited int,
+	silenced suppressionTally,
+	notes RuleNotes,
+	ruleCrashes []RuleCrash,
+	readiness *fileReadiness,
+	crashed error,
+) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			// The visited count is discarded along with the file. A file that crashed halfway
@@ -1161,8 +1244,18 @@ func (dispatcher *fileDispatcher) dispatchFileSafely(
 		}
 	}()
 
-	visited, silenced, notes, ruleCrashes, readiness = dispatcher.dispatchFile(sourceFile, report, rules, slots, fileChecker,
-		listeningCounts, offeredCounts, ruleOptions, measureOnly, resolution)
+	visited, silenced, notes, ruleCrashes, readiness = dispatcher.dispatchFile(
+		sourceFile,
+		report,
+		rules,
+		slots,
+		fileChecker,
+		listeningCounts,
+		offeredCounts,
+		ruleOptions,
+		measureOnly,
+		resolution,
+	)
 	return visited, silenced, notes, ruleCrashes, readiness, nil
 }
 
@@ -1282,7 +1375,10 @@ func (dispatcher *fileDispatcher) dispatchFile(
 			if len(dispatcher.listeners[kind]) == 0 {
 				dispatcher.used = append(dispatcher.used, kind)
 			}
-			dispatcher.listeners[kind] = append(dispatcher.listeners[kind], listenerCall{listener: listener, slot: slot})
+			dispatcher.listeners[kind] = append(
+				dispatcher.listeners[kind],
+				listenerCall{listener: listener, slot: slot},
+			)
 			listened = true
 		}
 	}
@@ -1471,7 +1567,12 @@ func pluginOf(name string) string {
 // The reasonless count is per withheld finding rather than per directive, because that is the
 // number that answers the question being asked: how much of what cohere chose not to tell you was
 // silenced by someone who did not say why.
-func tally(fileName string, directives *suppression.Index, ranRule map[string]bool, resolution configuration.Resolved) suppressionTally {
+func tally(
+	fileName string,
+	directives *suppression.Index,
+	ranRule map[string]bool,
+	resolution configuration.Resolved,
+) suppressionTally {
 	counted := suppressionTally{}
 	for index, directive := range directives.Directives() {
 		applied := directives.AppliedCount(index)
@@ -1481,7 +1582,10 @@ func tally(fileName string, directives *suppression.Index, ranRule map[string]bo
 				counted.unusedForUnrunRule++
 				continue
 			}
-			counted.dead = append(counted.dead, DeadSuppression{File: fileName, Line: directive.Line, Rules: directive.Rules})
+			counted.dead = append(
+				counted.dead,
+				DeadSuppression{File: fileName, Line: directive.Line, Rules: directive.Rules},
+			)
 			continue
 		}
 		counted.applied += applied
@@ -1641,8 +1745,14 @@ func (selection *ruleSelection) classNames() *ruleClassNames {
 	if selection.classes == nil {
 		pure, typeAware, design, derived, _ := CacheClasses(selection.applicable)
 		shaped, typed := ShapeClasses(typeAware)
-		selection.classes = &ruleClassNames{pure: ruleNames(pure), typed: ruleNames(typed), shaped: ruleNames(shaped), design: ruleNames(design),
-			derived: ruleNames(derived), derivedRules: derived}
+		selection.classes = &ruleClassNames{
+			pure:         ruleNames(pure),
+			typed:        ruleNames(typed),
+			shaped:       ruleNames(shaped),
+			design:       ruleNames(design),
+			derived:      ruleNames(derived),
+			derivedRules: derived,
+		}
 		for _, subject := range derived {
 			if subject.NeedsTypeChecker || subject.ProgramReads&rule.ReadsModuleResolution != 0 {
 				selection.classes.derivedReadsTypes = true
@@ -1654,7 +1764,11 @@ func (selection *ruleSelection) classNames() *ruleClassNames {
 
 // selectRules makes the selection for one resolution.
 func (graph *Graph) selectRules(rules []rule.Rule, resolution configuration.Resolved) *ruleSelection {
-	selection := &ruleSelection{applicable: make([]rule.Rule, 0, len(rules)), options: map[string]any{}, optionsKeys: map[string]string{}}
+	selection := &ruleSelection{
+		applicable:  make([]rule.Rule, 0, len(rules)),
+		options:     map[string]any{},
+		optionsKeys: map[string]string{},
+	}
 	for _, subject := range rules {
 		status, _ := resolution.StatusOf(subject.Name)
 		if graph.Readiness.Measures(subject.Name) {
@@ -1734,7 +1848,12 @@ func optionsKey(elements []json.RawMessage) string {
 //
 // A walk with no rule that reads a checker strides instead: asking which checker owns a file creates every
 // checker, which such a walk never needs.
-func (graph *Graph) assignFilesToWorkers(ctx context.Context, files []*ast.SourceFile, workers int, needsCheckers bool) [][]int {
+func (graph *Graph) assignFilesToWorkers(
+	ctx context.Context,
+	files []*ast.SourceFile,
+	workers int,
+	needsCheckers bool,
+) [][]int {
 	assignments := make([][]int, workers)
 	if !needsCheckers {
 		for index := range files {
@@ -1835,14 +1954,22 @@ func foreignQueue(queues []*walkQueue, homeFiles []*ast.SourceFile, worker int) 
 // which keys no file the selection serves: the rule's findings there neither replay nor record this run.
 //
 // Mutates: selection keeps the fingerprints gathered here, so its later files reuse them
-func (graph *Graph) programFingerprints(selection *ruleSelection, memo *programFingerprintMemo) map[string][sha256.Size]byte {
+func (graph *Graph) programFingerprints(
+	selection *ruleSelection,
+	memo *programFingerprintMemo,
+) map[string][sha256.Size]byte {
 	if selection.programFingerprints != nil {
 		return selection.programFingerprints
 	}
 	derived := selection.classNames().derivedRules
 	fingerprints := make(map[string][sha256.Size]byte, len(derived))
 	for _, subject := range derived {
-		if fingerprint, usable := memo.fingerprint(graph, subject, selection.options[subject.Name], selection.optionsKeys[subject.Name]); usable {
+		if fingerprint, usable := memo.fingerprint(
+			graph,
+			subject,
+			selection.options[subject.Name],
+			selection.optionsKeys[subject.Name],
+		); usable {
 			fingerprints[subject.Name] = fingerprint
 		}
 	}
@@ -1876,7 +2003,12 @@ type programFingerprintEntry struct {
 // fingerprint is subject's program fingerprint under options, computed once for the walk through a Program
 // viewed under the rule's own reads. optionsKey names the options; see ruleSelection.optionsKeys. The second
 // return is false when the fingerprint panicked, every time it is asked.
-func (memo *programFingerprintMemo) fingerprint(g *Graph, subject rule.Rule, options any, optionsKey string) ([sha256.Size]byte, bool) {
+func (memo *programFingerprintMemo) fingerprint(
+	g *Graph,
+	subject rule.Rule,
+	options any,
+	optionsKey string,
+) ([sha256.Size]byte, bool) {
 	key := programFingerprintKey{rule: subject.Name, options: optionsKey}
 	memo.mutex.Lock()
 	entry, found := memo.entries[key]
@@ -1901,7 +2033,11 @@ func (memo *programFingerprintMemo) fingerprint(g *Graph, subject rule.Rule, opt
 // derivedKey is a file's key for its derived rules: each one's name and program fingerprint, in the order they
 // apply, and the file's type fingerprint when any of them reads types. Zero when a derived rule has no
 // fingerprint this run, which no lookup matches, and when no derived rule applies.
-func derivedKey(classes *ruleClassNames, programFingerprints map[string][sha256.Size]byte, typeFingerprint [sha256.Size]byte) [sha256.Size]byte {
+func derivedKey(
+	classes *ruleClassNames,
+	programFingerprints map[string][sha256.Size]byte,
+	typeFingerprint [sha256.Size]byte,
+) [sha256.Size]byte {
 	if len(classes.derived) == 0 {
 		return [sha256.Size]byte{}
 	}

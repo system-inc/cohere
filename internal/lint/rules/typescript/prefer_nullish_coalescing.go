@@ -143,7 +143,9 @@ func DecodePreferNullishCoalescingOptions(raw []byte) (any, error) {
 		options.ReactCompiler = *wire.ReactCompiler
 	}
 
-	primitives, decodePreferNullishCoalescingPrimitivesError := decodePreferNullishCoalescingPrimitives(wire.IgnorePrimitives)
+	primitives, decodePreferNullishCoalescingPrimitivesError := decodePreferNullishCoalescingPrimitives(
+		wire.IgnorePrimitives,
+	)
 	if decodePreferNullishCoalescingPrimitivesError != nil {
 		return options, decodePreferNullishCoalescingPrimitivesError
 	}

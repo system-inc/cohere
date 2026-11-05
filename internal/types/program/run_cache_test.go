@@ -67,7 +67,16 @@ func writeFile(test *testing.T, path string, contents string) {
 // record captures the tree as a run that printed one finding and exited 1.
 func (tree *runCacheTree) record(test *testing.T) *program.RunCache {
 	test.Helper()
-	cache, recordRunCacheError := program.RecordRunCache(tree.key, tree.files, nil, tree.absent, nil, []byte("a.ts:1 finding\n"), 1, time.Time{})
+	cache, recordRunCacheError := program.RecordRunCache(
+		tree.key,
+		tree.files,
+		nil,
+		tree.absent,
+		nil,
+		[]byte("a.ts:1 finding\n"),
+		1,
+		time.Time{},
+	)
 	if recordRunCacheError != nil {
 		test.Fatalf("record: %v", recordRunCacheError)
 	}
@@ -200,10 +209,25 @@ func TestRunCacheKeySeparatesRuns(test *testing.T) {
 	}
 
 	for name, other := range map[string]func() (string, error){
-		"different flags":             func() (string, error) { return program.RunCacheKey([]string{"--types"}, root) },
-		"an extra flag":               func() (string, error) { return program.RunCacheKey([]string{"--lint", "--fix"}, root) },
-		"a different directory":       func() (string, error) { return program.RunCacheKey([]string{"--lint"}, test.TempDir()) },
-		"arguments split differently": func() (string, error) { return program.RunCacheKey([]string{"--li", "nt"}, root) },
+		"different flags": func() (string, error) { return program.RunCacheKey([]string{"--types"}, root) },
+		"an extra flag": func() (
+			string,
+			error,
+		) {
+			return program.RunCacheKey([]string{"--lint", "--fix"}, root)
+		},
+		"a different directory": func() (
+			string,
+			error,
+		) {
+			return program.RunCacheKey([]string{"--lint"}, test.TempDir())
+		},
+		"arguments split differently": func() (
+			string,
+			error,
+		) {
+			return program.RunCacheKey([]string{"--li", "nt"}, root)
+		},
 	} {
 		key, err := other()
 		if err != nil {
@@ -300,7 +324,13 @@ func TestRunCacheReplaysOutputAndExitCodeThroughDisk(test *testing.T) {
 	table := program.NewCacheTable()
 	table.Runs["--no-fix"] = tree.record(test)
 	sections := program.CacheTableSections{Runs: []string{"--no-fix"}}
-	if writeCacheTableError := program.WriteCacheTable(directory, table, testIdentity, sections, program.PathAnchor{}); writeCacheTableError != nil {
+	if writeCacheTableError := program.WriteCacheTable(
+		directory,
+		table,
+		testIdentity,
+		sections,
+		program.PathAnchor{},
+	); writeCacheTableError != nil {
 		test.Fatalf("write: %v", writeCacheTableError)
 	}
 	read, readCacheTableError := program.ReadCacheTable(directory, testIdentity, sections, program.PathAnchor{})
@@ -338,7 +368,16 @@ func TestRunCacheRecordsADirectoryAmongTheFilesAsADirectory(test *testing.T) {
 	test.Parallel()
 	tree := newRunCacheTree(test)
 	withDirectory := append(append([]string(nil), tree.files...), tree.subdir, tree.root)
-	cache, recordRunCacheError := program.RecordRunCache(tree.key, withDirectory, nil, tree.absent, nil, []byte("x"), 0, time.Time{})
+	cache, recordRunCacheError := program.RecordRunCache(
+		tree.key,
+		withDirectory,
+		nil,
+		tree.absent,
+		nil,
+		[]byte("x"),
+		0,
+		time.Time{},
+	)
 	if recordRunCacheError != nil {
 		test.Fatalf("record: %v", recordRunCacheError)
 	}
@@ -396,7 +435,11 @@ func TestRunCacheRecordsInParallelInTheSerialOrder(test *testing.T) {
 			if createDirectoryError := os.MkdirAll(filepath.Dir(path), 0o755); createDirectoryError != nil {
 				test.Fatal(createDirectoryError)
 			}
-			if writeError := os.WriteFile(path, []byte(strings.Repeat("x", directory*60+file)), 0o644); writeError != nil {
+			if writeError := os.WriteFile(
+				path,
+				[]byte(strings.Repeat("x", directory*60+file)),
+				0o644,
+			); writeError != nil {
 				test.Fatal(writeError)
 			}
 			files = append(files, path)
@@ -434,7 +477,10 @@ func TestRunCacheRecordsInParallelInTheSerialOrder(test *testing.T) {
 			if input.Exists {
 				test.Errorf("%s is recorded present", input.Path)
 			}
-		case statError != nil || !input.Exists || input.Size != information.Size() || input.Directory != information.IsDir() ||
+		case statError != nil ||
+			!input.Exists ||
+			input.Size != information.Size() ||
+			input.Directory != information.IsDir() ||
 			input.ModifiedNanoseconds != information.ModTime().UnixNano():
 			test.Errorf("%s is recorded with another file's signature: %+v", input.Path, input)
 		}
@@ -443,7 +489,16 @@ func TestRunCacheRecordsInParallelInTheSerialOrder(test *testing.T) {
 	if removeError := os.Remove(files[len(files)/2]); removeError != nil {
 		test.Fatal(removeError)
 	}
-	if _, recordRunCacheError := program.RecordRunCache("key", shuffled, nil, absent, nil, nil, 0, time.Time{}); recordRunCacheError == nil {
+	if _, recordRunCacheError := program.RecordRunCache(
+		"key",
+		shuffled,
+		nil,
+		absent,
+		nil,
+		nil,
+		0,
+		time.Time{},
+	); recordRunCacheError == nil {
 		test.Error("a file that vanished before the record was recorded anyway")
 	}
 }

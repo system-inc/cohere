@@ -14,7 +14,9 @@ import (
 // declarationsProbe builds a program where one symbol is declared in two files: `Shared`, an interface
 // two scripts each declare, which merges into one global symbol. It returns that symbol and both files,
 // and the symbol of `parseInt`, whose declarations are all in the lib.
-func declarationsProbe(test *testing.T) (shared *ast.Symbol, first *ast.SourceFile, second *ast.SourceFile, global *ast.Symbol) {
+func declarationsProbe(
+	test *testing.T,
+) (shared *ast.Symbol, first *ast.SourceFile, second *ast.SourceFile, global *ast.Symbol) {
 	test.Helper()
 	directory := test.TempDir()
 	files := map[string]string{
@@ -27,7 +29,11 @@ func declarationsProbe(test *testing.T) (shared *ast.Symbol, first *ast.SourceFi
 			test.Fatal(writeError)
 		}
 	}
-	graph, buildError := program.Build(program.Options{ConfigFileName: filepath.Join(directory, "tsconfig.json"), CurrentDirectory: directory, SingleThreaded: true})
+	graph, buildError := program.Build(program.Options{
+		ConfigFileName:   filepath.Join(directory, "tsconfig.json"),
+		CurrentDirectory: directory,
+		SingleThreaded:   true,
+	})
 	if buildError != nil {
 		test.Fatal(buildError)
 	}
@@ -49,7 +55,11 @@ func declarationsProbe(test *testing.T) (shared *ast.Symbol, first *ast.SourceFi
 	callee := statements[2].AsExpressionStatement().Expression.AsCallExpression().Expression
 	global = checker.GetSymbolAtLocation(callee)
 	if shared == nil || len(shared.Declarations) != 2 || global == nil {
-		test.Fatalf("the probe did not produce a symbol merged across two files and a lib global (%v, %v)", shared, global)
+		test.Fatalf(
+			"the probe did not produce a symbol merged across two files and a lib global (%v, %v)",
+			shared,
+			global,
+		)
 	}
 	return shared, first, second, global
 }
@@ -62,7 +72,11 @@ func TestDeclarationsInKeepsOnlyTheFilesOwn(test *testing.T) {
 	for _, sourceFile := range []*ast.SourceFile{first, second} {
 		own := rule.DeclarationsIn(sourceFile, shared)
 		if len(own) != 1 || ast.GetSourceFileOfNode(own[0]) != sourceFile {
-			test.Errorf("%s: kept %d declarations, want its own one", filepath.Base(sourceFile.FileName().AsString()), len(own))
+			test.Errorf(
+				"%s: kept %d declarations, want its own one",
+				filepath.Base(sourceFile.FileName().AsString()),
+				len(own),
+			)
 		}
 	}
 	if own := rule.DeclarationsIn(first, global); len(own) != 0 {
@@ -143,7 +157,11 @@ func TestIsDeclaredByADependencyTellsADependencysTypeFromOurs(test *testing.T) {
 			test.Fatal(writeError)
 		}
 	}
-	graph, buildError := program.Build(program.Options{ConfigFileName: filepath.Join(directory, "tsconfig.json"), CurrentDirectory: directory, SingleThreaded: true})
+	graph, buildError := program.Build(program.Options{
+		ConfigFileName:   filepath.Join(directory, "tsconfig.json"),
+		CurrentDirectory: directory,
+		SingleThreaded:   true,
+	})
 	if buildError != nil {
 		test.Fatal(buildError)
 	}
@@ -168,7 +186,9 @@ func TestIsDeclaredByADependencyTellsADependencysTypeFromOurs(test *testing.T) {
 		}
 		return symbol
 	}
-	page, kit, ours, merged := symbolOfTypeAt(3), checker.GetAliasedSymbol(symbolOfTypeAt(4)), symbolOfTypeAt(5), symbolOfTypeAt(6)
+	page, kit, ours, merged := symbolOfTypeAt(
+		3,
+	), checker.GetAliasedSymbol(symbolOfTypeAt(4)), symbolOfTypeAt(5), symbolOfTypeAt(6)
 
 	if !rule.IsDeclaredByADependency(page) {
 		test.Error("a global declared in a declaration file was not recognised as a dependency's")
@@ -211,7 +231,12 @@ func TestDeclarationMetadataQueriesPreserveAllAnyAndEmpty(test *testing.T) {
 		{"source then library", []*ast.Node{source, library}, true, false, true, true},
 	} {
 		symbol := &ast.Symbol{Declarations: tc.declarations}
-		got := [4]bool{rule.HasDeclarations(symbol), rule.IsDeclaredOnlyInDeclarationFiles(symbol), rule.IsDeclaredInASourceFile(symbol), rule.IsDeclaredInANonDeclarationFile(symbol)}
+		got := [4]bool{
+			rule.HasDeclarations(symbol),
+			rule.IsDeclaredOnlyInDeclarationFiles(symbol),
+			rule.IsDeclaredInASourceFile(symbol),
+			rule.IsDeclaredInANonDeclarationFile(symbol),
+		}
 		want := [4]bool{tc.has, tc.onlyAmbient, tc.anySource, tc.nonAmbient}
 		if got != want {
 			test.Errorf("%s: got %v, want %v", tc.name, got, want)
@@ -236,7 +261,11 @@ func TestIsResolvedSymbolRequiresADeclaration(test *testing.T) {
 			test.Fatal(writeError)
 		}
 	}
-	graph, buildError := program.Build(program.Options{ConfigFileName: filepath.Join(directory, "tsconfig.json"), CurrentDirectory: directory, SingleThreaded: true})
+	graph, buildError := program.Build(program.Options{
+		ConfigFileName:   filepath.Join(directory, "tsconfig.json"),
+		CurrentDirectory: directory,
+		SingleThreaded:   true,
+	})
 	if buildError != nil {
 		test.Fatal(buildError)
 	}
@@ -257,7 +286,9 @@ func TestIsResolvedSymbolRequiresADeclaration(test *testing.T) {
 	if !rule.IsUnresolvedType(checker.GetTypeAtLocation(typeAt(3))) {
 		test.Error("missing global lost its unresolved type")
 	}
-	if rule.IsUnresolvedType(checker.GetTypeAtLocation(typeAt(2))) || rule.IsUnresolvedType(checker.GetTypeAtLocation(typeAt(5))) || rule.IsUnresolvedType(nil) {
+	if rule.IsUnresolvedType(checker.GetTypeAtLocation(typeAt(2))) ||
+		rule.IsUnresolvedType(checker.GetTypeAtLocation(typeAt(5))) ||
+		rule.IsUnresolvedType(nil) {
 		test.Error("own type, explicit any, or no context was classified as unresolved")
 	}
 	unknown := checker.GetAliasedSymbol(alias)

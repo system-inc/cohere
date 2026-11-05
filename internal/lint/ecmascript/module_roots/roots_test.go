@@ -31,7 +31,11 @@ func TestSetSparesFrameworkFiles(test *testing.T) {
 		{"global declarations", "/repo/libraries/structure/GlobalDeclarations.d.ts", ReasonDeclaration},
 		{"test file", "/repo/modules/Thing.test.ts", ReasonTest},
 		{"spec file", "/repo/modules/Thing.spec.tsx", ReasonTest},
-		{"dynamically imported locale", "/repo/libraries/structure/source/localization/translations/de.ts", ReasonDynamicImportTarget},
+		{
+			"dynamically imported locale",
+			"/repo/libraries/structure/source/localization/translations/de.ts",
+			ReasonDynamicImportTarget,
+		},
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()

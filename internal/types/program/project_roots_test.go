@@ -71,7 +71,8 @@ func TestBuildRefusesARootItCannotReadInsteadOfPanicking(test *testing.T) {
 		test.Fatalf("Build returned a graph of %d project files from a config naming 2, one unreadable",
 			len(graph.ProjectFiles()))
 	}
-	if !strings.Contains(buildError.Error(), "Locked.ts") || !strings.Contains(buildError.Error(), "could not be read") {
+	if !strings.Contains(buildError.Error(), "Locked.ts") ||
+		!strings.Contains(buildError.Error(), "could not be read") {
 		test.Fatalf("the error does not name the unreadable file and why: %v", buildError)
 	}
 }

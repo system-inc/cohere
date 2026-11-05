@@ -60,100 +60,337 @@ func TestNoDeprecatedFires(test *testing.T) {
 		sourceText   string
 		descriptions []string
 	}{
-		{"upstream valid-11", "React.renderComponent()", []string{"React.renderComponent is deprecated since React 0.12.0, use React.render instead"}},              // upstream sets settings; cohere reads no React settings, so this is the unconfigured answer
-		{"upstream valid-12", "React.createClass()", []string{"React.createClass is deprecated since React 15.5.0, use the npm module create-react-class instead"}}, // upstream sets settings; cohere reads no React settings, so this is the unconfigured answer
-		{"upstream valid-14", "\n        class Foo extends React.Component {\n          componentWillMount() {}\n          componentWillReceiveProps() {}\n          componentWillUpdate() {}\n        }\n      ", []string{"componentWillMount is deprecated since React 16.9.0, use UNSAFE_componentWillMount instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillmount. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.", "componentWillReceiveProps is deprecated since React 16.9.0, use UNSAFE_componentWillReceiveProps instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillreceiveprops. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.", "componentWillUpdate is deprecated since React 16.9.0, use UNSAFE_componentWillUpdate instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillupdate. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components."}},                                                                                                               // upstream sets settings; cohere reads no React settings, so this is the unconfigured answer
-		{"upstream valid-16", "\n        import { render, hydrate } from 'react-dom';\n        import { renderToNodeStream } from 'react-dom/server';\n        ReactDOM.render(element, container);\n        ReactDOM.unmountComponentAtNode(container);\n        ReactDOMServer.renderToNodeStream(element);\n      ", []string{"ReactDOM.render is deprecated since React 18.0.0, use createRoot instead, see https://reactjs.org/link/switch-to-createroot", "ReactDOM.hydrate is deprecated since React 18.0.0, use hydrateRoot instead, see https://reactjs.org/link/switch-to-createroot", "ReactDOMServer.renderToNodeStream is deprecated since React 18.0.0, use renderToPipeableStream instead, see https://reactjs.org/docs/react-dom-server.html#rendertonodestream", "ReactDOM.render is deprecated since React 18.0.0, use createRoot instead, see https://reactjs.org/link/switch-to-createroot", "ReactDOM.unmountComponentAtNode is deprecated since React 18.0.0, use root.unmount instead, see https://reactjs.org/link/switch-to-createroot", "ReactDOMServer.renderToNodeStream is deprecated since React 18.0.0, use renderToPipeableStream instead, see https://reactjs.org/docs/react-dom-server.html#rendertonodestream"}}, // upstream sets settings; cohere reads no React settings, so this is the unconfigured answer
-		{"upstream invalid-0", "React.renderComponent()", []string{"React.renderComponent is deprecated since React 0.12.0, use React.render instead"}},
-		{"upstream invalid-2", "/** @jsx Foo */ Foo.renderComponent()", []string{"Foo.renderComponent is deprecated since React 0.12.0, use Foo.render instead"}},
-		{"upstream invalid-3", "this.transferPropsTo()", []string{"this.transferPropsTo is deprecated since React 0.12.0, use spread operator ({...}) instead"}},
-		{"upstream invalid-4", "React.addons.TestUtils", []string{"React.addons.TestUtils is deprecated since React 15.5.0, use ReactDOM.TestUtils instead"}},
-		{"upstream invalid-5", "React.addons.classSet()", []string{"React.addons.classSet is deprecated since React 0.13.0, use the npm module classnames instead"}},
-		{"upstream invalid-6", "React.render(element, container);", []string{"React.render is deprecated since React 0.14.0, use ReactDOM.render instead"}},
-		{"upstream invalid-7", "React.unmountComponentAtNode(container);", []string{"React.unmountComponentAtNode is deprecated since React 0.14.0, use ReactDOM.unmountComponentAtNode instead"}},
-		{"upstream invalid-8", "React.findDOMNode(instance);", []string{"React.findDOMNode is deprecated since React 0.14.0, use ReactDOM.findDOMNode instead"}},
-		{"upstream invalid-9", "React.renderToString(element);", []string{"React.renderToString is deprecated since React 0.14.0, use ReactDOMServer.renderToString instead"}},
-		{"upstream invalid-10", "React.renderToStaticMarkup(element);", []string{"React.renderToStaticMarkup is deprecated since React 0.14.0, use ReactDOMServer.renderToStaticMarkup instead"}},
-		{"upstream invalid-11", "React.createClass({});", []string{"React.createClass is deprecated since React 15.5.0, use the npm module create-react-class instead"}},
-		{"upstream invalid-13", "React.PropTypes", []string{"React.PropTypes is deprecated since React 15.5.0, use the npm module prop-types instead"}},
-		{"upstream invalid-14", "var {createClass} = require('react');", []string{"React.createClass is deprecated since React 15.5.0, use the npm module create-react-class instead"}},
-		{"upstream invalid-15", "var {createClass, PropTypes} = require('react');", []string{"React.createClass is deprecated since React 15.5.0, use the npm module create-react-class instead", "React.PropTypes is deprecated since React 15.5.0, use the npm module prop-types instead"}},
-		{"upstream invalid-16", "import {createClass} from 'react';", []string{"React.createClass is deprecated since React 15.5.0, use the npm module create-react-class instead"}},
-		{"upstream invalid-17", "import {createClass, PropTypes} from 'react';", []string{"React.createClass is deprecated since React 15.5.0, use the npm module create-react-class instead", "React.PropTypes is deprecated since React 15.5.0, use the npm module prop-types instead"}},
-		{"upstream invalid-18", "\n      import React from 'react';\n      const {createClass, PropTypes} = React;\n    ", []string{"React.createClass is deprecated since React 15.5.0, use the npm module create-react-class instead", "React.PropTypes is deprecated since React 15.5.0, use the npm module prop-types instead"}},
-		{"upstream invalid-19", "import {printDOM} from 'react-addons-perf';", []string{"ReactPerf.printDOM is deprecated since React 15.0.0, use ReactPerf.printOperations instead"}},
-		{"upstream invalid-20", "\n        import ReactPerf from 'react-addons-perf';\n        const {printDOM} = ReactPerf;\n      ", []string{"ReactPerf.printDOM is deprecated since React 15.0.0, use ReactPerf.printOperations instead"}},
-		{"upstream invalid-21", "React.DOM.div", []string{"React.DOM is deprecated since React 15.6.0, use the npm module react-dom-factories instead"}},
-		{"upstream invalid-22", "\n        class Bar extends React.PureComponent {\n          componentWillMount() {}\n          componentWillReceiveProps() {}\n          componentWillUpdate() {}\n        };\n      ", []string{"componentWillMount is deprecated since React 16.9.0, use UNSAFE_componentWillMount instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillmount. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.", "componentWillReceiveProps is deprecated since React 16.9.0, use UNSAFE_componentWillReceiveProps instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillreceiveprops. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.", "componentWillUpdate is deprecated since React 16.9.0, use UNSAFE_componentWillUpdate instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillupdate. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components."}},
-		{"upstream invalid-23", "\n        function Foo() {\n          return class Bar extends React.PureComponent {\n            componentWillMount() {}\n            componentWillReceiveProps() {}\n            componentWillUpdate() {}\n          };\n        }\n      ", []string{"componentWillMount is deprecated since React 16.9.0, use UNSAFE_componentWillMount instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillmount. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.", "componentWillReceiveProps is deprecated since React 16.9.0, use UNSAFE_componentWillReceiveProps instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillreceiveprops. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.", "componentWillUpdate is deprecated since React 16.9.0, use UNSAFE_componentWillUpdate instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillupdate. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components."}},
-		{"upstream invalid-24", "\n        class Bar extends PureComponent {\n          componentWillMount() {}\n          componentWillReceiveProps() {}\n          componentWillUpdate() {}\n        };\n      ", []string{"componentWillMount is deprecated since React 16.9.0, use UNSAFE_componentWillMount instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillmount. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.", "componentWillReceiveProps is deprecated since React 16.9.0, use UNSAFE_componentWillReceiveProps instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillreceiveprops. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.", "componentWillUpdate is deprecated since React 16.9.0, use UNSAFE_componentWillUpdate instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillupdate. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components."}},
-		{"upstream invalid-25", "\n        class Foo extends React.Component {\n          componentWillMount() {}\n          componentWillReceiveProps() {}\n          componentWillUpdate() {}\n        }\n      ", []string{"componentWillMount is deprecated since React 16.9.0, use UNSAFE_componentWillMount instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillmount. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.", "componentWillReceiveProps is deprecated since React 16.9.0, use UNSAFE_componentWillReceiveProps instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillreceiveprops. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.", "componentWillUpdate is deprecated since React 16.9.0, use UNSAFE_componentWillUpdate instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillupdate. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components."}},
-		{"upstream invalid-26", "\n        class Foo extends Component {\n          componentWillMount() {}\n          componentWillReceiveProps() {}\n          componentWillUpdate() {}\n        }\n      ", []string{"componentWillMount is deprecated since React 16.9.0, use UNSAFE_componentWillMount instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillmount. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.", "componentWillReceiveProps is deprecated since React 16.9.0, use UNSAFE_componentWillReceiveProps instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillreceiveprops. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.", "componentWillUpdate is deprecated since React 16.9.0, use UNSAFE_componentWillUpdate instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillupdate. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components."}},
-		{"upstream invalid-27", "\n        var Foo = createReactClass({\n          componentWillMount: function() {},\n          componentWillReceiveProps: function() {},\n          componentWillUpdate: function() {}\n        })\n      ", []string{"componentWillMount is deprecated since React 16.9.0, use UNSAFE_componentWillMount instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillmount. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.", "componentWillReceiveProps is deprecated since React 16.9.0, use UNSAFE_componentWillReceiveProps instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillreceiveprops. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.", "componentWillUpdate is deprecated since React 16.9.0, use UNSAFE_componentWillUpdate instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillupdate. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components."}},
-		{"upstream invalid-28", "\n        class Foo extends React.Component {\n          constructor() {}\n          componentWillMount() {}\n          componentWillReceiveProps() {}\n          componentWillUpdate() {}\n        }\n      ", []string{"componentWillMount is deprecated since React 16.9.0, use UNSAFE_componentWillMount instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillmount. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.", "componentWillReceiveProps is deprecated since React 16.9.0, use UNSAFE_componentWillReceiveProps instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillreceiveprops. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.", "componentWillUpdate is deprecated since React 16.9.0, use UNSAFE_componentWillUpdate instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillupdate. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components."}},
-		{"upstream invalid-29", "\n        import { render } from 'react-dom';\n        ReactDOM.render(<div></div>, container);\n      ", []string{"ReactDOM.render is deprecated since React 18.0.0, use createRoot instead, see https://reactjs.org/link/switch-to-createroot", "ReactDOM.render is deprecated since React 18.0.0, use createRoot instead, see https://reactjs.org/link/switch-to-createroot"}},
-		{"upstream invalid-30", "\n        import { hydrate } from 'react-dom';\n        ReactDOM.hydrate(<div></div>, container);\n      ", []string{"ReactDOM.hydrate is deprecated since React 18.0.0, use hydrateRoot instead, see https://reactjs.org/link/switch-to-createroot", "ReactDOM.hydrate is deprecated since React 18.0.0, use hydrateRoot instead, see https://reactjs.org/link/switch-to-createroot"}},
-		{"upstream invalid-31", "\n        import { unmountComponentAtNode } from 'react-dom';\n        ReactDOM.unmountComponentAtNode(container);\n      ", []string{"ReactDOM.unmountComponentAtNode is deprecated since React 18.0.0, use root.unmount instead, see https://reactjs.org/link/switch-to-createroot", "ReactDOM.unmountComponentAtNode is deprecated since React 18.0.0, use root.unmount instead, see https://reactjs.org/link/switch-to-createroot"}},
-		{"upstream invalid-32", "\n        import { renderToNodeStream } from 'react-dom/server';\n        ReactDOMServer.renderToNodeStream(element);\n      ", []string{"ReactDOMServer.renderToNodeStream is deprecated since React 18.0.0, use renderToPipeableStream instead, see https://reactjs.org/docs/react-dom-server.html#rendertonodestream", "ReactDOMServer.renderToNodeStream is deprecated since React 18.0.0, use renderToPipeableStream instead, see https://reactjs.org/docs/react-dom-server.html#rendertonodestream"}},
+		{
+			"upstream valid-11",
+			"React.renderComponent()",
+			[]string{"React.renderComponent is deprecated since React 0.12.0, use React.render instead"},
+		}, // upstream sets settings; cohere reads no React settings, so this is the unconfigured answer
+		{"upstream valid-12", "React.createClass()", []string{
+			"React.createClass is deprecated since React 15.5.0, use the npm module create-react-class instead",
+		}}, // upstream sets settings; cohere reads no React settings, so this is the unconfigured answer
+		{
+			"upstream valid-14",
+			"\n        class Foo extends React.Component {\n          componentWillMount() {}\n          componentWillReceiveProps() {}\n          componentWillUpdate() {}\n        }\n      ",
+			[]string{
+				"componentWillMount is deprecated since React 16.9.0, use UNSAFE_componentWillMount instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillmount. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.",
+				"componentWillReceiveProps is deprecated since React 16.9.0, use UNSAFE_componentWillReceiveProps instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillreceiveprops. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.",
+				"componentWillUpdate is deprecated since React 16.9.0, use UNSAFE_componentWillUpdate instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillupdate. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.",
+			},
+		}, // upstream sets settings; cohere reads no React settings, so this is the unconfigured answer
+		{
+			"upstream valid-16",
+			"\n        import { render, hydrate } from 'react-dom';\n        import { renderToNodeStream } from 'react-dom/server';\n        ReactDOM.render(element, container);\n        ReactDOM.unmountComponentAtNode(container);\n        ReactDOMServer.renderToNodeStream(element);\n      ",
+			[]string{
+				"ReactDOM.render is deprecated since React 18.0.0, use createRoot instead, see https://reactjs.org/link/switch-to-createroot",
+				"ReactDOM.hydrate is deprecated since React 18.0.0, use hydrateRoot instead, see https://reactjs.org/link/switch-to-createroot",
+				"ReactDOMServer.renderToNodeStream is deprecated since React 18.0.0, use renderToPipeableStream instead, see https://reactjs.org/docs/react-dom-server.html#rendertonodestream",
+				"ReactDOM.render is deprecated since React 18.0.0, use createRoot instead, see https://reactjs.org/link/switch-to-createroot",
+				"ReactDOM.unmountComponentAtNode is deprecated since React 18.0.0, use root.unmount instead, see https://reactjs.org/link/switch-to-createroot",
+				"ReactDOMServer.renderToNodeStream is deprecated since React 18.0.0, use renderToPipeableStream instead, see https://reactjs.org/docs/react-dom-server.html#rendertonodestream",
+			},
+		}, // upstream sets settings; cohere reads no React settings, so this is the unconfigured answer
+		{
+			"upstream invalid-0",
+			"React.renderComponent()",
+			[]string{"React.renderComponent is deprecated since React 0.12.0, use React.render instead"},
+		},
+		{
+			"upstream invalid-2",
+			"/** @jsx Foo */ Foo.renderComponent()",
+			[]string{"Foo.renderComponent is deprecated since React 0.12.0, use Foo.render instead"},
+		},
+		{
+			"upstream invalid-3",
+			"this.transferPropsTo()",
+			[]string{"this.transferPropsTo is deprecated since React 0.12.0, use spread operator ({...}) instead"},
+		},
+		{
+			"upstream invalid-4",
+			"React.addons.TestUtils",
+			[]string{"React.addons.TestUtils is deprecated since React 15.5.0, use ReactDOM.TestUtils instead"},
+		},
+		{
+			"upstream invalid-5",
+			"React.addons.classSet()",
+			[]string{"React.addons.classSet is deprecated since React 0.13.0, use the npm module classnames instead"},
+		},
+		{
+			"upstream invalid-6",
+			"React.render(element, container);",
+			[]string{"React.render is deprecated since React 0.14.0, use ReactDOM.render instead"},
+		},
+		{"upstream invalid-7", "React.unmountComponentAtNode(container);", []string{
+			"React.unmountComponentAtNode is deprecated since React 0.14.0, use ReactDOM.unmountComponentAtNode instead",
+		}},
+		{
+			"upstream invalid-8",
+			"React.findDOMNode(instance);",
+			[]string{"React.findDOMNode is deprecated since React 0.14.0, use ReactDOM.findDOMNode instead"},
+		},
+		{"upstream invalid-9", "React.renderToString(element);", []string{
+			"React.renderToString is deprecated since React 0.14.0, use ReactDOMServer.renderToString instead",
+		}},
+		{"upstream invalid-10", "React.renderToStaticMarkup(element);", []string{
+			"React.renderToStaticMarkup is deprecated since React 0.14.0, use ReactDOMServer.renderToStaticMarkup instead",
+		}},
+		{"upstream invalid-11", "React.createClass({});", []string{
+			"React.createClass is deprecated since React 15.5.0, use the npm module create-react-class instead",
+		}},
+		{
+			"upstream invalid-13",
+			"React.PropTypes",
+			[]string{"React.PropTypes is deprecated since React 15.5.0, use the npm module prop-types instead"},
+		},
+		{"upstream invalid-14", "var {createClass} = require('react');", []string{
+			"React.createClass is deprecated since React 15.5.0, use the npm module create-react-class instead",
+		}},
+		{"upstream invalid-15", "var {createClass, PropTypes} = require('react');", []string{
+			"React.createClass is deprecated since React 15.5.0, use the npm module create-react-class instead",
+			"React.PropTypes is deprecated since React 15.5.0, use the npm module prop-types instead",
+		}},
+		{"upstream invalid-16", "import {createClass} from 'react';", []string{
+			"React.createClass is deprecated since React 15.5.0, use the npm module create-react-class instead",
+		}},
+		{"upstream invalid-17", "import {createClass, PropTypes} from 'react';", []string{
+			"React.createClass is deprecated since React 15.5.0, use the npm module create-react-class instead",
+			"React.PropTypes is deprecated since React 15.5.0, use the npm module prop-types instead",
+		}},
+		{
+			"upstream invalid-18",
+			"\n      import React from 'react';\n      const {createClass, PropTypes} = React;\n    ",
+			[]string{
+				"React.createClass is deprecated since React 15.5.0, use the npm module create-react-class instead",
+				"React.PropTypes is deprecated since React 15.5.0, use the npm module prop-types instead",
+			},
+		},
+		{
+			"upstream invalid-19",
+			"import {printDOM} from 'react-addons-perf';",
+			[]string{"ReactPerf.printDOM is deprecated since React 15.0.0, use ReactPerf.printOperations instead"},
+		},
+		{
+			"upstream invalid-20",
+			"\n        import ReactPerf from 'react-addons-perf';\n        const {printDOM} = ReactPerf;\n      ",
+			[]string{"ReactPerf.printDOM is deprecated since React 15.0.0, use ReactPerf.printOperations instead"},
+		},
+		{
+			"upstream invalid-21",
+			"React.DOM.div",
+			[]string{"React.DOM is deprecated since React 15.6.0, use the npm module react-dom-factories instead"},
+		},
+		{
+			"upstream invalid-22",
+			"\n        class Bar extends React.PureComponent {\n          componentWillMount() {}\n          componentWillReceiveProps() {}\n          componentWillUpdate() {}\n        };\n      ",
+			[]string{
+				"componentWillMount is deprecated since React 16.9.0, use UNSAFE_componentWillMount instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillmount. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.",
+				"componentWillReceiveProps is deprecated since React 16.9.0, use UNSAFE_componentWillReceiveProps instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillreceiveprops. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.",
+				"componentWillUpdate is deprecated since React 16.9.0, use UNSAFE_componentWillUpdate instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillupdate. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.",
+			},
+		},
+		{
+			"upstream invalid-23",
+			"\n        function Foo() {\n          return class Bar extends React.PureComponent {\n            componentWillMount() {}\n            componentWillReceiveProps() {}\n            componentWillUpdate() {}\n          };\n        }\n      ",
+			[]string{
+				"componentWillMount is deprecated since React 16.9.0, use UNSAFE_componentWillMount instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillmount. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.",
+				"componentWillReceiveProps is deprecated since React 16.9.0, use UNSAFE_componentWillReceiveProps instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillreceiveprops. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.",
+				"componentWillUpdate is deprecated since React 16.9.0, use UNSAFE_componentWillUpdate instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillupdate. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.",
+			},
+		},
+		{
+			"upstream invalid-24",
+			"\n        class Bar extends PureComponent {\n          componentWillMount() {}\n          componentWillReceiveProps() {}\n          componentWillUpdate() {}\n        };\n      ",
+			[]string{
+				"componentWillMount is deprecated since React 16.9.0, use UNSAFE_componentWillMount instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillmount. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.",
+				"componentWillReceiveProps is deprecated since React 16.9.0, use UNSAFE_componentWillReceiveProps instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillreceiveprops. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.",
+				"componentWillUpdate is deprecated since React 16.9.0, use UNSAFE_componentWillUpdate instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillupdate. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.",
+			},
+		},
+		{
+			"upstream invalid-25",
+			"\n        class Foo extends React.Component {\n          componentWillMount() {}\n          componentWillReceiveProps() {}\n          componentWillUpdate() {}\n        }\n      ",
+			[]string{
+				"componentWillMount is deprecated since React 16.9.0, use UNSAFE_componentWillMount instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillmount. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.",
+				"componentWillReceiveProps is deprecated since React 16.9.0, use UNSAFE_componentWillReceiveProps instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillreceiveprops. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.",
+				"componentWillUpdate is deprecated since React 16.9.0, use UNSAFE_componentWillUpdate instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillupdate. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.",
+			},
+		},
+		{
+			"upstream invalid-26",
+			"\n        class Foo extends Component {\n          componentWillMount() {}\n          componentWillReceiveProps() {}\n          componentWillUpdate() {}\n        }\n      ",
+			[]string{
+				"componentWillMount is deprecated since React 16.9.0, use UNSAFE_componentWillMount instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillmount. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.",
+				"componentWillReceiveProps is deprecated since React 16.9.0, use UNSAFE_componentWillReceiveProps instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillreceiveprops. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.",
+				"componentWillUpdate is deprecated since React 16.9.0, use UNSAFE_componentWillUpdate instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillupdate. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.",
+			},
+		},
+		{
+			"upstream invalid-27",
+			"\n        var Foo = createReactClass({\n          componentWillMount: function() {},\n          componentWillReceiveProps: function() {},\n          componentWillUpdate: function() {}\n        })\n      ",
+			[]string{
+				"componentWillMount is deprecated since React 16.9.0, use UNSAFE_componentWillMount instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillmount. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.",
+				"componentWillReceiveProps is deprecated since React 16.9.0, use UNSAFE_componentWillReceiveProps instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillreceiveprops. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.",
+				"componentWillUpdate is deprecated since React 16.9.0, use UNSAFE_componentWillUpdate instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillupdate. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.",
+			},
+		},
+		{
+			"upstream invalid-28",
+			"\n        class Foo extends React.Component {\n          constructor() {}\n          componentWillMount() {}\n          componentWillReceiveProps() {}\n          componentWillUpdate() {}\n        }\n      ",
+			[]string{
+				"componentWillMount is deprecated since React 16.9.0, use UNSAFE_componentWillMount instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillmount. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.",
+				"componentWillReceiveProps is deprecated since React 16.9.0, use UNSAFE_componentWillReceiveProps instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillreceiveprops. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.",
+				"componentWillUpdate is deprecated since React 16.9.0, use UNSAFE_componentWillUpdate instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillupdate. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.",
+			},
+		},
+		{
+			"upstream invalid-29",
+			"\n        import { render } from 'react-dom';\n        ReactDOM.render(<div></div>, container);\n      ",
+			[]string{
+				"ReactDOM.render is deprecated since React 18.0.0, use createRoot instead, see https://reactjs.org/link/switch-to-createroot",
+				"ReactDOM.render is deprecated since React 18.0.0, use createRoot instead, see https://reactjs.org/link/switch-to-createroot",
+			},
+		},
+		{
+			"upstream invalid-30",
+			"\n        import { hydrate } from 'react-dom';\n        ReactDOM.hydrate(<div></div>, container);\n      ",
+			[]string{
+				"ReactDOM.hydrate is deprecated since React 18.0.0, use hydrateRoot instead, see https://reactjs.org/link/switch-to-createroot",
+				"ReactDOM.hydrate is deprecated since React 18.0.0, use hydrateRoot instead, see https://reactjs.org/link/switch-to-createroot",
+			},
+		},
+		{
+			"upstream invalid-31",
+			"\n        import { unmountComponentAtNode } from 'react-dom';\n        ReactDOM.unmountComponentAtNode(container);\n      ",
+			[]string{
+				"ReactDOM.unmountComponentAtNode is deprecated since React 18.0.0, use root.unmount instead, see https://reactjs.org/link/switch-to-createroot",
+				"ReactDOM.unmountComponentAtNode is deprecated since React 18.0.0, use root.unmount instead, see https://reactjs.org/link/switch-to-createroot",
+			},
+		},
+		{
+			"upstream invalid-32",
+			"\n        import { renderToNodeStream } from 'react-dom/server';\n        ReactDOMServer.renderToNodeStream(element);\n      ",
+			[]string{
+				"ReactDOMServer.renderToNodeStream is deprecated since React 18.0.0, use renderToPipeableStream instead, see https://reactjs.org/docs/react-dom-server.html#rendertonodestream",
+				"ReactDOMServer.renderToNodeStream is deprecated since React 18.0.0, use renderToPipeableStream instead, see https://reactjs.org/docs/react-dom-server.html#rendertonodestream",
+			},
+		},
 
 		// --- cases upstream does not cover, each measured against the installed build 7.37.5 ---
 
 		// Two findings from one expression: the listener fires on the outer member and again on the
 		// inner `React.PropTypes`, and both slices are keys.
-		{"m5", "React.PropTypes.component", []string{"React.PropTypes.component is deprecated since React 0.12.0, use React.PropTypes.element instead", "React.PropTypes is deprecated since React 15.5.0, use the npm module prop-types instead"}},
+		{"m5", "React.PropTypes.component", []string{
+			"React.PropTypes.component is deprecated since React 0.12.0, use React.PropTypes.element instead",
+			"React.PropTypes is deprecated since React 15.5.0, use the npm module prop-types instead",
+		}},
 
 		// The two entries with no replacement. Their message must end at the version with no trailing
 		// comma, which is the clause upstream builds in the report call rather than in the template.
 		{"m6", "React.isValidClass()", []string{"React.isValidClass is deprecated since React 0.12.0"}},
-		{"m7", "React.addons.LinkedStateMixin", []string{"React.addons.LinkedStateMixin is deprecated since React 15.0.0"}},
+		{
+			"m7",
+			"React.addons.LinkedStateMixin",
+			[]string{"React.addons.LinkedStateMixin is deprecated since React 15.0.0"},
+		},
 
 		// The only route by which `react-addons-perf`'s second module name is reachable: the bare
 		// identifier branch of `getReactModuleName`. The import arm always takes the first name.
-		{"m8", "var {printDOM} = Perf;", []string{"Perf.printDOM is deprecated since React 15.0.0, use Perf.printOperations instead"}},
-		{"m9", "var {printDOM} = ReactPerf;", []string{"ReactPerf.printDOM is deprecated since React 15.0.0, use ReactPerf.printOperations instead"}},
+		{
+			"m8",
+			"var {printDOM} = Perf;",
+			[]string{"Perf.printDOM is deprecated since React 15.0.0, use Perf.printOperations instead"},
+		},
+		{
+			"m9",
+			"var {printDOM} = ReactPerf;",
+			[]string{"ReactPerf.printDOM is deprecated since React 15.0.0, use ReactPerf.printOperations instead"},
+		},
 
 		// An alias reports under the imported name, not the local one, and the span covers the whole
 		// specifier including the alias.
-		{"m10", "import {createClass as cc} from 'react';", []string{"React.createClass is deprecated since React 15.5.0, use the npm module create-react-class instead"}},
+		{"m10", "import {createClass as cc} from 'react';", []string{
+			"React.createClass is deprecated since React 15.5.0, use the npm module create-react-class instead",
+		}},
 
 		// The destructuring twin of the above: the key decides, and the span is the whole property.
-		{"m11", "var {createClass: cc} = require('react');", []string{"React.createClass is deprecated since React 15.5.0, use the npm module create-react-class instead"}},
+		{"m11", "var {createClass: cc} = require('react');", []string{
+			"React.createClass is deprecated since React 15.5.0, use the npm module create-react-class instead",
+		}},
 
 		// A rest element is filtered out and the named sibling still reports.
-		{"m12", "var {createClass, ...rest} = require('react');", []string{"React.createClass is deprecated since React 15.5.0, use the npm module create-react-class instead"}},
+		{"m12", "var {createClass, ...rest} = require('react');", []string{
+			"React.createClass is deprecated since React 15.5.0, use the npm module create-react-class instead",
+		}},
 
 		// A getter, a static, and a field holding a number all report. This arm tests the name only.
-		{"m19", "class F extends React.Component { get componentWillMount() {} }", []string{"componentWillMount is deprecated since React 16.9.0, use UNSAFE_componentWillMount instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillmount. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components."}},
-		{"m20", "class F extends React.Component { static componentWillMount() {} }", []string{"componentWillMount is deprecated since React 16.9.0, use UNSAFE_componentWillMount instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillmount. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components."}},
-		{"m21", "class F extends React.Component { componentWillMount = 1 }", []string{"componentWillMount is deprecated since React 16.9.0, use UNSAFE_componentWillMount instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillmount. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components."}},
+		{"m19", "class F extends React.Component { get componentWillMount() {} }", []string{
+			"componentWillMount is deprecated since React 16.9.0, use UNSAFE_componentWillMount instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillmount. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.",
+		}},
+		{"m20", "class F extends React.Component { static componentWillMount() {} }", []string{
+			"componentWillMount is deprecated since React 16.9.0, use UNSAFE_componentWillMount instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillmount. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.",
+		}},
+		{"m21", "class F extends React.Component { componentWillMount = 1 }", []string{
+			"componentWillMount is deprecated since React 16.9.0, use UNSAFE_componentWillMount instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillmount. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.",
+		}},
 
 		// All four paren spellings on the heritage clause report. espree produces no parenthesized
 		// node so upstream never sees them; our parser does, which is why both positions are skipped.
-		{"m22", "class F extends (React.Component) { componentWillMount() {} }", []string{"componentWillMount is deprecated since React 16.9.0, use UNSAFE_componentWillMount instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillmount. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components."}},
-		{"m23", "class F extends (React).Component { componentWillMount() {} }", []string{"componentWillMount is deprecated since React 16.9.0, use UNSAFE_componentWillMount instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillmount. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components."}},
-		{"m24", "class F extends ((React.Component)) { componentWillMount() {} }", []string{"componentWillMount is deprecated since React 16.9.0, use UNSAFE_componentWillMount instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillmount. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components."}},
-		{"m25", "class F extends (Component) { componentWillMount() {} }", []string{"componentWillMount is deprecated since React 16.9.0, use UNSAFE_componentWillMount instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillmount. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components."}},
+		{"m22", "class F extends (React.Component) { componentWillMount() {} }", []string{
+			"componentWillMount is deprecated since React 16.9.0, use UNSAFE_componentWillMount instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillmount. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.",
+		}},
+		{"m23", "class F extends (React).Component { componentWillMount() {} }", []string{
+			"componentWillMount is deprecated since React 16.9.0, use UNSAFE_componentWillMount instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillmount. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.",
+		}},
+		{"m24", "class F extends ((React.Component)) { componentWillMount() {} }", []string{
+			"componentWillMount is deprecated since React 16.9.0, use UNSAFE_componentWillMount instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillmount. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.",
+		}},
+		{"m25", "class F extends (Component) { componentWillMount() {} }", []string{
+			"componentWillMount is deprecated since React 16.9.0, use UNSAFE_componentWillMount instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillmount. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.",
+		}},
 
 		// The ES5 factory callee in parentheses, same mechanism.
-		{"m26", "var F = (createReactClass)({ componentWillMount: function() {} })", []string{"componentWillMount is deprecated since React 16.9.0, use UNSAFE_componentWillMount instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillmount. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components."}},
+		{"m26", "var F = (createReactClass)({ componentWillMount: function() {} })", []string{
+			"componentWillMount is deprecated since React 16.9.0, use UNSAFE_componentWillMount instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillmount. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.",
+		}},
 
 		// The namespaced factory, which is `React.createReactClass` and not `React.createClass`.
-		{"m28", "var F = React.createReactClass({ componentWillMount: function() {} })", []string{"componentWillMount is deprecated since React 16.9.0, use UNSAFE_componentWillMount instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillmount. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components."}},
+		{"m28", "var F = React.createReactClass({ componentWillMount: function() {} })", []string{
+			"componentWillMount is deprecated since React 16.9.0, use UNSAFE_componentWillMount instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillmount. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.",
+		}},
 
 		// The `@jsx` pragma renames React for the whole file.
-		{"m29", "/** @jsx Foo */ Foo.renderComponent()", []string{"Foo.renderComponent is deprecated since React 0.12.0, use Foo.render instead"}},
+		{
+			"m29",
+			"/** @jsx Foo */ Foo.renderComponent()",
+			[]string{"Foo.renderComponent is deprecated since React 0.12.0, use Foo.render instead"},
+		},
 
 		// A line comment carries the pragma too; the scan is not restricted to block comments.
-		{"m31", "// @jsx Foo\nFoo.renderComponent()", []string{"Foo.renderComponent is deprecated since React 0.12.0, use Foo.render instead"}},
+		{
+			"m31",
+			"// @jsx Foo\nFoo.renderComponent()",
+			[]string{"Foo.renderComponent is deprecated since React 0.12.0, use Foo.render instead"},
+		},
 
 		// Only the part before the first dot is taken.
-		{"m32", "/** @jsx Foo.bar */ Foo.renderComponent()", []string{"Foo.renderComponent is deprecated since React 0.12.0, use Foo.render instead"}},
+		{
+			"m32",
+			"/** @jsx Foo.bar */ Foo.renderComponent()",
+			[]string{"Foo.renderComponent is deprecated since React 0.12.0, use Foo.render instead"},
+		},
 
 		// Position in the file does not matter; every comment is scanned.
-		{"m33", "Foo.renderComponent()\n/** @jsx Foo */", []string{"Foo.renderComponent is deprecated since React 0.12.0, use Foo.render instead"}},
+		{
+			"m33",
+			"Foo.renderComponent()\n/** @jsx Foo */",
+			[]string{"Foo.renderComponent is deprecated since React 0.12.0, use Foo.render instead"},
+		},
 
 		// A pragma that is not a valid identifier falls back to React, so this reports as React.
-		{"m34", "/** @jsx 9bad */ React.renderComponent()", []string{"React.renderComponent is deprecated since React 0.12.0, use React.render instead"}},
+		{
+			"m34",
+			"/** @jsx 9bad */ React.renderComponent()",
+			[]string{"React.renderComponent is deprecated since React 0.12.0, use React.render instead"},
+		},
 
 		// The pragma name written flush against the block comment's closing delimiter.
 		//
@@ -165,13 +402,23 @@ func TestNoDeprecatedFires(test *testing.T) {
 		//
 		// Written for a surviving mutant that removed the `*/` strip, and it kills it. The matching
 		// `//` strip has no such input and is argued at its own line rather than tested.
-		{"block pragma flush against the closing delimiter", "/**@jsx Foo*/ Foo.renderComponent()", []string{"Foo.renderComponent is deprecated since React 0.12.0, use Foo.render instead"}},
+		{
+			"block pragma flush against the closing delimiter",
+			"/**@jsx Foo*/ Foo.renderComponent()",
+			[]string{"Foo.renderComponent is deprecated since React 0.12.0, use Foo.render instead"},
+		},
 
 		// No whitespace after `@jsx` does not match at all, so the fallback applies.
-		{"m35", "/**@jsxFoo*/ React.renderComponent()", []string{"React.renderComponent is deprecated since React 0.12.0, use React.render instead"}},
+		{
+			"m35",
+			"/**@jsxFoo*/ React.renderComponent()",
+			[]string{"React.renderComponent is deprecated since React 0.12.0, use React.render instead"},
+		},
 
 		// A spread in the object literal does not stop the named sibling from reporting.
-		{"m40", "var F = createReactClass({ ...x, componentWillMount: function() {} })", []string{"componentWillMount is deprecated since React 16.9.0, use UNSAFE_componentWillMount instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillmount. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components."}},
+		{"m40", "var F = createReactClass({ ...x, componentWillMount: function() {} })", []string{
+			"componentWillMount is deprecated since React 16.9.0, use UNSAFE_componentWillMount instead, see https://reactjs.org/docs/react-component.html#unsafe_componentwillmount. Use https://github.com/reactjs/react-codemod#rename-unsafe-lifecycles to automatically update your components.",
+		}},
 	}
 
 	for _, testCase := range cases {
@@ -209,19 +456,52 @@ func TestNoDeprecatedStaysSilent(test *testing.T) {
 		{"upstream valid-4", "ReactDOM.createPortal(child, container);"},
 		{"upstream valid-5", "ReactDOMServer.renderToString(element);"},
 		{"upstream valid-6", "ReactDOMServer.renderToStaticMarkup(element);"},
-		{"upstream valid-7", "\n        var Foo = createReactClass({\n          render: function() {}\n        })\n      "},
-		{"upstream valid-8", "\n        var Foo = createReactClassNonReact({\n          componentWillMount: function() {},\n          componentWillReceiveProps: function() {},\n          componentWillUpdate: function() {}\n        });\n      "},
-		{"upstream valid-9", "\n        var Foo = {\n          componentWillMount: function() {},\n          componentWillReceiveProps: function() {},\n          componentWillUpdate: function() {}\n        };\n      "},
-		{"upstream valid-10", "\n        class Foo {\n          constructor() {}\n          componentWillMount() {}\n          componentWillReceiveProps() {}\n          componentWillUpdate() {}\n        }\n      "},
-		{"upstream valid-13", "PropTypes"}, // upstream sets settings; cohere reads no React settings, so this is the unconfigured answer
-		{"upstream valid-15", "\n        import React from \"react\";\n\n        let { default: defaultReactExport, ...allReactExports } = React;\n      "},
-		{"upstream valid-17", "\n        import ReactDOM, { createRoot } from 'react-dom/client';\n        ReactDOM.createRoot(container);\n        const root = createRoot(container);\n        root.unmount();\n      "},
-		{"upstream valid-18", "\n        import ReactDOM, { hydrateRoot } from 'react-dom/client';\n        ReactDOM.hydrateRoot(container, <App/>);\n        hydrateRoot(container, <App/>);\n      "},
-		{"upstream valid-19", "\n        import ReactDOMServer, { renderToPipeableStream } from 'react-dom/server';\n        ReactDOMServer.renderToPipeableStream(<App />, {});\n        renderToPipeableStream(<App />, {});\n      "},
+		{
+			"upstream valid-7",
+			"\n        var Foo = createReactClass({\n          render: function() {}\n        })\n      ",
+		},
+		{
+			"upstream valid-8",
+			"\n        var Foo = createReactClassNonReact({\n          componentWillMount: function() {},\n          componentWillReceiveProps: function() {},\n          componentWillUpdate: function() {}\n        });\n      ",
+		},
+		{
+			"upstream valid-9",
+			"\n        var Foo = {\n          componentWillMount: function() {},\n          componentWillReceiveProps: function() {},\n          componentWillUpdate: function() {}\n        };\n      ",
+		},
+		{
+			"upstream valid-10",
+			"\n        class Foo {\n          constructor() {}\n          componentWillMount() {}\n          componentWillReceiveProps() {}\n          componentWillUpdate() {}\n        }\n      ",
+		},
+		{
+			"upstream valid-13",
+			"PropTypes",
+		}, // upstream sets settings; cohere reads no React settings, so this is the unconfigured answer
+		{
+			"upstream valid-15",
+			"\n        import React from \"react\";\n\n        let { default: defaultReactExport, ...allReactExports } = React;\n      ",
+		},
+		{
+			"upstream valid-17",
+			"\n        import ReactDOM, { createRoot } from 'react-dom/client';\n        ReactDOM.createRoot(container);\n        const root = createRoot(container);\n        root.unmount();\n      ",
+		},
+		{
+			"upstream valid-18",
+			"\n        import ReactDOM, { hydrateRoot } from 'react-dom/client';\n        ReactDOM.hydrateRoot(container, <App/>);\n        hydrateRoot(container, <App/>);\n      ",
+		},
+		{
+			"upstream valid-19",
+			"\n        import ReactDOMServer, { renderToPipeableStream } from 'react-dom/server';\n        ReactDOMServer.renderToPipeableStream(<App />, {});\n        renderToPipeableStream(<App />, {});\n      ",
+		},
 		{"upstream valid-20", "\n        import { renderToString } from 'react-dom/server';\n      "},
 		{"upstream valid-21", "\n        const { renderToString } = require('react-dom/server');\n      "},
-		{"upstream invalid-1", "Foo.renderComponent()"}, // upstream sets settings; cohere reads no React settings, so this is the unconfigured answer
-		{"upstream invalid-12", "Foo.createClass({});"}, // upstream sets settings; cohere reads no React settings, so this is the unconfigured answer
+		{
+			"upstream invalid-1",
+			"Foo.renderComponent()",
+		}, // upstream sets settings; cohere reads no React settings, so this is the unconfigured answer
+		{
+			"upstream invalid-12",
+			"Foo.createClass({});",
+		}, // upstream sets settings; cohere reads no React settings, so this is the unconfigured answer
 
 		// --- cases upstream does not cover, each measured against the installed build 7.37.5 ---
 		{"m1", "React . renderComponent()"},

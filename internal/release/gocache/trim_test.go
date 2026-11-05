@@ -13,7 +13,11 @@ import (
 func newCache(test *testing.T) string {
 	test.Helper()
 	directory := test.TempDir()
-	if writeError := os.WriteFile(filepath.Join(directory, "README"), []byte(readmeMarker+"\n"), 0o644); writeError != nil {
+	if writeError := os.WriteFile(
+		filepath.Join(directory, "README"),
+		[]byte(readmeMarker+"\n"),
+		0o644,
+	); writeError != nil {
 		test.Fatal(writeError)
 	}
 	return directory
@@ -45,7 +49,11 @@ func TestADirectoryWithoutGosReadmeIsRefused(test *testing.T) {
 	test.Parallel()
 	directory := test.TempDir()
 	file := put(test, directory, "ab/0000ab-d", 4096, time.Now().Add(-48*time.Hour))
-	if _, trimError := Trim(directory, Limit{Cap: 1, Target: 0, Spare: InUseWindow}, time.Now()); trimError == nil || !strings.Contains(trimError.Error(), "refusing to trim") {
+	if _, trimError := Trim(
+		directory,
+		Limit{Cap: 1, Target: 0, Spare: InUseWindow},
+		time.Now(),
+	); trimError == nil || !strings.Contains(trimError.Error(), "refusing to trim") {
 		test.Fatalf("a directory with no README was trimmed: %v", trimError)
 	}
 	if !exists(file) {
@@ -186,10 +194,18 @@ func TestTheGoCommandBuildsFromATrimmedCache(test *testing.T) {
 	}
 	cache := test.TempDir()
 	module := test.TempDir()
-	if writeError := os.WriteFile(filepath.Join(module, "go.mod"), []byte("module trimmed\n\ngo 1.21\n"), 0o644); writeError != nil {
+	if writeError := os.WriteFile(
+		filepath.Join(module, "go.mod"),
+		[]byte("module trimmed\n\ngo 1.21\n"),
+		0o644,
+	); writeError != nil {
 		test.Fatal(writeError)
 	}
-	if writeError := os.WriteFile(filepath.Join(module, "main.go"), []byte("package main\n\nfunc main() {}\n"), 0o644); writeError != nil {
+	if writeError := os.WriteFile(
+		filepath.Join(module, "main.go"),
+		[]byte("package main\n\nfunc main() {}\n"),
+		0o644,
+	); writeError != nil {
 		test.Fatal(writeError)
 	}
 	build := func() {

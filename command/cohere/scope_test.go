@@ -167,7 +167,11 @@ func TestTheScopeStatesBothCounts(test *testing.T) {
 
 	want := "3 named paths, 2 of them in the program"
 	if narrowed.Description != want {
-		test.Fatalf("the scope description does not state both counts:\n  want %q\n  got  %q", want, narrowed.Description)
+		test.Fatalf(
+			"the scope description does not state both counts:\n  want %q\n  got  %q",
+			want,
+			narrowed.Description,
+		)
 	}
 
 	// Narrowing describes; it must not silently shrink what is in scope, or the two numbers would
@@ -217,7 +221,14 @@ func TestTheEmptyScopeNamingSurvivesNarrowing(test *testing.T) {
 }
 
 // enumerationOf builds an Enumeration the way the real walk would report one.
-func enumerationOf(root string, files []string, walked int, declined map[string]int, nested []string, ignored map[string]int) formatfiles.Enumeration {
+func enumerationOf(
+	root string,
+	files []string,
+	walked int,
+	declined map[string]int,
+	nested []string,
+	ignored map[string]int,
+) formatfiles.Enumeration {
 	return formatfiles.Enumeration{
 		Root:               root,
 		Walked:             walked,
@@ -271,7 +282,14 @@ func TestAWholeTreeScopeBecomesTheEnumeration(test *testing.T) {
 // the coverage line could not even report it as skipped.
 func TestDeclinedExtensionsAreNamedRatherThanOmitted(test *testing.T) {
 	test.Parallel()
-	enumeration := enumerationOf("/repo", []string{"/repo/a.ts"}, 61, map[string]int{".rb": 3, ".txt": 57, "(none)": 1}, nil, nil)
+	enumeration := enumerationOf(
+		"/repo",
+		[]string{"/repo/a.ts"},
+		61,
+		map[string]int{".rb": 3, ".txt": 57, "(none)": 1},
+		nil,
+		nil,
+	)
 
 	description := wholeTreeScope().narrowToEnumeration(enumeration).Description
 
@@ -315,7 +333,12 @@ func TestIgnoreLayersAndNestedRepositoriesAreReported(test *testing.T) {
 
 	description := wholeTreeScope().narrowToEnumeration(enumeration).Description
 
-	for _, want := range []string{"400 by .gitignore", "28 by format.ignore", "libraries/structure", "projects/ahraos-macos"} {
+	for _, want := range []string{
+		"400 by .gitignore",
+		"28 by format.ignore",
+		"libraries/structure",
+		"projects/ahraos-macos",
+	} {
 		if !strings.Contains(description, want) {
 			test.Fatalf("want %q in %q", want, description)
 		}
@@ -448,7 +471,11 @@ func TestNamedPathsScopeResolvesFilesAndDirectories(test *testing.T) {
 	// and this scope reached it once during development by resolving against an empty directory.
 	test.Run("a path that does not exist is an error", func(test *testing.T) {
 		test.Parallel()
-		if _, namedPathsScopeError := namedPathsScope(directory, directory, []string{"source/Missing.ts"}); namedPathsScopeError == nil {
+		if _, namedPathsScopeError := namedPathsScope(
+			directory,
+			directory,
+			[]string{"source/Missing.ts"},
+		); namedPathsScopeError == nil {
 			test.Fatal("a nonexistent path resolved without error")
 		}
 	})
@@ -506,7 +533,9 @@ func TestNarrowToUsesTheWholeProgramNotTheLintScope(test *testing.T) {
 	// The regression. A lint scope of one named file is not the population this question is about,
 	// and narrowing against it reports zero on a tree that has two.
 	lintScopedToOneFile := map[string]struct{}{"/repository/c.ts": {}}
-	if narrowed := changed.narrowTo(lintScopedToOneFile); !strings.Contains(narrowed.Description, "0 of them in the program") {
+	if narrowed := changed.narrowTo(
+		lintScopedToOneFile,
+	); !strings.Contains(narrowed.Description, "0 of them in the program") {
 		test.Fatalf("this fixture no longer reproduces the defect it was written for: %s", narrowed.Description)
 	}
 }
@@ -557,11 +586,19 @@ func TestNarrowToAppendsToTheScopesOwnWording(test *testing.T) {
 // source file is a stated skip rather than an absence.
 func TestTheScopeLineNamesSkippedSymbolicLinks(test *testing.T) {
 	test.Parallel()
-	description := describeEnumeration(formatfiles.Enumeration{Root: "/project", Walked: 4, SymbolicLinks: 2, Files: []string{"/project/a.ts", "/project/b.ts"}}, 2)
+	description := describeEnumeration(formatfiles.Enumeration{
+		Root:          "/project",
+		Walked:        4,
+		SymbolicLinks: 2,
+		Files:         []string{"/project/a.ts", "/project/b.ts"},
+	}, 2)
 	if !strings.Contains(description, "skipped 2 symbolic links") {
 		test.Fatalf("description %q does not name the skipped links", description)
 	}
-	if description := describeEnumeration(formatfiles.Enumeration{Root: "/project", Walked: 1, Files: []string{"/project/a.ts"}}, 1); strings.Contains(description, "symbolic") {
+	if description := describeEnumeration(
+		formatfiles.Enumeration{Root: "/project", Walked: 1, Files: []string{"/project/a.ts"}},
+		1,
+	); strings.Contains(description, "symbolic") {
 		test.Fatalf("a walk with no links names them: %q", description)
 	}
 }

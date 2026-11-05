@@ -35,9 +35,17 @@ func TestAZeroConfigProjectReplaysAndNoticesASettingsFileCreated(test *testing.T
 	finding := regexp.MustCompile(`(?m)^\S+:\d+:\d+ - .*$`)
 	findings := func(output string) string { return strings.Join(finding.FindAllString(output, -1), "\n") }
 	if findings(cold) == findings(replayed) {
-		test.Fatalf("the settings file changed nothing a run reports, so the miss above proves nothing:\n--- zero config\n%s\n--- with settings\n%s", replayed, cold)
+		test.Fatalf(
+			"the settings file changed nothing a run reports, so the miss above proves nothing:\n--- zero config\n%s\n--- with settings\n%s",
+			replayed,
+			cold,
+		)
 	}
 	if findings(warm) != findings(cold) || warmExit != coldExit {
-		test.Errorf("after CohereSettings.json was created the run reported other findings than a run with no cache:\n--- warm\n%s\n--- cold\n%s", warm, cold)
+		test.Errorf(
+			"after CohereSettings.json was created the run reported other findings than a run with no cache:\n--- warm\n%s\n--- cold\n%s",
+			warm,
+			cold,
+		)
 	}
 }

@@ -93,7 +93,10 @@ func TestNoPromiseExecutorReturnStaysSilent(test *testing.T) {
 		{"new Promise(function (resolve, reject) { () => { return 1; } });", ""},
 		{"new Promise((resolve, reject) => { () => 1 });", ""},
 		{"function foo() { return new Promise(function (resolve, reject) { resolve(bar); }) };", ""},
-		{"foo => new Promise((resolve, reject) => { bar(foo, (err, data) => { if (err) { reject(err); return; } resolve(data); })});", ""},
+		{
+			"foo => new Promise((resolve, reject) => { bar(foo, (err, data) => { if (err) { reject(err); return; } resolve(data); })});",
+			"",
+		},
 		{"new Promise(function (resolve, reject) {}); function foo() { return 1; }", ""},
 		{"new Promise((resolve, reject) => {}); (function () { return 1; });", ""},
 		{"new Promise(function (resolve, reject) {}); () => { return 1; };", ""},
@@ -129,7 +132,11 @@ func TestNoPromiseExecutorReturnFires(test *testing.T) {
 		wantSuggest []string
 	}{
 		{"new Promise(function (resolve, reject) { return 1; })", "", nil},
-		{"new Promise((resolve, reject) => resolve(1))", "{\"allowVoid\": true}", []string{"prependVoid", "wrapBraces"}},
+		{
+			"new Promise((resolve, reject) => resolve(1))",
+			"{\"allowVoid\": true}",
+			[]string{"prependVoid", "wrapBraces"},
+		},
 		{"new Promise((resolve, reject) => { return 1 })", "{\"allowVoid\": true}", []string{"prependVoid"}},
 		{"new Promise(r => 1)", "{\"allowVoid\": true}", []string{"prependVoid", "wrapBraces"}},
 		{"new Promise(r => 1 ? 2 : 3)", "{\"allowVoid\": true}", []string{"prependVoid", "wrapBraces"}},
@@ -281,12 +288,24 @@ func TestNoPromiseExecutorReturnCasesThisHarnessCannotExpress(test *testing.T) {
 		reason     string
 	}{
 		{"new Promise((resolve, reject) => { return 1; });", "needs a configured-globals surface"},
-		{"/* globals Promise:off */ new Promise(function (resolve, reject) { return 1; });", "needs a directive-comment globals surface"},
+		{
+			"/* globals Promise:off */ new Promise(function (resolve, reject) { return 1; });",
+			"needs a directive-comment globals surface",
+		},
 		{"return 1;", "needs commonjs or globalReturn, where a top-level return is legal"},
 		{"return 1;", "needs commonjs or globalReturn, where a top-level return is legal"},
-		{"return 1; function foo(){ return 1; } return 1;", "needs commonjs or globalReturn, where a top-level return is legal"},
-		{"function foo(){} return 1; var bar = function*(){ return 1; }; return 1; var baz = () => {}; return 1;", "needs commonjs or globalReturn, where a top-level return is legal"},
-		{"new Promise(function (resolve, reject) {}); return 1;", "needs commonjs or globalReturn, where a top-level return is legal"},
+		{
+			"return 1; function foo(){ return 1; } return 1;",
+			"needs commonjs or globalReturn, where a top-level return is legal",
+		},
+		{
+			"function foo(){} return 1; var bar = function*(){ return 1; }; return 1; var baz = () => {}; return 1;",
+			"needs commonjs or globalReturn, where a top-level return is legal",
+		},
+		{
+			"new Promise(function (resolve, reject) {}); return 1;",
+			"needs commonjs or globalReturn, where a top-level return is legal",
+		},
 	}
 
 	for _, testCase := range cases {
@@ -321,7 +340,9 @@ func TestDecodeNoPromiseExecutorReturnOptions(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, decodeNoPromiseExecutorReturnOptionsError := DecodeNoPromiseExecutorReturnOptions(json.RawMessage(testCase.raw))
+			decoded, decodeNoPromiseExecutorReturnOptionsError := DecodeNoPromiseExecutorReturnOptions(
+				json.RawMessage(testCase.raw),
+			)
 			if decodeNoPromiseExecutorReturnOptionsError != nil {
 				test.Fatalf("the decoder refused %q: %v", testCase.raw, decodeNoPromiseExecutorReturnOptionsError)
 			}
@@ -387,7 +408,10 @@ func TestNoPromiseExecutorReturnMessages(test *testing.T) {
 	if got := result.Diagnostics[0].Message.Id; got != "returnsValue" {
 		test.Errorf("message id is %q, want %q", got, "returnsValue")
 	}
-	if got := result.Diagnostics[0].Message.Description; !strings.HasPrefix(got, "This returns a value from a promise executor") {
+	if got := result.Diagnostics[0].Message.Description; !strings.HasPrefix(
+		got,
+		"This returns a value from a promise executor",
+	) {
 		test.Errorf("message description starts %q, which is not the sentence this rule reports", got)
 	}
 	wantSuggestionIds := []string{"prependVoid", "wrapBraces"}
@@ -416,14 +440,44 @@ func TestNoPromiseExecutorReturnSuggestionOutputs(test *testing.T) {
 		wantId     string
 		wantOutput string
 	}{
-		{"new Promise((resolve, reject) => resolve(1))", "{\"allowVoid\": true}", 0, "prependVoid", "new Promise((resolve, reject) => void resolve(1))"},
-		{"new Promise((resolve, reject) => resolve(1))", "{\"allowVoid\": true}", 1, "wrapBraces", "new Promise((resolve, reject) => {resolve(1)})"},
-		{"new Promise((resolve, reject) => { return 1 })", "{\"allowVoid\": true}", 0, "prependVoid", "new Promise((resolve, reject) => { return void 1 })"},
+		{
+			"new Promise((resolve, reject) => resolve(1))",
+			"{\"allowVoid\": true}",
+			0,
+			"prependVoid",
+			"new Promise((resolve, reject) => void resolve(1))",
+		},
+		{
+			"new Promise((resolve, reject) => resolve(1))",
+			"{\"allowVoid\": true}",
+			1,
+			"wrapBraces",
+			"new Promise((resolve, reject) => {resolve(1)})",
+		},
+		{
+			"new Promise((resolve, reject) => { return 1 })",
+			"{\"allowVoid\": true}",
+			0,
+			"prependVoid",
+			"new Promise((resolve, reject) => { return void 1 })",
+		},
 		{"new Promise(r => 1)", "{\"allowVoid\": true}", 0, "prependVoid", "new Promise(r => void 1)"},
 		{"new Promise(r => 1)", "{\"allowVoid\": true}", 1, "wrapBraces", "new Promise(r => {1})"},
-		{"new Promise(r => 1 ? 2 : 3)", "{\"allowVoid\": true}", 0, "prependVoid", "new Promise(r => void (1 ? 2 : 3))"},
+		{
+			"new Promise(r => 1 ? 2 : 3)",
+			"{\"allowVoid\": true}",
+			0,
+			"prependVoid",
+			"new Promise(r => void (1 ? 2 : 3))",
+		},
 		{"new Promise(r => 1 ? 2 : 3)", "{\"allowVoid\": true}", 1, "wrapBraces", "new Promise(r => {1 ? 2 : 3})"},
-		{"new Promise(r => (1 ? 2 : 3))", "{\"allowVoid\": true}", 0, "prependVoid", "new Promise(r => void (1 ? 2 : 3))"},
+		{
+			"new Promise(r => (1 ? 2 : 3))",
+			"{\"allowVoid\": true}",
+			0,
+			"prependVoid",
+			"new Promise(r => void (1 ? 2 : 3))",
+		},
 		{"new Promise(r => (1 ? 2 : 3))", "{\"allowVoid\": true}", 1, "wrapBraces", "new Promise(r => {(1 ? 2 : 3)})"},
 		{"new Promise(r => (1))", "{\"allowVoid\": true}", 0, "prependVoid", "new Promise(r => void (1))"},
 		{"new Promise(r => (1))", "{\"allowVoid\": true}", 1, "wrapBraces", "new Promise(r => {(1)})"},
@@ -435,17 +489,59 @@ func TestNoPromiseExecutorReturnSuggestionOutputs(test *testing.T) {
 		{"new Promise(r => /*hi*/ ~0)", "{\"allowVoid\": true}", 0, "prependVoid", "new Promise(r => /*hi*/ void ~0)"},
 		{"new Promise(r => /*hi*/ ~0)", "{\"allowVoid\": true}", 1, "wrapBraces", "new Promise(r => /*hi*/ {~0})"},
 		{"new Promise(r => /*hi*/ ~0)", "{\"allowVoid\": false}", 0, "wrapBraces", "new Promise(r => /*hi*/ {~0})"},
-		{"new Promise(r => { return 0 })", "{\"allowVoid\": true}", 0, "prependVoid", "new Promise(r => { return void 0 })"},
-		{"new Promise(r => { if (foo) { return void 0 } return 0 })", "{\"allowVoid\": true}", 0, "prependVoid", "new Promise(r => { if (foo) { return void 0 } return void 0 })"},
-		{"new Promise(resolve => { return (foo = resolve(1)); })", "{\"allowVoid\": true}", 0, "prependVoid", "new Promise(resolve => { return void (foo = resolve(1)); })"},
-		{"new Promise(resolve => r = resolve)", "{\"allowVoid\": true}", 0, "prependVoid", "new Promise(resolve => void (r = resolve))"},
-		{"new Promise(resolve => r = resolve)", "{\"allowVoid\": true}", 1, "wrapBraces", "new Promise(resolve => {r = resolve})"},
-		{"new Promise(r => { return(1) })", "{\"allowVoid\": true}", 0, "prependVoid", "new Promise(r => { return void (1) })"},
+		{
+			"new Promise(r => { return 0 })",
+			"{\"allowVoid\": true}",
+			0,
+			"prependVoid",
+			"new Promise(r => { return void 0 })",
+		},
+		{
+			"new Promise(r => { if (foo) { return void 0 } return 0 })",
+			"{\"allowVoid\": true}",
+			0,
+			"prependVoid",
+			"new Promise(r => { if (foo) { return void 0 } return void 0 })",
+		},
+		{
+			"new Promise(resolve => { return (foo = resolve(1)); })",
+			"{\"allowVoid\": true}",
+			0,
+			"prependVoid",
+			"new Promise(resolve => { return void (foo = resolve(1)); })",
+		},
+		{
+			"new Promise(resolve => r = resolve)",
+			"{\"allowVoid\": true}",
+			0,
+			"prependVoid",
+			"new Promise(resolve => void (r = resolve))",
+		},
+		{
+			"new Promise(resolve => r = resolve)",
+			"{\"allowVoid\": true}",
+			1,
+			"wrapBraces",
+			"new Promise(resolve => {r = resolve})",
+		},
+		{
+			"new Promise(r => { return(1) })",
+			"{\"allowVoid\": true}",
+			0,
+			"prependVoid",
+			"new Promise(r => { return void (1) })",
+		},
 		{"new Promise(r =>1)", "{\"allowVoid\": true}", 0, "prependVoid", "new Promise(r =>void 1)"},
 		{"new Promise(r =>1)", "{\"allowVoid\": true}", 1, "wrapBraces", "new Promise(r =>{1})"},
 		{"new Promise(r => ((1)))", "{\"allowVoid\": true}", 0, "prependVoid", "new Promise(r => void ((1)))"},
 		{"new Promise(r => ((1)))", "{\"allowVoid\": true}", 1, "wrapBraces", "new Promise(r => {((1))})"},
-		{"new Promise((resolve, reject) => resolve)", "", 0, "wrapBraces", "new Promise((resolve, reject) => {resolve})"},
+		{
+			"new Promise((resolve, reject) => resolve)",
+			"",
+			0,
+			"wrapBraces",
+			"new Promise((resolve, reject) => {resolve})",
+		},
 		{"new Promise((resolve, reject) => null)", "", 0, "wrapBraces", "new Promise((resolve, reject) => {null})"},
 		{"new Promise((resolve, reject) => x + y)", "", 0, "wrapBraces", "new Promise((resolve, reject) => {x + y})"},
 		{"new Promise(() => (1))", "", 0, "wrapBraces", "new Promise(() => {(1)})"},
@@ -454,7 +550,13 @@ func TestNoPromiseExecutorReturnSuggestionOutputs(test *testing.T) {
 		{"() => new Promise(() => 1);", "", 0, "wrapBraces", "() => new Promise(() => {1});"},
 		{"() => new Promise(() => () => 1);", "", 0, "wrapBraces", "() => new Promise(() => {() => 1});"},
 		{"() => new Promise(() => async () => 1);", "", 0, "wrapBraces", "() => new Promise(() => {async () => 1});"},
-		{"() => new Promise(() => function foo() {});", "", 0, "wrapBraces", "() => new Promise(() => {function foo() {}});"},
+		{
+			"() => new Promise(() => function foo() {});",
+			"",
+			0,
+			"wrapBraces",
+			"() => new Promise(() => {function foo() {}});",
+		},
 		{"() => new Promise(() => class Foo {});", "", 0, "wrapBraces", "() => new Promise(() => {class Foo {}});"},
 		{"() => new Promise(() => []);", "", 0, "wrapBraces", "() => new Promise(() => {[]});"},
 	}

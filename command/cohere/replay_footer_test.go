@@ -43,7 +43,11 @@ func TestAReplaysFooterIsTheReplays(test *testing.T) {
 // or a file rewritten, none of which a replay does.
 func isTheReplaysFooter(footerLine string, recorded runSummary) error {
 	if strings.Contains(footerLine, footerSeconds(recorded.Total)) {
-		return fmt.Errorf("the footer carries the recorded run's time, %s: %s", footerSeconds(recorded.Total), footerLine)
+		return fmt.Errorf(
+			"the footer carries the recorded run's time, %s: %s",
+			footerSeconds(recorded.Total),
+			footerLine,
+		)
 	}
 	if strings.Contains(footerLine, " checked") {
 		return fmt.Errorf("the footer says files were checked fresh: %s", footerLine)

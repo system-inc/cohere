@@ -104,7 +104,14 @@ func compareProperty(name string, points []rune, bits []string) (int, string) {
 						return count, matchRunesError.Error()
 					}
 					if match != (bits[index][j] == '1') {
-						return count, fmt.Sprintf("%s /%s U+%04X: Go=%t Node=%t", source, flags, c, match, bits[index][j] == '1')
+						return count, fmt.Sprintf(
+							"%s /%s U+%04X: Go=%t Node=%t",
+							source,
+							flags,
+							c,
+							match,
+							bits[index][j] == '1',
+						)
 					}
 				}
 				index++
@@ -155,12 +162,25 @@ func TestUnicodePropertiesNode(test *testing.T) {
 			}
 		})
 	}
-	test.Logf("table spellings=%d tested spellings=%d patterns=%d membership checks=%d", len(names), tested, tested*12, checks)
+	test.Logf(
+		"table spellings=%d tested spellings=%d patterns=%d membership checks=%d",
+		len(names),
+		tested,
+		tested*12,
+		checks,
+	)
 }
 
 func TestUnicodePropertiesFresh(test *testing.T) {
 	test.Parallel()
-	command := exec.Command("go", "run", "../../../../unicodeproperties/internal/generate", "-check", "-output", "../../../../unicodeproperties/tables_generated.go")
+	command := exec.Command(
+		"go",
+		"run",
+		"../../../../unicodeproperties/internal/generate",
+		"-check",
+		"-output",
+		"../../../../unicodeproperties/tables_generated.go",
+	)
 	output, outputError := command.CombinedOutput()
 	if outputError != nil {
 		test.Fatalf("freshness: %v: %s", outputError, output)
@@ -196,7 +216,26 @@ func TestUnicodePropertySyntaxNode(test *testing.T) {
 		{`^\p{Script=Greek}$`, ""},
 		{`^\\p\{Script=Greek\}$`, "u"},
 	}
-	subjects := []string{"", "A", "a", "α", "Α", "µ", "μ", "-", "_", "0", " ", "\u0085", "\ufeff", "AA", "αa", "αA", "p{Script=Greek}", `\p{Script=Greek}`}
+	subjects := []string{
+		"",
+		"A",
+		"a",
+		"α",
+		"Α",
+		"µ",
+		"μ",
+		"-",
+		"_",
+		"0",
+		" ",
+		"\u0085",
+		"\ufeff",
+		"AA",
+		"αa",
+		"αA",
+		"p{Script=Greek}",
+		`\p{Script=Greek}`,
+	}
 	input, err := json.Marshal(struct {
 		Fixtures []fixture
 		Subjects []string
@@ -204,7 +243,11 @@ func TestUnicodePropertySyntaxNode(test *testing.T) {
 	if err != nil {
 		test.Fatal(err)
 	}
-	command := exec.Command("node", "-e", `const fs=require('fs');if(process.versions.unicode!=='17.0')throw Error('Unicode version mismatch');const {Fixtures,Subjects}=JSON.parse(fs.readFileSync(0,'utf8'));process.stdout.write(JSON.stringify(Fixtures.map(({Source,Flags})=>{try{const r=new RegExp(Source,Flags);return {Accepted:true,Bits:Subjects.map(s=>r.test(s))}}catch{return {Accepted:false}}})))`)
+	command := exec.Command(
+		"node",
+		"-e",
+		`const fs=require('fs');if(process.versions.unicode!=='17.0')throw Error('Unicode version mismatch');const {Fixtures,Subjects}=JSON.parse(fs.readFileSync(0,'utf8'));process.stdout.write(JSON.stringify(Fixtures.map(({Source,Flags})=>{try{const r=new RegExp(Source,Flags);return {Accepted:true,Bits:Subjects.map(s=>r.test(s))}}catch{return {Accepted:false}}})))`,
+	)
 	command.Stdin = bytes.NewReader(input)
 	output, err := command.CombinedOutput()
 	if err != nil {

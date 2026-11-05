@@ -331,7 +331,10 @@ func TestNoUselessBackreferenceIgnoresALocalRegExp(test *testing.T) {
 	for _, sourceText := range cases {
 		test.Run(sourceText, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoUselessBackreference, backreferenceFile, sourceText))
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.RunTyped(test, NoUselessBackreference, backreferenceFile, sourceText),
+			)
 		})
 	}
 }
@@ -412,12 +415,22 @@ func TestNoUselessBackreferenceEveryPathStartsAtTheRoot(test *testing.T) {
 			}
 			for _, group := range structure.groups {
 				if len(group.path) == 0 || group.path[0] != 0 {
-					test.Errorf("group path %v in %q flags %q does not start at the root", group.path, pattern, flagText)
+					test.Errorf(
+						"group path %v in %q flags %q does not start at the root",
+						group.path,
+						pattern,
+						flagText,
+					)
 				}
 			}
 			for _, reference := range structure.backreferences {
 				if len(reference.path) == 0 || reference.path[0] != 0 {
-					test.Errorf("reference path %v in %q flags %q does not start at the root", reference.path, pattern, flagText)
+					test.Errorf(
+						"reference path %v in %q flags %q does not start at the root",
+						reference.path,
+						pattern,
+						flagText,
+					)
 				}
 			}
 		}

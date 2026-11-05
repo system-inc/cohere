@@ -74,58 +74,293 @@ func runContextRequiresAccess(
 // cases, and are recorded in TestContextRequiresAccessUnmeasurableShapes.
 func securityRequireContextAccessFiresCases() []securityRequireContextAccessCase {
 	return []securityRequireContextAccessCase{
-		{"bare: unprotected reports", "class A { m(@InjectRequestContext(AccountRequestContextKey) a: string) {} }", securityRequireContextAccessLiveOptions(), []string{"AccountRequestContextKey"}},
-		{"bare: a decorator for a different key does not protect", "class A { @RequireDeviceId() m(@InjectRequestContext(AccountRequestContextKey) a: string) {} }", securityRequireContextAccessLiveOptions(), []string{"AccountRequestContextKey"}},
-		{"class decorator, wrong one", "@RequireDeviceId() class A { m(@InjectRequestContext(AccountRequestContextKey) a: string) {} }", securityRequireContextAccessLiveOptions(), []string{"AccountRequestContextKey"}},
-		{"member-access key resolves to the property", "class A { m(@InjectRequestContext(Keys.AccountRequestContextKey) a: string) {} }", securityRequireContextAccessLiveOptions(), []string{"AccountRequestContextKey"}},
-		{"no annotation at all is NOT soft use", "class A { m(@InjectRequestContext(AccountRequestContextKey) a) {} }", securityRequireContextAccessLiveOptions(), []string{"AccountRequestContextKey"}},
-		{"parameter property, unprotected", "class A { constructor(@InjectRequestContext(AccountRequestContextKey) private a: string) {} }", securityRequireContextAccessLiveOptions(), []string{"AccountRequestContextKey"}},
-		{"defaulted parameter, unprotected", "class A { m(@InjectRequestContext(AccountRequestContextKey) a: string = 'x') {} }", securityRequireContextAccessLiveOptions(), []string{"AccountRequestContextKey"}},
-		{"two protected keys, both unprotected", "class A { m(@InjectRequestContext(AccountRequestContextKey) a: string, @InjectRequestContext(DeviceIdRequestContextKey) b: string) {} }", securityRequireContextAccessLiveOptions(), []string{"AccountRequestContextKey", "DeviceIdRequestContextKey"}},
-		{"two keys, decorator satisfies only one", "class A { @RequireDeviceId() m(@InjectRequestContext(AccountRequestContextKey) a: string, @InjectRequestContext(DeviceIdRequestContextKey) b: string) {} }", securityRequireContextAccessLiveOptions(), []string{"AccountRequestContextKey"}},
-		{"same key twice reports once", "class A { m(@InjectRequestContext(AccountRequestContextKey) a: string, @InjectRequestContext(AccountRequestContextKey) b: string) {} }", securityRequireContextAccessLiveOptions(), []string{"AccountRequestContextKey"}},
-		{"import alias resolves to the exported name", "import { AccountRequestContextKey as AK } from 'x';\nclass A { m(@InjectRequestContext(AK) a: string) {} }", securityRequireContextAccessLiveOptions(), []string{"AccountRequestContextKey"}},
-		{"non-aliased import is unaffected", "import { AccountRequestContextKey } from 'x';\nclass A { m(@InjectRequestContext(AccountRequestContextKey) a: string) {} }", securityRequireContextAccessLiveOptions(), []string{"AccountRequestContextKey"}},
-		{"computed method name", "class A { [key](@InjectRequestContext(AccountRequestContextKey) a: string) {} }", securityRequireContextAccessLiveOptions(), []string{"AccountRequestContextKey"}},
-		{"static method, unprotected", "class A { static m(@InjectRequestContext(AccountRequestContextKey) a: string) {} }", securityRequireContextAccessLiveOptions(), []string{"AccountRequestContextKey"}},
-		{"getter with a decorated parameter is not a method definition shape", "class A { set m(@InjectRequestContext(AccountRequestContextKey) a: string) {} }", securityRequireContextAccessLiveOptions(), []string{"AccountRequestContextKey"}},
-		{"authentication key, unprotected", "class A { m(@InjectRequestContext(AuthenticationRequestContextKey) a: string) {} }", securityRequireContextAccessLiveOptions(), []string{"AuthenticationRequestContextKey"}},
-		{"namespaced access decorator does not match", "class A { @Access.RequireSessionAccess() m(@InjectRequestContext(AccountRequestContextKey) a: string) {} }", securityRequireContextAccessLiveOptions(), []string{"AccountRequestContextKey"}},
+		{
+			"bare: unprotected reports",
+			"class A { m(@InjectRequestContext(AccountRequestContextKey) a: string) {} }",
+			securityRequireContextAccessLiveOptions(),
+			[]string{"AccountRequestContextKey"},
+		},
+		{
+			"bare: a decorator for a different key does not protect",
+			"class A { @RequireDeviceId() m(@InjectRequestContext(AccountRequestContextKey) a: string) {} }",
+			securityRequireContextAccessLiveOptions(),
+			[]string{"AccountRequestContextKey"},
+		},
+		{
+			"class decorator, wrong one",
+			"@RequireDeviceId() class A { m(@InjectRequestContext(AccountRequestContextKey) a: string) {} }",
+			securityRequireContextAccessLiveOptions(),
+			[]string{"AccountRequestContextKey"},
+		},
+		{
+			"member-access key resolves to the property",
+			"class A { m(@InjectRequestContext(Keys.AccountRequestContextKey) a: string) {} }",
+			securityRequireContextAccessLiveOptions(),
+			[]string{"AccountRequestContextKey"},
+		},
+		{
+			"no annotation at all is NOT soft use",
+			"class A { m(@InjectRequestContext(AccountRequestContextKey) a) {} }",
+			securityRequireContextAccessLiveOptions(),
+			[]string{"AccountRequestContextKey"},
+		},
+		{
+			"parameter property, unprotected",
+			"class A { constructor(@InjectRequestContext(AccountRequestContextKey) private a: string) {} }",
+			securityRequireContextAccessLiveOptions(),
+			[]string{"AccountRequestContextKey"},
+		},
+		{
+			"defaulted parameter, unprotected",
+			"class A { m(@InjectRequestContext(AccountRequestContextKey) a: string = 'x') {} }",
+			securityRequireContextAccessLiveOptions(),
+			[]string{"AccountRequestContextKey"},
+		},
+		{
+			"two protected keys, both unprotected",
+			"class A { m(@InjectRequestContext(AccountRequestContextKey) a: string, @InjectRequestContext(DeviceIdRequestContextKey) b: string) {} }",
+			securityRequireContextAccessLiveOptions(),
+			[]string{"AccountRequestContextKey", "DeviceIdRequestContextKey"},
+		},
+		{
+			"two keys, decorator satisfies only one",
+			"class A { @RequireDeviceId() m(@InjectRequestContext(AccountRequestContextKey) a: string, @InjectRequestContext(DeviceIdRequestContextKey) b: string) {} }",
+			securityRequireContextAccessLiveOptions(),
+			[]string{"AccountRequestContextKey"},
+		},
+		{
+			"same key twice reports once",
+			"class A { m(@InjectRequestContext(AccountRequestContextKey) a: string, @InjectRequestContext(AccountRequestContextKey) b: string) {} }",
+			securityRequireContextAccessLiveOptions(),
+			[]string{"AccountRequestContextKey"},
+		},
+		{
+			"import alias resolves to the exported name",
+			"import { AccountRequestContextKey as AK } from 'x';\nclass A { m(@InjectRequestContext(AK) a: string) {} }",
+			securityRequireContextAccessLiveOptions(),
+			[]string{"AccountRequestContextKey"},
+		},
+		{
+			"non-aliased import is unaffected",
+			"import { AccountRequestContextKey } from 'x';\nclass A { m(@InjectRequestContext(AccountRequestContextKey) a: string) {} }",
+			securityRequireContextAccessLiveOptions(),
+			[]string{"AccountRequestContextKey"},
+		},
+		{
+			"computed method name",
+			"class A { [key](@InjectRequestContext(AccountRequestContextKey) a: string) {} }",
+			securityRequireContextAccessLiveOptions(),
+			[]string{"AccountRequestContextKey"},
+		},
+		{
+			"static method, unprotected",
+			"class A { static m(@InjectRequestContext(AccountRequestContextKey) a: string) {} }",
+			securityRequireContextAccessLiveOptions(),
+			[]string{"AccountRequestContextKey"},
+		},
+		{
+			"getter with a decorated parameter is not a method definition shape",
+			"class A { set m(@InjectRequestContext(AccountRequestContextKey) a: string) {} }",
+			securityRequireContextAccessLiveOptions(),
+			[]string{"AccountRequestContextKey"},
+		},
+		{
+			"authentication key, unprotected",
+			"class A { m(@InjectRequestContext(AuthenticationRequestContextKey) a: string) {} }",
+			securityRequireContextAccessLiveOptions(),
+			[]string{"AuthenticationRequestContextKey"},
+		},
+		{
+			"namespaced access decorator does not match",
+			"class A { @Access.RequireSessionAccess() m(@InjectRequestContext(AccountRequestContextKey) a: string) {} }",
+			securityRequireContextAccessLiveOptions(),
+			[]string{"AccountRequestContextKey"},
+		},
 	}
 }
 
 func securityRequireContextAccessSilentCases() []securityRequireContextAccessCase {
 	return []securityRequireContextAccessCase{
-		{"bare: method decorator protects", "class A { @RequireSessionAccess() m(@InjectRequestContext(AccountRequestContextKey) a: string) {} }", securityRequireContextAccessLiveOptions(), nil},
-		{"bare: the other alternative also protects", "class A { @WithSessionAccess() m(@InjectRequestContext(AccountRequestContextKey) a: string) {} }", securityRequireContextAccessLiveOptions(), nil},
-		{"class decorator protects", "@RequireSessionAccess() class A { m(@InjectRequestContext(AccountRequestContextKey) a: string) {} }", securityRequireContextAccessLiveOptions(), nil},
-		{"unconfigured key is ignored", "class A { m(@InjectRequestContext(SomeOtherKey) a: string) {} }", securityRequireContextAccessLiveOptions(), nil},
-		{"computed member access does not resolve", "class A { m(@InjectRequestContext(Keys['AccountRequestContextKey']) a: string) {} }", securityRequireContextAccessLiveOptions(), nil},
-		{"soft use: optional parameter", "class A { m(@InjectRequestContext(AccountRequestContextKey) a?: string) {} }", securityRequireContextAccessLiveOptions(), nil},
-		{"soft use: union with undefined", "class A { m(@InjectRequestContext(AccountRequestContextKey) a: string | undefined) {} }", securityRequireContextAccessLiveOptions(), nil},
-		{"soft use: union with null", "class A { m(@InjectRequestContext(AccountRequestContextKey) a: string | null) {} }", securityRequireContextAccessLiveOptions(), nil},
-		{"soft use: any", "class A { m(@InjectRequestContext(AccountRequestContextKey) a: any) {} }", securityRequireContextAccessLiveOptions(), nil},
-		{"soft use: unknown", "class A { m(@InjectRequestContext(AccountRequestContextKey) a: unknown) {} }", securityRequireContextAccessLiveOptions(), nil},
-		{"soft use: void", "class A { m(@InjectRequestContext(AccountRequestContextKey) a: void) {} }", securityRequireContextAccessLiveOptions(), nil},
-		{"soft use: bare undefined annotation", "class A { m(@InjectRequestContext(AccountRequestContextKey) a: undefined) {} }", securityRequireContextAccessLiveOptions(), nil},
-		{"nested union counts as soft use", "class A { m(@InjectRequestContext(AccountRequestContextKey) a: string | (number | null)) {} }", securityRequireContextAccessLiveOptions(), nil},
-		{"GraphQlFieldResolver exempts the method", "class A { @GraphQlFieldResolver() m(@InjectRequestContext(AccountRequestContextKey) a: string) {} }", securityRequireContextAccessLiveOptions(), nil},
-		{"parameter property, optional is soft use", "class A { constructor(@InjectRequestContext(AccountRequestContextKey) private a?: string) {} }", securityRequireContextAccessLiveOptions(), nil},
-		{"defaulted parameter, optional-typed is soft use", "class A { m(@InjectRequestContext(AccountRequestContextKey) a: string | undefined = undefined) {} }", securityRequireContextAccessLiveOptions(), nil},
-		{"two keys, one decorator satisfies both", "class A { @RequireSessionAccess() m(@InjectRequestContext(AccountRequestContextKey) a: string, @InjectRequestContext(DeviceIdRequestContextKey) b: string) {} }", securityRequireContextAccessLiveOptions(), nil},
-		{"import alias, protected", "import { AccountRequestContextKey as AK } from 'x';\nclass A { @RequireSessionAccess() m(@InjectRequestContext(AK) a: string) {} }", securityRequireContextAccessLiveOptions(), nil},
-		{"an alias TO a configured name from something else", "import { Something as AccountRequestContextKey } from 'x';\nclass A { m(@InjectRequestContext(AccountRequestContextKey) a: string) {} }", securityRequireContextAccessLiveOptions(), nil},
-		{"a different decorator entirely is ignored", "class A { m(@InjectSomethingElse(AccountRequestContextKey) a: string) {} }", securityRequireContextAccessLiveOptions(), nil},
-		{"decorator with no argument", "class A { m(@InjectRequestContext() a: string) {} }", securityRequireContextAccessLiveOptions(), nil},
-		{"bare decorator, not a call", "class A { m(@InjectRequestContext a: string) {} }", securityRequireContextAccessLiveOptions(), nil},
-		{"authentication key, its own alternative", "class A { @RequireAuthenticationSession() m(@InjectRequestContext(AuthenticationRequestContextKey) a: string) {} }", securityRequireContextAccessLiveOptions(), nil},
-		{"device key, its own alternative", "class A { @RequireDeviceId() m(@InjectRequestContext(DeviceIdRequestContextKey) a: string) {} }", securityRequireContextAccessLiveOptions(), nil},
-		{"bare access decorator, not a call", "class A { @RequireSessionAccess m(@InjectRequestContext(AccountRequestContextKey) a: string) {} }", securityRequireContextAccessLiveOptions(), nil},
-		{"empty requirements: rule is inert", "class A { m(@InjectRequestContext(AccountRequestContextKey) a: string) {} }", securityRequireContextAccessOptions("[]"), nil},
-		{"parameter property, class-protected", "@RequireSessionAccess() class A { constructor(@InjectRequestContext(AccountRequestContextKey) private readonly a: string) {} }", securityRequireContextAccessLiveOptions(), nil},
-		{"alias TO a configured name (recheck)", "import { Something as AccountRequestContextKey } from 'x';\nclass A { m(@InjectRequestContext(AccountRequestContextKey) a: string) {} }", securityRequireContextAccessLiveOptions(), nil},
-		{"bare access decorator, not a call (recheck)", "class A { @RequireSessionAccess m(@InjectRequestContext(AccountRequestContextKey) a: string) {} }", securityRequireContextAccessLiveOptions(), nil},
-		{"bare access decorator on the class", "@RequireSessionAccess class A { m(@InjectRequestContext(AccountRequestContextKey) a: string) {} }", securityRequireContextAccessLiveOptions(), nil},
+		{
+			"bare: method decorator protects",
+			"class A { @RequireSessionAccess() m(@InjectRequestContext(AccountRequestContextKey) a: string) {} }",
+			securityRequireContextAccessLiveOptions(),
+			nil,
+		},
+		{
+			"bare: the other alternative also protects",
+			"class A { @WithSessionAccess() m(@InjectRequestContext(AccountRequestContextKey) a: string) {} }",
+			securityRequireContextAccessLiveOptions(),
+			nil,
+		},
+		{
+			"class decorator protects",
+			"@RequireSessionAccess() class A { m(@InjectRequestContext(AccountRequestContextKey) a: string) {} }",
+			securityRequireContextAccessLiveOptions(),
+			nil,
+		},
+		{
+			"unconfigured key is ignored",
+			"class A { m(@InjectRequestContext(SomeOtherKey) a: string) {} }",
+			securityRequireContextAccessLiveOptions(),
+			nil,
+		},
+		{
+			"computed member access does not resolve",
+			"class A { m(@InjectRequestContext(Keys['AccountRequestContextKey']) a: string) {} }",
+			securityRequireContextAccessLiveOptions(),
+			nil,
+		},
+		{
+			"soft use: optional parameter",
+			"class A { m(@InjectRequestContext(AccountRequestContextKey) a?: string) {} }",
+			securityRequireContextAccessLiveOptions(),
+			nil,
+		},
+		{
+			"soft use: union with undefined",
+			"class A { m(@InjectRequestContext(AccountRequestContextKey) a: string | undefined) {} }",
+			securityRequireContextAccessLiveOptions(),
+			nil,
+		},
+		{
+			"soft use: union with null",
+			"class A { m(@InjectRequestContext(AccountRequestContextKey) a: string | null) {} }",
+			securityRequireContextAccessLiveOptions(),
+			nil,
+		},
+		{
+			"soft use: any",
+			"class A { m(@InjectRequestContext(AccountRequestContextKey) a: any) {} }",
+			securityRequireContextAccessLiveOptions(),
+			nil,
+		},
+		{
+			"soft use: unknown",
+			"class A { m(@InjectRequestContext(AccountRequestContextKey) a: unknown) {} }",
+			securityRequireContextAccessLiveOptions(),
+			nil,
+		},
+		{
+			"soft use: void",
+			"class A { m(@InjectRequestContext(AccountRequestContextKey) a: void) {} }",
+			securityRequireContextAccessLiveOptions(),
+			nil,
+		},
+		{
+			"soft use: bare undefined annotation",
+			"class A { m(@InjectRequestContext(AccountRequestContextKey) a: undefined) {} }",
+			securityRequireContextAccessLiveOptions(),
+			nil,
+		},
+		{
+			"nested union counts as soft use",
+			"class A { m(@InjectRequestContext(AccountRequestContextKey) a: string | (number | null)) {} }",
+			securityRequireContextAccessLiveOptions(),
+			nil,
+		},
+		{
+			"GraphQlFieldResolver exempts the method",
+			"class A { @GraphQlFieldResolver() m(@InjectRequestContext(AccountRequestContextKey) a: string) {} }",
+			securityRequireContextAccessLiveOptions(),
+			nil,
+		},
+		{
+			"parameter property, optional is soft use",
+			"class A { constructor(@InjectRequestContext(AccountRequestContextKey) private a?: string) {} }",
+			securityRequireContextAccessLiveOptions(),
+			nil,
+		},
+		{
+			"defaulted parameter, optional-typed is soft use",
+			"class A { m(@InjectRequestContext(AccountRequestContextKey) a: string | undefined = undefined) {} }",
+			securityRequireContextAccessLiveOptions(),
+			nil,
+		},
+		{
+			"two keys, one decorator satisfies both",
+			"class A { @RequireSessionAccess() m(@InjectRequestContext(AccountRequestContextKey) a: string, @InjectRequestContext(DeviceIdRequestContextKey) b: string) {} }",
+			securityRequireContextAccessLiveOptions(),
+			nil,
+		},
+		{
+			"import alias, protected",
+			"import { AccountRequestContextKey as AK } from 'x';\nclass A { @RequireSessionAccess() m(@InjectRequestContext(AK) a: string) {} }",
+			securityRequireContextAccessLiveOptions(),
+			nil,
+		},
+		{
+			"an alias TO a configured name from something else",
+			"import { Something as AccountRequestContextKey } from 'x';\nclass A { m(@InjectRequestContext(AccountRequestContextKey) a: string) {} }",
+			securityRequireContextAccessLiveOptions(),
+			nil,
+		},
+		{
+			"a different decorator entirely is ignored",
+			"class A { m(@InjectSomethingElse(AccountRequestContextKey) a: string) {} }",
+			securityRequireContextAccessLiveOptions(),
+			nil,
+		},
+		{
+			"decorator with no argument",
+			"class A { m(@InjectRequestContext() a: string) {} }",
+			securityRequireContextAccessLiveOptions(),
+			nil,
+		},
+		{
+			"bare decorator, not a call",
+			"class A { m(@InjectRequestContext a: string) {} }",
+			securityRequireContextAccessLiveOptions(),
+			nil,
+		},
+		{
+			"authentication key, its own alternative",
+			"class A { @RequireAuthenticationSession() m(@InjectRequestContext(AuthenticationRequestContextKey) a: string) {} }",
+			securityRequireContextAccessLiveOptions(),
+			nil,
+		},
+		{
+			"device key, its own alternative",
+			"class A { @RequireDeviceId() m(@InjectRequestContext(DeviceIdRequestContextKey) a: string) {} }",
+			securityRequireContextAccessLiveOptions(),
+			nil,
+		},
+		{
+			"bare access decorator, not a call",
+			"class A { @RequireSessionAccess m(@InjectRequestContext(AccountRequestContextKey) a: string) {} }",
+			securityRequireContextAccessLiveOptions(),
+			nil,
+		},
+		{
+			"empty requirements: rule is inert",
+			"class A { m(@InjectRequestContext(AccountRequestContextKey) a: string) {} }",
+			securityRequireContextAccessOptions("[]"),
+			nil,
+		},
+		{
+			"parameter property, class-protected",
+			"@RequireSessionAccess() class A { constructor(@InjectRequestContext(AccountRequestContextKey) private readonly a: string) {} }",
+			securityRequireContextAccessLiveOptions(),
+			nil,
+		},
+		{
+			"alias TO a configured name (recheck)",
+			"import { Something as AccountRequestContextKey } from 'x';\nclass A { m(@InjectRequestContext(AccountRequestContextKey) a: string) {} }",
+			securityRequireContextAccessLiveOptions(),
+			nil,
+		},
+		{
+			"bare access decorator, not a call (recheck)",
+			"class A { @RequireSessionAccess m(@InjectRequestContext(AccountRequestContextKey) a: string) {} }",
+			securityRequireContextAccessLiveOptions(),
+			nil,
+		},
+		{
+			"bare access decorator on the class",
+			"@RequireSessionAccess class A { m(@InjectRequestContext(AccountRequestContextKey) a: string) {} }",
+			securityRequireContextAccessLiveOptions(),
+			nil,
+		},
 	}
 }
 
@@ -415,17 +650,23 @@ func TestDecodeContextRequiresAccessOptions(test *testing.T) {
 	test.Run("an empty requiresAny is rejected", func(test *testing.T) {
 		test.Parallel()
 		if _, decodeContextRequiresAccessOptionsError := DecodeContextRequiresAccessOptions(
-			[]byte(`{"requirements":[{"contextKey":"K","requiresAny":[]}]}`)); decodeContextRequiresAccessOptionsError == nil {
+			[]byte(`{"requirements":[{"contextKey":"K","requiresAny":[]}]}`),
+		); decodeContextRequiresAccessOptionsError == nil {
 			test.Error("a requirement nothing could satisfy decoded")
 		}
 	})
 
 	test.Run("the live wiring decodes", func(test *testing.T) {
 		test.Parallel()
-		if _, decodeContextRequiresAccessOptionsError := DecodeContextRequiresAccessOptions([]byte(
-			`{"requirements":[{"contextKey":"AccountRequestContextKey",` +
-				`"requiresAny":["RequireSessionAccess","WithSessionAccess"]}]}`)); decodeContextRequiresAccessOptionsError != nil {
-			test.Errorf("the configuration api-phi-health runs did not decode: %v", decodeContextRequiresAccessOptionsError)
+		if _, decodeContextRequiresAccessOptionsError := DecodeContextRequiresAccessOptions(
+			[]byte(
+				`{"requirements":[{"contextKey":"AccountRequestContextKey",` +
+					`"requiresAny":["RequireSessionAccess","WithSessionAccess"]}]}`),
+		); decodeContextRequiresAccessOptionsError != nil {
+			test.Errorf(
+				"the configuration api-phi-health runs did not decode: %v",
+				decodeContextRequiresAccessOptionsError,
+			)
 		}
 	})
 }

@@ -119,20 +119,30 @@ var CorrectnessRequireSerializableNullableParity = rule.Rule{
 
 // The rule's messages, whose wording lives in `policy/messages/correctness-require-serializable-nullable-parity.json`.
 var (
-	correctnessRequireSerializableNullableParityDecoratorOptionalButTypeNotText = policy.MessageOf("base/correctness-require-serializable-nullable-parity", "decoratorOptionalButTypeNot")
-	correctnessRequireSerializableNullableParityTypeOptionalButDecoratorNotText = policy.MessageOf("base/correctness-require-serializable-nullable-parity", "typeOptionalButDecoratorNot")
+	correctnessRequireSerializableNullableParityDecoratorOptionalButTypeNotText = policy.MessageOf(
+		"base/correctness-require-serializable-nullable-parity",
+		"decoratorOptionalButTypeNot",
+	)
+	correctnessRequireSerializableNullableParityTypeOptionalButDecoratorNotText = policy.MessageOf(
+		"base/correctness-require-serializable-nullable-parity",
+		"typeOptionalButDecoratorNot",
+	)
 )
 
 func buildDecoratorOptionalButTypeNotMessage(typeText string) rule.Message {
 	return rule.Message{
-		Id:          correctnessRequireSerializableNullableParityDecoratorOptionalButTypeNotText.Id,
-		Description: correctnessRequireSerializableNullableParityDecoratorOptionalButTypeNotText.Render(map[string]string{"typeText": typeText}),
+		Id: correctnessRequireSerializableNullableParityDecoratorOptionalButTypeNotText.Id,
+		Description: correctnessRequireSerializableNullableParityDecoratorOptionalButTypeNotText.Render(
+			map[string]string{"typeText": typeText},
+		),
 	}
 }
 
 func buildTypeOptionalButDecoratorNotMessage(typeText string) rule.Message {
 	return rule.Message{
-		Id:          correctnessRequireSerializableNullableParityTypeOptionalButDecoratorNotText.Id,
-		Description: correctnessRequireSerializableNullableParityTypeOptionalButDecoratorNotText.Render(map[string]string{"typeText": typeText}),
+		Id: correctnessRequireSerializableNullableParityTypeOptionalButDecoratorNotText.Id,
+		Description: correctnessRequireSerializableNullableParityTypeOptionalButDecoratorNotText.Render(
+			map[string]string{"typeText": typeText},
+		),
 	}
 }

@@ -16,9 +16,15 @@ import (
 // refused, because the config loads and the setting silently does nothing (#gj5nm6e).
 var tailwindPortedOptions = map[string][]string{
 	"*": {"entryPoint", "tailwindConfig", "cwd", "tsconfig", "selectors", "tags"},
-	"better-tailwindcss/enforce-canonical-classes":      {"collapse", "logical"},
-	"better-tailwindcss/enforce-consistent-class-order": {"order", "unknownClassOrder", "unknownClassPosition", "componentClassOrder", "componentClassPosition"},
-	"better-tailwindcss/no-unnecessary-whitespace":      {"allowMultiline"},
+	"better-tailwindcss/enforce-canonical-classes": {"collapse", "logical"},
+	"better-tailwindcss/enforce-consistent-class-order": {
+		"order",
+		"unknownClassOrder",
+		"unknownClassPosition",
+		"componentClassOrder",
+		"componentClassPosition",
+	},
+	"better-tailwindcss/no-unnecessary-whitespace": {"allowMultiline"},
 }
 
 // tailwindAcceptedBefore are the keys cohere's decoders took before any of #gj5nm6e, which a sample
@@ -34,8 +40,8 @@ var tailwindAcceptedBefore = map[string][]string{
 // TestTailwindForwardSamplesLoadOncePorted runs every better-tailwindcss option list that upstream
 // 4.7.0's schema accepts (#pd2chkx's forward sweep, which found cohere refusing all of them) through
 // cohere's real decoders. A list whose every key is ported (or was accepted before) must load; a list
-// setting any option not yet ported must still be refused. The second half is the point as much as the first: it is what stops
-// an option from being accepted before it does anything.
+// setting any option not yet ported must still be refused. The second half is the point as much as the first: it is
+// what stops an option from being accepted before it does anything.
 func TestTailwindForwardSamplesLoadOncePorted(test *testing.T) {
 	test.Parallel()
 

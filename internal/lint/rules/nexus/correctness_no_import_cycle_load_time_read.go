@@ -20,7 +20,10 @@ const correctnessNoImportCycleLoadTimeReadId = "loadTimeReadInImportCycle"
 
 // correctnessNoImportCycleLoadTimeReadText is the rule's message, whose wording lives in
 // `policy/messages/correctness-no-import-cycle-load-time-read.json`.
-var correctnessNoImportCycleLoadTimeReadText = policy.MessageOf("nexus/correctness-no-import-cycle-load-time-read", correctnessNoImportCycleLoadTimeReadId)
+var correctnessNoImportCycleLoadTimeReadText = policy.MessageOf(
+	"nexus/correctness-no-import-cycle-load-time-read",
+	correctnessNoImportCycleLoadTimeReadId,
+)
 
 // CorrectnessNoImportCycleLoadTimeRead reports a binding read while its module loads, when the binding
 // is declared in a module in the same runtime import cycle as the reader.
@@ -178,7 +181,8 @@ var correctnessNoImportCycleLoadTimeReadCache struct {
 func correctnessNoImportCycleLoadTimeReadGraphFor(ruleContext rule.Context) *correctnessNoImportCycleLoadTimeReadGraph {
 	correctnessNoImportCycleLoadTimeReadCache.Lock()
 	defer correctnessNoImportCycleLoadTimeReadCache.Unlock()
-	if correctnessNoImportCycleLoadTimeReadCache.program == ruleContext.Program.Identity() && correctnessNoImportCycleLoadTimeReadCache.graph != nil {
+	if correctnessNoImportCycleLoadTimeReadCache.program == ruleContext.Program.Identity() &&
+		correctnessNoImportCycleLoadTimeReadCache.graph != nil {
 		return correctnessNoImportCycleLoadTimeReadCache.graph
 	}
 	graph := correctnessNoImportCycleLoadTimeReadBuildGraph(ruleContext.Program, ruleContext.TypeChecker)
@@ -200,7 +204,10 @@ type correctnessNoImportCycleLoadTimeReadCandidate struct {
 // are a superset of the runtime cycles, because it can only hold more edges. The second asks the
 // checker which of the edges inside those cycles survive elision, and computes the cycles again over
 // the survivors. Only a file in a cycle of the first pass is ever handed to the checker.
-func correctnessNoImportCycleLoadTimeReadBuildGraph(program rule.Program, typeChecker *checker.Checker) *correctnessNoImportCycleLoadTimeReadGraph {
+func correctnessNoImportCycleLoadTimeReadBuildGraph(
+	program rule.Program,
+	typeChecker *checker.Checker,
+) *correctnessNoImportCycleLoadTimeReadGraph {
 	graph := &correctnessNoImportCycleLoadTimeReadGraph{
 		component: map[tspath.PathKey]int{},
 		edges:     map[tspath.PathKey][]tspath.PathKey{},
@@ -216,11 +223,15 @@ func correctnessNoImportCycleLoadTimeReadBuildGraph(program rule.Program, typeCh
 		}
 		var referenced map[*ast.Symbol]bool
 		for _, candidate := range syntactic.candidates[importerPath] {
-			if targetComponent, targetInCycle := syntactic.superset[candidate.target]; !targetInCycle || targetComponent != importerComponent {
+			if targetComponent, targetInCycle := syntactic.superset[candidate.target]; !targetInCycle ||
+				targetComponent != importerComponent {
 				continue
 			}
 			if referenced == nil {
-				referenced = correctnessNoImportCycleLoadTimeReadReferencedImports(typeChecker, syntactic.byPath[importerPath])
+				referenced = correctnessNoImportCycleLoadTimeReadReferencedImports(
+					typeChecker,
+					syntactic.byPath[importerPath],
+				)
 			}
 			if correctnessNoImportCycleLoadTimeReadIsRuntimeEdge(typeChecker, candidate.statement, referenced) {
 				verified[importerPath] = append(verified[importerPath], candidate.target)
@@ -228,7 +239,9 @@ func correctnessNoImportCycleLoadTimeReadBuildGraph(program rule.Program, typeCh
 		}
 	}
 
-	graph.component = correctnessNoImportCycleLoadTimeReadComponents(syntactic.paths, func(from tspath.PathKey) []tspath.PathKey {
+	graph.component = correctnessNoImportCycleLoadTimeReadComponents(syntactic.paths, func(
+		from tspath.PathKey,
+	) []tspath.PathKey {
 		return verified[from]
 	})
 	for from, targets := range verified {
@@ -265,10 +278,13 @@ var correctnessNoImportCycleLoadTimeReadSyntacticCache struct {
 	graph   *correctnessNoImportCycleLoadTimeReadSyntacticGraph
 }
 
-func correctnessNoImportCycleLoadTimeReadSyntacticGraphFor(program rule.Program) *correctnessNoImportCycleLoadTimeReadSyntacticGraph {
+func correctnessNoImportCycleLoadTimeReadSyntacticGraphFor(
+	program rule.Program,
+) *correctnessNoImportCycleLoadTimeReadSyntacticGraph {
 	correctnessNoImportCycleLoadTimeReadSyntacticCache.Lock()
 	defer correctnessNoImportCycleLoadTimeReadSyntacticCache.Unlock()
-	if correctnessNoImportCycleLoadTimeReadSyntacticCache.program == program.Identity() && correctnessNoImportCycleLoadTimeReadSyntacticCache.graph != nil {
+	if correctnessNoImportCycleLoadTimeReadSyntacticCache.program == program.Identity() &&
+		correctnessNoImportCycleLoadTimeReadSyntacticCache.graph != nil {
 		return correctnessNoImportCycleLoadTimeReadSyntacticCache.graph
 	}
 	graph := correctnessNoImportCycleLoadTimeReadBuildSyntacticGraph(program)
@@ -277,11 +293,15 @@ func correctnessNoImportCycleLoadTimeReadSyntacticGraphFor(program rule.Program)
 	return graph
 }
 
-func correctnessNoImportCycleLoadTimeReadBuildSyntacticGraph(program rule.Program) *correctnessNoImportCycleLoadTimeReadSyntacticGraph {
+func correctnessNoImportCycleLoadTimeReadBuildSyntacticGraph(
+	program rule.Program,
+) *correctnessNoImportCycleLoadTimeReadSyntacticGraph {
 	byPath := map[tspath.PathKey]*ast.SourceFile{}
 	var paths []tspath.PathKey
 	for _, sourceFile := range program.SourceFiles() {
-		if sourceFile == nil || sourceFile.IsDeclarationFile || strings.Contains(sourceFile.FileName().AsString(), "/node_modules/") {
+		if sourceFile == nil ||
+			sourceFile.IsDeclarationFile ||
+			strings.Contains(sourceFile.FileName().AsString(), "/node_modules/") {
 			continue
 		}
 		byPath[sourceFile.PathKey()] = sourceFile
@@ -318,10 +338,16 @@ func correctnessNoImportCycleLoadTimeReadBuildSyntacticGraph(program rule.Progra
 				continue
 			}
 			target := program.GetSourceFileForResolvedModule(resolved.ResolvedFileName)
-			if target == nil || target == importer || byPath[target.PathKey()] == nil || correctnessNoImportCycleLoadTimeReadIsServerActions(target) {
+			if target == nil ||
+				target == importer ||
+				byPath[target.PathKey()] == nil ||
+				correctnessNoImportCycleLoadTimeReadIsServerActions(target) {
 				continue
 			}
-			candidates[importerPath] = append(candidates[importerPath], correctnessNoImportCycleLoadTimeReadCandidate{statement: statement, target: target.PathKey()})
+			candidates[importerPath] = append(
+				candidates[importerPath],
+				correctnessNoImportCycleLoadTimeReadCandidate{statement: statement, target: target.PathKey()},
+			)
 		}
 	}
 
@@ -332,7 +358,12 @@ func correctnessNoImportCycleLoadTimeReadBuildSyntacticGraph(program rule.Progra
 		}
 		return targets
 	})
-	return &correctnessNoImportCycleLoadTimeReadSyntacticGraph{paths: paths, byPath: byPath, candidates: candidates, superset: superset}
+	return &correctnessNoImportCycleLoadTimeReadSyntacticGraph{
+		paths:      paths,
+		byPath:     byPath,
+		candidates: candidates,
+		superset:   superset,
+	}
 }
 
 // correctnessNoImportCycleLoadTimeReadFingerprint is the rule's program fingerprint (#n030v3r): the
@@ -356,9 +387,13 @@ func correctnessNoImportCycleLoadTimeReadFingerprint(program rule.Program, _ any
 			continue
 		}
 		for _, candidate := range candidates {
-			if targetComponent, targetInCycle := syntactic.superset[candidate.target]; targetInCycle && targetComponent == component {
-				edges = append(edges, rule.FingerprintPath(program, syntactic.byPath[from].FileName().AsString())+"\x00"+
-					rule.FingerprintPath(program, syntactic.byPath[candidate.target].FileName().AsString()))
+			if targetComponent, targetInCycle := syntactic.superset[candidate.target]; targetInCycle &&
+				targetComponent == component {
+				edges = append(
+					edges,
+					rule.FingerprintPath(program, syntactic.byPath[from].FileName().AsString())+"\x00"+
+						rule.FingerprintPath(program, syntactic.byPath[candidate.target].FileName().AsString()),
+				)
 			}
 		}
 	}
@@ -389,7 +424,11 @@ func correctnessNoImportCycleLoadTimeReadIsServerActions(sourceFile *ast.SourceF
 
 // correctnessNoImportCycleLoadTimeReadIsRuntimeEdge reports whether one import or re-export statement
 // survives elision. See the doc comment's list.
-func correctnessNoImportCycleLoadTimeReadIsRuntimeEdge(typeChecker *checker.Checker, statement *ast.Node, referenced map[*ast.Symbol]bool) bool {
+func correctnessNoImportCycleLoadTimeReadIsRuntimeEdge(
+	typeChecker *checker.Checker,
+	statement *ast.Node,
+	referenced map[*ast.Symbol]bool,
+) bool {
 	switch statement.Kind {
 	case ast.KindImportDeclaration:
 		if statement.AsImportDeclaration().ImportClause == nil {
@@ -397,7 +436,9 @@ func correctnessNoImportCycleLoadTimeReadIsRuntimeEdge(typeChecker *checker.Chec
 		}
 		for _, name := range correctnessNoImportCycleLoadTimeReadBindingNames(statement) {
 			alias := typeChecker.GetSymbolAtLocation(name.name)
-			if alias != nil && referenced[alias] && correctnessNoImportCycleLoadTimeReadIsValueAlias(typeChecker, alias) {
+			if alias != nil &&
+				referenced[alias] &&
+				correctnessNoImportCycleLoadTimeReadIsValueAlias(typeChecker, alias) {
 				return true
 			}
 		}
@@ -440,7 +481,9 @@ type correctnessNoImportCycleLoadTimeReadBindingName struct {
 
 // correctnessNoImportCycleLoadTimeReadBindingNames returns the local names of an import's bindings,
 // leaving out `type` specifiers and every name of an `import type`.
-func correctnessNoImportCycleLoadTimeReadBindingNames(statement *ast.Node) []correctnessNoImportCycleLoadTimeReadBindingName {
+func correctnessNoImportCycleLoadTimeReadBindingNames(
+	statement *ast.Node,
+) []correctnessNoImportCycleLoadTimeReadBindingName {
 	declaration := statement.AsImportDeclaration()
 	if declaration.ImportClause == nil || declaration.ImportClause.IsTypeOnly() {
 		return nil
@@ -451,7 +494,10 @@ func correctnessNoImportCycleLoadTimeReadBindingNames(statement *ast.Node) []cor
 		names = append(names, correctnessNoImportCycleLoadTimeReadBindingName{name: bindings.Default})
 	}
 	if bindings.Namespace != nil && bindings.Namespace.Name() != nil {
-		names = append(names, correctnessNoImportCycleLoadTimeReadBindingName{name: bindings.Namespace.Name(), namespace: true})
+		names = append(
+			names,
+			correctnessNoImportCycleLoadTimeReadBindingName{name: bindings.Namespace.Name(), namespace: true},
+		)
 	}
 	for _, specifier := range bindings.Named {
 		if !specifier.IsTypeOnly() && specifier.Name() != nil {
@@ -463,7 +509,10 @@ func correctnessNoImportCycleLoadTimeReadBindingNames(statement *ast.Node) []cor
 
 // correctnessNoImportCycleLoadTimeReadReferencedImports returns the import aliases of one file that it
 // reads as a value anywhere, at load or later: the references that keep an import from being elided.
-func correctnessNoImportCycleLoadTimeReadReferencedImports(typeChecker *checker.Checker, sourceFile *ast.SourceFile) map[*ast.Symbol]bool {
+func correctnessNoImportCycleLoadTimeReadReferencedImports(
+	typeChecker *checker.Checker,
+	sourceFile *ast.SourceFile,
+) map[*ast.Symbol]bool {
 	referenced := map[*ast.Symbol]bool{}
 	names := map[string]bool{}
 	for _, statement := range sourceFile.Statements.Nodes {
@@ -491,8 +540,13 @@ func correctnessNoImportCycleLoadTimeReadReferencedImports(typeChecker *checker.
 // correctnessNoImportCycleLoadTimeReadReferencedSymbol resolves an identifier in a value position to
 // the symbol it reads. A shorthand property `{ X }` names a property and reads a value, and the value
 // is the one wanted.
-func correctnessNoImportCycleLoadTimeReadReferencedSymbol(typeChecker *checker.Checker, identifier *ast.Node) *ast.Symbol {
-	if parent := identifier.Parent; parent != nil && ast.IsShorthandPropertyAssignment(parent) && parent.Name() == identifier {
+func correctnessNoImportCycleLoadTimeReadReferencedSymbol(
+	typeChecker *checker.Checker,
+	identifier *ast.Node,
+) *ast.Symbol {
+	if parent := identifier.Parent; parent != nil &&
+		ast.IsShorthandPropertyAssignment(parent) &&
+		parent.Name() == identifier {
 		return typeChecker.GetShorthandAssignmentValueSymbol(parent)
 	}
 	return typeChecker.GetSymbolAtLocation(identifier)
@@ -501,7 +555,11 @@ func correctnessNoImportCycleLoadTimeReadReferencedSymbol(typeChecker *checker.C
 // correctnessNoImportCycleLoadTimeReadWalkValueIdentifiers calls visit on each identifier in an
 // expression position under node: not in a type, not in an import or export clause, not under
 // `declare`. With loadOnly, it also stops at code that runs after the module has loaded.
-func correctnessNoImportCycleLoadTimeReadWalkValueIdentifiers(node *ast.Node, loadOnly bool, visit func(identifier *ast.Node)) {
+func correctnessNoImportCycleLoadTimeReadWalkValueIdentifiers(
+	node *ast.Node,
+	loadOnly bool,
+	visit func(identifier *ast.Node),
+) {
 	var walk func(node *ast.Node) bool
 	walk = func(node *ast.Node) bool {
 		if node == nil || node.Flags&ast.NodeFlagsAmbient != 0 {
@@ -561,7 +619,10 @@ type correctnessNoImportCycleLoadTimeReadImportBinding struct {
 	namespace bool
 }
 
-func correctnessNoImportCycleLoadTimeReadScanFile(ruleContext rule.Context, graph *correctnessNoImportCycleLoadTimeReadGraph) {
+func correctnessNoImportCycleLoadTimeReadScanFile(
+	ruleContext rule.Context,
+	graph *correctnessNoImportCycleLoadTimeReadGraph,
+) {
 	readerPath := ruleContext.SourceFile.PathKey()
 	bindingsByName := map[string][]correctnessNoImportCycleLoadTimeReadImportBinding{}
 	for _, statement := range ruleContext.SourceFile.Statements.Nodes {
@@ -570,7 +631,10 @@ func correctnessNoImportCycleLoadTimeReadScanFile(ruleContext rule.Context, grap
 		}
 		for _, name := range correctnessNoImportCycleLoadTimeReadBindingNames(statement) {
 			if alias := ruleContext.TypeChecker.GetSymbolAtLocation(name.name); alias != nil {
-				bindingsByName[name.name.Text()] = append(bindingsByName[name.name.Text()], correctnessNoImportCycleLoadTimeReadImportBinding{alias: alias, namespace: name.namespace})
+				bindingsByName[name.name.Text()] = append(
+					bindingsByName[name.name.Text()],
+					correctnessNoImportCycleLoadTimeReadImportBinding{alias: alias, namespace: name.namespace},
+				)
 			}
 		}
 	}
@@ -578,7 +642,9 @@ func correctnessNoImportCycleLoadTimeReadScanFile(ruleContext rule.Context, grap
 		return
 	}
 
-	correctnessNoImportCycleLoadTimeReadWalkValueIdentifiers(ruleContext.SourceFile.AsNode(), true, func(identifier *ast.Node) {
+	correctnessNoImportCycleLoadTimeReadWalkValueIdentifiers(ruleContext.SourceFile.AsNode(), true, func(
+		identifier *ast.Node,
+	) {
 		bindings := bindingsByName[identifier.Text()]
 		if len(bindings) == 0 {
 			return
@@ -612,7 +678,8 @@ func correctnessNoImportCycleLoadTimeReadScanFile(ruleContext rule.Context, grap
 			if declaringFile == nil || declaringFile.PathKey() == readerPath {
 				return
 			}
-			if declaringComponent, inCycle := graph.component[declaringFile.PathKey()]; !inCycle || declaringComponent != graph.component[readerPath] {
+			if declaringComponent, inCycle := graph.component[declaringFile.PathKey()]; !inCycle ||
+				declaringComponent != graph.component[readerPath] {
 				return
 			}
 			ruleContext.ReportNode(read, rule.Message{
@@ -631,7 +698,10 @@ func correctnessNoImportCycleLoadTimeReadScanFile(ruleContext rule.Context, grap
 // correctnessNoImportCycleLoadTimeReadUninitializedDeclaration returns the declaration that creates a
 // binding when its module runs, or nil for one that exists before: a hoisted function, a `const
 // enum`, an ambient declaration, or anything the checker could not resolve.
-func correctnessNoImportCycleLoadTimeReadUninitializedDeclaration(typeChecker *checker.Checker, target *ast.Symbol) *ast.Node {
+func correctnessNoImportCycleLoadTimeReadUninitializedDeclaration(
+	typeChecker *checker.Checker,
+	target *ast.Symbol,
+) *ast.Node {
 	if target == nil || typeChecker.IsUnknownSymbol(target) || target.ValueDeclaration == nil {
 		return nil
 	}
@@ -656,7 +726,10 @@ func correctnessNoImportCycleLoadTimeReadUninitializedDeclaration(typeChecker *c
 
 // cycleThrough names one cycle through both files, `A.ts → B.ts → A.ts`, from the shortest path each
 // way between them.
-func (graph *correctnessNoImportCycleLoadTimeReadGraph) cycleThrough(reader tspath.PathKey, declaring tspath.PathKey) string {
+func (graph *correctnessNoImportCycleLoadTimeReadGraph) cycleThrough(
+	reader tspath.PathKey,
+	declaring tspath.PathKey,
+) string {
 	there := graph.shortestPath(reader, declaring)
 	back := graph.shortestPath(declaring, reader)
 	if len(there) == 0 || len(back) == 0 {
@@ -670,7 +743,10 @@ func (graph *correctnessNoImportCycleLoadTimeReadGraph) cycleThrough(reader tspa
 }
 
 // shortestPath returns the files from one to the other along runtime edges, both ends included.
-func (graph *correctnessNoImportCycleLoadTimeReadGraph) shortestPath(from tspath.PathKey, to tspath.PathKey) []tspath.PathKey {
+func (graph *correctnessNoImportCycleLoadTimeReadGraph) shortestPath(
+	from tspath.PathKey,
+	to tspath.PathKey,
+) []tspath.PathKey {
 	previous := map[tspath.PathKey]tspath.PathKey{from: from}
 	queue := []tspath.PathKey{from}
 	for len(queue) > 0 {
@@ -699,7 +775,10 @@ func (graph *correctnessNoImportCycleLoadTimeReadGraph) shortestPath(from tspath
 
 // correctnessNoImportCycleLoadTimeReadComponents runs Tarjan's algorithm and numbers every strongly
 // connected component of two or more files. A file in no such component is left out.
-func correctnessNoImportCycleLoadTimeReadComponents(paths []tspath.PathKey, edgesOf func(from tspath.PathKey) []tspath.PathKey) map[tspath.PathKey]int {
+func correctnessNoImportCycleLoadTimeReadComponents(
+	paths []tspath.PathKey,
+	edgesOf func(from tspath.PathKey) []tspath.PathKey,
+) map[tspath.PathKey]int {
 	index := map[tspath.PathKey]int{}
 	lowLink := map[tspath.PathKey]int{}
 	onStack := map[tspath.PathKey]bool{}

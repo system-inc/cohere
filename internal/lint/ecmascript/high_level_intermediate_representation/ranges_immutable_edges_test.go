@@ -18,7 +18,10 @@ func TestImmutableSourcesDoNotWidenThroughMutableFallbacks(test *testing.T) {
 		for _, functionName := range []string{"Component", "ordinary"} {
 			test.Run(testCase.name+"/"+functionName, func(test *testing.T) {
 				test.Parallel()
-				function, ranges := rangesFor(test, fmt.Sprintf("function %s(props) {%s mutate(items); return props;}", functionName, testCase.binding))
+				function, ranges := rangesFor(
+					test,
+					fmt.Sprintf("function %s(props) {%s mutate(items); return props;}", functionName, testCase.binding),
+				)
 				var mutationOrder static_single_assignment.EvaluationOrder
 				calls := 0
 				for _, instruction := range function.Instructions {
@@ -91,7 +94,11 @@ return <div>{result}</div>;
 }`, false},
 		{"no iteration", `import {useMemo} from 'react'; import {useProjects} from './hooks';
 function Component() {const request = useProjects(); const result = useMemo(() => request.data ?? [], [request.data]); return <div>{result}</div>;}`, false},
-		{"unpreserved dependency", `import {useMemo} from 'react'; function Component({propA}) {return useMemo(() => propA.x(), [propA.x]);}`, true},
+		{
+			"unpreserved dependency",
+			`import {useMemo} from 'react'; function Component({propA}) {return useMemo(() => propA.x(), [propA.x]);}`,
+			true,
+		},
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()

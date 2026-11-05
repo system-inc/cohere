@@ -85,7 +85,10 @@ func (analysis *PathAnalysis[E]) IsCyclic(block *Block[E]) bool {
 // non-throwing final path, matching the vacuous path-count comparison used by
 // ESLint consumers.
 func (analysis *PathAnalysis[E]) IsOnEveryFinalPath(block *Block[E]) bool {
-	return analysis != nil && block != nil && block.Index() < len(analysis.blocks) && analysis.blocks[block.Index()].flags&pathOnEveryFinal != 0
+	return analysis != nil &&
+		block != nil &&
+		block.Index() < len(analysis.blocks) &&
+		analysis.blocks[block.Index()].flags&pathOnEveryFinal != 0
 }
 
 // IsExit reports whether block is a reachable final segment, including an
@@ -93,7 +96,10 @@ func (analysis *PathAnalysis[E]) IsOnEveryFinalPath(block *Block[E]) bool {
 // finalSegments even though path counting deliberately assigns them zero
 // paths.
 func (analysis *PathAnalysis[E]) IsExit(block *Block[E]) bool {
-	return analysis != nil && block != nil && block.Index() < len(analysis.blocks) && analysis.blocks[block.Index()].flags&pathExit != 0
+	return analysis != nil &&
+		block != nil &&
+		block.Index() < len(analysis.blocks) &&
+		analysis.blocks[block.Index()].flags&pathExit != 0
 }
 
 // ShortestPathFromStart returns the number of blocks on the shortest path from
@@ -189,7 +195,8 @@ func (analysis *PathAnalysis[E]) findShortestPaths(graph *Graph[E]) {
 		if distance == 0 {
 			continue
 		}
-		if analysis.blocks[index].flags&pathExit != 0 && (analysis.shortestExit == 0 || int(distance) < analysis.shortestExit) {
+		if analysis.blocks[index].flags&pathExit != 0 &&
+			(analysis.shortestExit == 0 || int(distance) < analysis.shortestExit) {
 			analysis.shortestExit = int(distance)
 		}
 	}

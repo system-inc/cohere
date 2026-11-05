@@ -46,34 +46,106 @@ func TestNoUnnecessaryParameterPropertyAssignmentStaysSilent(test *testing.T) {
 		sourceText string
 	}{
 		{1, "\n        class Foo {\n          constructor(public name: unknown) {}\n        }\n        "},
-		{2, "\n        class Foo {\n          constructor(public name: unknown, other: unknown) {\n            this.other = other;\n          }\n        }\n        "},
-		{3, "\n        class Foo {\n          constructor(public name: unknown) {\n            this.other = name;\n          }\n        }\n        "},
-		{4, "\n        class Foo {\n          constructor(name: unknown) {\n            this.name = name;\n          }\n        }\n        "},
-		{5, "\n        class Foo {\n          constructor(public name: unknown) {\n            this.name = 'other';\n          }\n        }\n        "},
-		{6, "\n        class Foo {\n          constructor(public name: unknown) {\n            this.name = name + 'edited';\n          }\n        }\n        "},
-		{7, "\n        class Foo {\n          constructor(public name: unknown) {\n            if (maybeTrue) {\n              this.name = name + 'edited';\n            }\n          }\n        }\n        "},
+		{
+			2,
+			"\n        class Foo {\n          constructor(public name: unknown, other: unknown) {\n            this.other = other;\n          }\n        }\n        ",
+		},
+		{
+			3,
+			"\n        class Foo {\n          constructor(public name: unknown) {\n            this.other = name;\n          }\n        }\n        ",
+		},
+		{
+			4,
+			"\n        class Foo {\n          constructor(name: unknown) {\n            this.name = name;\n          }\n        }\n        ",
+		},
+		{
+			5,
+			"\n        class Foo {\n          constructor(public name: unknown) {\n            this.name = 'other';\n          }\n        }\n        ",
+		},
+		{
+			6,
+			"\n        class Foo {\n          constructor(public name: unknown) {\n            this.name = name + 'edited';\n          }\n        }\n        ",
+		},
+		{
+			7,
+			"\n        class Foo {\n          constructor(public name: unknown) {\n            if (maybeTrue) {\n              this.name = name + 'edited';\n            }\n          }\n        }\n        ",
+		},
 		{8, "\n        class Foo {\n          constructor(foo: string) {}\n        }\n        "},
 		{9, "\n        class Foo {\n          constructor(private foo: string) {}\n        }\n        "},
-		{10, "\n        class Foo {\n          constructor(private foo: string) {\n            this.foo = bar;\n          }\n        }\n        "},
-		{11, "\n        class Foo {\n          constructor(private foo: any) {\n            this.foo = foo.bar;\n          }\n        }\n        "},
-		{12, "\n        class Foo {\n          constructor(private foo: string) {\n            this.foo = this.bar;\n          }\n        }\n        "},
-		{13, "\n        class Foo {\n          foo: string;\n          constructor(foo: string) {\n            this.foo = foo;\n          }\n        }\n        "},
-		{14, "\n        class Foo {\n          bar: string;\n          constructor(private foo: string) {\n            this.bar = foo;\n          }\n        }\n        "},
-		{15, "\n        class Foo {\n          constructor(private foo: string) {\n            this.bar = () => {\n              this.foo = foo;\n            };\n          }\n        }\n        "},
-		{16, "\n        class Foo {\n          constructor(private foo: string) {\n            this[`${foo}`] = foo;\n          }\n        }\n        "},
+		{
+			10,
+			"\n        class Foo {\n          constructor(private foo: string) {\n            this.foo = bar;\n          }\n        }\n        ",
+		},
+		{
+			11,
+			"\n        class Foo {\n          constructor(private foo: any) {\n            this.foo = foo.bar;\n          }\n        }\n        ",
+		},
+		{
+			12,
+			"\n        class Foo {\n          constructor(private foo: string) {\n            this.foo = this.bar;\n          }\n        }\n        ",
+		},
+		{
+			13,
+			"\n        class Foo {\n          foo: string;\n          constructor(foo: string) {\n            this.foo = foo;\n          }\n        }\n        ",
+		},
+		{
+			14,
+			"\n        class Foo {\n          bar: string;\n          constructor(private foo: string) {\n            this.bar = foo;\n          }\n        }\n        ",
+		},
+		{
+			15,
+			"\n        class Foo {\n          constructor(private foo: string) {\n            this.bar = () => {\n              this.foo = foo;\n            };\n          }\n        }\n        ",
+		},
+		{
+			16,
+			"\n        class Foo {\n          constructor(private foo: string) {\n            this[`${foo}`] = foo;\n          }\n        }\n        ",
+		},
 		{17, "\n        function Foo(foo) {\n          this.foo = foo;\n        }\n        "},
 		{18, "\n        const foo = 'foo';\n        this.foo = foo;\n        "},
-		{19, "\n        class Foo {\n          constructor(public foo: number) {\n            this.foo += foo;\n            this.foo -= foo;\n            this.foo *= foo;\n            this.foo /= foo;\n            this.foo %= foo;\n            this.foo **= foo;\n          }\n        }\n        "},
-		{20, "\n        class Foo {\n          constructor(public foo: number) {\n            this.foo += 1;\n            this.foo = foo;\n          }\n        }\n        "},
-		{21, "\n        class Foo {\n          constructor(\n            public foo: number,\n            bar: boolean,\n          ) {\n            if (bar) {\n              this.foo += 1;\n            } else {\n              this.foo = foo;\n            }\n          }\n        }\n        "},
-		{22, "\n        class Foo {\n          constructor(public foo: number) {\n            this.foo = foo;\n          }\n          init = (this.foo += 1);\n        }\n        "},
-		{23, "\n        class Foo {\n          constructor(public foo: number) {\n            {\n              const foo = 1;\n              this.foo = foo;\n            }\n          }\n        }\n        "},
-		{24, "\n        declare const name: string;\n        class Foo {\n          constructor(public foo: number) {\n            this[name] = foo;\n          }\n        }\n        "},
-		{25, "\n        declare const name: string;\n        class Foo {\n          constructor(public foo: number) {\n            Foo.foo = foo;\n          }\n        }\n        "},
-		{26, "\n        class Foo {\n          constructor(public foo: number) {\n            this.foo = foo;\n          }\n          init = (() => {\n            this.foo += 1;\n          })();\n        }\n        "},
-		{27, "\n        declare const name: string;\n        class Foo {\n          constructor(public foo: number) {\n            this[name] = foo;\n          }\n          init = (this[name] = 1);\n          init2 = (Foo.foo = 1);\n        }\n        "},
-		{28, "\n        class Foo {\n          constructor(public foo: number) {\n            this.foo = foo;\n          }\n          init = (function() {\n            console.log('hi');\n            this.foo += 1;\n          })();\n        }\n        "},
-		{29, "\n        class Foo {\n          constructor(private foo: string) {\n            function bar() {\n              this.foo = foo;\n            }\n          }\n        }\n        "},
+		{
+			19,
+			"\n        class Foo {\n          constructor(public foo: number) {\n            this.foo += foo;\n            this.foo -= foo;\n            this.foo *= foo;\n            this.foo /= foo;\n            this.foo %= foo;\n            this.foo **= foo;\n          }\n        }\n        ",
+		},
+		{
+			20,
+			"\n        class Foo {\n          constructor(public foo: number) {\n            this.foo += 1;\n            this.foo = foo;\n          }\n        }\n        ",
+		},
+		{
+			21,
+			"\n        class Foo {\n          constructor(\n            public foo: number,\n            bar: boolean,\n          ) {\n            if (bar) {\n              this.foo += 1;\n            } else {\n              this.foo = foo;\n            }\n          }\n        }\n        ",
+		},
+		{
+			22,
+			"\n        class Foo {\n          constructor(public foo: number) {\n            this.foo = foo;\n          }\n          init = (this.foo += 1);\n        }\n        ",
+		},
+		{
+			23,
+			"\n        class Foo {\n          constructor(public foo: number) {\n            {\n              const foo = 1;\n              this.foo = foo;\n            }\n          }\n        }\n        ",
+		},
+		{
+			24,
+			"\n        declare const name: string;\n        class Foo {\n          constructor(public foo: number) {\n            this[name] = foo;\n          }\n        }\n        ",
+		},
+		{
+			25,
+			"\n        declare const name: string;\n        class Foo {\n          constructor(public foo: number) {\n            Foo.foo = foo;\n          }\n        }\n        ",
+		},
+		{
+			26,
+			"\n        class Foo {\n          constructor(public foo: number) {\n            this.foo = foo;\n          }\n          init = (() => {\n            this.foo += 1;\n          })();\n        }\n        ",
+		},
+		{
+			27,
+			"\n        declare const name: string;\n        class Foo {\n          constructor(public foo: number) {\n            this[name] = foo;\n          }\n          init = (this[name] = 1);\n          init2 = (Foo.foo = 1);\n        }\n        ",
+		},
+		{
+			28,
+			"\n        class Foo {\n          constructor(public foo: number) {\n            this.foo = foo;\n          }\n          init = (function() {\n            console.log('hi');\n            this.foo += 1;\n          })();\n        }\n        ",
+		},
+		{
+			29,
+			"\n        class Foo {\n          constructor(private foo: string) {\n            function bar() {\n              this.foo = foo;\n            }\n          }\n        }\n        ",
+		},
 	}
 
 	for _, testCase := range cases {
@@ -94,27 +166,111 @@ func TestNoUnnecessaryParameterPropertyAssignmentFires(test *testing.T) {
 		sourceText string
 		findings   int
 	}{
-		{1, "\n        class Foo {\n          constructor(public name: unknown) {\n            this.name = name;\n          }\n        }\n        ", 1},
-		{2, "\n        class Foo {\n          constructor(other: unknown, public name: unknown) {\n            this.other = other;\n            this.name = name;\n          }\n        }\n        ", 1},
-		{3, "\n        class Foo {\n          constructor(public name: unknown) {\n            this.name = name;\n            this.name = name;\n            this.name = name;\n          }\n        }\n        ", 3},
-		{4, "\n        class Foo {\n          constructor(public name: unknown) {\n            if (maybeTrue) {\n              this.name = name;\n            } else {\n              this.name = name + 'edited';\n            }\n          }\n        }\n        ", 1},
-		{5, "\n        class Foo {\n          constructor(public foo: string) {\n            this.foo = foo;\n          }\n        }\n        ", 1},
-		{6, "\n        class Foo {\n          constructor(public foo?: string) {\n            this.foo = foo!;\n          }\n        }\n        ", 1},
-		{7, "\n        class Foo {\n          constructor(public foo?: string) {\n            this.foo = foo as any;\n          }\n        }\n        ", 1},
-		{8, "\n        class Foo {\n          constructor(public foo = '') {\n            this.foo = foo;\n          }\n        }\n        ", 1},
-		{9, "\n        class Foo {\n          constructor(public foo = '') {\n            this.foo = foo;\n            this.foo += 'foo';\n          }\n        }\n        ", 1},
-		{10, "\n        class Foo {\n          constructor(public foo: string) {\n            this.foo ||= foo;\n          }\n        }\n        ", 1},
-		{11, "\n        class Foo {\n          constructor(public foo: string) {\n            this.foo ??= foo;\n          }\n        }\n        ", 1},
-		{12, "\n        class Foo {\n          constructor(public foo: string) {\n            this.foo &&= foo;\n          }\n        }\n        ", 1},
-		{13, "\n        class Foo {\n          constructor(private foo: string) {\n            this['foo'] = foo;\n          }\n        }\n        ", 1},
-		{14, "\n        class Foo {\n          constructor(private foo: string) {\n            function bar() {\n              this.foo = foo;\n            }\n            this.foo = foo;\n          }\n        }\n        ", 1},
-		{15, "\n        class Foo {\n          constructor(private foo: string) {\n            this.bar = () => {\n              this.foo = foo;\n            };\n            this.foo = foo;\n          }\n        }\n        ", 1},
-		{16, "\n        class Foo {\n          constructor(private foo: string) {\n            class Bar {\n              constructor(private foo: string) {\n                this.foo = foo;\n              }\n            }\n            this.foo = foo;\n          }\n        }\n        ", 2},
-		{17, "\n        class Foo {\n          constructor(private foo: string) {\n            this.foo = foo;\n          }\n          bar = () => {\n            this.foo = 'foo';\n          };\n        }\n        ", 1},
-		{18, "\n        class Foo {\n          constructor(private foo: string) {\n            this.foo = foo;\n          }\n          init = foo => {\n            this.foo = foo;\n          };\n        }\n        ", 1},
-		{19, "\n        class Foo {\n          constructor(private foo: string) {\n            this.foo = foo;\n          }\n          init = class Bar {\n            constructor(private foo: string) {\n              this.foo = foo;\n            }\n          };\n        }\n        ", 2},
-		{20, "\n        class Foo {\n          constructor(private foo: string) {\n            {\n              this.foo = foo;\n            }\n          }\n        }\n        ", 1},
-		{21, "\n        class Foo {\n          constructor(private foo: string) {\n            (() => {\n              this.foo = foo;\n            })();\n          }\n        }\n        ", 1},
+		{
+			1,
+			"\n        class Foo {\n          constructor(public name: unknown) {\n            this.name = name;\n          }\n        }\n        ",
+			1,
+		},
+		{
+			2,
+			"\n        class Foo {\n          constructor(other: unknown, public name: unknown) {\n            this.other = other;\n            this.name = name;\n          }\n        }\n        ",
+			1,
+		},
+		{
+			3,
+			"\n        class Foo {\n          constructor(public name: unknown) {\n            this.name = name;\n            this.name = name;\n            this.name = name;\n          }\n        }\n        ",
+			3,
+		},
+		{
+			4,
+			"\n        class Foo {\n          constructor(public name: unknown) {\n            if (maybeTrue) {\n              this.name = name;\n            } else {\n              this.name = name + 'edited';\n            }\n          }\n        }\n        ",
+			1,
+		},
+		{
+			5,
+			"\n        class Foo {\n          constructor(public foo: string) {\n            this.foo = foo;\n          }\n        }\n        ",
+			1,
+		},
+		{
+			6,
+			"\n        class Foo {\n          constructor(public foo?: string) {\n            this.foo = foo!;\n          }\n        }\n        ",
+			1,
+		},
+		{
+			7,
+			"\n        class Foo {\n          constructor(public foo?: string) {\n            this.foo = foo as any;\n          }\n        }\n        ",
+			1,
+		},
+		{
+			8,
+			"\n        class Foo {\n          constructor(public foo = '') {\n            this.foo = foo;\n          }\n        }\n        ",
+			1,
+		},
+		{
+			9,
+			"\n        class Foo {\n          constructor(public foo = '') {\n            this.foo = foo;\n            this.foo += 'foo';\n          }\n        }\n        ",
+			1,
+		},
+		{
+			10,
+			"\n        class Foo {\n          constructor(public foo: string) {\n            this.foo ||= foo;\n          }\n        }\n        ",
+			1,
+		},
+		{
+			11,
+			"\n        class Foo {\n          constructor(public foo: string) {\n            this.foo ??= foo;\n          }\n        }\n        ",
+			1,
+		},
+		{
+			12,
+			"\n        class Foo {\n          constructor(public foo: string) {\n            this.foo &&= foo;\n          }\n        }\n        ",
+			1,
+		},
+		{
+			13,
+			"\n        class Foo {\n          constructor(private foo: string) {\n            this['foo'] = foo;\n          }\n        }\n        ",
+			1,
+		},
+		{
+			14,
+			"\n        class Foo {\n          constructor(private foo: string) {\n            function bar() {\n              this.foo = foo;\n            }\n            this.foo = foo;\n          }\n        }\n        ",
+			1,
+		},
+		{
+			15,
+			"\n        class Foo {\n          constructor(private foo: string) {\n            this.bar = () => {\n              this.foo = foo;\n            };\n            this.foo = foo;\n          }\n        }\n        ",
+			1,
+		},
+		{
+			16,
+			"\n        class Foo {\n          constructor(private foo: string) {\n            class Bar {\n              constructor(private foo: string) {\n                this.foo = foo;\n              }\n            }\n            this.foo = foo;\n          }\n        }\n        ",
+			2,
+		},
+		{
+			17,
+			"\n        class Foo {\n          constructor(private foo: string) {\n            this.foo = foo;\n          }\n          bar = () => {\n            this.foo = 'foo';\n          };\n        }\n        ",
+			1,
+		},
+		{
+			18,
+			"\n        class Foo {\n          constructor(private foo: string) {\n            this.foo = foo;\n          }\n          init = foo => {\n            this.foo = foo;\n          };\n        }\n        ",
+			1,
+		},
+		{
+			19,
+			"\n        class Foo {\n          constructor(private foo: string) {\n            this.foo = foo;\n          }\n          init = class Bar {\n            constructor(private foo: string) {\n              this.foo = foo;\n            }\n          };\n        }\n        ",
+			2,
+		},
+		{
+			20,
+			"\n        class Foo {\n          constructor(private foo: string) {\n            {\n              this.foo = foo;\n            }\n          }\n        }\n        ",
+			1,
+		},
+		{
+			21,
+			"\n        class Foo {\n          constructor(private foo: string) {\n            (() => {\n              this.foo = foo;\n            })();\n          }\n        }\n        ",
+			1,
+		},
 	}
 
 	for _, testCase := range cases {
@@ -145,27 +301,111 @@ func TestNoUnnecessaryParameterPropertyAssignmentSuggestsTheRepair(test *testing
 		before string
 		after  string
 	}{
-		{1, "\n            class Foo {\n              constructor(public name: unknown) {\n                this.name = name;\n              }\n            }\n            ", "\n            class Foo {\n              constructor(public name: unknown) {\n                \n              }\n            }\n            "},
-		{2, "\n            class Foo {\n              constructor(other: unknown, public name: unknown) {\n                this.other = other;\n                this.name = name;\n              }\n            }\n            ", "\n            class Foo {\n              constructor(other: unknown, public name: unknown) {\n                this.other = other;\n                \n              }\n            }\n            "},
-		{3, "\n            class Foo {\n              constructor(public name: unknown) {\n                this.name = name;\n                this.name = name;\n                this.name = name;\n              }\n            }\n            ", "\n            class Foo {\n              constructor(public name: unknown) {\n                \n                \n                \n              }\n            }\n            "},
-		{4, "\n            class Foo {\n              constructor(public name: unknown) {\n                if (maybeTrue) {\n                  this.name = name;\n                } else {\n                  this.name = name + 'edited';\n                }\n              }\n            }\n            ", "\n            class Foo {\n              constructor(public name: unknown) {\n                if (maybeTrue) {\n                  \n                } else {\n                  this.name = name + 'edited';\n                }\n              }\n            }\n            "},
-		{5, "\n            class Foo {\n              constructor(public foo: string) {\n                this.foo = foo;\n              }\n            }\n            ", "\n            class Foo {\n              constructor(public foo: string) {\n                \n              }\n            }\n            "},
-		{6, "\n            class Foo {\n              constructor(public foo?: string) {\n                this.foo = foo!;\n              }\n            }\n            ", "\n            class Foo {\n              constructor(public foo?: string) {\n                \n              }\n            }\n            "},
-		{7, "\n            class Foo {\n              constructor(public foo?: string) {\n                this.foo = foo as any;\n              }\n            }\n            ", "\n            class Foo {\n              constructor(public foo?: string) {\n                \n              }\n            }\n            "},
-		{8, "\n            class Foo {\n              constructor(public foo = '') {\n                this.foo = foo;\n              }\n            }\n            ", "\n            class Foo {\n              constructor(public foo = '') {\n                \n              }\n            }\n            "},
-		{9, "\n            class Foo {\n              constructor(public foo = '') {\n                this.foo = foo;\n                this.foo += 'foo';\n              }\n            }\n            ", "\n            class Foo {\n              constructor(public foo = '') {\n                \n                this.foo += 'foo';\n              }\n            }\n            "},
-		{10, "\n            class Foo {\n              constructor(public foo: string) {\n                this.foo ||= foo;\n              }\n            }\n            ", "\n            class Foo {\n              constructor(public foo: string) {\n                \n              }\n            }\n            "},
-		{11, "\n            class Foo {\n              constructor(public foo: string) {\n                this.foo ??= foo;\n              }\n            }\n            ", "\n            class Foo {\n              constructor(public foo: string) {\n                \n              }\n            }\n            "},
-		{12, "\n            class Foo {\n              constructor(public foo: string) {\n                this.foo &&= foo;\n              }\n            }\n            ", "\n            class Foo {\n              constructor(public foo: string) {\n                \n              }\n            }\n            "},
-		{13, "\n            class Foo {\n              constructor(private foo: string) {\n                this['foo'] = foo;\n              }\n            }\n            ", "\n            class Foo {\n              constructor(private foo: string) {\n                \n              }\n            }\n            "},
-		{14, "\n            class Foo {\n              constructor(private foo: string) {\n                function bar() {\n                  this.foo = foo;\n                }\n                this.foo = foo;\n              }\n            }\n            ", "\n            class Foo {\n              constructor(private foo: string) {\n                function bar() {\n                  this.foo = foo;\n                }\n                \n              }\n            }\n            "},
-		{15, "\n            class Foo {\n              constructor(private foo: string) {\n                this.bar = () => {\n                  this.foo = foo;\n                };\n                this.foo = foo;\n              }\n            }\n            ", "\n            class Foo {\n              constructor(private foo: string) {\n                this.bar = () => {\n                  this.foo = foo;\n                };\n                \n              }\n            }\n            "},
-		{16, "\n            class Foo {\n              constructor(private foo: string) {\n                class Bar {\n                  constructor(private foo: string) {\n                    this.foo = foo;\n                  }\n                }\n                this.foo = foo;\n              }\n            }\n            ", "\n            class Foo {\n              constructor(private foo: string) {\n                class Bar {\n                  constructor(private foo: string) {\n                    \n                  }\n                }\n                \n              }\n            }\n            "},
-		{17, "\n            class Foo {\n              constructor(private foo: string) {\n                this.foo = foo;\n              }\n              bar = () => {\n                this.foo = 'foo';\n              };\n            }\n            ", "\n            class Foo {\n              constructor(private foo: string) {\n                \n              }\n              bar = () => {\n                this.foo = 'foo';\n              };\n            }\n            "},
-		{18, "\n            class Foo {\n              constructor(private foo: string) {\n                this.foo = foo;\n              }\n              init = foo => {\n                this.foo = foo;\n              };\n            }\n            ", "\n            class Foo {\n              constructor(private foo: string) {\n                \n              }\n              init = foo => {\n                this.foo = foo;\n              };\n            }\n            "},
-		{19, "\n            class Foo {\n              constructor(private foo: string) {\n                this.foo = foo;\n              }\n              init = class Bar {\n                constructor(private foo: string) {\n                  this.foo = foo;\n                }\n              };\n            }\n            ", "\n            class Foo {\n              constructor(private foo: string) {\n                \n              }\n              init = class Bar {\n                constructor(private foo: string) {\n                  \n                }\n              };\n            }\n            "},
-		{20, "\n            class Foo {\n              constructor(private foo: string) {\n                {\n                  this.foo = foo;\n                }\n              }\n            }\n            ", "\n            class Foo {\n              constructor(private foo: string) {\n                {\n                  \n                }\n              }\n            }\n            "},
-		{21, "\n            class Foo {\n              constructor(private foo: string) {\n                (() => {\n                  this.foo = foo;\n                })();\n              }\n            }\n            ", "\n            class Foo {\n              constructor(private foo: string) {\n                (() => {\n                  \n                })();\n              }\n            }\n            "},
+		{
+			1,
+			"\n            class Foo {\n              constructor(public name: unknown) {\n                this.name = name;\n              }\n            }\n            ",
+			"\n            class Foo {\n              constructor(public name: unknown) {\n                \n              }\n            }\n            ",
+		},
+		{
+			2,
+			"\n            class Foo {\n              constructor(other: unknown, public name: unknown) {\n                this.other = other;\n                this.name = name;\n              }\n            }\n            ",
+			"\n            class Foo {\n              constructor(other: unknown, public name: unknown) {\n                this.other = other;\n                \n              }\n            }\n            ",
+		},
+		{
+			3,
+			"\n            class Foo {\n              constructor(public name: unknown) {\n                this.name = name;\n                this.name = name;\n                this.name = name;\n              }\n            }\n            ",
+			"\n            class Foo {\n              constructor(public name: unknown) {\n                \n                \n                \n              }\n            }\n            ",
+		},
+		{
+			4,
+			"\n            class Foo {\n              constructor(public name: unknown) {\n                if (maybeTrue) {\n                  this.name = name;\n                } else {\n                  this.name = name + 'edited';\n                }\n              }\n            }\n            ",
+			"\n            class Foo {\n              constructor(public name: unknown) {\n                if (maybeTrue) {\n                  \n                } else {\n                  this.name = name + 'edited';\n                }\n              }\n            }\n            ",
+		},
+		{
+			5,
+			"\n            class Foo {\n              constructor(public foo: string) {\n                this.foo = foo;\n              }\n            }\n            ",
+			"\n            class Foo {\n              constructor(public foo: string) {\n                \n              }\n            }\n            ",
+		},
+		{
+			6,
+			"\n            class Foo {\n              constructor(public foo?: string) {\n                this.foo = foo!;\n              }\n            }\n            ",
+			"\n            class Foo {\n              constructor(public foo?: string) {\n                \n              }\n            }\n            ",
+		},
+		{
+			7,
+			"\n            class Foo {\n              constructor(public foo?: string) {\n                this.foo = foo as any;\n              }\n            }\n            ",
+			"\n            class Foo {\n              constructor(public foo?: string) {\n                \n              }\n            }\n            ",
+		},
+		{
+			8,
+			"\n            class Foo {\n              constructor(public foo = '') {\n                this.foo = foo;\n              }\n            }\n            ",
+			"\n            class Foo {\n              constructor(public foo = '') {\n                \n              }\n            }\n            ",
+		},
+		{
+			9,
+			"\n            class Foo {\n              constructor(public foo = '') {\n                this.foo = foo;\n                this.foo += 'foo';\n              }\n            }\n            ",
+			"\n            class Foo {\n              constructor(public foo = '') {\n                \n                this.foo += 'foo';\n              }\n            }\n            ",
+		},
+		{
+			10,
+			"\n            class Foo {\n              constructor(public foo: string) {\n                this.foo ||= foo;\n              }\n            }\n            ",
+			"\n            class Foo {\n              constructor(public foo: string) {\n                \n              }\n            }\n            ",
+		},
+		{
+			11,
+			"\n            class Foo {\n              constructor(public foo: string) {\n                this.foo ??= foo;\n              }\n            }\n            ",
+			"\n            class Foo {\n              constructor(public foo: string) {\n                \n              }\n            }\n            ",
+		},
+		{
+			12,
+			"\n            class Foo {\n              constructor(public foo: string) {\n                this.foo &&= foo;\n              }\n            }\n            ",
+			"\n            class Foo {\n              constructor(public foo: string) {\n                \n              }\n            }\n            ",
+		},
+		{
+			13,
+			"\n            class Foo {\n              constructor(private foo: string) {\n                this['foo'] = foo;\n              }\n            }\n            ",
+			"\n            class Foo {\n              constructor(private foo: string) {\n                \n              }\n            }\n            ",
+		},
+		{
+			14,
+			"\n            class Foo {\n              constructor(private foo: string) {\n                function bar() {\n                  this.foo = foo;\n                }\n                this.foo = foo;\n              }\n            }\n            ",
+			"\n            class Foo {\n              constructor(private foo: string) {\n                function bar() {\n                  this.foo = foo;\n                }\n                \n              }\n            }\n            ",
+		},
+		{
+			15,
+			"\n            class Foo {\n              constructor(private foo: string) {\n                this.bar = () => {\n                  this.foo = foo;\n                };\n                this.foo = foo;\n              }\n            }\n            ",
+			"\n            class Foo {\n              constructor(private foo: string) {\n                this.bar = () => {\n                  this.foo = foo;\n                };\n                \n              }\n            }\n            ",
+		},
+		{
+			16,
+			"\n            class Foo {\n              constructor(private foo: string) {\n                class Bar {\n                  constructor(private foo: string) {\n                    this.foo = foo;\n                  }\n                }\n                this.foo = foo;\n              }\n            }\n            ",
+			"\n            class Foo {\n              constructor(private foo: string) {\n                class Bar {\n                  constructor(private foo: string) {\n                    \n                  }\n                }\n                \n              }\n            }\n            ",
+		},
+		{
+			17,
+			"\n            class Foo {\n              constructor(private foo: string) {\n                this.foo = foo;\n              }\n              bar = () => {\n                this.foo = 'foo';\n              };\n            }\n            ",
+			"\n            class Foo {\n              constructor(private foo: string) {\n                \n              }\n              bar = () => {\n                this.foo = 'foo';\n              };\n            }\n            ",
+		},
+		{
+			18,
+			"\n            class Foo {\n              constructor(private foo: string) {\n                this.foo = foo;\n              }\n              init = foo => {\n                this.foo = foo;\n              };\n            }\n            ",
+			"\n            class Foo {\n              constructor(private foo: string) {\n                \n              }\n              init = foo => {\n                this.foo = foo;\n              };\n            }\n            ",
+		},
+		{
+			19,
+			"\n            class Foo {\n              constructor(private foo: string) {\n                this.foo = foo;\n              }\n              init = class Bar {\n                constructor(private foo: string) {\n                  this.foo = foo;\n                }\n              };\n            }\n            ",
+			"\n            class Foo {\n              constructor(private foo: string) {\n                \n              }\n              init = class Bar {\n                constructor(private foo: string) {\n                  \n                }\n              };\n            }\n            ",
+		},
+		{
+			20,
+			"\n            class Foo {\n              constructor(private foo: string) {\n                {\n                  this.foo = foo;\n                }\n              }\n            }\n            ",
+			"\n            class Foo {\n              constructor(private foo: string) {\n                {\n                  \n                }\n              }\n            }\n            ",
+		},
+		{
+			21,
+			"\n            class Foo {\n              constructor(private foo: string) {\n                (() => {\n                  this.foo = foo;\n                })();\n              }\n            }\n            ",
+			"\n            class Foo {\n              constructor(private foo: string) {\n                (() => {\n                  \n                })();\n              }\n            }\n            ",
+		},
 	}
 
 	for _, testCase := range cases {

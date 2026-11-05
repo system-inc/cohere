@@ -17,14 +17,22 @@ import (
 // nextNoNearMissRouteExportNearMissText and nextNoNearMissRouteExportPagesRouterText are the rule's
 // messages, whose wording lives in `policy/messages/next-no-near-miss-route-export.json`.
 var (
-	nextNoNearMissRouteExportNearMissText    = policy.MessageOf("structure/next-no-near-miss-route-export", "nearMissRouteExport")
-	nextNoNearMissRouteExportPagesRouterText = policy.MessageOf("structure/next-no-near-miss-route-export", "pagesRouterExport")
+	nextNoNearMissRouteExportNearMissText = policy.MessageOf(
+		"structure/next-no-near-miss-route-export",
+		"nearMissRouteExport",
+	)
+	nextNoNearMissRouteExportPagesRouterText = policy.MessageOf(
+		"structure/next-no-near-miss-route-export",
+		"pagesRouterExport",
+	)
 )
 
 func messageNearMissRouteExport(name string, contractName string) rule.Message {
 	return rule.Message{
-		Id:          nextNoNearMissRouteExportNearMissText.Id,
-		Description: nextNoNearMissRouteExportNearMissText.Render(map[string]string{"name": name, "contractName": contractName}),
+		Id: nextNoNearMissRouteExportNearMissText.Id,
+		Description: nextNoNearMissRouteExportNearMissText.Render(
+			map[string]string{"name": name, "contractName": contractName},
+		),
 	}
 }
 

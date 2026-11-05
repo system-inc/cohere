@@ -20,21 +20,31 @@ type ConsistencyNoScreamingSnakeCaseOptions struct {
 // The reasoning is identical for both, so it is written once there as the `reasoning` phrase. A rule
 // that says only what is wrong gets disabled the first time it is inconvenient.
 var (
-	consistencyNoScreamingSnakeCaseExportedText = policy.MessageOf("nexus/consistency-no-screaming-snake-case", "noScreamingSnakeCaseExported")
-	consistencyNoScreamingSnakeCaseLocalText    = policy.MessageOf("nexus/consistency-no-screaming-snake-case", "noScreamingSnakeCaseLocal")
+	consistencyNoScreamingSnakeCaseExportedText = policy.MessageOf(
+		"nexus/consistency-no-screaming-snake-case",
+		"noScreamingSnakeCaseExported",
+	)
+	consistencyNoScreamingSnakeCaseLocalText = policy.MessageOf(
+		"nexus/consistency-no-screaming-snake-case",
+		"noScreamingSnakeCaseLocal",
+	)
 )
 
 func messageScreamingSnakeCaseExported(name string, suggestion string) rule.Message {
 	return rule.Message{
-		Id:          consistencyNoScreamingSnakeCaseExportedText.Id,
-		Description: consistencyNoScreamingSnakeCaseExportedText.Render(map[string]string{"name": name, "suggestion": suggestion}),
+		Id: consistencyNoScreamingSnakeCaseExportedText.Id,
+		Description: consistencyNoScreamingSnakeCaseExportedText.Render(
+			map[string]string{"name": name, "suggestion": suggestion},
+		),
 	}
 }
 
 func messageScreamingSnakeCaseLocal(name string, suggestion string) rule.Message {
 	return rule.Message{
-		Id:          consistencyNoScreamingSnakeCaseLocalText.Id,
-		Description: consistencyNoScreamingSnakeCaseLocalText.Render(map[string]string{"name": name, "suggestion": suggestion}),
+		Id: consistencyNoScreamingSnakeCaseLocalText.Id,
+		Description: consistencyNoScreamingSnakeCaseLocalText.Render(
+			map[string]string{"name": name, "suggestion": suggestion},
+		),
 	}
 }
 
@@ -89,7 +99,10 @@ var ConsistencyNoScreamingSnakeCase = rule.Rule{
 				}
 
 				if module.IsExported(declarationList.Parent) {
-					ruleContext.ReportNode(name, messageScreamingSnakeCaseExported(name.Text(), toPascalCase(name.Text())))
+					ruleContext.ReportNode(
+						name,
+						messageScreamingSnakeCaseExported(name.Text(), toPascalCase(name.Text())),
+					)
 					return
 				}
 				ruleContext.ReportNode(name, messageScreamingSnakeCaseLocal(name.Text(), toCamelCase(name.Text())))

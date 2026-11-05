@@ -78,7 +78,10 @@ func TestNetworkNoInvalidateCacheLiteralKeyStaysSilent(test *testing.T) {
 		sourceText string
 	}{
 		{"an imported key", "export function run() {\n    networkService.cache.invalidate(UserCacheKey);\n}\n"},
-		{"an array of imported keys", "export function run() {\n    networkService.cache.invalidate([UserCacheKey, PostCacheKey]);\n}\n"},
+		{
+			"an array of imported keys",
+			"export function run() {\n    networkService.cache.invalidate([UserCacheKey, PostCacheKey]);\n}\n",
+		},
 		{"an empty array", "export function run() {\n    networkService.cache.invalidate([]);\n}\n"},
 		{"a call with no arguments", "export function run() {\n    networkService.cache.invalidate(undefined);\n}\n"},
 		// The shape check is what these break, each in a different place.
@@ -95,7 +98,10 @@ func TestNetworkNoInvalidateCacheLiteralKeyStaysSilent(test *testing.T) {
 			"declare const svc: { cache: { clear(key: unknown): void } };\nexport function run() {\n    svc.cache.clear('users');\n}\n",
 		},
 		// A literal passed somewhere else entirely is not this rule's business.
-		{"a literal in an unrelated call", "declare function log(message: string): void;\nexport function run() {\n    log('users');\n}\n"},
+		{
+			"a literal in an unrelated call",
+			"declare function log(message: string): void;\nexport function run() {\n    log('users');\n}\n",
+		},
 		{"no calls at all", "export const Value = 1;\n"},
 	}
 	for _, testCase := range cases {

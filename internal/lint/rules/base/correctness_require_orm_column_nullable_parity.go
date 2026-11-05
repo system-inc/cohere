@@ -9,7 +9,10 @@ import (
 
 // correctnessRequireOrmColumnNullableParityText is the rule's message, whose wording lives in
 // `policy/messages/correctness-require-orm-column-nullable-parity.json`.
-var correctnessRequireOrmColumnNullableParityText = policy.MessageOf("base/correctness-require-orm-column-nullable-parity", "columnNullableButTypeNot")
+var correctnessRequireOrmColumnNullableParityText = policy.MessageOf(
+	"base/correctness-require-orm-column-nullable-parity",
+	"columnNullableButTypeNot",
+)
 
 // ormNullableColumnDecorators is the source rule's own `nullableColumnDecorators`.
 //

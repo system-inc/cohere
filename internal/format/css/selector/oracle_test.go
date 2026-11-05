@@ -418,7 +418,13 @@ func TestParseAgreesWithPostcssSelectorParser(test *testing.T) {
 		switch {
 		case oracleRefused && dumpSelectorError != nil:
 			if dumpSelectorError.Error() != wantError {
-				fail("%s %q: both refuse, with different messages:\n  library %s\n  Go      %s", name, text, wantError, dumpSelectorError.Error())
+				fail(
+					"%s %q: both refuse, with different messages:\n  library %s\n  Go      %s",
+					name,
+					text,
+					wantError,
+					dumpSelectorError.Error(),
+				)
 				continue
 			}
 			refusedByBoth++
@@ -448,21 +454,43 @@ func TestParseAgreesWithPostcssSelectorParser(test *testing.T) {
 			continue // a COHERE_CSS_CORPORA file Prettier refuses has no selectors, which is all it means
 		}
 		if _, named := prettierRefusedFixtures[filepath.ToSlash(relative)]; !named {
-			test.Errorf("%s: Prettier's parse refuses it (%s), and it isn't named in prettierRefusedFixtures", relative, cssError)
+			test.Errorf(
+				"%s: Prettier's parse refuses it (%s), and it isn't named in prettierRefusedFixtures",
+				relative,
+				cssError,
+			)
 		}
 	}
 	for relative, reason := range prettierRefusedFixtures {
 		if _, refused := refusedFiles[filepath.Join(vendored, filepath.FromSlash(relative))]; !refused {
-			test.Errorf("%s is named as refused by Prettier (%s), and Prettier's parse now accepts it: take it off the list", relative, reason)
+			test.Errorf(
+				"%s is named as refused by Prettier (%s), and Prettier's parse now accepts it: take it off the list",
+				relative,
+				reason,
+			)
 		}
 	}
-	test.Logf("%d corpus files (%d refused whole by Prettier's parse) gave %d distinct selectors (%d repeats skipped); with %d fixtures: %d identical, %d refused by both with the same message, %d different; %d corpus selectors refused",
-		corpusFiles, len(refusedFiles), corpusSelectors, corpusDuplicates, len(selectorFixtures), identical, refusedByBoth, different, corpusRefused)
+	test.Logf(
+		"%d corpus files (%d refused whole by Prettier's parse) gave %d distinct selectors (%d repeats skipped); with %d fixtures: %d identical, %d refused by both with the same message, %d different; %d corpus selectors refused",
+		corpusFiles,
+		len(refusedFiles),
+		corpusSelectors,
+		corpusDuplicates,
+		len(selectorFixtures),
+		identical,
+		refusedByBoth,
+		different,
+		corpusRefused,
+	)
 	if corpusSelectors == 0 {
 		test.Errorf("the corpus gave no selectors")
 	}
 	if corpusRefused > corpusSelectors/10 {
-		test.Errorf("the library refused %d of %d corpus selectors; the comparison is thinner than it looks", corpusRefused, corpusSelectors)
+		test.Errorf(
+			"the library refused %d of %d corpus selectors; the comparison is thinner than it looks",
+			corpusRefused,
+			corpusSelectors,
+		)
 	}
 }
 
@@ -615,7 +643,14 @@ func TestParseAgreesOnRandomSelectors(test *testing.T) {
 			parsed++
 		}
 	}
-	test.Logf("%d random selectors (%d more skipped as ErrLoopsForever): %d parsed alike, %d refused alike, %d different", len(inputs), loopsForever, parsed, refused, different)
+	test.Logf(
+		"%d random selectors (%d more skipped as ErrLoopsForever): %d parsed alike, %d refused alike, %d different",
+		len(inputs),
+		loopsForever,
+		parsed,
+		refused,
+		different,
+	)
 	for message, times := range messages {
 		test.Logf("  %5d refused with %q", times, message)
 	}
@@ -739,7 +774,14 @@ func firstSelectorDifference(want any, got any, path string) string {
 			wantValue, wantPresent := typed[key]
 			gotValue, gotPresent := other[key]
 			if wantPresent != gotPresent {
-				return fmt.Sprintf("%s.%s: present in the library %v, in Go %v (%v)", path, key, wantPresent, gotPresent, typed["type"])
+				return fmt.Sprintf(
+					"%s.%s: present in the library %v, in Go %v (%v)",
+					path,
+					key,
+					wantPresent,
+					gotPresent,
+					typed["type"],
+				)
 			}
 			if difference := firstSelectorDifference(wantValue, gotValue, path+"."+key); difference != "" {
 				return difference
@@ -752,7 +794,11 @@ func firstSelectorDifference(want any, got any, path string) string {
 			return fmt.Sprintf("%s: want %d elements, got %v", path, len(typed), got)
 		}
 		for index := range typed {
-			if difference := firstSelectorDifference(typed[index], other[index], fmt.Sprintf("%s[%d]", path, index)); difference != "" {
+			if difference := firstSelectorDifference(
+				typed[index],
+				other[index],
+				fmt.Sprintf("%s[%d]", path, index),
+			); difference != "" {
 				return difference
 			}
 		}

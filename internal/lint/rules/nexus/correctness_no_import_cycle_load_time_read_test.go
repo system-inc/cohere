@@ -12,7 +12,11 @@ import (
 
 // correctnessNoImportCycleLoadTimeReadRun runs the rule on subject with every file of the fixture in
 // the program.
-func correctnessNoImportCycleLoadTimeReadRun(test *testing.T, files map[string]string, subject string) rule_testing.Result {
+func correctnessNoImportCycleLoadTimeReadRun(
+	test *testing.T,
+	files map[string]string,
+	subject string,
+) rule_testing.Result {
 	test.Helper()
 	return rule_testing.RunTypedFiles(test, CorrectnessNoImportCycleLoadTimeRead, files, subject)
 }
@@ -41,7 +45,11 @@ func correctnessNoImportCycleLoadTimeReadExpect(test *testing.T, result rule_tes
 			test.Fatalf("unexpected message id %q", diagnostic.Message.Id)
 		}
 		if len(diagnostic.Fixes) != 0 || len(diagnostic.Suggestions) != 0 {
-			test.Fatalf("expected no fix and no suggestion, got %d and %d", len(diagnostic.Fixes), len(diagnostic.Suggestions))
+			test.Fatalf(
+				"expected no fix and no suggestion, got %d and %d",
+				len(diagnostic.Fixes),
+				len(diagnostic.Suggestions),
+			)
 		}
 		got = append(got, strings.TrimSpace(text[diagnostic.Range.Pos():diagnostic.Range.End()]))
 	}
@@ -145,9 +153,15 @@ func correctnessNoImportCycleLoadTimeReadBaseErrors(fixed bool) map[string]strin
 	}
 	if fixed {
 		files[correctnessNoImportCycleLoadTimeReadRateLimiterFile] = strings.Join(rateLimiterDeclarations, "\n")
-		files["/repository/nexus/source/modules/rate-limiter/RateLimitErrorData.ts"] = strings.Join(append(rateLimitGuardImports, rateLimitGuard...), "\n")
+		files["/repository/nexus/source/modules/rate-limiter/RateLimitErrorData.ts"] = strings.Join(
+			append(rateLimitGuardImports, rateLimitGuard...),
+			"\n",
+		)
 	} else {
-		files[correctnessNoImportCycleLoadTimeReadRateLimiterFile] = strings.Join(append(append(rateLimitGuardImports, rateLimiterDeclarations...), rateLimitGuard...), "\n")
+		files[correctnessNoImportCycleLoadTimeReadRateLimiterFile] = strings.Join(
+			append(append(rateLimitGuardImports, rateLimiterDeclarations...), rateLimitGuard...),
+			"\n",
+		)
 	}
 	return files
 }
@@ -156,9 +170,16 @@ func correctnessNoImportCycleLoadTimeReadBaseErrors(fixed bool) map[string]strin
 func TestCorrectnessNoImportCycleLoadTimeReadFiresOnBaseErrorIdentifiers(test *testing.T) {
 	test.Parallel()
 
-	result := correctnessNoImportCycleLoadTimeReadRun(test, correctnessNoImportCycleLoadTimeReadBaseErrors(false), correctnessNoImportCycleLoadTimeReadIdentifiersFile)
+	result := correctnessNoImportCycleLoadTimeReadRun(
+		test,
+		correctnessNoImportCycleLoadTimeReadBaseErrors(false),
+		correctnessNoImportCycleLoadTimeReadIdentifiersFile,
+	)
 	correctnessNoImportCycleLoadTimeReadExpect(test, result, "RateLimiterModuleErrors")
-	if !strings.Contains(result.Diagnostics[0].Message.Description, "BaseErrorIdentifiers.ts → RateLimiterModuleErrors.ts → BaseErrorIdentifiers.ts") {
+	if !strings.Contains(
+		result.Diagnostics[0].Message.Description,
+		"BaseErrorIdentifiers.ts → RateLimiterModuleErrors.ts → BaseErrorIdentifiers.ts",
+	) {
 		test.Fatalf("the message should name the cycle, got %q", result.Diagnostics[0].Message.Description)
 	}
 }
@@ -167,8 +188,15 @@ func TestCorrectnessNoImportCycleLoadTimeReadFiresOnBaseErrorIdentifiers(test *t
 func TestCorrectnessNoImportCycleLoadTimeReadStaysSilentOnTheRestOfTheBaseErrorCycle(test *testing.T) {
 	test.Parallel()
 
-	for _, subject := range []string{correctnessNoImportCycleLoadTimeReadRateLimiterFile, correctnessNoImportCycleLoadTimeReadBaseErrorFile} {
-		rule_testing.ExpectClean(test, correctnessNoImportCycleLoadTimeReadRun(test, correctnessNoImportCycleLoadTimeReadBaseErrors(false), subject))
+	for _, subject := range []string{
+		correctnessNoImportCycleLoadTimeReadRateLimiterFile,
+		correctnessNoImportCycleLoadTimeReadBaseErrorFile,
+	} {
+		rule_testing.ExpectClean(test, correctnessNoImportCycleLoadTimeReadRun(
+			test,
+			correctnessNoImportCycleLoadTimeReadBaseErrors(false),
+			subject,
+		))
 	}
 }
 
@@ -177,7 +205,11 @@ func TestCorrectnessNoImportCycleLoadTimeReadStaysSilentOnTheRestOfTheBaseErrorC
 func TestCorrectnessNoImportCycleLoadTimeReadStaysSilentOnFixedBaseErrorIdentifiers(test *testing.T) {
 	test.Parallel()
 
-	rule_testing.ExpectClean(test, correctnessNoImportCycleLoadTimeReadRun(test, correctnessNoImportCycleLoadTimeReadBaseErrors(true), correctnessNoImportCycleLoadTimeReadIdentifiersFile))
+	rule_testing.ExpectClean(test, correctnessNoImportCycleLoadTimeReadRun(
+		test,
+		correctnessNoImportCycleLoadTimeReadBaseErrors(true),
+		correctnessNoImportCycleLoadTimeReadIdentifiersFile,
+	))
 }
 
 const (
@@ -231,26 +263,88 @@ func TestCorrectnessNoImportCycleLoadTimeReadFires(test *testing.T) {
 		lines []string
 		want  []string
 	}{
-		{"a const in an initializer", []string{"import { Limit } from './B';", "export const doubled = Limit * 2;"}, []string{"Limit"}},
-		{"a class extended", []string{"import { Base } from './B';", "export class Derived extends Base {}"}, []string{"Base"}},
-		{"a namespace member", []string{"import * as b from './B';", "export const doubled = b.Limit * 2;"}, []string{"b.Limit"}},
-		{"typeof, which throws in the dead zone", []string{"import { Limit } from './B';", "export const kind = typeof Limit;"}, []string{"Limit"}},
-		{"a shorthand property", []string{"import { Limit } from './B';", "export const bag = { Limit };"}, []string{"Limit"}},
-		{"export default of an expression", []string{"import { Limit } from './B';", "export default Limit;"}, []string{"Limit"}},
-		{"a static field", []string{"import { Limit } from './B';", "export class Holder { static limit = Limit; }"}, []string{"Limit"}},
-		{"a static block", []string{"import { Limit } from './B';", "export class Holder { static { use(Limit); } }"}, []string{"Limit"}},
-		{"a class decorator", []string{"import { tag } from './B';", "@tag", "export class Tagged {}"}, []string{"tag"}},
-		{"a condition at top level", []string{"import { Limit } from './B';", "if(Limit > 1) {", "    use(1);", "}"}, []string{"Limit"}},
-		{"let, var, a destructured const and an enum", []string{"import { counter, legacy, destructured, Color } from './B';", "use(counter);", "use(legacy);", "use(destructured);", "use(Color.Red);"}, []string{"counter", "legacy", "destructured", "Color"}},
-		{"a default import of a class", []string{"import DefaultThing from './B';", "use(DefaultThing);"}, []string{"DefaultThing"}},
+		{
+			"a const in an initializer",
+			[]string{"import { Limit } from './B';", "export const doubled = Limit * 2;"},
+			[]string{"Limit"},
+		},
+		{
+			"a class extended",
+			[]string{"import { Base } from './B';", "export class Derived extends Base {}"},
+			[]string{"Base"},
+		},
+		{
+			"a namespace member",
+			[]string{"import * as b from './B';", "export const doubled = b.Limit * 2;"},
+			[]string{"b.Limit"},
+		},
+		{
+			"typeof, which throws in the dead zone",
+			[]string{"import { Limit } from './B';", "export const kind = typeof Limit;"},
+			[]string{"Limit"},
+		},
+		{
+			"a shorthand property",
+			[]string{"import { Limit } from './B';", "export const bag = { Limit };"},
+			[]string{"Limit"},
+		},
+		{
+			"export default of an expression",
+			[]string{"import { Limit } from './B';", "export default Limit;"},
+			[]string{"Limit"},
+		},
+		{
+			"a static field",
+			[]string{"import { Limit } from './B';", "export class Holder { static limit = Limit; }"},
+			[]string{"Limit"},
+		},
+		{
+			"a static block",
+			[]string{"import { Limit } from './B';", "export class Holder { static { use(Limit); } }"},
+			[]string{"Limit"},
+		},
+		{
+			"a class decorator",
+			[]string{"import { tag } from './B';", "@tag", "export class Tagged {}"},
+			[]string{"tag"},
+		},
+		{
+			"a condition at top level",
+			[]string{"import { Limit } from './B';", "if(Limit > 1) {", "    use(1);", "}"},
+			[]string{"Limit"},
+		},
+		{"let, var, a destructured const and an enum", []string{
+			"import { counter, legacy, destructured, Color } from './B';",
+			"use(counter);",
+			"use(legacy);",
+			"use(destructured);",
+			"use(Color.Red);",
+		}, []string{"counter", "legacy", "destructured", "Color"}},
+		{
+			"a default import of a class",
+			[]string{"import DefaultThing from './B';", "use(DefaultThing);"},
+			[]string{"DefaultThing"},
+		},
 		{"a renamed import", []string{"import { Limit as Ceiling } from './B';", "use(Ceiling);"}, []string{"Ceiling"}},
-		{"an instantiation expression", []string{"import { make } from './B';", "export const makeNumber = make<number>;"}, []string{"make"}},
-		{"two reads", []string{"import { Limit } from './B';", "use(Limit);", "export const a = [Limit];"}, []string{"Limit", "Limit"}},
+		{
+			"an instantiation expression",
+			[]string{"import { make } from './B';", "export const makeNumber = make<number>;"},
+			[]string{"make"},
+		},
+		{
+			"two reads",
+			[]string{"import { Limit } from './B';", "use(Limit);", "export const a = [Limit];"},
+			[]string{"Limit", "Limit"},
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			correctnessNoImportCycleLoadTimeReadExpect(test, correctnessNoImportCycleLoadTimeReadPair(test, testCase.lines, correctnessNoImportCycleLoadTimeReadOther), testCase.want...)
+			correctnessNoImportCycleLoadTimeReadExpect(test, correctnessNoImportCycleLoadTimeReadPair(
+				test,
+				testCase.lines,
+				correctnessNoImportCycleLoadTimeReadOther,
+			), testCase.want...)
 		})
 	}
 }
@@ -262,9 +356,15 @@ func TestCorrectnessNoImportCycleLoadTimeReadStaysSilent(test *testing.T) {
 		name  string
 		lines []string
 	}{
-		{"a function body", []string{"import { Limit } from './B';", "export function doubled(): number { return Limit * 2; }"}},
+		{
+			"a function body",
+			[]string{"import { Limit } from './B';", "export function doubled(): number { return Limit * 2; }"},
+		},
 		{"an arrow function", []string{"import { Limit } from './B';", "export const doubled = () => Limit * 2;"}},
-		{"a function expression", []string{"import { Limit } from './B';", "export const doubled = function() { return Limit * 2; };"}},
+		{
+			"a function expression",
+			[]string{"import { Limit } from './B';", "export const doubled = function() { return Limit * 2; };"},
+		},
 		{"methods, accessors, a constructor and an instance field", []string{
 			"import { Limit } from './B';",
 			"export class Holder {",
@@ -274,24 +374,59 @@ func TestCorrectnessNoImportCycleLoadTimeReadStaysSilent(test *testing.T) {
 			"    read(): number { return Limit; }",
 			"}",
 		}},
-		{"an object method", []string{"import { Limit } from './B';", "export const holder = { read() { return Limit; } };"}},
-		{"a parameter default", []string{"import { Limit } from './B';", "export function read(value = Limit): number { return value; }"}},
-		{"a hoisted function called at load", []string{"import { helper } from './B';", "export const one = helper();"}},
-		{"type positions", []string{"import { Limit, Base } from './B';", "export const typed: typeof Limit = 10;", "export const cast = 10 as typeof Limit;", "export type Instance = Base;"}},
+		{
+			"an object method",
+			[]string{"import { Limit } from './B';", "export const holder = { read() { return Limit; } };"},
+		},
+		{
+			"a parameter default",
+			[]string{"import { Limit } from './B';", "export function read(value = Limit): number { return value; }"},
+		},
+		{
+			"a hoisted function called at load",
+			[]string{"import { helper } from './B';", "export const one = helper();"},
+		},
+		{"type positions", []string{
+			"import { Limit, Base } from './B';",
+			"export const typed: typeof Limit = 10;",
+			"export const cast = 10 as typeof Limit;",
+			"export type Instance = Base;",
+		}},
 		{"an export that forwards the binding", []string{"import { Limit } from './B';", "export { Limit };"}},
 		{"an ambient declaration", []string{"import { ambient } from './B';", "use(ambient);"}},
-		{"a const enum", []string{"import { Flag, Limit } from './B';", "use(Flag.On);", "export function read(): number { return Limit; }"}},
-		{"a local shadowing the import", []string{"import { Limit } from './B';", "{", "    const Limit = 3;", "    use(Limit);", "}", "export function read(): number { return Limit; }"}},
+		{"a const enum", []string{
+			"import { Flag, Limit } from './B';",
+			"use(Flag.On);",
+			"export function read(): number { return Limit; }",
+		}},
+		{"a local shadowing the import", []string{
+			"import { Limit } from './B';",
+			"{",
+			"    const Limit = 3;",
+			"    use(Limit);",
+			"}",
+			"export function read(): number { return Limit; }",
+		}},
 		{"the namespace object itself", []string{"import * as b from './B';", "use(b);"}},
-		{"a module outside the cycle", []string{"import { Outside } from './C';", "import { Limit } from './B';", "use(Outside);", "export function read(): number { return Limit; }"}},
+		{"a module outside the cycle", []string{
+			"import { Outside } from './C';",
+			"import { Limit } from './B';",
+			"use(Outside);",
+			"export function read(): number { return Limit; }",
+		}},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			result := correctnessNoImportCycleLoadTimeReadRun(test, map[string]string{
-				correctnessNoImportCycleLoadTimeReadSubjectFile: correctnessNoImportCycleLoadTimeReadSubject(testCase.lines...),
-				correctnessNoImportCycleLoadTimeReadOtherFile:   strings.Join(correctnessNoImportCycleLoadTimeReadOther, "\n"),
-				"/repository/source/C.ts":                       "export const Outside = 1;",
+				correctnessNoImportCycleLoadTimeReadSubjectFile: correctnessNoImportCycleLoadTimeReadSubject(
+					testCase.lines...,
+				),
+				correctnessNoImportCycleLoadTimeReadOtherFile: strings.Join(
+					correctnessNoImportCycleLoadTimeReadOther,
+					"\n",
+				),
+				"/repository/source/C.ts": "export const Outside = 1;",
 			}, correctnessNoImportCycleLoadTimeReadSubjectFile)
 			rule_testing.ExpectClean(test, result)
 		})
@@ -317,15 +452,31 @@ func TestCorrectnessNoImportCycleLoadTimeReadFiresOnEveryRuntimeBackEdge(test *t
 		{"export star", []string{"export * from './A';"}},
 		{"export star as a namespace", []string{"export * as a from './A';"}},
 		{"a named re-export of a value", []string{"export { fromA } from './A';"}},
-		{"a value read in a function", []string{"import { fromA } from './A';", "export function read(): number { return fromA; }"}},
-		{"a value read through a shorthand property", []string{"import { fromA } from './A';", "export function bag() { return { fromA }; }"}},
-		{"a namespace import read", []string{"import * as a from './A';", "export function read(): number { return a.fromA; }"}},
-		{"a mixed import whose value binding is read", []string{"import { type FromAType, fromA } from './A';", "export function read(): FromAType { return fromA; }"}},
+		{
+			"a value read in a function",
+			[]string{"import { fromA } from './A';", "export function read(): number { return fromA; }"},
+		},
+		{
+			"a value read through a shorthand property",
+			[]string{"import { fromA } from './A';", "export function bag() { return { fromA }; }"},
+		},
+		{
+			"a namespace import read",
+			[]string{"import * as a from './A';", "export function read(): number { return a.fromA; }"},
+		},
+		{"a mixed import whose value binding is read", []string{
+			"import { type FromAType, fromA } from './A';",
+			"export function read(): FromAType { return fromA; }",
+		}},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := correctnessNoImportCycleLoadTimeReadPair(test, []string{"import { Limit } from './B';", "export const doubled = Limit * 2;"}, correctnessNoImportCycleLoadTimeReadBackEdge(testCase.lines...))
+			result := correctnessNoImportCycleLoadTimeReadPair(
+				test,
+				[]string{"import { Limit } from './B';", "export const doubled = Limit * 2;"},
+				correctnessNoImportCycleLoadTimeReadBackEdge(testCase.lines...),
+			)
 			correctnessNoImportCycleLoadTimeReadExpect(test, result, "Limit")
 		})
 	}
@@ -340,18 +491,35 @@ func TestCorrectnessNoImportCycleLoadTimeReadStaysSilentWithoutARuntimeBackEdge(
 		lines []string
 	}{
 		{"import type", []string{"import type { FromAType } from './A';", "export const typed: FromAType = 1;"}},
-		{"an inline type specifier", []string{"import { type FromAType } from './A';", "export const typed: FromAType = 1;"}},
+		{
+			"an inline type specifier",
+			[]string{"import { type FromAType } from './A';", "export const typed: FromAType = 1;"},
+		},
 		{"export type", []string{"export type { FromAType } from './A';"}},
 		{"a named re-export of a type", []string{"export { FromAType } from './A';"}},
-		{"a value import used only in types, which TypeScript elides", []string{"import { fromA } from './A';", "export type Copy = typeof fromA;"}},
-		{"a value import whose only use is a shadowing parameter", []string{"import { fromA } from './A';", "export function read(fromA: number): number { return fromA; }"}},
+		{
+			"a value import used only in types, which TypeScript elides",
+			[]string{"import { fromA } from './A';", "export type Copy = typeof fromA;"},
+		},
+		{
+			"a value import whose only use is a shadowing parameter",
+			[]string{"import { fromA } from './A';", "export function read(fromA: number): number { return fromA; }"},
+		},
 		{"a dynamic import", []string{"export async function later(): Promise<unknown> { return import('./A'); }"}},
-		{"a server actions module", []string{"'use server';", "import { fromA } from './A';", "export async function read(): Promise<number> { return fromA; }"}},
+		{"a server actions module", []string{
+			"'use server';",
+			"import { fromA } from './A';",
+			"export async function read(): Promise<number> { return fromA; }",
+		}},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := correctnessNoImportCycleLoadTimeReadPair(test, []string{"import { Limit } from './B';", "export const doubled = Limit * 2;"}, correctnessNoImportCycleLoadTimeReadBackEdge(testCase.lines...))
+			result := correctnessNoImportCycleLoadTimeReadPair(
+				test,
+				[]string{"import { Limit } from './B';", "export const doubled = Limit * 2;"},
+				correctnessNoImportCycleLoadTimeReadBackEdge(testCase.lines...),
+			)
 			rule_testing.ExpectClean(test, result)
 		})
 	}
@@ -363,14 +531,23 @@ func TestCorrectnessNoImportCycleLoadTimeReadFollowsABarrel(test *testing.T) {
 	test.Parallel()
 
 	files := map[string]string{
-		correctnessNoImportCycleLoadTimeReadSubjectFile: correctnessNoImportCycleLoadTimeReadSubject("import { Limit } from './Barrel';", "export const doubled = Limit * 2;"),
-		"/repository/source/Barrel.ts":                  "export { Limit } from './B';",
-		correctnessNoImportCycleLoadTimeReadOtherFile:   strings.Join(correctnessNoImportCycleLoadTimeReadBackEdge("import './A';"), "\n"),
+		correctnessNoImportCycleLoadTimeReadSubjectFile: correctnessNoImportCycleLoadTimeReadSubject(
+			"import { Limit } from './Barrel';",
+			"export const doubled = Limit * 2;",
+		),
+		"/repository/source/Barrel.ts": "export { Limit } from './B';",
+		correctnessNoImportCycleLoadTimeReadOtherFile: strings.Join(
+			correctnessNoImportCycleLoadTimeReadBackEdge("import './A';"),
+			"\n",
+		),
 	}
 	result := correctnessNoImportCycleLoadTimeReadRun(test, files, correctnessNoImportCycleLoadTimeReadSubjectFile)
 	correctnessNoImportCycleLoadTimeReadExpect(test, result, "Limit")
 	if !strings.Contains(result.Diagnostics[0].Message.Description, "A.ts → Barrel.ts → B.ts → A.ts") {
-		test.Fatalf("the message should name the cycle through the barrel, got %q", result.Diagnostics[0].Message.Description)
+		test.Fatalf(
+			"the message should name the cycle through the barrel, got %q",
+			result.Diagnostics[0].Message.Description,
+		)
 	}
 }
 
@@ -380,11 +557,17 @@ func TestCorrectnessNoImportCycleLoadTimeReadStaysSilentWhenTheDeclarationIsOuts
 	test.Parallel()
 
 	files := map[string]string{
-		correctnessNoImportCycleLoadTimeReadSubjectFile: correctnessNoImportCycleLoadTimeReadSubject("import { Outside } from './Barrel';", "export const doubled = Outside * 2;"),
-		"/repository/source/Barrel.ts":                  "export { Outside } from './C';\nimport './A';",
-		"/repository/source/C.ts":                       "export const Outside = 1;",
+		correctnessNoImportCycleLoadTimeReadSubjectFile: correctnessNoImportCycleLoadTimeReadSubject(
+			"import { Outside } from './Barrel';",
+			"export const doubled = Outside * 2;",
+		),
+		"/repository/source/Barrel.ts": "export { Outside } from './C';\nimport './A';",
+		"/repository/source/C.ts":      "export const Outside = 1;",
 	}
-	rule_testing.ExpectClean(test, correctnessNoImportCycleLoadTimeReadRun(test, files, correctnessNoImportCycleLoadTimeReadSubjectFile))
+	rule_testing.ExpectClean(
+		test,
+		correctnessNoImportCycleLoadTimeReadRun(test, files, correctnessNoImportCycleLoadTimeReadSubjectFile),
+	)
 }
 
 // A re-export of a name another module exported with `export type` is elided like any type, so it is
@@ -394,17 +577,27 @@ func TestCorrectnessNoImportCycleLoadTimeReadStaysSilentThroughATypeOnlyReExport
 	test.Parallel()
 
 	files := map[string]string{
-		correctnessNoImportCycleLoadTimeReadSubjectFile: correctnessNoImportCycleLoadTimeReadSubject("import { Limit } from './B';", "export const doubled = Limit * 2;"),
-		correctnessNoImportCycleLoadTimeReadOtherFile:   "export { fromA } from './Mid';\nexport const Limit = 10;",
-		"/repository/source/Mid.ts":                     "import './A';\nexport type { fromA } from './A';",
+		correctnessNoImportCycleLoadTimeReadSubjectFile: correctnessNoImportCycleLoadTimeReadSubject(
+			"import { Limit } from './B';",
+			"export const doubled = Limit * 2;",
+		),
+		correctnessNoImportCycleLoadTimeReadOtherFile: "export { fromA } from './Mid';\nexport const Limit = 10;",
+		"/repository/source/Mid.ts":                   "import './A';\nexport type { fromA } from './A';",
 	}
-	rule_testing.ExpectClean(test, correctnessNoImportCycleLoadTimeReadRun(test, files, correctnessNoImportCycleLoadTimeReadSubjectFile))
+	rule_testing.ExpectClean(
+		test,
+		correctnessNoImportCycleLoadTimeReadRun(test, files, correctnessNoImportCycleLoadTimeReadSubjectFile),
+	)
 }
 
 // correctnessNoImportCycleLoadTimeReadJsxPair runs the rule on a JSX pair modelled on the component
 // cycles in ahra (`TaskRowExpandable.tsx` and `TaskRowExpandedChildren.tsx` render each other).
 // `element` is A.tsx's top-level use of B.tsx's component; `component` is how B.tsx declares it.
-func correctnessNoImportCycleLoadTimeReadJsxPair(test *testing.T, element string, component string) rule_testing.Result {
+func correctnessNoImportCycleLoadTimeReadJsxPair(
+	test *testing.T,
+	element string,
+	component string,
+) rule_testing.Result {
 	test.Helper()
 	return rule_testing.RunTypedFilesWithSetup(test, CorrectnessNoImportCycleLoadTimeRead, map[string]string{
 		"/repository/source/A.tsx": strings.Join([]string{
@@ -420,7 +613,11 @@ func correctnessNoImportCycleLoadTimeReadJsxPair(test *testing.T, element string
 		}, "\n"),
 	}, "/repository/source/A.tsx", func(directory string) {
 		configuration := `{"compilerOptions": {"strict": true, "target": "ES2022", "lib": ["ES2022"], "jsx": "preserve", "moduleDetection": "force", "types": []}, "include": ["**/*.tsx"]}`
-		if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration), 0o644); writeError != nil {
+		if writeError := os.WriteFile(
+			filepath.Join(directory, "tsconfig.json"),
+			[]byte(configuration),
+			0o644,
+		); writeError != nil {
 			test.Fatalf("writing the JSX tsconfig: %v", writeError)
 		}
 	})
@@ -430,14 +627,22 @@ func correctnessNoImportCycleLoadTimeReadJsxPair(test *testing.T, element string
 func TestCorrectnessNoImportCycleLoadTimeReadStaysSilentOnComponentsRenderingEachOther(test *testing.T) {
 	test.Parallel()
 
-	rule_testing.ExpectClean(test, correctnessNoImportCycleLoadTimeReadJsxPair(test, "", "export const Child = function(): unknown { return null; };"))
+	rule_testing.ExpectClean(test, correctnessNoImportCycleLoadTimeReadJsxPair(
+		test,
+		"",
+		"export const Child = function(): unknown { return null; };",
+	))
 }
 
 // An element built at load reads its component then. The closing tag is not a second read.
 func TestCorrectnessNoImportCycleLoadTimeReadFiresOnAnElementBuiltAtLoad(test *testing.T) {
 	test.Parallel()
 
-	result := correctnessNoImportCycleLoadTimeReadJsxPair(test, "export const placeholder = <Child></Child>;", "export const Child = function(): unknown { return null; };")
+	result := correctnessNoImportCycleLoadTimeReadJsxPair(
+		test,
+		"export const placeholder = <Child></Child>;",
+		"export const Child = function(): unknown { return null; };",
+	)
 	correctnessNoImportCycleLoadTimeReadExpect(test, result, "Child")
 }
 
@@ -445,5 +650,9 @@ func TestCorrectnessNoImportCycleLoadTimeReadFiresOnAnElementBuiltAtLoad(test *t
 func TestCorrectnessNoImportCycleLoadTimeReadStaysSilentOnAnElementOfAHoistedComponent(test *testing.T) {
 	test.Parallel()
 
-	rule_testing.ExpectClean(test, correctnessNoImportCycleLoadTimeReadJsxPair(test, "export const placeholder = <Child></Child>;", "export function Child(): unknown { return null; }"))
+	rule_testing.ExpectClean(test, correctnessNoImportCycleLoadTimeReadJsxPair(
+		test,
+		"export const placeholder = <Child></Child>;",
+		"export function Child(): unknown { return null; }",
+	))
 }

@@ -179,7 +179,8 @@ func staticMethodName(callee *ast.Node) string {
 		}
 	case ast.KindElementAccessExpression:
 		argument := ast.SkipParentheses(callee.AsElementAccessExpression().ArgumentExpression)
-		if argument != nil && (argument.Kind == ast.KindStringLiteral || argument.Kind == ast.KindNoSubstitutionTemplateLiteral) {
+		if argument != nil &&
+			(argument.Kind == ast.KindStringLiteral || argument.Kind == ast.KindNoSubstitutionTemplateLiteral) {
 			return argument.Text()
 		}
 	}
@@ -219,12 +220,15 @@ func isNaNReference(ruleContext rule.Context, node *ast.Node) bool {
 		// `Number['NaN']` is the same read in brackets, which upstream's isSpecificMemberAccess
 		// accepts through its static property name.
 		access := node.AsElementAccessExpression()
-		if access.Expression == nil || access.Expression.Kind != ast.KindIdentifier || access.Expression.Text() != "Number" ||
+		if access.Expression == nil ||
+			access.Expression.Kind != ast.KindIdentifier ||
+			access.Expression.Text() != "Number" ||
 			identifierIsShadowed(ruleContext, access.Expression) {
 			return false
 		}
 		argument := ast.SkipParentheses(access.ArgumentExpression)
-		return argument != nil && (argument.Kind == ast.KindStringLiteral || argument.Kind == ast.KindNoSubstitutionTemplateLiteral) &&
+		return argument != nil &&
+			(argument.Kind == ast.KindStringLiteral || argument.Kind == ast.KindNoSubstitutionTemplateLiteral) &&
 			argument.Text() == "NaN"
 
 	case ast.KindParenthesizedExpression:

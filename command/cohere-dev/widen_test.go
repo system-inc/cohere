@@ -89,7 +89,10 @@ func TestAGateWidensWhenThePoolGoesIdleBetweenItsCommands(test *testing.T) {
 		test.Fatalf("the landing failed: %v\n%s", waitError, &output)
 	}
 	if line := gate.line(test, "test"); !strings.Contains(line, "flags=-p=4 -buildvcs=false -trimpath threads=3") {
-		test.Errorf("the tests, once the pool went idle, ran at %q, want three tokens' share, 4 packages on 3 threads", line)
+		test.Errorf(
+			"the tests, once the pool went idle, ran at %q, want three tokens' share, 4 packages on 3 threads",
+			line,
+		)
 	}
 	if !strings.Contains(output.String(), "the pool went idle, so the test run borrows") {
 		test.Errorf("the gate did not say its tests widened:\n%s", &output)

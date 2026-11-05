@@ -186,11 +186,15 @@ func defaultIncompatibleLibraryTable(moduleName string) (map[string]incompatible
 		}, true
 	case "@tanstack/react-table":
 		return map[string]incompatibleLibraryEntry{
-			"useReactTable": {message: "TanStack Table's `useReactTable()` API returns functions that cannot be memoized safely"},
+			"useReactTable": {
+				message: "TanStack Table's `useReactTable()` API returns functions that cannot be memoized safely",
+			},
 		}, true
 	case "@tanstack/react-virtual":
 		return map[string]incompatibleLibraryEntry{
-			"useVirtualizer": {message: "TanStack Virtual's `useVirtualizer()` API returns functions that cannot be memoized safely"},
+			"useVirtualizer": {
+				message: "TanStack Virtual's `useVirtualizer()` API returns functions that cannot be memoized safely",
+			},
 		}, true
 	}
 	return nil, false
@@ -281,7 +285,12 @@ func incompatibleLibraryReport(ruleContext rule.Context, sourceFile *ast.Node, l
 			incompatibleLibraryCollectDestructure(node, locals, destructured, results)
 		}
 		if node.Kind == ast.KindCallExpression {
-			if span, message, offending := incompatibleLibraryCallMessage(node, locals, destructured, results); offending {
+			if span, message, offending := incompatibleLibraryCallMessage(
+				node,
+				locals,
+				destructured,
+				results,
+			); offending {
 				enclosing := incompatibleLibraryEnclosingRoot(node)
 				if enclosing != nil && !reported[enclosing] {
 					reported[enclosing] = true
@@ -308,7 +317,12 @@ func incompatibleLibraryReport(ruleContext rule.Context, sourceFile *ast.Node, l
 //
 // Mutates: destructured gains each destructured local, keyed to the message its property carries
 // Mutates: results gains each whole-result binding, keyed to its library's property table for a later member call
-func incompatibleLibraryCollectDestructure(declaration *ast.Node, locals incompatibleLibraryLocals, destructured map[string]string, results map[string]map[string]string) {
+func incompatibleLibraryCollectDestructure(
+	declaration *ast.Node,
+	locals incompatibleLibraryLocals,
+	destructured map[string]string,
+	results map[string]map[string]string,
+) {
 	node := declaration.AsVariableDeclaration()
 	if node == nil || node.Initializer == nil || node.Name() == nil {
 		return

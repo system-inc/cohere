@@ -26,7 +26,10 @@ func designSystemRule(root string) rule.Rule {
 				// Asked every time, not after the theme in an ||: a question never asked is not in the read set.
 				candidate := fileSystem.FileExists(tspath.RootedFilePath(filepath.Join(root, "candidate.css")))
 				if strings.Contains(theme, "flag") || candidate {
-					ruleContext.ReportNode(node, rule.Message{Id: "flagged", Description: "the design system flags this"})
+					ruleContext.ReportNode(
+						node,
+						rule.Message{Id: "flagged", Description: "the design system flags this"},
+					)
 				}
 			}}
 		},
@@ -60,7 +63,10 @@ func TestDesignSystemRulesReplayUntilWhatTheDesignSystemReadChanges(test *testin
 
 	first, recorded := walkAndRecord(test, root, rules, nil)
 	if len(first.Diagnostics) != 2 {
-		test.Fatalf("the fixture flagged %d declarations, not 2, so what follows proves nothing", len(first.Diagnostics))
+		test.Fatalf(
+			"the fixture flagged %d declarations, not 2, so what follows proves nothing",
+			len(first.Diagnostics),
+		)
 	}
 	if recorded.DesignSystem == nil {
 		test.Fatal("the first walk recorded no design system")
@@ -108,8 +114,12 @@ func TestDesignSystemRulesReplayUntilWhatTheDesignSystemReadChanges(test *testin
 		}
 		switch {
 		case step.wantRerun && result.DesignSystemRerun != result.FilesReplayed:
-			test.Errorf("%s: the design-system rules ran again on %d of %d replayed files; something they read changed, so all must",
-				step.name, result.DesignSystemRerun, result.FilesReplayed)
+			test.Errorf(
+				"%s: the design-system rules ran again on %d of %d replayed files; something they read changed, so all must",
+				step.name,
+				result.DesignSystemRerun,
+				result.FilesReplayed,
+			)
 		case !step.wantRerun && result.DesignSystemRerun != 0:
 			test.Errorf("%s: the design-system rules ran again on %d replayed files though nothing they read changed",
 				step.name, result.DesignSystemRerun)

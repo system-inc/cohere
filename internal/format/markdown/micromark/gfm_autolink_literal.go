@@ -156,7 +156,11 @@ func (run *emailAutolink) atext(code Code) State {
 func (run *emailAutolink) emailDomain(code Code) State {
 	// Dot followed by alphanumerical (not `-` or `_`).
 	if code == CodeDot {
-		return run.effects.Check(gfmAutolinkLiteralEmailDomainDotTrail, run.emailDomainAfterState, run.emailDomainDotState)(code)
+		return run.effects.Check(
+			gfmAutolinkLiteralEmailDomainDotTrail,
+			run.emailDomainAfterState,
+			run.emailDomainDotState,
+		)(code)
 	}
 
 	// Alphanumerical, `-`, and `_`.

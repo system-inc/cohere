@@ -57,13 +57,21 @@ func correctnessNoNullishStrippingAssertionSource(lines ...string) string {
 // and runs one rule on it. A program per case, so no two cases share interned types: the partition
 // with the style rule is decided by type identity, and identity across files is the instrument bug
 // that rule's doc comment records.
-func correctnessNoNullishStrippingAssertionRunRule(test *testing.T, subject rule.Rule, sourceText string) rule_testing.Result {
+func correctnessNoNullishStrippingAssertionRunRule(
+	test *testing.T,
+	subject rule.Rule,
+	sourceText string,
+) rule_testing.Result {
 	test.Helper()
 	return rule_testing.RunTypedFilesWithSetup(test, subject, map[string]string{
 		correctnessNoNullishStrippingAssertionFile: sourceText,
 	}, correctnessNoNullishStrippingAssertionFile, func(directory string) {
 		configurationPath := filepath.Join(directory, "tsconfig.json")
-		if writeError := os.WriteFile(configurationPath, []byte(correctnessNoNullishStrippingAssertionTsConfig), 0o644); writeError != nil {
+		if writeError := os.WriteFile(
+			configurationPath,
+			[]byte(correctnessNoNullishStrippingAssertionTsConfig),
+			0o644,
+		); writeError != nil {
 			test.Fatalf("writing the fixture tsconfig: %v", writeError)
 		}
 	})
@@ -100,7 +108,11 @@ func correctnessNoNullishStrippingAssertionExpect(test *testing.T, result rule_t
 	rule_testing.ExpectFindings(test, result, wantIds...)
 	for _, diagnostic := range result.Diagnostics {
 		if len(diagnostic.Fixes) != 0 || len(diagnostic.Suggestions) != 0 {
-			test.Fatalf("expected no fix and no suggestion, got %d and %d", len(diagnostic.Fixes), len(diagnostic.Suggestions))
+			test.Fatalf(
+				"expected no fix and no suggestion, got %d and %d",
+				len(diagnostic.Fixes),
+				len(diagnostic.Suggestions),
+			)
 		}
 	}
 	got := correctnessNoNullishStrippingAssertionSpans(result)
@@ -202,7 +214,10 @@ func TestCorrectnessNoNullishStrippingAssertionFiresOnAnalyticsDays(test *testin
 func TestCorrectnessNoNullishStrippingAssertionStaysSilentOnFixedAnalyticsDays(test *testing.T) {
 	test.Parallel()
 
-	rule_testing.ExpectClean(test, correctnessNoNullishStrippingAssertionRun(test, correctnessNoNullishStrippingAssertionAnalytics(true)))
+	rule_testing.ExpectClean(
+		test,
+		correctnessNoNullishStrippingAssertionRun(test, correctnessNoNullishStrippingAssertionAnalytics(true)),
+	)
 }
 
 // The real `typeof null === 'object'` read, before the fix: the inner assertion is reported, the outer
@@ -211,13 +226,20 @@ func TestCorrectnessNoNullishStrippingAssertionFiresOnReactionsAssignee(test *te
 	test.Parallel()
 
 	result := correctnessNoNullishStrippingAssertionRun(test, correctnessNoNullishStrippingAssertionReactions(false))
-	correctnessNoNullishStrippingAssertionExpect(test, result, "assigneeFromConfiguration.configuration as Record<string, unknown>")
+	correctnessNoNullishStrippingAssertionExpect(
+		test,
+		result,
+		"assigneeFromConfiguration.configuration as Record<string, unknown>",
+	)
 }
 
 func TestCorrectnessNoNullishStrippingAssertionStaysSilentOnFixedReactionsAssignee(test *testing.T) {
 	test.Parallel()
 
-	rule_testing.ExpectClean(test, correctnessNoNullishStrippingAssertionRun(test, correctnessNoNullishStrippingAssertionReactions(true)))
+	rule_testing.ExpectClean(
+		test,
+		correctnessNoNullishStrippingAssertionRun(test, correctnessNoNullishStrippingAssertionReactions(true)),
+	)
 }
 
 // The real dialog focus handler, before the fix: `event.target` is `EventTarget | null`.
@@ -231,7 +253,10 @@ func TestCorrectnessNoNullishStrippingAssertionFiresOnDialogMenu(test *testing.T
 func TestCorrectnessNoNullishStrippingAssertionStaysSilentOnFixedDialogMenu(test *testing.T) {
 	test.Parallel()
 
-	rule_testing.ExpectClean(test, correctnessNoNullishStrippingAssertionRun(test, correctnessNoNullishStrippingAssertionDialogMenu(true)))
+	rule_testing.ExpectClean(
+		test,
+		correctnessNoNullishStrippingAssertionRun(test, correctnessNoNullishStrippingAssertionDialogMenu(true)),
+	)
 }
 
 func TestCorrectnessNoNullishStrippingAssertionFires(test *testing.T) {
@@ -291,7 +316,10 @@ func TestCorrectnessNoNullishStrippingAssertionFires(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := correctnessNoNullishStrippingAssertionRun(test, correctnessNoNullishStrippingAssertionSource(testCase.lines...))
+			result := correctnessNoNullishStrippingAssertionRun(
+				test,
+				correctnessNoNullishStrippingAssertionSource(testCase.lines...),
+			)
 			correctnessNoNullishStrippingAssertionExpect(test, result, testCase.want...)
 		})
 	}
@@ -397,7 +425,10 @@ func TestCorrectnessNoNullishStrippingAssertionStaysSilent(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, correctnessNoNullishStrippingAssertionRun(test, correctnessNoNullishStrippingAssertionSource(testCase.lines...)))
+			rule_testing.ExpectClean(test, correctnessNoNullishStrippingAssertionRun(
+				test,
+				correctnessNoNullishStrippingAssertionSource(testCase.lines...),
+			))
 		})
 	}
 }
@@ -417,10 +448,28 @@ func TestCorrectnessNoNullishStrippingAssertionNeverReportsTheStyleRulesCast(tes
 	}{
 		{"pure removal", "export const name = maybe as string;", "maybe as string", true, false},
 		{"pure removal of null", "export const name = nullable as string;", "nullable as string", true, false},
-		{"pure removal through an alias", "type StateType = 'Ready' | 'Stale'; declare const state: StateType | undefined; export const ready = state as StateType;", "state as StateType", true, false},
+		{
+			"pure removal through an alias",
+			"type StateType = 'Ready' | 'Stale'; declare const state: StateType | undefined; export const ready = state as StateType;",
+			"state as StateType",
+			true,
+			false,
+		},
 		{"removal and narrowing", "export const state = maybe as 'Ready';", "maybe as 'Ready'", false, true},
-		{"removal and widening", "export const value = maybe as string | number;", "maybe as string | number", false, true},
-		{"a Map read narrowed", "export const state = cache.get('job') as 'Ready' | 'Stale';", "cache.get('job') as 'Ready' | 'Stale'", false, true},
+		{
+			"removal and widening",
+			"export const value = maybe as string | number;",
+			"maybe as string | number",
+			false,
+			true,
+		},
+		{
+			"a Map read narrowed",
+			"export const state = cache.get('job') as 'Ready' | 'Stale';",
+			"cache.get('job') as 'Ready' | 'Stale'",
+			false,
+			true,
+		},
 		{"undefined kept", "export const state = maybe as string | undefined;", "", false, false},
 	}
 
@@ -430,7 +479,11 @@ func TestCorrectnessNoNullishStrippingAssertionNeverReportsTheStyleRulesCast(tes
 			source := correctnessNoNullishStrippingAssertionSource(testCase.line)
 
 			thisResult := correctnessNoNullishStrippingAssertionRun(test, source)
-			styleResult := correctnessNoNullishStrippingAssertionRunRule(test, typescript.NonNullableTypeAssertionStyle, source)
+			styleResult := correctnessNoNullishStrippingAssertionRunRule(
+				test,
+				typescript.NonNullableTypeAssertionStyle,
+				source,
+			)
 
 			if testCase.thisOwns {
 				correctnessNoNullishStrippingAssertionExpect(test, thisResult, testCase.span)
@@ -461,7 +514,12 @@ func TestCorrectnessNoNullishStrippingAssertionMessageGivesTheRepairsInOrder(tes
 	}
 	text := result.Diagnostics[0].Message.Description
 	rest := text
-	for _, part := range []string{"guard it", "fix the type", "`stringFlag` or `numberFlag`", "`required(value, 'why it is present')` from `@nexus/source/errors/Assert`"} {
+	for _, part := range []string{
+		"guard it",
+		"fix the type",
+		"`stringFlag` or `numberFlag`",
+		"`required(value, 'why it is present')` from `@nexus/source/errors/Assert`",
+	} {
 		index := strings.Index(rest, part)
 		if index < 0 {
 			test.Fatalf("message lacks %q after the parts before it:\n%s", part, text)

@@ -204,7 +204,9 @@ func RunCacheKeyPartsOf(arguments []string, workingDirectory string, facts ...st
 
 // Key is the parts as one key.
 func (parts RunCacheKeyParts) Key() string {
-	sum := sha256.Sum256([]byte(parts.Binary + "\x00" + parts.Directory + "\x00" + parts.Arguments + "\x00" + parts.Facts))
+	sum := sha256.Sum256(
+		[]byte(parts.Binary + "\x00" + parts.Directory + "\x00" + parts.Arguments + "\x00" + parts.Facts),
+	)
 	return fmt.Sprintf("%x", sum)
 }
 
@@ -225,7 +227,10 @@ func (parts RunCacheKeyParts) Changed(recorded RunCacheKeyParts) string {
 		changed = append(changed, "the arguments")
 	}
 	if parts.Facts != recorded.Facts {
-		changed = append(changed, "the configuration (the tsconfig or lint config, their extends chains, the rules, or the output's color)")
+		changed = append(
+			changed,
+			"the configuration (the tsconfig or lint config, their extends chains, the rules, or the output's color)",
+		)
 	}
 	if len(changed) == 0 {
 		return "no part changed, though the key did"
@@ -252,7 +257,16 @@ func (parts RunCacheKeyParts) Changed(recorded RunCacheKeyParts) string {
 // the change, so the stat taken here would sign the new bytes against a verdict computed from the old ones,
 // and the next run would replay that verdict over a tree it does not describe: a file saved in an editor
 // while cohere runs is exactly this. Such a run is not recorded. The zero time checks nothing.
-func RecordRunCache(key string, files []string, extraDirectories []string, absent []string, probed []string, output []byte, exitCode int, readSince time.Time) (*RunCache, error) {
+func RecordRunCache(
+	key string,
+	files []string,
+	extraDirectories []string,
+	absent []string,
+	probed []string,
+	output []byte,
+	exitCode int,
+	readSince time.Time,
+) (*RunCache, error) {
 	cache := &RunCache{Version: runCacheVersion, Key: key, Output: output, ExitCode: exitCode}
 
 	// One entry per path. A path can arrive as a file read, a directory listed, and the parent of
@@ -328,7 +342,10 @@ func RecordRunCache(key string, files []string, extraDirectories []string, absen
 				continue
 			}
 			if max(input.ModifiedNanoseconds, input.ChangedNanoseconds) > readSince.UnixNano() {
-				return nil, fmt.Errorf("%s changed after the run began reading, so what the run saw of it is not known", input.Path)
+				return nil, fmt.Errorf(
+					"%s changed after the run began reading, so what the run saw of it is not known",
+					input.Path,
+				)
 			}
 		}
 	}
@@ -502,7 +519,10 @@ func (input RunCacheInput) stillMatches(snapshot *StatSnapshot) error {
 	if information.ModTime().UnixNano() != input.ModifiedNanoseconds {
 		return fmt.Errorf("%w: %s was modified", ErrRunCacheMiss, input.Path)
 	}
-	if changed, inode := changeTimeAndInode(input.Path, information); changed != input.ChangedNanoseconds || inode != input.Inode {
+	if changed, inode := changeTimeAndInode(
+		input.Path,
+		information,
+	); changed != input.ChangedNanoseconds || inode != input.Inode {
 		return fmt.Errorf("%w: %s was changed or replaced under its modification time", ErrRunCacheMiss, input.Path)
 	}
 	return nil

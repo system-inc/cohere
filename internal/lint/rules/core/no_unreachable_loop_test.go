@@ -215,7 +215,9 @@ func TestNoUnreachableLoopIgnoringEveryKindDisablesTheRule(test *testing.T) {
 	test.Parallel()
 
 	decode := rule.DecodeOptionsInto[NoUnreachableLoopOptions]()
-	decoded, err := decode([]byte(`{"ignore":["WhileStatement","DoWhileStatement","ForStatement","ForInStatement","ForOfStatement"]}`))
+	decoded, err := decode(
+		[]byte(`{"ignore":["WhileStatement","DoWhileStatement","ForStatement","ForInStatement","ForOfStatement"]}`),
+	)
 	if err != nil {
 		test.Fatalf("decoding: %v", err)
 	}

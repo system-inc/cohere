@@ -10,7 +10,10 @@ import (
 
 // consistencyRequirePaginationArgumentNameText is the rule's message, whose wording lives in
 // `policy/messages/consistency-require-pagination-argument-name.json`.
-var consistencyRequirePaginationArgumentNameText = policy.MessageOf("base/consistency-require-pagination-argument-name", "invalidName")
+var consistencyRequirePaginationArgumentNameText = policy.MessageOf(
+	"base/consistency-require-pagination-argument-name",
+	"invalidName",
+)
 
 func messagePaginationDecoratorInvalidName() rule.Message {
 	return rule.Message{
@@ -29,7 +32,8 @@ var paginationInputTypeName = regexp.MustCompile(`PaginationInput$`)
 // paginationArgumentName matches the disambiguating form, `prefixPagination`.
 var paginationArgumentName = regexp.MustCompile(`Pagination$`)
 
-// ConsistencyRequirePaginationArgumentName requires a GraphQlArgument of PaginationInput type to be named for what it is.
+// ConsistencyRequirePaginationArgumentName requires a GraphQlArgument of PaginationInput type to be named for what it
+// is.
 //
 //	valid:   m(@GraphQlArgument(() => UserPaginationInput) pagination: UserPaginationInput)
 //	valid:   m(@GraphQlArgument('postsPagination') p: PaginationInput)

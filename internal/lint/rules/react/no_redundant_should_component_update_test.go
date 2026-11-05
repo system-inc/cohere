@@ -36,17 +36,46 @@ func TestNoRedundantShouldComponentUpdateFires(test *testing.T) {
 		findings      []string
 		componentName string
 	}{
-		{"\n        class Foo extends React.PureComponent {\n          shouldComponentUpdate() {\n            return true;\n          }\n        }\n      ", []string{"noShouldCompUpdate"}, "Foo"},
-		{"\n        class Foo extends PureComponent {\n          shouldComponentUpdate() {\n            return true;\n          }\n        }\n      ", []string{"noShouldCompUpdate"}, "Foo"},
-		{"\n        class Foo extends React.PureComponent {\n          shouldComponentUpdate = () => {\n            return true;\n          }\n        }\n      ", []string{"noShouldCompUpdate"}, "Foo"},
-		{"\n        function Foo() {\n          return class Bar extends React.PureComponent {\n            shouldComponentUpdate() {\n              return true;\n            }\n          };\n        }\n      ", []string{"noShouldCompUpdate"}, "Bar"},
-		{"\n        function Foo() {\n          return class Bar extends PureComponent {\n            shouldComponentUpdate() {\n              return true;\n            }\n          };\n        }\n      ", []string{"noShouldCompUpdate"}, "Bar"},
-		{"\n        var Foo = class extends PureComponent {\n          shouldComponentUpdate() {\n            return true;\n          }\n        }\n      ", []string{"noShouldCompUpdate"}, "Foo"},
+		{
+			"\n        class Foo extends React.PureComponent {\n          shouldComponentUpdate() {\n            return true;\n          }\n        }\n      ",
+			[]string{"noShouldCompUpdate"},
+			"Foo",
+		},
+		{
+			"\n        class Foo extends PureComponent {\n          shouldComponentUpdate() {\n            return true;\n          }\n        }\n      ",
+			[]string{"noShouldCompUpdate"},
+			"Foo",
+		},
+		{
+			"\n        class Foo extends React.PureComponent {\n          shouldComponentUpdate = () => {\n            return true;\n          }\n        }\n      ",
+			[]string{"noShouldCompUpdate"},
+			"Foo",
+		},
+		{
+			"\n        function Foo() {\n          return class Bar extends React.PureComponent {\n            shouldComponentUpdate() {\n              return true;\n            }\n          };\n        }\n      ",
+			[]string{"noShouldCompUpdate"},
+			"Bar",
+		},
+		{
+			"\n        function Foo() {\n          return class Bar extends PureComponent {\n            shouldComponentUpdate() {\n              return true;\n            }\n          };\n        }\n      ",
+			[]string{"noShouldCompUpdate"},
+			"Bar",
+		},
+		{
+			"\n        var Foo = class extends PureComponent {\n          shouldComponentUpdate() {\n            return true;\n          }\n        }\n      ",
+			[]string{"noShouldCompUpdate"},
+			"Foo",
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.sourceText, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.Run(test, NoRedundantShouldComponentUpdate, noRedundantShouldComponentUpdateFile, testCase.sourceText)
+			result := rule_testing.Run(
+				test,
+				NoRedundantShouldComponentUpdate,
+				noRedundantShouldComponentUpdateFile,
+				testCase.sourceText,
+			)
 			rule_testing.ExpectFindings(test, result, testCase.findings...)
 			// The name is interpolated into the message, so an id assertion cannot see it and a
 			// wrong derivation would ship green. Asserted as a prefix of the rendered text against
@@ -54,7 +83,11 @@ func TestNoRedundantShouldComponentUpdateFires(test *testing.T) {
 			// comparison to the rule's own constant moves with it under mutation.
 			wantPrefix := testCase.componentName + " extends PureComponent and also writes shouldComponentUpdate."
 			if !strings.HasPrefix(result.Diagnostics[0].Message.Description, wantPrefix) {
-				test.Fatalf("message was %q, wanted it to start %q", result.Diagnostics[0].Message.Description, wantPrefix)
+				test.Fatalf(
+					"message was %q, wanted it to start %q",
+					result.Diagnostics[0].Message.Description,
+					wantPrefix,
+				)
 			}
 		})
 	}
@@ -71,7 +104,12 @@ func TestNoRedundantShouldComponentUpdateStaysSilent(test *testing.T) {
 	for _, sourceText := range cases {
 		test.Run(sourceText, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.Run(test, NoRedundantShouldComponentUpdate, noRedundantShouldComponentUpdateFile, sourceText)
+			result := rule_testing.Run(
+				test,
+				NoRedundantShouldComponentUpdate,
+				noRedundantShouldComponentUpdateFile,
+				sourceText,
+			)
 			rule_testing.ExpectClean(test, result)
 		})
 	}
@@ -94,22 +132,58 @@ func TestNoRedundantShouldComponentUpdateBaseClassBoundary(test *testing.T) {
 		sourceText string
 		findings   []string
 	}{
-		{"the namespaced spelling", "class Foo extends React.PureComponent { shouldComponentUpdate() { return true; } }", []string{"noShouldCompUpdate"}},
-		{"the bare spelling a direct import writes", "class Foo extends PureComponent { shouldComponentUpdate() { return true; } }", []string{"noShouldCompUpdate"}},
-		{"a parenthesized heritage, which upstream reports because its tree has no parenthesis node", "class Foo extends (React.PureComponent) { shouldComponentUpdate() { return true; } }", []string{"noShouldCompUpdate"}},
-		{"Component is the whole point of the boundary and is silent", "class Foo extends React.Component { shouldComponentUpdate() { return true; } }", nil},
+		{
+			"the namespaced spelling",
+			"class Foo extends React.PureComponent { shouldComponentUpdate() { return true; } }",
+			[]string{"noShouldCompUpdate"},
+		},
+		{
+			"the bare spelling a direct import writes",
+			"class Foo extends PureComponent { shouldComponentUpdate() { return true; } }",
+			[]string{"noShouldCompUpdate"},
+		},
+		{
+			"a parenthesized heritage, which upstream reports because its tree has no parenthesis node",
+			"class Foo extends (React.PureComponent) { shouldComponentUpdate() { return true; } }",
+			[]string{"noShouldCompUpdate"},
+		},
+		{
+			"Component is the whole point of the boundary and is silent",
+			"class Foo extends React.Component { shouldComponentUpdate() { return true; } }",
+			nil,
+		},
 		// The bare Component spelling, which neither upstream's corpus nor the namespaced case
 		// above covers. Added for a surviving mutant that broke the identifier comparison into an
 		// always-true test: every fixture stayed green, because the only bare identifier any of
 		// them writes in a heritage is PureComponent, so a rule accepting every bare identifier
 		// agreed with all of them. Both lines measured silent on the installed build.
-		{"the bare Component spelling a direct import writes is silent", "class Foo extends Component { shouldComponentUpdate() { return true; } }", nil},
-		{"and so is an unrelated base class", "class Foo extends Whatever { shouldComponentUpdate() { return true; } }", nil},
-		{"another package's PureComponent is silent", "class Foo extends Preact.PureComponent { shouldComponentUpdate() { return true; } }", nil},
-		{"and so is any other object", "class Foo extends Foo.PureComponent { shouldComponentUpdate() { return true; } }", nil},
+		{
+			"the bare Component spelling a direct import writes is silent",
+			"class Foo extends Component { shouldComponentUpdate() { return true; } }",
+			nil,
+		},
+		{
+			"and so is an unrelated base class",
+			"class Foo extends Whatever { shouldComponentUpdate() { return true; } }",
+			nil,
+		},
+		{
+			"another package's PureComponent is silent",
+			"class Foo extends Preact.PureComponent { shouldComponentUpdate() { return true; } }",
+			nil,
+		},
+		{
+			"and so is any other object",
+			"class Foo extends Foo.PureComponent { shouldComponentUpdate() { return true; } }",
+			nil,
+		},
 		{"PureComponent without the method is silent", "class Foo extends PureComponent {}", nil},
 		{"the method without PureComponent is silent", "class Foo { shouldComponentUpdate() { return true; } }", nil},
-		{"an implements clause is not an extends clause", "interface P {} class Foo extends React.Component implements P { shouldComponentUpdate() { return true; } }", nil},
+		{
+			"an implements clause is not an extends clause",
+			"interface P {} class Foo extends React.Component implements P { shouldComponentUpdate() { return true; } }",
+			nil,
+		},
 		// TypeScript-only shapes, which upstream cannot express at all: its default parser rejects
 		// `implements` outright, and its rule reads `node.superClass`, which an implements clause
 		// never populates. So silence is upstream's answer structurally rather than by measurement,
@@ -126,14 +200,31 @@ func TestNoRedundantShouldComponentUpdateBaseClassBoundary(test *testing.T) {
 		// two guards cover different halves and neither subsumes the other, which is why the first
 		// mutation of this line read as a survivor: rewriting `!= Extends` into `== Implements`
 		// skips the same clauses and is inert. Only neutralizing it to a constant separates them.
-		{"a well-formed implements clause carries a different type kind", "class Foo implements PureComponent { shouldComponentUpdate() { return true; } }", nil},
-		{"and a malformed parenthesized one is what the extends-token guard actually prevents", "class Foo implements (PureComponent) { shouldComponentUpdate() { return true; } }", nil},
-		{"nor does a doubly parenthesized one", "class Foo implements ((PureComponent)) { shouldComponentUpdate() { return true; } }", nil},
+		{
+			"a well-formed implements clause carries a different type kind",
+			"class Foo implements PureComponent { shouldComponentUpdate() { return true; } }",
+			nil,
+		},
+		{
+			"and a malformed parenthesized one is what the extends-token guard actually prevents",
+			"class Foo implements (PureComponent) { shouldComponentUpdate() { return true; } }",
+			nil,
+		},
+		{
+			"nor does a doubly parenthesized one",
+			"class Foo implements ((PureComponent)) { shouldComponentUpdate() { return true; } }",
+			nil,
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.Run(test, NoRedundantShouldComponentUpdate, noRedundantShouldComponentUpdateFile, testCase.sourceText)
+			result := rule_testing.Run(
+				test,
+				NoRedundantShouldComponentUpdate,
+				noRedundantShouldComponentUpdateFile,
+				testCase.sourceText,
+			)
 			rule_testing.ExpectFindings(test, result, testCase.findings...)
 		})
 	}
@@ -156,21 +247,66 @@ func TestNoRedundantShouldComponentUpdateMemberShapes(test *testing.T) {
 		sourceText string
 		findings   []string
 	}{
-		{"a method", "class Foo extends PureComponent { shouldComponentUpdate() { return true; } }", []string{"noShouldCompUpdate"}},
-		{"a class field holding an arrow", "class Foo extends PureComponent { shouldComponentUpdate = () => true; }", []string{"noShouldCompUpdate"}},
-		{"a bare field with no initializer", "class Foo extends PureComponent { shouldComponentUpdate; }", []string{"noShouldCompUpdate"}},
-		{"static is not excluded", "class Foo extends PureComponent { static shouldComponentUpdate() { return true; } }", []string{"noShouldCompUpdate"}},
-		{"nor is a getter", "class Foo extends PureComponent { get shouldComponentUpdate() { return true; } }", []string{"noShouldCompUpdate"}},
-		{"nor a private name, which React never calls and upstream reports anyway", "class Foo extends PureComponent { #shouldComponentUpdate() { return true; } }", []string{"noShouldCompUpdate"}},
-		{"a computed key is silent, because it has no name to read", "class Foo extends PureComponent { ['shouldComponentUpdate']() { return true; } }", nil},
-		{"and a string key is silent for the same reason", "class Foo extends PureComponent { 'shouldComponentUpdate'() { return true; } }", nil},
-		{"a differently named method is silent", "class Foo extends PureComponent { componentDidUpdate() { return true; } }", nil},
-		{"the method written twice reports once, because upstream stops at the first match", "class Foo extends PureComponent { shouldComponentUpdate() {} shouldComponentUpdate() {} }", []string{"noShouldCompUpdate"}},
+		{
+			"a method",
+			"class Foo extends PureComponent { shouldComponentUpdate() { return true; } }",
+			[]string{"noShouldCompUpdate"},
+		},
+		{
+			"a class field holding an arrow",
+			"class Foo extends PureComponent { shouldComponentUpdate = () => true; }",
+			[]string{"noShouldCompUpdate"},
+		},
+		{
+			"a bare field with no initializer",
+			"class Foo extends PureComponent { shouldComponentUpdate; }",
+			[]string{"noShouldCompUpdate"},
+		},
+		{
+			"static is not excluded",
+			"class Foo extends PureComponent { static shouldComponentUpdate() { return true; } }",
+			[]string{"noShouldCompUpdate"},
+		},
+		{
+			"nor is a getter",
+			"class Foo extends PureComponent { get shouldComponentUpdate() { return true; } }",
+			[]string{"noShouldCompUpdate"},
+		},
+		{
+			"nor a private name, which React never calls and upstream reports anyway",
+			"class Foo extends PureComponent { #shouldComponentUpdate() { return true; } }",
+			[]string{"noShouldCompUpdate"},
+		},
+		{
+			"a computed key is silent, because it has no name to read",
+			"class Foo extends PureComponent { ['shouldComponentUpdate']() { return true; } }",
+			nil,
+		},
+		{
+			"and a string key is silent for the same reason",
+			"class Foo extends PureComponent { 'shouldComponentUpdate'() { return true; } }",
+			nil,
+		},
+		{
+			"a differently named method is silent",
+			"class Foo extends PureComponent { componentDidUpdate() { return true; } }",
+			nil,
+		},
+		{
+			"the method written twice reports once, because upstream stops at the first match",
+			"class Foo extends PureComponent { shouldComponentUpdate() {} shouldComponentUpdate() {} }",
+			[]string{"noShouldCompUpdate"},
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.Run(test, NoRedundantShouldComponentUpdate, noRedundantShouldComponentUpdateFile, testCase.sourceText)
+			result := rule_testing.Run(
+				test,
+				NoRedundantShouldComponentUpdate,
+				noRedundantShouldComponentUpdateFile,
+				testCase.sourceText,
+			)
 			rule_testing.ExpectFindings(test, result, testCase.findings...)
 		})
 	}
@@ -194,20 +330,49 @@ func TestNoRedundantShouldComponentUpdateNameDerivation(test *testing.T) {
 		wantName   string
 	}{
 		{"a declaration uses its own name", "class Foo extends PureComponent { shouldComponentUpdate() {} }", "Foo"},
-		{"a named class expression uses its own name over the variable's", "const Foo = class Bar extends PureComponent { shouldComponentUpdate() {} };", "Bar"},
-		{"an anonymous class expression borrows the declarator's name", "var Foo = class extends PureComponent { shouldComponentUpdate() {} };", "Foo"},
-		{"an anonymous class in a call argument has no name at all", "declare function foo(x: unknown): void; foo(class extends PureComponent { shouldComponentUpdate() {} });", ""},
-		{"nor does one in an object property, which is not a declarator", "const o = { Foo: class extends PureComponent { shouldComponentUpdate() {} } };", ""},
-		{"nor does one on the right of an assignment", "let a: unknown; a = class extends PureComponent { shouldComponentUpdate() {} };", ""},
+		{
+			"a named class expression uses its own name over the variable's",
+			"const Foo = class Bar extends PureComponent { shouldComponentUpdate() {} };",
+			"Bar",
+		},
+		{
+			"an anonymous class expression borrows the declarator's name",
+			"var Foo = class extends PureComponent { shouldComponentUpdate() {} };",
+			"Foo",
+		},
+		{
+			"an anonymous class in a call argument has no name at all",
+			"declare function foo(x: unknown): void; foo(class extends PureComponent { shouldComponentUpdate() {} });",
+			"",
+		},
+		{
+			"nor does one in an object property, which is not a declarator",
+			"const o = { Foo: class extends PureComponent { shouldComponentUpdate() {} } };",
+			"",
+		},
+		{
+			"nor does one on the right of an assignment",
+			"let a: unknown; a = class extends PureComponent { shouldComponentUpdate() {} };",
+			"",
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.Run(test, NoRedundantShouldComponentUpdate, noRedundantShouldComponentUpdateFile, testCase.sourceText)
+			result := rule_testing.Run(
+				test,
+				NoRedundantShouldComponentUpdate,
+				noRedundantShouldComponentUpdateFile,
+				testCase.sourceText,
+			)
 			rule_testing.ExpectFindings(test, result, "noShouldCompUpdate")
 			wantPrefix := testCase.wantName + " extends PureComponent and also writes shouldComponentUpdate."
 			if !strings.HasPrefix(result.Diagnostics[0].Message.Description, wantPrefix) {
-				test.Fatalf("message was %q, wanted it to start %q", result.Diagnostics[0].Message.Description, wantPrefix)
+				test.Fatalf(
+					"message was %q, wanted it to start %q",
+					result.Diagnostics[0].Message.Description,
+					wantPrefix,
+				)
 			}
 		})
 	}
@@ -225,7 +390,12 @@ func TestNoRedundantShouldComponentUpdateSpan(test *testing.T) {
 	test.Run("a declaration reports on the whole class", func(test *testing.T) {
 		test.Parallel()
 		const sourceText = "class Foo extends PureComponent { shouldComponentUpdate() {} }"
-		result := rule_testing.Run(test, NoRedundantShouldComponentUpdate, noRedundantShouldComponentUpdateFile, sourceText)
+		result := rule_testing.Run(
+			test,
+			NoRedundantShouldComponentUpdate,
+			noRedundantShouldComponentUpdateFile,
+			sourceText,
+		)
 		rule_testing.ExpectFindings(test, result, "noShouldCompUpdate")
 		reported := result.SourceFile.Text()[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 		if reported != sourceText {
@@ -237,7 +407,12 @@ func TestNoRedundantShouldComponentUpdateSpan(test *testing.T) {
 		test.Parallel()
 		const sourceText = "var Foo = class extends PureComponent { shouldComponentUpdate() {} };"
 		const want = "class extends PureComponent { shouldComponentUpdate() {} }"
-		result := rule_testing.Run(test, NoRedundantShouldComponentUpdate, noRedundantShouldComponentUpdateFile, sourceText)
+		result := rule_testing.Run(
+			test,
+			NoRedundantShouldComponentUpdate,
+			noRedundantShouldComponentUpdateFile,
+			sourceText,
+		)
 		rule_testing.ExpectFindings(test, result, "noShouldCompUpdate")
 		reported := result.SourceFile.Text()[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 		if reported != want {
@@ -295,15 +470,28 @@ func TestNoRedundantShouldComponentUpdateDoesNotPanicOnComputedMembers(test *tes
 		findings   []string
 	}{
 		{"a computed member alone", "class Foo extends PureComponent { ['anything']() {} }", nil},
-		{"a computed member beside a reporting one", "class Foo extends PureComponent { ['anything']() {} shouldComponentUpdate() {} }", []string{"noShouldCompUpdate"}},
+		{
+			"a computed member beside a reporting one",
+			"class Foo extends PureComponent { ['anything']() {} shouldComponentUpdate() {} }",
+			[]string{"noShouldCompUpdate"},
+		},
 		{"a computed field", "const k = 'a'; class Foo extends PureComponent { [k] = 1; }", nil},
-		{"a string key beside a reporting one", "class Foo extends PureComponent { 'anything'() {} shouldComponentUpdate() {} }", []string{"noShouldCompUpdate"}},
+		{
+			"a string key beside a reporting one",
+			"class Foo extends PureComponent { 'anything'() {} shouldComponentUpdate() {} }",
+			[]string{"noShouldCompUpdate"},
+		},
 		{"a numeric key", "class Foo extends PureComponent { 1() {} }", nil},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.Run(test, NoRedundantShouldComponentUpdate, noRedundantShouldComponentUpdateFile, testCase.sourceText)
+			result := rule_testing.Run(
+				test,
+				NoRedundantShouldComponentUpdate,
+				noRedundantShouldComponentUpdateFile,
+				testCase.sourceText,
+			)
 			rule_testing.ExpectFindings(test, result, testCase.findings...)
 		})
 	}

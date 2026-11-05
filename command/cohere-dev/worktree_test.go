@@ -78,7 +78,11 @@ func TestAWorktreeIsMadeAtMainWithItsSubmoduleLinked(test *testing.T) {
 	if !strings.Contains(standardError, "created") {
 		test.Errorf("it did not say it created the worktree:\n%s", standardError)
 	}
-	if head, main := fixture.git(path, "rev-parse", "HEAD"), fixture.git(fixture.repository, "rev-parse", "main"); head != main {
+	if head, main := fixture.git(
+		path,
+		"rev-parse",
+		"HEAD",
+	), fixture.git(fixture.repository, "rev-parse", "main"); head != main {
 		test.Errorf("the worktree is at %s, want main at %s", head, main)
 	}
 	info, statError := os.Lstat(filepath.Join(path, "library"))
@@ -112,7 +116,11 @@ func TestAMovedWorktreeKeepsTheModificationTimesOfFilesThatDidNotChange(test *te
 		test.Fatal(changeTimesError)
 	}
 
-	if writeError := os.WriteFile(filepath.Join(fixture.repository, "changing.txt"), []byte("changed\n"), 0o644); writeError != nil {
+	if writeError := os.WriteFile(
+		filepath.Join(fixture.repository, "changing.txt"),
+		[]byte("changed\n"),
+		0o644,
+	); writeError != nil {
 		test.Fatal(writeError)
 	}
 	fixture.git(fixture.repository, "add", "changing.txt")
@@ -127,7 +135,9 @@ func TestAMovedWorktreeKeepsTheModificationTimesOfFilesThatDidNotChange(test *te
 	if !sameFile(test, strings.TrimSpace(standardOutput), path) {
 		test.Errorf("standard output was %q, want %s", standardOutput, path)
 	}
-	if contents, readError := os.ReadFile(filepath.Join(path, "changing.txt")); readError != nil || string(contents) != "changed\n" {
+	if contents, readError := os.ReadFile(
+		filepath.Join(path, "changing.txt"),
+	); readError != nil || string(contents) != "changed\n" {
 		test.Errorf("the changed file holds %q (%v), want main's new content", contents, readError)
 	}
 	info, statError := os.Stat(filepath.Join(path, "base.txt"))
@@ -135,12 +145,22 @@ func TestAMovedWorktreeKeepsTheModificationTimesOfFilesThatDidNotChange(test *te
 		test.Fatal(statError)
 	}
 	if !info.ModTime().Equal(past) {
-		test.Errorf("the file the move did not change was rewritten: its modification time is %s, want %s", info.ModTime(), past)
+		test.Errorf(
+			"the file the move did not change was rewritten: its modification time is %s, want %s",
+			info.ModTime(),
+			past,
+		)
 	}
-	if head, main := fixture.git(path, "rev-parse", "HEAD"), fixture.git(fixture.repository, "rev-parse", "main"); head != main {
+	if head, main := fixture.git(
+		path,
+		"rev-parse",
+		"HEAD",
+	), fixture.git(fixture.repository, "rev-parse", "main"); head != main {
 		test.Errorf("the worktree is at %s, want main at %s", head, main)
 	}
-	if info, statError := os.Lstat(filepath.Join(path, "library")); statError != nil || info.Mode()&fs.ModeSymlink == 0 {
+	if info, statError := os.Lstat(
+		filepath.Join(path, "library"),
+	); statError != nil || info.Mode()&fs.ModeSymlink == 0 {
 		test.Errorf("the worktree's submodule is no longer a symlink after the move (%v)", statError)
 	}
 }
@@ -160,7 +180,13 @@ func TestAMoveRefusesADirtyWorktree(test *testing.T) {
 		test.Helper()
 		standardOutput, standardError, code := fixture.namedWorktree(fixture.repository, "tools")
 		if code != 2 || !strings.Contains(standardError, file) || standardOutput != "" {
-			test.Errorf("a worktree with %s not committed was not refused by name (exit %d):\n%s%s", file, code, standardOutput, standardError)
+			test.Errorf(
+				"a worktree with %s not committed was not refused by name (exit %d):\n%s%s",
+				file,
+				code,
+				standardOutput,
+				standardError,
+			)
 		}
 		if after := fixture.git(path, "rev-parse", "HEAD"); after != before {
 			test.Errorf("the refused worktree moved from %s to %s", before, after)
@@ -201,9 +227,17 @@ func TestAMoveRefusesAWorktreeWithACommitNotOnMain(test *testing.T) {
 	fixture.commit(fixture.repository, "later.txt")
 
 	standardOutput, standardError, code := fixture.namedWorktree(fixture.repository, "tools")
-	if code != 2 || !strings.Contains(standardError, unlanded) || !strings.Contains(standardError, "add unlanded.txt") ||
-		!strings.Contains(standardError, "land them") || standardOutput != "" {
-		test.Errorf("a worktree with a commit not on main was not refused, naming it (exit %d):\n%s%s", code, standardOutput, standardError)
+	if code != 2 ||
+		!strings.Contains(standardError, unlanded) ||
+		!strings.Contains(standardError, "add unlanded.txt") ||
+		!strings.Contains(standardError, "land them") ||
+		standardOutput != "" {
+		test.Errorf(
+			"a worktree with a commit not on main was not refused, naming it (exit %d):\n%s%s",
+			code,
+			standardOutput,
+			standardError,
+		)
 	}
 	if head := fixture.git(path, "rev-parse", "--short", "HEAD"); head != unlanded {
 		test.Errorf("the refused worktree moved from %s to %s", unlanded, head)
@@ -226,7 +260,11 @@ func TestAMoveTakesAWorktreeWhoseCommitWasCherryPickedOntoMain(test *testing.T) 
 	if _, standardError, code := fixture.namedWorktree(fixture.repository, "tools"); code != 0 {
 		test.Fatalf("a worktree whose commit main holds by cherry-pick was refused (exit %d):\n%s", code, standardError)
 	}
-	if head, main := fixture.git(path, "rev-parse", "HEAD"), fixture.git(fixture.repository, "rev-parse", "main"); head != main {
+	if head, main := fixture.git(
+		path,
+		"rev-parse",
+		"HEAD",
+	), fixture.git(fixture.repository, "rev-parse", "main"); head != main {
 		test.Errorf("the worktree is at %s, want main at %s", head, main)
 	}
 }
@@ -244,9 +282,16 @@ func TestAWorktreeRefusesAPathThatIsNotOneOfTheRepositorys(test *testing.T) {
 
 	standardOutput, standardError, code := fixture.namedWorktree(fixture.repository, "tools")
 	if code != 2 || !strings.Contains(standardError, "is not a worktree of") || standardOutput != "" {
-		test.Errorf("a path that is not a worktree of the repository was not refused (exit %d):\n%s%s", code, standardOutput, standardError)
+		test.Errorf(
+			"a path that is not a worktree of the repository was not refused (exit %d):\n%s%s",
+			code,
+			standardOutput,
+			standardError,
+		)
 	}
-	if contents, readError := os.ReadFile(filepath.Join(path, "theirs.txt")); readError != nil || string(contents) != "theirs\n" {
+	if contents, readError := os.ReadFile(
+		filepath.Join(path, "theirs.txt"),
+	); readError != nil || string(contents) != "theirs\n" {
 		test.Errorf("the refused path's file holds %q (%v)", contents, readError)
 	}
 	if listing := fixture.git(fixture.repository, "worktree", "list"); strings.Contains(listing, worktreePrefix) {
@@ -259,10 +304,25 @@ func TestAWorktreeRefusesAPathThatIsNotOneOfTheRepositorys(test *testing.T) {
 func TestAWorktreeRefusesABadName(test *testing.T) {
 	test.Parallel()
 	fixture := newLandFixture(test)
-	for _, arguments := range [][]string{{"Tools"}, {"_tools"}, {"tools/inner"}, {"to ols"}, {"../tools"}, {}, {"--branch", "x", "remove"}, {"remove", "remove"}} {
+	for _, arguments := range [][]string{
+		{"Tools"},
+		{"_tools"},
+		{"tools/inner"},
+		{"to ols"},
+		{"../tools"},
+		{},
+		{"--branch", "x", "remove"},
+		{"remove", "remove"},
+	} {
 		standardOutput, standardError, code := fixture.namedWorktree(fixture.repository, arguments...)
 		if code != 2 || !strings.Contains(standardError, "usage: cohere-dev worktree") || standardOutput != "" {
-			test.Errorf("worktree %q was not refused with exit 2 and the usage (exit %d):\n%s%s", arguments, code, standardOutput, standardError)
+			test.Errorf(
+				"worktree %q was not refused with exit 2 and the usage (exit %d):\n%s%s",
+				arguments,
+				code,
+				standardOutput,
+				standardError,
+			)
 		}
 	}
 	entries, readDirectoryError := os.ReadDir(filepath.Dir(fixture.repository))
@@ -290,7 +350,11 @@ func TestAWorktreeStartsTheBranchItIsGiven(test *testing.T) {
 		if current := fixture.git(path, "symbolic-ref", "--short", "HEAD"); current != branch {
 			test.Errorf("the worktree is on %q, want %q", current, branch)
 		}
-		if head, main := fixture.git(path, "rev-parse", "HEAD"), fixture.git(fixture.repository, "rev-parse", "main"); head != main {
+		if head, main := fixture.git(
+			path,
+			"rev-parse",
+			"HEAD",
+		), fixture.git(fixture.repository, "rev-parse", "main"); head != main {
 			test.Errorf("the worktree is at %s, want main at %s", head, main)
 		}
 	}
@@ -325,7 +389,12 @@ func TestRemoveRetiresACleanWorktreeAndKeepsMainsSubmodule(test *testing.T) {
 	if _, statError := os.Lstat(path); !errors.Is(statError, fs.ErrNotExist) {
 		test.Errorf("the removed worktree's directory is still there (%v)", statError)
 	}
-	if listing := fixture.git(fixture.repository, "worktree", "list", "--porcelain"); strings.Contains(listing, worktreePrefix+"tools") {
+	if listing := fixture.git(
+		fixture.repository,
+		"worktree",
+		"list",
+		"--porcelain",
+	); strings.Contains(listing, worktreePrefix+"tools") {
 		test.Errorf("git still lists the removed worktree:\n%s", listing)
 	}
 	for _, file := range []string{"first.txt", "second.txt", ".git"} {
@@ -352,15 +421,27 @@ func TestRemoveRefusesAWorktreeHoldingWork(test *testing.T) {
 		test.Helper()
 		_, standardError, code := fixture.namedWorktree(fixture.repository, "remove", "tools")
 		if code != 2 || !strings.Contains(standardError, named) {
-			test.Errorf("removing a worktree holding work was not refused naming %q (exit %d):\n%s", named, code, standardError)
+			test.Errorf(
+				"removing a worktree holding work was not refused naming %q (exit %d):\n%s",
+				named,
+				code,
+				standardError,
+			)
 		}
 		if _, statError := os.Stat(filepath.Join(path, "base.txt")); statError != nil {
 			test.Errorf("the refused worktree lost its files: %v", statError)
 		}
-		if info, statError := os.Lstat(filepath.Join(path, "library")); statError != nil || info.Mode()&fs.ModeSymlink == 0 {
+		if info, statError := os.Lstat(
+			filepath.Join(path, "library"),
+		); statError != nil || info.Mode()&fs.ModeSymlink == 0 {
 			test.Errorf("the refused worktree's submodule is no longer a symlink (%v)", statError)
 		}
-		if listing := fixture.git(fixture.repository, "worktree", "list", "--porcelain"); !strings.Contains(listing, worktreePrefix+"tools") {
+		if listing := fixture.git(
+			fixture.repository,
+			"worktree",
+			"list",
+			"--porcelain",
+		); !strings.Contains(listing, worktreePrefix+"tools") {
 			test.Errorf("git no longer lists the refused worktree:\n%s", listing)
 		}
 	}

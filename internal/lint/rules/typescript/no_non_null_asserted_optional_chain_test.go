@@ -54,12 +54,21 @@ func TestNoNonNullAssertedOptionalChainStaysSilent(test *testing.T) {
 		// are the fixtures that sit exactly where the rule decides.
 		{"an assertion mid-chain before a member", "declare const foo: any;\nexport const r = foo?.bar!.baz;\n"},
 		{"an assertion mid-chain before a call", "declare const foo: any;\nexport const r = foo?.bar!();\n"},
-		{"an assertion mid-chain before an element access", "declare const foo: any;\nexport const r = foo?.bar![0];\n"},
+		{
+			"an assertion mid-chain before an element access",
+			"declare const foo: any;\nexport const r = foo?.bar![0];\n",
+		},
 		{"an assertion mid-chain, longer", "declare const foo: any;\nexport const r = foo?.bar!.baz.qux;\n"},
 		// An assertion inside the chain's brackets rather than on the chain: the optional link does
 		// not reach through a computed property's own expression.
-		{"an assertion inside a computed property", "declare const foo: any;\ndeclare const key: any;\nexport const r = foo?.[key!];\n"},
-		{"an assertion in an argument", "declare const foo: any;\ndeclare const x: any;\nexport const r = foo?.bar(x!);\n"},
+		{
+			"an assertion inside a computed property",
+			"declare const foo: any;\ndeclare const key: any;\nexport const r = foo?.[key!];\n",
+		},
+		{
+			"an assertion in an argument",
+			"declare const foo: any;\ndeclare const x: any;\nexport const r = foo?.bar(x!);\n",
+		},
 		// An assertion with no chain at all, and a chain with no assertion: each half of the
 		// condition present without the other.
 		{"an assertion with no chain", "declare const foo: any;\nexport const r = foo!;\n"},

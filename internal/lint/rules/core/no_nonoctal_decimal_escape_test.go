@@ -34,8 +34,11 @@ func TestNoNonoctalDecimalEscapeFires(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectFindings(test, rule_testing.Run(test, NoNonoctalDecimalEscape, nonoctalDecimalEscapeFile, testCase.sourceText),
-				"nonoctalDecimalEscape")
+			rule_testing.ExpectFindings(
+				test,
+				rule_testing.Run(test, NoNonoctalDecimalEscape, nonoctalDecimalEscapeFile, testCase.sourceText),
+				"nonoctalDecimalEscape",
+			)
 		})
 	}
 }
@@ -71,7 +74,10 @@ func TestNoNonoctalDecimalEscapeStaysSilent(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.Run(test, NoNonoctalDecimalEscape, nonoctalDecimalEscapeFile, testCase.sourceText))
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.Run(test, NoNonoctalDecimalEscape, nonoctalDecimalEscapeFile, testCase.sourceText),
+			)
 		})
 	}
 }

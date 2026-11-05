@@ -91,9 +91,13 @@ func TestGlobalsScoresAgainstReactsOwnGoldens(test *testing.T) {
 		detail = append(detail, "  "+fixture.Name+": "+string(verdict.Verdict))
 	}
 
-	test.Logf("react/globals against React's own goldens: %d passed, %d failed, %d excluded as stated divergences, of %d",
-		counts[react_conformance.VerdictPassed], counts[react_conformance.VerdictFailed],
-		counts[react_conformance.VerdictStatedDivergence], len(scored))
+	test.Logf(
+		"react/globals against React's own goldens: %d passed, %d failed, %d excluded as stated divergences, of %d",
+		counts[react_conformance.VerdictPassed],
+		counts[react_conformance.VerdictFailed],
+		counts[react_conformance.VerdictStatedDivergence],
+		len(scored),
+	)
 	for _, line := range detail {
 		test.Log(line)
 	}
@@ -105,7 +109,10 @@ func TestGlobalsScoresAgainstReactsOwnGoldens(test *testing.T) {
 	// inside its stated scope, which is the only outcome in this harness that is a defect in cohere
 	// rather than a fact about the corpus.
 	if counts[react_conformance.VerdictFailed] != 0 {
-		test.Errorf("react/globals failed %d fixtures inside its own stated scope", counts[react_conformance.VerdictFailed])
+		test.Errorf(
+			"react/globals failed %d fixtures inside its own stated scope",
+			counts[react_conformance.VerdictFailed],
+		)
 	}
 
 	// And the honest half: today the rule passes none of them. Asserted so the zero is a recorded
@@ -113,7 +120,10 @@ func TestGlobalsScoresAgainstReactsOwnGoldens(test *testing.T) {
 	// day a scope decision closes one of these divergences, this test fails and someone updates the
 	// number deliberately instead of the improvement passing unnoticed.
 	if got := counts[react_conformance.VerdictPassed]; got != 0 {
-		test.Errorf("react/globals now passes %d of React's own goldens, was 0; update this number and the statedDivergences entries it came from", got)
+		test.Errorf(
+			"react/globals now passes %d of React's own goldens, was 0; update this number and the statedDivergences entries it came from",
+			got,
+		)
 	}
 	if got := counts[react_conformance.VerdictStatedDivergence]; got != 11 {
 		test.Errorf("stated divergences among the pure globals fixtures = %d, want 11", got)

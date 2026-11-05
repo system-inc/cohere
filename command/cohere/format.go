@@ -102,7 +102,11 @@ func formatTransform(engine formatEngine) edit.Transform {
 		}
 
 		if !engine.Handles(fileName) {
-			return "", fmt.Errorf("%w: %s is not a file type the formatter handles", edit.ErrSkipped, extensionOf(fileName))
+			return "", fmt.Errorf(
+				"%w: %s is not a file type the formatter handles",
+				edit.ErrSkipped,
+				extensionOf(fileName),
+			)
 		}
 
 		// Formatted until the text stops changing, not once. Prettier is not idempotent on every input,
@@ -147,7 +151,11 @@ func formatTransform(engine formatEngine) edit.Transform {
 		// Still changing at the bound. Writing the last pass would call a file formatted that the next
 		// run rewrites again, so it is a failure naming the file, and the edit engine keeps the fixes
 		// and leaves the formatting undone.
-		return "", fmt.Errorf("%s is not idempotent under the formatter: pass %d still changed it", fileName, formatPassLimit)
+		return "", fmt.Errorf(
+			"%s is not idempotent under the formatter: pass %d still changed it",
+			fileName,
+			formatPassLimit,
+		)
 	}
 }
 

@@ -47,9 +47,16 @@ func TestALoneRunBorrowsAllButOneFreeToken(test *testing.T) {
 	bin := test.TempDir()
 	log := filepath.Join(bin, "log")
 	release := filepath.Join(bin, "release")
-	stand := "#!/bin/sh\necho \"$COHERE_DEV_TEST_RUN token=$" + heldTokenVariable + " flags=$GOFLAGS threads=$GOMAXPROCS cores=$" +
-		coresVariable + "\" >> '" + log + "'\n" +
-		"[ \"$COHERE_DEV_TEST_RUN\" = first ] && while [ ! -e '" + release + "' ]; do sleep 0.05; done\nexit 0\n"
+	stand := "#!/bin/sh\necho \"$COHERE_DEV_TEST_RUN token=$" +
+		heldTokenVariable +
+		" flags=$GOFLAGS threads=$GOMAXPROCS cores=$" +
+		coresVariable +
+		"\" >> '" +
+		log +
+		"'\n" +
+		"[ \"$COHERE_DEV_TEST_RUN\" = first ] && while [ ! -e '" +
+		release +
+		"' ]; do sleep 0.05; done\nexit 0\n"
 	if writeError := os.WriteFile(filepath.Join(bin, "go"), []byte(stand), 0o755); writeError != nil {
 		test.Fatal(writeError)
 	}
@@ -57,8 +64,15 @@ func TestALoneRunBorrowsAllButOneFreeToken(test *testing.T) {
 	start := func(name string) (*exec.Cmd, *strings.Builder) {
 		var output strings.Builder
 		command := exec.Command(wrapper, "build", "./command/cohere")
-		command.Env = append(outsideThePool(os.Environ()), "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
-			homeVariable+"="+home, tokensVariable+"=4", packagesVariable+"=2", threadsVariable+"=2", "COHERE_DEV_TEST_RUN="+name)
+		command.Env = append(
+			outsideThePool(os.Environ()),
+			"PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"),
+			homeVariable+"="+home,
+			tokensVariable+"=4",
+			packagesVariable+"=2",
+			threadsVariable+"=2",
+			"COHERE_DEV_TEST_RUN="+name,
+		)
 		command.Stdout, command.Stderr = &output, &output
 		if startError := command.Start(); startError != nil {
 			test.Fatal(startError)
@@ -88,7 +102,10 @@ func TestALoneRunBorrowsAllButOneFreeToken(test *testing.T) {
 
 	first, firstOutput := start("first")
 	if line := waitFor("first"); !strings.Contains(line, "flags=-trimpath -p=4 threads=3 cores=12") {
-		test.Errorf("a lone run on an idle four-token pool ran with %q, want three tokens' share: -p=4, 3 threads, 12 cores", line)
+		test.Errorf(
+			"a lone run on an idle four-token pool ran with %q, want three tokens' share: -p=4, 3 threads, 12 cores",
+			line,
+		)
 	}
 	status := exec.Command(wrapper, "status")
 	status.Env = append(outsideThePool(os.Environ()), homeVariable+"="+home, tokensVariable+"=4")
@@ -96,7 +113,10 @@ func TestALoneRunBorrowsAllButOneFreeToken(test *testing.T) {
 	if outputError != nil {
 		test.Fatalf("cohere-dev status: %v\n%s", outputError, output)
 	}
-	if borrowed := strings.Count(string(output), "borrowed by token 1's run"); borrowed != 2 || strings.Count(string(output), "token 4: free") != 1 {
+	if borrowed := strings.Count(
+		string(output),
+		"borrowed by token 1's run",
+	); borrowed != 2 || strings.Count(string(output), "token 4: free") != 1 {
 		test.Errorf("status shows %d borrowed tokens, want 2 borrowed and 1 free:\n%s", borrowed, output)
 	}
 

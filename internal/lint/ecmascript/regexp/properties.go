@@ -122,9 +122,25 @@ func builtinSetRanges(text string) []unicodeproperties.Range {
 	case 'd', 'D':
 		ranges = []unicodeproperties.Range{{Lo: '0', Hi: '9'}}
 	case 'w', 'W':
-		ranges = []unicodeproperties.Range{{Lo: '0', Hi: '9'}, {Lo: 'A', Hi: 'Z'}, {Lo: '_', Hi: '_'}, {Lo: 'a', Hi: 'z'}}
+		ranges = []unicodeproperties.Range{
+			{Lo: '0', Hi: '9'},
+			{Lo: 'A', Hi: 'Z'},
+			{Lo: '_', Hi: '_'},
+			{Lo: 'a', Hi: 'z'},
+		}
 	case 's', 'S':
-		ranges = []unicodeproperties.Range{{Lo: 9, Hi: 13}, {Lo: 0x20, Hi: 0x20}, {Lo: 0xa0, Hi: 0xa0}, {Lo: 0x1680, Hi: 0x1680}, {Lo: 0x2000, Hi: 0x200a}, {Lo: 0x2028, Hi: 0x2029}, {Lo: 0x202f, Hi: 0x202f}, {Lo: 0x205f, Hi: 0x205f}, {Lo: 0x3000, Hi: 0x3000}, {Lo: 0xfeff, Hi: 0xfeff}}
+		ranges = []unicodeproperties.Range{
+			{Lo: 9, Hi: 13},
+			{Lo: 0x20, Hi: 0x20},
+			{Lo: 0xa0, Hi: 0xa0},
+			{Lo: 0x1680, Hi: 0x1680},
+			{Lo: 0x2000, Hi: 0x200a},
+			{Lo: 0x2028, Hi: 0x2029},
+			{Lo: 0x202f, Hi: 0x202f},
+			{Lo: 0x205f, Hi: 0x205f},
+			{Lo: 0x3000, Hi: 0x3000},
+			{Lo: 0xfeff, Hi: 0xfeff},
+		}
 	}
 	if text[1] >= 'A' && text[1] <= 'Z' {
 		complement := []unicodeproperties.Range{}

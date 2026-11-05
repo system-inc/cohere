@@ -28,7 +28,12 @@ func printAssignment(
 	switch layout {
 	// First break after operator, then the sides are broken independently on their own lines
 	case "break-after-operator":
-		return groupIn(path, concatIn(path, groupIn(path, leftDoc), operator, groupIn(path, indentIn(path, concatIn(path, line, rightDoc)))))
+		return groupIn(path, concatIn(
+			path,
+			groupIn(path, leftDoc),
+			operator,
+			groupIn(path, indentIn(path, concatIn(path, line, rightDoc))),
+		))
 
 	// First break right-hand side, then left-hand side
 	case "never-break-after-operator":

@@ -81,7 +81,10 @@ after();
 				body, _ := function.Block(loop.Loop)
 				continuation, _ := function.Block(loop.Fallthrough)
 				original.End = startingIdOf(function, body) + 1
-				expected = mutation_aliasing.MutableRange{Start: TerminalOrder(loop), End: startingIdOf(function, continuation)}
+				expected = mutation_aliasing.MutableRange{
+					Start: TerminalOrder(loop),
+					End:   startingIdOf(function, continuation),
+				}
 			}
 			identifier := target.LValue.Identifier
 			scopes := &ReactiveScopes{
@@ -94,7 +97,10 @@ after();
 			if actual := aligned.RangeOf(1); actual != expected {
 				test.Fatalf("range %v aligned to %v, want %v", original, actual, expected)
 			}
-			if violations := blockNestingViolations(scopeNestingItems(alignedRangeMap(aligned)), programBlockSubtrees(function)); violations != 0 {
+			if violations := blockNestingViolations(
+				scopeNestingItems(alignedRangeMap(aligned)),
+				programBlockSubtrees(function),
+			); violations != 0 {
 				test.Errorf("aligned scope leaves %d nesting violations", violations)
 			}
 			BuildReactiveScopeTerminals(function, scopes, MergedScopeIdentity{Aligned: aligned, Merged: merged})
@@ -103,8 +109,15 @@ after();
 				instructions += len(block.Instructions)
 			}
 			tree, result := BuildReactiveFunction(function)
-			if tree == nil || result.Instructions != instructions || result.DoubleEmitted != 0 || result.UnmatchedGotos != 0 {
-				test.Errorf("conversion must preserve all %d instructions without duplicate blocks or unmatched gotos: %+v", instructions, result)
+			if tree == nil ||
+				result.Instructions != instructions ||
+				result.DoubleEmitted != 0 ||
+				result.UnmatchedGotos != 0 {
+				test.Errorf(
+					"conversion must preserve all %d instructions without duplicate blocks or unmatched gotos: %+v",
+					instructions,
+					result,
+				)
 			}
 		})
 	}
@@ -148,7 +161,11 @@ subscriber.handlers.current?.onResync?.(channel);
 				test.Fatal("the fixture must produce a nonempty graph and reactive tree")
 			}
 			if result.Instructions != instructions || result.DoubleEmitted != 0 || result.UnmatchedGotos != 0 {
-				test.Errorf("conversion must preserve all %d instructions without duplicate blocks or unmatched gotos: %+v", instructions, result)
+				test.Errorf(
+					"conversion must preserve all %d instructions without duplicate blocks or unmatched gotos: %+v",
+					instructions,
+					result,
+				)
 			}
 		})
 	}

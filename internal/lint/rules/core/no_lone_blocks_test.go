@@ -97,22 +97,70 @@ func TestNoLoneBlocksFires(test *testing.T) {
 		{"{var x = 1;}", []string{"redundantBlock"}},
 		{"{ \n{var x = 1;}\n let y = 2; } {let z = 1;}", []string{"redundantNestedBlock"}},
 		{"{ \n{let x = 1;}\n var y = 2; } {let z = 1;}", []string{"redundantBlock"}},
-		{"{ \n{var x = 1;}\n var y = 2; }\n {var z = 1;}", []string{"redundantBlock", "redundantNestedBlock", "redundantBlock"}},
-		{"\n              switch (foo) {\n                case 1:\n                    foo();\n                    {\n                        bar;\n                    }\n              }\n            ", []string{"redundantBlock"}},
-		{"\n              switch (foo) {\n                case 1:\n                {\n                    bar;\n                }\n                foo();\n              }\n            ", []string{"redundantBlock"}},
-		{"\n              function foo () {\n                {\n                  const x = 4;\n                }\n              }\n            ", []string{"redundantNestedBlock"}},
-		{"\n              function foo () {\n                {\n                  var x = 4;\n                }\n              }\n            ", []string{"redundantNestedBlock"}},
-		{"\n              class C {\n                static {\n                  if (foo) {\n                    {\n                        let block;\n                    }\n                  }\n                }\n              }\n            ", []string{"redundantNestedBlock"}},
-		{"\n              class C {\n                static {\n                  if (foo) {\n                    {\n                        block;\n                    }\n                    something;\n                  }\n                }\n              }\n            ", []string{"redundantNestedBlock"}},
-		{"\n              class C {\n                static {\n                  {\n                    block;\n                  }\n                }\n              }\n            ", []string{"redundantNestedBlock"}},
-		{"\n              class C {\n                static {\n                  {\n                    let block;\n                  }\n                }\n              }\n            ", []string{"redundantNestedBlock"}},
-		{"\n              class C {\n                static {\n                  {\n                    const block = 1;\n                  }\n                }\n              }\n            ", []string{"redundantNestedBlock"}},
-		{"\n              class C {\n                static {\n                  {\n                    function block() {}\n                  }\n                }\n              }\n            ", []string{"redundantNestedBlock"}},
-		{"\n              class C {\n                static {\n                  {\n                    class block {}\n                  }\n                }\n              }\n            ", []string{"redundantNestedBlock"}},
-		{"\n              class C {\n                static {\n                  {\n                    var block;\n                  }\n                  something;\n                }\n              }\n            ", []string{"redundantNestedBlock"}},
-		{"\n              class C {\n                static {\n                  something;\n                  {\n                    var block;\n                  }\n                }\n              }\n            ", []string{"redundantNestedBlock"}},
-		{"\n              class C {\n                static {\n                  {\n                    block;\n                  }\n                  something;\n                }\n              }\n            ", []string{"redundantNestedBlock"}},
-		{"\n              class C {\n                static {\n                  something;\n                  {\n                    block;\n                  }\n                }\n              }\n            ", []string{"redundantNestedBlock"}},
+		{
+			"{ \n{var x = 1;}\n var y = 2; }\n {var z = 1;}",
+			[]string{"redundantBlock", "redundantNestedBlock", "redundantBlock"},
+		},
+		{
+			"\n              switch (foo) {\n                case 1:\n                    foo();\n                    {\n                        bar;\n                    }\n              }\n            ",
+			[]string{"redundantBlock"},
+		},
+		{
+			"\n              switch (foo) {\n                case 1:\n                {\n                    bar;\n                }\n                foo();\n              }\n            ",
+			[]string{"redundantBlock"},
+		},
+		{
+			"\n              function foo () {\n                {\n                  const x = 4;\n                }\n              }\n            ",
+			[]string{"redundantNestedBlock"},
+		},
+		{
+			"\n              function foo () {\n                {\n                  var x = 4;\n                }\n              }\n            ",
+			[]string{"redundantNestedBlock"},
+		},
+		{
+			"\n              class C {\n                static {\n                  if (foo) {\n                    {\n                        let block;\n                    }\n                  }\n                }\n              }\n            ",
+			[]string{"redundantNestedBlock"},
+		},
+		{
+			"\n              class C {\n                static {\n                  if (foo) {\n                    {\n                        block;\n                    }\n                    something;\n                  }\n                }\n              }\n            ",
+			[]string{"redundantNestedBlock"},
+		},
+		{
+			"\n              class C {\n                static {\n                  {\n                    block;\n                  }\n                }\n              }\n            ",
+			[]string{"redundantNestedBlock"},
+		},
+		{
+			"\n              class C {\n                static {\n                  {\n                    let block;\n                  }\n                }\n              }\n            ",
+			[]string{"redundantNestedBlock"},
+		},
+		{
+			"\n              class C {\n                static {\n                  {\n                    const block = 1;\n                  }\n                }\n              }\n            ",
+			[]string{"redundantNestedBlock"},
+		},
+		{
+			"\n              class C {\n                static {\n                  {\n                    function block() {}\n                  }\n                }\n              }\n            ",
+			[]string{"redundantNestedBlock"},
+		},
+		{
+			"\n              class C {\n                static {\n                  {\n                    class block {}\n                  }\n                }\n              }\n            ",
+			[]string{"redundantNestedBlock"},
+		},
+		{
+			"\n              class C {\n                static {\n                  {\n                    var block;\n                  }\n                  something;\n                }\n              }\n            ",
+			[]string{"redundantNestedBlock"},
+		},
+		{
+			"\n              class C {\n                static {\n                  something;\n                  {\n                    var block;\n                  }\n                }\n              }\n            ",
+			[]string{"redundantNestedBlock"},
+		},
+		{
+			"\n              class C {\n                static {\n                  {\n                    block;\n                  }\n                  something;\n                }\n              }\n            ",
+			[]string{"redundantNestedBlock"},
+		},
+		{
+			"\n              class C {\n                static {\n                  something;\n                  {\n                    block;\n                  }\n                }\n              }\n            ",
+			[]string{"redundantNestedBlock"},
+		},
 	}
 
 	for _, testCase := range cases {

@@ -318,7 +318,11 @@ func TestBoundaryReadingIsWhitespaceAware(test *testing.T) {
 	for _, source := range silentButInterpolated {
 		result := rule_testing.Run(test, NoConcatenatedClasses, "Component.tsx", source)
 		if len(result.Diagnostics) != 0 {
-			test.Errorf("a whitespace-aware rule must stay silent on %q, it reported %d", source, len(result.Diagnostics))
+			test.Errorf(
+				"a whitespace-aware rule must stay silent on %q, it reported %d",
+				source,
+				len(result.Diagnostics),
+			)
 		}
 	}
 

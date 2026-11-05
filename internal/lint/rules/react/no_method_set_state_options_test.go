@@ -68,7 +68,9 @@ func TestDecodeNoMethodSetStateOptions(test *testing.T) {
 	for _, testCase := range refused {
 		test.Run(testCase.name+" is refused", func(test *testing.T) {
 			test.Parallel()
-			if _, decodeNoMethodSetStateOptionsError := DecodeNoMethodSetStateOptions([]byte(testCase.raw)); decodeNoMethodSetStateOptionsError == nil {
+			if _, decodeNoMethodSetStateOptionsError := DecodeNoMethodSetStateOptions(
+				[]byte(testCase.raw),
+			); decodeNoMethodSetStateOptionsError == nil {
 				test.Errorf("%s decoded; upstream's schema refuses it", testCase.raw)
 			}
 		})

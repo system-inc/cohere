@@ -17,11 +17,36 @@ func TestFixRelintRemovesOnlyDeadDisableNames(test *testing.T) {
 		name, source, fixed string
 		rules               []rule.Rule
 	}{
-		{"dead", "// cohere-disable-next-line no-debugger\nconst a = 1;\n", "\nconst a = 1;\n", []rule.Rule{core.NoDebugger}},
-		{"unselected", "// cohere-disable-next-line no-debugger\nconst a = 1;\n", "// cohere-disable-next-line no-debugger\nconst a = 1;\n", []rule.Rule{core.NoSelfCompare}},
-		{"live", "// cohere-disable-next-line no-debugger\ndebugger;\n", "// cohere-disable-next-line no-debugger\ndebugger;\n", []rule.Rule{core.NoDebugger}},
-		{"blanket with skipped type-aware rule", "/* cohere-disable */\nconst a = 1;\n", "/* cohere-disable */\nconst a = 1;\n", []rule.Rule{core.NoDebugger, {Name: "test-type-aware", NeedsTypeChecker: true}}},
-		{"mixed", "// cohere-disable-next-line no-self-compare, no-debugger -- needed\ndebugger;\n", "// cohere-disable-next-line no-debugger -- needed\ndebugger;\n", []rule.Rule{core.NoDebugger, core.NoSelfCompare}},
+		{
+			"dead",
+			"// cohere-disable-next-line no-debugger\nconst a = 1;\n",
+			"\nconst a = 1;\n",
+			[]rule.Rule{core.NoDebugger},
+		},
+		{
+			"unselected",
+			"// cohere-disable-next-line no-debugger\nconst a = 1;\n",
+			"// cohere-disable-next-line no-debugger\nconst a = 1;\n",
+			[]rule.Rule{core.NoSelfCompare},
+		},
+		{
+			"live",
+			"// cohere-disable-next-line no-debugger\ndebugger;\n",
+			"// cohere-disable-next-line no-debugger\ndebugger;\n",
+			[]rule.Rule{core.NoDebugger},
+		},
+		{
+			"blanket with skipped type-aware rule",
+			"/* cohere-disable */\nconst a = 1;\n",
+			"/* cohere-disable */\nconst a = 1;\n",
+			[]rule.Rule{core.NoDebugger, {Name: "test-type-aware", NeedsTypeChecker: true}},
+		},
+		{
+			"mixed",
+			"// cohere-disable-next-line no-self-compare, no-debugger -- needed\ndebugger;\n",
+			"// cohere-disable-next-line no-debugger -- needed\ndebugger;\n",
+			[]rule.Rule{core.NoDebugger, core.NoSelfCompare},
+		},
 	} {
 		test.Run(fixture.name, func(test *testing.T) {
 			test.Parallel()
@@ -36,9 +61,14 @@ func TestFixRelintRemovesOnlyDeadDisableNames(test *testing.T) {
 			if len(proposals) != wantProposals {
 				test.Fatalf("got %d initial proposals, want %d", len(proposals), wantProposals)
 			}
-			fixed, err := edit.FixText("/Probe.ts", fixture.source, func(fileName, text string) ([]edit.Proposal, error) {
-				return proposalsForText(fileName, text, &program.Graph{}, fixture.rules)
-			}, 2)
+			fixed, err := edit.FixText(
+				"/Probe.ts",
+				fixture.source,
+				func(fileName, text string) ([]edit.Proposal, error) {
+					return proposalsForText(fileName, text, &program.Graph{}, fixture.rules)
+				},
+				2,
+			)
 			if err != nil {
 				test.Fatal(err)
 			}

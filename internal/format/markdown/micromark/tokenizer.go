@@ -218,7 +218,10 @@ func (context *TokenizeContext) onSuccessfulCheck(_ *Construct, info *storeInfo)
 
 // constructFactory is upstream's constructFactory: attempt, check and interrupt differ in what happens on
 // success and in whether constructs see `interrupt: true`.
-func (context *TokenizeContext) constructFactory(onReturn func(*Construct, *storeInfo), interrupt bool) func(Constructs, State, State) State {
+func (context *TokenizeContext) constructFactory(
+	onReturn func(*Construct, *storeInfo),
+	interrupt bool,
+) func(Constructs, State, State) State {
 	return func(constructs Constructs, returnState State, bogusState State) State {
 		run := context.Parser.memory.attempt()
 		run.context, run.onReturn, run.interrupt = context, onReturn, interrupt

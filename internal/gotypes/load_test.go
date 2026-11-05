@@ -11,7 +11,11 @@ import (
 func loadFixture(test *testing.T) (string, string) {
 	test.Helper()
 	directory := test.TempDir()
-	if writeError := os.WriteFile(filepath.Join(directory, "go.mod"), []byte("module example.com/fixture\n\ngo 1.21\n"), 0o644); writeError != nil {
+	if writeError := os.WriteFile(
+		filepath.Join(directory, "go.mod"),
+		[]byte("module example.com/fixture\n\ngo 1.21\n"),
+		0o644,
+	); writeError != nil {
 		test.Fatal(writeError)
 	}
 	file := filepath.Join(directory, "fixture.go")
@@ -38,11 +42,15 @@ func TestALoadReadsTheOverlayInPlaceOfTheFile(test *testing.T) {
 		test.Fatal("the fixture's Count was not in its types")
 	}
 
-	planted, err := Load(Config{Directory: directory, Overlay: map[string][]byte{file: []byte("package fixture\n\nvar Count int = \"text\"\n")}}, ".")
+	planted, err := Load(Config{
+		Directory: directory,
+		Overlay:   map[string][]byte{file: []byte("package fixture\n\nvar Count int = \"text\"\n")},
+	}, ".")
 	if err != nil {
 		test.Fatal(err)
 	}
-	if problems := planted.ErrorsAnywhere(); len(problems) != 1 || !strings.Contains(problems[0].Error(), "fixture.go") {
+	if problems := planted.ErrorsAnywhere(); len(problems) != 1 ||
+		!strings.Contains(problems[0].Error(), "fixture.go") {
 		test.Fatalf("a type error only the overlay holds was not reported: %v", problems)
 	}
 }
@@ -54,7 +62,10 @@ func TestAnOverlayNoSourcePackageReadsIsRefused(test *testing.T) {
 
 	directory, _ := loadFixture(test)
 	added := filepath.Join(directory, "added.go")
-	_, loadError := Load(Config{Directory: directory, Overlay: map[string][]byte{added: []byte("package fixture\n")}}, ".")
+	_, loadError := Load(
+		Config{Directory: directory, Overlay: map[string][]byte{added: []byte("package fixture\n")}},
+		".",
+	)
 	if loadError == nil || !strings.Contains(loadError.Error(), added) {
 		test.Fatalf("an overlay naming a file the load does not read was not refused by name: %v", loadError)
 	}
@@ -102,7 +113,11 @@ func TestTestsAreCheckedAsGoTestBuildsThem(test *testing.T) {
 	for _, loadedPackage := range loaded.Source {
 		variants[loadedPackage.ImportPath] = true
 	}
-	for _, want := range []string{"example.com/variants/p [example.com/variants/p.test]", "example.com/variants/q [example.com/variants/p.test]", "example.com/variants/p_test [example.com/variants/p.test]"} {
+	for _, want := range []string{
+		"example.com/variants/p [example.com/variants/p.test]",
+		"example.com/variants/q [example.com/variants/p.test]",
+		"example.com/variants/p_test [example.com/variants/p.test]",
+	} {
 		if !variants[want] {
 			test.Errorf("%s was not checked", want)
 		}

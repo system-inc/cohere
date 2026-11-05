@@ -92,11 +92,13 @@ func TestNetworkNoForbiddenImportStaysSilent(test *testing.T) {
 			"import { QueryClient } from '@tanstack/react-query';\nexport const Use = QueryClient;\n",
 		},
 		{
-			"tanstack inside NetworkService's provider", "/repository/source/services/network/NetworkServiceProvider.tsx",
+			"tanstack inside NetworkService's provider",
+			"/repository/source/services/network/NetworkServiceProvider.tsx",
 			"import { QueryClientProvider } from '@tanstack/react-query';\nexport const Use = QueryClientProvider;\n",
 		},
 		{
-			"tanstack inside NetworkService's internal cache", "/repository/libraries/structure/source/services/network/internal/NetworkServiceCache.ts",
+			"tanstack inside NetworkService's internal cache",
+			"/repository/libraries/structure/source/services/network/internal/NetworkServiceCache.ts",
 			"import { QueryClient } from '@tanstack/react-query';\nexport const Use = QueryClient;\n",
 		},
 		// The apollo exemption is deliberately absent, so this is the boundary: the prefix must be

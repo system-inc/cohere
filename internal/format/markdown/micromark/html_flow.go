@@ -376,7 +376,11 @@ func tokenizeHtmlFlow(self *Self, effects *Effects, ok State, nok State) State {
 	// In attribute name.
 	completeAttributeName = func(code Code) State {
 		// ASCII alphanumerical and `-`, `.`, `:`, and `_`.
-		if code == CodeDash || code == CodeDot || code == CodeColon || code == CodeUnderscore || asciiAlphanumeric(code) {
+		if code == CodeDash ||
+			code == CodeDot ||
+			code == CodeColon ||
+			code == CodeUnderscore ||
+			asciiAlphanumeric(code) {
 			effects.Consume(code)
 			return completeAttributeName
 		}
@@ -401,7 +405,11 @@ func tokenizeHtmlFlow(self *Self, effects *Effects, ok State, nok State) State {
 
 	// Before unquoted, double quoted, or single quoted attribute value, allowing whitespace.
 	completeAttributeValueBefore = func(code Code) State {
-		if code == CodeEof || code == CodeLessThan || code == CodeEqualsTo || code == CodeGreaterThan || code == CodeGraveAccent {
+		if code == CodeEof ||
+			code == CodeLessThan ||
+			code == CodeEqualsTo ||
+			code == CodeGreaterThan ||
+			code == CodeGraveAccent {
 			return nok(code)
 		}
 

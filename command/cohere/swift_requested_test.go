@@ -12,7 +12,12 @@ import (
 
 // renderRequested renders a stream for a command line that asked for the phases requested names, the way
 // runSwiftEngine does, and returns what renderRecords returns.
-func renderRequested(test *testing.T, lines []string, requested map[phaseName]bool, engineExit int) (string, int, error) {
+func renderRequested(
+	test *testing.T,
+	lines []string,
+	requested map[phaseName]bool,
+	engineExit int,
+) (string, int, error) {
 	test.Helper()
 	var out bytes.Buffer
 	stream := bufio.NewWriter(&out)
@@ -143,7 +148,8 @@ func TestARequestedPhaseThatComesBackSkippedStillFails(test *testing.T) {
 	// Skipped as not requested when it was requested: a bare run reported as though it were --lint. The
 	// engine is refused rather than believed.
 	_, _, err := renderRequested(test, contractFixture(test, "LintOnly.jsonl"), engineRequestedPhases(flagsOf()), 1)
-	if err == nil || !strings.Contains(err.Error(), "the fix phase was asked for, and the engine skipped it as \"not requested\"") {
+	if err == nil ||
+		!strings.Contains(err.Error(), "the fix phase was asked for, and the engine skipped it as \"not requested\"") {
 		test.Fatalf("a bare run whose fix came back not requested was accepted: %v", err)
 	}
 
@@ -184,7 +190,12 @@ func TestFormatOnlyAsksForTheFixPhaseAlone(test *testing.T) {
 	if !requested[phaseFix] || requested[phaseTypes] || requested[phaseLint] || requested[phaseUnused] {
 		test.Fatalf("--format-only requested %v, want fix alone", requested)
 	}
-	output, exitCode, renderRequestedError := renderRequested(test, contractFixture(test, "FormatOnly.jsonl"), requested, 1)
+	output, exitCode, renderRequestedError := renderRequested(
+		test,
+		contractFixture(test, "FormatOnly.jsonl"),
+		requested,
+		1,
+	)
 	if renderRequestedError != nil {
 		test.Fatalf("the format-only stream was refused: %v\n%s", renderRequestedError, output)
 	}
@@ -192,7 +203,12 @@ func TestFormatOnlyAsksForTheFixPhaseAlone(test *testing.T) {
 		test.Errorf("the format finding exited %d, want 1:\n%s", exitCode, output)
 	}
 	everything := engineRequestedPhases(flagsOf("no-fix"))
-	if _, _, renderRequestedError := renderRequested(test, contractFixture(test, "FormatOnly.jsonl"), everything, 1); renderRequestedError == nil {
+	if _, _, renderRequestedError := renderRequested(
+		test,
+		contractFixture(test, "FormatOnly.jsonl"),
+		everything,
+		1,
+	); renderRequestedError == nil {
 		test.Errorf("a stream skipping types and lint as not requested was accepted for a run that asked for them")
 	}
 }

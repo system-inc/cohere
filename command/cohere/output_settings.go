@@ -40,7 +40,11 @@ func readOutputBlock(settingsPath string) (outputBlock, error) {
 	decoder := json.NewDecoder(bytes.NewReader(raw))
 	decoder.DisallowUnknownFields()
 	if decodeError := decoder.Decode(&block); decodeError != nil {
-		return outputBlock{}, fmt.Errorf("the \"output\" block in %s: %w; the only key it takes is \"phases\"", settingsPath, decodeError)
+		return outputBlock{}, fmt.Errorf(
+			"the \"output\" block in %s: %w; the only key it takes is \"phases\"",
+			settingsPath,
+			decodeError,
+		)
 	}
 	return block, nil
 }

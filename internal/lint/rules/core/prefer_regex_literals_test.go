@@ -144,117 +144,259 @@ var preferRegexLiteralsReporting = []preferRegexLiteralsRow{
 	{source: "RegExp(`abc`, `g`);", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
 		{id: "replaceWithLiteral", output: "/abc/g;"},
 	}},
-	{source: "new RegExp(String.raw`abc`);", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "/abc/;"},
-	}},
-	{source: "new RegExp(String.raw`abc\nabc`);", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "/abc\\nabc/;"},
-	}},
-	{source: "new RegExp(String.raw`\tabc\nabc`);", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "/\\tabc\\nabc/;"},
-	}},
-	{source: "RegExp(String.raw`abc`);", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "/abc/;"},
-	}},
-	{source: "new RegExp(String.raw`abc`, String.raw`g`);", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "/abc/g;"},
-	}},
-	{source: "RegExp(String.raw`abc`, String.raw`g`);", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "/abc/g;"},
-	}},
-	{source: "new RegExp(String['raw']`a`);", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "/a/;"},
-	}},
+	{
+		source: "new RegExp(String.raw`abc`);",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "/abc/;"},
+		},
+	},
+	{
+		source: "new RegExp(String.raw`abc\nabc`);",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "/abc\\nabc/;"},
+		},
+	},
+	{
+		source: "new RegExp(String.raw`\tabc\nabc`);",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "/\\tabc\\nabc/;"},
+		},
+	},
+	{
+		source: "RegExp(String.raw`abc`);",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "/abc/;"},
+		},
+	},
+	{
+		source: "new RegExp(String.raw`abc`, String.raw`g`);",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "/abc/g;"},
+		},
+	},
+	{
+		source: "RegExp(String.raw`abc`, String.raw`g`);",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "/abc/g;"},
+		},
+	},
+	{
+		source: "new RegExp(String['raw']`a`);",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "/a/;"},
+		},
+	},
 	{source: "new RegExp('');", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
 		{id: "replaceWithLiteral", output: "/(?:)/;"},
 	}},
 	{source: "RegExp('', '');", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
 		{id: "replaceWithLiteral", output: "/(?:)/;"},
 	}},
-	{source: "new RegExp(String.raw``);", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "/(?:)/;"},
-	}},
+	{
+		source: "new RegExp(String.raw``);",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "/(?:)/;"},
+		},
+	},
 	{source: "new RegExp('a', `g`);", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
 		{id: "replaceWithLiteral", output: "/a/g;"},
 	}},
 	{source: "RegExp(`a`, 'g');", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
 		{id: "replaceWithLiteral", output: "/a/g;"},
 	}},
-	{source: "RegExp(String.raw`a`, 'g');", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "/a/g;"},
-	}},
-	{source: "new RegExp(String.raw`\\d`, `g`);", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "/\\d/g;"},
-	}},
-	{source: "new RegExp(String.raw`\\\\d`, `g`);", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "/\\\\d/g;"},
-	}},
-	{source: "new RegExp(String['raw']`\\\\d`, `g`);", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "/\\\\d/g;"},
-	}},
-	{source: "new RegExp(String[\"raw\"]`\\\\d`, `g`);", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "/\\\\d/g;"},
-	}},
-	{source: "RegExp('a', String.raw`g`);", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "/a/g;"},
-	}},
-	{source: "new globalThis.RegExp('a');", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "/a/;"},
-	}, upstreamLanguageOptions: "{\"ecmaVersion\":2020}"},
+	{
+		source: "RegExp(String.raw`a`, 'g');",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "/a/g;"},
+		},
+	},
+	{
+		source: "new RegExp(String.raw`\\d`, `g`);",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "/\\d/g;"},
+		},
+	},
+	{
+		source: "new RegExp(String.raw`\\\\d`, `g`);",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "/\\\\d/g;"},
+		},
+	},
+	{
+		source: "new RegExp(String['raw']`\\\\d`, `g`);",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "/\\\\d/g;"},
+		},
+	},
+	{
+		source: "new RegExp(String[\"raw\"]`\\\\d`, `g`);",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "/\\\\d/g;"},
+		},
+	},
+	{
+		source: "RegExp('a', String.raw`g`);",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "/a/g;"},
+		},
+	},
+	{
+		source: "new globalThis.RegExp('a');",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "/a/;"},
+		},
+		upstreamLanguageOptions: "{\"ecmaVersion\":2020}",
+	},
 	{source: "globalThis.RegExp('a');", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
 		{id: "replaceWithLiteral", output: "/a/;"},
 	}, upstreamLanguageOptions: "{\"ecmaVersion\":2020}"},
-	{source: "new RegExp(/a/);", ids: []string{"unexpectedRedundantRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "/a/;"},
-	}, options: "{\"disallowRedundantWrapping\":true}"},
-	{source: "new RegExp(/a/, 'u');", ids: []string{"unexpectedRedundantRegExpWithFlags"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteralAndFlags", output: "/a/u;"},
-	}, options: "{\"disallowRedundantWrapping\":true}"},
-	{source: "new RegExp(/a/g, '');", ids: []string{"unexpectedRedundantRegExpWithFlags"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteralAndFlags", output: "/a/;"},
-		{id: "replaceWithIntendedLiteralAndFlags", output: "/a/g;"},
-	}, options: "{\"disallowRedundantWrapping\":true}"},
-	{source: "new RegExp(/a/g, 'g');", ids: []string{"unexpectedRedundantRegExpWithFlags"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteralAndFlags", output: "/a/g;"},
-	}, options: "{\"disallowRedundantWrapping\":true}"},
-	{source: "new RegExp(/a/ig, 'g');", ids: []string{"unexpectedRedundantRegExpWithFlags"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteralAndFlags", output: "/a/g;"},
-		{id: "replaceWithIntendedLiteralAndFlags", output: "/a/ig;"},
-	}, options: "{\"disallowRedundantWrapping\":true}"},
-	{source: "new RegExp(/a/g, 'ig');", ids: []string{"unexpectedRedundantRegExpWithFlags"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteralAndFlags", output: "/a/ig;"},
-	}, options: "{\"disallowRedundantWrapping\":true}"},
-	{source: "new RegExp(/a/i, 'g');", ids: []string{"unexpectedRedundantRegExpWithFlags"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteralAndFlags", output: "/a/g;"},
-		{id: "replaceWithIntendedLiteralAndFlags", output: "/a/ig;"},
-	}, options: "{\"disallowRedundantWrapping\":true}"},
-	{source: "new RegExp(/a/i, 'i');", ids: []string{"unexpectedRedundantRegExpWithFlags"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteralAndFlags", output: "/a/i;"},
-	}, options: "{\"disallowRedundantWrapping\":true}"},
-	{source: "new RegExp(/a/, `u`);", ids: []string{"unexpectedRedundantRegExpWithFlags"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteralAndFlags", output: "/a/u;"},
-	}, options: "{\"disallowRedundantWrapping\":true}"},
-	{source: "new RegExp(/a/, `gi`);", ids: []string{"unexpectedRedundantRegExpWithFlags"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteralAndFlags", output: "/a/gi;"},
-	}, options: "{\"disallowRedundantWrapping\":true}"},
+	{
+		source: "new RegExp(/a/);",
+		ids:    []string{"unexpectedRedundantRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "/a/;"},
+		},
+		options: "{\"disallowRedundantWrapping\":true}",
+	},
+	{
+		source: "new RegExp(/a/, 'u');",
+		ids:    []string{"unexpectedRedundantRegExpWithFlags"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteralAndFlags", output: "/a/u;"},
+		},
+		options: "{\"disallowRedundantWrapping\":true}",
+	},
+	{
+		source: "new RegExp(/a/g, '');",
+		ids:    []string{"unexpectedRedundantRegExpWithFlags"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteralAndFlags", output: "/a/;"},
+			{id: "replaceWithIntendedLiteralAndFlags", output: "/a/g;"},
+		},
+		options: "{\"disallowRedundantWrapping\":true}",
+	},
+	{
+		source: "new RegExp(/a/g, 'g');",
+		ids:    []string{"unexpectedRedundantRegExpWithFlags"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteralAndFlags", output: "/a/g;"},
+		},
+		options: "{\"disallowRedundantWrapping\":true}",
+	},
+	{
+		source: "new RegExp(/a/ig, 'g');",
+		ids:    []string{"unexpectedRedundantRegExpWithFlags"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteralAndFlags", output: "/a/g;"},
+			{id: "replaceWithIntendedLiteralAndFlags", output: "/a/ig;"},
+		},
+		options: "{\"disallowRedundantWrapping\":true}",
+	},
+	{
+		source: "new RegExp(/a/g, 'ig');",
+		ids:    []string{"unexpectedRedundantRegExpWithFlags"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteralAndFlags", output: "/a/ig;"},
+		},
+		options: "{\"disallowRedundantWrapping\":true}",
+	},
+	{
+		source: "new RegExp(/a/i, 'g');",
+		ids:    []string{"unexpectedRedundantRegExpWithFlags"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteralAndFlags", output: "/a/g;"},
+			{id: "replaceWithIntendedLiteralAndFlags", output: "/a/ig;"},
+		},
+		options: "{\"disallowRedundantWrapping\":true}",
+	},
+	{
+		source: "new RegExp(/a/i, 'i');",
+		ids:    []string{"unexpectedRedundantRegExpWithFlags"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteralAndFlags", output: "/a/i;"},
+		},
+		options: "{\"disallowRedundantWrapping\":true}",
+	},
+	{
+		source: "new RegExp(/a/, `u`);",
+		ids:    []string{"unexpectedRedundantRegExpWithFlags"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteralAndFlags", output: "/a/u;"},
+		},
+		options: "{\"disallowRedundantWrapping\":true}",
+	},
+	{
+		source: "new RegExp(/a/, `gi`);",
+		ids:    []string{"unexpectedRedundantRegExpWithFlags"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteralAndFlags", output: "/a/gi;"},
+		},
+		options: "{\"disallowRedundantWrapping\":true}",
+	},
 	{source: "new RegExp('a');", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
 		{id: "replaceWithLiteral", output: "/a/;"},
 	}, options: "{\"disallowRedundantWrapping\":true}"},
-	{source: "new RegExp(/a/, String.raw`u`);", ids: []string{"unexpectedRedundantRegExpWithFlags"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteralAndFlags", output: "/a/u;"},
-	}, options: "{\"disallowRedundantWrapping\":true}"},
-	{source: "new RegExp(/a/ /* comment */);", ids: []string{"unexpectedRedundantRegExp"}, options: "{\"disallowRedundantWrapping\":true}"},
-	{source: "(a)\nnew RegExp(/b/);", ids: []string{"unexpectedRedundantRegExp"}, options: "{\"disallowRedundantWrapping\":true}"},
-	{source: "(a)\nnew RegExp(/b/, 'g');", ids: []string{"unexpectedRedundantRegExpWithFlags"}, options: "{\"disallowRedundantWrapping\":true}"},
-	{source: "a/RegExp(/foo/);", ids: []string{"unexpectedRedundantRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "a/ /foo/;"},
-	}, options: "{\"disallowRedundantWrapping\":true}"},
-	{source: "RegExp(/foo/)in a;", ids: []string{"unexpectedRedundantRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "/foo/ in a;"},
-	}, options: "{\"disallowRedundantWrapping\":true}"},
-	{source: "new RegExp((String?.raw)`a`);", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "/a/;"},
-	}},
+	{
+		source: "new RegExp(/a/, String.raw`u`);",
+		ids:    []string{"unexpectedRedundantRegExpWithFlags"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteralAndFlags", output: "/a/u;"},
+		},
+		options: "{\"disallowRedundantWrapping\":true}",
+	},
+	{
+		source:  "new RegExp(/a/ /* comment */);",
+		ids:     []string{"unexpectedRedundantRegExp"},
+		options: "{\"disallowRedundantWrapping\":true}",
+	},
+	{
+		source:  "(a)\nnew RegExp(/b/);",
+		ids:     []string{"unexpectedRedundantRegExp"},
+		options: "{\"disallowRedundantWrapping\":true}",
+	},
+	{
+		source:  "(a)\nnew RegExp(/b/, 'g');",
+		ids:     []string{"unexpectedRedundantRegExpWithFlags"},
+		options: "{\"disallowRedundantWrapping\":true}",
+	},
+	{
+		source: "a/RegExp(/foo/);",
+		ids:    []string{"unexpectedRedundantRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "a/ /foo/;"},
+		},
+		options: "{\"disallowRedundantWrapping\":true}",
+	},
+	{
+		source: "RegExp(/foo/)in a;",
+		ids:    []string{"unexpectedRedundantRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "/foo/ in a;"},
+		},
+		options: "{\"disallowRedundantWrapping\":true}",
+	},
+	{
+		source: "new RegExp((String?.raw)`a`);",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "/a/;"},
+		},
+	},
 	{source: "new RegExp('+');", ids: []string{"unexpectedRegExp"}},
 	{source: "new RegExp('*');", ids: []string{"unexpectedRegExp"}},
 	{source: "RegExp('+');", ids: []string{"unexpectedRegExp"}},
@@ -302,243 +444,598 @@ var preferRegexLiteralsReporting = []preferRegexLiteralsRow{
 	{source: "RegExp('\\\\b', '');", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
 		{id: "replaceWithLiteral", output: "/\\b/;"},
 	}},
-	{source: "RegExp('\\\\b\\\\b', '');", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "/\\b\\b/;"},
-	}},
-	{source: "new RegExp('\\\\B\\\\b', '');", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "/\\B\\b/;"},
-	}},
+	{
+		source: "RegExp('\\\\b\\\\b', '');",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "/\\b\\b/;"},
+		},
+	},
+	{
+		source: "new RegExp('\\\\B\\\\b', '');",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "/\\B\\b/;"},
+		},
+	},
 	{source: "RegExp('\\\\w', '');", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
 		{id: "replaceWithLiteral", output: "/\\w/;"},
 	}},
-	{source: "new globalThis.RegExp('\\\\W', '');", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "/\\W/;"},
-	}, upstreamLanguageOptions: "{\"globals\":{\"globalThis\":\"readonly\"}}"},
+	{
+		source: "new globalThis.RegExp('\\\\W', '');",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "/\\W/;"},
+		},
+		upstreamLanguageOptions: "{\"globals\":{\"globalThis\":\"readonly\"}}",
+	},
 	{source: "RegExp('\\\\s', '');", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
 		{id: "replaceWithLiteral", output: "/\\s/;"},
 	}},
 	{source: "new RegExp('\\\\S', '')", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
 		{id: "replaceWithLiteral", output: "/\\S/"},
 	}},
-	{source: "globalThis.RegExp('\\\\d', '');", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "/\\d/;"},
-	}, upstreamLanguageOptions: "{\"globals\":{\"globalThis\":\"readonly\"}}"},
-	{source: "globalThis.RegExp('\\\\D', '')", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "/\\D/"},
-	}, upstreamLanguageOptions: "{\"globals\":{\"globalThis\":\"readonly\"}}"},
-	{source: "globalThis.RegExp('\\\\\\\\\\\\D', '')", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "/\\\\\\D/"},
-	}, upstreamLanguageOptions: "{\"globals\":{\"globalThis\":\"readonly\"}}"},
-	{source: "new RegExp('\\\\D\\\\D', '')", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "/\\D\\D/"},
-	}},
-	{source: "new globalThis.RegExp('\\\\0\\\\0', '');", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "/\\0\\0/;"},
-	}, upstreamLanguageOptions: "{\"globals\":{\"globalThis\":\"writable\"}}"},
-	{source: "new RegExp('\\\\0\\\\0', '');", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "/\\0\\0/;"},
-	}},
+	{
+		source: "globalThis.RegExp('\\\\d', '');",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "/\\d/;"},
+		},
+		upstreamLanguageOptions: "{\"globals\":{\"globalThis\":\"readonly\"}}",
+	},
+	{
+		source: "globalThis.RegExp('\\\\D', '')",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "/\\D/"},
+		},
+		upstreamLanguageOptions: "{\"globals\":{\"globalThis\":\"readonly\"}}",
+	},
+	{
+		source: "globalThis.RegExp('\\\\\\\\\\\\D', '')",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "/\\\\\\D/"},
+		},
+		upstreamLanguageOptions: "{\"globals\":{\"globalThis\":\"readonly\"}}",
+	},
+	{
+		source: "new RegExp('\\\\D\\\\D', '')",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "/\\D\\D/"},
+		},
+	},
+	{
+		source: "new globalThis.RegExp('\\\\0\\\\0', '');",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "/\\0\\0/;"},
+		},
+		upstreamLanguageOptions: "{\"globals\":{\"globalThis\":\"writable\"}}",
+	},
+	{
+		source: "new RegExp('\\\\0\\\\0', '');",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "/\\0\\0/;"},
+		},
+	},
 	{source: "new RegExp('\\0\\0', 'g');", ids: []string{"unexpectedRegExp"}},
-	{source: "RegExp('\\\\0\\\\0\\\\0', '')", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "/\\0\\0\\0/"},
-	}},
-	{source: "RegExp('\\\\78\\\\126\\\\5934', '')", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "/\\78\\126\\5934/"},
-	}, upstreamLanguageOptions: "{\"ecmaVersion\":2022}"},
+	{
+		source: "RegExp('\\\\0\\\\0\\\\0', '')",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "/\\0\\0\\0/"},
+		},
+	},
+	{
+		source: "RegExp('\\\\78\\\\126\\\\5934', '')",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "/\\78\\126\\5934/"},
+		},
+		upstreamLanguageOptions: "{\"ecmaVersion\":2022}",
+	},
 	{source: "a in(RegExp('abc'))", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
 		{id: "replaceWithLiteral", output: "a in(/abc/)"},
 	}},
 	{source: "x = y\n            RegExp(\"foo\").test(x) ? bar() : baz()", ids: []string{"unexpectedRegExp"}},
-	{source: "func(new RegExp(String.raw`\\w{1, 2`, 'u'),new RegExp(String.raw`\\w{1, 2`, 'u'))", ids: []string{"unexpectedRegExp", "unexpectedRegExp"}},
-	{source: "x = y;\n            RegExp(\"foo\").test(x) ? bar() : baz()", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "x = y;\n            /foo/.test(x) ? bar() : baz()"},
-	}},
+	{
+		source: "func(new RegExp(String.raw`\\w{1, 2`, 'u'),new RegExp(String.raw`\\w{1, 2`, 'u'))",
+		ids:    []string{"unexpectedRegExp", "unexpectedRegExp"},
+	},
+	{
+		source: "x = y;\n            RegExp(\"foo\").test(x) ? bar() : baz()",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "x = y;\n            /foo/.test(x) ? bar() : baz()"},
+		},
+	},
 	{source: "typeof RegExp(\"foo\")", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
 		{id: "replaceWithLiteral", output: "typeof /foo/"},
 	}},
-	{source: "RegExp(\"foo\") instanceof RegExp(String.raw`blahblah`, 'g') ? typeof new RegExp('(\\\\p{Emoji_Presentation})\\\\1', `ug`) : false", ids: []string{"unexpectedRegExp", "unexpectedRegExp", "unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "/foo/ instanceof RegExp(String.raw`blahblah`, 'g') ? typeof new RegExp('(\\\\p{Emoji_Presentation})\\\\1', `ug`) : false"},
-		{id: "replaceWithLiteral", output: "RegExp(\"foo\") instanceof /blahblah/g ? typeof new RegExp('(\\\\p{Emoji_Presentation})\\\\1', `ug`) : false"},
-		{id: "replaceWithLiteral", output: "RegExp(\"foo\") instanceof RegExp(String.raw`blahblah`, 'g') ? typeof /(\\p{Emoji_Presentation})\\1/ug : false"},
-	}},
-	{source: "[   new RegExp(`someregular`)]", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "[   /someregular/]"},
-	}},
-	{source: "const totallyValidatesEmails = new RegExp(\"\\\\S+@(\\\\S+\\\\.)+\\\\S+\")\n            if (typeof totallyValidatesEmails === 'object') {\n                runSomethingThatExists(Regexp('stuff'))\n            }", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "const totallyValidatesEmails = /\\S+@(\\S+\\.)+\\S+/\n            if (typeof totallyValidatesEmails === 'object') {\n                runSomethingThatExists(Regexp('stuff'))\n            }"},
-	}},
-	{source: "!new RegExp('^Hey, ', 'u') && new RegExp('jk$') && ~new RegExp('^Sup, ') || new RegExp('hi') + new RegExp('person') === -new RegExp('hi again') ? 5 * new RegExp('abc') : 'notregbutstring'", ids: []string{"unexpectedRegExp", "unexpectedRegExp", "unexpectedRegExp", "unexpectedRegExp", "unexpectedRegExp", "unexpectedRegExp", "unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "!/^Hey, /u && new RegExp('jk$') && ~new RegExp('^Sup, ') || new RegExp('hi') + new RegExp('person') === -new RegExp('hi again') ? 5 * new RegExp('abc') : 'notregbutstring'"},
-		{id: "replaceWithLiteral", output: "!new RegExp('^Hey, ', 'u') && /jk$/ && ~new RegExp('^Sup, ') || new RegExp('hi') + new RegExp('person') === -new RegExp('hi again') ? 5 * new RegExp('abc') : 'notregbutstring'"},
-		{id: "replaceWithLiteral", output: "!new RegExp('^Hey, ', 'u') && new RegExp('jk$') && ~/^Sup, / || new RegExp('hi') + new RegExp('person') === -new RegExp('hi again') ? 5 * new RegExp('abc') : 'notregbutstring'"},
-		{id: "replaceWithLiteral", output: "!new RegExp('^Hey, ', 'u') && new RegExp('jk$') && ~new RegExp('^Sup, ') || /hi/ + new RegExp('person') === -new RegExp('hi again') ? 5 * new RegExp('abc') : 'notregbutstring'"},
-		{id: "replaceWithLiteral", output: "!new RegExp('^Hey, ', 'u') && new RegExp('jk$') && ~new RegExp('^Sup, ') || new RegExp('hi') + /person/ === -new RegExp('hi again') ? 5 * new RegExp('abc') : 'notregbutstring'"},
-		{id: "replaceWithLiteral", output: "!new RegExp('^Hey, ', 'u') && new RegExp('jk$') && ~new RegExp('^Sup, ') || new RegExp('hi') + new RegExp('person') === -/hi again/ ? 5 * new RegExp('abc') : 'notregbutstring'"},
-		{id: "replaceWithLiteral", output: "!new RegExp('^Hey, ', 'u') && new RegExp('jk$') && ~new RegExp('^Sup, ') || new RegExp('hi') + new RegExp('person') === -new RegExp('hi again') ? 5 * /abc/ : 'notregbutstring'"},
-	}},
-	{source: "#!/usr/bin/sh\n            RegExp(\"foo\")", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "#!/usr/bin/sh\n            /foo/"},
-	}},
-	{source: "async function abc(){await new RegExp(\"foo\")}", ids: []string{"unexpectedRegExp"}, upstreamLanguageOptions: "{\"ecmaVersion\":8,\"sourceType\":\"module\"}"},
+	{
+		source: "RegExp(\"foo\") instanceof RegExp(String.raw`blahblah`, 'g') ? typeof new RegExp('(\\\\p{Emoji_Presentation})\\\\1', `ug`) : false",
+		ids:    []string{"unexpectedRegExp", "unexpectedRegExp", "unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{
+				id:     "replaceWithLiteral",
+				output: "/foo/ instanceof RegExp(String.raw`blahblah`, 'g') ? typeof new RegExp('(\\\\p{Emoji_Presentation})\\\\1', `ug`) : false",
+			},
+			{
+				id:     "replaceWithLiteral",
+				output: "RegExp(\"foo\") instanceof /blahblah/g ? typeof new RegExp('(\\\\p{Emoji_Presentation})\\\\1', `ug`) : false",
+			},
+			{
+				id:     "replaceWithLiteral",
+				output: "RegExp(\"foo\") instanceof RegExp(String.raw`blahblah`, 'g') ? typeof /(\\p{Emoji_Presentation})\\1/ug : false",
+			},
+		},
+	},
+	{
+		source: "[   new RegExp(`someregular`)]",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "[   /someregular/]"},
+		},
+	},
+	{
+		source: "const totallyValidatesEmails = new RegExp(\"\\\\S+@(\\\\S+\\\\.)+\\\\S+\")\n            if (typeof totallyValidatesEmails === 'object') {\n                runSomethingThatExists(Regexp('stuff'))\n            }",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{
+				id:     "replaceWithLiteral",
+				output: "const totallyValidatesEmails = /\\S+@(\\S+\\.)+\\S+/\n            if (typeof totallyValidatesEmails === 'object') {\n                runSomethingThatExists(Regexp('stuff'))\n            }",
+			},
+		},
+	},
+	{
+		source: "!new RegExp('^Hey, ', 'u') && new RegExp('jk$') && ~new RegExp('^Sup, ') || new RegExp('hi') + new RegExp('person') === -new RegExp('hi again') ? 5 * new RegExp('abc') : 'notregbutstring'",
+		ids: []string{
+			"unexpectedRegExp",
+			"unexpectedRegExp",
+			"unexpectedRegExp",
+			"unexpectedRegExp",
+			"unexpectedRegExp",
+			"unexpectedRegExp",
+			"unexpectedRegExp",
+		},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{
+				id:     "replaceWithLiteral",
+				output: "!/^Hey, /u && new RegExp('jk$') && ~new RegExp('^Sup, ') || new RegExp('hi') + new RegExp('person') === -new RegExp('hi again') ? 5 * new RegExp('abc') : 'notregbutstring'",
+			},
+			{
+				id:     "replaceWithLiteral",
+				output: "!new RegExp('^Hey, ', 'u') && /jk$/ && ~new RegExp('^Sup, ') || new RegExp('hi') + new RegExp('person') === -new RegExp('hi again') ? 5 * new RegExp('abc') : 'notregbutstring'",
+			},
+			{
+				id:     "replaceWithLiteral",
+				output: "!new RegExp('^Hey, ', 'u') && new RegExp('jk$') && ~/^Sup, / || new RegExp('hi') + new RegExp('person') === -new RegExp('hi again') ? 5 * new RegExp('abc') : 'notregbutstring'",
+			},
+			{
+				id:     "replaceWithLiteral",
+				output: "!new RegExp('^Hey, ', 'u') && new RegExp('jk$') && ~new RegExp('^Sup, ') || /hi/ + new RegExp('person') === -new RegExp('hi again') ? 5 * new RegExp('abc') : 'notregbutstring'",
+			},
+			{
+				id:     "replaceWithLiteral",
+				output: "!new RegExp('^Hey, ', 'u') && new RegExp('jk$') && ~new RegExp('^Sup, ') || new RegExp('hi') + /person/ === -new RegExp('hi again') ? 5 * new RegExp('abc') : 'notregbutstring'",
+			},
+			{
+				id:     "replaceWithLiteral",
+				output: "!new RegExp('^Hey, ', 'u') && new RegExp('jk$') && ~new RegExp('^Sup, ') || new RegExp('hi') + new RegExp('person') === -/hi again/ ? 5 * new RegExp('abc') : 'notregbutstring'",
+			},
+			{
+				id:     "replaceWithLiteral",
+				output: "!new RegExp('^Hey, ', 'u') && new RegExp('jk$') && ~new RegExp('^Sup, ') || new RegExp('hi') + new RegExp('person') === -new RegExp('hi again') ? 5 * /abc/ : 'notregbutstring'",
+			},
+		},
+	},
+	{
+		source: "#!/usr/bin/sh\n            RegExp(\"foo\")",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "#!/usr/bin/sh\n            /foo/"},
+		},
+	},
+	{
+		source:                  "async function abc(){await new RegExp(\"foo\")}",
+		ids:                     []string{"unexpectedRegExp"},
+		upstreamLanguageOptions: "{\"ecmaVersion\":8,\"sourceType\":\"module\"}",
+	},
 	{source: "function* abc(){yield new RegExp(\"foo\")}", ids: []string{"unexpectedRegExp"}},
-	{source: "function* abc(){yield* new RegExp(\"foo\")}", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "function* abc(){yield* /foo/}"},
-	}},
-	{source: "console.log({ ...new RegExp('a') })", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "console.log({ .../a/ })"},
-	}},
+	{
+		source: "function* abc(){yield* new RegExp(\"foo\")}",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "function* abc(){yield* /foo/}"},
+		},
+	},
+	{
+		source: "console.log({ ...new RegExp('a') })",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "console.log({ .../a/ })"},
+		},
+	},
 	{source: "delete RegExp('a');", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
 		{id: "replaceWithLiteral", output: "delete /a/;"},
 	}},
 	{source: "void RegExp('a');", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
 		{id: "replaceWithLiteral", output: "void /a/;"},
 	}},
-	{source: "new RegExp(\"\\\\S+@(\\\\S+\\\\.)+\\\\S+\")**RegExp('a')", ids: []string{"unexpectedRegExp", "unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "/\\S+@(\\S+\\.)+\\S+/**RegExp('a')"},
-		{id: "replaceWithLiteral", output: "new RegExp(\"\\\\S+@(\\\\S+\\\\.)+\\\\S+\")**/a/"},
-	}},
-	{source: "new RegExp(\"\\\\S+@(\\\\S+\\\\.)+\\\\S+\")%RegExp('a')", ids: []string{"unexpectedRegExp", "unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "/\\S+@(\\S+\\.)+\\S+/%RegExp('a')"},
-		{id: "replaceWithLiteral", output: "new RegExp(\"\\\\S+@(\\\\S+\\\\.)+\\\\S+\")%/a/"},
-	}},
+	{
+		source: "new RegExp(\"\\\\S+@(\\\\S+\\\\.)+\\\\S+\")**RegExp('a')",
+		ids:    []string{"unexpectedRegExp", "unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "/\\S+@(\\S+\\.)+\\S+/**RegExp('a')"},
+			{id: "replaceWithLiteral", output: "new RegExp(\"\\\\S+@(\\\\S+\\\\.)+\\\\S+\")**/a/"},
+		},
+	},
+	{
+		source: "new RegExp(\"\\\\S+@(\\\\S+\\\\.)+\\\\S+\")%RegExp('a')",
+		ids:    []string{"unexpectedRegExp", "unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "/\\S+@(\\S+\\.)+\\S+/%RegExp('a')"},
+			{id: "replaceWithLiteral", output: "new RegExp(\"\\\\S+@(\\\\S+\\\\.)+\\\\S+\")%/a/"},
+		},
+	},
 	{source: "a in RegExp('abc')", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
 		{id: "replaceWithLiteral", output: "a in /abc/"},
 	}},
-	{source: "\n            /abc/ == new RegExp('cba');\n            ", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "\n            /abc/ == /cba/;\n            "},
-	}, upstreamLanguageOptions: "{\"ecmaVersion\":2021}"},
-	{source: "\n            /abc/ === new RegExp('cba');\n            ", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "\n            /abc/ === /cba/;\n            "},
-	}, upstreamLanguageOptions: "{\"ecmaVersion\":2021}"},
-	{source: "\n            /abc/ != new RegExp('cba');\n            ", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "\n            /abc/ != /cba/;\n            "},
-	}, upstreamLanguageOptions: "{\"ecmaVersion\":2021}"},
-	{source: "\n            /abc/ !== new RegExp('cba');\n            ", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "\n            /abc/ !== /cba/;\n            "},
-	}, upstreamLanguageOptions: "{\"ecmaVersion\":2021}"},
-	{source: "\n            /abc/ > new RegExp('cba');\n            ", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "\n            /abc/ > /cba/;\n            "},
-	}, upstreamLanguageOptions: "{\"ecmaVersion\":2021}"},
-	{source: "\n            /abc/ < new RegExp('cba');\n            ", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "\n            /abc/ < /cba/;\n            "},
-	}, upstreamLanguageOptions: "{\"ecmaVersion\":2021}"},
-	{source: "\n            /abc/ >= new RegExp('cba');\n            ", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "\n            /abc/ >= /cba/;\n            "},
-	}, upstreamLanguageOptions: "{\"ecmaVersion\":2021}"},
-	{source: "\n            /abc/ <= new RegExp('cba');\n            ", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "\n            /abc/ <= /cba/;\n            "},
-	}, upstreamLanguageOptions: "{\"ecmaVersion\":2021}"},
-	{source: "\n            /abc/ << new RegExp('cba');\n            ", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "\n            /abc/ << /cba/;\n            "},
-	}, upstreamLanguageOptions: "{\"ecmaVersion\":2021}"},
-	{source: "\n            /abc/ >> new RegExp('cba');\n            ", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "\n            /abc/ >> /cba/;\n            "},
-	}, upstreamLanguageOptions: "{\"ecmaVersion\":2021}"},
-	{source: "\n            /abc/ >>> new RegExp('cba');\n            ", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "\n            /abc/ >>> /cba/;\n            "},
-	}, upstreamLanguageOptions: "{\"ecmaVersion\":2021}"},
-	{source: "\n            /abc/ ^ new RegExp('cba');\n            ", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "\n            /abc/ ^ /cba/;\n            "},
-	}, upstreamLanguageOptions: "{\"ecmaVersion\":2021}"},
-	{source: "\n            /abc/ & new RegExp('cba');\n            ", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "\n            /abc/ & /cba/;\n            "},
-	}, upstreamLanguageOptions: "{\"ecmaVersion\":2021}"},
-	{source: "\n            /abc/ | new RegExp('cba');\n            ", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "\n            /abc/ | /cba/;\n            "},
-	}, upstreamLanguageOptions: "{\"ecmaVersion\":2021}"},
-	{source: "\n            null ?? new RegExp('blah')\n            ", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "\n            null ?? /blah/\n            "},
-	}, upstreamLanguageOptions: "{\"ecmaVersion\":2021}"},
-	{source: "\n            abc *= new RegExp('blah')\n            ", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "\n            abc *= /blah/\n            "},
-	}, upstreamLanguageOptions: "{\"ecmaVersion\":2021}"},
-	{source: "\n            console.log({a: new RegExp('sup')})\n            ", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "\n            console.log({a: /sup/})\n            "},
-	}, upstreamLanguageOptions: "{\"ecmaVersion\":2021}"},
-	{source: "\n            console.log(() => {new RegExp('sup')})\n            ", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "\n            console.log(() => {/sup/})\n            "},
-	}, upstreamLanguageOptions: "{\"ecmaVersion\":2021}"},
-	{source: "\n            function abc() {new RegExp('sup')}\n            ", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "\n            function abc() {/sup/}\n            "},
-	}, upstreamLanguageOptions: "{\"ecmaVersion\":2021}"},
-	{source: "\n            function abc() {return new RegExp('sup')}\n            ", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "\n            function abc() {return /sup/}\n            "},
-	}, upstreamLanguageOptions: "{\"ecmaVersion\":2021}"},
-	{source: "\n            abc <<= new RegExp('cba');\n            ", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "\n            abc <<= /cba/;\n            "},
-	}, upstreamLanguageOptions: "{\"ecmaVersion\":2021}"},
-	{source: "\n            abc >>= new RegExp('cba');\n            ", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "\n            abc >>= /cba/;\n            "},
-	}, upstreamLanguageOptions: "{\"ecmaVersion\":2021}"},
-	{source: "\n            abc >>>= new RegExp('cba');\n            ", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "\n            abc >>>= /cba/;\n            "},
-	}, upstreamLanguageOptions: "{\"ecmaVersion\":2021}"},
-	{source: "\n            abc ^= new RegExp('cba');\n            ", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "\n            abc ^= /cba/;\n            "},
-	}, upstreamLanguageOptions: "{\"ecmaVersion\":2021}"},
-	{source: "\n            abc &= new RegExp('cba');\n            ", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "\n            abc &= /cba/;\n            "},
-	}, upstreamLanguageOptions: "{\"ecmaVersion\":2021}"},
-	{source: "\n            abc |= new RegExp('cba');\n            ", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "\n            abc |= /cba/;\n            "},
-	}, upstreamLanguageOptions: "{\"ecmaVersion\":2021}"},
-	{source: "\n            abc ??= new RegExp('cba');\n            ", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "\n            abc ??= /cba/;\n            "},
-	}, upstreamLanguageOptions: "{\"ecmaVersion\":2021}"},
-	{source: "\n            abc &&= new RegExp('cba');\n            ", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "\n            abc &&= /cba/;\n            "},
-	}, upstreamLanguageOptions: "{\"ecmaVersion\":2021}"},
-	{source: "\n            abc ||= new RegExp('cba');\n            ", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "\n            abc ||= /cba/;\n            "},
-	}, upstreamLanguageOptions: "{\"ecmaVersion\":2021}"},
-	{source: "\n            abc **= new RegExp('blah')\n            ", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "\n            abc **= /blah/\n            "},
-	}, upstreamLanguageOptions: "{\"ecmaVersion\":2021}"},
-	{source: "\n            abc /= new RegExp('blah')\n            ", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "\n            abc /= /blah/\n            "},
-	}, upstreamLanguageOptions: "{\"ecmaVersion\":2021}"},
-	{source: "\n            abc += new RegExp('blah')\n            ", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "\n            abc += /blah/\n            "},
-	}, upstreamLanguageOptions: "{\"ecmaVersion\":2021}"},
-	{source: "\n            abc -= new RegExp('blah')\n            ", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "\n            abc -= /blah/\n            "},
-	}, upstreamLanguageOptions: "{\"ecmaVersion\":2021}"},
-	{source: "\n            abc %= new RegExp('blah')\n            ", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "\n            abc %= /blah/\n            "},
-	}, upstreamLanguageOptions: "{\"ecmaVersion\":2021}"},
-	{source: "\n            () => new RegExp('blah')\n            ", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "\n            () => /blah/\n            "},
-	}, upstreamLanguageOptions: "{\"ecmaVersion\":2021}"},
+	{
+		source: "\n            /abc/ == new RegExp('cba');\n            ",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "\n            /abc/ == /cba/;\n            "},
+		},
+		upstreamLanguageOptions: "{\"ecmaVersion\":2021}",
+	},
+	{
+		source: "\n            /abc/ === new RegExp('cba');\n            ",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "\n            /abc/ === /cba/;\n            "},
+		},
+		upstreamLanguageOptions: "{\"ecmaVersion\":2021}",
+	},
+	{
+		source: "\n            /abc/ != new RegExp('cba');\n            ",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "\n            /abc/ != /cba/;\n            "},
+		},
+		upstreamLanguageOptions: "{\"ecmaVersion\":2021}",
+	},
+	{
+		source: "\n            /abc/ !== new RegExp('cba');\n            ",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "\n            /abc/ !== /cba/;\n            "},
+		},
+		upstreamLanguageOptions: "{\"ecmaVersion\":2021}",
+	},
+	{
+		source: "\n            /abc/ > new RegExp('cba');\n            ",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "\n            /abc/ > /cba/;\n            "},
+		},
+		upstreamLanguageOptions: "{\"ecmaVersion\":2021}",
+	},
+	{
+		source: "\n            /abc/ < new RegExp('cba');\n            ",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "\n            /abc/ < /cba/;\n            "},
+		},
+		upstreamLanguageOptions: "{\"ecmaVersion\":2021}",
+	},
+	{
+		source: "\n            /abc/ >= new RegExp('cba');\n            ",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "\n            /abc/ >= /cba/;\n            "},
+		},
+		upstreamLanguageOptions: "{\"ecmaVersion\":2021}",
+	},
+	{
+		source: "\n            /abc/ <= new RegExp('cba');\n            ",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "\n            /abc/ <= /cba/;\n            "},
+		},
+		upstreamLanguageOptions: "{\"ecmaVersion\":2021}",
+	},
+	{
+		source: "\n            /abc/ << new RegExp('cba');\n            ",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "\n            /abc/ << /cba/;\n            "},
+		},
+		upstreamLanguageOptions: "{\"ecmaVersion\":2021}",
+	},
+	{
+		source: "\n            /abc/ >> new RegExp('cba');\n            ",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "\n            /abc/ >> /cba/;\n            "},
+		},
+		upstreamLanguageOptions: "{\"ecmaVersion\":2021}",
+	},
+	{
+		source: "\n            /abc/ >>> new RegExp('cba');\n            ",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "\n            /abc/ >>> /cba/;\n            "},
+		},
+		upstreamLanguageOptions: "{\"ecmaVersion\":2021}",
+	},
+	{
+		source: "\n            /abc/ ^ new RegExp('cba');\n            ",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "\n            /abc/ ^ /cba/;\n            "},
+		},
+		upstreamLanguageOptions: "{\"ecmaVersion\":2021}",
+	},
+	{
+		source: "\n            /abc/ & new RegExp('cba');\n            ",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "\n            /abc/ & /cba/;\n            "},
+		},
+		upstreamLanguageOptions: "{\"ecmaVersion\":2021}",
+	},
+	{
+		source: "\n            /abc/ | new RegExp('cba');\n            ",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "\n            /abc/ | /cba/;\n            "},
+		},
+		upstreamLanguageOptions: "{\"ecmaVersion\":2021}",
+	},
+	{
+		source: "\n            null ?? new RegExp('blah')\n            ",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "\n            null ?? /blah/\n            "},
+		},
+		upstreamLanguageOptions: "{\"ecmaVersion\":2021}",
+	},
+	{
+		source: "\n            abc *= new RegExp('blah')\n            ",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "\n            abc *= /blah/\n            "},
+		},
+		upstreamLanguageOptions: "{\"ecmaVersion\":2021}",
+	},
+	{
+		source: "\n            console.log({a: new RegExp('sup')})\n            ",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "\n            console.log({a: /sup/})\n            "},
+		},
+		upstreamLanguageOptions: "{\"ecmaVersion\":2021}",
+	},
+	{
+		source: "\n            console.log(() => {new RegExp('sup')})\n            ",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "\n            console.log(() => {/sup/})\n            "},
+		},
+		upstreamLanguageOptions: "{\"ecmaVersion\":2021}",
+	},
+	{
+		source: "\n            function abc() {new RegExp('sup')}\n            ",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "\n            function abc() {/sup/}\n            "},
+		},
+		upstreamLanguageOptions: "{\"ecmaVersion\":2021}",
+	},
+	{
+		source: "\n            function abc() {return new RegExp('sup')}\n            ",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "\n            function abc() {return /sup/}\n            "},
+		},
+		upstreamLanguageOptions: "{\"ecmaVersion\":2021}",
+	},
+	{
+		source: "\n            abc <<= new RegExp('cba');\n            ",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "\n            abc <<= /cba/;\n            "},
+		},
+		upstreamLanguageOptions: "{\"ecmaVersion\":2021}",
+	},
+	{
+		source: "\n            abc >>= new RegExp('cba');\n            ",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "\n            abc >>= /cba/;\n            "},
+		},
+		upstreamLanguageOptions: "{\"ecmaVersion\":2021}",
+	},
+	{
+		source: "\n            abc >>>= new RegExp('cba');\n            ",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "\n            abc >>>= /cba/;\n            "},
+		},
+		upstreamLanguageOptions: "{\"ecmaVersion\":2021}",
+	},
+	{
+		source: "\n            abc ^= new RegExp('cba');\n            ",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "\n            abc ^= /cba/;\n            "},
+		},
+		upstreamLanguageOptions: "{\"ecmaVersion\":2021}",
+	},
+	{
+		source: "\n            abc &= new RegExp('cba');\n            ",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "\n            abc &= /cba/;\n            "},
+		},
+		upstreamLanguageOptions: "{\"ecmaVersion\":2021}",
+	},
+	{
+		source: "\n            abc |= new RegExp('cba');\n            ",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "\n            abc |= /cba/;\n            "},
+		},
+		upstreamLanguageOptions: "{\"ecmaVersion\":2021}",
+	},
+	{
+		source: "\n            abc ??= new RegExp('cba');\n            ",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "\n            abc ??= /cba/;\n            "},
+		},
+		upstreamLanguageOptions: "{\"ecmaVersion\":2021}",
+	},
+	{
+		source: "\n            abc &&= new RegExp('cba');\n            ",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "\n            abc &&= /cba/;\n            "},
+		},
+		upstreamLanguageOptions: "{\"ecmaVersion\":2021}",
+	},
+	{
+		source: "\n            abc ||= new RegExp('cba');\n            ",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "\n            abc ||= /cba/;\n            "},
+		},
+		upstreamLanguageOptions: "{\"ecmaVersion\":2021}",
+	},
+	{
+		source: "\n            abc **= new RegExp('blah')\n            ",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "\n            abc **= /blah/\n            "},
+		},
+		upstreamLanguageOptions: "{\"ecmaVersion\":2021}",
+	},
+	{
+		source: "\n            abc /= new RegExp('blah')\n            ",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "\n            abc /= /blah/\n            "},
+		},
+		upstreamLanguageOptions: "{\"ecmaVersion\":2021}",
+	},
+	{
+		source: "\n            abc += new RegExp('blah')\n            ",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "\n            abc += /blah/\n            "},
+		},
+		upstreamLanguageOptions: "{\"ecmaVersion\":2021}",
+	},
+	{
+		source: "\n            abc -= new RegExp('blah')\n            ",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "\n            abc -= /blah/\n            "},
+		},
+		upstreamLanguageOptions: "{\"ecmaVersion\":2021}",
+	},
+	{
+		source: "\n            abc %= new RegExp('blah')\n            ",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "\n            abc %= /blah/\n            "},
+		},
+		upstreamLanguageOptions: "{\"ecmaVersion\":2021}",
+	},
+	{
+		source: "\n            () => new RegExp('blah')\n            ",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "\n            () => /blah/\n            "},
+		},
+		upstreamLanguageOptions: "{\"ecmaVersion\":2021}",
+	},
 	{source: "a/RegExp(\"foo\")in b", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
 		{id: "replaceWithLiteral", output: "a/ /foo/ in b"},
 	}},
-	{source: "a/RegExp(\"foo\")instanceof b", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "a/ /foo/ instanceof b"},
-	}},
-	{source: "do RegExp(\"foo\")\nwhile (true);", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "do /foo/\nwhile (true);"},
-	}},
-	{source: "for(let i;i<5;i++) { break\nnew RegExp('search')}", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "for(let i;i<5;i++) { break\n/search/}"},
-	}},
-	{source: "for(let i;i<5;i++) { continue\nnew RegExp('search')}", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "for(let i;i<5;i++) { continue\n/search/}"},
-	}},
-	{source: "\n            switch (value) {\n                case \"possibility\":\n                    console.log('possibility matched')\n                case RegExp('myReg').toString():\n                    console.log('matches a regexp\\' toString value')\n                    break;\n            }\n            ", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "\n            switch (value) {\n                case \"possibility\":\n                    console.log('possibility matched')\n                case /myReg/.toString():\n                    console.log('matches a regexp\\' toString value')\n                    break;\n            }\n            "},
-	}},
-	{source: "throw new RegExp('abcdefg') // fail with a regular expression", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "throw /abcdefg/ // fail with a regular expression"},
-	}},
-	{source: "for (value of new RegExp('something being searched')) { console.log(value) }", ids: []string{"unexpectedRegExp"}},
-	{source: "(async function(){for await (value of new RegExp('something being searched')) { console.log(value) }})()", ids: []string{"unexpectedRegExp"}, upstreamLanguageOptions: "{\"ecmaVersion\":2018}"},
-	{source: "for (value in new RegExp('something being searched')) { console.log(value) }", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "for (value in /something being searched/) { console.log(value) }"},
-	}},
+	{
+		source: "a/RegExp(\"foo\")instanceof b",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "a/ /foo/ instanceof b"},
+		},
+	},
+	{
+		source: "do RegExp(\"foo\")\nwhile (true);",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "do /foo/\nwhile (true);"},
+		},
+	},
+	{
+		source: "for(let i;i<5;i++) { break\nnew RegExp('search')}",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "for(let i;i<5;i++) { break\n/search/}"},
+		},
+	},
+	{
+		source: "for(let i;i<5;i++) { continue\nnew RegExp('search')}",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "for(let i;i<5;i++) { continue\n/search/}"},
+		},
+	},
+	{
+		source: "\n            switch (value) {\n                case \"possibility\":\n                    console.log('possibility matched')\n                case RegExp('myReg').toString():\n                    console.log('matches a regexp\\' toString value')\n                    break;\n            }\n            ",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{
+				id:     "replaceWithLiteral",
+				output: "\n            switch (value) {\n                case \"possibility\":\n                    console.log('possibility matched')\n                case /myReg/.toString():\n                    console.log('matches a regexp\\' toString value')\n                    break;\n            }\n            ",
+			},
+		},
+	},
+	{
+		source: "throw new RegExp('abcdefg') // fail with a regular expression",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "throw /abcdefg/ // fail with a regular expression"},
+		},
+	},
+	{
+		source: "for (value of new RegExp('something being searched')) { console.log(value) }",
+		ids:    []string{"unexpectedRegExp"},
+	},
+	{
+		source:                  "(async function(){for await (value of new RegExp('something being searched')) { console.log(value) }})()",
+		ids:                     []string{"unexpectedRegExp"},
+		upstreamLanguageOptions: "{\"ecmaVersion\":2018}",
+	},
+	{
+		source: "for (value in new RegExp('something being searched')) { console.log(value) }",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "for (value in /something being searched/) { console.log(value) }"},
+		},
+	},
 	{source: "if (condition1 && condition2) new RegExp('avalue').test(str);", ids: []string{"unexpectedRegExp"}},
-	{source: "debugger\nnew RegExp('myReg')", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "debugger\n/myReg/"},
-	}},
+	{
+		source: "debugger\nnew RegExp('myReg')",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "debugger\n/myReg/"},
+		},
+	},
 	{source: "RegExp(\"\\\\\\n\")", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
 		{id: "replaceWithLiteral", output: "/\\n/"},
 	}},
@@ -566,36 +1063,86 @@ var preferRegexLiteralsReporting = []preferRegexLiteralsRow{
 	{source: "new RegExp(\"\\\\.\")", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
 		{id: "replaceWithLiteral", output: "/\\./"},
 	}},
-	{source: "new RegExp(\"\\\\\\n\\\\\\n\")", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "/\\n\\n/"},
-	}},
-	{source: "new RegExp(\"\\\\\\n\\\\\\f\\\\\\n\")", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "/\\n\\f\\n/"},
-	}},
-	{source: "new RegExp(\"\\u000A\\u000A\");", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "/\\n\\n/;"},
-	}},
+	{
+		source: "new RegExp(\"\\\\\\n\\\\\\n\")",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "/\\n\\n/"},
+		},
+	},
+	{
+		source: "new RegExp(\"\\\\\\n\\\\\\f\\\\\\n\")",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "/\\n\\f\\n/"},
+		},
+	},
+	{
+		source: "new RegExp(\"\\u000A\\u000A\");",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "/\\n\\n/;"},
+		},
+	},
 	{source: "new RegExp('mysafereg' /* comment explaining its safety */)", ids: []string{"unexpectedRegExp"}},
-	{source: "new RegExp('[[A--B]]', 'v')", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "/[[A--B]]/v"},
-	}, upstreamLanguageOptions: "{\"ecmaVersion\":2024}"},
-	{source: "new RegExp('a', 'uv')", ids: []string{"unexpectedRegExp"}, upstreamLanguageOptions: "{\"ecmaVersion\":2024}"},
-	{source: "new RegExp(/a/, 'v')", ids: []string{"unexpectedRedundantRegExpWithFlags"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteralAndFlags", output: "/a/v"},
-	}, options: "{\"disallowRedundantWrapping\":true}", upstreamLanguageOptions: "{\"ecmaVersion\":2024}"},
-	{source: "new RegExp(/a/g, 'v')", ids: []string{"unexpectedRedundantRegExpWithFlags"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteralAndFlags", output: "/a/v"},
-		{id: "replaceWithIntendedLiteralAndFlags", output: "/a/gv"},
-	}, options: "{\"disallowRedundantWrapping\":true}", upstreamLanguageOptions: "{\"ecmaVersion\":2024}"},
-	{source: "new RegExp(/a/u, 'v')", ids: []string{"unexpectedRedundantRegExpWithFlags"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteralAndFlags", output: "/a/v"},
-	}, options: "{\"disallowRedundantWrapping\":true}", upstreamLanguageOptions: "{\"ecmaVersion\":2024}"},
-	{source: "new RegExp(/a/v, 'u')", ids: []string{"unexpectedRedundantRegExpWithFlags"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteralAndFlags", output: "/a/u"},
-	}, options: "{\"disallowRedundantWrapping\":true}", upstreamLanguageOptions: "{\"ecmaVersion\":2024}"},
-	{source: "var regex = new RegExp('foo', 'u');", ids: []string{"unexpectedRegExp"}, suggestions: []preferRegexLiteralsSuggestion{
-		{id: "replaceWithLiteral", output: "var regex = /foo/u;"},
-	}, upstreamLanguageOptions: "{\"ecmaVersion\":2015}"},
+	{
+		source: "new RegExp('[[A--B]]', 'v')",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "/[[A--B]]/v"},
+		},
+		upstreamLanguageOptions: "{\"ecmaVersion\":2024}",
+	},
+	{
+		source:                  "new RegExp('a', 'uv')",
+		ids:                     []string{"unexpectedRegExp"},
+		upstreamLanguageOptions: "{\"ecmaVersion\":2024}",
+	},
+	{
+		source: "new RegExp(/a/, 'v')",
+		ids:    []string{"unexpectedRedundantRegExpWithFlags"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteralAndFlags", output: "/a/v"},
+		},
+		options:                 "{\"disallowRedundantWrapping\":true}",
+		upstreamLanguageOptions: "{\"ecmaVersion\":2024}",
+	},
+	{
+		source: "new RegExp(/a/g, 'v')",
+		ids:    []string{"unexpectedRedundantRegExpWithFlags"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteralAndFlags", output: "/a/v"},
+			{id: "replaceWithIntendedLiteralAndFlags", output: "/a/gv"},
+		},
+		options:                 "{\"disallowRedundantWrapping\":true}",
+		upstreamLanguageOptions: "{\"ecmaVersion\":2024}",
+	},
+	{
+		source: "new RegExp(/a/u, 'v')",
+		ids:    []string{"unexpectedRedundantRegExpWithFlags"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteralAndFlags", output: "/a/v"},
+		},
+		options:                 "{\"disallowRedundantWrapping\":true}",
+		upstreamLanguageOptions: "{\"ecmaVersion\":2024}",
+	},
+	{
+		source: "new RegExp(/a/v, 'u')",
+		ids:    []string{"unexpectedRedundantRegExpWithFlags"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteralAndFlags", output: "/a/u"},
+		},
+		options:                 "{\"disallowRedundantWrapping\":true}",
+		upstreamLanguageOptions: "{\"ecmaVersion\":2024}",
+	},
+	{
+		source: "var regex = new RegExp('foo', 'u');",
+		ids:    []string{"unexpectedRegExp"},
+		suggestions: []preferRegexLiteralsSuggestion{
+			{id: "replaceWithLiteral", output: "var regex = /foo/u;"},
+		},
+		upstreamLanguageOptions: "{\"ecmaVersion\":2015}",
+	},
 }
 
 // preferRegexLiteralsDecidedByGlobalsConfig holds the four upstream clean cases whose verdict is not
@@ -618,9 +1165,17 @@ var preferRegexLiteralsReporting = []preferRegexLiteralsRow{
 // the config is the whole difference.
 var preferRegexLiteralsDecidedByGlobalsConfig = []preferRegexLiteralsRow{
 	{source: "/* globals String:off */ new RegExp(String.raw`a`);", ids: []string{"unexpectedRegExp"}},
-	{source: "RegExp('a', String.raw`g`);", ids: []string{"unexpectedRegExp"}, upstreamLanguageOptions: "{\"globals\":{\"String\":\"off\"}}"},
+	{
+		source:                  "RegExp('a', String.raw`g`);",
+		ids:                     []string{"unexpectedRegExp"},
+		upstreamLanguageOptions: "{\"globals\":{\"String\":\"off\"}}",
+	},
 	{source: "/* globals RegExp:off */ new RegExp('a');", ids: []string{"unexpectedRegExp"}},
-	{source: "RegExp('a');", ids: []string{"unexpectedRegExp"}, upstreamLanguageOptions: "{\"globals\":{\"RegExp\":\"off\"}}"},
+	{
+		source:                  "RegExp('a');",
+		ids:                     []string{"unexpectedRegExp"},
+		upstreamLanguageOptions: "{\"globals\":{\"RegExp\":\"off\"}}",
+	},
 }
 
 // TestPreferRegexLiteralsReportsWhatTheGlobalsConfigWouldHaveSilenced pins those four as reporting.
@@ -671,22 +1226,66 @@ func TestPreferRegexLiteralsReportsWhatTheGlobalsConfigWouldHaveSilenced(test *t
 // is pinned here rather than deleted so the difference stays visible.
 var preferRegexLiteralsDecidedByLanguageEdition = []preferRegexLiteralsRow{
 	// Upstream is silent because `globalThis` is not a name before ES2020. Cohere reports.
-	{source: "new globalThis.RegExp('a');", ids: []string{"unexpectedRegExp"}, upstreamLanguageOptions: "ecmaVersion 5, silent upstream"},
+	{
+		source:                  "new globalThis.RegExp('a');",
+		ids:                     []string{"unexpectedRegExp"},
+		upstreamLanguageOptions: "ecmaVersion 5, silent upstream",
+	},
 
 	// Upstream withholds the suggestion because the flag does not exist at the pinned edition.
 	// Cohere offers one.
-	{source: "new RegExp(/a/, 'd');", ids: []string{"unexpectedRedundantRegExpWithFlags"}, options: "{\"disallowRedundantWrapping\":true}", upstreamLanguageOptions: "ecmaVersion 2021, no suggestion upstream"},
-	{source: "RegExp('abc', 'u');", ids: []string{"unexpectedRegExp"}, upstreamLanguageOptions: "ecmaVersion 3, no suggestion upstream"},
-	{source: "new RegExp('abc', 'd');", ids: []string{"unexpectedRegExp"}, upstreamLanguageOptions: "ecmaVersion 2021, no suggestion upstream"},
-	{source: "new RegExp('[[A--B]]', 'v')", ids: []string{"unexpectedRegExp"}, upstreamLanguageOptions: "ecmaVersion 2023, no suggestion upstream"},
-	{source: "new RegExp('[[A&&&]]', 'v')", ids: []string{"unexpectedRegExp"}, upstreamLanguageOptions: "ecmaVersion 2024, no suggestion upstream"},
-	{source: "new RegExp(/a/, 'v')", ids: []string{"unexpectedRedundantRegExpWithFlags"}, options: "{\"disallowRedundantWrapping\":true}", upstreamLanguageOptions: "ecmaVersion 2023, no suggestion upstream"},
-	{source: "new RegExp(/[[A--B]]/v, 'u')", ids: []string{"unexpectedRedundantRegExpWithFlags"}, options: "{\"disallowRedundantWrapping\":true}", upstreamLanguageOptions: "ecmaVersion 2024, no suggestion upstream"},
-	{source: "new RegExp(/[[A--B]]/v, 'g')", ids: []string{"unexpectedRedundantRegExpWithFlags"}, options: "{\"disallowRedundantWrapping\":true}", upstreamLanguageOptions: "ecmaVersion 2024, one suggestion upstream"},
+	{
+		source:                  "new RegExp(/a/, 'd');",
+		ids:                     []string{"unexpectedRedundantRegExpWithFlags"},
+		options:                 "{\"disallowRedundantWrapping\":true}",
+		upstreamLanguageOptions: "ecmaVersion 2021, no suggestion upstream",
+	},
+	{
+		source:                  "RegExp('abc', 'u');",
+		ids:                     []string{"unexpectedRegExp"},
+		upstreamLanguageOptions: "ecmaVersion 3, no suggestion upstream",
+	},
+	{
+		source:                  "new RegExp('abc', 'd');",
+		ids:                     []string{"unexpectedRegExp"},
+		upstreamLanguageOptions: "ecmaVersion 2021, no suggestion upstream",
+	},
+	{
+		source:                  "new RegExp('[[A--B]]', 'v')",
+		ids:                     []string{"unexpectedRegExp"},
+		upstreamLanguageOptions: "ecmaVersion 2023, no suggestion upstream",
+	},
+	{
+		source:                  "new RegExp('[[A&&&]]', 'v')",
+		ids:                     []string{"unexpectedRegExp"},
+		upstreamLanguageOptions: "ecmaVersion 2024, no suggestion upstream",
+	},
+	{
+		source:                  "new RegExp(/a/, 'v')",
+		ids:                     []string{"unexpectedRedundantRegExpWithFlags"},
+		options:                 "{\"disallowRedundantWrapping\":true}",
+		upstreamLanguageOptions: "ecmaVersion 2023, no suggestion upstream",
+	},
+	{
+		source:                  "new RegExp(/[[A--B]]/v, 'u')",
+		ids:                     []string{"unexpectedRedundantRegExpWithFlags"},
+		options:                 "{\"disallowRedundantWrapping\":true}",
+		upstreamLanguageOptions: "ecmaVersion 2024, no suggestion upstream",
+	},
+	{
+		source:                  "new RegExp(/[[A--B]]/v, 'g')",
+		ids:                     []string{"unexpectedRedundantRegExpWithFlags"},
+		options:                 "{\"disallowRedundantWrapping\":true}",
+		upstreamLanguageOptions: "ecmaVersion 2024, one suggestion upstream",
+	},
 
 	// The other direction: an ES2025 syntax the pattern scanner does not know, so cohere withholds
 	// where upstream at 2025 offers.
-	{source: "new RegExp('(?i:foo)bar')", ids: []string{"unexpectedRegExp"}, upstreamLanguageOptions: "ecmaVersion 2025, one suggestion upstream"},
+	{
+		source:                  "new RegExp('(?i:foo)bar')",
+		ids:                     []string{"unexpectedRegExp"},
+		upstreamLanguageOptions: "ecmaVersion 2025, one suggestion upstream",
+	},
 }
 
 // TestPreferRegexLiteralsRecordsTheLanguageEditionDivergence pins those cases at what cohere does.

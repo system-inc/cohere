@@ -206,7 +206,13 @@ func decodePropertyEscape(source string, i int, size int, escaping escapeContext
 	if _, ok := unicodeproperties.Lookup(name); !ok {
 		return decodedEscape{}, fmt.Errorf("%w: unknown Unicode property %q", ErrUnsupportedSyntax, name)
 	}
-	return decodedEscape{kind: escapeSet, set: setProperty, width: size + end + 1, property: name, negated: source[i] == 'P'}, nil
+	return decodedEscape{
+		kind:     escapeSet,
+		set:      setProperty,
+		width:    size + end + 1,
+		property: name,
+		negated:  source[i] == 'P',
+	}, nil
 }
 
 // decodeNumericEscape reads an escape a digit opens, which is a backreference,

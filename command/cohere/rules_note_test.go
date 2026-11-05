@@ -21,7 +21,10 @@ func TestRulesProvenanceNoteSaysWhetherACommitReproducesTheList(test *testing.T)
 		test.Fatalf("a clean build of a named commit still claims its rules are whatever was on disk: %q", clean)
 	}
 
-	dirty := rulesProvenanceNote(release.Provenance{Version: "dev", SelfCommit: "7b434bb4105b", SourceTreeModified: true}, 464)
+	dirty := rulesProvenanceNote(
+		release.Provenance{Version: "dev", SelfCommit: "7b434bb4105b", SourceTreeModified: true},
+		464,
+	)
 	if !strings.Contains(dirty, "not necessarily what is committed") {
 		test.Fatalf("a build from a dirty tree lost its disclaimer: %q", dirty)
 	}

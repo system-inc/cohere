@@ -182,8 +182,14 @@ func withSteppedToken(what string, steps func(step func(name string) []string) i
 	}
 
 	held, err := waitInLine(directory, tokens, what, "token", func() {
-		fmt.Fprintf(streams.Errors, "cohere-dev: waiting for a token; the machine runs %d heavy Go runs at once, each %d packages "+
-			"at a time on %d threads, and these hold them (cohere-dev status shows the line):\n", tokens, shape.packages, shape.threads)
+		fmt.Fprintf(
+			streams.Errors,
+			"cohere-dev: waiting for a token; the machine runs %d heavy Go runs at once, each %d packages "+
+				"at a time on %d threads, and these hold them (cohere-dev status shows the line):\n",
+			tokens,
+			shape.packages,
+			shape.threads,
+		)
 	})
 	if err != nil {
 		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", err)
@@ -214,7 +220,11 @@ func borrowTokens(directory string, shape poolShape, own int, what string) []*he
 	}
 	borrowed := []*heldSlot{}
 	for len(borrowed) < free-1 {
-		token, takeSlotError := takeSlot(directory, shape.tokens, "borrowed by token "+strconv.Itoa(own)+"'s run: "+what)
+		token, takeSlotError := takeSlot(
+			directory,
+			shape.tokens,
+			"borrowed by token "+strconv.Itoa(own)+"'s run: "+what,
+		)
 		if takeSlotError != nil || token == nil {
 			break
 		}
@@ -258,11 +268,23 @@ func (run *tokenRun) step(name string) []string {
 			"cohere-dev: the pool is idle, so %s borrows %s: %d packages at a time on %d threads\n",
 			subject, tokenNumbers(run.borrowed), wide.packages, wide.threads)
 	case run.stepped && len(run.borrowed) > before:
-		fmt.Fprintf(streams.Errors, "cohere-dev: the pool went idle, so %s borrows %s: %d packages at a time on %d threads\n",
-			subject, tokenNumbers(run.borrowed), wide.packages, wide.threads)
+		fmt.Fprintf(
+			streams.Errors,
+			"cohere-dev: the pool went idle, so %s borrows %s: %d packages at a time on %d threads\n",
+			subject,
+			tokenNumbers(run.borrowed),
+			wide.packages,
+			wide.threads,
+		)
 	case run.stepped && len(run.borrowed) < before:
-		fmt.Fprintf(streams.Errors, "cohere-dev: the pool is busy now, so %s gives back %d borrowed tokens and runs %d packages at a time on %d threads\n",
-			subject, before-len(run.borrowed), wide.packages, wide.threads)
+		fmt.Fprintf(
+			streams.Errors,
+			"cohere-dev: the pool is busy now, so %s gives back %d borrowed tokens and runs %d packages at a time on %d threads\n",
+			subject,
+			before-len(run.borrowed),
+			wide.packages,
+			wide.threads,
+		)
 	}
 	run.stepped = true
 	return budgetEnvironment(os.Environ(), run.held.number, wide)
@@ -361,7 +383,13 @@ func waitInLine(directory string, slots int, what string, noun string, explain f
 					ticket = nil
 				}
 				if announced {
-					fmt.Fprintf(streams.Errors, "cohere-dev: took %s %d after waiting %s\n", noun, held.number, time.Since(waitingSince).Round(time.Second))
+					fmt.Fprintf(
+						streams.Errors,
+						"cohere-dev: took %s %d after waiting %s\n",
+						noun,
+						held.number,
+						time.Since(waitingSince).Round(time.Second),
+					)
 				}
 				return held, nil
 			}
@@ -443,8 +471,15 @@ func status() int {
 		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", err)
 		return 1
 	}
-	fmt.Fprintf(streams.Output, "pool: %d tokens, each %d packages at a time on %d threads, nice %d (%s)\n", shape.tokens, shape.packages,
-		shape.threads, testNiceness, directory)
+	fmt.Fprintf(
+		streams.Output,
+		"pool: %d tokens, each %d packages at a time on %d threads, nice %d (%s)\n",
+		shape.tokens,
+		shape.packages,
+		shape.threads,
+		testNiceness,
+		directory,
+	)
 	for token := 1; token <= shape.tokens; token++ {
 		holder := "free"
 		if held := heldBy(directory, token); held != "" {

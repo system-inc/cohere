@@ -103,7 +103,10 @@ func (entry *PreserveCaughtErrorClassName) UnmarshalJSON(raw []byte) error {
 		return fmt.Errorf("an errorClassNames object needs both name and argumentPosition")
 	}
 	if *object.ArgumentPosition < 1 {
-		return fmt.Errorf("errorClassNames argumentPosition is %d, and the first argument is 1", *object.ArgumentPosition)
+		return fmt.Errorf(
+			"errorClassNames argumentPosition is %d, and the first argument is 1",
+			*object.ArgumentPosition,
+		)
 	}
 	entry.Name = *object.Name
 	entry.ArgumentPosition = *object.ArgumentPosition
@@ -316,7 +319,12 @@ func errorClassName(callee *ast.Node) string {
 }
 
 // checkThrowInCatch decides whether one throw statement reports, and with what.
-func checkThrowInCatch(ruleContext rule.Context, throwStatement *ast.Node, requireCatchParameter bool, errorClassPositions map[string]int) {
+func checkThrowInCatch(
+	ruleContext rule.Context,
+	throwStatement *ast.Node,
+	requireCatchParameter bool,
+	errorClassPositions map[string]int,
+) {
 	construction, isConstruction := thrownConstruction(throwStatement.AsThrowStatement().Expression)
 	if !isConstruction {
 		return
@@ -333,7 +341,9 @@ func checkThrowInCatch(ruleContext rule.Context, throwStatement *ast.Node, requi
 	if className == "" {
 		return
 	}
-	builtIn := callee.Kind == ast.KindIdentifier && builtInErrorTypes[className] && resolvesToAGlobal(ruleContext, callee)
+	builtIn := callee.Kind == ast.KindIdentifier &&
+		builtInErrorTypes[className] &&
+		resolvesToAGlobal(ruleContext, callee)
 	customPosition, isCustom := errorClassPositions[className]
 	if !builtIn && !isCustom {
 		return
@@ -366,7 +376,14 @@ func checkThrowInCatch(ruleContext rule.Context, throwStatement *ast.Node, requi
 	}
 
 	if causeProperty == nil {
-		fix, hasFix := missingCauseFix(ruleContext, construction, builtIn, className == "AggregateError", optionsIndex, binding.Text())
+		fix, hasFix := missingCauseFix(
+			ruleContext,
+			construction,
+			builtIn,
+			className == "AggregateError",
+			optionsIndex,
+			binding.Text(),
+		)
 		if !hasFix {
 			ruleContext.ReportNode(throwStatement, messageMissingCause)
 			return
@@ -398,7 +415,10 @@ func checkThrowInCatch(ruleContext rule.Context, throwStatement *ast.Node, requi
 // It answers known false where ESLint answers UNKNOWN_CAUSE and stays silent: a spread argument at or
 // before the options position, a spread property in the options, or options that are not an object
 // literal. Known with a nil property is "no cause at all".
-func errorCauseProperty(arguments []*ast.Node, optionsIndex int) (causeProperty *ast.Node, known bool, multipleDefinitions bool) {
+func errorCauseProperty(
+	arguments []*ast.Node,
+	optionsIndex int,
+) (causeProperty *ast.Node, known bool, multipleDefinitions bool) {
 	for index, argument := range arguments {
 		if argument.Kind == ast.KindSpreadElement && index <= optionsIndex {
 			return nil, false, false
@@ -418,7 +438,10 @@ func errorCauseProperty(arguments []*ast.Node, optionsIndex int) (causeProperty 
 		if member.Kind == ast.KindSpreadAssignment {
 			return nil, false, false
 		}
-		if name, isStatic := property.Name(member.Name(), property.Named|property.Quoted|property.Templated|property.Computed); isStatic && name == "cause" {
+		if name, isStatic := property.Name(
+			member.Name(),
+			property.Named|property.Quoted|property.Templated|property.Computed,
+		); isStatic && name == "cause" {
 			causeProperty = member
 			count++
 		}
@@ -441,7 +464,13 @@ func causePropertyValue(causeProperty *ast.Node) *ast.Node {
 
 // reportIncorrectCause reports a `cause` that names something other than the caught error, at its
 // value, with the suggestion to attach the caught one unless there are two `cause` keys.
-func reportIncorrectCause(ruleContext rule.Context, causeProperty *ast.Node, value *ast.Node, multipleDefinitions bool, caughtName string) {
+func reportIncorrectCause(
+	ruleContext rule.Context,
+	causeProperty *ast.Node,
+	value *ast.Node,
+	multipleDefinitions bool,
+	caughtName string,
+) {
 	var reported core.TextRange
 	var fix rule.Fix
 	switch {
@@ -472,7 +501,14 @@ func reportIncorrectCause(ruleContext rule.Context, causeProperty *ast.Node, val
 
 // missingCauseFix builds the edit that attaches the caught error to a construction carrying none, or
 // answers false where ESLint offers nothing.
-func missingCauseFix(ruleContext rule.Context, construction constructedError, builtIn bool, aggregate bool, optionsIndex int, caughtName string) (rule.Fix, bool) {
+func missingCauseFix(
+	ruleContext rule.Context,
+	construction constructedError,
+	builtIn bool,
+	aggregate bool,
+	optionsIndex int,
+	caughtName string,
+) (rule.Fix, bool) {
 	causeObject := "{ cause: " + caughtName + " }"
 	arguments := construction.arguments
 

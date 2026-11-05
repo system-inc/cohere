@@ -19,7 +19,10 @@ const (
 
 // correctnessNoCollectionMisuseInOnArrayText is one of the rule's messages, whose wording lives in
 // `policy/messages/correctness-no-collection-misuse.json`.
-var correctnessNoCollectionMisuseInOnArrayText = policy.MessageOf("nexus/correctness-no-collection-misuse", correctnessNoCollectionMisuseInOnArrayId)
+var correctnessNoCollectionMisuseInOnArrayText = policy.MessageOf(
+	"nexus/correctness-no-collection-misuse",
+	correctnessNoCollectionMisuseInOnArrayId,
+)
 
 func correctnessNoCollectionMisuseInOnArrayMessage() rule.Message {
 	return rule.Message{
@@ -30,7 +33,10 @@ func correctnessNoCollectionMisuseInOnArrayMessage() rule.Message {
 
 // correctnessNoCollectionMisuseSizeComparisonText is one of the rule's messages, whose wording lives in
 // `policy/messages/correctness-no-collection-misuse.json`.
-var correctnessNoCollectionMisuseSizeComparisonText = policy.MessageOf("nexus/correctness-no-collection-misuse", correctnessNoCollectionMisuseSizeComparisonId)
+var correctnessNoCollectionMisuseSizeComparisonText = policy.MessageOf(
+	"nexus/correctness-no-collection-misuse",
+	correctnessNoCollectionMisuseSizeComparisonId,
+)
 
 func correctnessNoCollectionMisuseSizeComparisonMessage() rule.Message {
 	return rule.Message{
@@ -41,7 +47,10 @@ func correctnessNoCollectionMisuseSizeComparisonMessage() rule.Message {
 
 // correctnessNoCollectionMisuseBracketAccessText is one of the rule's messages, whose wording lives in
 // `policy/messages/correctness-no-collection-misuse.json`.
-var correctnessNoCollectionMisuseBracketAccessText = policy.MessageOf("nexus/correctness-no-collection-misuse", correctnessNoCollectionMisuseBracketAccessId)
+var correctnessNoCollectionMisuseBracketAccessText = policy.MessageOf(
+	"nexus/correctness-no-collection-misuse",
+	correctnessNoCollectionMisuseBracketAccessId,
+)
 
 func correctnessNoCollectionMisuseBracketAccessMessage() rule.Message {
 	return rule.Message{
@@ -52,7 +61,10 @@ func correctnessNoCollectionMisuseBracketAccessMessage() rule.Message {
 
 // correctnessNoCollectionMisuseObjectMethodText is one of the rule's messages, whose wording lives in
 // `policy/messages/correctness-no-collection-misuse.json`.
-var correctnessNoCollectionMisuseObjectMethodText = policy.MessageOf("nexus/correctness-no-collection-misuse", correctnessNoCollectionMisuseObjectMethodId)
+var correctnessNoCollectionMisuseObjectMethodText = policy.MessageOf(
+	"nexus/correctness-no-collection-misuse",
+	correctnessNoCollectionMisuseObjectMethodId,
+)
 
 func correctnessNoCollectionMisuseObjectMethodMessage() rule.Message {
 	return rule.Message{
@@ -166,10 +178,18 @@ var CorrectnessNoCollectionMisuse = rule.Rule{
 			ast.KindElementAccessExpression: func(node *ast.Node) {
 				access := node.AsElementAccessExpression()
 				if access.ArgumentExpression == nil ||
-					!correctnessNoCollectionMisuseIsCollection(ruleContext, access.Expression, correctnessNoCollectionMisuseAnyCollection) {
+					!correctnessNoCollectionMisuseIsCollection(
+						ruleContext,
+						access.Expression,
+						correctnessNoCollectionMisuseAnyCollection,
+					) {
 					return
 				}
-				if correctnessNoCollectionMisuseKeyMissesEveryMember(ruleContext, access.Expression, access.ArgumentExpression) {
+				if correctnessNoCollectionMisuseKeyMissesEveryMember(
+					ruleContext,
+					access.Expression,
+					access.ArgumentExpression,
+				) {
 					ruleContext.ReportNode(node, correctnessNoCollectionMisuseBracketAccessMessage())
 				}
 			},
@@ -212,7 +232,11 @@ func correctnessNoCollectionMisuseParts(ruleContext rule.Context, expression *as
 
 // correctnessNoCollectionMisuseIsLibraryType says whether a type's own symbol is one of the named
 // default-library types, never a subclass or a project type of the same name.
-func correctnessNoCollectionMisuseIsLibraryType(ruleContext rule.Context, part *checker.Type, names map[string]bool) bool {
+func correctnessNoCollectionMisuseIsLibraryType(
+	ruleContext rule.Context,
+	part *checker.Type,
+	names map[string]bool,
+) bool {
 	symbol := checker.Type_symbol(part)
 	if symbol == nil {
 		return false
@@ -222,7 +246,11 @@ func correctnessNoCollectionMisuseIsLibraryType(ruleContext rule.Context, part *
 
 // correctnessNoCollectionMisuseIsCollection says whether every member of an expression's type is one
 // of the named default-library collections.
-func correctnessNoCollectionMisuseIsCollection(ruleContext rule.Context, expression *ast.Node, names map[string]bool) bool {
+func correctnessNoCollectionMisuseIsCollection(
+	ruleContext rule.Context,
+	expression *ast.Node,
+	names map[string]bool,
+) bool {
 	parts := correctnessNoCollectionMisuseParts(ruleContext, expression)
 	if len(parts) == 0 {
 		return false
@@ -277,7 +305,10 @@ func correctnessNoCollectionMisuseIsArrayIndex(name string) bool {
 
 // correctnessNoCollectionMisuseIsImpossibleSizeComparison says whether a comparison sets a length
 // or size against a literal no value from 0 up can change the answer of.
-func correctnessNoCollectionMisuseIsImpossibleSizeComparison(ruleContext rule.Context, binary *ast.BinaryExpression) bool {
+func correctnessNoCollectionMisuseIsImpossibleSizeComparison(
+	ruleContext rule.Context,
+	binary *ast.BinaryExpression,
+) bool {
 	operator := binary.OperatorToken.Kind
 	switch {
 	case correctnessNoCollectionMisuseIsSize(ruleContext, binary.Left):
@@ -365,14 +396,22 @@ func correctnessNoCollectionMisuseIsSize(ruleContext rule.Context, expression *a
 		for _, part := range receivers {
 			if !checker.Checker_isArrayOrTupleType(ruleContext.TypeChecker, part) &&
 				!type_checking.IsTypeFlagSet(part, checker.TypeFlagsStringLike) &&
-				!correctnessNoCollectionMisuseIsLibraryType(ruleContext, part, correctnessNoCollectionMisuseTypedArrays) {
+				!correctnessNoCollectionMisuseIsLibraryType(
+					ruleContext,
+					part,
+					correctnessNoCollectionMisuseTypedArrays,
+				) {
 				return false
 			}
 		}
 		return true
 	case "size":
 		for _, part := range receivers {
-			if !correctnessNoCollectionMisuseIsLibraryType(ruleContext, part, correctnessNoCollectionMisuseSizedCollection) {
+			if !correctnessNoCollectionMisuseIsLibraryType(
+				ruleContext,
+				part,
+				correctnessNoCollectionMisuseSizedCollection,
+			) {
 				return false
 			}
 		}
@@ -383,7 +422,11 @@ func correctnessNoCollectionMisuseIsSize(ruleContext rule.Context, expression *a
 
 // correctnessNoCollectionMisuseKeyMissesEveryMember says whether every value a key's type allows
 // becomes a property name that no member of the collection's type declares.
-func correctnessNoCollectionMisuseKeyMissesEveryMember(ruleContext rule.Context, collection *ast.Node, key *ast.Node) bool {
+func correctnessNoCollectionMisuseKeyMissesEveryMember(
+	ruleContext rule.Context,
+	collection *ast.Node,
+	key *ast.Node,
+) bool {
 	keyType := ruleContext.TypeChecker.GetTypeAtLocation(key)
 	if keyType == nil {
 		return false
@@ -428,8 +471,15 @@ func correctnessNoCollectionMisuseIsObjectMethodOnCollection(ruleContext rule.Co
 		return false
 	}
 	if !rule.IsSymbolFromDefaultLibrary(ruleContext.Program, ruleContext.TypeChecker.GetSymbolAtLocation(object)) ||
-		!rule.IsSymbolFromDefaultLibrary(ruleContext.Program, ruleContext.TypeChecker.GetSymbolAtLocation(access.Name())) {
+		!rule.IsSymbolFromDefaultLibrary(
+			ruleContext.Program,
+			ruleContext.TypeChecker.GetSymbolAtLocation(access.Name()),
+		) {
 		return false
 	}
-	return correctnessNoCollectionMisuseIsCollection(ruleContext, call.Arguments.Nodes[0], correctnessNoCollectionMisuseAnyCollection)
+	return correctnessNoCollectionMisuseIsCollection(
+		ruleContext,
+		call.Arguments.Nodes[0],
+		correctnessNoCollectionMisuseAnyCollection,
+	)
 }

@@ -101,8 +101,14 @@ func Load(configuration Config, patterns ...string) (*Loaded, error) {
 			if !roots[listedPackage.ImportPath] {
 				continue
 			}
-			for _, imported := range append(append([]string{}, listedPackage.TestImports...), listedPackage.XTestImports...) {
-				if imported = canonical(listedPackage, imported); listed.byPath[imported] == nil && imported != "C" && !roots[imported] {
+			for _, imported := range append(
+				append([]string{}, listedPackage.TestImports...),
+				listedPackage.XTestImports...,
+			) {
+				if imported = canonical(
+					listedPackage,
+					imported,
+				); listed.byPath[imported] == nil && imported != "C" && !roots[imported] {
 					testImports[imported] = true
 				}
 			}
@@ -132,9 +138,16 @@ func Load(configuration Config, patterns ...string) (*Loaded, error) {
 		fromExports = exportSet(listed, sourceModule)
 		for path := range fromExports {
 			if path != "unsafe" && configuration.Exports.files[path] == "" {
-				return nil, fmt.Errorf("the %s product (%s) holds no export data for %s, which %s imports from %s: the product "+
-					"was listed from %s, so this load reaches a package it does not; widen the product's patterns",
-					configuration.Exports.name, configuration.Exports.key[:12], path, strings.Join(patterns, " "), root, strings.Join(configuration.Exports.patterns, " "))
+				return nil, fmt.Errorf(
+					"the %s product (%s) holds no export data for %s, which %s imports from %s: the product "+
+						"was listed from %s, so this load reaches a package it does not; widen the product's patterns",
+					configuration.Exports.name,
+					configuration.Exports.key[:12],
+					path,
+					strings.Join(patterns, " "),
+					root,
+					strings.Join(configuration.Exports.patterns, " "),
+				)
 			}
 		}
 	}
@@ -147,17 +160,27 @@ func Load(configuration Config, patterns ...string) (*Loaded, error) {
 		}
 		names := listedPackage.GoFiles
 		if configuration.Tests && roots[listedPackage.ImportPath] {
-			names = append(append(append([]string{}, names...), listedPackage.TestGoFiles...), listedPackage.XTestGoFiles...)
+			names = append(
+				append(append([]string{}, names...), listedPackage.TestGoFiles...),
+				listedPackage.XTestGoFiles...,
+			)
 		}
 		for _, name := range names {
 			sourceFiles[filepath.Join(listedPackage.Dir, name)] = true
 		}
 		if len(listedPackage.CgoFiles) > 0 {
-			return nil, fmt.Errorf("%s has cgo files (%s), whose Go only a cgo run produces, and that compiles; "+
-				"nothing here can type-check it from source", listedPackage.ImportPath, strings.Join(listedPackage.CgoFiles, ", "))
+			return nil, fmt.Errorf(
+				"%s has cgo files (%s), whose Go only a cgo run produces, and that compiles; "+
+					"nothing here can type-check it from source",
+				listedPackage.ImportPath,
+				strings.Join(listedPackage.CgoFiles, ", "),
+			)
 		}
 	}
-	if refuseUnreadOverlayError := refuseUnreadOverlay(configuration.Overlay, sourceFiles); refuseUnreadOverlayError != nil {
+	if refuseUnreadOverlayError := refuseUnreadOverlay(
+		configuration.Overlay,
+		sourceFiles,
+	); refuseUnreadOverlayError != nil {
 		return nil, refuseUnreadOverlayError
 	}
 
@@ -195,8 +218,12 @@ func Parse(configuration Config, patterns ...string) ([]*Package, error) {
 			continue
 		}
 		if len(listedPackage.CgoFiles) > 0 {
-			return nil, fmt.Errorf("%s has cgo files (%s), whose Go only a cgo run produces, and that compiles; "+
-				"nothing here can read it as go build would", listedPackage.ImportPath, strings.Join(listedPackage.CgoFiles, ", "))
+			return nil, fmt.Errorf(
+				"%s has cgo files (%s), whose Go only a cgo run produces, and that compiles; "+
+					"nothing here can read it as go build would",
+				listedPackage.ImportPath,
+				strings.Join(listedPackage.CgoFiles, ", "),
+			)
 		}
 		for _, name := range listedPackage.GoFiles {
 			sourceFiles[filepath.Join(listedPackage.Dir, name)] = true
@@ -205,7 +232,10 @@ func Parse(configuration Config, patterns ...string) ([]*Package, error) {
 		reader.parse(listedPackage, listedPackage.GoFiles, true, read)
 		parsed = append(parsed, read)
 	}
-	if refuseUnreadOverlayError := refuseUnreadOverlay(configuration.Overlay, sourceFiles); refuseUnreadOverlayError != nil {
+	if refuseUnreadOverlayError := refuseUnreadOverlay(
+		configuration.Overlay,
+		sourceFiles,
+	); refuseUnreadOverlayError != nil {
 		return nil, refuseUnreadOverlayError
 	}
 	return parsed, nil
@@ -277,7 +307,13 @@ func (loader *loader) load() (*Loaded, error) {
 				}
 			}
 			slots <- struct{}{}
-			checked, _ := loader.check(listedPackage, listedPackage.ImportPath, listedPackage.ImportPath, listedPackage.GoFiles, nil)
+			checked, _ := loader.check(
+				listedPackage,
+				listedPackage.ImportPath,
+				listedPackage.ImportPath,
+				listedPackage.GoFiles,
+				nil,
+			)
 			<-slots
 			loader.checkedLock.Lock()
 			loader.checked[listedPackage.ImportPath] = checked
@@ -304,7 +340,12 @@ func (loader *loader) load() (*Loaded, error) {
 			if importExportedError != nil {
 				return nil, importExportedError
 			}
-			loaded.Roots = append(loaded.Roots, &Package{ImportPath: listedPackage.ImportPath, Name: listedPackage.Name, Fset: loader.fileSet, Types: imported})
+			loaded.Roots = append(loaded.Roots, &Package{
+				ImportPath: listedPackage.ImportPath,
+				Name:       listedPackage.Name,
+				Fset:       loader.fileSet,
+				Types:      imported,
+			})
 		}
 	}
 	return loaded, nil
@@ -328,7 +369,12 @@ func (loader *loader) importExported(path string) (*types.Package, error) {
 // are already checked, and returns it, named name, with the files it parsed: the package itself (its
 // GoFiles, under its own path and name), or one of its test variants. overrides, when set, stands in for the
 // packages it names, as a test variant does for the packages go test builds again.
-func (loader *loader) check(listedPackage *listedPackage, packagePath, name string, names []string, overrides map[string]*types.Package) (*Package, []*ast.File) {
+func (loader *loader) check(
+	listedPackage *listedPackage,
+	packagePath, name string,
+	names []string,
+	overrides map[string]*types.Package,
+) (*Package, []*ast.File) {
 	variant := name != listedPackage.ImportPath
 	checked := &Package{ImportPath: name, Name: listedPackage.Name, Fset: loader.fileSet}
 	loader.parse(listedPackage, names, !variant, checked)
@@ -344,9 +390,11 @@ func (loader *loader) check(listedPackage *listedPackage, packagePath, name stri
 		FileVersions: map[*ast.File]string{},
 	}
 	configuration := &types.Config{
-		Importer: importerFunc(func(path string) (*types.Package, error) { return loader.resolve(listedPackage, path, overrides) }),
-		Sizes:    loader.sizes,
-		Error:    func(err error) { checked.Errors = append(checked.Errors, err) },
+		Importer: importerFunc(
+			func(path string) (*types.Package, error) { return loader.resolve(listedPackage, path, overrides) },
+		),
+		Sizes: loader.sizes,
+		Error: func(err error) { checked.Errors = append(checked.Errors, err) },
 	}
 	if listedPackage.Module != nil && listedPackage.Module.GoVersion != "" {
 		configuration.GoVersion = "go" + listedPackage.Module.GoVersion
@@ -369,7 +417,8 @@ func (loader *loader) testVariants(sourcePackages []*listedPackage, slots chan s
 	byRoot := make([][]*Package, len(sourcePackages))
 	var group sync.WaitGroup
 	for index, listedPackage := range sourcePackages {
-		if !loader.roots[listedPackage.ImportPath] || len(listedPackage.TestGoFiles)+len(listedPackage.XTestGoFiles) == 0 {
+		if !loader.roots[listedPackage.ImportPath] ||
+			len(listedPackage.TestGoFiles)+len(listedPackage.XTestGoFiles) == 0 {
 			continue
 		}
 		group.Add(1)
@@ -396,8 +445,17 @@ func (loader *loader) testVariantsOf(listedPackage *listedPackage) []*Package {
 	var variants []*Package
 	overrides := map[string]*types.Package{}
 	if len(listedPackage.TestGoFiles) > 0 {
-		inPackage, parsed := loader.check(listedPackage, path, path+testName, append(append([]string{}, listedPackage.GoFiles...), listedPackage.TestGoFiles...), nil)
-		inPackage.Errors = append(inPackage.Errors, testFunctionErrors(loader.fileSet, filesNamed(loader.fileSet, parsed, listedPackage.TestGoFiles))...)
+		inPackage, parsed := loader.check(
+			listedPackage,
+			path,
+			path+testName,
+			append(append([]string{}, listedPackage.GoFiles...), listedPackage.TestGoFiles...),
+			nil,
+		)
+		inPackage.Errors = append(
+			inPackage.Errors,
+			testFunctionErrors(loader.fileSet, filesNamed(loader.fileSet, parsed, listedPackage.TestGoFiles))...,
+		)
 		variants = append(variants, inPackage)
 		overrides[path] = inPackage.Types
 	}
@@ -418,10 +476,19 @@ func (loader *loader) testVariantsOf(listedPackage *listedPackage) []*Package {
 			}
 		}
 		for _, between := range loader.listed.packages {
-			if between.ImportPath == path || !reached[between.ImportPath] || loader.fromExports[between.ImportPath] || !slices.Contains(between.Deps, path) {
+			if between.ImportPath == path ||
+				!reached[between.ImportPath] ||
+				loader.fromExports[between.ImportPath] ||
+				!slices.Contains(between.Deps, path) {
 				continue
 			}
-			rebuilt, _ := loader.check(between, between.ImportPath, between.ImportPath+testName, between.GoFiles, overrides)
+			rebuilt, _ := loader.check(
+				between,
+				between.ImportPath,
+				between.ImportPath+testName,
+				between.GoFiles,
+				overrides,
+			)
 			variants = append(variants, rebuilt)
 			overrides[between.ImportPath] = rebuilt.Types
 		}
@@ -429,7 +496,13 @@ func (loader *loader) testVariantsOf(listedPackage *listedPackage) []*Package {
 	if overrides[path] == nil {
 		overrides = nil
 	}
-	external, parsed := loader.check(listedPackage, path+"_test", path+"_test"+testName, listedPackage.XTestGoFiles, overrides)
+	external, parsed := loader.check(
+		listedPackage,
+		path+"_test",
+		path+"_test"+testName,
+		listedPackage.XTestGoFiles,
+		overrides,
+	)
 	external.Errors = append(external.Errors, testFunctionErrors(loader.fileSet, parsed)...)
 	return append(variants, external)
 }
@@ -470,7 +543,11 @@ func (loader *loader) parse(listedPackage *listedPackage, names []string, withLi
 }
 
 // resolve is one source package's import of path: an override, a source package as checked, or export data.
-func (loader *loader) resolve(importer *listedPackage, path string, overrides map[string]*types.Package) (*types.Package, error) {
+func (loader *loader) resolve(
+	importer *listedPackage,
+	path string,
+	overrides map[string]*types.Package,
+) (*types.Package, error) {
 	if path == "unsafe" {
 		return types.Unsafe, nil
 	}

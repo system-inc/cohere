@@ -88,8 +88,13 @@ func TestSharedReadingAgreesWithAFreshOne(test *testing.T) {
 			for range 2 {
 				shared := bound.classValuesIn(node)
 				if expected := fresh.classValuesIn(node); !reflect.DeepEqual(shared, expected) {
-					test.Fatalf("settings %s: a shared reading of %s differs from a fresh one:\n  shared: %+v\n  fresh:  %+v",
-						settings.key(), node.Kind, shared, expected)
+					test.Fatalf(
+						"settings %s: a shared reading of %s differs from a fresh one:\n  shared: %+v\n  fresh:  %+v",
+						settings.key(),
+						node.Kind,
+						shared,
+						expected,
+					)
 				}
 			}
 			read += len(fresh.classValuesIn(node).literals)
@@ -114,7 +119,12 @@ func TestSharedReadingAgreesWithAFreshOne(test *testing.T) {
 			}
 		}
 		if wantBare := settings.key() == tagSettings.key(); rememberedBare != wantBare {
-			test.Fatalf("settings %s: remembered a bare template's reading %v, want %v", settings.key(), rememberedBare, wantBare)
+			test.Fatalf(
+				"settings %s: remembered a bare template's reading %v, want %v",
+				settings.key(),
+				rememberedBare,
+				wantBare,
+			)
 		}
 	}
 }

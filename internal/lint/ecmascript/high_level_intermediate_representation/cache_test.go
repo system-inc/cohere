@@ -262,12 +262,36 @@ func TestForFunctionWithoutManualMemoizationSeesEscapedSpellings(test *testing.T
 		source     string
 		recognised bool
 	}{
-		{"plain", "import {useMemo} from 'react';\nexport function Component({value}: {value: number}) {\n\treturn useMemo(() => value * 2, [value]);\n}\n", true},
-		{"identifierFourDigitEscape", "import {use\\u004Demo} from 'react';\nexport function Component({value}: {value: number}) {\n\treturn use\\u004Demo(() => value * 2, [value]);\n}\n", true},
-		{"identifierCodePointEscape", "import {use\\u{43}allback} from 'react';\nexport function Component({value}: {value: number}) {\n\treturn use\\u{43}allback(() => value, [value]);\n}\n", true},
-		{"computedHexEscape", "import * as React from 'react';\nexport function Component({value}: {value: number}) {\n\treturn React['use\\x4Demo'](() => value * 2, [value]);\n}\n", true},
-		{"propertyNameEscape", "import * as React from 'react';\nexport function Component({value}: {value: number}) {\n\treturn React.use\\u0043allback(() => value, [value]);\n}\n", true},
-		{"memoFreeWithBackslash", "export function Component({value}: {value: number}) {\n\treturn 'a\\tb' + value;\n}\n", false},
+		{
+			"plain",
+			"import {useMemo} from 'react';\nexport function Component({value}: {value: number}) {\n\treturn useMemo(() => value * 2, [value]);\n}\n",
+			true,
+		},
+		{
+			"identifierFourDigitEscape",
+			"import {use\\u004Demo} from 'react';\nexport function Component({value}: {value: number}) {\n\treturn use\\u004Demo(() => value * 2, [value]);\n}\n",
+			true,
+		},
+		{
+			"identifierCodePointEscape",
+			"import {use\\u{43}allback} from 'react';\nexport function Component({value}: {value: number}) {\n\treturn use\\u{43}allback(() => value, [value]);\n}\n",
+			true,
+		},
+		{
+			"computedHexEscape",
+			"import * as React from 'react';\nexport function Component({value}: {value: number}) {\n\treturn React['use\\x4Demo'](() => value * 2, [value]);\n}\n",
+			true,
+		},
+		{
+			"propertyNameEscape",
+			"import * as React from 'react';\nexport function Component({value}: {value: number}) {\n\treturn React.use\\u0043allback(() => value, [value]);\n}\n",
+			true,
+		},
+		{
+			"memoFreeWithBackslash",
+			"export function Component({value}: {value: number}) {\n\treturn 'a\\tb' + value;\n}\n",
+			false,
+		},
 	}
 
 	for _, testCase := range cases {
@@ -304,13 +328,18 @@ func TestForFunctionWithoutManualMemoizationSeesEscapedSpellings(test *testing.T
 				test.Fatal("the probe function did not lower, so this case proves nothing")
 			}
 			if (recognised > 0) != testCase.recognised {
-				test.Fatalf("an independent erasure recognised %d calls, so this case does not test what it names", recognised)
+				test.Fatalf(
+					"an independent erasure recognised %d calls, so this case does not test what it names",
+					recognised,
+				)
 			}
 			if testCase.recognised && erased == shared {
 				test.Error("the erasure recognises a memo call here, but the gate handed back the memo-intact graph")
 			}
 			if !testCase.recognised && erased != shared {
-				test.Error("nothing here can be erased, but the gate lowered a second graph instead of sharing the first")
+				test.Error(
+					"nothing here can be erased, but the gate lowered a second graph instead of sharing the first",
+				)
 			}
 		})
 	}
@@ -330,13 +359,38 @@ func TestMayHoldComponentOrHookAnswersFromTheText(test *testing.T) {
 		name, file, source string
 		want               bool
 	}{
-		{"a plain module", "plain.ts", "export const total = (values: number[]) => values.reduce((a, b) => a + b, 0);\n", false},
+		{
+			"a plain module",
+			"plain.ts",
+			"export const total = (values: number[]) => values.reduce((a, b) => a + b, 0);\n",
+			false,
+		},
 		{"a backslash that spells no hook", "escape.ts", "export const line = 'a\\tb';\n", false},
 		{"a JSX-variant file with no tag and no hook", "quiet.tsx", "export const count = 1;\n", false},
-		{"a hook call", "hook.ts", "import {useState} from 'react';\nexport function useCounter() { return useState(0); }\n", true},
-		{"a digit after use", "digit.ts", "declare function use2Things(): number;\nexport function useBoth() { return use2Things(); }\n", true},
-		{"an escaped hook name", "escaped.ts", "import {use\\u0053tate} from 'react';\nexport function use\\u0043ounter() { return use\\u0053tate(0); }\n", true},
-		{"an escaped hook name in a computed member", "computed.ts", "declare const React: Record<string, (value: number) => number>;\nexport function counter() { return React['use\\x53tate'](0); }\n", true},
+		{
+			"a hook call",
+			"hook.ts",
+			"import {useState} from 'react';\nexport function useCounter() { return useState(0); }\n",
+			true,
+		},
+		{
+			"a digit after use",
+			"digit.ts",
+			"declare function use2Things(): number;\nexport function useBoth() { return use2Things(); }\n",
+			true,
+		},
+		{
+			"an escaped hook name",
+			"escaped.ts",
+			"import {use\\u0053tate} from 'react';\nexport function use\\u0043ounter() { return use\\u0053tate(0); }\n",
+			true,
+		},
+		{
+			"an escaped hook name in a computed member",
+			"computed.ts",
+			"declare const React: Record<string, (value: number) => number>;\nexport function counter() { return React['use\\x53tate'](0); }\n",
+			true,
+		},
 		{"a tag in a JSX-variant file", "tag.tsx", "export function Shown() { return <div />; }\n", true},
 	}
 

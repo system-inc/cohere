@@ -642,7 +642,11 @@ func DecodeArrayTypeOptions(raw []byte) (any, error) {
 	}
 	decoded, err := rule.DecodeOptionsInto[arrayTypeRawOptions]()(raw)
 	if err != nil {
-		return DefaultArrayTypeOptions(), fmt.Errorf("expected an object of default and readonly, got %s: %w", trimmed, err)
+		return DefaultArrayTypeOptions(), fmt.Errorf(
+			"expected an object of default and readonly, got %s: %w",
+			trimmed,
+			err,
+		)
 	}
 
 	wire, _ := decoded.(arrayTypeRawOptions)
@@ -651,7 +655,10 @@ func DecodeArrayTypeOptions(raw []byte) (any, error) {
 	if wire.Default != nil {
 		setting, recognized := arrayTypeSettingFromWire(*wire.Default)
 		if !recognized {
-			return DefaultArrayTypeOptions(), fmt.Errorf(`default %q is not "array", "array-simple" or "generic"`, *wire.Default)
+			return DefaultArrayTypeOptions(), fmt.Errorf(
+				`default %q is not "array", "array-simple" or "generic"`,
+				*wire.Default,
+			)
 		}
 		options.Default = setting
 	}
@@ -661,7 +668,10 @@ func DecodeArrayTypeOptions(raw []byte) (any, error) {
 	if wire.Readonly != nil {
 		setting, recognized := arrayTypeSettingFromWire(*wire.Readonly)
 		if !recognized {
-			return DefaultArrayTypeOptions(), fmt.Errorf(`readonly %q is not "array", "array-simple" or "generic"`, *wire.Readonly)
+			return DefaultArrayTypeOptions(), fmt.Errorf(
+				`readonly %q is not "array", "array-simple" or "generic"`,
+				*wire.Readonly,
+			)
 		}
 		options.Readonly = setting
 	}

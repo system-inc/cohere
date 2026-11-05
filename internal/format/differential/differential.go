@@ -179,7 +179,14 @@ func Language(fileName string) string {
 // The oracle side goes through the cache when one is given, because the oracle is deterministic in its
 // bundle digest, its options and the file's bytes, and it is by far the slower side. Re-reading the
 // progress number should cost the candidate's time, not Prettier's.
-func Compare(root string, files []string, newOracle NewFormatter, newCandidate NewFormatter, workers int, cache *OracleCache) (Report, error) {
+func Compare(
+	root string,
+	files []string,
+	newOracle NewFormatter,
+	newCandidate NewFormatter,
+	workers int,
+	cache *OracleCache,
+) (Report, error) {
 	if workers < 1 {
 		workers = 1
 	}
@@ -337,10 +344,19 @@ func (report Report) Summary() string {
 	sort.Strings(languages)
 
 	row := func(name string, tally Tally) {
-		fmt.Fprintf(&builder, "  %-8s %6.2f%%  %5d/%-5d identical  rewrites %6.2f%% (%d/%d)  refused %d  oracle failed %d\n",
-			name, tally.Percent(), tally.Identical, tally.Measured(),
-			tally.RewritePercent(), tally.RewriteIdentical, tally.RewriteTotal,
-			tally.CandidateRefused, tally.OracleFailed)
+		fmt.Fprintf(
+			&builder,
+			"  %-8s %6.2f%%  %5d/%-5d identical  rewrites %6.2f%% (%d/%d)  refused %d  oracle failed %d\n",
+			name,
+			tally.Percent(),
+			tally.Identical,
+			tally.Measured(),
+			tally.RewritePercent(),
+			tally.RewriteIdentical,
+			tally.RewriteTotal,
+			tally.CandidateRefused,
+			tally.OracleFailed,
+		)
 	}
 	for _, language := range languages {
 		row(language, *report.ByLanguage[language])
@@ -399,7 +415,10 @@ func (cache *OracleCache) format(oracle Formatter, path string, text string) (st
 	// fixture, a copied config) and would otherwise write one shared temporary at the same instant.
 	// The cache is an optimization, so any failure here is swallowed and the answer still returned.
 	if createDirectoryError := os.MkdirAll(filepath.Dir(entry), 0o755); createDirectoryError == nil {
-		if temporary, temporaryFileError := os.CreateTemp(filepath.Dir(entry), key+".*.tmp"); temporaryFileError == nil {
+		if temporary, temporaryFileError := os.CreateTemp(
+			filepath.Dir(entry),
+			key+".*.tmp",
+		); temporaryFileError == nil {
 			_, writeError := temporary.WriteString(formatted)
 			closeError := temporary.Close()
 			if writeError == nil && closeError == nil {

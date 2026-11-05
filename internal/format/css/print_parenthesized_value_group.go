@@ -14,7 +14,10 @@ func hasComma(path *astPath, options *printerOptions) bool {
 	node := currentNode(path)
 	parent, _ := path.Parent()
 	return node.Truthy("source") &&
-		strings.HasSuffix(trimEnd(sliceText(options.OriginalText, locStart(node), locStart(parent.Child("close")))), ",")
+		strings.HasSuffix(
+			trimEnd(sliceText(options.OriginalText, locStart(node), locStart(parent.Child("close")))),
+			",",
+		)
 }
 
 func printTrailingComma(path *astPath, options *printerOptions) doc.Doc {
@@ -155,7 +158,10 @@ func shouldBreakList(path *astPath) bool {
 			value := asNode(node)
 			return value.Type() == "value-paren_group" &&
 				value.Child("open") == nil &&
-				someNode(value.List("groups"), func(group *estree.Node) bool { return group.Type() == "value-comma_group" })
+				someNode(
+					value.List("groups"),
+					func(group *estree.Node) bool { return group.Type() == "value-comma_group" },
+				)
 		},
 		func(node any, key any, _ int, _ bool) bool {
 			return key == "group" && asNode(node).Type() == "value-value"

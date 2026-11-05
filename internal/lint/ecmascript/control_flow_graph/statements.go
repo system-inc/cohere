@@ -497,7 +497,10 @@ func (builder *Builder[E]) labeledStatement(node *ast.Node) {
 }
 
 func (builder *Builder[E]) pushJump(node *ast.Node, breakTo, continueTo *Block[E], loop *ast.Node) {
-	builder.jumps = append(builder.jumps, jumpTarget[E]{labels: labelsOf(node), breakTo: breakTo, continueTo: continueTo, loop: loop, breakable: true})
+	builder.jumps = append(
+		builder.jumps,
+		jumpTarget[E]{labels: labelsOf(node), breakTo: breakTo, continueTo: continueTo, loop: loop, breakable: true},
+	)
 }
 
 func (builder *Builder[E]) popJump() {

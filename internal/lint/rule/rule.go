@@ -601,7 +601,10 @@ func TokenRange(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange {
 		return node.Loc
 	}
 	if ast.IsJSDocNode(node) || node.Kind == ast.KindJsxText || node.Flags&ast.NodeFlagsJSDoc != 0 {
-		return core.NewTextRange(min(scanner.GetRangeOfTokenAtPosition(sourceFile, node.Pos()).Pos(), node.End()), node.End())
+		return core.NewTextRange(
+			min(scanner.GetRangeOfTokenAtPosition(sourceFile, node.Pos()).Pos(), node.End()),
+			node.End(),
+		)
 	}
 	return core.NewTextRange(scanner.GetTokenPosOfNode(node, sourceFile, false), node.End())
 }

@@ -165,7 +165,11 @@ func TestCompilerPinAcceptsARelativeModuleDirectory(test *testing.T) {
 	}
 
 	if _, readCompilerPinError := readCompilerPin(relative); readCompilerPinError != nil {
-		test.Fatalf("a compiler checked out at its pin was refused when named as %s: %v", relative, readCompilerPinError)
+		test.Fatalf(
+			"a compiler checked out at its pin was refused when named as %s: %v",
+			relative,
+			readCompilerPinError,
+		)
 	}
 }
 
@@ -240,7 +244,14 @@ func TestUpstreamIsReadFromTheCommittedGitmodules(test *testing.T) {
 	test.Parallel()
 
 	fixture := moduleWithCompiler(test)
-	gitIn(test, filepath.Join(fixture.Module, "TypeScript"), "remote", "set-url", "origin", "git@github.com:microsoft/TypeScript.git")
+	gitIn(
+		test,
+		filepath.Join(fixture.Module, "TypeScript"),
+		"remote",
+		"set-url",
+		"origin",
+		"git@github.com:microsoft/TypeScript.git",
+	)
 	writeFile(test, filepath.Join(fixture.Module, ".gitmodules"),
 		"[submodule \"TypeScript\"]\n\tpath = TypeScript\n\turl = https://github.com/someone/else.git\n")
 
@@ -267,10 +278,21 @@ func TestCompilerUpstreamFromGitmodules(test *testing.T) {
 			"[submodule \"libraries/other\"]\n\tpath = libraries/other\n\turl = https://github.com/someone/other.git\n" +
 				"[submodule \"compiler\"]\n\tpath = TypeScript\n\turl = git@github.com:system-inc/TypeScript.git\n",
 			"system-inc/TypeScript"},
-		{"over https, quoted", "[submodule \"TypeScript\"]\n\tpath = \"TypeScript\"\n\turl = \"https://github.com/system-inc/TypeScript.git\"\n\tbranch = adamic\n",
-			"system-inc/TypeScript"},
-		{"no entry for the compiler", "[submodule \"other\"]\n\tpath = other\n\turl = https://github.com/someone/other.git\n", "unknown"},
-		{"a url that names no repository", "[submodule \"TypeScript\"]\n\tpath = TypeScript\n\turl = https://github.com/\n", "unknown"},
+		{
+			"over https, quoted",
+			"[submodule \"TypeScript\"]\n\tpath = \"TypeScript\"\n\turl = \"https://github.com/system-inc/TypeScript.git\"\n\tbranch = adamic\n",
+			"system-inc/TypeScript",
+		},
+		{
+			"no entry for the compiler",
+			"[submodule \"other\"]\n\tpath = other\n\turl = https://github.com/someone/other.git\n",
+			"unknown",
+		},
+		{
+			"a url that names no repository",
+			"[submodule \"TypeScript\"]\n\tpath = TypeScript\n\turl = https://github.com/\n",
+			"unknown",
+		},
 		{"empty", "", "unknown"},
 	} {
 		if got := CompilerUpstreamFromGitmodules(testCase.gitmodules); got != testCase.want {

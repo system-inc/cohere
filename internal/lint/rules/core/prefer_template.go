@@ -410,7 +410,12 @@ func preferTemplateNeedsSemicolonGuard(ruleContext rule.Context, top *ast.Node) 
 // `textBefore` and `textAfter` carry the source text that sat around a `+` sign -- comments, in
 // practice -- so it can be placed inside a curly where it remains legal. Upstream's two corpus
 // cases with comments are what pin this.
-func preferTemplateLiteralFor(ruleContext rule.Context, node *ast.Node, textBefore string, textAfter string) (string, bool) {
+func preferTemplateLiteralFor(
+	ruleContext rule.Context,
+	node *ast.Node,
+	textBefore string,
+	textAfter string,
+) (string, bool) {
 	if node == nil {
 		return "", false
 	}
@@ -471,7 +476,12 @@ func preferTemplateLiteralFor(ruleContext rule.Context, node *ast.Node, textBefo
 		// the corpus asserts the rewritten file byte for byte.
 		if leftEndsWithCurly {
 			// The left side already ends in a curly, so the text around the `+` goes inside it.
-			left, leftOk := preferTemplateLiteralFor(ruleContext, expression.Left, textBefore, textBeforePlus+textAfterPlus)
+			left, leftOk := preferTemplateLiteralFor(
+				ruleContext,
+				expression.Left,
+				textBefore,
+				textBeforePlus+textAfterPlus,
+			)
 			right, rightOk := preferTemplateLiteralFor(ruleContext, expression.Right, "", textAfter)
 			if !leftOk || !rightOk || len(left) < 1 || len(right) < 1 {
 				return "", false
@@ -481,7 +491,12 @@ func preferTemplateLiteralFor(ruleContext rule.Context, node *ast.Node, textBefo
 		if rightStartsWithCurly {
 			// Otherwise the right side opens with a curly and the text goes there.
 			left, leftOk := preferTemplateLiteralFor(ruleContext, expression.Left, textBefore, "")
-			right, rightOk := preferTemplateLiteralFor(ruleContext, expression.Right, textBeforePlus+textAfterPlus, textAfter)
+			right, rightOk := preferTemplateLiteralFor(
+				ruleContext,
+				expression.Right,
+				textBeforePlus+textAfterPlus,
+				textAfter,
+			)
 			if !leftOk || !rightOk || len(left) < 1 || len(right) < 1 {
 				return "", false
 			}

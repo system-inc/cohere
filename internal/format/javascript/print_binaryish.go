@@ -163,7 +163,13 @@ func printBinaryishExpression(path *Path, options *Options, print PrintFunc) Doc
 // precedence level and the AST is structured based on precedence
 // level, things are naturally broken up correctly, i.e. `&&` is
 // broken before `+`.
-func printBinaryishExpressions(path *Path, options *Options, print PrintFunc, isNested bool, isInsideParenthesis bool) []Doc {
+func printBinaryishExpressions(
+	path *Path,
+	options *Options,
+	print PrintFunc,
+	isNested bool,
+	isInsideParenthesis bool,
+) []Doc {
 	current := node(path)
 
 	// Simply print the node normally.

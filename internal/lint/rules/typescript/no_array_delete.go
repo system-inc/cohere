@@ -208,7 +208,10 @@ var NoArrayDelete = rule.Rule{
 				argumentRange := rule.TokenRange(ruleContext.SourceFile, expression.ArgumentExpression)
 
 				deleteTokenRange := scanner.GetRangeOfTokenAtPosition(ruleContext.SourceFile, node.Pos())
-				leftBracketTokenRange := scanner.GetRangeOfTokenAtPosition(ruleContext.SourceFile, expressionRange.End())
+				leftBracketTokenRange := scanner.GetRangeOfTokenAtPosition(
+					ruleContext.SourceFile,
+					expressionRange.End(),
+				)
 				rightBracketTokenRange := scanner.GetRangeOfTokenAtPosition(ruleContext.SourceFile, argumentRange.End())
 
 				ruleContext.ReportNodeWithSuggestions(node, buildNoArrayDeleteMessage(), rule.Suggestion{

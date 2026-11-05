@@ -32,17 +32,50 @@ func TestNoUselessReturnStaysSilent(test *testing.T) {
 		{name: "valid0", source: "function foo() { return 5; }"},
 		{name: "valid1", source: "function foo() { return null; }"},
 		{name: "valid2", source: "function foo() { return doSomething(); }"},
-		{name: "valid3", source: "\n          function foo() {\n            if (bar) {\n              doSomething();\n              return;\n            } else {\n              doSomethingElse();\n            }\n            qux();\n          }\n        "},
-		{name: "valid4", source: "\n          function foo() {\n            switch (bar) {\n              case 1:\n                doSomething();\n                return;\n              default:\n                doSomethingElse();\n            }\n          }\n        "},
-		{name: "valid5", source: "\n          function foo() {\n            switch (bar) {\n              default:\n                doSomething();\n                return;\n              case 1:\n                doSomethingElse();\n            }\n          }\n        "},
-		{name: "valid6", source: "\n          function foo() {\n            switch (bar) {\n              case 1:\n                if (a) {\n                  doSomething();\n                  return;\n                } else {\n                  doSomething();\n                  return;\n                }\n              default:\n                doSomethingElse();\n            }\n          }\n        "},
-		{name: "valid7", source: "\n          function foo() {\n            for (var foo = 0; foo < 10; foo++) {\n              return;\n            }\n          }\n        "},
-		{name: "valid8", source: "\n          function foo() {\n            for (var foo in bar) {\n              return;\n            }\n          }\n        "},
-		{name: "valid9", source: "\n          function foo() {\n            try {\n              return 5;\n            } finally {\n              return; // This is allowed because it can override the returned value of 5\n            }\n          }\n        "},
-		{name: "valid10", source: "\n          function foo() {\n            try {\n              bar();\n              return;\n            } catch (err) {}\n            baz();\n          }\n        "},
-		{name: "valid11", source: "\n          function foo() {\n              if (something) {\n                  try {\n                      bar();\n                      return;\n                  } catch (err) {}\n              }\n              baz();\n          }\n        "},
-		{name: "valid12", source: "\n          function foo() {\n            return;\n            doSomething();\n          }\n        "},
-		{name: "valid13", source: "\n              function foo() {\n                for (var foo of bar) return;\n              }\n            "},
+		{
+			name:   "valid3",
+			source: "\n          function foo() {\n            if (bar) {\n              doSomething();\n              return;\n            } else {\n              doSomethingElse();\n            }\n            qux();\n          }\n        ",
+		},
+		{
+			name:   "valid4",
+			source: "\n          function foo() {\n            switch (bar) {\n              case 1:\n                doSomething();\n                return;\n              default:\n                doSomethingElse();\n            }\n          }\n        ",
+		},
+		{
+			name:   "valid5",
+			source: "\n          function foo() {\n            switch (bar) {\n              default:\n                doSomething();\n                return;\n              case 1:\n                doSomethingElse();\n            }\n          }\n        ",
+		},
+		{
+			name:   "valid6",
+			source: "\n          function foo() {\n            switch (bar) {\n              case 1:\n                if (a) {\n                  doSomething();\n                  return;\n                } else {\n                  doSomething();\n                  return;\n                }\n              default:\n                doSomethingElse();\n            }\n          }\n        ",
+		},
+		{
+			name:   "valid7",
+			source: "\n          function foo() {\n            for (var foo = 0; foo < 10; foo++) {\n              return;\n            }\n          }\n        ",
+		},
+		{
+			name:   "valid8",
+			source: "\n          function foo() {\n            for (var foo in bar) {\n              return;\n            }\n          }\n        ",
+		},
+		{
+			name:   "valid9",
+			source: "\n          function foo() {\n            try {\n              return 5;\n            } finally {\n              return; // This is allowed because it can override the returned value of 5\n            }\n          }\n        ",
+		},
+		{
+			name:   "valid10",
+			source: "\n          function foo() {\n            try {\n              bar();\n              return;\n            } catch (err) {}\n            baz();\n          }\n        ",
+		},
+		{
+			name:   "valid11",
+			source: "\n          function foo() {\n              if (something) {\n                  try {\n                      bar();\n                      return;\n                  } catch (err) {}\n              }\n              baz();\n          }\n        ",
+		},
+		{
+			name:   "valid12",
+			source: "\n          function foo() {\n            return;\n            doSomething();\n          }\n        ",
+		},
+		{
+			name:   "valid13",
+			source: "\n              function foo() {\n                for (var foo of bar) return;\n              }\n            ",
+		},
 		{name: "valid14", source: "() => { if (foo) return; bar(); }"},
 		{name: "valid15", source: "() => 5"},
 		{name: "valid16", source: "() => { return; doSomething(); }"},
@@ -50,13 +83,34 @@ func TestNoUselessReturnStaysSilent(test *testing.T) {
 		// Wrapped in a function here, which preserves the judgment: a return followed by
 		// a statement is not useless.
 		{name: "valid17", source: "function wrapper() { if (foo) { return; } doSomething(); }"},
-		{name: "valid18", source: "\n          function foo() {\n            if (bar) return;\n            return baz;\n          }\n        "},
-		{name: "valid19", source: "\n          function foo() {\n            if (bar) {\n              return;\n            }\n            return baz;\n          }\n        "},
-		{name: "valid20", source: "\n          function foo() {\n            if (bar) baz();\n            else return;\n            return 5;\n          }\n        "},
-		{name: "valid21", source: "\n          function foo() {\n            return;\n            while (foo) return;\n            foo;\n          }\n        "},
-		{name: "valid22", source: "\n          try {\n            throw new Error('foo');\n            while (false);\n          } catch (err) {}\n        "},
-		{name: "valid23", source: "\n          function foo(arg) {\n            throw new Error(\"Debugging...\");\n            if (!arg) {\n              return;\n            }\n            console.log(arg);\n          }\n        "},
-		{name: "valid24", source: "\n        function foo() {\n          try {\n              bar();\n              return;\n          } finally {\n              baz();\n          }\n          qux();\n        }\n        "},
+		{
+			name:   "valid18",
+			source: "\n          function foo() {\n            if (bar) return;\n            return baz;\n          }\n        ",
+		},
+		{
+			name:   "valid19",
+			source: "\n          function foo() {\n            if (bar) {\n              return;\n            }\n            return baz;\n          }\n        ",
+		},
+		{
+			name:   "valid20",
+			source: "\n          function foo() {\n            if (bar) baz();\n            else return;\n            return 5;\n          }\n        ",
+		},
+		{
+			name:   "valid21",
+			source: "\n          function foo() {\n            return;\n            while (foo) return;\n            foo;\n          }\n        ",
+		},
+		{
+			name:   "valid22",
+			source: "\n          try {\n            throw new Error('foo');\n            while (false);\n          } catch (err) {}\n        ",
+		},
+		{
+			name:   "valid23",
+			source: "\n          function foo(arg) {\n            throw new Error(\"Debugging...\");\n            if (!arg) {\n              return;\n            }\n            console.log(arg);\n          }\n        ",
+		},
+		{
+			name:   "valid24",
+			source: "\n        function foo() {\n          try {\n              bar();\n              return;\n          } finally {\n              baz();\n          }\n          qux();\n        }\n        ",
+		},
 	}
 	if len(cases) != 25 {
 		test.Fatalf("REFUSING: the clean table holds %d cases, want 25", len(cases))
@@ -79,17 +133,52 @@ func TestNoUselessReturnFires(test *testing.T) {
 		wantFixed string
 	}{
 		{name: "invalid0", source: "function foo() { return; }", findings: 1, wantFixed: "function foo() {  }"},
-		{name: "invalid1", source: "function foo() { doSomething(); return; }", findings: 1, wantFixed: "function foo() { doSomething();  }"},
-		{name: "invalid2", source: "function foo() { if (condition) { bar(); return; } else { baz(); } }", findings: 1, wantFixed: "function foo() { if (condition) { bar();  } else { baz(); } }"},
-		{name: "invalid3", source: "function foo() { if (foo) return; }", findings: 1, wantFixed: noUselessReturnDeclinesToFix},
-		{name: "invalid4", source: "function foo() { bar(); return/**/; }", findings: 1, wantFixed: noUselessReturnDeclinesToFix},
-		{name: "invalid5", source: "function foo() { bar(); return//\n; }", findings: 1, wantFixed: noUselessReturnDeclinesToFix},
+		{
+			name:      "invalid1",
+			source:    "function foo() { doSomething(); return; }",
+			findings:  1,
+			wantFixed: "function foo() { doSomething();  }",
+		},
+		{
+			name:      "invalid2",
+			source:    "function foo() { if (condition) { bar(); return; } else { baz(); } }",
+			findings:  1,
+			wantFixed: "function foo() { if (condition) { bar();  } else { baz(); } }",
+		},
+		{
+			name:      "invalid3",
+			source:    "function foo() { if (foo) return; }",
+			findings:  1,
+			wantFixed: noUselessReturnDeclinesToFix,
+		},
+		{
+			name:      "invalid4",
+			source:    "function foo() { bar(); return/**/; }",
+			findings:  1,
+			wantFixed: noUselessReturnDeclinesToFix,
+		},
+		{
+			name:      "invalid5",
+			source:    "function foo() { bar(); return//\n; }",
+			findings:  1,
+			wantFixed: noUselessReturnDeclinesToFix,
+		},
 		// Upstream writes this at the top level under ecmaVersion 5 with globalReturn.
 		// Wrapped in a function here; the judgment and the repair are unchanged.
-		{name: "invalid6", source: "function wrapper() { foo(); return; }", findings: 1, wantFixed: "function wrapper() { foo();  }"},
+		{
+			name:      "invalid6",
+			source:    "function wrapper() { foo(); return; }",
+			findings:  1,
+			wantFixed: "function wrapper() { foo();  }",
+		},
 		// Upstream writes this at the top level under ecmaVersion 5 with globalReturn.
 		// Wrapped in a function here; the judgment and the repair are unchanged.
-		{name: "invalid7", source: "function wrapper() { if (foo) { bar(); return; } else { baz(); } }", findings: 1, wantFixed: "function wrapper() { if (foo) { bar();  } else { baz(); } }"},
+		{
+			name:      "invalid7",
+			source:    "function wrapper() { if (foo) { bar(); return; } else { baz(); } }",
+			findings:  1,
+			wantFixed: "function wrapper() { if (foo) { bar();  } else { baz(); } }",
+		},
 		// Upstream's recorded output keeps the second `return;`, and that is an artifact of its
 		// fix engine rather than of the rule. Measured: it reports both returns and both fixes
 		// rewrite the whole function, range [0,47], because upstream wraps every repair in
@@ -98,22 +187,97 @@ func TestNoUselessReturnFires(test *testing.T) {
 		// corpus records the intermediate text. Run to a fixed point it produces exactly what
 		// is asserted here, and so does our engine in one pass, since our fixes are the two
 		// return statements themselves and do not overlap.
-		{name: "invalid8", source: "\n              function foo() {\n                if (foo) {\n                  return;\n                }\n                return;\n              }\n            ", findings: 2, wantFixed: "\n              function foo() {\n                if (foo) {\n                  \n                }\n                \n              }\n            "},
-		{name: "invalid9", source: "\n              function foo() {\n                switch (bar) {\n                  case 1:\n                    doSomething();\n                  default:\n                    doSomethingElse();\n                    return;\n                }\n              }\n            ", findings: 1, wantFixed: "\n              function foo() {\n                switch (bar) {\n                  case 1:\n                    doSomething();\n                  default:\n                    doSomethingElse();\n                    \n                }\n              }\n            "},
-		{name: "invalid10", source: "\n              function foo() {\n                switch (bar) {\n                  default:\n                    doSomething();\n                  case 1:\n                    doSomething();\n                    return;\n                }\n              }\n            ", findings: 1, wantFixed: "\n              function foo() {\n                switch (bar) {\n                  default:\n                    doSomething();\n                  case 1:\n                    doSomething();\n                    \n                }\n              }\n            "},
-		{name: "invalid11", source: "\n              function foo() {\n                switch (bar) {\n                  case 1:\n                    if (a) {\n                      doSomething();\n                      return;\n                    }\n                    break;\n                  default:\n                    doSomethingElse();\n                }\n              }\n            ", findings: 1, wantFixed: "\n              function foo() {\n                switch (bar) {\n                  case 1:\n                    if (a) {\n                      doSomething();\n                      \n                    }\n                    break;\n                  default:\n                    doSomethingElse();\n                }\n              }\n            "},
-		{name: "invalid12", source: "\n              function foo() {\n                switch (bar) {\n                  case 1:\n                    if (a) {\n                      doSomething();\n                      return;\n                    } else {\n                      doSomething();\n                    }\n                    break;\n                  default:\n                    doSomethingElse();\n                }\n              }\n            ", findings: 1, wantFixed: "\n              function foo() {\n                switch (bar) {\n                  case 1:\n                    if (a) {\n                      doSomething();\n                      \n                    } else {\n                      doSomething();\n                    }\n                    break;\n                  default:\n                    doSomethingElse();\n                }\n              }\n            "},
-		{name: "invalid13", source: "\n              function foo() {\n                switch (bar) {\n                  case 1:\n                    if (a) {\n                      doSomething();\n                      return;\n                    }\n                  default:\n                }\n              }\n            ", findings: 1, wantFixed: "\n              function foo() {\n                switch (bar) {\n                  case 1:\n                    if (a) {\n                      doSomething();\n                      \n                    }\n                  default:\n                }\n              }\n            "},
-		{name: "invalid14", source: "\n              function foo() {\n                try {} catch (err) { return; }\n              }\n            ", findings: 1, wantFixed: "\n              function foo() {\n                try {} catch (err) {  }\n              }\n            "},
-		{name: "invalid15", source: "\n              function foo() {\n                try {\n                  foo();\n                  return;\n                } catch (err) {\n                  return 5;\n                }\n              }\n            ", findings: 1, wantFixed: "\n              function foo() {\n                try {\n                  foo();\n                  \n                } catch (err) {\n                  return 5;\n                }\n              }\n            "},
-		{name: "invalid16", source: "\n              function foo() {\n                  if (something) {\n                      try {\n                          bar();\n                          return;\n                      } catch (err) {}\n                  }\n              }\n            ", findings: 1, wantFixed: "\n              function foo() {\n                  if (something) {\n                      try {\n                          bar();\n                          \n                      } catch (err) {}\n                  }\n              }\n            "},
-		{name: "invalid17", source: "\n              function foo() {\n                try {\n                  return;\n                } catch (err) {\n                  foo();\n                }\n              }\n            ", findings: 1, wantFixed: "\n              function foo() {\n                try {\n                  \n                } catch (err) {\n                  foo();\n                }\n              }\n            "},
-		{name: "invalid18", source: "\n              function foo() {\n                  try {\n                      return;\n                  } finally {\n                      bar();\n                  }\n              }\n            ", findings: 1, wantFixed: "\n              function foo() {\n                  try {\n                      \n                  } finally {\n                      bar();\n                  }\n              }\n            "},
-		{name: "invalid19", source: "\n              function foo() {\n                try {\n                  bar();\n                } catch (e) {\n                  try {\n                    baz();\n                    return;\n                  } catch (e) {\n                    qux();\n                  }\n                }\n              }\n            ", findings: 1, wantFixed: "\n              function foo() {\n                try {\n                  bar();\n                } catch (e) {\n                  try {\n                    baz();\n                    \n                  } catch (e) {\n                    qux();\n                  }\n                }\n              }\n            "},
-		{name: "invalid20", source: "\n              function foo() {\n                try {} finally {}\n                return;\n              }\n            ", findings: 1, wantFixed: "\n              function foo() {\n                try {} finally {}\n                \n              }\n            "},
-		{name: "invalid21", source: "\n              function foo() {\n                try {\n                  return 5;\n                } finally {\n                  function bar() {\n                    return;\n                  }\n                }\n              }\n            ", findings: 1, wantFixed: "\n              function foo() {\n                try {\n                  return 5;\n                } finally {\n                  function bar() {\n                    \n                  }\n                }\n              }\n            "},
+		{
+			name:      "invalid8",
+			source:    "\n              function foo() {\n                if (foo) {\n                  return;\n                }\n                return;\n              }\n            ",
+			findings:  2,
+			wantFixed: "\n              function foo() {\n                if (foo) {\n                  \n                }\n                \n              }\n            ",
+		},
+		{
+			name:      "invalid9",
+			source:    "\n              function foo() {\n                switch (bar) {\n                  case 1:\n                    doSomething();\n                  default:\n                    doSomethingElse();\n                    return;\n                }\n              }\n            ",
+			findings:  1,
+			wantFixed: "\n              function foo() {\n                switch (bar) {\n                  case 1:\n                    doSomething();\n                  default:\n                    doSomethingElse();\n                    \n                }\n              }\n            ",
+		},
+		{
+			name:      "invalid10",
+			source:    "\n              function foo() {\n                switch (bar) {\n                  default:\n                    doSomething();\n                  case 1:\n                    doSomething();\n                    return;\n                }\n              }\n            ",
+			findings:  1,
+			wantFixed: "\n              function foo() {\n                switch (bar) {\n                  default:\n                    doSomething();\n                  case 1:\n                    doSomething();\n                    \n                }\n              }\n            ",
+		},
+		{
+			name:      "invalid11",
+			source:    "\n              function foo() {\n                switch (bar) {\n                  case 1:\n                    if (a) {\n                      doSomething();\n                      return;\n                    }\n                    break;\n                  default:\n                    doSomethingElse();\n                }\n              }\n            ",
+			findings:  1,
+			wantFixed: "\n              function foo() {\n                switch (bar) {\n                  case 1:\n                    if (a) {\n                      doSomething();\n                      \n                    }\n                    break;\n                  default:\n                    doSomethingElse();\n                }\n              }\n            ",
+		},
+		{
+			name:      "invalid12",
+			source:    "\n              function foo() {\n                switch (bar) {\n                  case 1:\n                    if (a) {\n                      doSomething();\n                      return;\n                    } else {\n                      doSomething();\n                    }\n                    break;\n                  default:\n                    doSomethingElse();\n                }\n              }\n            ",
+			findings:  1,
+			wantFixed: "\n              function foo() {\n                switch (bar) {\n                  case 1:\n                    if (a) {\n                      doSomething();\n                      \n                    } else {\n                      doSomething();\n                    }\n                    break;\n                  default:\n                    doSomethingElse();\n                }\n              }\n            ",
+		},
+		{
+			name:      "invalid13",
+			source:    "\n              function foo() {\n                switch (bar) {\n                  case 1:\n                    if (a) {\n                      doSomething();\n                      return;\n                    }\n                  default:\n                }\n              }\n            ",
+			findings:  1,
+			wantFixed: "\n              function foo() {\n                switch (bar) {\n                  case 1:\n                    if (a) {\n                      doSomething();\n                      \n                    }\n                  default:\n                }\n              }\n            ",
+		},
+		{
+			name:      "invalid14",
+			source:    "\n              function foo() {\n                try {} catch (err) { return; }\n              }\n            ",
+			findings:  1,
+			wantFixed: "\n              function foo() {\n                try {} catch (err) {  }\n              }\n            ",
+		},
+		{
+			name:      "invalid15",
+			source:    "\n              function foo() {\n                try {\n                  foo();\n                  return;\n                } catch (err) {\n                  return 5;\n                }\n              }\n            ",
+			findings:  1,
+			wantFixed: "\n              function foo() {\n                try {\n                  foo();\n                  \n                } catch (err) {\n                  return 5;\n                }\n              }\n            ",
+		},
+		{
+			name:      "invalid16",
+			source:    "\n              function foo() {\n                  if (something) {\n                      try {\n                          bar();\n                          return;\n                      } catch (err) {}\n                  }\n              }\n            ",
+			findings:  1,
+			wantFixed: "\n              function foo() {\n                  if (something) {\n                      try {\n                          bar();\n                          \n                      } catch (err) {}\n                  }\n              }\n            ",
+		},
+		{
+			name:      "invalid17",
+			source:    "\n              function foo() {\n                try {\n                  return;\n                } catch (err) {\n                  foo();\n                }\n              }\n            ",
+			findings:  1,
+			wantFixed: "\n              function foo() {\n                try {\n                  \n                } catch (err) {\n                  foo();\n                }\n              }\n            ",
+		},
+		{
+			name:      "invalid18",
+			source:    "\n              function foo() {\n                  try {\n                      return;\n                  } finally {\n                      bar();\n                  }\n              }\n            ",
+			findings:  1,
+			wantFixed: "\n              function foo() {\n                  try {\n                      \n                  } finally {\n                      bar();\n                  }\n              }\n            ",
+		},
+		{
+			name:      "invalid19",
+			source:    "\n              function foo() {\n                try {\n                  bar();\n                } catch (e) {\n                  try {\n                    baz();\n                    return;\n                  } catch (e) {\n                    qux();\n                  }\n                }\n              }\n            ",
+			findings:  1,
+			wantFixed: "\n              function foo() {\n                try {\n                  bar();\n                } catch (e) {\n                  try {\n                    baz();\n                    \n                  } catch (e) {\n                    qux();\n                  }\n                }\n              }\n            ",
+		},
+		{
+			name:      "invalid20",
+			source:    "\n              function foo() {\n                try {} finally {}\n                return;\n              }\n            ",
+			findings:  1,
+			wantFixed: "\n              function foo() {\n                try {} finally {}\n                \n              }\n            ",
+		},
+		{
+			name:      "invalid21",
+			source:    "\n              function foo() {\n                try {\n                  return 5;\n                } finally {\n                  function bar() {\n                    return;\n                  }\n                }\n              }\n            ",
+			findings:  1,
+			wantFixed: "\n              function foo() {\n                try {\n                  return 5;\n                } finally {\n                  function bar() {\n                    \n                  }\n                }\n              }\n            ",
+		},
 		{name: "invalid22", source: "() => { return; }", findings: 1, wantFixed: "() => {  }"},
-		{name: "invalid23", source: "function foo() { return; return; }", findings: 1, wantFixed: "function foo() {  return; }"},
+		{
+			name:      "invalid23",
+			source:    "function foo() { return; return; }",
+			findings:  1,
+			wantFixed: "function foo() {  return; }",
+		},
 	}
 	if len(cases) != 24 {
 		test.Fatalf("REFUSING: the reporting table holds %d cases, want 24", len(cases))
@@ -322,7 +486,10 @@ func TestNoUselessReturnKeepsAReturnTheCompilerRequires(test *testing.T) {
 				"        return;\n    }\n}\n"},
 		{"a union with undefined after other work", "export function f(): string | undefined { bar(); return; }\n"},
 		{"unknown", "export function f(): unknown { bar(); return; }\n"},
-		{"an async function's promised type", "export async function f(): Promise<string | undefined> { bar(); return; }\n"},
+		{
+			"an async function's promised type",
+			"export async function f(): Promise<string | undefined> { bar(); return; }\n",
+		},
 		{"a getter, whatever its type", "export class S { get g() { bar(); return; } }\n"},
 		{"a nested function's return does not satisfy the outer one",
 			"export function f(): string | undefined { const g = () => { return 'x'; }; g(); return; }\n"},
@@ -330,7 +497,10 @@ func TestNoUselessReturnKeepsAReturnTheCompilerRequires(test *testing.T) {
 	for _, testCase := range silent {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoUselessReturn, "file.ts", prelude+testCase.source))
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.RunTyped(test, NoUselessReturn, "file.ts", prelude+testCase.source),
+			)
 		})
 	}
 
@@ -349,8 +519,11 @@ func TestNoUselessReturnKeepsAReturnTheCompilerRequires(test *testing.T) {
 	for _, testCase := range reporting {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoUselessReturn, "file.ts", prelude+testCase.source),
-				"unnecessaryReturn")
+			rule_testing.ExpectFindings(
+				test,
+				rule_testing.RunTyped(test, NoUselessReturn, "file.ts", prelude+testCase.source),
+				"unnecessaryReturn",
+			)
 		})
 	}
 }

@@ -1179,89 +1179,127 @@ func TestReturnAwaitOffersSuggestionsRatherThanFixes(test *testing.T) {
 		wantSuggestions []string
 	}{
 		{
-			sourceText:      "async function test() {\n  try {\n    return Promise.resolve(1);\n  } catch (e) {\n    return Promise.resolve(2);\n  } finally {\n    console.log('cleanup');\n  }\n}\n",
-			optionsJson:     "\"error-handling-correctness-only\"",
-			wantSuggestions: []string{"Add `await` before the expression. Use caution as this may impact control flow.", "Add `await` before the expression. Use caution as this may impact control flow."},
+			sourceText:  "async function test() {\n  try {\n    return Promise.resolve(1);\n  } catch (e) {\n    return Promise.resolve(2);\n  } finally {\n    console.log('cleanup');\n  }\n}\n",
+			optionsJson: "\"error-handling-correctness-only\"",
+			wantSuggestions: []string{
+				"Add `await` before the expression. Use caution as this may impact control flow.",
+				"Add `await` before the expression. Use caution as this may impact control flow.",
+			},
 		},
 		{
-			sourceText:      "async function test() {\n  try {\n    return Promise.resolve(1);\n  } catch (e) {\n    return Promise.resolve(2);\n  } finally {\n    console.log('cleanup');\n  }\n}\n",
-			optionsJson:     "\"always\"",
-			wantSuggestions: []string{"Add `await` before the expression. Use caution as this may impact control flow.", "Add `await` before the expression. Use caution as this may impact control flow."},
+			sourceText:  "async function test() {\n  try {\n    return Promise.resolve(1);\n  } catch (e) {\n    return Promise.resolve(2);\n  } finally {\n    console.log('cleanup');\n  }\n}\n",
+			optionsJson: "\"always\"",
+			wantSuggestions: []string{
+				"Add `await` before the expression. Use caution as this may impact control flow.",
+				"Add `await` before the expression. Use caution as this may impact control flow.",
+			},
 		},
 		{
-			sourceText:      "async function test() {\n  try {\n    return Promise.resolve(1);\n  } catch (e) {\n    return Promise.resolve(2);\n  } finally {\n    console.log('cleanup');\n  }\n}\n",
-			optionsJson:     "\"in-try-catch\"",
-			wantSuggestions: []string{"Add `await` before the expression. Use caution as this may impact control flow.", "Add `await` before the expression. Use caution as this may impact control flow."},
+			sourceText:  "async function test() {\n  try {\n    return Promise.resolve(1);\n  } catch (e) {\n    return Promise.resolve(2);\n  } finally {\n    console.log('cleanup');\n  }\n}\n",
+			optionsJson: "\"in-try-catch\"",
+			wantSuggestions: []string{
+				"Add `await` before the expression. Use caution as this may impact control flow.",
+				"Add `await` before the expression. Use caution as this may impact control flow.",
+			},
 		},
 		{
-			sourceText:      "async function test() {\n  try {\n    return await Promise.resolve(1);\n  } catch (e) {\n    return await Promise.resolve(2);\n  } finally {\n    console.log('cleanup');\n  }\n}\n",
-			optionsJson:     "\"never\"",
-			wantSuggestions: []string{"Remove `await` before the expression. Use caution as this may impact control flow.", "Remove `await` before the expression. Use caution as this may impact control flow."},
+			sourceText:  "async function test() {\n  try {\n    return await Promise.resolve(1);\n  } catch (e) {\n    return await Promise.resolve(2);\n  } finally {\n    console.log('cleanup');\n  }\n}\n",
+			optionsJson: "\"never\"",
+			wantSuggestions: []string{
+				"Remove `await` before the expression. Use caution as this may impact control flow.",
+				"Remove `await` before the expression. Use caution as this may impact control flow.",
+			},
 		},
 		{
-			sourceText:      "async function test<T>(): Promise<T> {\n  const res = await fetch('...');\n  try {\n    return res.json() as Promise<T>;\n  } catch (err) {\n    throw Error('Request Failed.');\n  }\n}\n",
-			optionsJson:     "",
-			wantSuggestions: []string{"Add `await` before the expression. Use caution as this may impact control flow."},
+			sourceText:  "async function test<T>(): Promise<T> {\n  const res = await fetch('...');\n  try {\n    return res.json() as Promise<T>;\n  } catch (err) {\n    throw Error('Request Failed.');\n  }\n}\n",
+			optionsJson: "",
+			wantSuggestions: []string{
+				"Add `await` before the expression. Use caution as this may impact control flow.",
+			},
 		},
 		{
-			sourceText:      "async function test() {\n  try {\n    const callback1 = function () {};\n    const callback2 = async function () {};\n    function callback3() {}\n    async function callback4() {}\n    const callback5 = () => {};\n    const callback6 = async () => {};\n    return Promise.resolve('try');\n  } finally {\n    return Promise.resolve('finally');\n  }\n}\n",
-			optionsJson:     "",
-			wantSuggestions: []string{"Add `await` before the expression. Use caution as this may impact control flow."},
+			sourceText:  "async function test() {\n  try {\n    const callback1 = function () {};\n    const callback2 = async function () {};\n    function callback3() {}\n    async function callback4() {}\n    const callback5 = () => {};\n    const callback6 = async () => {};\n    return Promise.resolve('try');\n  } finally {\n    return Promise.resolve('finally');\n  }\n}\n",
+			optionsJson: "",
+			wantSuggestions: []string{
+				"Add `await` before the expression. Use caution as this may impact control flow.",
+			},
 		},
 		{
-			sourceText:      "async function bar() {}\nasync function foo() {\n  try {\n    return undefined || bar();\n  } catch {}\n}\n",
-			optionsJson:     "",
-			wantSuggestions: []string{"Add `await` before the expression. Use caution as this may impact control flow."},
+			sourceText:  "async function bar() {}\nasync function foo() {\n  try {\n    return undefined || bar();\n  } catch {}\n}\n",
+			optionsJson: "",
+			wantSuggestions: []string{
+				"Add `await` before the expression. Use caution as this may impact control flow.",
+			},
 		},
 		{
-			sourceText:      "async function bar() {}\nasync function foo() {\n  try {\n    return bar() || undefined || bar();\n  } catch {}\n}\n",
-			optionsJson:     "",
-			wantSuggestions: []string{"Add `await` before the expression. Use caution as this may impact control flow."},
+			sourceText:  "async function bar() {}\nasync function foo() {\n  try {\n    return bar() || undefined || bar();\n  } catch {}\n}\n",
+			optionsJson: "",
+			wantSuggestions: []string{
+				"Add `await` before the expression. Use caution as this may impact control flow.",
+			},
 		},
 		{
-			sourceText:      "async function bar() {}\nasync function func1() {\n  try {\n    return null ?? bar();\n  } catch {}\n}\n",
-			optionsJson:     "",
-			wantSuggestions: []string{"Add `await` before the expression. Use caution as this may impact control flow."},
+			sourceText:  "async function bar() {}\nasync function func1() {\n  try {\n    return null ?? bar();\n  } catch {}\n}\n",
+			optionsJson: "",
+			wantSuggestions: []string{
+				"Add `await` before the expression. Use caution as this may impact control flow.",
+			},
 		},
 		{
-			sourceText:      "async function bar() {}\nasync function func2() {\n  try {\n    return 1 && bar();\n  } catch {}\n}\n",
-			optionsJson:     "",
-			wantSuggestions: []string{"Add `await` before the expression. Use caution as this may impact control flow."},
+			sourceText:  "async function bar() {}\nasync function func2() {\n  try {\n    return 1 && bar();\n  } catch {}\n}\n",
+			optionsJson: "",
+			wantSuggestions: []string{
+				"Add `await` before the expression. Use caution as this may impact control flow.",
+			},
 		},
 		{
-			sourceText:      "const foo = {\n  bar: async function () {},\n};\nasync function func3() {\n  try {\n    return foo.bar();\n  } catch {}\n}\n",
-			optionsJson:     "",
-			wantSuggestions: []string{"Add `await` before the expression. Use caution as this may impact control flow."},
+			sourceText:  "const foo = {\n  bar: async function () {},\n};\nasync function func3() {\n  try {\n    return foo.bar();\n  } catch {}\n}\n",
+			optionsJson: "",
+			wantSuggestions: []string{
+				"Add `await` before the expression. Use caution as this may impact control flow.",
+			},
 		},
 		{
-			sourceText:      "class X {\n  async bar() {\n    return;\n  }\n  async func2() {\n    try {\n      return this.bar();\n    } catch {}\n  }\n}\n",
-			optionsJson:     "",
-			wantSuggestions: []string{"Add `await` before the expression. Use caution as this may impact control flow."},
+			sourceText:  "class X {\n  async bar() {\n    return;\n  }\n  async func2() {\n    try {\n      return this.bar();\n    } catch {}\n  }\n}\n",
+			optionsJson: "",
+			wantSuggestions: []string{
+				"Add `await` before the expression. Use caution as this may impact control flow.",
+			},
 		},
 		{
-			sourceText:      "async function f() {\n  try {\n    try {\n    } finally {\n      // affects error handling of outer catch\n      return Promise.reject();\n    }\n  } catch {}\n}\n",
-			optionsJson:     "",
-			wantSuggestions: []string{"Add `await` before the expression. Use caution as this may impact control flow."},
+			sourceText:  "async function f() {\n  try {\n    try {\n    } finally {\n      // affects error handling of outer catch\n      return Promise.reject();\n    }\n  } catch {}\n}\n",
+			optionsJson: "",
+			wantSuggestions: []string{
+				"Add `await` before the expression. Use caution as this may impact control flow.",
+			},
 		},
 		{
-			sourceText:      "async function f() {\n  try {\n    try {\n    } catch {\n      // affects error handling of outer catch\n      return Promise.reject();\n    }\n  } catch {}\n}\n",
-			optionsJson:     "",
-			wantSuggestions: []string{"Add `await` before the expression. Use caution as this may impact control flow."},
+			sourceText:  "async function f() {\n  try {\n    try {\n    } catch {\n      // affects error handling of outer catch\n      return Promise.reject();\n    }\n  } catch {}\n}\n",
+			optionsJson: "",
+			wantSuggestions: []string{
+				"Add `await` before the expression. Use caution as this may impact control flow.",
+			},
 		},
 		{
-			sourceText:      "async function f() {\n  try {\n  } catch {\n    try {\n    } finally {\n      try {\n      } catch {\n        return Promise.reject();\n      }\n    }\n  } finally {\n  }\n}\n",
-			optionsJson:     "",
-			wantSuggestions: []string{"Add `await` before the expression. Use caution as this may impact control flow."},
+			sourceText:  "async function f() {\n  try {\n  } catch {\n    try {\n    } finally {\n      try {\n      } catch {\n        return Promise.reject();\n      }\n    }\n  } finally {\n  }\n}\n",
+			optionsJson: "",
+			wantSuggestions: []string{
+				"Add `await` before the expression. Use caution as this may impact control flow.",
+			},
 		},
 		{
-			sourceText:      "declare const bleh: any;\nasync function f() {\n  if (cond) {\n    using something = bleh;\n    if (anotherCondition) {\n      return Promise.resolve(2);\n    }\n  }\n}\n",
-			optionsJson:     "\"always\"",
-			wantSuggestions: []string{"Add `await` before the expression. Use caution as this may impact control flow."},
+			sourceText:  "declare const bleh: any;\nasync function f() {\n  if (cond) {\n    using something = bleh;\n    if (anotherCondition) {\n      return Promise.resolve(2);\n    }\n  }\n}\n",
+			optionsJson: "\"always\"",
+			wantSuggestions: []string{
+				"Add `await` before the expression. Use caution as this may impact control flow.",
+			},
 		},
 		{
-			sourceText:      "declare const bleh: any;\nasync function f() {\n  if (cond) {\n    await using something = bleh;\n    if (anotherCondition) {\n      return Promise.resolve(2);\n    }\n  }\n}\n",
-			optionsJson:     "\"always\"",
-			wantSuggestions: []string{"Add `await` before the expression. Use caution as this may impact control flow."},
+			sourceText:  "declare const bleh: any;\nasync function f() {\n  if (cond) {\n    await using something = bleh;\n    if (anotherCondition) {\n      return Promise.resolve(2);\n    }\n  }\n}\n",
+			optionsJson: "\"always\"",
+			wantSuggestions: []string{
+				"Add `await` before the expression. Use caution as this may impact control flow.",
+			},
 		},
 	}
 	for index, testCase := range cases {

@@ -16,10 +16,11 @@ import (
 // went unused, since discovery, the tsconfig's enumeration and the program's file loads are bound by the
 // kernel rather than the CPU. Begun here, about 2.6 of formatting's 5.8 CPU-seconds are done before the walk
 // and none after it, against 1.35 after it before: about 0.06s of a cold run's wall, measured. It is not more
-// because the early pass's own file opens wait on the same kernel path as the program's. Formatting needs no program, only each file's bytes and the options its
-// directory resolves to, so the speculation the fix phase starts with the walk can start here instead, on
-// every idle core, and narrow to its usual share when the walk begins. What it computes is judged exactly as
-// before: keepable discards any attempt the walk proposed a fix for, or whose bytes the walk read differently.
+// because the early pass's own file opens wait on the same kernel path as the program's. Formatting needs no program,
+// only each file's bytes and the options its directory resolves to, so the speculation the fix phase starts with the
+// walk can start here instead, on every idle core, and narrow to its usual share when the walk begins. What it computes
+// is judged exactly as before: keepable discards any attempt the walk proposed a fix for, or whose bytes the walk read
+// differently.
 //
 // Only the scope is computed off the main goroutine. Declaring the walk's inputs to the run cache, or declining
 // it, stays on the main goroutine where the scope is taken (formatScopeOf), as it always was.
@@ -49,12 +50,19 @@ type earlyFormat struct {
 // startEarlyFormat begins the default scope's walk and its speculation, and returns at once. record is the one the
 // run would have loaded, and transform is built from it the way the fix phase builds its own.
 func startEarlyFormat(engine formatEngine, record *formatRecord, root string, maximumPasses int) *earlyFormat {
-	early := &earlyFormat{record: record, formatting: newFormatClock(), lineEndings: &crlfFiles{}, ready: make(chan struct{})}
+	early := &earlyFormat{
+		record:      record,
+		formatting:  newFormatClock(),
+		lineEndings: &crlfFiles{},
+		ready:       make(chan struct{}),
+	}
 	go func() {
 		defer close(early.ready)
 		// A test instrument: hold the pass this long before it enumerates, so its scope is ready only after the
 		// walk is done, as a cold run's often was. See TestALateEarlyFormatScopeFindsWhatAPromptOneDoes.
-		if held, parseDurationError := time.ParseDuration(os.Getenv("COHERE_TEST_LATE_EARLY_FORMAT")); parseDurationError == nil {
+		if held, parseDurationError := time.ParseDuration(
+			os.Getenv("COHERE_TEST_LATE_EARLY_FORMAT"),
+		); parseDurationError == nil {
 			time.Sleep(held)
 		}
 		early.universe, early.err = enumerateFormatUniverse(engine, root)
@@ -64,7 +72,13 @@ func startEarlyFormat(engine formatEngine, record *formatRecord, root string, ma
 		}
 		early.scope = unformattedScopeOf(engine, record, early.universe)
 		transform := early.lineEndings.observing(early.transform(engine))
-		early.started(speculateFormatOn(early.scope.formatCandidates(), transform, maximumPasses, earlyFormatWorkers(), &early.programs))
+		early.started(speculateFormatOn(
+			early.scope.formatCandidates(),
+			transform,
+			maximumPasses,
+			earlyFormatWorkers(),
+			&early.programs,
+		))
 	}()
 	return early
 }
@@ -98,7 +112,9 @@ func (early *earlyFormat) speculationOf() *formatSpeculation {
 
 // transform is the fix phase's format transform over this pass's scope, built the same way.
 func (early *earlyFormat) transform(engine formatEngine) edit.Transform {
-	return early.formatting.timing(scopedTransform(early.record.observe(formatTransform(engine), optionsFingerprintOf(engine)), early.scope))
+	return early.formatting.timing(
+		scopedTransform(early.record.observe(formatTransform(engine), optionsFingerprintOf(engine)), early.scope),
+	)
 }
 
 // formatScopeOf waits for the early pass and returns the default scope, declaring the walk to the run cache, or

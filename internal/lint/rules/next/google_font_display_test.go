@@ -125,8 +125,8 @@ func TestGoogleFontDisplayIsSilent(test *testing.T) {
 	}
 }
 
-// TestGoogleFontDisplayDecodesEntities reads its attribute as ESLint does, with HTML entities decoded: typescript-estree decodes a
-// JSX attribute string before any rule sees it. Each row's verdict is the installed
+// TestGoogleFontDisplayDecodesEntities reads its attribute as ESLint does, with HTML entities decoded:
+// typescript-estree decodes a JSX attribute string before any rule sees it. Each row's verdict is the installed
 // @next/eslint-plugin-next 16.3.1's under the typescript-eslint parser (#51y9jh2).
 func TestGoogleFontDisplayDecodesEntities(test *testing.T) {
 	test.Parallel()
@@ -136,8 +136,16 @@ func TestGoogleFontDisplayDecodesEntities(test *testing.T) {
 		source string
 		ids    []string
 	}{
-		{`an encoded ampersand before display=block`, `export const Test = () => <link href="https://fonts.googleapis.com/css2?family=Krona+One&amp;display=block" />;`, []string{messageGoogleFontDisplayNotRecommended.Id}},
-		{`an encoded ampersand before display=optional`, `export const Test = () => <link href="https://fonts.googleapis.com/css2?family=Krona+One&amp;display=optional" />;`, []string{}},
+		{
+			`an encoded ampersand before display=block`,
+			`export const Test = () => <link href="https://fonts.googleapis.com/css2?family=Krona+One&amp;display=block" />;`,
+			[]string{messageGoogleFontDisplayNotRecommended.Id},
+		},
+		{
+			`an encoded ampersand before display=optional`,
+			`export const Test = () => <link href="https://fonts.googleapis.com/css2?family=Krona+One&amp;display=optional" />;`,
+			[]string{},
+		},
 	} {
 		test.Run(row.name, func(test *testing.T) {
 			test.Parallel()

@@ -14,10 +14,16 @@ const securityNoInterpolatedShellCommandId = "interpolatedShellCommand"
 
 // securityNoInterpolatedShellCommandText is the rule's message, whose wording lives in
 // `policy/messages/security-no-interpolated-shell-command.json`.
-var securityNoInterpolatedShellCommandText = policy.MessageOf("nexus/security-no-interpolated-shell-command", securityNoInterpolatedShellCommandId)
+var securityNoInterpolatedShellCommandText = policy.MessageOf(
+	"nexus/security-no-interpolated-shell-command",
+	securityNoInterpolatedShellCommandId,
+)
 
 func securityNoInterpolatedShellCommandMessage() rule.Message {
-	return rule.Message{Id: securityNoInterpolatedShellCommandId, Description: securityNoInterpolatedShellCommandText.Render(nil)}
+	return rule.Message{
+		Id:          securityNoInterpolatedShellCommandId,
+		Description: securityNoInterpolatedShellCommandText.Render(nil),
+	}
 }
 
 // securityNoInterpolatedShellCommandVerdict is what the rule concludes about a command or a piece
@@ -160,7 +166,11 @@ var SecurityNoInterpolatedShellCommand = rule.Rule{
 					return
 				}
 				built := securityNoInterpolatedShellCommandBuilt(ruleContext, arguments[0], 0)
-				if built != nil && securityNoInterpolatedShellCommandJudge(ruleContext, built, 0) == securityNoInterpolatedShellCommandUnsafe {
+				if built != nil && securityNoInterpolatedShellCommandJudge(
+					ruleContext,
+					built,
+					0,
+				) == securityNoInterpolatedShellCommandUnsafe {
 					ruleContext.ReportNode(arguments[0], securityNoInterpolatedShellCommandMessage())
 					return
 				}
@@ -177,7 +187,11 @@ var SecurityNoInterpolatedShellCommand = rule.Rule{
 					if element.Kind == ast.KindSpreadElement || element.Kind == ast.KindOmittedExpression {
 						continue
 					}
-					if securityNoInterpolatedShellCommandJudge(ruleContext, element, 0) == securityNoInterpolatedShellCommandUnsafe {
+					if securityNoInterpolatedShellCommandJudge(
+						ruleContext,
+						element,
+						0,
+					) == securityNoInterpolatedShellCommandUnsafe {
 						ruleContext.ReportNode(element, securityNoInterpolatedShellCommandMessage())
 						return
 					}
@@ -264,7 +278,10 @@ func securityNoInterpolatedShellCommandHasShell(ruleContext rule.Context, argume
 			if valueType == nil {
 				return false
 			}
-			return type_checking.Every(type_checking.UnionTypeParts(valueType), securityNoInterpolatedShellCommandIsTruthyShell)
+			return type_checking.Every(
+				type_checking.UnionTypeParts(valueType),
+				securityNoInterpolatedShellCommandIsTruthyShell,
+			)
 		}
 	}
 	return false
@@ -307,7 +324,10 @@ func securityNoInterpolatedShellCommandBuilt(ruleContext rule.Context, expressio
 			return unwrapped
 		}
 	case ast.KindIdentifier:
-		if initializer := securityNoInterpolatedShellCommandConstInitializer(ruleContext, unwrapped); initializer != nil {
+		if initializer := securityNoInterpolatedShellCommandConstInitializer(
+			ruleContext,
+			unwrapped,
+		); initializer != nil {
 			return securityNoInterpolatedShellCommandBuilt(ruleContext, initializer, depth+1)
 		}
 	}
@@ -328,7 +348,11 @@ const securityNoInterpolatedShellCommandHole = "\x00"
 // securityNoInterpolatedShellCommandJudge decides whether the shell parses a value in a command
 // that is not provably literal. It flattens the command into text and values, finds the values the
 // shell reads as data rather than code (inside a quoted heredoc's body), and judges the rest.
-func securityNoInterpolatedShellCommandJudge(ruleContext rule.Context, expression *ast.Node, depth int) securityNoInterpolatedShellCommandVerdict {
+func securityNoInterpolatedShellCommandJudge(
+	ruleContext rule.Context,
+	expression *ast.Node,
+	depth int,
+) securityNoInterpolatedShellCommandVerdict {
 	if depth > securityNoInterpolatedShellCommandDepthLimit {
 		return securityNoInterpolatedShellCommandDeclined
 	}
@@ -361,7 +385,12 @@ func securityNoInterpolatedShellCommandJudge(ruleContext rule.Context, expressio
 // a single string literal is its text. It returns false when the walk runs too deep.
 //
 // Mutates: pieces the walk appends every piece it reads, so one slice gathers a whole command
-func securityNoInterpolatedShellCommandFlatten(ruleContext rule.Context, expression *ast.Node, depth int, pieces *[]securityNoInterpolatedShellCommandPiece) bool {
+func securityNoInterpolatedShellCommandFlatten(
+	ruleContext rule.Context,
+	expression *ast.Node,
+	depth int,
+	pieces *[]securityNoInterpolatedShellCommandPiece,
+) bool {
 	if depth > securityNoInterpolatedShellCommandDepthLimit {
 		return false
 	}
@@ -374,10 +403,18 @@ func securityNoInterpolatedShellCommandFlatten(ruleContext rule.Context, express
 		template := unwrapped.AsTemplateExpression()
 		*pieces = append(*pieces, securityNoInterpolatedShellCommandPiece{text: template.Head.Text()})
 		for _, span := range template.TemplateSpans.Nodes {
-			if !securityNoInterpolatedShellCommandFlatten(ruleContext, span.AsTemplateSpan().Expression, depth+1, pieces) {
+			if !securityNoInterpolatedShellCommandFlatten(
+				ruleContext,
+				span.AsTemplateSpan().Expression,
+				depth+1,
+				pieces,
+			) {
 				return false
 			}
-			*pieces = append(*pieces, securityNoInterpolatedShellCommandPiece{text: span.AsTemplateSpan().Literal.Text()})
+			*pieces = append(
+				*pieces,
+				securityNoInterpolatedShellCommandPiece{text: span.AsTemplateSpan().Literal.Text()},
+			)
 		}
 		return true
 	case ast.KindBinaryExpression:
@@ -388,7 +425,10 @@ func securityNoInterpolatedShellCommandFlatten(ruleContext rule.Context, express
 				securityNoInterpolatedShellCommandFlatten(ruleContext, binary.Right, depth+1, pieces)
 		}
 	case ast.KindIdentifier:
-		if initializer := securityNoInterpolatedShellCommandConstInitializer(ruleContext, unwrapped); initializer != nil {
+		if initializer := securityNoInterpolatedShellCommandConstInitializer(
+			ruleContext,
+			unwrapped,
+		); initializer != nil {
 			switch ast.SkipParentheses(initializer).Kind {
 			case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral, ast.KindTemplateExpression,
 				ast.KindBinaryExpression, ast.KindConditionalExpression, ast.KindIdentifier:
@@ -396,7 +436,10 @@ func securityNoInterpolatedShellCommandFlatten(ruleContext rule.Context, express
 			}
 		}
 	}
-	if text, isSingleLiteral := securityNoInterpolatedShellCommandSingleStringLiteral(ruleContext, unwrapped); isSingleLiteral {
+	if text, isSingleLiteral := securityNoInterpolatedShellCommandSingleStringLiteral(
+		ruleContext,
+		unwrapped,
+	); isSingleLiteral {
 		*pieces = append(*pieces, securityNoInterpolatedShellCommandPiece{text: text})
 		return true
 	}
@@ -409,7 +452,11 @@ func securityNoInterpolatedShellCommandFlatten(ruleContext rule.Context, express
 // checker types a branch built from literals as `string`; a branch that opens a heredoc is
 // declined, since its body would run on past the conditional into text judged without it. Any
 // other value is unsafe.
-func securityNoInterpolatedShellCommandJudgeValue(ruleContext rule.Context, value *ast.Node, depth int) securityNoInterpolatedShellCommandVerdict {
+func securityNoInterpolatedShellCommandJudgeValue(
+	ruleContext rule.Context,
+	value *ast.Node,
+	depth int,
+) securityNoInterpolatedShellCommandVerdict {
 	if securityNoInterpolatedShellCommandLiteralType(ruleContext, value) {
 		if securityNoInterpolatedShellCommandMayOpenHeredoc(ruleContext, value) {
 			return securityNoInterpolatedShellCommandDeclined
@@ -468,7 +515,9 @@ func securityNoInterpolatedShellCommandMayOpenHeredoc(ruleContext rule.Context, 
 // (inside quotes, a comment, or another language's script) can only mark values safe that are not,
 // which misses a finding; it never invents one. Neither can a value that itself holds the
 // delimiter line and so ends the body early: that is a miss too, and a known one.
-func securityNoInterpolatedShellCommandQuotedHeredocValues(pieces []securityNoInterpolatedShellCommandPiece) (map[int]bool, bool) {
+func securityNoInterpolatedShellCommandQuotedHeredocValues(
+	pieces []securityNoInterpolatedShellCommandPiece,
+) (map[int]bool, bool) {
 	var builder strings.Builder
 	valueAt := map[int]int{}
 	for index, piece := range pieces {
@@ -588,7 +637,10 @@ func securityNoInterpolatedShellCommandWordLength(text string) int {
 	length := 0
 	for length < len(text) {
 		character := text[length]
-		if character != '_' && (character < '0' || character > '9') && (character < 'a' || character > 'z') && (character < 'A' || character > 'Z') {
+		if character != '_' &&
+			(character < '0' || character > '9') &&
+			(character < 'a' || character > 'z') &&
+			(character < 'A' || character > 'Z') {
 			break
 		}
 		length++
@@ -598,7 +650,10 @@ func securityNoInterpolatedShellCommandWordLength(text string) int {
 
 // securityNoInterpolatedShellCommandSingleStringLiteral is the text of a value whose type is one
 // string literal, which is the text the value always holds.
-func securityNoInterpolatedShellCommandSingleStringLiteral(ruleContext rule.Context, expression *ast.Node) (string, bool) {
+func securityNoInterpolatedShellCommandSingleStringLiteral(
+	ruleContext rule.Context,
+	expression *ast.Node,
+) (string, bool) {
 	expressionType := type_checking.GetConstrainedTypeAtLocation(ruleContext.TypeChecker, expression)
 	if expressionType == nil || !type_checking.IsTypeFlagSet(expressionType, checker.TypeFlagsStringLiteral) {
 		return "", false

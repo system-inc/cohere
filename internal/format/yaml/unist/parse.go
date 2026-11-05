@@ -135,7 +135,15 @@ func (offsets unitOffsets) byteOffset(unit int) int {
 // convert is the position as Node.Position holds it.
 func (offsets unitOffsets) convert(position *position) Position {
 	return Position{
-		Start: Point{Line: position.start.line, Column: position.start.column, Offset: offsets.byteOffset(position.start.offset)},
-		End:   Point{Line: position.end.line, Column: position.end.column, Offset: offsets.byteOffset(position.end.offset)},
+		Start: Point{
+			Line:   position.start.line,
+			Column: position.start.column,
+			Offset: offsets.byteOffset(position.start.offset),
+		},
+		End: Point{
+			Line:   position.end.line,
+			Column: position.end.column,
+			Offset: offsets.byteOffset(position.end.offset),
+		},
 	}
 }

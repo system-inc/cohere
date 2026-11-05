@@ -155,7 +155,8 @@ var NoChildrenProp = rule.Rule{
 				}
 				// No `children` key, so a function as the third and last argument is the other way
 				// round, which upstream reports only under the option.
-				if arguments := node.AsCallExpression().Arguments.Nodes; len(arguments) == 3 && isFunction(arguments[2]) {
+				if arguments := node.AsCallExpression().Arguments.Nodes; len(arguments) == 3 &&
+					isFunction(arguments[2]) {
 					ruleContext.ReportNode(node, messageNoChildrenPropPassFunctionAsArgs)
 				}
 			},

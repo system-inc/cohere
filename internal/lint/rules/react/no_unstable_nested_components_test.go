@@ -657,7 +657,13 @@ func TestNoUnstableNestedComponentsStaysSilent(test *testing.T) {
 					options.PropNamePattern = "render*"
 				}
 			}
-			result := rule_testing.RunTypedWithOptions(test, NoUnstableNestedComponents, "Component.tsx", testCase.source, options)
+			result := rule_testing.RunTypedWithOptions(
+				test,
+				NoUnstableNestedComponents,
+				"Component.tsx",
+				testCase.source,
+				options,
+			)
 			rule_testing.ExpectClean(test, result)
 		})
 	}
@@ -1392,7 +1398,13 @@ func TestNoUnstableNestedComponentsFires(test *testing.T) {
 					options.PropNamePattern = "render*"
 				}
 			}
-			result := rule_testing.RunTypedWithOptions(test, NoUnstableNestedComponents, "Component.tsx", testCase.source, options)
+			result := rule_testing.RunTypedWithOptions(
+				test,
+				NoUnstableNestedComponents,
+				"Component.tsx",
+				testCase.source,
+				options,
+			)
 			expected := make([]string, testCase.count)
 			for index := range expected {
 				expected[index] = "unstableNestedComponent"
@@ -1655,7 +1667,8 @@ func TestDecodeNoUnstableNestedComponentsOptions(test *testing.T) {
 	// customValidators is in upstream's schema and unread by this rule. It must decode rather than
 	// error, or a configuration carrying it would fail to load.
 	if _, decodeNoUnstableNestedComponentsOptionsError := DecodeNoUnstableNestedComponentsOptions(
-		[]byte(`{"customValidators":["./x"],"allowAsProps":true}`)); decodeNoUnstableNestedComponentsOptionsError != nil {
+		[]byte(`{"customValidators":["./x"],"allowAsProps":true}`),
+	); decodeNoUnstableNestedComponentsOptionsError != nil {
 		test.Fatalf("decoding customValidators: %v", decodeNoUnstableNestedComponentsOptionsError)
 	}
 }

@@ -42,7 +42,11 @@ func TestValidatorAgreesWithAjv(test *testing.T) {
 		test.Fatal(decodeError)
 	}
 	if !equalVersions(samples.GeneratedFrom, GeneratedFrom()) {
-		test.Fatalf("the samples were drawn from %v and the embedded schemas from %v; regenerate both together", samples.GeneratedFrom, GeneratedFrom())
+		test.Fatalf(
+			"the samples were drawn from %v and the embedded schemas from %v; regenerate both together",
+			samples.GeneratedFrom,
+			GeneratedFrom(),
+		)
 	}
 
 	var falseRefusals []string
@@ -70,7 +74,10 @@ func TestValidatorAgreesWithAjv(test *testing.T) {
 		case "refuses":
 			refused++
 			if violation == nil {
-				falseAccepts = append(falseAccepts, fmt.Sprintf("%s %s (%s at %s)", sample.Rule, encoded, sample.Keyword, sample.Path))
+				falseAccepts = append(
+					falseAccepts,
+					fmt.Sprintf("%s %s (%s at %s)", sample.Rule, encoded, sample.Keyword, sample.Path),
+				)
 			}
 		default:
 			test.Fatalf("%s: unknown verdict %q", sample.Rule, sample.EsLint)
@@ -136,7 +143,12 @@ func TestValidatorAgreesWithAjv(test *testing.T) {
 
 	// The counts are part of the gate: a sample file that shrank would read as agreement.
 	if accepted < 1900 || refused < 8000 || corpusRows != 6641 {
-		test.Errorf("the gate ran on %d accepted samples, %d refused and %d corpus rows, fewer than it was built on", accepted, refused, corpusRows)
+		test.Errorf(
+			"the gate ran on %d accepted samples, %d refused and %d corpus rows, fewer than it was built on",
+			accepted,
+			refused,
+			corpusRows,
+		)
 	}
 }
 
@@ -257,7 +269,9 @@ func TestExtensionsAreExactlyTheDeclaredOnes(test *testing.T) {
 func TestTheBoundariesExtensionAcceptsElementsAndNothingElse(test *testing.T) {
 	test.Parallel()
 
-	withElements := []json.RawMessage{json.RawMessage(`{"default":"disallow","elements":[{"type":"api","pattern":"api/**"}]}`)}
+	withElements := []json.RawMessage{
+		json.RawMessage(`{"default":"disallow","elements":[{"type":"api","pattern":"api/**"}]}`),
+	}
 	if checkError := Check("boundaries/dependencies", withElements); checkError != nil {
 		test.Errorf("elements are refused: %v", checkError)
 	}
@@ -282,11 +296,17 @@ func TestTheBoundariesExtensionAcceptsElementsAndNothingElse(test *testing.T) {
 func TestARefusalNamesTheElementThePathAndTheExpectation(test *testing.T) {
 	test.Parallel()
 
-	checkError := Check("@typescript-eslint/no-deprecated", []json.RawMessage{json.RawMessage(`{"allow":[{"from":"File","name":"x"}]}`)})
+	checkError := Check(
+		"@typescript-eslint/no-deprecated",
+		[]json.RawMessage{json.RawMessage(`{"allow":[{"from":"File","name":"x"}]}`)},
+	)
 	if checkError == nil {
 		test.Fatal("a mis-cased from is accepted")
 	}
-	for _, want := range []string{"element 1 at allow[0]", "upstream's schema, which ESLint validates against, expects"} {
+	for _, want := range []string{
+		"element 1 at allow[0]",
+		"upstream's schema, which ESLint validates against, expects",
+	} {
 		if !strings.Contains(checkError.Error(), want) {
 			test.Errorf("the refusal %q does not say %q", checkError, want)
 		}

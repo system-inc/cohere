@@ -114,7 +114,8 @@ func spellsHookName(text string) bool {
 	for offset := strings.Index(text, "use"); offset >= 0; {
 		next := offset + 3
 		if next < len(text) {
-			if character := text[next]; (character >= 'A' && character <= 'Z') || (character >= '0' && character <= '9') {
+			if character := text[next]; (character >= 'A' && character <= 'Z') ||
+				(character >= '0' && character <= '9') {
 				return true
 			}
 		}

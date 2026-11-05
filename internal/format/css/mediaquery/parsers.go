@@ -29,7 +29,9 @@ import (
 var errorReadingMode = errors.New("Cannot read properties of undefined (reading 'mode')")
 
 // errorUnclosedUrl stands for the infinite loop on an unclosed `url(`, where the library never returns.
-var errorUnclosedUrl = errors.New("postcss-media-query-parser never returns on an unclosed url(: its parentheses loop reads past the end forever")
+var errorUnclosedUrl = errors.New(
+	"postcss-media-query-parser never returns on an unclosed url(: its parentheses loop reads past the end forever",
+)
 
 // mode is one entry of modesEntered. character is the quote a string mode was entered with.
 type mode struct {
@@ -78,7 +80,9 @@ func parseMediaFeature(text string, index int) ([]*estree.Node, error) {
 					character:            character,
 				})
 				lastModeIndex++
-			} else if modesEntered[lastModeIndex].mode == "string" && modesEntered[lastModeIndex].character == character && (i == 0 || stringNormalized[i-1] != '\\') {
+			} else if modesEntered[lastModeIndex].mode == "string" &&
+				modesEntered[lastModeIndex].character == character &&
+				(i == 0 || stringNormalized[i-1] != '\\') {
 				modesEntered = modesEntered[:len(modesEntered)-1]
 				lastModeIndex--
 			}
@@ -227,7 +231,9 @@ func parseMediaQuery(text string, index int) ([]*estree.Node, error) {
 		}
 
 		// If exited all parens/curlies and the next symbol
-		if insideSomeValue && localLevel == 0 && (character == ")" || i+size == len(text) || startsWithWhitespace(text[i+size:])) {
+		if insideSomeValue &&
+			localLevel == 0 &&
+			(character == ")" || i+size == len(text) || startsWithWhitespace(text[i+size:])) {
 			if node.value == "not" || node.value == "only" || node.value == "and" {
 				node.nodeType = "keyword"
 			}
@@ -240,7 +246,10 @@ func parseMediaQuery(text string, index int) ([]*estree.Node, error) {
 				node.nodes = nodes
 			}
 			if node.nodes != nil {
-				result = append(result, newContainer(node.after, node.before, node.nodeType, node.value, node.sourceIndex, node.nodes))
+				result = append(
+					result,
+					newContainer(node.after, node.before, node.nodeType, node.value, node.sourceIndex, node.nodes),
+				)
 			} else {
 				result = append(result, newNode(node.after, node.before, node.nodeType, node.value, node.sourceIndex))
 			}

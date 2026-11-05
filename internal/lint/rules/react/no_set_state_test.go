@@ -17,8 +17,14 @@ func TestNoSetStateStaysSilent(test *testing.T) {
 
 	cases := []struct{ name, sourceText string }{
 		{"upstream valid 0", "\n        var Hello = function() {\n          this.setState({})\n        };\n      "},
-		{"upstream valid 1", "\n        var Hello = createReactClass({\n          render: function() {\n            return <div>Hello {this.props.name}</div>;\n          }\n        });\n      "},
-		{"upstream valid 2", "\n        var Hello = createReactClass({\n          componentDidUpdate: function() {\n            someNonMemberFunction(arg);\n            this.someHandler = this.setState;\n          },\n          render: function() {\n            return <div>Hello {this.props.name}</div>;\n          }\n        });\n      "},
+		{
+			"upstream valid 1",
+			"\n        var Hello = createReactClass({\n          render: function() {\n            return <div>Hello {this.props.name}</div>;\n          }\n        });\n      ",
+		},
+		{
+			"upstream valid 2",
+			"\n        var Hello = createReactClass({\n          componentDidUpdate: function() {\n            someNonMemberFunction(arg);\n            this.someHandler = this.setState;\n          },\n          render: function() {\n            return <div>Hello {this.props.name}</div>;\n          }\n        });\n      ",
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -36,11 +42,31 @@ func TestNoSetStateFires(test *testing.T) {
 		name, sourceText string
 		wantIds          []string
 	}{
-		{"upstream invalid 0", "\n        var Hello = createReactClass({\n          componentDidUpdate: function() {\n            this.setState({\n              name: this.props.name.toUpperCase()\n            });\n          },\n          render: function() {\n            return <div>Hello {this.state.name}</div>;\n          }\n        });\n      ", []string{"noSetState"}},
-		{"upstream invalid 1", "\n        var Hello = createReactClass({\n          someMethod: function() {\n            this.setState({\n              name: this.props.name.toUpperCase()\n            });\n          },\n          render: function() {\n            return <div onClick={this.someMethod.bind(this)}>Hello {this.state.name}</div>;\n          }\n        });\n      ", []string{"noSetState"}},
-		{"upstream invalid 2", "\n        class Hello extends React.Component {\n          someMethod() {\n            this.setState({\n              name: this.props.name.toUpperCase()\n            });\n          }\n          render() {\n            return <div onClick={this.someMethod.bind(this)}>Hello {this.state.name}</div>;\n          }\n        };\n      ", []string{"noSetState"}},
-		{"upstream invalid 3", "\n        class Hello extends React.Component {\n          someMethod = () => {\n            this.setState({\n              name: this.props.name.toUpperCase()\n            });\n          }\n          render() {\n            return <div onClick={this.someMethod.bind(this)}>Hello {this.state.name}</div>;\n          }\n        };\n      ", []string{"noSetState"}},
-		{"upstream invalid 4", "\n        class Hello extends React.Component {\n          render() {\n            return <div onMouseEnter={() => this.setState({dropdownIndex: index})} />;\n          }\n        };\n      ", []string{"noSetState"}},
+		{
+			"upstream invalid 0",
+			"\n        var Hello = createReactClass({\n          componentDidUpdate: function() {\n            this.setState({\n              name: this.props.name.toUpperCase()\n            });\n          },\n          render: function() {\n            return <div>Hello {this.state.name}</div>;\n          }\n        });\n      ",
+			[]string{"noSetState"},
+		},
+		{
+			"upstream invalid 1",
+			"\n        var Hello = createReactClass({\n          someMethod: function() {\n            this.setState({\n              name: this.props.name.toUpperCase()\n            });\n          },\n          render: function() {\n            return <div onClick={this.someMethod.bind(this)}>Hello {this.state.name}</div>;\n          }\n        });\n      ",
+			[]string{"noSetState"},
+		},
+		{
+			"upstream invalid 2",
+			"\n        class Hello extends React.Component {\n          someMethod() {\n            this.setState({\n              name: this.props.name.toUpperCase()\n            });\n          }\n          render() {\n            return <div onClick={this.someMethod.bind(this)}>Hello {this.state.name}</div>;\n          }\n        };\n      ",
+			[]string{"noSetState"},
+		},
+		{
+			"upstream invalid 3",
+			"\n        class Hello extends React.Component {\n          someMethod = () => {\n            this.setState({\n              name: this.props.name.toUpperCase()\n            });\n          }\n          render() {\n            return <div onClick={this.someMethod.bind(this)}>Hello {this.state.name}</div>;\n          }\n        };\n      ",
+			[]string{"noSetState"},
+		},
+		{
+			"upstream invalid 4",
+			"\n        class Hello extends React.Component {\n          render() {\n            return <div onMouseEnter={() => this.setState({dropdownIndex: index})} />;\n          }\n        };\n      ",
+			[]string{"noSetState"},
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -80,28 +106,56 @@ func TestNoSetStateMatchesTheInstalledRuleOnInputsTheCorpusDoesNotWrite(test *te
 		wantFindings int
 	}{
 		{"class no heritage", "class H { m(){ this.setState({}); } render(){ return <div/>; } }\n", 0},
-		{"class extends React.Component", "class H extends React.Component { m(){ this.setState({}); } render(){ return <div/>; } }\n", 1},
-		{"class extends React.PureComponent", "class H extends React.PureComponent { m(){ this.setState({}); } render(){ return <div/>; } }\n", 1},
-		{"class extends bare Component", "import {Component} from 'react';\nclass H extends Component { m(){ this.setState({}); } }\n", 1},
+		{
+			"class extends React.Component",
+			"class H extends React.Component { m(){ this.setState({}); } render(){ return <div/>; } }\n",
+			1,
+		},
+		{
+			"class extends React.PureComponent",
+			"class H extends React.PureComponent { m(){ this.setState({}); } render(){ return <div/>; } }\n",
+			1,
+		},
+		{
+			"class extends bare Component",
+			"import {Component} from 'react';\nclass H extends Component { m(){ this.setState({}); } }\n",
+			1,
+		},
 		{"class extends parenthesized", "class H extends (React.Component) { m(){ this.setState({}); } }\n", 1},
 		{"class extends Other.Component", "class H extends Other.Component { m(){ this.setState({}); } }\n", 0},
 		{"class expression", "const H = class extends React.Component { m(){ this.setState({}); } };\n", 1},
 		{"createReactClass", "var H = createReactClass({ m: function(){ this.setState({}); } });\n", 1},
 		{"bare createClass", "var H = createClass({ m: function(){ this.setState({}); } });\n", 0},
 		{"React.createClass", "var H = React.createClass({ m: function(){ this.setState({}); } });\n", 0},
-		{"private name reports, because upstream reads the bare property name", "class H extends React.Component { #setState(){} m(){ this.#setState({}); } }\n", 1},
-		{"a differently named private member is silent", "class H extends React.Component { #other(){} m(){ this.#other({}); } }\n", 0},
+		{
+			"private name reports, because upstream reads the bare property name",
+			"class H extends React.Component { #setState(){} m(){ this.#setState({}); } }\n",
+			1,
+		},
+		{
+			"a differently named private member is silent",
+			"class H extends React.Component { #other(){} m(){ this.#other({}); } }\n",
+			0,
+		},
 		{"computed member", "class H extends React.Component { m(){ this[\"setState\"]({}); } }\n", 0},
 		{"parenthesized this", "class H extends React.Component { m(){ (this).setState({}); } }\n", 1},
 		{"parenthesized callee", "class H extends React.Component { m(){ (this.setState)({}); } }\n", 1},
 		{"not this receiver", "class H extends React.Component { m(){ foo.setState({}); } }\n", 0},
 		{"reference not call", "class H extends React.Component { m(){ this.x = this.setState; } }\n", 0},
 		{"two calls", "class H extends React.Component { m(){ this.setState({}); this.setState({}); } }\n", 2},
-		{"nested arrow in render", "class H extends React.Component { render(){ return <div onClick={()=>this.setState({})}/>; } }\n", 1},
+		{
+			"nested arrow in render",
+			"class H extends React.Component { render(){ return <div onClick={()=>this.setState({})}/>; } }\n",
+			1,
+		},
 		{"class field arrow", "class H extends React.Component { m = () => { this.setState({}); } }\n", 1},
 		{"setState outside any component", "function f(){ this.setState({}); }\n", 0},
 		{"setState at top level", "this.setState({});\n", 0},
-		{"nested class inside component", "class Outer extends React.Component { m(){ class Inner { n(){ this.setState({}); } } } }\n", 1},
+		{
+			"nested class inside component",
+			"class Outer extends React.Component { m(){ class Inner { n(){ this.setState({}); } } } }\n",
+			1,
+		},
 		{"optional call this?.setState()", "class H extends React.Component { m(){ this?.setState({}); } }\n", 1},
 		{"no args", "class H extends React.Component { m(){ this.setState(); } }\n", 1},
 	}

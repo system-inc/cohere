@@ -19,7 +19,10 @@ func messageNoAnchorElement() rule.Message {
 }
 
 func messageNoHorizontalRuleElement() rule.Message {
-	return rule.Message{Id: reactElementNoHorizontalRuleText.Id, Description: reactElementNoHorizontalRuleText.Render(nil)}
+	return rule.Message{
+		Id:          reactElementNoHorizontalRuleText.Id,
+		Description: reactElementNoHorizontalRuleText.Render(nil),
+	}
 }
 
 // ReactElementNoAnchor flags a raw <a> element outside the Link component's own implementation.

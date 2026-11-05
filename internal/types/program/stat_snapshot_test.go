@@ -36,7 +36,10 @@ func TestABuildAnsweredFromTheCheckBuildsTheProgramTheDiskDoes(test *testing.T) 
 			test.Fatal(writeError)
 		}
 	}
-	write("tsconfig.json", `{"compilerOptions":{"strict":true,"noEmit":true,"module":"esnext","moduleResolution":"bundler"},"files":["source/index.ts"]}`)
+	write(
+		"tsconfig.json",
+		`{"compilerOptions":{"strict":true,"noEmit":true,"module":"esnext","moduleResolution":"bundler"},"files":["source/index.ts"]}`,
+	)
 	write("source/index.ts", "import { a } from './helper';\nexport const b = a;\n")
 	write("source/helper/index.ts", "export const a = 1;\n")
 	helper := filepath.Join(root, "source", "helper.ts")
@@ -44,14 +47,18 @@ func TestABuildAnsweredFromTheCheckBuildsTheProgramTheDiskDoes(test *testing.T) 
 	build := func(snapshot *program.StatSnapshot, recorder *program.InputRecorder) ([]string, int64) {
 		test.Helper()
 		timing := &program.GraphTiming{}
-		graph, buildError := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json"), CurrentDirectory: root,
-			Inputs: recorder, CheckedStats: snapshot, Timing: timing})
+		graph, buildError := program.Build(
+			program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json"), CurrentDirectory: root,
+				Inputs: recorder, CheckedStats: snapshot, Timing: timing},
+		)
 		if buildError != nil {
 			test.Fatalf("build: %v", buildError)
 		}
 		var ours []string
 		for _, sourceFile := range graph.SourceFiles() {
-			if name := filepath.FromSlash(sourceFile.FileName().AsString()); strings.HasPrefix(name, root+string(filepath.Separator)) {
+			if name := filepath.FromSlash(
+				sourceFile.FileName().AsString(),
+			); strings.HasPrefix(name, root+string(filepath.Separator)) {
 				ours = append(ours, name)
 			}
 		}
@@ -64,9 +71,22 @@ func TestABuildAnsweredFromTheCheckBuildsTheProgramTheDiskDoes(test *testing.T) 
 		build(nil, recorder)
 		present, absent, probed := recorder.Inputs()
 		if !slices.Contains(absent, helper) {
-			test.Fatalf("the build did not record looking for %s, so the case below is not the one this test is about: %v", helper, absent)
+			test.Fatalf(
+				"the build did not record looking for %s, so the case below is not the one this test is about: %v",
+				helper,
+				absent,
+			)
 		}
-		recorded, recordRunCacheError := program.RecordRunCache("key", present, nil, absent, probed, []byte("verdict"), 0, time.Time{})
+		recorded, recordRunCacheError := program.RecordRunCache(
+			"key",
+			present,
+			nil,
+			absent,
+			probed,
+			[]byte("verdict"),
+			0,
+			time.Time{},
+		)
 		if recordRunCacheError != nil {
 			test.Fatal(recordRunCacheError)
 		}
@@ -82,10 +102,16 @@ func TestABuildAnsweredFromTheCheckBuildsTheProgramTheDiskDoes(test *testing.T) 
 	fromDisk, _ := build(nil, nil)
 	fromCheck, answered := build(snapshot, nil)
 	if !slices.Equal(fromCheck, fromDisk) {
-		test.Fatalf("on the untouched tree the build answered from the check holds %v, the disk's %v", fromCheck, fromDisk)
+		test.Fatalf(
+			"on the untouched tree the build answered from the check holds %v, the disk's %v",
+			fromCheck,
+			fromDisk,
+		)
 	}
 	if answered == 0 {
-		test.Fatal("the check answered none of the build's questions, so the agreement above is the disk agreeing with itself")
+		test.Fatal(
+			"the check answered none of the build's questions, so the agreement above is the disk agreeing with itself",
+		)
 	}
 
 	// helper.ts created since the last run.
@@ -97,11 +123,19 @@ func TestABuildAnsweredFromTheCheckBuildsTheProgramTheDiskDoes(test *testing.T) 
 	}
 	fromDisk, _ = build(nil, nil)
 	if !slices.Contains(fromDisk, helper) {
-		test.Fatalf("the disk's build does not resolve './helper' to the new %s, so the fixture is wrong: %v", helper, fromDisk)
+		test.Fatalf(
+			"the disk's build does not resolve './helper' to the new %s, so the fixture is wrong: %v",
+			helper,
+			fromDisk,
+		)
 	}
 	fromCheck, answered = build(snapshot, nil)
 	if !slices.Equal(fromCheck, fromDisk) {
-		test.Errorf("after helper.ts was created the build answered from the check holds %v, the disk's %v", fromCheck, fromDisk)
+		test.Errorf(
+			"after helper.ts was created the build answered from the check holds %v, the disk's %v",
+			fromCheck,
+			fromDisk,
+		)
 	}
 	if answered == 0 {
 		test.Error("the check answered none of the build's questions after the change")
@@ -110,6 +144,10 @@ func TestABuildAnsweredFromTheCheckBuildsTheProgramTheDiskDoes(test *testing.T) 
 	// The control: answers kept from the recording rather than taken now resolve to the old file.
 	stale := program.StaleStatSnapshotForTest(recorded)
 	if fromStale, _ := build(stale, nil); slices.Contains(fromStale, helper) {
-		test.Errorf("a snapshot that says nothing is at %s still built a program holding it, so the comparison above cannot fail: %v", helper, fromStale)
+		test.Errorf(
+			"a snapshot that says nothing is at %s still built a program holding it, so the comparison above cannot fail: %v",
+			helper,
+			fromStale,
+		)
 	}
 }

@@ -81,7 +81,11 @@ func printCommentsForFunction(path *Path, options *Options, printed Doc) Doc {
 	current := node(path)
 	if (hasComment(current, commentLeading, nil) || hasComment(current, commentTrailing, nil)) &&
 		isIifeCalleeOrTaggedTemplateExpressionTag(path) {
-		return concatIn(path, indentIn(path, concatIn(path, softline, printing.PrintComments(path, printed, options, nil))), softline)
+		return concatIn(
+			path,
+			indentIn(path, concatIn(path, softline, printing.PrintComments(path, printed, options, nil))),
+			softline,
+		)
 	}
 	return printed
 }
@@ -98,7 +102,12 @@ func printEstreeNode(path *Path, options *Options, print PrintFunc, args any) Do
 
 	switch current.Type() {
 	case "JsonRoot":
-		return concatIn(path, printing.PrintDanglingComments(path, options, printing.DanglingOptions[Node]{}), print("node", nil), hardline)
+		return concatIn(
+			path,
+			printing.PrintDanglingComments(path, options, printing.DanglingOptions[Node]{}),
+			print("node", nil),
+			hardline,
+		)
 	case "ExpressionStatement":
 		return printExpressionStatement(path, options, print)
 	case "ChainExpression":
@@ -110,7 +119,10 @@ func printEstreeNode(path *Path, options *Options, print PrintFunc, args any) Do
 		if shouldHug {
 			return concatIn(path, "(", print("expression", nil), ")")
 		}
-		return groupIn(path, concatIn(path, "(", indentIn(path, concatIn(path, softline, print("expression", nil))), softline, ")"))
+		return groupIn(
+			path,
+			concatIn(path, "(", indentIn(path, concatIn(path, softline, print("expression", nil))), softline, ")"),
+		)
 	case "AssignmentExpression":
 		return printAssignmentExpression(path, options, print)
 	case "VariableDeclarator":
@@ -198,7 +210,10 @@ func printEstreeNode(path *Path, options *Options, print PrintFunc, args any) Do
 		}
 		argumentDoc := print("argument", nil)
 		if hasAnyComment(current.Child("argument")) {
-			parts = append(parts, groupIn(path, concatIn(path, "(", indentIn(path, concatIn(path, softline, argumentDoc)), softline, ")")))
+			parts = append(parts, groupIn(
+				path,
+				concatIn(path, "(", indentIn(path, concatIn(path, softline, argumentDoc)), softline, ")"),
+			))
 		} else {
 			parts = append(parts, argumentDoc)
 		}
@@ -258,7 +273,10 @@ func printEstreeNode(path *Path, options *Options, print PrintFunc, args any) Do
 		value, isTemplateValue := current.Get("value").(*estree.TemplateValue)
 		if !isTemplateValue || value == nil {
 			// Invariant: estree builds every TemplateElement with an *estree.TemplateValue for its value.
-			panic(fmt.Sprintf("javascript: a TemplateElement's value is a %T, not an *estree.TemplateValue", current.Get("value")))
+			panic(fmt.Sprintf(
+				"javascript: a TemplateElement's value is a %T, not an *estree.TemplateValue",
+				current.Get("value"),
+			))
 		}
 		return doc.ReplaceEndOfLine(doc.Text(value.Raw), nil)
 	case "TemplateLiteral":
@@ -350,7 +368,14 @@ func printTypescript(path *Path, options *Options, print PrintFunc, args any) Do
 		if current.Bool("readonly") {
 			readonly = "readonly "
 		}
-		return concatIn(path, printTypeScriptAccessibilityToken(current), static, override, readonly, print("parameter", nil))
+		return concatIn(
+			path,
+			printTypeScriptAccessibilityToken(current),
+			static,
+			override,
+			readonly,
+			print("parameter", nil),
+		)
 	case "TSTypeQuery":
 		return printTypeQuery(path, print)
 	case "TSIndexSignature":

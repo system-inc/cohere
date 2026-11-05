@@ -14,11 +14,23 @@ func TestNoOptionalWideningFiresWhereAnOptionalPropertyIsAdded(test *testing.T) 
 		span   string
 	}{
 		// h05
-		"a re-widened value": {`const full = { x: 1, y: 'surprise' }; const narrow: { x: number } = full; const wide: { x: number; y?: number } = narrow;`, "narrow"},
-		"an argument":        {`declare const narrow: { x: number }; function draw(point: { x: number; y?: number }): void {} draw(narrow);`, "narrow"},
+		"a re-widened value": {
+			`const full = { x: 1, y: 'surprise' }; const narrow: { x: number } = full; const wide: { x: number; y?: number } = narrow;`,
+			"narrow",
+		},
+		"an argument": {
+			`declare const narrow: { x: number }; function draw(point: { x: number; y?: number }): void {} draw(narrow);`,
+			"narrow",
+		},
 		// t5 on #drbrp8c: Object.assign can hand a function any member, and width subtyping drops it.
-		"a function's own member": {`declare const plain: (value: string) => string; const component: { (value: string): string; displayName?: string } = plain;`, "plain"},
-		"a nested property":       {`declare const narrow: { readonly at: { x: number } }; const wide: { readonly at: { x: number; y?: number } } = narrow;`, "narrow"},
+		"a function's own member": {
+			`declare const plain: (value: string) => string; const component: { (value: string): string; displayName?: string } = plain;`,
+			"plain",
+		},
+		"a nested property": {
+			`declare const narrow: { readonly at: { x: number } }; const wide: { readonly at: { x: number; y?: number } } = narrow;`,
+			"narrow",
+		},
 	} {
 		test.Run(name, func(test *testing.T) {
 			test.Parallel()

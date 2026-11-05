@@ -66,67 +66,285 @@ func TestIdMatchFires(test *testing.T) {
 		// id and no count could tell them apart.
 		findings []string
 	}{
-		{source: "var __foo = \"Matthieu\"", settings: idMatchOf("^[a-z]+$", map[string]bool{"onlyDeclarations": true}), findings: []string{messageIdMatchNotMatch.Id}},
-		{source: "first_name = \"Matthieu\"", settings: idMatchOf("^[a-z]+$", nil), findings: []string{messageIdMatchNotMatch.Id}},
-		{source: "first_name = \"Matthieu\"", settings: idMatchOf("^z", nil), findings: []string{messageIdMatchNotMatch.Id}},
-		{source: "Last_Name = \"Larcher\"", settings: idMatchOf("^[a-z]+(_[A-Z][a-z])*$", nil), findings: []string{messageIdMatchNotMatch.Id}},
-		{source: "var obj = {key: no_under}", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}), findings: []string{messageIdMatchNotMatch.Id}},
-		{source: "function no_under21(){}", settings: idMatchOf("^[^_]+$", nil), findings: []string{messageIdMatchNotMatch.Id}},
-		{source: "obj.no_under22 = function(){};", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}), findings: []string{messageIdMatchNotMatch.Id}},
-		{source: "no_under23.foo = function(){};", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}), findings: []string{messageIdMatchNotMatch.Id}},
-		{source: "[no_under24.baz]", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}), findings: []string{messageIdMatchNotMatch.Id}},
-		{source: "if (foo.bar_baz === boom.bam_pow) { [no_under25.baz] }", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}), findings: []string{messageIdMatchNotMatch.Id}},
-		{source: "foo.no_under26 = boom.bam_pow", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}), findings: []string{messageIdMatchNotMatch.Id}},
-		{source: "var foo = { no_under27: boom.bam_pow }", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}), findings: []string{messageIdMatchNotMatch.Id}},
-		{source: "foo.qux.no_under28 = { bar: boom.bam_pow }", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}), findings: []string{messageIdMatchNotMatch.Id}},
-		{source: "var o = {no_under29: 1}", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}), findings: []string{messageIdMatchNotMatch.Id}},
-		{source: "obj.no_under30 = 2;", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}), findings: []string{messageIdMatchNotMatch.Id}},
-		{source: "var { category_id: category_alias } = query;", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}), findings: []string{messageIdMatchNotMatch.Id}},
-		{source: "var { category_id: category_alias } = query;", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true, "ignoreDestructuring": true}), findings: []string{messageIdMatchNotMatch.Id}},
-		{source: "var { category_id: categoryId, ...other_props } = query;", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true, "ignoreDestructuring": true}), findings: []string{messageIdMatchNotMatch.Id}},
-		{source: "var { category_id } = query;", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}), findings: []string{messageIdMatchNotMatch.Id}},
-		{source: "var { category_id = 1 } = query;", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}), findings: []string{messageIdMatchNotMatch.Id}},
-		{source: "import no_camelcased from \"external-module\";", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}), findings: []string{messageIdMatchNotMatch.Id}},
-		{source: "import * as no_camelcased from \"external-module\";", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}), findings: []string{messageIdMatchNotMatch.Id}},
-		{source: "export * as no_camelcased from \"external-module\";", settings: idMatchOf("^[^_]+$", nil), findings: []string{messageIdMatchNotMatch.Id}},
-		{source: "import { no_camelcased } from \"external-module\";", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}), findings: []string{messageIdMatchNotMatch.Id}},
-		{source: "import { no_camelcased as no_camel_cased } from \"external module\";", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}), findings: []string{messageIdMatchNotMatch.Id}},
-		{source: "import { camelCased as no_camel_cased } from \"external module\";", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}), findings: []string{messageIdMatchNotMatch.Id}},
-		{source: "import { camelCased, no_camelcased } from \"external-module\";", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}), findings: []string{messageIdMatchNotMatch.Id}},
-		{source: "import { no_camelcased as camelCased, another_no_camelcased } from \"external-module\";", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}), findings: []string{messageIdMatchNotMatch.Id}},
-		{source: "import camelCased, { no_camelcased } from \"external-module\";", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}), findings: []string{messageIdMatchNotMatch.Id}},
-		{source: "import no_camelcased, { another_no_camelcased as camelCased } from \"external-module\";", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}), findings: []string{messageIdMatchNotMatch.Id}},
-		{source: "function foo({ no_camelcased }) {};", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}), findings: []string{messageIdMatchNotMatch.Id}},
-		{source: "function foo({ no_camelcased = 'default value' }) {};", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}), findings: []string{messageIdMatchNotMatch.Id}},
-		{source: "const no_camelcased = 0; function foo({ camelcased_value = no_camelcased }) {}", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}), findings: []string{messageIdMatchNotMatch.Id, messageIdMatchNotMatch.Id}},
-		{source: "const { bar: no_camelcased } = foo;", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}), findings: []string{messageIdMatchNotMatch.Id}},
-		{source: "function foo({ value_1: my_default }) {}", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}), findings: []string{messageIdMatchNotMatch.Id}},
-		{source: "function foo({ isCamelcased: no_camelcased }) {};", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}), findings: []string{messageIdMatchNotMatch.Id}},
-		{source: "var { foo: bar_baz = 1 } = quz;", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}), findings: []string{messageIdMatchNotMatch.Id}},
-		{source: "const { no_camelcased = false } = bar;", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}), findings: []string{messageIdMatchNotMatch.Id}},
-		{source: "\n            const foo_variable = 1;\n            class MyClass {\n            }\n            let a = new MyClass();\n            let b = {id: 1};\n            let c = Object.keys(b);\n            let d = Array.from(b);\n            let e = (Object) => Object.keys(obj, prop); // not global Object\n            let f = (Array) => Array.from(obj, prop); // not global Array\n            foo.Array = 5; // not global Array\n            ", settings: idMatchOf("^\\$?[a-z]+([A-Z0-9][a-z0-9]+)*$", map[string]bool{"properties": true}), findings: []string{messageIdMatchNotMatch.Id, messageIdMatchNotMatch.Id, messageIdMatchNotMatch.Id, messageIdMatchNotMatch.Id, messageIdMatchNotMatch.Id, messageIdMatchNotMatch.Id, messageIdMatchNotMatch.Id}},
-		{source: "class x { _foo() {} }", settings: idMatchOf("^[^_]+$", nil), findings: []string{messageIdMatchNotMatch.Id}},
-		{source: "class x { #_foo() {} }", settings: idMatchOf("^[^_]+$", nil), findings: []string{messageIdMatchNotMatchPrivate.Id}},
-		{source: "class x { _foo = 1; }", settings: idMatchOf("^[^_]+$", map[string]bool{"classFields": true}), findings: []string{messageIdMatchNotMatch.Id}},
-		{source: "class x { #_foo = 1; }", settings: idMatchOf("^[^_]+$", map[string]bool{"classFields": true}), findings: []string{messageIdMatchNotMatchPrivate.Id}},
-		{source: "\n            const foo = {\n                foo_one: 1,\n                bar_one: 2,\n                fooBar: 3\n            };\n            ", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true, "onlyDeclarations": true}), findings: []string{messageIdMatchNotMatch.Id, messageIdMatchNotMatch.Id}},
-		{source: "\n            const foo = {\n                foo_one: 1,\n                bar_one: 2,\n                fooBar: 3\n            };\n            ", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true, "onlyDeclarations": false}), findings: []string{messageIdMatchNotMatch.Id, messageIdMatchNotMatch.Id}},
-		{source: "\n            const foo = {\n                [a]: 1,\n            };\n            ", settings: idMatchOf("^[^a]", map[string]bool{"properties": true, "onlyDeclarations": false}), findings: []string{messageIdMatchNotMatch.Id}},
-		{source: "\n            const foo = {\n                [a]: 1,\n            };\n            ", settings: idMatchOf("^[^a]", map[string]bool{"properties": false, "onlyDeclarations": false}), findings: []string{messageIdMatchNotMatch.Id}},
-		{source: "import('foo.json', { with: { [type]: 'json' } })", settings: idMatchOf("^foo", map[string]bool{"properties": true}), findings: []string{messageIdMatchNotMatch.Id}},
-		{source: "import('foo.json', { with: { type: json } })", settings: idMatchOf("^foo", map[string]bool{"properties": true}), findings: []string{messageIdMatchNotMatch.Id}},
+		{
+			source:   "var __foo = \"Matthieu\"",
+			settings: idMatchOf("^[a-z]+$", map[string]bool{"onlyDeclarations": true}),
+			findings: []string{messageIdMatchNotMatch.Id},
+		},
+		{
+			source:   "first_name = \"Matthieu\"",
+			settings: idMatchOf("^[a-z]+$", nil),
+			findings: []string{messageIdMatchNotMatch.Id},
+		},
+		{
+			source:   "first_name = \"Matthieu\"",
+			settings: idMatchOf("^z", nil),
+			findings: []string{messageIdMatchNotMatch.Id},
+		},
+		{
+			source:   "Last_Name = \"Larcher\"",
+			settings: idMatchOf("^[a-z]+(_[A-Z][a-z])*$", nil),
+			findings: []string{messageIdMatchNotMatch.Id},
+		},
+		{
+			source:   "var obj = {key: no_under}",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}),
+			findings: []string{messageIdMatchNotMatch.Id},
+		},
+		{
+			source:   "function no_under21(){}",
+			settings: idMatchOf("^[^_]+$", nil),
+			findings: []string{messageIdMatchNotMatch.Id},
+		},
+		{
+			source:   "obj.no_under22 = function(){};",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}),
+			findings: []string{messageIdMatchNotMatch.Id},
+		},
+		{
+			source:   "no_under23.foo = function(){};",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}),
+			findings: []string{messageIdMatchNotMatch.Id},
+		},
+		{
+			source:   "[no_under24.baz]",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}),
+			findings: []string{messageIdMatchNotMatch.Id},
+		},
+		{
+			source:   "if (foo.bar_baz === boom.bam_pow) { [no_under25.baz] }",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}),
+			findings: []string{messageIdMatchNotMatch.Id},
+		},
+		{
+			source:   "foo.no_under26 = boom.bam_pow",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}),
+			findings: []string{messageIdMatchNotMatch.Id},
+		},
+		{
+			source:   "var foo = { no_under27: boom.bam_pow }",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}),
+			findings: []string{messageIdMatchNotMatch.Id},
+		},
+		{
+			source:   "foo.qux.no_under28 = { bar: boom.bam_pow }",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}),
+			findings: []string{messageIdMatchNotMatch.Id},
+		},
+		{
+			source:   "var o = {no_under29: 1}",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}),
+			findings: []string{messageIdMatchNotMatch.Id},
+		},
+		{
+			source:   "obj.no_under30 = 2;",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}),
+			findings: []string{messageIdMatchNotMatch.Id},
+		},
+		{
+			source:   "var { category_id: category_alias } = query;",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}),
+			findings: []string{messageIdMatchNotMatch.Id},
+		},
+		{
+			source:   "var { category_id: category_alias } = query;",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true, "ignoreDestructuring": true}),
+			findings: []string{messageIdMatchNotMatch.Id},
+		},
+		{
+			source:   "var { category_id: categoryId, ...other_props } = query;",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true, "ignoreDestructuring": true}),
+			findings: []string{messageIdMatchNotMatch.Id},
+		},
+		{
+			source:   "var { category_id } = query;",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}),
+			findings: []string{messageIdMatchNotMatch.Id},
+		},
+		{
+			source:   "var { category_id = 1 } = query;",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}),
+			findings: []string{messageIdMatchNotMatch.Id},
+		},
+		{
+			source:   "import no_camelcased from \"external-module\";",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}),
+			findings: []string{messageIdMatchNotMatch.Id},
+		},
+		{
+			source:   "import * as no_camelcased from \"external-module\";",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}),
+			findings: []string{messageIdMatchNotMatch.Id},
+		},
+		{
+			source:   "export * as no_camelcased from \"external-module\";",
+			settings: idMatchOf("^[^_]+$", nil),
+			findings: []string{messageIdMatchNotMatch.Id},
+		},
+		{
+			source:   "import { no_camelcased } from \"external-module\";",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}),
+			findings: []string{messageIdMatchNotMatch.Id},
+		},
+		{
+			source:   "import { no_camelcased as no_camel_cased } from \"external module\";",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}),
+			findings: []string{messageIdMatchNotMatch.Id},
+		},
+		{
+			source:   "import { camelCased as no_camel_cased } from \"external module\";",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}),
+			findings: []string{messageIdMatchNotMatch.Id},
+		},
+		{
+			source:   "import { camelCased, no_camelcased } from \"external-module\";",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}),
+			findings: []string{messageIdMatchNotMatch.Id},
+		},
+		{
+			source:   "import { no_camelcased as camelCased, another_no_camelcased } from \"external-module\";",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}),
+			findings: []string{messageIdMatchNotMatch.Id},
+		},
+		{
+			source:   "import camelCased, { no_camelcased } from \"external-module\";",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}),
+			findings: []string{messageIdMatchNotMatch.Id},
+		},
+		{
+			source:   "import no_camelcased, { another_no_camelcased as camelCased } from \"external-module\";",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}),
+			findings: []string{messageIdMatchNotMatch.Id},
+		},
+		{
+			source:   "function foo({ no_camelcased }) {};",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}),
+			findings: []string{messageIdMatchNotMatch.Id},
+		},
+		{
+			source:   "function foo({ no_camelcased = 'default value' }) {};",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}),
+			findings: []string{messageIdMatchNotMatch.Id},
+		},
+		{
+			source:   "const no_camelcased = 0; function foo({ camelcased_value = no_camelcased }) {}",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}),
+			findings: []string{messageIdMatchNotMatch.Id, messageIdMatchNotMatch.Id},
+		},
+		{
+			source:   "const { bar: no_camelcased } = foo;",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}),
+			findings: []string{messageIdMatchNotMatch.Id},
+		},
+		{
+			source:   "function foo({ value_1: my_default }) {}",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}),
+			findings: []string{messageIdMatchNotMatch.Id},
+		},
+		{
+			source:   "function foo({ isCamelcased: no_camelcased }) {};",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}),
+			findings: []string{messageIdMatchNotMatch.Id},
+		},
+		{
+			source:   "var { foo: bar_baz = 1 } = quz;",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}),
+			findings: []string{messageIdMatchNotMatch.Id},
+		},
+		{
+			source:   "const { no_camelcased = false } = bar;",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}),
+			findings: []string{messageIdMatchNotMatch.Id},
+		},
+		{
+			source:   "\n            const foo_variable = 1;\n            class MyClass {\n            }\n            let a = new MyClass();\n            let b = {id: 1};\n            let c = Object.keys(b);\n            let d = Array.from(b);\n            let e = (Object) => Object.keys(obj, prop); // not global Object\n            let f = (Array) => Array.from(obj, prop); // not global Array\n            foo.Array = 5; // not global Array\n            ",
+			settings: idMatchOf("^\\$?[a-z]+([A-Z0-9][a-z0-9]+)*$", map[string]bool{"properties": true}),
+			findings: []string{
+				messageIdMatchNotMatch.Id,
+				messageIdMatchNotMatch.Id,
+				messageIdMatchNotMatch.Id,
+				messageIdMatchNotMatch.Id,
+				messageIdMatchNotMatch.Id,
+				messageIdMatchNotMatch.Id,
+				messageIdMatchNotMatch.Id,
+			},
+		},
+		{
+			source:   "class x { _foo() {} }",
+			settings: idMatchOf("^[^_]+$", nil),
+			findings: []string{messageIdMatchNotMatch.Id},
+		},
+		{
+			source:   "class x { #_foo() {} }",
+			settings: idMatchOf("^[^_]+$", nil),
+			findings: []string{messageIdMatchNotMatchPrivate.Id},
+		},
+		{
+			source:   "class x { _foo = 1; }",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"classFields": true}),
+			findings: []string{messageIdMatchNotMatch.Id},
+		},
+		{
+			source:   "class x { #_foo = 1; }",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"classFields": true}),
+			findings: []string{messageIdMatchNotMatchPrivate.Id},
+		},
+		{
+			source:   "\n            const foo = {\n                foo_one: 1,\n                bar_one: 2,\n                fooBar: 3\n            };\n            ",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true, "onlyDeclarations": true}),
+			findings: []string{messageIdMatchNotMatch.Id, messageIdMatchNotMatch.Id},
+		},
+		{
+			source:   "\n            const foo = {\n                foo_one: 1,\n                bar_one: 2,\n                fooBar: 3\n            };\n            ",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true, "onlyDeclarations": false}),
+			findings: []string{messageIdMatchNotMatch.Id, messageIdMatchNotMatch.Id},
+		},
+		{
+			source:   "\n            const foo = {\n                [a]: 1,\n            };\n            ",
+			settings: idMatchOf("^[^a]", map[string]bool{"properties": true, "onlyDeclarations": false}),
+			findings: []string{messageIdMatchNotMatch.Id},
+		},
+		{
+			source:   "\n            const foo = {\n                [a]: 1,\n            };\n            ",
+			settings: idMatchOf("^[^a]", map[string]bool{"properties": false, "onlyDeclarations": false}),
+			findings: []string{messageIdMatchNotMatch.Id},
+		},
+		{
+			source:   "import('foo.json', { with: { [type]: 'json' } })",
+			settings: idMatchOf("^foo", map[string]bool{"properties": true}),
+			findings: []string{messageIdMatchNotMatch.Id},
+		},
+		{
+			source:   "import('foo.json', { with: { type: json } })",
+			settings: idMatchOf("^foo", map[string]bool{"properties": true}),
+			findings: []string{messageIdMatchNotMatch.Id},
+		},
 		// #7mztrdd, beyond the corpus: a pattern is read as JavaScript reads it, `new RegExp(pattern, "u")`. RE2
 		// refused these, so they did not even decode. In Node, new RegExp("^(?!.*_)", "u") tests false on foo_bar and
 		// new RegExp("^\\w+(?<!_)$", "u") tests false on foo_, so both names are reported.
-		{source: "var foo_bar = 1;", settings: idMatchOf("^(?!.*_)", nil), findings: []string{messageIdMatchNotMatch.Id}},
-		{source: "var foo_ = 1;", settings: idMatchOf("^\\w+(?<!_)$", nil), findings: []string{messageIdMatchNotMatch.Id}},
+		{
+			source:   "var foo_bar = 1;",
+			settings: idMatchOf("^(?!.*_)", nil),
+			findings: []string{messageIdMatchNotMatch.Id},
+		},
+		{
+			source:   "var foo_ = 1;",
+			settings: idMatchOf("^\\w+(?<!_)$", nil),
+			findings: []string{messageIdMatchNotMatch.Id},
+		},
 	}
 
 	for _, testCase := range cases {
 		result := rule_testing.RunTypedWithOptions(test, IdMatch, idMatchFile, testCase.source, testCase.settings)
 		if len(result.Diagnostics) != len(testCase.findings) {
-			test.Errorf("%q with %+v: expected %d findings, got %d %v",
-				testCase.source, testCase.settings, len(testCase.findings), len(result.Diagnostics), result.MessageIds())
+			test.Errorf(
+				"%q with %+v: expected %d findings, got %d %v",
+				testCase.source,
+				testCase.settings,
+				len(testCase.findings),
+				len(result.Diagnostics),
+				result.MessageIds(),
+			)
 			continue
 		}
 		rule_testing.ExpectFindings(test, result, testCase.findings...)
@@ -161,24 +379,60 @@ func TestIdMatchStaysSilent(test *testing.T) {
 		{source: "var arr = [foo.no_under11.qux];", settings: idMatchOf("^[^_]+$", nil)},
 		{source: "[foo.no_under12.nesting]", settings: idMatchOf("^[^_]+$", nil)},
 		{source: "if (foo.no_under13 === boom.no_under14) { [foo.no_under15] }", settings: idMatchOf("^[^_]+$", nil)},
-		{source: "var myArray = new Array(); var myDate = new Date();", settings: idMatchOf("^[a-z$]+([A-Z][a-z]+)*$", nil)},
+		{
+			source:   "var myArray = new Array(); var myDate = new Date();",
+			settings: idMatchOf("^[a-z$]+([A-Z][a-z]+)*$", nil),
+		},
 		{source: "var x = obj._foo;", settings: idMatchOf("^[^_]+$", nil)},
-		{source: "var obj = {key: no_under}", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true, "onlyDeclarations": true})},
+		{
+			source:   "var obj = {key: no_under}",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true, "onlyDeclarations": true}),
+		},
 		{source: "var {key_no_under: key} = {}", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true})},
-		{source: "var { category_id } = query;", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true, "ignoreDestructuring": true})},
-		{source: "var { category_id: category_id } = query;", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true, "ignoreDestructuring": true})},
-		{source: "var { category_id = 1 } = query;", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true, "ignoreDestructuring": true})},
+		{
+			source:   "var { category_id } = query;",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true, "ignoreDestructuring": true}),
+		},
+		{
+			source:   "var { category_id: category_id } = query;",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true, "ignoreDestructuring": true}),
+		},
+		{
+			source:   "var { category_id = 1 } = query;",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true, "ignoreDestructuring": true}),
+		},
 		{source: "var o = {key: 1}", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true})},
 		{source: "var o = {no_under16: 1}", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": false})},
 		{source: "obj.no_under17 = 2;", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": false})},
-		{source: "var obj = {\n no_under18: 1 \n};\n obj.no_under19 = 2;", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": false})},
-		{source: "obj.no_under20 = function(){};", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": false})},
+		{
+			source:   "var obj = {\n no_under18: 1 \n};\n obj.no_under19 = 2;",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"properties": false}),
+		},
+		{
+			source:   "obj.no_under20 = function(){};",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"properties": false}),
+		},
 		{source: "var x = obj._foo2;", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": false})},
-		{source: "\n            const foo = Object.keys(bar);\n            const a = Array.from(b);\n            const bar = () => Array;\n            ", settings: idMatchOf("^\\$?[a-z]+([A-Z0-9][a-z0-9]+)*$", map[string]bool{"properties": true})},
-		{source: "\n            const foo = {\n                foo_one: 1,\n                bar_one: 2,\n                fooBar: 3\n            };\n            ", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": false})},
-		{source: "\n            const foo = {\n                foo_one: 1,\n                bar_one: 2,\n                fooBar: 3\n            };\n            ", settings: idMatchOf("^[^_]+$", map[string]bool{"onlyDeclarations": true})},
-		{source: "\n            const foo = {\n                foo_one: 1,\n                bar_one: 2,\n                fooBar: 3\n            };\n            ", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": false, "onlyDeclarations": false})},
-		{source: "\n            const foo = {\n                [a]: 1,\n            };\n            ", settings: idMatchOf("^[^a]", map[string]bool{"properties": true, "onlyDeclarations": true})},
+		{
+			source:   "\n            const foo = Object.keys(bar);\n            const a = Array.from(b);\n            const bar = () => Array;\n            ",
+			settings: idMatchOf("^\\$?[a-z]+([A-Z0-9][a-z0-9]+)*$", map[string]bool{"properties": true}),
+		},
+		{
+			source:   "\n            const foo = {\n                foo_one: 1,\n                bar_one: 2,\n                fooBar: 3\n            };\n            ",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"properties": false}),
+		},
+		{
+			source:   "\n            const foo = {\n                foo_one: 1,\n                bar_one: 2,\n                fooBar: 3\n            };\n            ",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"onlyDeclarations": true}),
+		},
+		{
+			source:   "\n            const foo = {\n                foo_one: 1,\n                bar_one: 2,\n                fooBar: 3\n            };\n            ",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"properties": false, "onlyDeclarations": false}),
+		},
+		{
+			source:   "\n            const foo = {\n                [a]: 1,\n            };\n            ",
+			settings: idMatchOf("^[^a]", map[string]bool{"properties": true, "onlyDeclarations": true}),
+		},
 		{source: "class x { foo() {} }", settings: idMatchOf("^[^_]+$", nil)},
 		{source: "class x { #foo() {} }", settings: idMatchOf("^[^_]+$", nil)},
 		{source: "class x { _foo = 1; }", settings: idMatchOf("^[^_]+$", nil)},
@@ -187,14 +441,33 @@ func TestIdMatchStaysSilent(test *testing.T) {
 		{source: "class x { #_foo = 1; }", settings: idMatchOf("^[^_]+$", nil)},
 		{source: "import.meta", settings: idMatchOf("^$", nil)},
 		{source: "function foo() { new.target; }", settings: idMatchOf("^foo$", nil)},
-		{source: "import foo from 'foo.json' with { type: 'json' }", settings: idMatchOf("^foo", map[string]bool{"properties": true})},
-		{source: "export * from 'foo.json' with { type: 'json' }", settings: idMatchOf("^foo", map[string]bool{"properties": true})},
-		{source: "export { default } from 'foo.json' with { type: 'json' }", settings: idMatchOf("^def", map[string]bool{"properties": true})},
-		{source: "import('foo.json', { with: { type: 'json' } })", settings: idMatchOf("^foo", map[string]bool{"properties": true})},
-		{source: "import('foo.json', { 'with': { type: 'json' } })", settings: idMatchOf("^foo", map[string]bool{"properties": true})},
-		{source: "import('foo.json', { with: { type } })", settings: idMatchOf("^foo", map[string]bool{"properties": true})},
+		{
+			source:   "import foo from 'foo.json' with { type: 'json' }",
+			settings: idMatchOf("^foo", map[string]bool{"properties": true}),
+		},
+		{
+			source:   "export * from 'foo.json' with { type: 'json' }",
+			settings: idMatchOf("^foo", map[string]bool{"properties": true}),
+		},
+		{
+			source:   "export { default } from 'foo.json' with { type: 'json' }",
+			settings: idMatchOf("^def", map[string]bool{"properties": true}),
+		},
+		{
+			source:   "import('foo.json', { with: { type: 'json' } })",
+			settings: idMatchOf("^foo", map[string]bool{"properties": true}),
+		},
+		{
+			source:   "import('foo.json', { 'with': { type: 'json' } })",
+			settings: idMatchOf("^foo", map[string]bool{"properties": true}),
+		},
+		{
+			source:   "import('foo.json', { with: { type } })",
+			settings: idMatchOf("^foo", map[string]bool{"properties": true}),
+		},
 		// #7mztrdd, beyond the corpus: the same lookahead and lookbehind as in TestIdMatchFires, on names they match.
-		// In Node, new RegExp("^(?!.*_)", "u") tests true on fooBar and new RegExp("^\\w+(?<!_)$", "u") tests true on foo.
+		// In Node, new RegExp("^(?!.*_)", "u") tests true on fooBar and new RegExp("^\\w+(?<!_)$", "u") tests true on
+		// foo.
 		{source: "var fooBar = 1;", settings: idMatchOf("^(?!.*_)", nil)},
 		{source: "var foo = 1;", settings: idMatchOf("^\\w+(?<!_)$", nil)},
 	}
@@ -308,7 +581,9 @@ func TestIdMatchSpansAndMessages(test *testing.T) {
 func TestIdMatchDecoderReadsBothTupleElements(test *testing.T) {
 	test.Parallel()
 
-	decoded, err := DecodeIdMatchOptions([]byte(`["^[a-z]+$", {"properties": true, "classFields": true, "onlyDeclarations": true, "ignoreDestructuring": true}]`))
+	decoded, err := DecodeIdMatchOptions([]byte(
+		`["^[a-z]+$", {"properties": true, "classFields": true, "onlyDeclarations": true, "ignoreDestructuring": true}]`,
+	))
 	if err != nil {
 		test.Fatalf("decoding a full option tuple: %v", err)
 	}
@@ -458,26 +733,87 @@ func TestIdMatchOptionGatesAreArmSpecific(test *testing.T) {
 	}{
 		// An assignment destructuring: only ignoreDestructuring gates it.
 		{source: "({ no_under } = bar);", settings: idMatchOf("^[^_]+$", nil), findings: 1, reported: "no_under"},
-		{source: "({ no_under } = bar);", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": false}), findings: 1, reported: "no_under"},
-		{source: "({ no_under } = bar);", settings: idMatchOf("^[^_]+$", map[string]bool{"onlyDeclarations": true}), findings: 1, reported: "no_under"},
-		{source: "({ no_under } = bar);", settings: idMatchOf("^[^_]+$", map[string]bool{"ignoreDestructuring": true}), findings: 0},
+		{
+			source:   "({ no_under } = bar);",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"properties": false}),
+			findings: 1,
+			reported: "no_under",
+		},
+		{
+			source:   "({ no_under } = bar);",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"onlyDeclarations": true}),
+			findings: 1,
+			reported: "no_under",
+		},
+		{
+			source:   "({ no_under } = bar);",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"ignoreDestructuring": true}),
+			findings: 0,
+		},
 		// A rename coins a new name, so ignoreDestructuring does not excuse it.
-		{source: "({ a: no_under } = bar);", settings: idMatchOf("^[^_]+$", map[string]bool{"ignoreDestructuring": true}), findings: 1, reported: "no_under"},
+		{
+			source:   "({ a: no_under } = bar);",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"ignoreDestructuring": true}),
+			findings: 1,
+			reported: "no_under",
+		},
 		// The key of an assignment destructuring is the source object's, never ours.
-		{source: "({ no_under: b } = bar);", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}), findings: 0},
+		{
+			source:   "({ no_under: b } = bar);",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}),
+			findings: 0,
+		},
 
 		// A rest element is never a property name, so `properties` does not gate it.
-		{source: "var { ...rest_name } = q;", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": false}), findings: 1, reported: "rest_name"},
-		{source: "var { ...rest_name } = q;", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}), findings: 1, reported: "rest_name"},
+		{
+			source:   "var { ...rest_name } = q;",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"properties": false}),
+			findings: 1,
+			reported: "rest_name",
+		},
+		{
+			source:   "var { ...rest_name } = q;",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}),
+			findings: 1,
+			reported: "rest_name",
+		},
 
 		// An array pattern's elements are positional, so `properties` does not gate them either,
 		// while `onlyDeclarations` does -- it reaches them through the default arm.
-		{source: "var [ arr_name ] = q;", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": false}), findings: 1, reported: "arr_name"},
-		{source: "var [ arr_name ] = q;", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}), findings: 1, reported: "arr_name"},
-		{source: "var [ arr_name ] = q;", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true, "ignoreDestructuring": true}), findings: 1, reported: "arr_name"},
-		{source: "var [ arr_name ] = q;", settings: idMatchOf("^[^_]+$", map[string]bool{"onlyDeclarations": true}), findings: 0},
-		{source: "function f([ arr_name ]) {}", settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}), findings: 1, reported: "arr_name"},
-		{source: "function f([ arr_name ]) {}", settings: idMatchOf("^[^_]+$", map[string]bool{"onlyDeclarations": true, "properties": true}), findings: 0},
+		{
+			source:   "var [ arr_name ] = q;",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"properties": false}),
+			findings: 1,
+			reported: "arr_name",
+		},
+		{
+			source:   "var [ arr_name ] = q;",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}),
+			findings: 1,
+			reported: "arr_name",
+		},
+		{
+			source:   "var [ arr_name ] = q;",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true, "ignoreDestructuring": true}),
+			findings: 1,
+			reported: "arr_name",
+		},
+		{
+			source:   "var [ arr_name ] = q;",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"onlyDeclarations": true}),
+			findings: 0,
+		},
+		{
+			source:   "function f([ arr_name ]) {}",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"properties": true}),
+			findings: 1,
+			reported: "arr_name",
+		},
+		{
+			source:   "function f([ arr_name ]) {}",
+			settings: idMatchOf("^[^_]+$", map[string]bool{"onlyDeclarations": true, "properties": true}),
+			findings: 0,
+		},
 	}
 
 	for _, testCase := range cases {
@@ -547,7 +883,9 @@ func TestIdMatchDecoderAcceptsTheConfigLayersShape(test *testing.T) {
 	test.Parallel()
 
 	// Upstream's spelling: the pattern, then the flags as the second element.
-	decoded, decodeIdMatchOptionsError := DecodeIdMatchOptions([]byte(`["^[a-z]+$", {"properties": true, "classFields": true}]`))
+	decoded, decodeIdMatchOptionsError := DecodeIdMatchOptions(
+		[]byte(`["^[a-z]+$", {"properties": true, "classFields": true}]`),
+	)
 	if decodeIdMatchOptionsError != nil {
 		test.Fatalf("decoding the option list: %v", decodeIdMatchOptionsError)
 	}

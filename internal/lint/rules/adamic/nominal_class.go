@@ -244,7 +244,13 @@ func typeArgumentsVerdict(typeChecker *checker.Checker, source *checker.Type, ta
 // inheritedVerdict walks an instance's bases, with its own type arguments mapped into them, for the target's class,
 // and judges the base it reaches as an instance of that class. found is false when no base is the class.
 // Mutates: seen the walk marks each base class it passes, so a class reached twice in the hierarchy is walked once
-func inheritedVerdict(typeChecker *checker.Checker, instance *checker.Type, target *checker.Type, targetClass *ast.Symbol, seen map[*ast.Symbol]bool) (verdict nominal, found bool) {
+func inheritedVerdict(
+	typeChecker *checker.Checker,
+	instance *checker.Type,
+	target *checker.Type,
+	targetClass *ast.Symbol,
+	seen map[*ast.Symbol]bool,
+) (verdict nominal, found bool) {
 	bases, mapped := instantiatedBases(typeChecker, instance)
 	for _, base := range bases {
 		baseClass := classSymbol(base)
@@ -318,7 +324,12 @@ func declaredClassType(typeChecker *checker.Checker, instance *checker.Type) *ch
 
 // derivesFrom walks a class's base types for the target class.
 // Mutates: seen the walk marks each base class it passes, so a class reached twice in the hierarchy is walked once
-func derivesFrom(typeChecker *checker.Checker, declared *checker.Type, targetClass *ast.Symbol, seen map[*ast.Symbol]bool) bool {
+func derivesFrom(
+	typeChecker *checker.Checker,
+	declared *checker.Type,
+	targetClass *ast.Symbol,
+	seen map[*ast.Symbol]bool,
+) bool {
 	if declared == nil || declared.ObjectFlags()&(checker.ObjectFlagsClass|checker.ObjectFlagsInterface) == 0 {
 		return false
 	}

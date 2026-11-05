@@ -16,8 +16,8 @@ import (
 // observation wearing two names. Two design systems that cannot differ cannot detect a table that
 // varies.
 //
-// Re-measured against `internal/lint/rules/tailwind/tools/generate_descriptor_base/testdata/independent_theme.css`, which
-// shares no submodule, both claims held: the same 44 families down to the value each was discovered
+// Re-measured against `internal/lint/rules/tailwind/tools/generate_descriptor_base/testdata/independent_theme.css`,
+// which shares no submodule, both claims held: the same 44 families down to the value each was discovered
 // at, over a registry differing by 25 functional roots, and the same 88 registrations across four
 // design systems. The generators now carry `-verify-invariance-against` so that measurement is
 // repeatable rather than a thing someone did once.
@@ -92,7 +92,9 @@ func TestRepositoryVariantsCannotMoveFrameworkRegistrations(test *testing.T) {
 		test.Errorf("expected the two new @custom-variant names to register, got %v", added)
 	}
 	if !redefiningSystem.HasVariant("totally-new-variant") {
-		test.Error("a repository's own @custom-variant did not reach the registry, so this test proves nothing about repositories")
+		test.Error(
+			"a repository's own @custom-variant did not reach the registry, so this test proves nothing about repositories",
+		)
 	}
 }
 

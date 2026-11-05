@@ -58,7 +58,10 @@ var supportedEmbedFrontMatterLanguages = map[string]bool{"yaml": true, "toml": t
 // embed is embed.js, an empty function, behind the core's front matter embed
 // (src/main/front-matter/embed.js): yaml front matter is formatted by the yaml printer through textToDoc.
 // toml has no parser in Prettier, so inferParser finds none and it prints as written.
-func embed(path *astPath, _ *printerOptions) func(printing.TextToDoc, printing.PrintFunc, *astPath, *printerOptions) (doc.Doc, error) {
+func embed(
+	path *astPath,
+	_ *printerOptions,
+) func(printing.TextToDoc, printing.PrintFunc, *astPath, *printerOptions) (doc.Doc, error) {
 	node := currentNode(path)
 	if !isFrontMatter(node) || !supportedEmbedFrontMatterLanguages[node.String("language")] {
 		return nil
@@ -163,7 +166,11 @@ func PrintToDocSCSS(text string, prettierOptions formatoptions.Options) (doc.Doc
 }
 
 // printToDocWithParser is PrintToDoc under the parser named, "css" or "scss".
-func printToDocWithParser(text string, prettierOptions formatoptions.Options, parser string) (document doc.Doc, err error) {
+func printToDocWithParser(
+	text string,
+	prettierOptions formatoptions.Options,
+	parser string,
+) (document doc.Doc, err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			document, err = nil, fmt.Errorf("%s: %v", parser, recovered)
@@ -190,8 +197,13 @@ func printToDoc(text string, prettierOptions formatoptions.Options, parser strin
 
 	// Format has no textToDoc to reach the yaml printer with, and the core would drop a failing embed
 	// and print the front matter as written, which is not what the fork prints. So it refuses instead.
-	if frontMatter := root.Child("frontMatter"); frontMatter.String("language") == "yaml" && trim(frontMatter.String("value")) != "" {
-		return nil, fmt.Errorf("%s: yaml front matter is formatted by the yaml printer, which css.Format cannot reach", parser)
+	if frontMatter := root.Child(
+		"frontMatter",
+	); frontMatter.String("language") == "yaml" && trim(frontMatter.String("value")) != "" {
+		return nil, fmt.Errorf(
+			"%s: yaml front matter is formatted by the yaml printer, which css.Format cannot reach",
+			parser,
+		)
 	}
 
 	printOptions := &printerOptions{

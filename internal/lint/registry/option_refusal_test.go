@@ -59,7 +59,12 @@ func TestEveryDecoderRefusesAnUnknownTopLevelKey(test *testing.T) {
 		if lenientOptionRules[name] {
 			lenient++
 			if err != nil {
-				test.Errorf("%s: upstream's schema leaves its options object open, and %s was refused: %v", name, probe, err)
+				test.Errorf(
+					"%s: upstream's schema leaves its options object open, and %s was refused: %v",
+					name,
+					probe,
+					err,
+				)
 			}
 			continue
 		}
@@ -75,7 +80,11 @@ func TestEveryDecoderRefusesAnUnknownTopLevelKey(test *testing.T) {
 	test.Logf("%d decoders refused the unknown key, %d accepted it as upstream does, %d have no baseline here: %v",
 		probed, lenient, len(skipped), skipped)
 	if lenient != len(lenientOptionRules) {
-		test.Errorf("probed %d of the %d lenient rules, so a lenient rule was renamed or lost its decoder", lenient, len(lenientOptionRules))
+		test.Errorf(
+			"probed %d of the %d lenient rules, so a lenient rule was renamed or lost its decoder",
+			lenient,
+			len(lenientOptionRules),
+		)
 	}
 	// About 190 registrations carry a decoder. Under 150 probed means the baselines stopped decoding
 	// for most of them, and the refusals above stopped meaning anything.
@@ -98,7 +107,9 @@ func topLevelProbe(registration rule.Registration) (baseline []byte, probe []byt
 		}
 		for _, mode := range optionListModes {
 			if _, err := registration.DecodeOptionList([]byte(`[` + mode + `, ` + object + `]`)); err == nil {
-				return []byte(`[` + mode + `, ` + object + `]`), []byte(`[` + mode + `, ` + probeObject + `]`), registration.DecodeOptionList
+				return []byte(
+					`[` + mode + `, ` + object + `]`,
+				), []byte(`[` + mode + `, ` + probeObject + `]`), registration.DecodeOptionList
 			}
 		}
 		return []byte(`[` + object + `]`), []byte(`[` + probeObject + `]`), registration.DecodeOptionList
@@ -118,30 +129,140 @@ type nestedOptionCase struct {
 // nestedOptionCases reach the objects a top-level probe cannot: list entries, a polymorphic value's
 // object form, and an option element after a mode string. Each is a decode this task converted.
 var nestedOptionCases = []nestedOptionCase{
-	{rule: "no-restricted-globals", baseline: `[{"name": "event", "message": "m"}]`, probe: `[{"name": "event", "mesage": "m"}]`, refusal: "mesage"},
-	{rule: "no-restricted-globals", baseline: `[{"globals": ["event"]}]`, probe: `[{"globals": ["event"], "checkGlobalObjects": true}]`, refusal: "checkGlobalObjects"},
-	{rule: "no-restricted-imports", baseline: `[{"paths": [{"name": "lodash"}]}]`, probe: `[{"paths": [{"name": "lodash", "importNames": ["map"], "mesage": "m"}]}]`, refusal: "mesage"},
-	{rule: "no-restricted-imports", baseline: `[{"patterns": [{"group": ["lodash/*"]}]}]`, probe: `[{"patterns": [{"group": ["lodash/*"], "mesage": "m"}]}]`, refusal: "mesage"},
-	{rule: "no-restricted-properties", baseline: `[{"object": "Math", "property": "pow"}]`, probe: `[{"object": "Math", "propery": "pow"}]`, refusal: "propery"},
-	{rule: "no-restricted-exports", baseline: `{"restrictDefaultExports": {"direct": true}}`, probe: `{"restrictDefaultExports": {"directly": true}}`, refusal: "directly"},
-	{rule: "react/forbid-elements", baseline: `{"forbid": [{"element": "button"}]}`, probe: `{"forbid": [{"element": "button", "mesage": "m"}]}`, refusal: "mesage"},
-	{rule: "react/forbid-dom-props", baseline: `{"forbid": ["id"]}`, probe: `{"forbid": ["id"], "forbidden": ["id"]}`, refusal: "forbidden"},
-	{rule: "@typescript-eslint/no-restricted-types", baseline: `{"types": {"Foo": {"message": "m"}}}`, probe: `{"types": {"Foo": {"mesage": "m"}}}`, refusal: "mesage"},
-	{rule: "@typescript-eslint/ban-ts-comment", baseline: `{"ts-ignore": {"descriptionFormat": "^: "}}`, probe: `{"ts-ignore": {"descriptionFormt": "^: "}}`, refusal: "descriptionFormt"},
-	{rule: "@typescript-eslint/no-misused-promises", baseline: `{"checksVoidReturn": {"arguments": false}}`, probe: `{"checksVoidReturn": {"argument": false}}`, refusal: "argument"},
-	{rule: "@typescript-eslint/no-misused-promises", baseline: `{"checksVoidReturn": false}`, probe: `{"checksVoidReturnOpts": {"arguments": false}}`, refusal: "checksVoidReturnOpts"},
-	{rule: "@typescript-eslint/no-floating-promises", baseline: `{"allowForKnownSafePromises": [{"from": "file", "name": "Safe"}]}`, probe: `{"allowForKnownSafePromises": [{"from": "file", "name": "Safe", "paths": "x"}]}`, refusal: "paths"},
-	{rule: "@typescript-eslint/only-throw-error", baseline: `{"allow": [{"from": "file", "name": "Thrown"}]}`, probe: `{"allow": [{"from": "file", "name": "Thrown", "paths": "x"}]}`, refusal: "paths"},
-	{rule: "@typescript-eslint/prefer-promise-reject-errors", baseline: `{"allow": [{"from": "file", "name": "Rejected"}]}`, probe: `{"allow": [{"from": "file", "name": "Rejected", "paths": "x"}]}`, refusal: "paths"},
-	{rule: "@typescript-eslint/prefer-nullish-coalescing", baseline: `{"ignorePrimitives": {"string": true}}`, probe: `{"ignorePrimitives": {"strings": true}}`, refusal: "strings"},
-	{rule: "no-shadow-restricted-names", baseline: `{"reportGlobalThis": false}`, probe: `{"allowGlobalThis": true}`, refusal: "allowGlobalThis"},
-	{rule: "base/security-require-context-access", baseline: `{"requirements": [{"contextKey": "user", "requiresAny": ["Authenticated"]}]}`, probe: `{"requirements": [{"contextKey": "user", "requiresAny": ["Authenticated"], "requireAll": true}]}`, refusal: "requireAll"},
+	{
+		rule:     "no-restricted-globals",
+		baseline: `[{"name": "event", "message": "m"}]`,
+		probe:    `[{"name": "event", "mesage": "m"}]`,
+		refusal:  "mesage",
+	},
+	{
+		rule:     "no-restricted-globals",
+		baseline: `[{"globals": ["event"]}]`,
+		probe:    `[{"globals": ["event"], "checkGlobalObjects": true}]`,
+		refusal:  "checkGlobalObjects",
+	},
+	{
+		rule:     "no-restricted-imports",
+		baseline: `[{"paths": [{"name": "lodash"}]}]`,
+		probe:    `[{"paths": [{"name": "lodash", "importNames": ["map"], "mesage": "m"}]}]`,
+		refusal:  "mesage",
+	},
+	{
+		rule:     "no-restricted-imports",
+		baseline: `[{"patterns": [{"group": ["lodash/*"]}]}]`,
+		probe:    `[{"patterns": [{"group": ["lodash/*"], "mesage": "m"}]}]`,
+		refusal:  "mesage",
+	},
+	{
+		rule:     "no-restricted-properties",
+		baseline: `[{"object": "Math", "property": "pow"}]`,
+		probe:    `[{"object": "Math", "propery": "pow"}]`,
+		refusal:  "propery",
+	},
+	{
+		rule:     "no-restricted-exports",
+		baseline: `{"restrictDefaultExports": {"direct": true}}`,
+		probe:    `{"restrictDefaultExports": {"directly": true}}`,
+		refusal:  "directly",
+	},
+	{
+		rule:     "react/forbid-elements",
+		baseline: `{"forbid": [{"element": "button"}]}`,
+		probe:    `{"forbid": [{"element": "button", "mesage": "m"}]}`,
+		refusal:  "mesage",
+	},
+	{
+		rule:     "react/forbid-dom-props",
+		baseline: `{"forbid": ["id"]}`,
+		probe:    `{"forbid": ["id"], "forbidden": ["id"]}`,
+		refusal:  "forbidden",
+	},
+	{
+		rule:     "@typescript-eslint/no-restricted-types",
+		baseline: `{"types": {"Foo": {"message": "m"}}}`,
+		probe:    `{"types": {"Foo": {"mesage": "m"}}}`,
+		refusal:  "mesage",
+	},
+	{
+		rule:     "@typescript-eslint/ban-ts-comment",
+		baseline: `{"ts-ignore": {"descriptionFormat": "^: "}}`,
+		probe:    `{"ts-ignore": {"descriptionFormt": "^: "}}`,
+		refusal:  "descriptionFormt",
+	},
+	{
+		rule:     "@typescript-eslint/no-misused-promises",
+		baseline: `{"checksVoidReturn": {"arguments": false}}`,
+		probe:    `{"checksVoidReturn": {"argument": false}}`,
+		refusal:  "argument",
+	},
+	{
+		rule:     "@typescript-eslint/no-misused-promises",
+		baseline: `{"checksVoidReturn": false}`,
+		probe:    `{"checksVoidReturnOpts": {"arguments": false}}`,
+		refusal:  "checksVoidReturnOpts",
+	},
+	{
+		rule:     "@typescript-eslint/no-floating-promises",
+		baseline: `{"allowForKnownSafePromises": [{"from": "file", "name": "Safe"}]}`,
+		probe:    `{"allowForKnownSafePromises": [{"from": "file", "name": "Safe", "paths": "x"}]}`,
+		refusal:  "paths",
+	},
+	{
+		rule:     "@typescript-eslint/only-throw-error",
+		baseline: `{"allow": [{"from": "file", "name": "Thrown"}]}`,
+		probe:    `{"allow": [{"from": "file", "name": "Thrown", "paths": "x"}]}`,
+		refusal:  "paths",
+	},
+	{
+		rule:     "@typescript-eslint/prefer-promise-reject-errors",
+		baseline: `{"allow": [{"from": "file", "name": "Rejected"}]}`,
+		probe:    `{"allow": [{"from": "file", "name": "Rejected", "paths": "x"}]}`,
+		refusal:  "paths",
+	},
+	{
+		rule:     "@typescript-eslint/prefer-nullish-coalescing",
+		baseline: `{"ignorePrimitives": {"string": true}}`,
+		probe:    `{"ignorePrimitives": {"strings": true}}`,
+		refusal:  "strings",
+	},
+	{
+		rule:     "no-shadow-restricted-names",
+		baseline: `{"reportGlobalThis": false}`,
+		probe:    `{"allowGlobalThis": true}`,
+		refusal:  "allowGlobalThis",
+	},
+	{
+		rule:     "base/security-require-context-access",
+		baseline: `{"requirements": [{"contextKey": "user", "requiresAny": ["Authenticated"]}]}`,
+		probe:    `{"requirements": [{"contextKey": "user", "requiresAny": ["Authenticated"], "requireAll": true}]}`,
+		refusal:  "requireAll",
+	},
 
 	// Spelling, which a tag now declares: a key that matches its field only case-insensitively.
-	{rule: "no-empty", baseline: `{"allowEmptyCatch": true}`, probe: `{"AllowEmptyCatch": true}`, refusal: "AllowEmptyCatch"},
-	{rule: "@typescript-eslint/restrict-plus-operands", baseline: `{"allowAny": true}`, probe: `{"allowany": true}`, refusal: "allowany"},
-	{rule: "@typescript-eslint/switch-exhaustiveness-check", baseline: `{"requireDefaultForNonUnion": true}`, probe: `{"RequireDefaultForNonUnion": true}`, refusal: "RequireDefaultForNonUnion"},
-	{rule: "nexus/consistency-no-shouting", baseline: `{"allow": ["NASA"]}`, probe: `{"Allow": ["NASA"]}`, refusal: "Allow"},
+	{
+		rule:     "no-empty",
+		baseline: `{"allowEmptyCatch": true}`,
+		probe:    `{"AllowEmptyCatch": true}`,
+		refusal:  "AllowEmptyCatch",
+	},
+	{
+		rule:     "@typescript-eslint/restrict-plus-operands",
+		baseline: `{"allowAny": true}`,
+		probe:    `{"allowany": true}`,
+		refusal:  "allowany",
+	},
+	{
+		rule:     "@typescript-eslint/switch-exhaustiveness-check",
+		baseline: `{"requireDefaultForNonUnion": true}`,
+		probe:    `{"RequireDefaultForNonUnion": true}`,
+		refusal:  "RequireDefaultForNonUnion",
+	},
+	{
+		rule:     "nexus/consistency-no-shouting",
+		baseline: `{"allow": ["NASA"]}`,
+		probe:    `{"Allow": ["NASA"]}`,
+		refusal:  "Allow",
+	},
 }
 
 func TestEveryNestedOptionObjectRefusesAnUnknownKey(test *testing.T) {
@@ -165,7 +286,11 @@ func TestEveryNestedOptionObjectRefusesAnUnknownKey(test *testing.T) {
 				test.Fatalf("%s registers neither Decode nor DecodeOptionList", testCase.rule)
 			}
 			if _, err := decode([]byte(testCase.baseline)); err != nil {
-				test.Fatalf("baseline %s was refused, so the probe could be refused for that instead: %v", testCase.baseline, err)
+				test.Fatalf(
+					"baseline %s was refused, so the probe could be refused for that instead: %v",
+					testCase.baseline,
+					err,
+				)
 			}
 			_, err := decode([]byte(testCase.probe))
 			if err == nil {

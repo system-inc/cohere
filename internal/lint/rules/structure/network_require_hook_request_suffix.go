@@ -11,11 +11,18 @@ import (
 // The rule's messages, one handle per id, whose wording lives in
 // `policy/messages/network-require-hook-request-suffix.json`.
 var (
-	networkRequireHookRequestSuffixHookShouldEndWithRequestText = policy.MessageOf("structure/network-require-hook-request-suffix", "hookShouldEndWithRequest")
-	networkRequireHookRequestSuffixFileShouldEndWithRequestText = policy.MessageOf("structure/network-require-hook-request-suffix", "fileShouldEndWithRequest")
+	networkRequireHookRequestSuffixHookShouldEndWithRequestText = policy.MessageOf(
+		"structure/network-require-hook-request-suffix",
+		"hookShouldEndWithRequest",
+	)
+	networkRequireHookRequestSuffixFileShouldEndWithRequestText = policy.MessageOf(
+		"structure/network-require-hook-request-suffix",
+		"fileShouldEndWithRequest",
+	)
 )
 
-// messageHookShouldEndWithRequest is the finding, rendered when it is reported so the text comes from the current catalog.
+// messageHookShouldEndWithRequest is the finding, rendered when it is reported so the text comes from the current
+// catalog.
 func messageHookShouldEndWithRequest() rule.Message {
 	return rule.Message{
 		Id:          networkRequireHookRequestSuffixHookShouldEndWithRequestText.Id,
@@ -23,7 +30,8 @@ func messageHookShouldEndWithRequest() rule.Message {
 	}
 }
 
-// messageFileShouldEndWithRequest is the finding, rendered when it is reported so the text comes from the current catalog.
+// messageFileShouldEndWithRequest is the finding, rendered when it is reported so the text comes from the current
+// catalog.
 func messageFileShouldEndWithRequest() rule.Message {
 	return rule.Message{
 		Id:          networkRequireHookRequestSuffixFileShouldEndWithRequestText.Id,

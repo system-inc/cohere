@@ -28,15 +28,24 @@ const compilerFork = "https://github.com/system-inc/TypeScript"
 func renderNotice(moduleDirectory string) ([]byte, error) {
 	microsoft, readError := os.ReadFile(filepath.Join(moduleDirectory, "TypeScript", "NOTICE.txt"))
 	if readError != nil {
-		return nil, fmt.Errorf("reading the TypeScript compiler's NOTICE.txt, which NOTICE carries unmodified: %w", readError)
+		return nil, fmt.Errorf(
+			"reading the TypeScript compiler's NOTICE.txt, which NOTICE carries unmodified: %w",
+			readError,
+		)
 	}
 	microsoft = bytes.ReplaceAll(microsoft, []byte("\r\n"), []byte("\n"))
 	var builder strings.Builder
 	builder.WriteString("cohere\n" + release.CopyrightLine + "\n\n")
-	builder.WriteString("cohere includes the TypeScript compiler (typescript-go), Copyright (c) Microsoft Corporation, licensed\n")
-	builder.WriteString("under the Apache License, Version 2.0. cohere builds a modified version of it, from System, Inc.'s fork at\n")
+	builder.WriteString(
+		"cohere includes the TypeScript compiler (typescript-go), Copyright (c) Microsoft Corporation, licensed\n",
+	)
+	builder.WriteString(
+		"under the Apache License, Version 2.0. cohere builds a modified version of it, from System, Inc.'s fork at\n",
+	)
 	builder.WriteString(compilerFork + ", which changes files of the original.\n\n")
-	builder.WriteString("The original's NOTICE.txt follows, unmodified but for its line endings. The licenses of everything else\n")
+	builder.WriteString(
+		"The original's NOTICE.txt follows, unmodified but for its line endings. The licenses of everything else\n",
+	)
 	builder.WriteString("cohere is built on are in THIRD_PARTY_NOTICES.md.\n\n")
 	builder.WriteString(generatedBy + "\n\n")
 	builder.WriteString(strings.Repeat("-", 100) + "\n\n")
@@ -49,11 +58,20 @@ func renderNotice(moduleDirectory string) ([]byte, error) {
 
 // renderThirdPartyNotices is THIRD_PARTY_NOTICES.md: every project cohere is built on, grouped by where
 // it reaches a user, each with its license in full.
-func renderThirdPartyNotices(moduleDirectory string, compiled []Module, repositoryOnly []Module, swiftPins []swiftPin) ([]byte, error) {
+func renderThirdPartyNotices(
+	moduleDirectory string,
+	compiled []Module,
+	repositoryOnly []Module,
+	swiftPins []swiftPin,
+) ([]byte, error) {
 	var builder strings.Builder
 	builder.WriteString("# Third-party notices\n\n")
-	builder.WriteString("cohere is licensed `MIT OR Apache-2.0` ([LICENSE-MIT](LICENSE-MIT), [LICENSE-APACHE](LICENSE-APACHE)). It is built\n")
-	builder.WriteString("on the work of the projects below, each under its own license, reproduced here in full. The TypeScript\n")
+	builder.WriteString(
+		"cohere is licensed `MIT OR Apache-2.0` ([LICENSE-MIT](LICENSE-MIT), [LICENSE-APACHE](LICENSE-APACHE)). It is built\n",
+	)
+	builder.WriteString(
+		"on the work of the projects below, each under its own license, reproduced here in full. The TypeScript\n",
+	)
 	builder.WriteString("compiler's notice is in [NOTICE](NOTICE).\n\n")
 	builder.WriteString(generatedBy + "\n\n")
 
@@ -64,25 +82,40 @@ func renderThirdPartyNotices(moduleDirectory string, compiled []Module, reposito
 	if err != nil {
 		return nil, err
 	}
-	writeEntry(&builder, entry{Name: "The Go toolchain and standard library", URL: "https://go.dev", License: "BSD-3-Clause",
-		Carries: "The runtime and standard library linked into every Go binary.", Text: string(goLicense)})
+	writeEntry(
+		&builder,
+		entry{Name: "The Go toolchain and standard library", URL: "https://go.dev", License: "BSD-3-Clause",
+			Carries: "The runtime and standard library linked into every Go binary.", Text: string(goLicense)},
+	)
 
 	compilerLicense, err := os.ReadFile(filepath.Join(moduleDirectory, "TypeScript", "LICENSE.txt"))
 	if err != nil {
 		return nil, fmt.Errorf("reading the TypeScript compiler's license: %w", err)
 	}
-	writeEntry(&builder, entry{Name: "TypeScript (typescript-go)", URL: "https://github.com/microsoft/typescript-go", License: "Apache-2.0",
-		Carries: "The TypeScript compiler, built from System, Inc.'s modified fork " + compilerFork + ", and a few of its functions copied into internal/lint/checking. Its NOTICE is in [NOTICE](NOTICE).",
-		Text:    string(compilerLicense)})
+	writeEntry(&builder, entry{
+		Name:    "TypeScript (typescript-go)",
+		URL:     "https://github.com/microsoft/typescript-go",
+		License: "Apache-2.0",
+		Carries: "The TypeScript compiler, built from System, Inc.'s modified fork " +
+			compilerFork +
+			", and a few of its functions copied into internal/lint/checking. Its NOTICE is in [NOTICE](NOTICE).",
+		Text: string(compilerLicense),
+	})
 
 	for _, module := range compiled {
-		if writeModuleError := writeModule(&builder, module, "A Go module in cohere's build graph."); writeModuleError != nil {
+		if writeModuleError := writeModule(
+			&builder,
+			module,
+			"A Go module in cohere's build graph.",
+		); writeModuleError != nil {
 			return nil, writeModuleError
 		}
 	}
 
 	builder.WriteString("### Ported or vendored into cohere's source\n\n")
-	builder.WriteString("Code adapted from these projects, translated to Go or copied in, compiled into the binary.\n\n")
+	builder.WriteString(
+		"Code adapted from these projects, translated to Go or copied in, compiled into the binary.\n\n",
+	)
 	for _, upstream := range Upstreams {
 		if upstream.Reach != Compiled {
 			continue
@@ -98,20 +131,31 @@ func renderThirdPartyNotices(moduleDirectory string, compiled []Module, reposito
 	for _, pin := range swiftPins {
 		license, known := swiftLicenses[pin.Identity]
 		if !known {
-			return nil, fmt.Errorf("the Swift engine resolves %s (%s), which has no license recorded in swiftLicenses", pin.Identity, pin.Location)
+			return nil, fmt.Errorf(
+				"the Swift engine resolves %s (%s), which has no license recorded in swiftLicenses",
+				pin.Identity,
+				pin.Location,
+			)
 		}
 		text, readFileError := licenseTexts.ReadFile("licenses/" + license.File)
 		if readFileError != nil {
 			return nil, readFileError
 		}
-		writeEntry(&builder, entry{Name: pin.Identity, URL: pin.Location, Version: pin.Version, License: license.Expression,
-			Carries: "A Swift package compiled into cohere-swift.", Text: string(text)})
+		writeEntry(
+			&builder,
+			entry{Name: pin.Identity, URL: pin.Location, Version: pin.Version, License: license.Expression,
+				Carries: "A Swift package compiled into cohere-swift.", Text: string(text)},
+		)
 	}
 
 	builder.WriteString("## In this repository only\n\n")
 	builder.WriteString("Used by tests and tools, or kept for them. None of these ship in any package.\n\n")
 	for _, module := range repositoryOnly {
-		if writeModuleError := writeModule(&builder, module, "A Go module that tests and tools import."); writeModuleError != nil {
+		if writeModuleError := writeModule(
+			&builder,
+			module,
+			"A Go module that tests and tools import.",
+		); writeModuleError != nil {
 			return nil, writeModuleError
 		}
 	}
@@ -176,7 +220,11 @@ func writeLicenseBlock(builder *strings.Builder, text string) {
 func writeModule(builder *strings.Builder, module Module, carries string) error {
 	license, known := moduleLicenses[module.Path]
 	if !known {
-		return fmt.Errorf("%s@%s is in cohere's module graph with no license recorded in moduleLicenses: read its license and add it", module.Path, module.Version)
+		return fmt.Errorf(
+			"%s@%s is in cohere's module graph with no license recorded in moduleLicenses: read its license and add it",
+			module.Path,
+			module.Version,
+		)
 	}
 	text, readModuleLicenseError := readModuleLicense(module)
 	if readModuleLicenseError != nil {
@@ -190,8 +238,16 @@ func writeModule(builder *strings.Builder, module Module, carries string) error 
 	if len(module.Targets) > 0 {
 		carries += " Linked on " + strings.Join(module.Targets, ", ") + " only."
 	}
-	writeEntry(builder, entry{Name: module.Path, URL: "https://pkg.go.dev/" + module.Path + "@" + module.Version, Version: module.Version,
-		License: license, Carries: carries, Text: text, ThirdPartyFile: thirdPartyFile, ThirdPartyText: thirdPartyText})
+	writeEntry(builder, entry{
+		Name:           module.Path,
+		URL:            "https://pkg.go.dev/" + module.Path + "@" + module.Version,
+		Version:        module.Version,
+		License:        license,
+		Carries:        carries,
+		Text:           text,
+		ThirdPartyFile: thirdPartyFile,
+		ThirdPartyText: thirdPartyText,
+	})
 	return nil
 }
 
@@ -200,15 +256,26 @@ func writeUpstream(builder *strings.Builder, upstream Upstream) error {
 		return fmt.Errorf("%s needs exactly one of a license file and a note saying why there is none", upstream.Name)
 	}
 	if upstream.LicenseFile == "" {
-		writeEntry(builder, entry{Name: upstream.Name, URL: upstream.URL, Version: upstream.Version, License: upstream.License,
-			Carries: upstream.Carries, Note: upstream.Note})
+		writeEntry(
+			builder,
+			entry{Name: upstream.Name, URL: upstream.URL, Version: upstream.Version, License: upstream.License,
+				Carries: upstream.Carries, Note: upstream.Note},
+		)
 		return nil
 	}
 	text, readFileError := licenseTexts.ReadFile("licenses/" + upstream.LicenseFile)
 	if readFileError != nil {
-		return fmt.Errorf("%s names the license file %s, which isn't in internal/release/notices/licenses: %w", upstream.Name, upstream.LicenseFile, readFileError)
+		return fmt.Errorf(
+			"%s names the license file %s, which isn't in internal/release/notices/licenses: %w",
+			upstream.Name,
+			upstream.LicenseFile,
+			readFileError,
+		)
 	}
-	writeEntry(builder, entry{Name: upstream.Name, URL: upstream.URL, Version: upstream.Version, License: upstream.License,
-		Carries: upstream.Carries, Text: string(text)})
+	writeEntry(
+		builder,
+		entry{Name: upstream.Name, URL: upstream.URL, Version: upstream.Version, License: upstream.License,
+			Carries: upstream.Carries, Text: string(text)},
+	)
 	return nil
 }

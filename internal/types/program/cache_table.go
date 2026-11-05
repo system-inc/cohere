@@ -213,7 +213,13 @@ type CacheTableSections struct {
 }
 
 // EveryCacheTableSection is the whole table.
-var EveryCacheTableSection = CacheTableSections{AllRuns: true, Findings: true, Signatures: true, Formatted: true, Types: true}
+var EveryCacheTableSection = CacheTableSections{
+	AllRuns:    true,
+	Findings:   true,
+	Signatures: true,
+	Formatted:  true,
+	Types:      true,
+}
 
 // cacheTableRunFile is the file a recorded run lives in: a hash of its invocation, since an invocation is
 // arguments joined by NUL and no file name can hold it.
@@ -323,7 +329,9 @@ func CacheTableInvocation(arguments []string) string {
 func encodeCacheTableFile[Body any](section string, body Body, identity CacheTableIdentity) ([]byte, error) {
 	var buffer bytes.Buffer
 	encoder := gob.NewEncoder(&buffer)
-	if encodeError := encoder.Encode(cacheTableHeader{Magic: cacheTableMagic, Version: cacheTableVersion, Identity: identity, Section: section}); encodeError != nil {
+	if encodeError := encoder.Encode(
+		cacheTableHeader{Magic: cacheTableMagic, Version: cacheTableVersion, Identity: identity, Section: section},
+	); encodeError != nil {
 		return nil, fmt.Errorf("encoding the %s file's header: %w", section, encodeError)
 	}
 	if encodeError := encoder.Encode(body); encodeError != nil {
@@ -364,7 +372,12 @@ func decodeCacheTableFile[Body any](contents []byte, section string, identity Ca
 		if other != identity {
 			return fmt.Errorf("written by %s, this is %s", header.Identity, identity)
 		}
-		otherCommit = fmt.Errorf("%w (%s, this is %s)", errWrittenByAnotherCommit, orUnknown(header.Identity.SelfCommit), orUnknown(identity.SelfCommit))
+		otherCommit = fmt.Errorf(
+			"%w (%s, this is %s)",
+			errWrittenByAnotherCommit,
+			orUnknown(header.Identity.SelfCommit),
+			orUnknown(identity.SelfCommit),
+		)
 	}
 
 	if decodeError := decoder.Decode(body); decodeError != nil {
@@ -393,7 +406,12 @@ func orUnknown(value string) string {
 // wire interns the findings cache's rule lists. It is stamped with this build's lintCacheVersion: a cache in
 // memory always means what this build means.
 func (cache *LintCache) wire() *lintCacheWire {
-	wire := &lintCacheWire{Version: lintCacheVersion, Key: cache.Key, KeyParts: cache.KeyParts, DesignSystem: cache.DesignSystem}
+	wire := &lintCacheWire{
+		Version:      lintCacheVersion,
+		Key:          cache.Key,
+		KeyParts:     cache.KeyParts,
+		DesignSystem: cache.DesignSystem,
+	}
 	// Interned by a cheap key, the length and the two ends, and confirmed by comparing names, never by joining
 	// a list into one string: ahra's entries hold about 18,000 lists of up to ~250 names, and joining each cost
 	// about 25ms of every recording run to find 31 distinct ones (#a66sfmh).
@@ -456,8 +474,13 @@ func (wire *lintCacheWire) cache() (*LintCache, error) {
 	if wire.Version != lintCacheVersion {
 		return nil, nil
 	}
-	cache := &LintCache{Version: wire.Version, Key: wire.Key, KeyParts: wire.KeyParts, Entries: make([]LintCacheEntry, 0, len(wire.Entries)),
-		DesignSystem: wire.DesignSystem}
+	cache := &LintCache{
+		Version:      wire.Version,
+		Key:          wire.Key,
+		KeyParts:     wire.KeyParts,
+		Entries:      make([]LintCacheEntry, 0, len(wire.Entries)),
+		DesignSystem: wire.DesignSystem,
+	}
 	list := func(index int) ([]string, error) {
 		if index < 0 || index >= len(wire.Lists) {
 			return nil, fmt.Errorf("list %d of %d", index, len(wire.Lists))
@@ -519,7 +542,12 @@ func (wire *lintCacheWire) cache() (*LintCache, error) {
 // appears.
 //
 // The single table.gob of earlier formats is removed here, unread.
-func ReadCacheTable(directory string, identity CacheTableIdentity, sections CacheTableSections, anchor PathAnchor) (*CacheTable, error) {
+func ReadCacheTable(
+	directory string,
+	identity CacheTableIdentity,
+	sections CacheTableSections,
+	anchor PathAnchor,
+) (*CacheTable, error) {
 	table, readCacheTableError := readCacheTable(directory, identity, sections)
 	table.spell(anchor)
 	return table, readCacheTableError
@@ -658,7 +686,13 @@ var beforeCacheTableRename func(temporaryName string)
 // has moved on, where nothing stops a kill landing mid-write; the rename is what keeps the old file whole if
 // one does (TestAWriterKilledBeforeItsRenameLeavesTheOldTable). Files are not atomic with each other, and
 // need not be: each carries its own proof, and the table's lock orders whole writes against reads.
-func WriteCacheTable(directory string, table *CacheTable, identity CacheTableIdentity, sections CacheTableSections, anchor PathAnchor) error {
+func WriteCacheTable(
+	directory string,
+	table *CacheTable,
+	identity CacheTableIdentity,
+	sections CacheTableSections,
+	anchor PathAnchor,
+) error {
 	table = table.anchored(anchor)
 	if createDirectoryError := os.MkdirAll(directory, 0o755); createDirectoryError != nil {
 		return fmt.Errorf("creating %s: %w", directory, createDirectoryError)
@@ -675,7 +709,13 @@ func WriteCacheTable(directory string, table *CacheTable, identity CacheTableIde
 		if run := table.Runs[invocation]; run != nil {
 			body := cacheTableRunBody{Invocation: invocation, Run: run}
 			name := cacheTableRunFile(invocation)
-			if writeCacheTableSectionError := writeCacheTableSection(directory, name, cacheTableRunSection, body, identity); writeCacheTableSectionError != nil {
+			if writeCacheTableSectionError := writeCacheTableSection(
+				directory,
+				name,
+				cacheTableRunSection,
+				body,
+				identity,
+			); writeCacheTableSectionError != nil {
 				return writeCacheTableSectionError
 			}
 		}
@@ -693,14 +733,24 @@ func WriteCacheTable(directory string, table *CacheTable, identity CacheTableIde
 		}
 	}
 	if sections.Formatted && table.Formatted != nil {
-		if writeCacheTableSectionError := writeCacheTableSection(directory, cacheTableFile(cacheTableFormatSection), cacheTableFormatSection,
-			table.Formatted, identity); writeCacheTableSectionError != nil {
+		if writeCacheTableSectionError := writeCacheTableSection(
+			directory,
+			cacheTableFile(cacheTableFormatSection),
+			cacheTableFormatSection,
+			table.Formatted,
+			identity,
+		); writeCacheTableSectionError != nil {
 			return writeCacheTableSectionError
 		}
 	}
 	if sections.Types && table.Types != nil {
-		if writeCacheTableSectionError := writeCacheTableSection(directory, cacheTableFile(cacheTableTypesSection), cacheTableTypesSection,
-			table.Types, identity); writeCacheTableSectionError != nil {
+		if writeCacheTableSectionError := writeCacheTableSection(
+			directory,
+			cacheTableFile(cacheTableTypesSection),
+			cacheTableTypesSection,
+			table.Types,
+			identity,
+		); writeCacheTableSectionError != nil {
 			return writeCacheTableSectionError
 		}
 	}
@@ -861,13 +911,27 @@ func writeCacheTableDump(dump *strings.Builder, directory string, table *CacheTa
 				files++
 			}
 		}
-		fmt.Fprintf(dump, "  %s: recorded %s, exit %d, key %.12s, %d inputs (%d files, %d directories, %d absent), %d bytes of output, %d of errors\n",
-			name, time.Unix(0, run.RecordedUnixNanoseconds).Format(time.DateTime), run.ExitCode, run.Key,
-			len(run.Inputs), files, directories, absent, len(run.Output), len(run.Errors))
+		fmt.Fprintf(
+			dump,
+			"  %s: recorded %s, exit %d, key %.12s, %d inputs (%d files, %d directories, %d absent), %d bytes of output, %d of errors\n",
+			name,
+			time.Unix(0, run.RecordedUnixNanoseconds).Format(time.DateTime),
+			run.ExitCode,
+			run.Key,
+			len(run.Inputs),
+			files,
+			directories,
+			absent,
+			len(run.Output),
+			len(run.Errors),
+		)
 		if changed := run.ChangedInput(); changed != nil {
 			fmt.Fprintf(dump, "    now: would not replay, %v\n", changed)
 		} else {
-			fmt.Fprintln(dump, "    now: every input as recorded, so it replays if the binary, flags and directory match")
+			fmt.Fprintln(
+				dump,
+				"    now: every input as recorded, so it replays if the binary, flags and directory match",
+			)
 		}
 	}
 
@@ -887,7 +951,13 @@ func writeCacheTableDump(dump *strings.Builder, directory string, table *CacheTa
 	for _, entry := range table.Findings.Entries {
 		findingCount += len(entry.Findings)
 	}
-	fmt.Fprintf(dump, "findings: %d files, %d findings, key %x\n", len(table.Findings.Entries), findingCount, table.Findings.Key[:6])
+	fmt.Fprintf(
+		dump,
+		"findings: %d files, %d findings, key %x\n",
+		len(table.Findings.Entries),
+		findingCount,
+		table.Findings.Key[:6],
+	)
 	if design := table.Findings.DesignSystem; design == nil {
 		fmt.Fprintln(dump, "  design system: none recorded")
 	} else {
@@ -904,17 +974,43 @@ func writeCacheTableDump(dump *strings.Builder, directory string, table *CacheTa
 		}
 	}
 	for _, entry := range table.Findings.Entries {
-		fmt.Fprintf(dump, "  %s  content %x  types %x  shapes %x  design %x  %d pure + %d type-aware + %d shape-keyed + %d design-system rules, %d listening, %d nodes, %d findings\n",
-			entry.Path, entry.ContentHash[:6], entry.TypeFingerprint[:6], entry.ShapeFingerprint[:6], entry.DesignFingerprint[:6], len(entry.Rules),
-			len(entry.TypedRules), len(entry.ShapedRules), len(entry.DesignRules), len(entry.Listening), entry.VisitedNodes, len(entry.Findings))
+		fmt.Fprintf(
+			dump,
+			"  %s  content %x  types %x  shapes %x  design %x  %d pure + %d type-aware + %d shape-keyed + %d design-system rules, %d listening, %d nodes, %d findings\n",
+			entry.Path,
+			entry.ContentHash[:6],
+			entry.TypeFingerprint[:6],
+			entry.ShapeFingerprint[:6],
+			entry.DesignFingerprint[:6],
+			len(entry.Rules),
+			len(entry.TypedRules),
+			len(entry.ShapedRules),
+			len(entry.DesignRules),
+			len(entry.Listening),
+			entry.VisitedNodes,
+			len(entry.Findings),
+		)
 		for _, finding := range entry.Findings {
-			fmt.Fprintf(dump, "    %d-%d %s/%s: %s\n", finding.Start, finding.End, finding.RuleName, finding.MessageId, finding.MessageDescription)
+			fmt.Fprintf(
+				dump,
+				"    %d-%d %s/%s: %s\n",
+				finding.Start,
+				finding.End,
+				finding.RuleName,
+				finding.MessageId,
+				finding.MessageDescription,
+			)
 		}
 		for _, withheld := range entry.Withheld {
 			fmt.Fprintf(dump, "    withheld by directive %d: %s\n", withheld.Directive, withheld.RuleName)
 		}
 		if entry.Adamic != nil {
-			fmt.Fprintf(dump, "    adamic: %d rules measured, %d skipped\n", len(entry.Adamic.Counts), len(entry.Adamic.Skipped))
+			fmt.Fprintf(
+				dump,
+				"    adamic: %d rules measured, %d skipped\n",
+				len(entry.Adamic.Counts),
+				len(entry.Adamic.Skipped),
+			)
 			for _, count := range entry.Adamic.Counts {
 				if count.Findings > 0 {
 					fmt.Fprintf(dump, "      %s: %d\n", count.Rule, count.Findings)

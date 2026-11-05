@@ -11,12 +11,22 @@ import (
 // The rule's messages, one handle per id, whose wording lives in
 // `policy/messages/network-require-hook-options-parameter.json`.
 var (
-	networkRequireHookOptionsParameterMissingOptionsParameterText          = policy.MessageOf("structure/network-require-hook-options-parameter", "missingOptionsParameter")
-	networkRequireHookOptionsParameterOptionsParameterNotPassedThroughText = policy.MessageOf("structure/network-require-hook-options-parameter", "optionsParameterNotPassedThrough")
-	networkRequireHookOptionsParameterIncorrectOptionsParameterTypeText    = policy.MessageOf("structure/network-require-hook-options-parameter", "incorrectOptionsParameterType")
+	networkRequireHookOptionsParameterMissingOptionsParameterText = policy.MessageOf(
+		"structure/network-require-hook-options-parameter",
+		"missingOptionsParameter",
+	)
+	networkRequireHookOptionsParameterOptionsParameterNotPassedThroughText = policy.MessageOf(
+		"structure/network-require-hook-options-parameter",
+		"optionsParameterNotPassedThrough",
+	)
+	networkRequireHookOptionsParameterIncorrectOptionsParameterTypeText = policy.MessageOf(
+		"structure/network-require-hook-options-parameter",
+		"incorrectOptionsParameterType",
+	)
 )
 
-// messageMissingOptionsParameter is the finding, rendered when it is reported so the text comes from the current catalog.
+// messageMissingOptionsParameter is the finding, rendered when it is reported so the text comes from the current
+// catalog.
 func messageMissingOptionsParameter() rule.Message {
 	return rule.Message{
 		Id:          networkRequireHookOptionsParameterMissingOptionsParameterText.Id,
@@ -24,7 +34,8 @@ func messageMissingOptionsParameter() rule.Message {
 	}
 }
 
-// messageOptionsParameterNotPassedThrough is the finding, rendered when it is reported so the text comes from the current catalog.
+// messageOptionsParameterNotPassedThrough is the finding, rendered when it is reported so the text comes from the
+// current catalog.
 func messageOptionsParameterNotPassedThrough() rule.Message {
 	return rule.Message{
 		Id:          networkRequireHookOptionsParameterOptionsParameterNotPassedThroughText.Id,
@@ -32,7 +43,8 @@ func messageOptionsParameterNotPassedThrough() rule.Message {
 	}
 }
 
-// messageIncorrectOptionsParameterType is the finding, rendered when it is reported so the text comes from the current catalog.
+// messageIncorrectOptionsParameterType is the finding, rendered when it is reported so the text comes from the current
+// catalog.
 func messageIncorrectOptionsParameterType() rule.Message {
 	return rule.Message{
 		Id:          networkRequireHookOptionsParameterIncorrectOptionsParameterTypeText.Id,

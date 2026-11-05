@@ -19,29 +19,86 @@ func TestVarsOnTopStaysSilent(test *testing.T) {
 	}{
 		{name: "valid0", source: "var first = 0;\nfunction foo() {\n    first = 2;\n}"},
 		{name: "valid1", source: "function foo() {\n}"},
-		{name: "valid2", source: "function foo() {\n   var first;\n   if (true) {\n       first = true;\n   } else {\n       first = 1;\n   }\n}"},
-		{name: "valid3", source: "function foo() {\n   var first;\n   var second = 1;\n   var third;\n   var fourth = 1, fifth, sixth = third;\n   var seventh;\n   if (true) {\n       third = true;\n   }\n   first = second;\n}"},
-		{name: "valid4", source: "function foo() {\n   var i;\n   for (i = 0; i < 10; i++) {\n       alert(i);\n   }\n}"},
-		{name: "valid5", source: "function foo() {\n   var outer;\n   function inner() {\n       var inner = 1;\n       var outer = inner;\n   }\n   outer = 1;\n}"},
-		{name: "valid6", source: "function foo() {\n   var first;\n   //Hello\n   var second = 1;\n   first = second;\n}"},
-		{name: "valid7", source: "function foo() {\n   var first;\n   /*\n       Hello Clarice\n   */\n   var second = 1;\n   first = second;\n}"},
-		{name: "valid8", source: "function foo() {\n   var first;\n   var second = 1;\n   function bar(){\n       var first;\n       first = 5;\n   }\n   first = second;\n}"},
-		{name: "valid9", source: "function foo() {\n   var first;\n   var second = 1;\n   function bar(){\n       var third;\n       third = 5;\n   }\n   first = second;\n}"},
-		{name: "valid10", source: "function foo() {\n   var first;\n   var bar = function(){\n       var third;\n       third = 5;\n   }\n   first = 5;\n}"},
-		{name: "valid11", source: "function foo() {\n   var first;\n   first.onclick(function(){\n       var third;\n       third = 5;\n   });\n   first = 5;\n}"},
-		{name: "valid12", source: "function foo() {\n   var i = 0;\n   for (let j = 0; j < 10; j++) {\n       alert(j);\n   }\n   i = i + 1;\n}"},
+		{
+			name:   "valid2",
+			source: "function foo() {\n   var first;\n   if (true) {\n       first = true;\n   } else {\n       first = 1;\n   }\n}",
+		},
+		{
+			name:   "valid3",
+			source: "function foo() {\n   var first;\n   var second = 1;\n   var third;\n   var fourth = 1, fifth, sixth = third;\n   var seventh;\n   if (true) {\n       third = true;\n   }\n   first = second;\n}",
+		},
+		{
+			name:   "valid4",
+			source: "function foo() {\n   var i;\n   for (i = 0; i < 10; i++) {\n       alert(i);\n   }\n}",
+		},
+		{
+			name:   "valid5",
+			source: "function foo() {\n   var outer;\n   function inner() {\n       var inner = 1;\n       var outer = inner;\n   }\n   outer = 1;\n}",
+		},
+		{
+			name:   "valid6",
+			source: "function foo() {\n   var first;\n   //Hello\n   var second = 1;\n   first = second;\n}",
+		},
+		{
+			name:   "valid7",
+			source: "function foo() {\n   var first;\n   /*\n       Hello Clarice\n   */\n   var second = 1;\n   first = second;\n}",
+		},
+		{
+			name:   "valid8",
+			source: "function foo() {\n   var first;\n   var second = 1;\n   function bar(){\n       var first;\n       first = 5;\n   }\n   first = second;\n}",
+		},
+		{
+			name:   "valid9",
+			source: "function foo() {\n   var first;\n   var second = 1;\n   function bar(){\n       var third;\n       third = 5;\n   }\n   first = second;\n}",
+		},
+		{
+			name:   "valid10",
+			source: "function foo() {\n   var first;\n   var bar = function(){\n       var third;\n       third = 5;\n   }\n   first = 5;\n}",
+		},
+		{
+			name:   "valid11",
+			source: "function foo() {\n   var first;\n   first.onclick(function(){\n       var third;\n       third = 5;\n   });\n   first = 5;\n}",
+		},
+		{
+			name:   "valid12",
+			source: "function foo() {\n   var i = 0;\n   for (let j = 0; j < 10; j++) {\n       alert(j);\n   }\n   i = i + 1;\n}",
+		},
 		{name: "valid13", source: "'use strict'; var x; f();"},
 		{name: "valid14", source: "'use strict'; 'directive'; var x; var y; f();"},
 		{name: "valid15", source: "function f() { 'use strict'; var x; f(); }"},
 		{name: "valid16", source: "function f() { 'use strict'; 'directive'; var x; var y; f(); }"},
-		{name: "valid17", source: "import React from 'react'; var y; function f() { 'use strict'; var x; var y; f(); }"},
-		{name: "valid18", source: "'use strict'; import React from 'react'; var y; function f() { 'use strict'; var x; var y; f(); }"},
-		{name: "valid19", source: "import React from 'react'; 'use strict'; var y; function f() { 'use strict'; var x; var y; f(); }"},
-		{name: "valid20", source: "import * as foo from 'mod.js'; 'use strict'; var y; function f() { 'use strict'; var x; var y; f(); }"},
-		{name: "valid21", source: "import { square, diag } from 'lib'; 'use strict'; var y; function f() { 'use strict'; var x; var y; f(); }"},
-		{name: "valid22", source: "import { default as foo } from 'lib'; 'use strict'; var y; function f() { 'use strict'; var x; var y; f(); }"},
-		{name: "valid23", source: "import 'src/mylib'; 'use strict'; var y; function f() { 'use strict'; var x; var y; f(); }"},
-		{name: "valid24", source: "import theDefault, { named1, named2 } from 'src/mylib'; 'use strict'; var y; function f() { 'use strict'; var x; var y; f(); }"},
+		{
+			name:   "valid17",
+			source: "import React from 'react'; var y; function f() { 'use strict'; var x; var y; f(); }",
+		},
+		{
+			name:   "valid18",
+			source: "'use strict'; import React from 'react'; var y; function f() { 'use strict'; var x; var y; f(); }",
+		},
+		{
+			name:   "valid19",
+			source: "import React from 'react'; 'use strict'; var y; function f() { 'use strict'; var x; var y; f(); }",
+		},
+		{
+			name:   "valid20",
+			source: "import * as foo from 'mod.js'; 'use strict'; var y; function f() { 'use strict'; var x; var y; f(); }",
+		},
+		{
+			name:   "valid21",
+			source: "import { square, diag } from 'lib'; 'use strict'; var y; function f() { 'use strict'; var x; var y; f(); }",
+		},
+		{
+			name:   "valid22",
+			source: "import { default as foo } from 'lib'; 'use strict'; var y; function f() { 'use strict'; var x; var y; f(); }",
+		},
+		{
+			name:   "valid23",
+			source: "import 'src/mylib'; 'use strict'; var y; function f() { 'use strict'; var x; var y; f(); }",
+		},
+		{
+			name:   "valid24",
+			source: "import theDefault, { named1, named2 } from 'src/mylib'; 'use strict'; var y; function f() { 'use strict'; var x; var y; f(); }",
+		},
 		{name: "valid25", source: "export var x;\nvar y;\nvar z;"},
 		{name: "valid26", source: "var x;\nexport var y;\nvar z;"},
 		{name: "valid27", source: "var x;\nvar y;\nexport var z;"},
@@ -68,19 +125,71 @@ func TestVarsOnTopFires(test *testing.T) {
 		source    string
 		wantCount int
 	}{
-		{name: "invalid0", source: "var first = 0;\nfunction foo() {\n    first = 2;\n    second = 2;\n}\nvar second = 0;", wantCount: 1},
-		{name: "invalid1", source: "function foo() {\n   var first;\n   first = 1;\n   first = 2;\n   first = 3;\n   first = 4;\n   var second = 1;\n   second = 2;\n   first = second;\n}", wantCount: 1},
-		{name: "invalid2", source: "function foo() {\n   var first;\n   if (true) {\n       var second = true;\n   }\n   first = second;\n}", wantCount: 1},
-		{name: "invalid3", source: "function foo() {\n   for (var i = 0; i < 10; i++) {\n       alert(i);\n   }\n}", wantCount: 1},
-		{name: "invalid4", source: "function foo() {\n   var first = 10;\n   var i;\n   for (i = 0; i < first; i ++) {\n       var second = i;\n   }\n}", wantCount: 1},
-		{name: "invalid5", source: "function foo() {\n   var first = 10;\n   var i;\n   switch (first) {\n       case 10:\n           var hello = 1;\n           break;\n   }\n}", wantCount: 1},
-		{name: "invalid6", source: "function foo() {\n   var first = 10;\n   var i;\n   try {\n       var hello = 1;\n   } catch (e) {\n       alert('error');\n   }\n}", wantCount: 1},
-		{name: "invalid7", source: "function foo() {\n   var first = 10;\n   var i;\n   try {\n       asdf;\n   } catch (e) {\n       var hello = 1;\n   }\n}", wantCount: 1},
-		{name: "invalid8", source: "function foo() {\n   var first = 10;\n   while (first) {\n       var hello = 1;\n   }\n}", wantCount: 1},
-		{name: "invalid9", source: "function foo() {\n   var first = 10;\n   do {\n       var hello = 1;\n   } while (first == 10);\n}", wantCount: 1},
-		{name: "invalid10", source: "function foo() {\n   var first = [1,2,3];\n   for (var item in first) {\n       item++;\n   }\n}", wantCount: 1},
-		{name: "invalid11", source: "function foo() {\n   var first = [1,2,3];\n   var item;\n   for (item in first) {\n       var hello = item;\n   }\n}", wantCount: 1},
-		{name: "invalid12", source: "var foo = () => {\n   var first = [1,2,3];\n   var item;\n   for (item in first) {\n       var hello = item;\n   }\n}", wantCount: 1},
+		{
+			name:      "invalid0",
+			source:    "var first = 0;\nfunction foo() {\n    first = 2;\n    second = 2;\n}\nvar second = 0;",
+			wantCount: 1,
+		},
+		{
+			name:      "invalid1",
+			source:    "function foo() {\n   var first;\n   first = 1;\n   first = 2;\n   first = 3;\n   first = 4;\n   var second = 1;\n   second = 2;\n   first = second;\n}",
+			wantCount: 1,
+		},
+		{
+			name:      "invalid2",
+			source:    "function foo() {\n   var first;\n   if (true) {\n       var second = true;\n   }\n   first = second;\n}",
+			wantCount: 1,
+		},
+		{
+			name:      "invalid3",
+			source:    "function foo() {\n   for (var i = 0; i < 10; i++) {\n       alert(i);\n   }\n}",
+			wantCount: 1,
+		},
+		{
+			name:      "invalid4",
+			source:    "function foo() {\n   var first = 10;\n   var i;\n   for (i = 0; i < first; i ++) {\n       var second = i;\n   }\n}",
+			wantCount: 1,
+		},
+		{
+			name:      "invalid5",
+			source:    "function foo() {\n   var first = 10;\n   var i;\n   switch (first) {\n       case 10:\n           var hello = 1;\n           break;\n   }\n}",
+			wantCount: 1,
+		},
+		{
+			name:      "invalid6",
+			source:    "function foo() {\n   var first = 10;\n   var i;\n   try {\n       var hello = 1;\n   } catch (e) {\n       alert('error');\n   }\n}",
+			wantCount: 1,
+		},
+		{
+			name:      "invalid7",
+			source:    "function foo() {\n   var first = 10;\n   var i;\n   try {\n       asdf;\n   } catch (e) {\n       var hello = 1;\n   }\n}",
+			wantCount: 1,
+		},
+		{
+			name:      "invalid8",
+			source:    "function foo() {\n   var first = 10;\n   while (first) {\n       var hello = 1;\n   }\n}",
+			wantCount: 1,
+		},
+		{
+			name:      "invalid9",
+			source:    "function foo() {\n   var first = 10;\n   do {\n       var hello = 1;\n   } while (first == 10);\n}",
+			wantCount: 1,
+		},
+		{
+			name:      "invalid10",
+			source:    "function foo() {\n   var first = [1,2,3];\n   for (var item in first) {\n       item++;\n   }\n}",
+			wantCount: 1,
+		},
+		{
+			name:      "invalid11",
+			source:    "function foo() {\n   var first = [1,2,3];\n   var item;\n   for (item in first) {\n       var hello = item;\n   }\n}",
+			wantCount: 1,
+		},
+		{
+			name:      "invalid12",
+			source:    "var foo = () => {\n   var first = [1,2,3];\n   var item;\n   for (item in first) {\n       var hello = item;\n   }\n}",
+			wantCount: 1,
+		},
 		{name: "invalid13", source: "'use strict'; 0; var x; f();", wantCount: 1},
 		{name: "invalid14", source: "'use strict'; var x; 'directive'; var y; f();", wantCount: 1},
 		{name: "invalid15", source: "function f() { 'use strict'; 0; var x; f(); }", wantCount: 1},
@@ -91,10 +200,26 @@ func TestVarsOnTopFires(test *testing.T) {
 		{name: "invalid20", source: "export {foo} from 'foo';\nvar test = 1;", wantCount: 1},
 		{name: "invalid21", source: "export * from 'foo';\nvar test = 1;", wantCount: 1},
 		{name: "invalid22", source: "class C {\n    static {\n        foo();\n        var x;\n    }\n}", wantCount: 1},
-		{name: "invalid23", source: "class C {\n    static {\n        'use strict';\n        var x;\n    }\n}", wantCount: 1},
-		{name: "invalid24", source: "class C {\n    static {\n        var x;\n        foo();\n        var y;\n    }\n}", wantCount: 1},
-		{name: "invalid25", source: "class C {\n    static {\n        if (foo) {\n            var x;\n        }\n    }\n}", wantCount: 1},
-		{name: "invalid26", source: "class C {\n    static {\n        if (foo)\n            var x;\n    }\n}", wantCount: 1},
+		{
+			name:      "invalid23",
+			source:    "class C {\n    static {\n        'use strict';\n        var x;\n    }\n}",
+			wantCount: 1,
+		},
+		{
+			name:      "invalid24",
+			source:    "class C {\n    static {\n        var x;\n        foo();\n        var y;\n    }\n}",
+			wantCount: 1,
+		},
+		{
+			name:      "invalid25",
+			source:    "class C {\n    static {\n        if (foo) {\n            var x;\n        }\n    }\n}",
+			wantCount: 1,
+		},
+		{
+			name:      "invalid26",
+			source:    "class C {\n    static {\n        if (foo)\n            var x;\n    }\n}",
+			wantCount: 1,
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {

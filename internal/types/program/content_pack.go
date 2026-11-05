@@ -140,11 +140,17 @@ func OpenContentPack(directory string) (*ContentPack, error) {
 	}
 	dataName, entries, err := parseContentPackIndex(index)
 	if err != nil {
-		return pack, fmt.Errorf("the content pack's index is damaged (%w), so every file is read from disk and a new pack is written", err)
+		return pack, fmt.Errorf(
+			"the content pack's index is damaged (%w), so every file is read from disk and a new pack is written",
+			err,
+		)
 	}
 	mapped := mapFile(filepath.Join(directory, dataName))
 	if mapped == nil && len(entries) > 0 {
-		return pack, fmt.Errorf("the content pack's data file %s could not be mapped, so every file is read from disk and a new pack is written", dataName)
+		return pack, fmt.Errorf(
+			"the content pack's data file %s could not be mapped, so every file is read from disk and a new pack is written",
+			dataName,
+		)
 	}
 	pack.dataName, pack.mapped, pack.entries = dataName, mapped, entries
 	return pack, nil
@@ -279,7 +285,9 @@ func (pack *ContentPack) Save() error {
 	current := map[string]contentPackEntry{}
 	currentData := ""
 	if index, readError := os.ReadFile(filepath.Join(pack.directory, contentPackIndexName)); readError == nil {
-		if dataName, entries, parseContentPackIndexError := parseContentPackIndex(index); parseContentPackIndexError == nil {
+		if dataName, entries, parseContentPackIndexError := parseContentPackIndex(
+			index,
+		); parseContentPackIndexError == nil {
 			currentData, current = dataName, entries
 		}
 	}
@@ -377,7 +385,11 @@ func (pack *ContentPack) rewrite() error {
 		os.Remove(file.Name())
 		return closeError
 	}
-	if writeContentPackIndexError := writeContentPackIndex(pack.directory, dataName, entries); writeContentPackIndexError != nil {
+	if writeContentPackIndexError := writeContentPackIndex(
+		pack.directory,
+		dataName,
+		entries,
+	); writeContentPackIndexError != nil {
 		// Ignored: no index names this file, as above.
 		os.Remove(file.Name())
 		return writeContentPackIndexError

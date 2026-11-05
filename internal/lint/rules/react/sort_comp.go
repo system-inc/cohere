@@ -605,7 +605,12 @@ type sortCompComparison struct {
 // positions the loops considered. Those failure indexes are what `storeError` keys the error map on
 // and what `dedupeErrors` looks entries up by, so returning source positions there would change
 // which findings survive deduplication.
-func sortCompComparePropsOrder(methodsOrder []string, members []sortCompMember, indexA int, indexB int) sortCompComparison {
+func sortCompComparePropsOrder(
+	methodsOrder []string,
+	members []sortCompMember,
+	indexA int,
+	indexB int,
+) sortCompComparison {
 	refIndexesA := sortCompRefIndexes(methodsOrder, members[indexA])
 	refIndexesB := sortCompRefIndexes(methodsOrder, members[indexB])
 

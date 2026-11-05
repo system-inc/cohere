@@ -130,7 +130,8 @@ func TestASecondWholeModuleRunWaitsAndSaysForWhom(test *testing.T) {
 	if elapsed := time.Since(began); elapsed < 4*time.Second {
 		test.Errorf("two runs on one slot finished in %s, so they overlapped", elapsed)
 	}
-	if !strings.Contains(outputs[1], "waiting for a token") || !strings.Contains(outputs[1], "go test -vet=all ./...") ||
+	if !strings.Contains(outputs[1], "waiting for a token") ||
+		!strings.Contains(outputs[1], "go test -vet=all ./...") ||
 		!strings.Contains(outputs[1], "after waiting") {
 		test.Errorf("the second run did not say it waited and for whom:\n%s", outputs[1])
 	}
@@ -142,7 +143,10 @@ func TestASecondWholeModuleRunWaitsAndSaysForWhom(test *testing.T) {
 	if err == nil || !strings.Contains(output, "never passes -count=1") || strings.Contains(output, "tested") {
 		test.Errorf("a -count=1 whole-module run was not refused before running:\n%s", output)
 	}
-	if output, err := run("-count=1", "./internal/edit"); err != nil || !strings.Contains(output, "tested test -vet=all -count=1 ./internal/edit") {
+	if output, err := run(
+		"-count=1",
+		"./internal/edit",
+	); err != nil || !strings.Contains(output, "tested test -vet=all -count=1 ./internal/edit") {
 		test.Errorf("a -count=1 run of one package was held back:\n%s (%v)", output, err)
 	}
 }
@@ -186,8 +190,12 @@ func TestWaitersTakeTheSlotInArrivalOrder(test *testing.T) {
 
 	// A go that records which run reached it and takes a second to test. The first run's waits for a release
 	// file too, so the line forms behind it before anyone can move.
-	if writeError := os.WriteFile(filepath.Join(bin, "go"), []byte("#!/bin/sh\necho \"$COHERE_DEV_TEST_RUN\" >> '"+order+"'\n"+
-		"[ \"$COHERE_DEV_TEST_RUN\" = A ] && while [ ! -e '"+order+".release' ]; do sleep 0.05; done\nsleep 1\n"), 0o755); writeError != nil {
+	if writeError := os.WriteFile(
+		filepath.Join(bin, "go"),
+		[]byte("#!/bin/sh\necho \"$COHERE_DEV_TEST_RUN\" >> '"+order+"'\n"+
+			"[ \"$COHERE_DEV_TEST_RUN\" = A ] && while [ ! -e '"+order+".release' ]; do sleep 0.05; done\nsleep 1\n"),
+		0o755,
+	); writeError != nil {
 		test.Fatal(writeError)
 	}
 	runs := map[string]*exec.Cmd{}
@@ -219,8 +227,10 @@ func TestWaitersTakeTheSlotInArrivalOrder(test *testing.T) {
 		}
 	}
 	if contents := readMaybeMissing(test, order); string(contents) != "A\nB\nD\nE\n" {
-		test.Errorf("the runs reached go in the order %q, want A, B, D, E: arrival order, passing over C, which died waiting",
-			strings.ReplaceAll(strings.TrimSpace(string(contents)), "\n", ", "))
+		test.Errorf(
+			"the runs reached go in the order %q, want A, B, D, E: arrival order, passing over C, which died waiting",
+			strings.ReplaceAll(strings.TrimSpace(string(contents)), "\n", ", "),
+		)
 	}
 	if left := tickets(); left != 0 {
 		test.Errorf("%d tickets were left in line after every run ended", left)
@@ -229,7 +239,17 @@ func TestWaitersTakeTheSlotInArrivalOrder(test *testing.T) {
 
 func TestOrdinalSaysAPlaceAsAPersonWould(test *testing.T) {
 	test.Parallel()
-	for place, want := range map[int]string{1: "1st", 2: "2nd", 3: "3rd", 4: "4th", 11: "11th", 12: "12th", 13: "13th", 21: "21st", 112: "112th"} {
+	for place, want := range map[int]string{
+		1:   "1st",
+		2:   "2nd",
+		3:   "3rd",
+		4:   "4th",
+		11:  "11th",
+		12:  "12th",
+		13:  "13th",
+		21:  "21st",
+		112: "112th",
+	} {
 		if got := ordinal(place); got != want {
 			test.Errorf("ordinal(%d) is %q, want %q", place, got, want)
 		}
@@ -251,7 +271,11 @@ func TestARunIsNiceUnlessItAsksForFullPriority(test *testing.T) {
 	}
 	// A go that says how nice it is and what it was asked.
 	bin := test.TempDir()
-	if writeError := os.WriteFile(filepath.Join(bin, "go"), []byte("#!/bin/sh\necho nice=$(ps -o nice= -p $$ | tr -d ' ') \"$@\"\n"), 0o755); writeError != nil {
+	if writeError := os.WriteFile(
+		filepath.Join(bin, "go"),
+		[]byte("#!/bin/sh\necho nice=$(ps -o nice= -p $$ | tr -d ' ') \"$@\"\n"),
+		0o755,
+	); writeError != nil {
 		test.Fatal(writeError)
 	}
 	// A pool of its own, so the run never waits in line behind the machine's real ones.
@@ -296,10 +320,23 @@ func TestARunIsNiceUnlessItAsksForFullPriority(test *testing.T) {
 		test.Skip("this test already runs at nice 19, the most a run can lower itself, so lowering cannot be seen")
 	}
 	if nice, asked := niceOf("./internal/edit"); nice != 19 || asked != "test -vet=all ./internal/edit" {
-		test.Errorf("a default run's go ran at nice %d asked %q, want nice 19 asked %q", nice, asked, "test -vet=all ./internal/edit")
+		test.Errorf(
+			"a default run's go ran at nice %d asked %q, want nice 19 asked %q",
+			nice,
+			asked,
+			"test -vet=all ./internal/edit",
+		)
 	}
-	if nice, asked := niceOf("--full-priority", "./internal/edit"); nice != own || asked != "test -vet=all ./internal/edit" {
-		test.Errorf("a --full-priority run's go ran at nice %d asked %q, want this test's own nice %d and the flag left out", nice, asked, own)
+	if nice, asked := niceOf(
+		"--full-priority",
+		"./internal/edit",
+	); nice != own || asked != "test -vet=all ./internal/edit" {
+		test.Errorf(
+			"a --full-priority run's go ran at nice %d asked %q, want this test's own nice %d and the flag left out",
+			nice,
+			asked,
+			own,
+		)
 	}
 }
 
@@ -322,9 +359,18 @@ func outsideThePool(environment []string) []string {
 // binary beneath it stays in its share (#qhg0ntb).
 func TestABudgetHoldsGoToTheTokensThreads(test *testing.T) {
 	test.Parallel()
-	environment := budgetEnvironment([]string{"HOME=/home", "GOMAXPROCS=16", "GOFLAGS=-trimpath -p=16 -buildvcs=false", heldTokenVariable + "=9"},
-		2, poolShape{tokens: 4, packages: 3, threads: 5})
-	want := []string{"HOME=/home", "GOFLAGS=-trimpath -buildvcs=false -p=3", "GOMAXPROCS=5", heldTokenVariable + "=2", coresVariable + "=15"}
+	environment := budgetEnvironment(
+		[]string{"HOME=/home", "GOMAXPROCS=16", "GOFLAGS=-trimpath -p=16 -buildvcs=false", heldTokenVariable + "=9"},
+		2,
+		poolShape{tokens: 4, packages: 3, threads: 5},
+	)
+	want := []string{
+		"HOME=/home",
+		"GOFLAGS=-trimpath -buildvcs=false -p=3",
+		"GOMAXPROCS=5",
+		heldTokenVariable + "=2",
+		coresVariable + "=15",
+	}
 	if strings.Join(environment, "|") != strings.Join(want, "|") {
 		test.Errorf("the budget environment is %q, want %q", environment, want)
 	}
@@ -371,8 +417,14 @@ func TestThePoolRunsAsManyAsItHasTokens(test *testing.T) {
 	// A go, and a tool, that log when they start and end, with their share, and take a second.
 	bin := test.TempDir()
 	log := filepath.Join(bin, "log")
-	stand := "#!/bin/sh\necho \"start $COHERE_DEV_TEST_RUN token=$" + heldTokenVariable + " flags=$GOFLAGS threads=$GOMAXPROCS $*\" >> '" + log + "'\n" +
-		"sleep 1\necho \"end $COHERE_DEV_TEST_RUN\" >> '" + log + "'\n"
+	stand := "#!/bin/sh\necho \"start $COHERE_DEV_TEST_RUN token=$" +
+		heldTokenVariable +
+		" flags=$GOFLAGS threads=$GOMAXPROCS $*\" >> '" +
+		log +
+		"'\n" +
+		"sleep 1\necho \"end $COHERE_DEV_TEST_RUN\" >> '" +
+		log +
+		"'\n"
 	for _, name := range []string{"go", "tool"} {
 		if writeError := os.WriteFile(filepath.Join(bin, name), []byte(stand), 0o755); writeError != nil {
 			test.Fatal(writeError)
@@ -396,7 +448,12 @@ func TestThePoolRunsAsManyAsItHasTokens(test *testing.T) {
 		start("exec", outsideThePool(os.Environ()), "exec", "--", "tool", "--flag"),
 	}
 	// Already under a token: runs at once, in its parent's share.
-	nested := start("nested", append(outsideThePool(os.Environ()), heldTokenVariable+"=7", "GOMAXPROCS=5", "GOFLAGS=-p=6"), "test", "./internal/edit")
+	nested := start(
+		"nested",
+		append(outsideThePool(os.Environ()), heldTokenVariable+"=7", "GOMAXPROCS=5", "GOFLAGS=-p=6"),
+		"test",
+		"./internal/edit",
+	)
 	for _, command := range append(runs, nested) {
 		if waitError := command.Wait(); waitError != nil {
 			test.Errorf("a run failed: %v", waitError)
@@ -432,11 +489,15 @@ func TestThePoolRunsAsManyAsItHasTokens(test *testing.T) {
 		"vet":   "flags=-trimpath -p=4 -buildvcs=false threads=3 vet ./...",
 		"exec":  "flags=-trimpath -p=4 threads=3 --flag",
 	} {
-		if got := started[name]; !strings.HasSuffix(got, want) || (!strings.HasPrefix(got, "token=1 ") && !strings.HasPrefix(got, "token=2 ")) {
+		if got := started[name]; !strings.HasSuffix(got, want) ||
+			(!strings.HasPrefix(got, "token=1 ") && !strings.HasPrefix(got, "token=2 ")) {
 			test.Errorf("%s ran with %q, want a token of the two and %q", name, got, want)
 		}
 	}
-	if !strings.Contains(string(contents), "start nested token=7 flags=-p=6 -buildvcs=false threads=5 test -vet=all ./internal/edit") {
+	if !strings.Contains(
+		string(contents),
+		"start nested token=7 flags=-p=6 -buildvcs=false threads=5 test -vet=all ./internal/edit",
+	) {
 		test.Errorf("a run already under a token did not run in its parent's share:\n%s", contents)
 	}
 }
@@ -467,7 +528,11 @@ func TestTheCacheTrimHoldsThePoolAndSettlesUnderTheCap(test *testing.T) {
 	if createDirectoryError := os.MkdirAll(cache, 0o755); createDirectoryError != nil {
 		test.Fatal(createDirectoryError)
 	}
-	if writeError := os.WriteFile(filepath.Join(cache, "README"), []byte("This directory holds cached build artifacts from the Go build system.\n"), 0o644); writeError != nil {
+	if writeError := os.WriteFile(
+		filepath.Join(cache, "README"),
+		[]byte("This directory holds cached build artifacts from the Go build system.\n"),
+		0o644,
+	); writeError != nil {
 		test.Fatal(writeError)
 	}
 	put := func(name string, age time.Duration) string {
@@ -526,7 +591,9 @@ func TestTheCacheTrimHoldsThePoolAndSettlesUnderTheCap(test *testing.T) {
 	status := exec.Command(wrapper, "status")
 	status.Env = environment
 	output, err := status.CombinedOutput()
-	if err != nil || !strings.Contains(string(output), "trimmed from") || !strings.Contains(string(output), "Go build cache: cap") {
+	if err != nil ||
+		!strings.Contains(string(output), "trimmed from") ||
+		!strings.Contains(string(output), "Go build cache: cap") {
 		test.Errorf("cohere-dev status does not report the trim (%v):\n%s", err, output)
 	}
 
@@ -621,7 +688,11 @@ func TestTheCacheTrimKeepsNoTokenIdleWhileAnotherRuns(test *testing.T) {
 	if createDirectoryError := os.MkdirAll(cache, 0o755); createDirectoryError != nil {
 		test.Fatal(createDirectoryError)
 	}
-	if writeError := os.WriteFile(filepath.Join(cache, "README"), []byte("This directory holds cached build artifacts from the Go build system.\n"), 0o644); writeError != nil {
+	if writeError := os.WriteFile(
+		filepath.Join(cache, "README"),
+		[]byte("This directory holds cached build artifacts from the Go build system.\n"),
+		0o644,
+	); writeError != nil {
 		test.Fatal(writeError)
 	}
 	for index := 0; index < 10; index++ {

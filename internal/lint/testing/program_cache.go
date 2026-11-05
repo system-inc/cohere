@@ -123,7 +123,11 @@ func programCacheKey(files map[string]string, subjectFileName string, verbatim b
 // filesystem of its own, the shared lib parse covers only bundled paths, and every run-scoped rule
 // cache (the theme, design system, importer, import-cycle and standard-streams caches, and the design
 // system's recordings) is keyed by the program's identity, so two graphs at one root are two keys.
-func buildCachedProgram(files map[string]string, subjectFileName string, verbatim bool) (*program.Graph, string, error) {
+func buildCachedProgram(
+	files map[string]string,
+	subjectFileName string,
+	verbatim bool,
+) (*program.Graph, string, error) {
 	key := programCacheKey(files, subjectFileName, verbatim)
 
 	programCacheMutex.Lock()
@@ -142,7 +146,12 @@ func buildCachedProgram(files map[string]string, subjectFileName string, verbati
 	// Outside the map lock, so one slow build does not stall every other fixture, and `sync.Once`
 	// still guarantees exactly one build per key even when several tests race for the same one.
 	entry.once.Do(func() {
-		entry.graph, entry.directory, entry.buildErr = buildProgramInto(entry.directory, files, subjectFileName, verbatim)
+		entry.graph, entry.directory, entry.buildErr = buildProgramInto(
+			entry.directory,
+			files,
+			subjectFileName,
+			verbatim,
+		)
 	})
 
 	return entry.graph, entry.directory, entry.buildErr
@@ -175,7 +184,12 @@ const memoryFixtureRoot = "/cohere-fixture"
 // 16,000 for a registry run, and three costs came with them: the writes, deleting them at exit (3.7s of
 // registry's 7.6s), and the module resolution's stats and opens around them, which went into the test log
 // Go replays on every cached run (about 420,000 lines for registry, 6.5s to say "cached") (#nxgt2ca).
-func buildProgramInto(directoryName string, files map[string]string, subjectFileName string, verbatim bool) (*program.Graph, string, error) {
+func buildProgramInto(
+	directoryName string,
+	files map[string]string,
+	subjectFileName string,
+	verbatim bool,
+) (*program.Graph, string, error) {
 	directory := memoryFixtureRoot + "/" + directoryName
 	contents := make(map[string]string, len(files)+1)
 	for name, text := range files {

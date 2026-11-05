@@ -19,11 +19,17 @@ func TestValidTypeofFires(test *testing.T) {
 		{"a misspelling", "declare const value: unknown;\nexport const Bad = typeof value === 'strng';\n"},
 		// The two that are not typos but wrong beliefs about the language. An array reports as
 		// 'object' and so does null, which is the oldest wart in JavaScript.
-		{"array is not a typeof result", "declare const value: unknown;\nexport const Bad = typeof value === 'array';\n"},
+		{
+			"array is not a typeof result",
+			"declare const value: unknown;\nexport const Bad = typeof value === 'array';\n",
+		},
 		{"null is not a typeof result", "declare const value: unknown;\nexport const Bad = typeof value === 'null';\n"},
 		{"typeof on the right", "declare const value: unknown;\nexport const Bad = 'array' === typeof value;\n"},
 		{"inequality", "declare const value: unknown;\nexport const Bad = typeof value !== 'array';\n"},
-		{"a template literal with no substitutions", "declare const value: unknown;\nexport const Bad = typeof value === `array`;\n"},
+		{
+			"a template literal with no substitutions",
+			"declare const value: unknown;\nexport const Bad = typeof value === `array`;\n",
+		},
 		{"parenthesized typeof", "declare const value: unknown;\nexport const Bad = (typeof value) === 'array';\n"},
 		// A literal that is not a string at all, which no result of typeof can equal.
 		{"the null literal", "declare const value: unknown;\nexport const Bad = typeof value === null;\n"},
@@ -60,11 +66,23 @@ func TestValidTypeofStaysSilent(test *testing.T) {
 		{"bigint", "declare const value: unknown;\nexport const Ok = typeof value === 'bigint';\n"},
 
 		// Unanalyzable without the checker, so left alone rather than guessed at.
-		{"typeof compared to typeof", "declare const a: unknown;\ndeclare const b: unknown;\nexport const Ok = typeof a === typeof b;\n"},
-		{"typeof compared to a binding", "declare const value: unknown;\ndeclare const expected: string;\nexport const Ok = typeof value === expected;\n"},
-		{"a template with a substitution", "declare const value: unknown;\ndeclare const rest: string;\nexport const Ok = typeof value === `str${rest}`;\n"},
+		{
+			"typeof compared to typeof",
+			"declare const a: unknown;\ndeclare const b: unknown;\nexport const Ok = typeof a === typeof b;\n",
+		},
+		{
+			"typeof compared to a binding",
+			"declare const value: unknown;\ndeclare const expected: string;\nexport const Ok = typeof value === expected;\n",
+		},
+		{
+			"a template with a substitution",
+			"declare const value: unknown;\ndeclare const rest: string;\nexport const Ok = typeof value === `str${rest}`;\n",
+		},
 		// A parameter named undefined is a binding like any other, and upstream reads it as one.
-		{"a local named undefined", "export function check(value: unknown, undefined: string) { return typeof value === undefined; }\n"},
+		{
+			"a local named undefined",
+			"export function check(value: unknown, undefined: string) { return typeof value === undefined; }\n",
+		},
 		// No typeof at all: a wrong-looking string on its own is not this rule's business.
 		{"a plain string comparison", "declare const value: string;\nexport const Ok = value === 'array';\n"},
 	}
@@ -85,21 +103,48 @@ func TestValidTypeofRequireStringLiterals(test *testing.T) {
 		sourceText string
 		want       string
 	}{
-		{"a binding", "declare const value: unknown;\ndeclare const expected: string;\nexport const Bad = typeof value === expected;\n", "notString"},
-		{"a binding on the left", "declare const value: unknown;\ndeclare const expected: string;\nexport const Bad = expected == typeof value;\n", "notString"},
-		{"a template with a substitution", "declare const value: unknown;\ndeclare const rest: string;\nexport const Bad = typeof value === `str${rest}`;\n", "notString"},
+		{
+			"a binding",
+			"declare const value: unknown;\ndeclare const expected: string;\nexport const Bad = typeof value === expected;\n",
+			"notString",
+		},
+		{
+			"a binding on the left",
+			"declare const value: unknown;\ndeclare const expected: string;\nexport const Bad = expected == typeof value;\n",
+			"notString",
+		},
+		{
+			"a template with a substitution",
+			"declare const value: unknown;\ndeclare const rest: string;\nexport const Bad = typeof value === `str${rest}`;\n",
+			"notString",
+		},
 		// The global undefined reads as notString under the option, as upstream switches its id.
-		{"the global undefined", "declare const value: unknown;\nexport const Bad = typeof value === undefined;\n", "notString"},
+		{
+			"the global undefined",
+			"declare const value: unknown;\nexport const Bad = typeof value === undefined;\n",
+			"notString",
+		},
 		// A local undefined is no longer the global, so it falls to the option like any binding.
-		{"a local named undefined", "export function check(value: unknown, undefined: string) { return typeof value === undefined; }\n", "notString"},
+		{
+			"a local named undefined",
+			"export function check(value: unknown, undefined: string) { return typeof value === undefined; }\n",
+			"notString",
+		},
 		// A literal is still judged against the eight, so a bad one stays invalidTypeofValue.
-		{"a misspelled literal", "declare const value: unknown;\nexport const Bad = typeof value == 'invalid string';\n", "invalidTypeofValue"},
+		{
+			"a misspelled literal",
+			"declare const value: unknown;\nexport const Bad = typeof value == 'invalid string';\n",
+			"invalidTypeofValue",
+		},
 	}
 	for _, testCase := range fires {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectFindings(test,
-				rule_testing.RunTypedWithOptions(test, ValidTypeof, typeofFile, testCase.sourceText, options), testCase.want)
+			rule_testing.ExpectFindings(
+				test,
+				rule_testing.RunTypedWithOptions(test, ValidTypeof, typeofFile, testCase.sourceText, options),
+				testCase.want,
+			)
 		})
 	}
 
@@ -108,8 +153,14 @@ func TestValidTypeofRequireStringLiterals(test *testing.T) {
 		sourceText string
 	}{
 		{"a string literal", "declare const value: unknown;\nexport const Ok = typeof value === 'number';\n"},
-		{"a template with no substitutions", "declare const value: unknown;\nexport const Ok = `object` === typeof value;\n"},
-		{"typeof compared to typeof", "declare const a: unknown;\ndeclare const b: unknown;\nexport const Ok = typeof a === typeof b;\n"},
+		{
+			"a template with no substitutions",
+			"declare const value: unknown;\nexport const Ok = `object` === typeof value;\n",
+		},
+		{
+			"typeof compared to typeof",
+			"declare const a: unknown;\ndeclare const b: unknown;\nexport const Ok = typeof a === typeof b;\n",
+		},
 		{"typeof outside a comparison", "declare const value: unknown;\nexport const Ok = typeof value + 'thing';\n"},
 	}
 	for _, testCase := range silent {

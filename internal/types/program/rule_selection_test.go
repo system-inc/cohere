@@ -23,7 +23,10 @@ func TestFilesThatResolveAlikeShareOneSelectionAndStillCountPerFile(test *testin
 			"off":  {Severity: configuration.SeverityOff},
 		},
 		Overrides: []configuration.Override{
-			{Files: []string{"special/**"}, Rules: map[string]configuration.RuleSetting{"runs": {Severity: configuration.SeverityOff}}},
+			{
+				Files: []string{"special/**"},
+				Rules: map[string]configuration.RuleSetting{"runs": {Severity: configuration.SeverityOff}},
+			},
 		},
 	}}
 	rules := []rule.Rule{{Name: "runs"}, {Name: "off"}, {Name: "nobody-configured"}}
@@ -41,7 +44,11 @@ func TestFilesThatResolveAlikeShareOneSelectionAndStillCountPerFile(test *testin
 		test.Fatal("a file an override changed shared the selection of files it did not change")
 	}
 	if len(first.applicable) != 1 || first.applicable[0].Name != "runs" || len(special.applicable) != 0 {
-		test.Fatalf("the selections apply %v and %v, want [runs] and none", ruleNames(first.applicable), ruleNames(special.applicable))
+		test.Fatalf(
+			"the selections apply %v and %v, want [runs] and none",
+			ruleNames(first.applicable),
+			ruleNames(special.applicable),
+		)
 	}
 	if scopedOff["off"] != 3 || scopedOff["runs"] != 1 || unconfigured["nobody-configured"] != 3 {
 		test.Fatalf("counts are scoped off %v and unconfigured %v, want off 3, runs 1 and nobody-configured 3",
@@ -59,13 +66,19 @@ func TestFilesThatResolveAlikeShareOneSelectionAndStillCountPerFile(test *testin
 func TestSelectionsFingerprintADerivedRuleOncePerOptionsForTheWholeWalk(test *testing.T) {
 	test.Parallel()
 	setting := func(marker string) configuration.RuleSetting {
-		return configuration.RuleSetting{Severity: configuration.SeverityError, Options: []json.RawMessage{json.RawMessage(`"` + marker + `"`)}}
+		return configuration.RuleSetting{
+			Severity: configuration.SeverityError,
+			Options:  []json.RawMessage{json.RawMessage(`"` + marker + `"`)},
+		}
 	}
 	graph := &Graph{
 		LintConfig: &configuration.Config{
 			Rules: map[string]configuration.RuleSetting{"derived": setting("red")},
 			Overrides: []configuration.Override{
-				{Files: []string{"special/**"}, Rules: map[string]configuration.RuleSetting{"derived": setting("blue")}},
+				{
+					Files: []string{"special/**"},
+					Rules: map[string]configuration.RuleSetting{"derived": setting("blue")},
+				},
 				{Files: []string{"again/**"}, Rules: map[string]configuration.RuleSetting{"derived": setting("red")}},
 			},
 		},
@@ -76,16 +89,20 @@ func TestSelectionsFingerprintADerivedRuleOncePerOptionsForTheWholeWalk(test *te
 		}}},
 	}
 	var calls atomic.Int32
-	rules := []rule.Rule{{Name: "derived", ProgramReads: rule.ReadsOtherFiles, ProgramFingerprint: func(_ rule.Program, options any) [sha256.Size]byte {
-		calls.Add(1)
-		marker, isMarker := options.(string)
-		if !isMarker {
-			// Invariant: every selection here configures the rule with an option, and RuleOptions decodes it into a
-			// string.
-			panic("the derived rule's options are not a marker")
-		}
-		return sha256.Sum256([]byte(marker))
-	}}}
+	rules := []rule.Rule{{
+		Name:         "derived",
+		ProgramReads: rule.ReadsOtherFiles,
+		ProgramFingerprint: func(_ rule.Program, options any) [sha256.Size]byte {
+			calls.Add(1)
+			marker, isMarker := options.(string)
+			if !isMarker {
+				// Invariant: every selection here configures the rule with an option, and RuleOptions decodes it into a
+				// string.
+				panic("the derived rule's options are not a marker")
+			}
+			return sha256.Sum256([]byte(marker))
+		},
+	}}
 	memo := &programFingerprintMemo{entries: map[programFingerprintKey]*programFingerprintEntry{}}
 
 	const workers = 16
@@ -97,7 +114,11 @@ func TestSelectionsFingerprintADerivedRuleOncePerOptionsForTheWholeWalk(test *te
 			defer wait.Done()
 			selections := map[any]*ruleSelection{}
 			scopedOff, unconfigured := map[string]int{}, map[string]int{}
-			for file, want := range map[string]string{"source/a.ts": "red", "special/c.ts": "blue", "again/d.ts": "red"} {
+			for file, want := range map[string]string{
+				"source/a.ts":  "red",
+				"special/c.ts": "blue",
+				"again/d.ts":   "red",
+			} {
 				selection, _ := graph.rulesFor(file, rules, selections, scopedOff, unconfigured)
 				if got := graph.programFingerprints(selection, memo)["derived"]; got != sha256.Sum256([]byte(want)) {
 					failures.Store(worker, file+" was not fingerprinted under "+want)
@@ -114,6 +135,10 @@ func TestSelectionsFingerprintADerivedRuleOncePerOptionsForTheWholeWalk(test *te
 		return true
 	})
 	if calls.Load() != 2 {
-		test.Fatalf("%d workers with 3 selections each over 2 options computed the fingerprint %d times, want once per options", workers, calls.Load())
+		test.Fatalf(
+			"%d workers with 3 selections each over 2 options computed the fingerprint %d times, want once per options",
+			workers,
+			calls.Load(),
+		)
 	}
 }

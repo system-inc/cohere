@@ -20,7 +20,10 @@ func TestDispatcherPackageShipsTheSettingsSchemas(test *testing.T) {
 	if err != nil {
 		test.Fatal(err)
 	}
-	staged, err := buildDispatcherPackage(Options{ModuleDirectory: module, OutputDirectory: test.TempDir(), Version: "1.0.0"}, placeholderChecksums)
+	staged, err := buildDispatcherPackage(
+		Options{ModuleDirectory: module, OutputDirectory: test.TempDir(), Version: "1.0.0"},
+		placeholderChecksums,
+	)
 	if err != nil {
 		test.Fatal(err)
 	}
@@ -75,7 +78,11 @@ func TestDispatcherPackageRefusesASchemaThatValidatesNothing(test *testing.T) {
 			for _, name := range SettingsSchemaFileNames {
 				writeFile(test, filepath.Join(module, SchemaDirectoryName, name), `{"type":"object"}`)
 			}
-			broken := filepath.Join(module, SchemaDirectoryName, SettingsSchemaFileNames[len(SettingsSchemaFileNames)-1])
+			broken := filepath.Join(
+				module,
+				SchemaDirectoryName,
+				SettingsSchemaFileNames[len(SettingsSchemaFileNames)-1],
+			)
 			if testCase.contents == nil {
 				if removeError := os.Remove(broken); removeError != nil {
 					test.Fatal(removeError)
@@ -84,7 +91,10 @@ func TestDispatcherPackageRefusesASchemaThatValidatesNothing(test *testing.T) {
 				writeFile(test, broken, *testCase.contents)
 			}
 
-			_, buildDispatcherPackageError := buildDispatcherPackage(Options{ModuleDirectory: module, OutputDirectory: test.TempDir(), Version: "1.0.0"}, placeholderChecksums)
+			_, buildDispatcherPackageError := buildDispatcherPackage(
+				Options{ModuleDirectory: module, OutputDirectory: test.TempDir(), Version: "1.0.0"},
+				placeholderChecksums,
+			)
 			if buildDispatcherPackageError == nil {
 				test.Fatal("the dispatcher was staged with a schema that validates nothing")
 			}

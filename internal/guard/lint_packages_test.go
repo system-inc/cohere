@@ -103,7 +103,10 @@ func loadLintPackages(overlay map[string][]byte) ([]*gotypes.Package, string) {
 	if err != nil {
 		return nil, err.Error()
 	}
-	loaded, err := gotypes.Load(gotypes.Config{Directory: root, Overlay: overlay, Exports: exports}, "./internal/lint/...")
+	loaded, err := gotypes.Load(
+		gotypes.Config{Directory: root, Overlay: overlay, Exports: exports},
+		"./internal/lint/...",
+	)
 	if err != nil {
 		return nil, fmt.Sprintf("loading the rule packages: %v", err)
 	}

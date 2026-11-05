@@ -71,7 +71,10 @@ func TestSwiftMessagesRefuseAValueWithTwoPlaces(test *testing.T) {
 	if loadMessagesError != nil {
 		test.Fatal(loadMessagesError)
 	}
-	if _, swiftMessagesSourceError := swiftMessagesSource(catalog, "digest"); swiftMessagesSourceError == nil || !strings.Contains(swiftMessagesSourceError.Error(), `"count"`) {
+	if _, swiftMessagesSourceError := swiftMessagesSource(
+		catalog,
+		"digest",
+	); swiftMessagesSourceError == nil || !strings.Contains(swiftMessagesSourceError.Error(), `"count"`) {
 		test.Errorf("a value with two places was generated (%v)", swiftMessagesSourceError)
 	}
 }
@@ -118,7 +121,10 @@ func TestOneEditReachesBothEngines(test *testing.T) {
 		test.Fatal(err)
 	}
 
-	goText := catalog.Render(MessageHandle{Rule: "base/consistency-no-bare-throw", Id: "bareThrow"}, map[string]string{"constructor": "Error"})
+	goText := catalog.Render(
+		MessageHandle{Rule: "base/consistency-no-bare-throw", Id: "bareThrow"},
+		map[string]string{"constructor": "Error"},
+	)
 	if !strings.Contains(goText, changed) {
 		test.Errorf("the Go rule renders %q", goText)
 	}

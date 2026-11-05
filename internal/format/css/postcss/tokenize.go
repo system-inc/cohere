@@ -232,7 +232,12 @@ func (tokens *tokenizer) nextToken() (token, bool) {
 				}
 			}
 
-			currentToken = token{kind: "brackets", value: tokens.input.slice(position, next+1), start: position, end: next}
+			currentToken = token{
+				kind:  "brackets",
+				value: tokens.input.slice(position, next+1),
+				start: position,
+				end:   next,
+			}
 
 			position = next
 		} else if position <= tokens.lastBadParen {
@@ -252,7 +257,12 @@ func (tokens *tokenizer) nextToken() (token, bool) {
 				}
 				currentToken = token{kind: "(", value: "(", start: position, end: -1}
 			} else {
-				currentToken = token{kind: "brackets", value: tokens.input.slice(position, next+1), start: position, end: next}
+				currentToken = token{
+					kind:  "brackets",
+					value: tokens.input.slice(position, next+1),
+					start: position,
+					end:   next,
+				}
 				position = next
 			}
 		}
@@ -343,7 +353,12 @@ func (tokens *tokenizer) nextToken() (token, bool) {
 				tokens.unclosed("comment")
 			}
 
-			currentToken = token{kind: "comment", value: tokens.input.slice(position, next+1), start: position, end: next}
+			currentToken = token{
+				kind:  "comment",
+				value: tokens.input.slice(position, next+1),
+				start: position,
+				end:   next,
+			}
 			position = next
 		} else {
 			// RE_WORD_END.lastIndex = pos + 1; RE_WORD_END.test(css).

@@ -147,7 +147,8 @@ func tokenizeListStart(self *Self, effects *Effects, ok State, nok State) State 
 	}
 
 	endOfPrefix = func(code Code) State {
-		self.ContainerState.size = initialSize + utf16Length(self.SliceSerialize(effects.Exit(TypeListItemPrefix), true))
+		self.ContainerState.size = initialSize +
+			utf16Length(self.SliceSerialize(effects.Exit(TypeListItemPrefix), true))
 		return ok(code)
 	}
 
@@ -160,7 +161,8 @@ func tokenizeListContinuation(self *Self, effects *Effects, ok State, nok State)
 	self.ContainerState.closeFlow = false
 
 	onBlank = func(code Code) State {
-		self.ContainerState.furtherBlankLines = self.ContainerState.furtherBlankLines || self.ContainerState.initialBlankLine
+		self.ContainerState.furtherBlankLines = self.ContainerState.furtherBlankLines ||
+			self.ContainerState.initialBlankLine
 
 		// We have a blank line.
 		// Still, try to consume at most the items size.

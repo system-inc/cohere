@@ -9,11 +9,18 @@ import (
 // The rule's messages, one handle per id, whose wording lives in
 // `policy/messages/next-require-api-parameter-name.json`.
 var (
-	nextRequireApiParameterNameUseParamsNotParametersText             = policy.MessageOf("structure/next-require-api-parameter-name", "useParamsNotParameters")
-	nextRequireApiParameterNameUseSearchParamsNotSearchParametersText = policy.MessageOf("structure/next-require-api-parameter-name", "useSearchParamsNotSearchParameters")
+	nextRequireApiParameterNameUseParamsNotParametersText = policy.MessageOf(
+		"structure/next-require-api-parameter-name",
+		"useParamsNotParameters",
+	)
+	nextRequireApiParameterNameUseSearchParamsNotSearchParametersText = policy.MessageOf(
+		"structure/next-require-api-parameter-name",
+		"useSearchParamsNotSearchParameters",
+	)
 )
 
-// messageUseParamsNotParameters is the finding, rendered when it is reported so the text comes from the current catalog.
+// messageUseParamsNotParameters is the finding, rendered when it is reported so the text comes from the current
+// catalog.
 func messageUseParamsNotParameters() rule.Message {
 	return rule.Message{
 		Id:          nextRequireApiParameterNameUseParamsNotParametersText.Id,
@@ -21,7 +28,8 @@ func messageUseParamsNotParameters() rule.Message {
 	}
 }
 
-// messageUseSearchParamsNotSearchParameters is the finding, rendered when it is reported so the text comes from the current catalog.
+// messageUseSearchParamsNotSearchParameters is the finding, rendered when it is reported so the text comes from the
+// current catalog.
 func messageUseSearchParamsNotSearchParameters() rule.Message {
 	return rule.Message{
 		Id:          nextRequireApiParameterNameUseSearchParamsNotSearchParametersText.Id,

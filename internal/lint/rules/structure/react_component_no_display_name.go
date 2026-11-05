@@ -9,11 +9,18 @@ import (
 
 // reactComponentNoDisplayNameText is the rule's message, whose wording lives in
 // `policy/messages/react-component-no-display-name.json`.
-var reactComponentNoDisplayNameText = policy.MessageOf("structure/react-component-no-display-name", "noDisplayNameAssignment")
+var reactComponentNoDisplayNameText = policy.MessageOf(
+	"structure/react-component-no-display-name",
+	"noDisplayNameAssignment",
+)
 
-// messageNoDisplayNameAssignment is the finding, rendered when it is reported so the text comes from the current catalog.
+// messageNoDisplayNameAssignment is the finding, rendered when it is reported so the text comes from the current
+// catalog.
 func messageNoDisplayNameAssignment() rule.Message {
-	return rule.Message{Id: reactComponentNoDisplayNameText.Id, Description: reactComponentNoDisplayNameText.Render(nil)}
+	return rule.Message{
+		Id:          reactComponentNoDisplayNameText.Id,
+		Description: reactComponentNoDisplayNameText.Render(nil),
+	}
 }
 
 // anonymousComponentWrapperNames are the wrappers whose result carries no name of its own.
@@ -158,7 +165,9 @@ func componentsDeclaredAtTopLevel(sourceFile *ast.Node) map[string]bool {
 				initializer := ast.SkipParentheses(declaration.Initializer)
 				// A memo or forwardRef result is a component too. Declared above the assignment it is exempt,
 				// by the walk; below it, the assignment is a temporal dead zone error and reports.
-				if IsLikelyReactComponent(initializer) || react.IsEs6ComponentClass(initializer) || isAnonymousWrapperCall(initializer) {
+				if IsLikelyReactComponent(initializer) ||
+					react.IsEs6ComponentClass(initializer) ||
+					isAnonymousWrapperCall(initializer) {
 					record(declaration.Name())
 				}
 			}

@@ -126,7 +126,11 @@ func TestAlignClosesTheFullBlockNestingAssertion(test *testing.T) {
 	componentFunctions, componentScopeInBlock, componentBlockInScope := 0, 0, 0
 	finalScopeInBlock, finalBlockInScope, finalBlockInBlock := 0, 0, 0
 
-	forEachCorpusFunction(test, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(test, 400, func(
+		function *Function,
+		ranges *mutation_aliasing.MutableRanges,
+		scopes *ReactiveScopes,
+	) {
 		functions++
 		scopesBefore += scopes.Len()
 		blocks := programBlockSubtrees(function)
@@ -237,7 +241,11 @@ func TestAlignMustRunBeforeTheMerge(test *testing.T) {
 	naiveFull, naiveScope, naiveUnions := 0, 0, 0
 	upstreamFull, upstreamScope, upstreamUnions := 0, 0, 0
 
-	forEachCorpusFunction(test, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(test, 400, func(
+		function *Function,
+		ranges *mutation_aliasing.MutableRanges,
+		scopes *ReactiveScopes,
+	) {
 		blocks := programBlockSubtrees(function)
 
 		// The naive order: merge first, then align the merged table. Expressed by handing the
@@ -317,9 +325,21 @@ func TestAlignMinimisesWithoutAGuard(test *testing.T) {
 		start mutation_aliasing.MutableRange
 		want  mutation_aliasing.MutableRange
 	}{
-		{"start after the construct is minimised back", mutation_aliasing.MutableRange{Start: 7, End: 15}, mutation_aliasing.MutableRange{Start: 5, End: 15}},
-		{"start already earlier is left alone", mutation_aliasing.MutableRange{Start: 3, End: 15}, mutation_aliasing.MutableRange{Start: 3, End: 15}},
-		{"an unset start stays zero rather than being widened", mutation_aliasing.MutableRange{Start: 0, End: 15}, mutation_aliasing.MutableRange{Start: 0, End: 15}},
+		{
+			"start after the construct is minimised back",
+			mutation_aliasing.MutableRange{Start: 7, End: 15},
+			mutation_aliasing.MutableRange{Start: 5, End: 15},
+		},
+		{
+			"start already earlier is left alone",
+			mutation_aliasing.MutableRange{Start: 3, End: 15},
+			mutation_aliasing.MutableRange{Start: 3, End: 15},
+		},
+		{
+			"an unset start stays zero rather than being widened",
+			mutation_aliasing.MutableRange{Start: 0, End: 15},
+			mutation_aliasing.MutableRange{Start: 0, End: 15},
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -351,7 +371,9 @@ func TestAlignMinimisesWithoutAGuard(test *testing.T) {
 func TestAlignExcludesBranchTerminals(test *testing.T) {
 	test.Parallel()
 
-	widened := func(makeTerminal func(fallthroughBlock static_single_assignment.BlockId) Terminal) mutation_aliasing.MutableRange {
+	widened := func(
+		makeTerminal func(fallthroughBlock static_single_assignment.BlockId) Terminal,
+	) mutation_aliasing.MutableRange {
 		function, scopes := buildAlignCaseWithTerminal(test, alignCase{
 			scope:        mutation_aliasing.MutableRange{Start: 4, End: 6},
 			terminalId:   5,
@@ -573,7 +595,11 @@ func TestAlignFallthroughsAreUniqueOnceBranchesAreExcluded(test *testing.T) {
 	skipWithoutCorpus(test)
 	branchReuse, nonBranchReuse, branchesWithFallthrough := 0, 0, 0
 
-	forEachCorpusFunction(test, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(test, 400, func(
+		function *Function,
+		ranges *mutation_aliasing.MutableRanges,
+		scopes *ReactiveScopes,
+	) {
 		seen := map[static_single_assignment.BlockId]bool{}
 		for _, block := range function.Blocks {
 			if block == nil {
@@ -624,7 +650,11 @@ func TestAlignReDerivesMemberRanges(test *testing.T) {
 	skipWithoutCorpus(test)
 	members, differing, wider, narrower := 0, 0, 0, 0
 
-	forEachCorpusFunction(test, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(test, 400, func(
+		function *Function,
+		ranges *mutation_aliasing.MutableRanges,
+		scopes *ReactiveScopes,
+	) {
 		aligned := AlignReactiveScopesToBlockScopes(function, scopes)
 		stale, fresh := scopes.MemberRanges(), aligned.MemberRanges()
 		for _, scope := range scopes.Ids() {
@@ -673,7 +703,11 @@ func TestAlignPreservesScopeWidthAndMembership(test *testing.T) {
 	oneNarrow, oneWide, manyNarrow, manyWide := 0, 0, 0, 0
 	var widths []int
 
-	forEachCorpusFunction(test, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, table *ReactiveScopes) {
+	forEachCorpusFunction(test, 400, func(
+		function *Function,
+		ranges *mutation_aliasing.MutableRanges,
+		table *ReactiveScopes,
+	) {
 		_, merged := AlignThenMergeReactiveScopes(function, table)
 		for _, id := range merged.Ids() {
 			scopeRange := merged.RangeOf(id)
@@ -739,7 +773,11 @@ func TestAlignVoidsTheMergesComparatorVerdicts(test *testing.T) {
 		return false
 	}
 
-	forEachCorpusFunction(test, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(test, 400, func(
+		function *Function,
+		ranges *mutation_aliasing.MutableRanges,
+		scopes *ReactiveScopes,
+	) {
 		// The control: on the UNALIGNED table the two spellings must agree, which is what makes a
 		// difference on the aligned table attributable to the comparator rather than to the local
 		// copy of the sweep having drifted from the real one.
@@ -809,7 +847,11 @@ func TestReactReversePostorderClosesFallthroughSelfNesting(test *testing.T) {
 	withScopes, withoutScopes := 0, 0
 
 	// The whole corpus, deliberately: this is a graph invariant rather than a React-domain metric.
-	forEachCorpusFunction(test, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(test, 400, func(
+		function *Function,
+		ranges *mutation_aliasing.MutableRanges,
+		scopes *ReactiveScopes,
+	) {
 		blocks := programBlockSubtrees(function)
 		_, merged := AlignThenMergeReactiveScopes(function, scopes)
 		withScopes += blockNestingViolations(scopeNestingItems(mergedRangeMap(merged)), blocks)
@@ -820,7 +862,10 @@ func TestReactReversePostorderClosesFallthroughSelfNesting(test *testing.T) {
 		withScopes, withoutScopes)
 
 	if withoutScopes != 0 {
-		test.Errorf("block-only nesting violations=%d, want 0; the retired fallthrough-ordering gap reopened", withoutScopes)
+		test.Errorf(
+			"block-only nesting violations=%d, want 0; the retired fallthrough-ordering gap reopened",
+			withoutScopes,
+		)
 	}
 }
 
@@ -852,7 +897,11 @@ func TestAlignIsASingleSweep(test *testing.T) {
 	skipWithoutCorpus(test)
 	blocksOverall, blocksWithScopes, visits, functionsWithoutScopes := 0, 0, 0, 0
 
-	forEachCorpusFunction(test, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(test, 400, func(
+		function *Function,
+		ranges *mutation_aliasing.MutableRanges,
+		scopes *ReactiveScopes,
+	) {
 		blocks := 0
 		for _, block := range function.Blocks {
 			if block != nil {
@@ -895,7 +944,11 @@ func TestAlignIsDeterministic(test *testing.T) {
 	skipWithoutCorpus(test)
 	compared := 0
 
-	forEachCorpusFunction(test, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(test, 400, func(
+		function *Function,
+		ranges *mutation_aliasing.MutableRanges,
+		scopes *ReactiveScopes,
+	) {
 		first := AlignReactiveScopesToBlockScopes(function, scopes)
 		second := AlignReactiveScopesToBlockScopes(function, scopes)
 		if first.Len() != second.Len() || first.Widened() != second.Widened() {

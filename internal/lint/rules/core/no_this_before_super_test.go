@@ -42,21 +42,48 @@ func TestNoThisBeforeSuperFires(test *testing.T) {
 		// disallows `this`/`super` in arguments of `super()`.
 		{"this as a direct argument to super", "class A extends B { constructor() { super(this); } }"},
 		{"this property as an argument to super", "class A extends B { constructor() { super(this.c); } }"},
-		{"this nested two calls deep in a super argument", "class A extends B { constructor() { super(a(b(this.c))); } }"},
+		{
+			"this nested two calls deep in a super argument",
+			"class A extends B { constructor() { super(a(b(this.c))); } }",
+		},
 		{"a this method call as an argument to super", "class A extends B { constructor() { super(this.c()); } }"},
 		{"super property as an argument to super", "class A extends B { constructor() { super(super.c); } }"},
 		{"a super method call as an argument to super", "class A extends B { constructor() { super(super.c()); } }"},
 		// even if is nested, reports correctly.
-		{"outer constructor offends while the inner one is clean", "class A extends B { constructor() { class C extends D { constructor() { super(); this.e(); } } this.f(); super(); } }"},
-		{"inner constructor offends while the outer one is clean", "class A extends B { constructor() { class C extends D { constructor() { this.e(); super(); } } super(); this.f(); } }"},
+		{
+			"outer constructor offends while the inner one is clean",
+			"class A extends B { constructor() { class C extends D { constructor() { super(); this.e(); } } this.f(); super(); } }",
+		},
+		{
+			"inner constructor offends while the outer one is clean",
+			"class A extends B { constructor() { class C extends D { constructor() { this.e(); super(); } } super(); this.f(); } }",
+		},
 		// multi code path.
 		{"super in only the consequent of an if", "class A extends B { constructor() { if (a) super(); this.a(); } }"},
-		{"this in a finally after super in the try", "class A extends B { constructor() { try { super(); } finally { this.a; } } }"},
-		{"this after a try whose catch could swallow a throwing super", "class A extends B { constructor() { try { super(); } catch (err) { } this.a; } }"},
-		{"logical and assignment short-circuits past super", "class A extends B { constructor() { foo &&= super().a; this.c(); } }"},
-		{"logical or assignment short-circuits past super", "class A extends B { constructor() { foo ||= super().a; this.c(); } }"},
-		{"nullish assignment short-circuits past super", "class A extends B { constructor() { foo ??= super().a; this.c(); } }"},
-		{"super nested inside an if with no else", "class A extends B { constructor() { if (foo) { if (bar) { } super(); } this.a(); }}"},
+		{
+			"this in a finally after super in the try",
+			"class A extends B { constructor() { try { super(); } finally { this.a; } } }",
+		},
+		{
+			"this after a try whose catch could swallow a throwing super",
+			"class A extends B { constructor() { try { super(); } catch (err) { } this.a; } }",
+		},
+		{
+			"logical and assignment short-circuits past super",
+			"class A extends B { constructor() { foo &&= super().a; this.c(); } }",
+		},
+		{
+			"logical or assignment short-circuits past super",
+			"class A extends B { constructor() { foo ||= super().a; this.c(); } }",
+		},
+		{
+			"nullish assignment short-circuits past super",
+			"class A extends B { constructor() { foo ??= super().a; this.c(); } }",
+		},
+		{
+			"super nested inside an if with no else",
+			"class A extends B { constructor() { if (foo) { if (bar) { } super(); } this.a(); }}",
+		},
 		{"super in only the alternate of an if", `class A extends B {
             constructor() {
                 if (foo) {
@@ -157,33 +184,78 @@ func TestNoThisBeforeSuperStaysSilent(test *testing.T) {
             }
         }
         `},
-		{"this on both sides of an assignment after super", "class A extends B { constructor() { super(); this.c = this.d; } }"},
+		{
+			"this on both sides of an assignment after super",
+			"class A extends B { constructor() { super(); this.c = this.d; } }",
+		},
 		{"a this call after super", "class A extends B { constructor() { super(); this.c(); } }"},
 		{"a super property call after super", "class A extends B { constructor() { super(); super.c(); } }"},
-		{"super in both arms of an if", "class A extends B { constructor() { if (true) { super(); } else { super(); } this.c(); } }"},
-		{"super as the right side of an assignment", "class A extends B { constructor() { foo = super(); this.c(); } }"},
+		{
+			"super in both arms of an if",
+			"class A extends B { constructor() { if (true) { super(); } else { super(); } this.c(); } }",
+		},
+		{
+			"super as the right side of an assignment",
+			"class A extends B { constructor() { foo = super(); this.c(); } }",
+		},
 		{"super inside an addition assignment", "class A extends B { constructor() { foo += super().a; this.c(); } }"},
 		{"super inside a bitwise or assignment", "class A extends B { constructor() { foo |= super().a; this.c(); } }"},
-		{"super inside a bitwise and assignment", "class A extends B { constructor() { foo &= super().a; this.c(); } }"},
+		{
+			"super inside a bitwise and assignment",
+			"class A extends B { constructor() { foo &= super().a; this.c(); } }",
+		},
 		// allows `this`/`super` in nested executable scopes, even if before `super()`.
-		{"a nested class declaration before super", "class A extends B { constructor() { class B extends C { constructor() { super(); this.d = 0; } } super(); } }"},
-		{"a nested class expression before super", "class A extends B { constructor() { var B = class extends C { constructor() { super(); this.d = 0; } }; super(); } }"},
-		{"a function declaration using this before super", "class A extends B { constructor() { function c() { this.d(); } super(); } }"},
-		{"a function expression using this before super", "class A extends B { constructor() { var c = function c() { this.d(); }; super(); } }"},
-		{"an arrow using this before super", "class A extends B { constructor() { var c = () => this.d(); super(); } }"},
+		{
+			"a nested class declaration before super",
+			"class A extends B { constructor() { class B extends C { constructor() { super(); this.d = 0; } } super(); } }",
+		},
+		{
+			"a nested class expression before super",
+			"class A extends B { constructor() { var B = class extends C { constructor() { super(); this.d = 0; } }; super(); } }",
+		},
+		{
+			"a function declaration using this before super",
+			"class A extends B { constructor() { function c() { this.d(); } super(); } }",
+		},
+		{
+			"a function expression using this before super",
+			"class A extends B { constructor() { var c = function c() { this.d(); }; super(); } }",
+		},
+		{
+			"an arrow using this before super",
+			"class A extends B { constructor() { var c = () => this.d(); super(); } }",
+		},
 		// ignores out of constructors.
 		{"this in a base class method", "class A { b() { this.c = 0; } }"},
 		{"this in a derived class method", "class A extends B { c() { this.d = 0; } }"},
 		{"this in a plain function", "function a() { this.b = 0; }"},
 		// multi code path.
-		{"super and this in both arms of an if", "class A extends B { constructor() { if (a) { super(); this.a(); } else { super(); this.b(); } } }"},
-		{"super in both unbraced arms of an if", "class A extends B { constructor() { if (a) super(); else super(); this.a(); } }"},
-		{"super in a try with an empty finally", "class A extends B { constructor() { try { super(); } finally {} this.a(); } }"},
+		{
+			"super and this in both arms of an if",
+			"class A extends B { constructor() { if (a) { super(); this.a(); } else { super(); this.b(); } } }",
+		},
+		{
+			"super in both unbraced arms of an if",
+			"class A extends B { constructor() { if (a) super(); else super(); this.a(); } }",
+		},
+		{
+			"super in a try with an empty finally",
+			"class A extends B { constructor() { try { super(); } finally {} this.a(); } }",
+		},
 		// https://github.com/eslint/eslint/issues/5261
-		{"a for-of loop using this after super", "class A extends B { constructor(a) { super(); for (const b of a) { this.a(); } } }"},
-		{"a for-of loop with no this before super", "class A extends B { constructor(a) { for (const b of a) { foo(b); } super(); } }"},
+		{
+			"a for-of loop using this after super",
+			"class A extends B { constructor(a) { super(); for (const b of a) { this.a(); } } }",
+		},
+		{
+			"a for-of loop with no this before super",
+			"class A extends B { constructor(a) { for (const b of a) { foo(b); } super(); } }",
+		},
 		// https://github.com/eslint/eslint/issues/5319
-		{"this inside a logical chain after super", "class A extends B { constructor(a) { super(); this.a = a && function(){} && this.foo; } }"},
+		{
+			"this inside a logical chain after super",
+			"class A extends B { constructor(a) { super(); this.a = a && function(){} && this.foo; } }",
+		},
 		// https://github.com/eslint/eslint/issues/5394
 		{"a bare this after a for loop after super", `class A extends Object {
                 constructor() {
@@ -213,9 +285,15 @@ func TestNoThisBeforeSuperStaysSilent(test *testing.T) {
 		// Class field initializers are always evaluated after `super()`.
 		{"a field initializer in a base class", "class C { field = this.toString(); }"},
 		{"a field initializer in a derived class with no constructor", "class C extends B { field = this.foo(); }"},
-		{"a field initializer alongside a clean constructor", "class C extends B { field = this.foo(); constructor() { super(); } }"},
+		{
+			"a field initializer alongside a clean constructor",
+			"class C extends B { field = this.foo(); constructor() { super(); } }",
+		},
 		// < in this case, initializers are never evaluated.
-		{"a field initializer alongside a constructor that never calls super", "class C extends B { field = this.foo(); constructor() { } }"},
+		{
+			"a field initializer alongside a constructor that never calls super",
+			"class C extends B { field = this.foo(); constructor() { } }",
+		},
 	}
 
 	for _, testCase := range cases {
@@ -569,20 +647,33 @@ func TestNoThisBeforeSuperKeepsTheCallAcrossElselessIfs(test *testing.T) {
 	for _, blocks := range []int{1, 2, 6} {
 		test.Run(fmt.Sprintf("super first, then %d else-less ifs", blocks), func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.Run(test, NoThisBeforeSuper, thisBeforeSuperFile, constructor(blocks)))
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.Run(test, NoThisBeforeSuper, thisBeforeSuperFile, constructor(blocks)),
+			)
 		})
 	}
 
 	reporting := []struct{ name, sourceText string }{
 		// `this` inside the second if, with super() only after both.
-		{"this in the second if, before super", "class A extends B { constructor(flag) { if (flag) { this.a = 1; } if (flag) { this.b = 2; } super(); } }"},
+		{
+			"this in the second if, before super",
+			"class A extends B { constructor(flag) { if (flag) { this.a = 1; } if (flag) { this.b = 2; } super(); } }",
+		},
 		// super() only in an else-less if, so the second if's this may run without it.
-		{"super in an else-less if, this in the next", "class A extends B { constructor(flag) { if (flag) { super(); } if (flag) { this.b = 2; } } }"},
+		{
+			"super in an else-less if, this in the next",
+			"class A extends B { constructor(flag) { if (flag) { super(); } if (flag) { this.b = 2; } } }",
+		},
 	}
 	for _, testCase := range reporting {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectFindings(test, rule_testing.Run(test, NoThisBeforeSuper, thisBeforeSuperFile, testCase.sourceText), "thisBeforeSuper")
+			rule_testing.ExpectFindings(
+				test,
+				rule_testing.Run(test, NoThisBeforeSuper, thisBeforeSuperFile, testCase.sourceText),
+				"thisBeforeSuper",
+			)
 		})
 	}
 }

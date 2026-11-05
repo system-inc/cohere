@@ -73,12 +73,19 @@ func TestCheckSeesARegistryChange(test *testing.T) {
 	removed := inputs
 	removed.Registrations = inputs.Registrations[1:]
 	if stale := staleAgainstCommitted(test, built(test, removed)); !slices.Contains(stale, RulesPath) {
-		test.Errorf("removing %s from the registry left rules.json current: %v", inputs.Registrations[0].Rule.Name, stale)
+		test.Errorf(
+			"removing %s from the registry left rules.json current: %v",
+			inputs.Registrations[0].Rule.Name,
+			stale,
+		)
 	}
 
 	added := inputs
 	added.Registrations = append(slices.Clone(inputs.Registrations), rule.Registration{
-		Rule: rule.Rule{Name: "nexus/consistency-no-docsdata-test-rule", Run: func(rule.Context, any) rule.Listeners { return nil }},
+		Rule: rule.Rule{
+			Name: "nexus/consistency-no-docsdata-test-rule",
+			Run:  func(rule.Context, any) rule.Listeners { return nil },
+		},
 	})
 	if stale := staleAgainstCommitted(test, built(test, added)); !slices.Contains(stale, RulesPath) {
 		test.Errorf("adding a rule to the registry left rules.json current: %v", stale)
@@ -168,7 +175,13 @@ func TestEveryRegisteredRuleHasOneRow(test *testing.T) {
 		for _, name := range registered[language] {
 			names[name] = true
 			if rows[language][name] != 1 {
-				test.Errorf("%s is a registered %s rule and has %d %s rows in rules.json", name, language, rows[language][name], language)
+				test.Errorf(
+					"%s is a registered %s rule and has %d %s rows in rules.json",
+					name,
+					language,
+					rows[language][name],
+					language,
+				)
 			}
 		}
 		for name := range rows[language] {
@@ -294,7 +307,9 @@ func TestEveryHouseRuleFollowsTheNamingScheme(test *testing.T) {
 	misnamed.Registrations = append(slices.Clone(inputs.Registrations), rule.Registration{
 		Rule: rule.Rule{Name: "nexus/docsdata-test-rule", Run: func(rule.Context, any) rule.Listeners { return nil }},
 	})
-	if _, buildError := Build(misnamed); buildError == nil || !strings.Contains(buildError.Error(), "nexus/docsdata-test-rule") {
+	if _, buildError := Build(
+		misnamed,
+	); buildError == nil || !strings.Contains(buildError.Error(), "nexus/docsdata-test-rule") {
 		test.Errorf("a house rule named outside the scheme built: %v", buildError)
 	}
 }
@@ -318,8 +333,10 @@ func TestBuildIsDeterministic(test *testing.T) {
 // a row does not have.
 func TestEveryFieldHasASourceNote(test *testing.T) {
 	test.Parallel()
-	encoded, encodeError := json.Marshal(RuleRow{Options: &RuleOptions{}, Swift: &SwiftVerdict{}, Sets: []RuleSetSeverity{{}}, MessageIds: []string{""},
-		Namespace: "-", UpstreamName: "-", Category: "-", FixKind: "-", TypeScriptRules: []string{""}})
+	encoded, encodeError := json.Marshal(
+		RuleRow{Options: &RuleOptions{}, Swift: &SwiftVerdict{}, Sets: []RuleSetSeverity{{}}, MessageIds: []string{""},
+			Namespace: "-", UpstreamName: "-", Category: "-", FixKind: "-", TypeScriptRules: []string{""}},
+	)
 	if encodeError != nil {
 		test.Fatal(encodeError)
 	}
@@ -387,12 +404,18 @@ func TestTheVerbHelpKeepsItsSynopsis(test *testing.T) {
 		"       cohere rename <name> <newName>\n\n" +
 		"Renames a symbol.\nNothing is written without --write.\n\n" +
 		"  -write\n    \tapply the rename\n"
-	cli, parseCommandLineInterfaceError := parseCli([]byte("  -fix\n    \tapply fixes only\n"), map[string][]byte{"rename": []byte(help)})
+	cli, parseCommandLineInterfaceError := parseCli(
+		[]byte("  -fix\n    \tapply fixes only\n"),
+		map[string][]byte{"rename": []byte(help)},
+	)
 	if parseCommandLineInterfaceError != nil {
 		test.Fatal(parseCommandLineInterfaceError)
 	}
 	verb := cli.Verbs[0]
-	if strings.Join(verb.Usage, "|") != "cohere rename <file>:<line>:<column> <newName>|cohere rename <name> <newName>" {
+	if strings.Join(
+		verb.Usage,
+		"|",
+	) != "cohere rename <file>:<line>:<column> <newName>|cohere rename <name> <newName>" {
 		test.Errorf("usage %q", verb.Usage)
 	}
 	if verb.Summary != "Renames a symbol. Nothing is written without --write." {
@@ -440,9 +463,30 @@ func TestPickExamplesPrefersWhatAReaderCanRun(test *testing.T) {
 		return []capture.Finding{{Line: 1, Column: 1, MessageId: id, Fix: fix}}
 	}
 	picked, _ := PickExamples([]capture.Record{
-		{Rule: "r", File: "a.ts", Source: "x", Options: json.RawMessage(`{}`), Outcome: capture.OutcomeFindings, Findings: finding("withOptions", false)},
-		{Rule: "r", File: "a.ts", Source: "xx", OtherFiles: 1, Outcome: capture.OutcomeFindings, Findings: finding("other", false)},
-		{Rule: "r", File: "a.ts", Source: "longer one", Outcome: capture.OutcomeFixed, Findings: finding("fixed", true), FixedSource: "fixed"},
+		{
+			Rule:     "r",
+			File:     "a.ts",
+			Source:   "x",
+			Options:  json.RawMessage(`{}`),
+			Outcome:  capture.OutcomeFindings,
+			Findings: finding("withOptions", false),
+		},
+		{
+			Rule:       "r",
+			File:       "a.ts",
+			Source:     "xx",
+			OtherFiles: 1,
+			Outcome:    capture.OutcomeFindings,
+			Findings:   finding("other", false),
+		},
+		{
+			Rule:        "r",
+			File:        "a.ts",
+			Source:      "longer one",
+			Outcome:     capture.OutcomeFixed,
+			Findings:    finding("fixed", true),
+			FixedSource: "fixed",
+		},
 		{Rule: "r", File: "a.ts", Source: "xyz", Outcome: capture.OutcomeFindings, Findings: finding("plain", false)},
 		{Rule: "r", File: "b.ts", Source: "clean, longer", Outcome: capture.OutcomeClean},
 		{Rule: "r", File: "a.ts", Source: "clean", Outcome: capture.OutcomeClean},
@@ -473,9 +517,21 @@ func TestPickExamplesPrefersWhatAReaderCanRun(test *testing.T) {
 func TestACaseRunWithOptionsIsNeverShown(test *testing.T) {
 	test.Parallel()
 	picked, withOptions := PickExamples([]capture.Record{
-		{Rule: "r", File: "a.ts", Source: "x", Options: json.RawMessage(`{"Mode": "TypeAnnotation"}`), Outcome: capture.OutcomeFindings,
-			Findings: []capture.Finding{{MessageId: "only"}}},
-		{Rule: "r", File: "a.ts", Source: "y", Options: json.RawMessage(`{"Mode": "TypeAnnotation"}`), Outcome: capture.OutcomeClean},
+		{
+			Rule:     "r",
+			File:     "a.ts",
+			Source:   "x",
+			Options:  json.RawMessage(`{"Mode": "TypeAnnotation"}`),
+			Outcome:  capture.OutcomeFindings,
+			Findings: []capture.Finding{{MessageId: "only"}},
+		},
+		{
+			Rule:    "r",
+			File:    "a.ts",
+			Source:  "y",
+			Options: json.RawMessage(`{"Mode": "TypeAnnotation"}`),
+			Outcome: capture.OutcomeClean,
+		},
 	})
 	examples := picked["r"]
 	if examples.Firing != nil || examples.Clean != nil {
@@ -490,7 +546,13 @@ func TestACaseRunWithOptionsIsNeverShown(test *testing.T) {
 // as findings by two tests, is counted once per outcome, and the fixed record is the one shown.
 func TestPickExamplesCountsACaseOnce(test *testing.T) {
 	test.Parallel()
-	findings := capture.Record{Rule: "r", File: "a.ts", Source: "x", Options: json.RawMessage(`{"a":1}`), Outcome: capture.OutcomeFindings}
+	findings := capture.Record{
+		Rule:    "r",
+		File:    "a.ts",
+		Source:  "x",
+		Options: json.RawMessage(`{"a":1}`),
+		Outcome: capture.OutcomeFindings,
+	}
 	_, withOptions := PickExamples([]capture.Record{findings, findings})
 	if withOptions != 1 {
 		test.Errorf("one case asserted twice counted %d times", withOptions)

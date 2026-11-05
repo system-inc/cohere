@@ -8,9 +8,10 @@ import (
 
 // Adamic readiness through the caches (#drbrp8c): every number a cached run prints is the number a `--no-cache`
 // run prints over the same tree. Readiness is measured only under --adamic-readiness (#9tgm3dq), so every run
-// here asks for it, and the last two tests change the flag between runs. A replayed file that was never measured, or one replayed as ready when its
-// imports moved, would read as Adamic-ready with nothing behind it, the cache's one failure that looks like a
-// success. Each test runs the cold truth on the tree the cached run saw and compares the segments whole.
+// here asks for it, and the last two tests change the flag between runs. A replayed file that was never measured, or
+// one replayed as ready when its imports moved, would read as Adamic-ready with nothing behind it, the cache's one
+// failure that looks like a success. Each test runs the cold truth on the tree the cached run saw and compares the
+// segments whole.
 
 // readinessFlag asks a run to measure readiness.
 const readinessFlag = "--adamic-readiness"
@@ -38,7 +39,10 @@ func readinessFixture(test *testing.T) *runCacheFixture {
 	fixture.write("source/types.ts", "export type Value = number;\n")
 	// A parameter, not an ambient declare: adamic/no-ambient-declarations refuses a declare read as a value, which
 	// would make use.ts unready before its import changes and leave the fixture nothing to move.
-	fixture.write("source/use.ts", "import type { Value } from \"./types\";\n\nexport function doubled(value: Value): number {\n    const result: number = value;\n    return result;\n}\n")
+	fixture.write(
+		"source/use.ts",
+		"import type { Value } from \"./types\";\n\nexport function doubled(value: Value): number {\n    const result: number = value;\n    return result;\n}\n",
+	)
 	fixture.commit("readiness")
 	return fixture
 }
@@ -64,7 +68,10 @@ func TestAReplayedRunReadsTheReadinessACheckedOneDoes(test *testing.T) {
 		test.Errorf("replayed readiness %q, cold %q", got, cold)
 	}
 	if !regexp.MustCompile(`^\d+% `).MatchString(cold) || cold[:4] == "100%" {
-		test.Errorf("the cold run reads %q: the fixture's failing files did not fail, so the comparison proves nothing", cold)
+		test.Errorf(
+			"the cold run reads %q: the fixture's failing files did not fail, so the comparison proves nothing",
+			cold,
+		)
 	}
 }
 
@@ -90,9 +97,15 @@ func TestReadinessFromTheFindingsCacheIsTheCheckedReadiness(test *testing.T) {
 func TestASuppressedAdamicFindingKeepsItsFileUnreadyWarm(test *testing.T) {
 	test.Parallel()
 	fixture := readinessFixture(test)
-	fixture.write("source/definite.ts", "export class Account {\n    // eslint-disable-next-line adamic/no-definite-assignment\n    balance!: number;\n}\n")
+	fixture.write(
+		"source/definite.ts",
+		"export class Account {\n    // eslint-disable-next-line adamic/no-definite-assignment\n    balance!: number;\n}\n",
+	)
 	fixture.write("source/chained.ts", "export let total!: number;\n")
-	fixture.write("CohereSettings.json", `{"rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off","no-debugger":"error","no-var":"error","adamic/no-definite-assignment":"off"}}`)
+	fixture.write(
+		"CohereSettings.json",
+		`{"rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off","no-debugger":"error","no-var":"error","adamic/no-definite-assignment":"off"}}`,
+	)
 	fixture.commit("suppressed")
 	cold := fixture.coldReadiness()
 
@@ -137,7 +150,10 @@ func TestAnImportsShapeChangeIsMeasuredAgainWarm(test *testing.T) {
 		test.Errorf("readiness after an imported shape changed %q, cold %q", got, cold)
 	}
 	if cold == before {
-		test.Errorf("readiness reads %q before and after use.ts's import became any, so the fixture does not move it", cold)
+		test.Errorf(
+			"readiness reads %q before and after use.ts's import became any, so the fixture does not move it",
+			cold,
+		)
 	}
 }
 

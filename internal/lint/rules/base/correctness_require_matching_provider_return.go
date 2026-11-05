@@ -9,7 +9,10 @@ import (
 
 // correctnessRequireMatchingProviderReturnText is the rule's message, whose wording lives in
 // `policy/messages/correctness-require-matching-provider-return.json`.
-var correctnessRequireMatchingProviderReturnText = policy.MessageOf("base/correctness-require-matching-provider-return", "mismatch")
+var correctnessRequireMatchingProviderReturnText = policy.MessageOf(
+	"base/correctness-require-matching-provider-return",
+	"mismatch",
+)
 
 // expectedReturnTypeBrand is the phantom property a typed method decorator carries.
 //

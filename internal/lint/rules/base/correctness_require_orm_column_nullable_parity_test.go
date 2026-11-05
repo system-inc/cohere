@@ -52,7 +52,12 @@ func TestOrmColumnNullableParityStaysSilent(test *testing.T) {
 	for index, sourceText := range cases {
 		test.Run(correctnessRequireOrmColumnNullableParityCaseName(index), func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, CorrectnessRequireOrmColumnNullableParity, correctnessRequireOrmColumnNullableParityFile, sourceText))
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(
+				test,
+				CorrectnessRequireOrmColumnNullableParity,
+				correctnessRequireOrmColumnNullableParityFile,
+				sourceText,
+			))
 		})
 	}
 }
@@ -67,32 +72,53 @@ func TestOrmColumnNullableParityFires(test *testing.T) {
 		{
 			sourceText: "\ndeclare function OrmColumn(o?: any): any;\ndeclare function TimestampColumn(o?: any): any;\ndeclare function OrmJoinColumn(o?: any): any;\ndeclare function OrmManyToOne(o?: any): any;\ndeclare function OrmOneToMany(o?: any): any;\ndeclare function SerializableField(o?: any): any;\nclass A { @OrmColumn({ nullable: true }) x!: string; }",
 			wantFindings: []correctnessRequireOrmColumnNullableParityFinding{
-				{wantId: "columnNullableButTypeNot", wantSpan: "x", wantMessage: "Column declares 'nullable: true' but the type 'string' does not include null/undefined \u2014 a NULL row value will not match this type"},
+				{
+					wantId:      "columnNullableButTypeNot",
+					wantSpan:    "x",
+					wantMessage: "Column declares 'nullable: true' but the type 'string' does not include null/undefined \u2014 a NULL row value will not match this type",
+				},
 			},
 		},
 		{
 			sourceText: "\ndeclare function OrmColumn(o?: any): any;\ndeclare function TimestampColumn(o?: any): any;\ndeclare function OrmJoinColumn(o?: any): any;\ndeclare function OrmManyToOne(o?: any): any;\ndeclare function OrmOneToMany(o?: any): any;\ndeclare function SerializableField(o?: any): any;\nclass A { @TimestampColumn({ nullable: true }) x!: Date; }",
 			wantFindings: []correctnessRequireOrmColumnNullableParityFinding{
-				{wantId: "columnNullableButTypeNot", wantSpan: "x", wantMessage: "Column declares 'nullable: true' but the type 'Date' does not include null/undefined \u2014 a NULL row value will not match this type"},
+				{
+					wantId:      "columnNullableButTypeNot",
+					wantSpan:    "x",
+					wantMessage: "Column declares 'nullable: true' but the type 'Date' does not include null/undefined \u2014 a NULL row value will not match this type",
+				},
 			},
 		},
 		{
 			sourceText: "\ndeclare function OrmColumn(o?: any): any;\ndeclare function TimestampColumn(o?: any): any;\ndeclare function OrmJoinColumn(o?: any): any;\ndeclare function OrmManyToOne(o?: any): any;\ndeclare function OrmOneToMany(o?: any): any;\ndeclare function SerializableField(o?: any): any;\nclass A { @OrmJoinColumn({ nullable: true }) x!: string; }",
 			wantFindings: []correctnessRequireOrmColumnNullableParityFinding{
-				{wantId: "columnNullableButTypeNot", wantSpan: "x", wantMessage: "Column declares 'nullable: true' but the type 'string' does not include null/undefined \u2014 a NULL row value will not match this type"},
+				{
+					wantId:      "columnNullableButTypeNot",
+					wantSpan:    "x",
+					wantMessage: "Column declares 'nullable: true' but the type 'string' does not include null/undefined \u2014 a NULL row value will not match this type",
+				},
 			},
 		},
 		{
 			sourceText: "\ndeclare function OrmColumn(o?: any): any;\ndeclare function TimestampColumn(o?: any): any;\ndeclare function OrmJoinColumn(o?: any): any;\ndeclare function OrmManyToOne(o?: any): any;\ndeclare function OrmOneToMany(o?: any): any;\ndeclare function SerializableField(o?: any): any;\nclass A { @OrmColumn({ nullable: true }) accessor x: string = \"a\"; }",
 			wantFindings: []correctnessRequireOrmColumnNullableParityFinding{
-				{wantId: "columnNullableButTypeNot", wantSpan: "x", wantMessage: "Column declares 'nullable: true' but the type 'string' does not include null/undefined \u2014 a NULL row value will not match this type"},
+				{
+					wantId:      "columnNullableButTypeNot",
+					wantSpan:    "x",
+					wantMessage: "Column declares 'nullable: true' but the type 'string' does not include null/undefined \u2014 a NULL row value will not match this type",
+				},
 			},
 		},
 	}
 	for index, testCase := range cases {
 		test.Run(correctnessRequireOrmColumnNullableParityCaseName(index), func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTyped(test, CorrectnessRequireOrmColumnNullableParity, correctnessRequireOrmColumnNullableParityFile, testCase.sourceText)
+			result := rule_testing.RunTyped(
+				test,
+				CorrectnessRequireOrmColumnNullableParity,
+				correctnessRequireOrmColumnNullableParityFile,
+				testCase.sourceText,
+			)
 
 			wantIds := make([]string, len(testCase.wantFindings))
 			for position, want := range testCase.wantFindings {
@@ -108,7 +134,12 @@ func TestOrmColumnNullableParityFires(test *testing.T) {
 					test.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
 				}
 				if diagnostic.Message.Description != want.wantMessage {
-					test.Fatalf("finding %d message: expected %q, got %q", position, want.wantMessage, diagnostic.Message.Description)
+					test.Fatalf(
+						"finding %d message: expected %q, got %q",
+						position,
+						want.wantMessage,
+						diagnostic.Message.Description,
+					)
 				}
 				if len(diagnostic.Fixes) != 0 || len(diagnostic.Suggestions) != 0 {
 					test.Fatalf("finding %d: expected no repair, got %d fixes and %d suggestions",
@@ -141,10 +172,12 @@ func TestOrmColumnNullableParityKeysOnTheDecoratorName(test *testing.T) {
 
 	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, CorrectnessRequireOrmColumnNullableParity,
 		correctnessRequireOrmColumnNullableParityFile,
-		preamble+"function OrmColumn(o?: any): any { return null; }\nclass A { @OrmColumn({ nullable: true }) x!: string; }"),
+		preamble+
+			"function OrmColumn(o?: any): any { return null; }\nclass A { @OrmColumn({ nullable: true }) x!: string; }"),
 		"columnNullableButTypeNot")
 
 	rule_testing.ExpectClean(test, rule_testing.RunTyped(test, CorrectnessRequireOrmColumnNullableParity,
 		correctnessRequireOrmColumnNullableParityFile,
-		preamble+"namespace N { export function OrmColumn(o?: any): any { return null; } }\nclass A { @N.OrmColumn({ nullable: true }) x!: string; }"))
+		preamble+
+			"namespace N { export function OrmColumn(o?: any): any { return null; } }\nclass A { @N.OrmColumn({ nullable: true }) x!: string; }"))
 }

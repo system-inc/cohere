@@ -34,7 +34,12 @@ type wave2bFixture struct {
 // it records.
 func TestFrameworkMultiDeclarationUtilitiesMatchTheEngine(test *testing.T) {
 	test.Parallel()
-	for _, name := range []string{"wave2b_fixtures.json", "wave2c_fixtures.json", "wave4_fixtures.json", "wave5_fixtures.json"} {
+	for _, name := range []string{
+		"wave2b_fixtures.json",
+		"wave2c_fixtures.json",
+		"wave4_fixtures.json",
+		"wave5_fixtures.json",
+	} {
 		test.Run(name, func(test *testing.T) {
 			test.Parallel()
 			forEachOracleCopy(test, name, func(test *testing.T, fixtureName string) {
@@ -80,7 +85,10 @@ func runMultiDeclarationComparison(test *testing.T, fixture wave2bFixture, syste
 			bothDeclined++
 		case testCase.Reading == nil && produced:
 			engineSilent++
-			disagreements = append(disagreements, testCase.ClassName+": engine declined, table read "+formatReading(reading))
+			disagreements = append(
+				disagreements,
+				testCase.ClassName+": engine declined, table read "+formatReading(reading),
+			)
 		case testCase.Reading != nil && !produced:
 			tableSilent++
 			silentNames = append(silentNames, testCase.ClassName)
@@ -90,14 +98,25 @@ func runMultiDeclarationComparison(test *testing.T, fixture wave2bFixture, syste
 				agreed++
 				continue
 			}
-			disagreements = append(disagreements, testCase.ClassName+": engine "+formatReading(expected)+", table "+formatReading(reading))
+			disagreements = append(
+				disagreements,
+				testCase.ClassName+": engine "+formatReading(expected)+", table "+formatReading(reading),
+			)
 		}
 	}
 
 	sort.Strings(disagreements)
 	sort.Strings(silentNames)
-	test.Logf("wave 2b: %d roots, %d cases, agreed %d, both-declined %d, table-silent %d, engine-silent %d, disagreed %d",
-		fixture.RootCount, fixture.CaseCount, agreed, bothDeclined, tableSilent, engineSilent, len(disagreements))
+	test.Logf(
+		"wave 2b: %d roots, %d cases, agreed %d, both-declined %d, table-silent %d, engine-silent %d, disagreed %d",
+		fixture.RootCount,
+		fixture.CaseCount,
+		agreed,
+		bothDeclined,
+		tableSilent,
+		engineSilent,
+		len(disagreements),
+	)
 	// A silence is only allowed when the static table answers the class instead. `content-none` is
 	// the case: upstream registers it as its own `staticUtility` and `ParseCandidate` reads it as a
 	// static, so the functional path is right to decline and M1's table is what answers it. Anything
@@ -112,10 +131,17 @@ func runMultiDeclarationComparison(test *testing.T, fixture wave2bFixture, syste
 	}
 
 	if agreed < 200 {
-		test.Errorf("only %d cases agreed of %d the engine answered; a table that stopped answering scores perfectly on any comparison counting only disagreements", agreed, fixture.Answered)
+		test.Errorf(
+			"only %d cases agreed of %d the engine answered; a table that stopped answering scores perfectly on any comparison counting only disagreements",
+			agreed,
+			fixture.Answered,
+		)
 	}
 	if bothDeclined < 100 {
-		test.Errorf("only %d cases were declined by both sides; the rejection branches are under-exercised", bothDeclined)
+		test.Errorf(
+			"only %d cases were declined by both sides; the rejection branches are under-exercised",
+			bothDeclined,
+		)
 	}
 	for _, disagreement := range disagreements {
 		test.Error(disagreement)
@@ -135,7 +161,10 @@ func TestFrameworkMultiDeclarationWrapperContributesNothing(test *testing.T) {
 		test.Fatal("grayscale is not in the table")
 	}
 	if grayscale.Reading.Count != 2 {
-		test.Errorf("grayscale reads %d declarations; the engine reads 2, so the at-root wrapper is being counted", grayscale.Reading.Count)
+		test.Errorf(
+			"grayscale reads %d declarations; the engine reads 2, so the at-root wrapper is being counted",
+			grayscale.Reading.Count,
+		)
 	}
 
 	// The at-root walk itself, so a change to PropertySort fails here rather than silently changing
@@ -145,7 +174,10 @@ func TestFrameworkMultiDeclarationWrapperContributesNothing(test *testing.T) {
 		Declaration("filter", "none"),
 	})
 	if sorted.Count != 1 {
-		test.Errorf("a tree of one at-root wrapper and one declaration counted %d; at-root contributes nothing, so it must be 1", sorted.Count)
+		test.Errorf(
+			"a tree of one at-root wrapper and one declaration counted %d; at-root contributes nothing, so it must be 1",
+			sorted.Count,
+		)
 	}
 }
 
@@ -162,7 +194,9 @@ func TestFrameworkMultiDeclarationLiteralReadingsBeatTheTheme(test *testing.T) {
 		test.Fatal("ease is not in the table")
 	}
 	if len(utility.LiteralReadings) == 0 {
-		test.Fatal("ease carries no literal readings; ease-initial reads differently from every other ease-* and needs one")
+		test.Fatal(
+			"ease carries no literal readings; ease-initial reads differently from every other ease-* and needs one",
+		)
 	}
 
 	theme := NewTheme()
@@ -178,8 +212,11 @@ func TestFrameworkMultiDeclarationLiteralReadingsBeatTheTheme(test *testing.T) {
 		test.Fatal("ease-initial produced nothing")
 	}
 	if reading.Count != 1 || len(reading.Order) != 0 {
-		test.Errorf("ease-initial read %v#%d against a theme declaring --ease-initial; the engine reads []#1, so the literal must be checked before the theme",
-			reading.Order, reading.Count)
+		test.Errorf(
+			"ease-initial read %v#%d against a theme declaring --ease-initial; the engine reads []#1, so the literal must be checked before the theme",
+			reading.Order,
+			reading.Count,
+		)
 	}
 }
 
@@ -194,7 +231,12 @@ func loadWave2bFixture(test *testing.T, name string) wave2bFixture {
 		test.Fatalf("parse %s: %v", name, decodeError)
 	}
 	if fixture.CaseCount == 0 || fixture.Answered == 0 {
-		test.Fatalf("%s carries %d cases and %d answered; a comparison over it would pass by comparing nothing", name, fixture.CaseCount, fixture.Answered)
+		test.Fatalf(
+			"%s carries %d cases and %d answered; a comparison over it would pass by comparing nothing",
+			name,
+			fixture.CaseCount,
+			fixture.Answered,
+		)
 	}
 	return fixture
 }

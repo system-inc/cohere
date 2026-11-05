@@ -12,9 +12,18 @@ import (
 // The rule's messages, one handle per id, whose wording lives in
 // `policy/messages/network-no-forbidden-import.json`.
 var (
-	networkNoForbiddenImportNoDirectTanStackQueryText = policy.MessageOf("structure/network-no-forbidden-import", "noDirectTanStackQuery")
-	networkNoForbiddenImportNoDirectApolloText        = policy.MessageOf("structure/network-no-forbidden-import", "noDirectApollo")
-	networkNoForbiddenImportNoDirectGraphqlImportText = policy.MessageOf("structure/network-no-forbidden-import", "noDirectGraphqlImport")
+	networkNoForbiddenImportNoDirectTanStackQueryText = policy.MessageOf(
+		"structure/network-no-forbidden-import",
+		"noDirectTanStackQuery",
+	)
+	networkNoForbiddenImportNoDirectApolloText = policy.MessageOf(
+		"structure/network-no-forbidden-import",
+		"noDirectApollo",
+	)
+	networkNoForbiddenImportNoDirectGraphqlImportText = policy.MessageOf(
+		"structure/network-no-forbidden-import",
+		"noDirectGraphqlImport",
+	)
 )
 
 // messageNoDirectTanStackQuery is the finding, rendered when it is reported so the text comes from the current catalog.

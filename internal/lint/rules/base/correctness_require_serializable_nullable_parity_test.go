@@ -58,7 +58,12 @@ func TestSerializableNullableParityStaysSilent(test *testing.T) {
 	for index, sourceText := range cases {
 		test.Run(correctnessRequireSerializableNullableParityCaseName(index), func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, CorrectnessRequireSerializableNullableParity, correctnessRequireSerializableNullableParityFile, sourceText))
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(
+				test,
+				CorrectnessRequireSerializableNullableParity,
+				correctnessRequireSerializableNullableParityFile,
+				sourceText,
+			))
 		})
 	}
 }
@@ -73,32 +78,53 @@ func TestSerializableNullableParityFires(test *testing.T) {
 		{
 			sourceText: "\ndeclare function OrmColumn(o?: any): any;\ndeclare function TimestampColumn(o?: any): any;\ndeclare function OrmJoinColumn(o?: any): any;\ndeclare function OrmManyToOne(o?: any): any;\ndeclare function OrmOneToMany(o?: any): any;\ndeclare function SerializableField(o?: any): any;\nclass A { @SerializableField({ optional: true }) x!: string; }",
 			wantFindings: []correctnessRequireSerializableNullableParityFinding{
-				{wantId: "decoratorOptionalButTypeNot", wantSpan: "x", wantMessage: "@SerializableField declares 'optional: true' but type 'string' does not include null/undefined"},
+				{
+					wantId:      "decoratorOptionalButTypeNot",
+					wantSpan:    "x",
+					wantMessage: "@SerializableField declares 'optional: true' but type 'string' does not include null/undefined",
+				},
 			},
 		},
 		{
 			sourceText: "\ndeclare function OrmColumn(o?: any): any;\ndeclare function TimestampColumn(o?: any): any;\ndeclare function OrmJoinColumn(o?: any): any;\ndeclare function OrmManyToOne(o?: any): any;\ndeclare function OrmOneToMany(o?: any): any;\ndeclare function SerializableField(o?: any): any;\nclass A { @SerializableField({ optional: false }) x?: string; }",
 			wantFindings: []correctnessRequireSerializableNullableParityFinding{
-				{wantId: "typeOptionalButDecoratorNot", wantSpan: "x", wantMessage: "Type 'string | undefined' is nullable but @SerializableField does not declare 'optional: true'"},
+				{
+					wantId:      "typeOptionalButDecoratorNot",
+					wantSpan:    "x",
+					wantMessage: "Type 'string | undefined' is nullable but @SerializableField does not declare 'optional: true'",
+				},
 			},
 		},
 		{
 			sourceText: "\ndeclare function OrmColumn(o?: any): any;\ndeclare function TimestampColumn(o?: any): any;\ndeclare function OrmJoinColumn(o?: any): any;\ndeclare function OrmManyToOne(o?: any): any;\ndeclare function OrmOneToMany(o?: any): any;\ndeclare function SerializableField(o?: any): any;\nclass A { @SerializableField() x?: string; }",
 			wantFindings: []correctnessRequireSerializableNullableParityFinding{
-				{wantId: "typeOptionalButDecoratorNot", wantSpan: "x", wantMessage: "Type 'string | undefined' is nullable but @SerializableField does not declare 'optional: true'"},
+				{
+					wantId:      "typeOptionalButDecoratorNot",
+					wantSpan:    "x",
+					wantMessage: "Type 'string | undefined' is nullable but @SerializableField does not declare 'optional: true'",
+				},
 			},
 		},
 		{
 			sourceText: "\ndeclare function OrmColumn(o?: any): any;\ndeclare function TimestampColumn(o?: any): any;\ndeclare function OrmJoinColumn(o?: any): any;\ndeclare function OrmManyToOne(o?: any): any;\ndeclare function OrmOneToMany(o?: any): any;\ndeclare function SerializableField(o?: any): any;\nclass A { @SerializableField({ optional: false }) x!: any; }",
 			wantFindings: []correctnessRequireSerializableNullableParityFinding{
-				{wantId: "typeOptionalButDecoratorNot", wantSpan: "x", wantMessage: "Type 'any' is nullable but @SerializableField does not declare 'optional: true'"},
+				{
+					wantId:      "typeOptionalButDecoratorNot",
+					wantSpan:    "x",
+					wantMessage: "Type 'any' is nullable but @SerializableField does not declare 'optional: true'",
+				},
 			},
 		},
 	}
 	for index, testCase := range cases {
 		test.Run(correctnessRequireSerializableNullableParityCaseName(index), func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTyped(test, CorrectnessRequireSerializableNullableParity, correctnessRequireSerializableNullableParityFile, testCase.sourceText)
+			result := rule_testing.RunTyped(
+				test,
+				CorrectnessRequireSerializableNullableParity,
+				correctnessRequireSerializableNullableParityFile,
+				testCase.sourceText,
+			)
 
 			wantIds := make([]string, len(testCase.wantFindings))
 			for position, want := range testCase.wantFindings {
@@ -114,7 +140,12 @@ func TestSerializableNullableParityFires(test *testing.T) {
 					test.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
 				}
 				if diagnostic.Message.Description != want.wantMessage {
-					test.Fatalf("finding %d message: expected %q, got %q", position, want.wantMessage, diagnostic.Message.Description)
+					test.Fatalf(
+						"finding %d message: expected %q, got %q",
+						position,
+						want.wantMessage,
+						diagnostic.Message.Description,
+					)
 				}
 				if len(diagnostic.Fixes) != 0 || len(diagnostic.Suggestions) != 0 {
 					test.Fatalf("finding %d: expected no repair, got %d fixes and %d suggestions",
@@ -142,10 +173,12 @@ func TestSerializableNullableParityKeysOnTheDecoratorName(test *testing.T) {
 
 	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, CorrectnessRequireSerializableNullableParity,
 		correctnessRequireSerializableNullableParityFile,
-		preamble+"function SerializableField(o?: any): any { return null; }\nclass A { @SerializableField({ optional: true }) x!: string; }"),
+		preamble+
+			"function SerializableField(o?: any): any { return null; }\nclass A { @SerializableField({ optional: true }) x!: string; }"),
 		"decoratorOptionalButTypeNot")
 
 	rule_testing.ExpectClean(test, rule_testing.RunTyped(test, CorrectnessRequireSerializableNullableParity,
 		correctnessRequireSerializableNullableParityFile,
-		preamble+"namespace N { export function SerializableField(o?: any): any { return null; } }\nclass A { @N.SerializableField({ optional: true }) x!: string; }"))
+		preamble+
+			"namespace N { export function SerializableField(o?: any): any { return null; } }\nclass A { @N.SerializableField({ optional: true }) x!: string; }"))
 }

@@ -227,7 +227,10 @@ func unwrapToElementType(ruleContext rule.Context, subject *checker.Type) *check
 		symbol := checker.Type_symbol(element)
 
 		if symbol != nil && symbol.Name == "Promise" {
-			if typeArguments := checker.Checker_getTypeArguments(ruleContext.TypeChecker, element); len(typeArguments) > 0 {
+			if typeArguments := checker.Checker_getTypeArguments(
+				ruleContext.TypeChecker,
+				element,
+			); len(typeArguments) > 0 {
 				element = typeArguments[0]
 				continue
 			}
@@ -266,7 +269,10 @@ func unwrapToElementType(ruleContext rule.Context, subject *checker.Type) *check
 		}
 
 		if symbol != nil && (symbol.Name == "Array" || symbol.Name == "ReadonlyArray") {
-			if typeArguments := checker.Checker_getTypeArguments(ruleContext.TypeChecker, element); len(typeArguments) > 0 {
+			if typeArguments := checker.Checker_getTypeArguments(
+				ruleContext.TypeChecker,
+				element,
+			); len(typeArguments) > 0 {
 				element = typeArguments[0]
 				continue
 			}
@@ -279,8 +285,14 @@ func unwrapToElementType(ruleContext rule.Context, subject *checker.Type) *check
 
 // The rule's messages, whose wording lives in `policy/messages/correctness-require-matching-operation-context.json`.
 var (
-	graphQlOperationContextMatchesReturnMismatchText      = policy.MessageOf("base/correctness-require-matching-operation-context", "mismatch")
-	graphQlOperationContextMatchesReturnWrongBaseTypeText = policy.MessageOf("base/correctness-require-matching-operation-context", "wrongBaseType")
+	graphQlOperationContextMatchesReturnMismatchText = policy.MessageOf(
+		"base/correctness-require-matching-operation-context",
+		"mismatch",
+	)
+	graphQlOperationContextMatchesReturnWrongBaseTypeText = policy.MessageOf(
+		"base/correctness-require-matching-operation-context",
+		"wrongBaseType",
+	)
 )
 
 func buildMismatchMessage(parameterGeneric string, returnType string) rule.Message {
@@ -295,7 +307,9 @@ func buildMismatchMessage(parameterGeneric string, returnType string) rule.Messa
 
 func buildWrongBaseTypeMessage(parameterType string) rule.Message {
 	return rule.Message{
-		Id:          graphQlOperationContextMatchesReturnWrongBaseTypeText.Id,
-		Description: graphQlOperationContextMatchesReturnWrongBaseTypeText.Render(map[string]string{"parameterType": parameterType}),
+		Id: graphQlOperationContextMatchesReturnWrongBaseTypeText.Id,
+		Description: graphQlOperationContextMatchesReturnWrongBaseTypeText.Render(
+			map[string]string{"parameterType": parameterType},
+		),
 	}
 }

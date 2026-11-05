@@ -48,16 +48,34 @@ func TestNoLocationAssignRelativeDestinationFires(test *testing.T) {
 		{"a template opening with an interpolation", "location.href = `${base}/path`;\n"},
 		{"a template with only interpolations", "location.href = `${a}${b}`;\n"},
 		{"a no-substitution template", "location.assign(`/dashboard`);\n"},
-		{"a concatenation whose left side is relative", "location.href = '/search?term=' + encodeURIComponent(term);\n"},
+		{
+			"a concatenation whose left side is relative",
+			"location.href = '/search?term=' + encodeURIComponent(term);\n",
+		},
 		{"a concatenation nested to the left", "location.href = '/a' + b + c;\n"},
 		{"a concatenation whose left side is a template", "location.href = `/a` + x;\n"},
 		{"an identifier initialized to a relative path", "const target = '/dashboard';\nlocation.assign(target);\n"},
 		{"an identifier initialized to a template", "const target = `/dashboard`;\nlocation.assign(target);\n"},
-		{"an identifier rewritten before the read", "let target = 'https://example.com';\ntarget = '/dashboard';\nlocation.assign(target);\n"},
-		{"an identifier declared without an initializer then written", "let target;\ntarget = '/dashboard';\nlocation.assign(target);\n"},
-		{"an identifier resolved through two hops", "const first = '/dashboard';\nconst second = first;\nlocation.assign(second);\n"},
-		{"a violation nested inside a handler inside a component", "export function Search() {\n    const onSelect = () => {\n        window.location.href = '/support/search?term=' + encodeURIComponent(term);\n    };\n    return onSelect;\n}\n"},
-		{"a violation inside a class method", "export class Nav {\n    go() {\n        window.location.href = '/home';\n    }\n}\n"},
+		{
+			"an identifier rewritten before the read",
+			"let target = 'https://example.com';\ntarget = '/dashboard';\nlocation.assign(target);\n",
+		},
+		{
+			"an identifier declared without an initializer then written",
+			"let target;\ntarget = '/dashboard';\nlocation.assign(target);\n",
+		},
+		{
+			"an identifier resolved through two hops",
+			"const first = '/dashboard';\nconst second = first;\nlocation.assign(second);\n",
+		},
+		{
+			"a violation nested inside a handler inside a component",
+			"export function Search() {\n    const onSelect = () => {\n        window.location.href = '/support/search?term=' + encodeURIComponent(term);\n    };\n    return onSelect;\n}\n",
+		},
+		{
+			"a violation inside a class method",
+			"export class Nav {\n    go() {\n        window.location.href = '/home';\n    }\n}\n",
+		},
 		// A parenthesized assignment target. Our tree keeps the parenthesis as a real node where
 		// the reference parser has already dropped it, so the skip at the target is load-bearing
 		// here and inert there. Measured against the reference: both report.
@@ -69,7 +87,10 @@ func TestNoLocationAssignRelativeDestinationFires(test *testing.T) {
 		{"a parenthesized argument", "location.assign(('/dashboard'));\n"},
 		{"an optional call", "location.assign?.('/dashboard');\n"},
 		{"an optional member access", "window.location?.assign('/dashboard');\n"},
-		{"a use outside a block that shadowed the name", "{\n    const location = { assign() {} };\n    location.assign('/inner');\n}\nlocation.assign('/dashboard');\n"},
+		{
+			"a use outside a block that shadowed the name",
+			"{\n    const location = { assign() {} };\n    location.assign('/inner');\n}\nlocation.assign('/dashboard');\n",
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -99,9 +120,18 @@ func TestNoLocationAssignRelativeDestinationStaysSilent(test *testing.T) {
 		{"a tel scheme", "location.assign('tel:5551234');\n"},
 		{"a template whose first span is a scheme", "location.href = `https://${host}/x`;\n"},
 		{"a concatenation whose left side is absolute", "location.href = 'https://example.com/' + path;\n"},
-		{"an identifier initialized to an absolute url", "const target = 'https://example.com';\nlocation.assign(target);\n"},
-		{"an identifier rewritten only after the read", "let target = 'https://example.com';\nlocation.assign(target);\ntarget = '/dashboard';\n"},
-		{"an identifier declared without an initializer and written after the read", "let target;\nlocation.assign(target);\ntarget = '/dashboard';\n"},
+		{
+			"an identifier initialized to an absolute url",
+			"const target = 'https://example.com';\nlocation.assign(target);\n",
+		},
+		{
+			"an identifier rewritten only after the read",
+			"let target = 'https://example.com';\nlocation.assign(target);\ntarget = '/dashboard';\n",
+		},
+		{
+			"an identifier declared without an initializer and written after the read",
+			"let target;\nlocation.assign(target);\ntarget = '/dashboard';\n",
+		},
 		{"an identifier bound to a call", "const target = buildUrl();\nlocation.assign(target);\n"},
 		{"a parameter", "export function go(target: string) {\n    location.assign(target);\n}\n"},
 		{"a property access", "location.href = result.checkoutUrl;\n"},
@@ -116,16 +146,31 @@ func TestNoLocationAssignRelativeDestinationStaysSilent(test *testing.T) {
 		{"a parent receiver", "parent.location.assign('/dashboard');\n"},
 		{"a nested self under window", "window.self.location.href = '/dashboard';\n"},
 		{"a location property of location", "location.location.href = '/dashboard';\n"},
-		{"a module-scope binding named location", "const location = { assign(_: string) {} };\nlocation.assign('/dashboard');\n"},
-		{"a parameter named location", "export function go(location: { assign(url: string): void }) {\n    location.assign('/dashboard');\n}\n"},
-		{"a parameter named window", "export function go(window: { location: { href: string } }) {\n    window.location.href = '/dashboard';\n}\n"},
+		{
+			"a module-scope binding named location",
+			"const location = { assign(_: string) {} };\nlocation.assign('/dashboard');\n",
+		},
+		{
+			"a parameter named location",
+			"export function go(location: { assign(url: string): void }) {\n    location.assign('/dashboard');\n}\n",
+		},
+		{
+			"a parameter named window",
+			"export function go(window: { location: { href: string } }) {\n    window.location.href = '/dashboard';\n}\n",
+		},
 		// An import binds the name locally, so the receiver is not the ambient global. All four
 		// import shapes were measured against the reference and all four are silent there. The
 		// renamed one matters most: what binds is the local name, not the imported one.
 		{"a named import of the name", "import { location } from \"./globals\";\nlocation.assign(\"/dashboard\");\n"},
 		{"a default import of the name", "import location from \"./globals\";\nlocation.assign(\"/dashboard\");\n"},
-		{"a namespace import of the name", "import * as window from \"./globals\";\nwindow.location.href = \"/dashboard\";\n"},
-		{"an import renamed to the name", "import { anything as location } from \"./globals\";\nlocation.assign(\"/dashboard\");\n"},
+		{
+			"a namespace import of the name",
+			"import * as window from \"./globals\";\nwindow.location.href = \"/dashboard\";\n",
+		},
+		{
+			"an import renamed to the name",
+			"import { anything as location } from \"./globals\";\nlocation.assign(\"/dashboard\");\n",
+		},
 		// These two must use the shadowed name as a receiver, not merely bind it. A fixture that
 		// declares the name and never navigates stays silent whatever the rule does, so it reads as
 		// coverage while testing nothing; the mutation sweep found exactly that and both branches
@@ -134,9 +179,18 @@ func TestNoLocationAssignRelativeDestinationStaysSilent(test *testing.T) {
 		{"a class declared with the name", "class window {}\nwindow.location.href = \"/dashboard\";\n"},
 		// A catch parameter binds the name for the length of its block, which is a shape no other
 		// fixture here reaches: the sweep found the catch arm surviving until these were added.
-		{"a catch parameter named location", "try {\n    go();\n} catch (location) {\n    location.assign(\"/dashboard\");\n}\n"},
-		{"a catch parameter named window", "try {\n    go();\n} catch (window) {\n    window.location.href = \"/dashboard\";\n}\n"},
-		{"a shadow inside the block that uses it", "{\n    const location = { assign(_: string) {} };\n    location.assign('/dashboard');\n}\n"},
+		{
+			"a catch parameter named location",
+			"try {\n    go();\n} catch (location) {\n    location.assign(\"/dashboard\");\n}\n",
+		},
+		{
+			"a catch parameter named window",
+			"try {\n    go();\n} catch (window) {\n    window.location.href = \"/dashboard\";\n}\n",
+		},
+		{
+			"a shadow inside the block that uses it",
+			"{\n    const location = { assign(_: string) {} };\n    location.assign('/dashboard');\n}\n",
+		},
 		{"a user object with a location property", "container.location.href = '/dashboard';\n"},
 		{"a property named href on another object", "window.settings.href = '/dashboard';\n"},
 		{"a differently cased method", "location.Assign('/dashboard');\n"},

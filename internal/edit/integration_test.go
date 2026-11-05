@@ -134,7 +134,12 @@ func TestARealRuleConvergesInTwoPasses(test *testing.T) {
 	test.Parallel()
 	source := "import * as NodeFileSystem from 'fs';\n"
 
-	result, fixTextError := FixText("imports.ts", source, proposeFromRules(nexus.ImportRequireNodeNamespace), DefaultMaxPasses)
+	result, fixTextError := FixText(
+		"imports.ts",
+		source,
+		proposeFromRules(nexus.ImportRequireNodeNamespace),
+		DefaultMaxPasses,
+	)
 	if fixTextError != nil {
 		test.Fatalf("unexpected error: %v", fixTextError)
 	}
@@ -193,7 +198,12 @@ func TestReplaceNodeMustNotEatLeadingTrivia(test *testing.T) {
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result, fixTextError := FixText("imports.ts", testCase.source, proposeFromRules(nexus.ImportRequireNodeNamespace), DefaultMaxPasses)
+			result, fixTextError := FixText(
+				"imports.ts",
+				testCase.source,
+				proposeFromRules(nexus.ImportRequireNodeNamespace),
+				DefaultMaxPasses,
+			)
 			if fixTextError != nil {
 				test.Fatalf("unexpected error: %v", fixTextError)
 			}

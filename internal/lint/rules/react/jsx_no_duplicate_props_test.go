@@ -298,7 +298,13 @@ func TestJsxNoDuplicatePropsIgnoreCase(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.sourceText, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, JsxNoDuplicateProps, duplicatePropsFile, testCase.sourceText, decoded)
+			result := rule_testing.RunWithOptions(
+				test,
+				JsxNoDuplicateProps,
+				duplicatePropsFile,
+				testCase.sourceText,
+				decoded,
+			)
 			if len(result.Diagnostics) != testCase.wantCount {
 				test.Errorf("got %d findings, want %d", len(result.Diagnostics), testCase.wantCount)
 			}

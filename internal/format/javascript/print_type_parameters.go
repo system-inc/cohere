@@ -23,7 +23,8 @@ func shouldForceTrailingComma(path *Path, options *Options, parametersKey string
 		strings.HasPrefix(current.Type(), "TS") &&
 		!current.List(parametersKey)[0].Truthy("constraint") &&
 		parentOf(path).Is("ArrowFunctionExpression") &&
-		!(settingsOf(options).FilePath != "" && strings.HasSuffix(sourcename.TreatedAs(settingsOf(options).FilePath), ".ts"))
+		!(settingsOf(options).FilePath != "" &&
+			strings.HasSuffix(sourcename.TreatedAs(settingsOf(options).FilePath), ".ts"))
 }
 
 /*

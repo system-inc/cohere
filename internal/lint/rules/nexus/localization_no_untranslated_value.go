@@ -29,7 +29,10 @@ const untranslatedValuePreviewLength = 40
 
 // localizationNoUntranslatedValueMissingTranslationText is the rule's `missingTranslation` message,
 // whose wording lives in `policy/messages/localization-no-untranslated-value.json`.
-var localizationNoUntranslatedValueMissingTranslationText = policy.MessageOf("nexus/localization-no-untranslated-value", "missingTranslation")
+var localizationNoUntranslatedValueMissingTranslationText = policy.MessageOf(
+	"nexus/localization-no-untranslated-value",
+	"missingTranslation",
+)
 
 func messageMissingTranslation(key string, locale string) rule.Message {
 	return rule.Message{
@@ -43,7 +46,10 @@ func messageMissingTranslation(key string, locale string) rule.Message {
 
 // localizationNoUntranslatedValueAmbiguousEnglishSiblingText is the rule's `ambiguousEnglishSibling`
 // message, whose wording lives in `policy/messages/localization-no-untranslated-value.json`.
-var localizationNoUntranslatedValueAmbiguousEnglishSiblingText = policy.MessageOf("nexus/localization-no-untranslated-value", "ambiguousEnglishSibling")
+var localizationNoUntranslatedValueAmbiguousEnglishSiblingText = policy.MessageOf(
+	"nexus/localization-no-untranslated-value",
+	"ambiguousEnglishSibling",
+)
 
 func messageAmbiguousEnglishSibling(first string, second string) rule.Message {
 	return rule.Message{
@@ -57,7 +63,10 @@ func messageAmbiguousEnglishSibling(first string, second string) rule.Message {
 
 // localizationNoUntranslatedValueMissingEnglishSiblingText is the rule's `missingEnglishSibling`
 // message, whose wording lives in `policy/messages/localization-no-untranslated-value.json`.
-var localizationNoUntranslatedValueMissingEnglishSiblingText = policy.MessageOf("nexus/localization-no-untranslated-value", "missingEnglishSibling")
+var localizationNoUntranslatedValueMissingEnglishSiblingText = policy.MessageOf(
+	"nexus/localization-no-untranslated-value",
+	"missingEnglishSibling",
+)
 
 func messageMissingEnglishSibling(expected string, alternative string) rule.Message {
 	return rule.Message{
@@ -71,7 +80,10 @@ func messageMissingEnglishSibling(expected string, alternative string) rule.Mess
 
 // localizationNoUntranslatedValueIdenticalToSourceText is the rule's `identicalToSource` message,
 // whose wording lives in `policy/messages/localization-no-untranslated-value.json`.
-var localizationNoUntranslatedValueIdenticalToSourceText = policy.MessageOf("nexus/localization-no-untranslated-value", "identicalToSource")
+var localizationNoUntranslatedValueIdenticalToSourceText = policy.MessageOf(
+	"nexus/localization-no-untranslated-value",
+	"identicalToSource",
+)
 
 func messageIdenticalToSource(key string, locale string, value string) rule.Message {
 	preview := value
@@ -142,7 +154,11 @@ var LocalizationNoUntranslatedValue = rule.Rule{
 		if ruleContext.Program == nil {
 			return nil
 		}
-		englishSourceFile, both := englishSibling(ruleContext.Program, translationsDirectory, ruleContext.SourceFile.FileName().AsString())
+		englishSourceFile, both := englishSibling(
+			ruleContext.Program,
+			translationsDirectory,
+			ruleContext.SourceFile.FileName().AsString(),
+		)
 		fileStart := ruleContext.SourceFile.AsNode().Loc.WithEnd(ruleContext.SourceFile.AsNode().Loc.Pos())
 		if both != nil {
 			ruleContext.ReportRange(fileStart, messageAmbiguousEnglishSibling(both[0], both[1]))
@@ -503,9 +519,15 @@ func localizationNoUntranslatedValueFingerprint(program rule.Program, _ any) [sh
 		if !isTranslationsDirectory(fileName[:lastSlash]) {
 			continue
 		}
-		tables = append(tables, englishTable{name: rule.FingerprintPath(program, fileName), text: sha256.Sum256([]byte(sourceFile.Text()))})
+		tables = append(
+			tables,
+			englishTable{name: rule.FingerprintPath(program, fileName), text: sha256.Sum256([]byte(sourceFile.Text()))},
+		)
 	}
-	slices.SortFunc(tables, func(first englishTable, second englishTable) int { return strings.Compare(first.name, second.name) })
+	slices.SortFunc(
+		tables,
+		func(first englishTable, second englishTable) int { return strings.Compare(first.name, second.name) },
+	)
 
 	hash := sha256.New()
 	for _, table := range tables {

@@ -27,11 +27,19 @@ func TestResolvingFormatsEachFileWithItsOwnDirectorysOptions(test *testing.T) {
 		}
 		// Each repository extends its own Nexus tier, the one file a format block may live in.
 		nexusTier := `{"format": {"printWidth": ` + printWidth + `}}`
-		if writeError := os.WriteFile(filepath.Join(root, name, "NexusCohereSettings.json"), []byte(nexusTier), 0o644); writeError != nil {
+		if writeError := os.WriteFile(
+			filepath.Join(root, name, "NexusCohereSettings.json"),
+			[]byte(nexusTier),
+			0o644,
+		); writeError != nil {
 			test.Fatal(writeError)
 		}
 		settings := `{"extends": "./NexusCohereSettings.json"}`
-		if writeError := os.WriteFile(filepath.Join(root, name, "CohereSettings.json"), []byte(settings), 0o644); writeError != nil {
+		if writeError := os.WriteFile(
+			filepath.Join(root, name, "CohereSettings.json"),
+			[]byte(settings),
+			0o644,
+		); writeError != nil {
 			test.Fatal(writeError)
 		}
 	}
@@ -90,7 +98,11 @@ func TestResolvingOffersOnlyWhatAPrinterHandles(test *testing.T) {
 func TestResolvingRefusesAConfigItCannotApplyAtConstruction(test *testing.T) {
 	test.Parallel()
 	root := test.TempDir()
-	if writeError := os.WriteFile(filepath.Join(root, "package.json"), []byte(`{"prettier": "@company/prettier-config"}`), 0o644); writeError != nil {
+	if writeError := os.WriteFile(
+		filepath.Join(root, "package.json"),
+		[]byte(`{"prettier": "@company/prettier-config"}`),
+		0o644,
+	); writeError != nil {
 		test.Fatal(writeError)
 	}
 	if _, newResolvingError := NewResolving(root); newResolvingError == nil {

@@ -167,34 +167,46 @@ func TestConcurrencyNoLostUpdate(test *testing.T) {
 			"    async fill() { this.entries = { ...this.entries, [key]: await load(key) }; } }"), 1},
 		{"an array spread before the await", concurrencyNoLostUpdateSource(
 			"export async function f() { state.items = [...state.items, ...(await load())]; }"), 1},
-		{"a destructured const", concurrencyNoLostUpdateSource(
-			"export async function f() { const { count: before } = state; await save(); state.count = before + 1; }"), 1},
+		{
+			"a destructured const",
+			concurrencyNoLostUpdateSource(
+				"export async function f() { const { count: before } = state; await save(); state.count = before + 1; }"),
+			1,
+		},
 		{"a chain of consts", concurrencyNoLostUpdateSource(
-			"export async function f() { const old = state.count; const following = old + 1; await save(); state.count = following; }"), 1},
+			"export async function f() { const old = state.count; const following = old + 1; await save(); state.count = following; }",
+		), 1},
 		{"a parameter's object, which the caller holds", concurrencyNoLostUpdateSource(
 			"export async function f(entry: Entry) { entry.retries = entry.retries + await next(); }"), 1},
 		{"a suspension on one branch is enough", concurrencyNoLostUpdateSource(
-			"export async function f() { const old = state.count; if (flag) { await save(); } state.count = old + 1; }"), 1},
+			"export async function f() { const old = state.count; if (flag) { await save(); } state.count = old + 1; }",
+		), 1},
 		{"a yield suspends", concurrencyNoLostUpdateSource(
 			"export function* g() { const old = state.count; yield 1; state.count = old + 1; }"), 1},
 		{"a read before a yield in the same expression", concurrencyNoLostUpdateSource(
 			"export function* g(): Generator<number, void, number> { state.count = state.count + (yield 1); }"), 1},
 		{"a for await loop suspends", concurrencyNoLostUpdateSource(
-			"export async function f() { const old = state.count; for await (const x of stream) { use(x); } state.count = old + 1; }"), 1},
+			"export async function f() { const old = state.count; for await (const x of stream) { use(x); } state.count = old + 1; }",
+		), 1},
 		{"a local a nested function writes", concurrencyNoLostUpdateSource(
-			"export async function f() { let total = 0; register(() => { total = 5; }); total = total + await next(); }"), 1},
+			"export async function f() { let total = 0; register(() => { total = 5; }); total = total + await next(); }",
+		), 1},
 		{"the read precedes a fork that suspends", concurrencyNoLostUpdateSource(
 			"export async function f() { state.count = state.count + (flag ? await next() : 1); }"), 1},
 		{"a method called on the stale value", concurrencyNoLostUpdateSource(
-			"export async function f() { const items = state.items; await save(); state.items = items.filter((item) => item > 0); }"), 1},
+			"export async function f() { const items = state.items; await save(); state.items = items.filter((item) => item > 0); }",
+		), 1},
 		{"through a try that suspends", concurrencyNoLostUpdateSource(
-			"export async function f() { const old = state.count; try { await save(); } catch { use(0); } state.count = old + 1; }"), 1},
+			"export async function f() { const old = state.count; try { await save(); } catch { use(0); } state.count = old + 1; }",
+		), 1},
 		{"a compound write through a computed key reads and writes one reference", concurrencyNoLostUpdateSource(
 			"export async function f() { state.byKey[key] += await next(); }"), 1},
 		{"a write to a sibling property is not a replacement", concurrencyNoLostUpdateSource(
-			"export async function f() { const old = state.count; state.other = 0; await save(); state.count = old + 1; }"), 1},
+			"export async function f() { const old = state.count; state.other = 0; await save(); state.count = old + 1; }",
+		), 1},
 		{"a write inside the target is not a replacement of it", concurrencyNoLostUpdateSource(
-			"export async function f() { const old = state.byKey; state.byKey.extra = 1; await save(); state.byKey = { ...old, more: 2 }; }"), 1},
+			"export async function f() { const old = state.byKey; state.byKey.extra = 1; await save(); state.byKey = { ...old, more: 2 }; }",
+		), 1},
 		{"a computed key on a parameter's object", concurrencyNoLostUpdateSource(
 			"export async function f(tallies: Record<string, number>) { tallies[key] += await next(); }"), 1},
 		{"a quoted key is a static path", concurrencyNoLostUpdateSource(
@@ -204,7 +216,8 @@ func TestConcurrencyNoLostUpdate(test *testing.T) {
 		{"a const used after a suspension inside the expression", concurrencyNoLostUpdateSource(
 			"export async function f() { const old = state.count; state.count = (await next()) + old; }"), 1},
 		{"a loop writing a const from before it", concurrencyNoLostUpdateSource(
-			"export async function f() { const old = state.count; for (const x of xs) { state.count = old + x; await save(); } }"), 1},
+			"export async function f() { const old = state.count; for (const x of xs) { state.count = old + x; await save(); } }",
+		), 1},
 		{"a read inside the awaited operand", concurrencyNoLostUpdateSource(
 			"export async function f() { count = (await count) + 1; }"), 1},
 		{"the short-circuit side carries the stale value", concurrencyNoLostUpdateSource(
@@ -212,13 +225,18 @@ func TestConcurrencyNoLostUpdate(test *testing.T) {
 		{"a condition that suspends stales what came before it", concurrencyNoLostUpdateSource(
 			"export async function f() { state.count = state.count + ((await next()) ? 1 : 2); }"), 1},
 		{"a for await step before a write in its body", concurrencyNoLostUpdateSource(
-			"export async function f() { const old = state.count; for await (const x of stream) { state.count = old + x; break; } }"), 1},
+			"export async function f() { const old = state.count; for await (const x of stream) { state.count = old + x; break; } }",
+		), 1},
 		{"popping a list: the head's next, read before the await", concurrencyNoLostUpdateSource(
 			"export async function pop() { const following = head?.next; await save(); head = following; }"), 1},
 		{"a method called on the target path", concurrencyNoLostUpdateSource(
 			"export async function f() { state.items = state.items.concat(await load()); }"), 1},
-		{"a const passed through a shorthand property", concurrencyNoLostUpdateSource(
-			"export async function f() { const before = state.count; await save(); state.count = total({ before }); }"), 1},
+		{
+			"a const passed through a shorthand property",
+			concurrencyNoLostUpdateSource(
+				"export async function f() { const before = state.count; await save(); state.count = total({ before }); }"),
+			1,
+		},
 		{"a computed key is evaluated before the await beside it", concurrencyNoLostUpdateSource(
 			"export async function f() { count = Object.keys({ [count]: await next() }).length; }"), 1},
 		{"a generator method", concurrencyNoLostUpdateSource(
@@ -238,7 +256,11 @@ func TestConcurrencyNoLostUpdate(test *testing.T) {
 			"    try { await run(); }",
 			"    finally { console.log = originalLog; console.info = originalInfo; }",
 			"}"), 0},
-		{"PhiSocialTerminal.ts:430, a bound original restored in finally, verbatim", concurrencyNoLostUpdatePhiSocialTerminal, 0},
+		{
+			"PhiSocialTerminal.ts:430, a bound original restored in finally, verbatim",
+			concurrencyNoLostUpdatePhiSocialTerminal,
+			0,
+		},
 		{"the same restore with the replacement removed is an update", concurrencyNoLostUpdateSource(
 			"declare const process: { stdout: { write(text: string): boolean } };",
 			"export async function f() {",
@@ -247,9 +269,11 @@ func TestConcurrencyNoLostUpdate(test *testing.T) {
 			"    finally { process.stdout.write = originalStdoutWrite; }",
 			"}"), 1},
 		{"a replacement on one path only leaves the other path an update", concurrencyNoLostUpdateSource(
-			"export async function f() { const old = state.count; if (flag) { state.count = 0; } await save(); state.count = old + 1; }"), 1},
+			"export async function f() { const old = state.count; if (flag) { state.count = 0; } await save(); state.count = old + 1; }",
+		), 1},
 		{"a replacement before the suspension makes the write a restore", concurrencyNoLostUpdateSource(
-			"export async function f() { const old = state.count; state.count = 0; await save(); state.count = old + 1; }"), 0},
+			"export async function f() { const old = state.count; state.count = 0; await save(); state.count = old + 1; }",
+		), 0},
 		{"a callback's own parameter object in Promise.all (SomfyShadeController)", concurrencyNoLostUpdateSource(
 			"export async function f() {",
 			"    await Promise.all(entries.map(async (entry) => {",
@@ -260,7 +284,8 @@ func TestConcurrencyNoLostUpdate(test *testing.T) {
 		{"a constant (RainbowMatrix)", concurrencyNoLostUpdateSource(
 			"export async function f() { if (blockoutBottomRow > 0) { await save(); blockoutBottomRow = -1; } }"), 0},
 		{"a cache replaced wholesale (GoogleClient, ApnsApi)", concurrencyNoLostUpdateSource(
-			"export async function f() { if (!tokenCache) { tokenCache = { token: await sign(), expiresAt: Date.now() }; } return tokenCache; }"), 0},
+			"export async function f() { if (!tokenCache) { tokenCache = { token: await sign(), expiresAt: Date.now() }; } return tokenCache; }",
+		), 0},
 		{"a parameter's fields from a response (SpotifyApi)", concurrencyNoLostUpdateSource(
 			"export async function f(credentials: { accessToken: string; expiresAt: number }) {",
 			"    const data = await sign();",
@@ -275,35 +300,54 @@ func TestConcurrencyNoLostUpdate(test *testing.T) {
 			"export async function f() { count = await next() + count; }"), 0},
 		{"a local nobody else can see", concurrencyNoLostUpdateSource(
 			"export async function f() { let total = 0; total += await next(); return total; }"), 0},
-		{"a local a nested function only reads", concurrencyNoLostUpdateSource(
-			"export async function f() { let total = 0; register(() => use(total)); total = total + await next(); }"), 0},
+		{
+			"a local a nested function only reads",
+			concurrencyNoLostUpdateSource(
+				"export async function f() { let total = 0; register(() => use(total)); total = total + await next(); }"),
+			0,
+		},
 		{"a shadowing local of the same name", concurrencyNoLostUpdateSource(
 			"export async function f() { let count = 0; count = count + await next(); return count; }"), 0},
 		{"the read and the suspension on different branches", concurrencyNoLostUpdateSource(
 			"export async function f() { state.count = flag ? state.count + 1 : await next(); }"), 0},
 		{"a fallback that suspends does not carry the read", concurrencyNoLostUpdateSource(
-			"export async function f() { state.count = state.count || await next(); state.total = state.total ?? await price(); }"), 0},
+			"export async function f() { state.count = state.count || await next(); state.total = state.total ?? await price(); }",
+		), 0},
 		{"the suspending branch returns", concurrencyNoLostUpdateSource(
-			"export async function f() { const old = state.count; if (flag) { await save(); return; } state.count = old + 1; }"), 0},
+			"export async function f() { const old = state.count; if (flag) { await save(); return; } state.count = old + 1; }",
+		), 0},
 		{"a const declared again on every iteration", concurrencyNoLostUpdateSource(
-			"export async function f() { for (const x of xs) { const old = state.count; state.count = old + x; await save(x); } }"), 0},
+			"export async function f() { for (const x of xs) { const old = state.count; state.count = old + x; await save(x); } }",
+		), 0},
 		{"the await wraps the write", concurrencyNoLostUpdateSource(
 			"export async function f() { const old = state.count; await save(state.count = old + 1); }"), 0},
 		{"a logical assignment is check-then-act", concurrencyNoLostUpdateSource(
 			"export async function f() { state.cache ??= await load(); }"), 0},
-		{"a local object nobody else can see", concurrencyNoLostUpdateSource(
-			"export async function f() { const tally = { n: 0 }; tally.n = tally.n + await next(); return tally; }"), 0},
-		{"an alias read after the suspension", concurrencyNoLostUpdateSource(
-			"export async function f() { const snapshot = state; await save(); state.count = snapshot.count + 1; }"), 0},
+		{
+			"a local object nobody else can see",
+			concurrencyNoLostUpdateSource(
+				"export async function f() { const tally = { n: 0 }; tally.n = tally.n + await next(); return tally; }"),
+			0,
+		},
+		{
+			"an alias read after the suspension",
+			concurrencyNoLostUpdateSource(
+				"export async function f() { const snapshot = state; await save(); state.count = snapshot.count + 1; }"),
+			0,
+		},
 		{"a const of a different property", concurrencyNoLostUpdateSource(
 			"export async function f() { const old = state.other; await save(); state.count = old + 1; }"), 0},
-		{"an awaited call's result is the callee's answer (SpotifyApi, QuickBooksClient)", concurrencyNoLostUpdateSource(
-			"declare function exchange(request: { body: { refresh: number } }): Promise<{ json(): Promise<{ next: number }> }>;",
-			"export async function f() {",
-			"    const response = await exchange({ body: { refresh: state.count } });",
-			"    const tokens = await response.json();",
-			"    state.count = tokens.next;",
-			"}"), 0},
+		{
+			"an awaited call's result is the callee's answer (SpotifyApi, QuickBooksClient)",
+			concurrencyNoLostUpdateSource(
+				"declare function exchange(request: { body: { refresh: number } }): Promise<{ json(): Promise<{ next: number }> }>;",
+				"export async function f() {",
+				"    const response = await exchange({ body: { refresh: state.count } });",
+				"    const tokens = await response.json();",
+				"    state.count = tokens.next;",
+				"}"),
+			0,
+		},
 		{"an awaited call handed the read", concurrencyNoLostUpdateSource(
 			"export async function f() { state.count = await price(state.count + 1); }"), 0},
 		{"a closure reads the binding when it runs, not when it is made", concurrencyNoLostUpdateSource(
@@ -313,17 +357,21 @@ func TestConcurrencyNoLostUpdate(test *testing.T) {
 		{"a computed key under a plain = is not judged", concurrencyNoLostUpdateSource(
 			"export async function f() { state.byKey[key] = state.byKey[key] + await next(); }"), 0},
 		{"a computed key on a local nobody else can see", concurrencyNoLostUpdateSource(
-			"export async function f() { const tally: Record<string, number> = {}; tally[key] += await next(); return tally; }"), 0},
+			"export async function f() { const tally: Record<string, number> = {}; tally[key] += await next(); return tally; }",
+		), 0},
 		{"a computed key on a call's result is not judged", concurrencyNoLostUpdateSource(
 			"export async function f() { load()[0] += await next(); }"), 0},
 		{"a function that cannot suspend", concurrencyNoLostUpdateSource(
 			"export function f() { count = count + 1; }"), 0},
 		{"a nested function's await is not this function's", concurrencyNoLostUpdateSource(
-			"export async function f() { const old = state.count; register(async () => { await save(); }); state.count = old + 1; }"), 0},
+			"export async function f() { const old = state.count; register(async () => { await save(); }); state.count = old + 1; }",
+		), 0},
 		{"a const that is stale only on the branch that does not carry it", concurrencyNoLostUpdateSource(
-			"export async function f() { const old = state.count; const chosen = flag ? old : await next(); state.count = chosen + 1; }"), 0},
+			"export async function f() { const old = state.count; const chosen = flag ? old : await next(); state.count = chosen + 1; }",
+		), 0},
 		{"a yield's value is what the caller sends", concurrencyNoLostUpdateSource(
-			"export async function* g(): AsyncGenerator<number, void, number> { state.count = (yield state.count) + (await next()); }"), 0},
+			"export async function* g(): AsyncGenerator<number, void, number> { state.count = (yield state.count) + (await next()); }",
+		), 0},
 		{"a reassigned let is not tracked", concurrencyNoLostUpdateSource(
 			"export async function f() { let old = state.count; old = 0; await save(); state.count = old + 1; }"), 0},
 		{"an updater callback reads at call time", concurrencyNoLostUpdateSource(
@@ -343,7 +391,8 @@ func TestConcurrencyNoLostUpdate(test *testing.T) {
 		{"a property of this is not the same property of a variable", concurrencyNoLostUpdateSource(
 			"export class Counter { count = 0; async add() { this.count = state.count + await next(); } }"), 0},
 		{"a restore through a destructured const", concurrencyNoLostUpdateSource(
-			"export async function f() { const { count: saved } = state; state.count = 0; await save(); state.count = saved; }"), 0},
+			"export async function f() { const { count: saved } = state; state.count = 0; await save(); state.count = saved; }",
+		), 0},
 
 		// Writes through a store's write call (storeAccessOf). Reporting.
 		{"a store write built from a read before the await (RedditClient)", concurrencyNoLostUpdateSource(
@@ -355,18 +404,27 @@ func TestConcurrencyNoLostUpdate(test *testing.T) {
 		{"a store read inside the written value, before its await", concurrencyNoLostUpdateSource(
 			"export async function f() { saveSettings({ ...loadSettings(), theme: await sign() }); }"), 1},
 		{"a store with no key", concurrencyNoLostUpdateSource(
-			"export async function f() { const settings = loadSettings(); await save(); saveSettings({ ...settings, runs: settings.runs + 1 }); }"), 1},
-		{"a shared Map's get and set", concurrencyNoLostUpdateSource(
-			"export async function f() { const old = cache.get(key) ?? 0; await save(); cache.set(key, old + 1); }"), 1},
+			"export async function f() { const settings = loadSettings(); await save(); saveSettings({ ...settings, runs: settings.runs + 1 }); }",
+		), 1},
+		{
+			"a shared Map's get and set",
+			concurrencyNoLostUpdateSource(
+				"export async function f() { const old = cache.get(key) ?? 0; await save(); cache.set(key, old + 1); }"),
+			1,
+		},
 		{"a store held on this", concurrencyNoLostUpdateSource(
 			"export class Tally { entries = new Map<string, number>();",
-			"    async bump() { const old = this.entries.get(key) ?? 0; await save(); this.entries.set(key, old + 1); } }"), 1},
+			"    async bump() { const old = this.entries.get(key) ?? 0; await save(); this.entries.set(key, old + 1); } }",
+		), 1},
 		{"literal keys name one entry", concurrencyNoLostUpdateSource(
-			"export async function f() { const account = getAccount('main'); await save(); updateAccount('main', { ...account }); }"), 1},
+			"export async function f() { const account = getAccount('main'); await save(); updateAccount('main', { ...account }); }",
+		), 1},
 		{"an awaited store read, then another await", concurrencyNoLostUpdateSource(
-			"export async function f() { const account = await loadRemote(key); await save(); await saveRemote(key, { ...account }); }"), 1},
+			"export async function f() { const account = await loadRemote(key); await save(); await saveRemote(key, { ...account }); }",
+		), 1},
 		{"a suspension inside the write's own value, after the read", concurrencyNoLostUpdateSource(
-			"export async function f() { const account = getAccount(key); updateAccount(key, { ...account, token: await sign() }); }"), 1},
+			"export async function f() { const account = getAccount(key); updateAccount(key, { ...account, token: await sign() }); }",
+		), 1},
 
 		// Writes through a store's write call. Silent.
 		{"the Reddit fix: read the account again after the await", concurrencyNoLostUpdateSource(
@@ -376,9 +434,11 @@ func TestConcurrencyNoLostUpdate(test *testing.T) {
 			"    updateAccount(accountKey, { oauth2: { ...account.oauth2, token } });",
 			"}"), 0},
 		{"a different key is a different entry", concurrencyNoLostUpdateSource(
-			"export async function f() { const account = getAccount(key); await save(); updateAccount('other', { ...account }); }"), 0},
+			"export async function f() { const account = getAccount(key); await save(); updateAccount('other', { ...account }); }",
+		), 0},
 		{"a different noun is a different store", concurrencyNoLostUpdateSource(
-			"export async function f() { const account = getAccount(key); await save(); updateProfile(key, { ...account }); }"), 0},
+			"export async function f() { const account = getAccount(key); await save(); updateProfile(key, { ...account }); }",
+		), 0},
 		{"a verbatim write back is a restore", concurrencyNoLostUpdateSource(
 			"export async function f() {",
 			"    const saved = getAccount(key);",
@@ -386,22 +446,32 @@ func TestConcurrencyNoLostUpdate(test *testing.T) {
 			"    try { await run(); }",
 			"    finally { updateAccount(key, saved); }",
 			"}"), 0},
-		{"the saved entry written back unchanged, with nothing replaced between, is a copy", concurrencyNoLostUpdateSource(
-			"export async function f() { const saved = getAccount(key); try { await run(); } finally { updateAccount(key, saved); } }"), 0},
+		{
+			"the saved entry written back unchanged, with nothing replaced between, is a copy",
+			concurrencyNoLostUpdateSource(
+				"export async function f() { const saved = getAccount(key); try { await run(); } finally { updateAccount(key, saved); } }"),
+			0,
+		},
 		{"a store write before the suspension makes the later one a restore", concurrencyNoLostUpdateSource(
-			"export async function f() { const saved = getAccount(key); updateAccount(key, {}); await run(); updateAccount(key, { ...saved }); }"), 0},
+			"export async function f() { const saved = getAccount(key); updateAccount(key, {}); await run(); updateAccount(key, { ...saved }); }",
+		), 0},
 		{"a Map nobody else can see", concurrencyNoLostUpdateSource(
-			"export async function f() { const local = new Map<string, number>(); const old = local.get(key) ?? 0; await save(); local.set(key, old + 1); return local; }"), 0},
+			"export async function f() { const local = new Map<string, number>(); const old = local.get(key) ?? 0; await save(); local.set(key, old + 1); return local; }",
+		), 0},
 		{"a key the function reassigns names no one entry", concurrencyNoLostUpdateSource(
-			"export async function f(accountKey: string) { const account = getAccount(accountKey); await save(); accountKey = 'other'; updateAccount(accountKey, { ...account }); }"), 0},
+			"export async function f(accountKey: string) { const account = getAccount(accountKey); await save(); accountKey = 'other'; updateAccount(accountKey, { ...account }); }",
+		), 0},
 		{"a member read as the key is not judged", concurrencyNoLostUpdateSource(
-			"export async function f(options: { key: string }) { const account = getAccount(options.key); await save(); updateAccount(options.key, { ...account }); }"), 0},
+			"export async function f(options: { key: string }) { const account = getAccount(options.key); await save(); updateAccount(options.key, { ...account }); }",
+		), 0},
 		{"no suspension between the store read and the write", concurrencyNoLostUpdateSource(
-			"export async function f() { const account = getAccount(key); updateAccount(key, { ...account }); await save(); }"), 0},
+			"export async function f() { const account = getAccount(key); updateAccount(key, { ...account }); await save(); }",
+		), 0},
 		{"a bare get and set name no store", concurrencyNoLostUpdateSource(
 			"export async function f() { const old = get(key); await save(); set(key, old + 1); }"), 0},
 		{"an awaited store read with no later suspension", concurrencyNoLostUpdateSource(
-			"export async function f() { const account = await loadRemote(key); await saveRemote(key, { ...account }); }"), 0},
+			"export async function f() { const account = await loadRemote(key); await saveRemote(key, { ...account }); }",
+		), 0},
 		{"a store read with no write", concurrencyNoLostUpdateSource(
 			"export async function f() { const account = getAccount(key); await save(); use({ ...account }); }"), 0},
 	}
@@ -455,7 +525,9 @@ func TestConcurrencyNoLostUpdateNamesTheStoreRead(test *testing.T) {
 
 	diagnostic := result.Diagnostics[0]
 	text := result.SourceFile.Text()
-	if got := text[diagnostic.Range.Pos():diagnostic.Range.End()]; strings.TrimSpace(got) != "updateAccount(accountKey, { ...account })" {
+	if got := text[diagnostic.Range.Pos():diagnostic.Range.End()]; strings.TrimSpace(
+		got,
+	) != "updateAccount(accountKey, { ...account })" {
 		test.Fatalf("span: got %q", got)
 	}
 	if !strings.Contains(diagnostic.Message.Description, "computed from what `getAccount(accountKey)` returned") {

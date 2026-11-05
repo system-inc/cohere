@@ -20,22 +20,28 @@ func TestIdentifiersShareNoStorageAcrossFunctions(test *testing.T) {
 	test.Parallel()
 	var body strings.Builder
 	for index := 0; index < 60; index++ {
-		body.WriteString("  const value" + strings.Repeat("x", index%5) + string(rune('a'+index%26)) + " = input + 1;\n")
+		body.WriteString(
+			"  const value" + strings.Repeat("x", index%5) + string(rune('a'+index%26)) + " = input + 1;\n",
+		)
 	}
 	source := "function first(input: number) {\n" + body.String() + "  return input;\n}\n" +
 		"function second(input: number) {\n" + body.String() + "  return input;\n}\n"
 
 	var functions []*Function
-	probe := rule.Rule{Name: "identifier-slab", NeedsTypeChecker: true, Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
-			forEachFunctionLike(node, func(node *ast.Node) {
-				if function := Lower(node, ruleContext.TypeChecker); function != nil {
-					Construct(function)
-					functions = append(functions, function)
-				}
-			})
-		}}
-	}}
+	probe := rule.Rule{
+		Name:             "identifier-slab",
+		NeedsTypeChecker: true,
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+			return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
+				forEachFunctionLike(node, func(node *ast.Node) {
+					if function := Lower(node, ruleContext.TypeChecker); function != nil {
+						Construct(function)
+						functions = append(functions, function)
+					}
+				})
+			}}
+		},
+	}
 	rule_testing.RunTypedFiles(test, probe, map[string]string{"/fixture.ts": source}, "/fixture.ts")
 	if len(functions) != 2 {
 		test.Fatalf("lowered %d functions, want two", len(functions))
@@ -43,7 +49,11 @@ func TestIdentifiersShareNoStorageAcrossFunctions(test *testing.T) {
 
 	for _, function := range functions {
 		if len(function.Identifiers) <= 16 {
-			test.Fatalf("%s has %d identifiers, too few to span a second chunk", function.Name, len(function.Identifiers))
+			test.Fatalf(
+				"%s has %d identifiers, too few to span a second chunk",
+				function.Name,
+				len(function.Identifiers),
+			)
 		}
 		for index, identifier := range function.Identifiers {
 			if identifier.Id != static_single_assignment.IdentifierId(index) {

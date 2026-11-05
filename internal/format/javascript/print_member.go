@@ -74,5 +74,8 @@ func printMemberLookup(path *Path, options *Options, print PrintFunc) Doc {
 		return concatIn(path, optional, "[", property, "]")
 	}
 
-	return groupIn(path, concatIn(path, optional, "[", indentIn(path, concatIn(path, softline, property)), softline, "]"))
+	return groupIn(
+		path,
+		concatIn(path, optional, "[", indentIn(path, concatIn(path, softline, property)), softline, "]"),
+	)
 }

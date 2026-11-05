@@ -53,23 +53,98 @@ func TestForbidElementsFires(test *testing.T) {
 		wantIds    []string
 	}{
 		{"invalid 0 a forbidden intrinsic", `<button />`, `{"forbid":["button"]}`, []string{"forbiddenElement"}},
-		{"invalid 1 two forbidden elements in one array", `[<Modal />, <button />]`, `{"forbid":["button","Modal"]}`, []string{"forbiddenElement", "forbiddenElement"}},
-		{"invalid 2 a dotted lowercase name", `<dotted.component />`, `{"forbid":["dotted.component"]}`, []string{"forbiddenElement"}},
-		{"invalid 3 a dotted capitalised name with a note", `<dotted.Component />`, `{"forbid":[{"element":"dotted.Component","message":"that ain't cool"}]}`, []string{"forbiddenElement_message"}},
-		{"invalid 4 an intrinsic with a note", `<button />`, `{"forbid":[{"element":"button","message":"use <Button> instead"}]}`, []string{"forbiddenElement_message"}},
-		{"invalid 5 nested elements, both objects", `<button><input /></button>`, `{"forbid":[{"element":"button"},{"element":"input"}]}`, []string{"forbiddenElement", "forbiddenElement"}},
-		{"invalid 6 nested elements, object then string", `<button><input /></button>`, `{"forbid":[{"element":"button"},"input"]}`, []string{"forbiddenElement", "forbiddenElement"}},
-		{"invalid 7 nested elements, string then object", `<button><input /></button>`, `{"forbid":["input",{"element":"button"}]}`, []string{"forbiddenElement", "forbiddenElement"}},
+		{
+			"invalid 1 two forbidden elements in one array",
+			`[<Modal />, <button />]`,
+			`{"forbid":["button","Modal"]}`,
+			[]string{"forbiddenElement", "forbiddenElement"},
+		},
+		{
+			"invalid 2 a dotted lowercase name",
+			`<dotted.component />`,
+			`{"forbid":["dotted.component"]}`,
+			[]string{"forbiddenElement"},
+		},
+		{
+			"invalid 3 a dotted capitalised name with a note",
+			`<dotted.Component />`,
+			`{"forbid":[{"element":"dotted.Component","message":"that ain't cool"}]}`,
+			[]string{"forbiddenElement_message"},
+		},
+		{
+			"invalid 4 an intrinsic with a note",
+			`<button />`,
+			`{"forbid":[{"element":"button","message":"use <Button> instead"}]}`,
+			[]string{"forbiddenElement_message"},
+		},
+		{
+			"invalid 5 nested elements, both objects",
+			`<button><input /></button>`,
+			`{"forbid":[{"element":"button"},{"element":"input"}]}`,
+			[]string{"forbiddenElement", "forbiddenElement"},
+		},
+		{
+			"invalid 6 nested elements, object then string",
+			`<button><input /></button>`,
+			`{"forbid":[{"element":"button"},"input"]}`,
+			[]string{"forbiddenElement", "forbiddenElement"},
+		},
+		{
+			"invalid 7 nested elements, string then object",
+			`<button><input /></button>`,
+			`{"forbid":["input",{"element":"button"}]}`,
+			[]string{"forbiddenElement", "forbiddenElement"},
+		},
 		// The corpus's one statement that later entries win. The finding carries the second note,
 		// which the message-text assertion below pins, since both entries share a message id.
-		{"invalid 8 the same name twice keeps the last note", `<button />`, `{"forbid":[{"element":"button","message":"use <Button> instead"},{"element":"button","message":"use <Button2> instead"}]}`, []string{"forbiddenElement_message"}},
-		{"invalid 9 a createElement literal with children", `React.createElement("button", {}, child)`, `{"forbid":["button"]}`, []string{"forbiddenElement"}},
-		{"invalid 10 an identifier and a literal in one array", `[React.createElement(Modal), React.createElement("button")]`, `{"forbid":["button","Modal"]}`, []string{"forbiddenElement", "forbiddenElement"}},
-		{"invalid 11 a createElement member with a note", `React.createElement(dotted.Component)`, `{"forbid":[{"element":"dotted.Component","message":"that ain't cool"}]}`, []string{"forbiddenElement_message"}},
-		{"invalid 12 a createElement member, lowercase", `React.createElement(dotted.component)`, `{"forbid":["dotted.component"]}`, []string{"forbiddenElement"}},
-		{"invalid 13 a createElement identifier starting with an underscore", `React.createElement(_comp)`, `{"forbid":["_comp"]}`, []string{"forbiddenElement"}},
-		{"invalid 14 a createElement literal with a note", `React.createElement("button")`, `{"forbid":[{"element":"button","message":"use <Button> instead"}]}`, []string{"forbiddenElement_message"}},
-		{"invalid 15 nested createElement calls", `React.createElement("button", {}, React.createElement("input"))`, `{"forbid":[{"element":"button"},{"element":"input"}]}`, []string{"forbiddenElement", "forbiddenElement"}},
+		{
+			"invalid 8 the same name twice keeps the last note",
+			`<button />`,
+			`{"forbid":[{"element":"button","message":"use <Button> instead"},{"element":"button","message":"use <Button2> instead"}]}`,
+			[]string{"forbiddenElement_message"},
+		},
+		{
+			"invalid 9 a createElement literal with children",
+			`React.createElement("button", {}, child)`,
+			`{"forbid":["button"]}`,
+			[]string{"forbiddenElement"},
+		},
+		{
+			"invalid 10 an identifier and a literal in one array",
+			`[React.createElement(Modal), React.createElement("button")]`,
+			`{"forbid":["button","Modal"]}`,
+			[]string{"forbiddenElement", "forbiddenElement"},
+		},
+		{
+			"invalid 11 a createElement member with a note",
+			`React.createElement(dotted.Component)`,
+			`{"forbid":[{"element":"dotted.Component","message":"that ain't cool"}]}`,
+			[]string{"forbiddenElement_message"},
+		},
+		{
+			"invalid 12 a createElement member, lowercase",
+			`React.createElement(dotted.component)`,
+			`{"forbid":["dotted.component"]}`,
+			[]string{"forbiddenElement"},
+		},
+		{
+			"invalid 13 a createElement identifier starting with an underscore",
+			`React.createElement(_comp)`,
+			`{"forbid":["_comp"]}`,
+			[]string{"forbiddenElement"},
+		},
+		{
+			"invalid 14 a createElement literal with a note",
+			`React.createElement("button")`,
+			`{"forbid":[{"element":"button","message":"use <Button> instead"}]}`,
+			[]string{"forbiddenElement_message"},
+		},
+		{
+			"invalid 15 nested createElement calls",
+			`React.createElement("button", {}, React.createElement("input"))`,
+			`{"forbid":[{"element":"button"},{"element":"input"}]}`,
+			[]string{"forbiddenElement", "forbiddenElement"},
+		},
 	}
 
 	for _, testCase := range cases {
@@ -108,7 +183,11 @@ func TestForbidElementsStaysSilent(test *testing.T) {
 		// The literal regex is `/^[a-z][^.]*$/`, so an underscore, a capital and a dot each fail it.
 		{"valid 7 a literal starting with an underscore", `React.createElement("_thing")`, `{"forbid":["_thing"]}`},
 		{"valid 8 a capitalised literal", `React.createElement("Modal")`, `{"forbid":["Modal"]}`},
-		{"valid 9 a literal holding a dot", `React.createElement("dotted.component")`, `{"forbid":["dotted.component"]}`},
+		{
+			"valid 9 a literal holding a dot",
+			`React.createElement("dotted.component")`,
+			`{"forbid":["dotted.component"]}`,
+		},
 		{"valid 10 a function expression argument", `React.createElement(function() {})`, `{"forbid":["button"]}`},
 		{"valid 11 an object argument", `React.createElement({})`, `{"forbid":["button"]}`},
 		{"valid 12 a numeric literal argument", `React.createElement(1)`, `{"forbid":["button"]}`},
@@ -173,9 +252,19 @@ func TestForbidElementsAnchorsOnTheName(test *testing.T) {
 	}{
 		{"a jsx name, not the tag", `<button />`, `{"forbid":["button"]}`, `button`},
 		{"a dotted jsx name in full", `<dotted.component />`, `{"forbid":["dotted.component"]}`, `dotted.component`},
-		{"a createElement literal with its quotes", `React.createElement("button")`, `{"forbid":["button"]}`, `"button"`},
+		{
+			"a createElement literal with its quotes",
+			`React.createElement("button")`,
+			`{"forbid":["button"]}`,
+			`"button"`,
+		},
 		{"a createElement identifier", `React.createElement(Modal)`, `{"forbid":["Modal"]}`, `Modal`},
-		{"a createElement member in full", `React.createElement(dotted.component)`, `{"forbid":["dotted.component"]}`, `dotted.component`},
+		{
+			"a createElement member in full",
+			`React.createElement(dotted.component)`,
+			`{"forbid":["dotted.component"]}`,
+			`dotted.component`,
+		},
 	}
 
 	for _, testCase := range cases {
@@ -212,7 +301,10 @@ func TestForbidElementsLaterEntriesWin(test *testing.T) {
 		test.Parallel()
 		result := rule_testing.RunTypedWithOptions(
 			test, ForbidElements, forbidElementsFile, `<button />`,
-			forbidElementsOptions(test, `{"forbid":[{"element":"button","message":"use <Button> instead"},{"element":"button","message":"use <Button2> instead"}]}`),
+			forbidElementsOptions(
+				test,
+				`{"forbid":[{"element":"button","message":"use <Button> instead"},{"element":"button","message":"use <Button2> instead"}]}`,
+			),
 		)
 		rule_testing.ExpectFindings(test, result, "forbiddenElement_message")
 		got := result.Diagnostics[0].Message.Description
@@ -272,26 +364,71 @@ func TestForbidElementsArgumentShapes(test *testing.T) {
 		wantIds    []string
 	}{
 		// The identifier regex is `/^[A-Z_]/`, tested at both accepted characters.
-		{"an uppercase identifier reports", `React.createElement(Modal)`, `{"forbid":["Modal"]}`, []string{"forbiddenElement"}},
-		{"an underscore identifier reports", `React.createElement(_x)`, `{"forbid":["_x"]}`, []string{"forbiddenElement"}},
+		{
+			"an uppercase identifier reports",
+			`React.createElement(Modal)`,
+			`{"forbid":["Modal"]}`,
+			[]string{"forbiddenElement"},
+		},
+		{
+			"an underscore identifier reports",
+			`React.createElement(_x)`,
+			`{"forbid":["_x"]}`,
+			[]string{"forbiddenElement"},
+		},
 		{"a lowercase identifier declines", `React.createElement(button)`, `{"forbid":["button"]}`, nil},
 		// The literal regex is `/^[a-z][^.]*$/`, anchored at both ends.
-		{"a dash inside a literal is fine", `React.createElement("my-el")`, `{"forbid":["my-el"]}`, []string{"forbiddenElement"}},
+		{
+			"a dash inside a literal is fine",
+			`React.createElement("my-el")`,
+			`{"forbid":["my-el"]}`,
+			[]string{"forbiddenElement"},
+		},
 		{"a digit first fails the literal regex", `React.createElement("1x")`, `{"forbid":["1x"]}`, nil},
 		{"a template literal is not a Literal upstream", "React.createElement(`button`)", `{"forbid":["button"]}`, nil},
 		// The one value in upstream's Literal set whose stringification matches the lowercase
 		// regex. Nothing in the corpus writes it, and it is reproduced rather than corrected: the
 		// alternative is a port that quietly disagrees with the running rule.
-		{"a boolean keyword reaches the lookup as its text", `React.createElement(true)`, `{"forbid":["true"]}`, []string{"forbiddenElement"}},
-		{"a false keyword likewise", `React.createElement(false)`, `{"forbid":["false"]}`, []string{"forbiddenElement"}},
+		{
+			"a boolean keyword reaches the lookup as its text",
+			`React.createElement(true)`,
+			`{"forbid":["true"]}`,
+			[]string{"forbiddenElement"},
+		},
+		{
+			"a false keyword likewise",
+			`React.createElement(false)`,
+			`{"forbid":["false"]}`,
+			[]string{"forbiddenElement"},
+		},
 		// The member arm reads source text, so the spelling survives into the lookup key. A port
 		// rebuilding the name from the tree would answer "a.b" for all three of these.
-		{"a deep member reports its whole path", `React.createElement(a.b.c)`, `{"forbid":["a.b.c"]}`, []string{"forbiddenElement"}},
-		{"a computed member keeps its brackets and quotes", `React.createElement(a["b"])`, `{"forbid":["a[\"b\"]"]}`, []string{"forbiddenElement"}},
-		{"a spaced member keeps its spaces", `React.createElement(a . b)`, `{"forbid":["a . b"]}`, []string{"forbiddenElement"}},
+		{
+			"a deep member reports its whole path",
+			`React.createElement(a.b.c)`,
+			`{"forbid":["a.b.c"]}`,
+			[]string{"forbiddenElement"},
+		},
+		{
+			"a computed member keeps its brackets and quotes",
+			`React.createElement(a["b"])`,
+			`{"forbid":["a[\"b\"]"]}`,
+			[]string{"forbiddenElement"},
+		},
+		{
+			"a spaced member keeps its spaces",
+			`React.createElement(a . b)`,
+			`{"forbid":["a . b"]}`,
+			[]string{"forbiddenElement"},
+		},
 		{"a spaced member does not match the tight spelling", `React.createElement(a . b)`, `{"forbid":["a.b"]}`, nil},
 		// The JSX arm reads source text too, which is why a namespaced name arrives whole.
-		{"a namespaced jsx name reports with its colon", `<svg:rect />`, `{"forbid":["svg:rect"]}`, []string{"forbiddenElement"}},
+		{
+			"a namespaced jsx name reports with its colon",
+			`<svg:rect />`,
+			`{"forbid":["svg:rect"]}`,
+			[]string{"forbiddenElement"},
+		},
 		{"a deep jsx member name reports whole", `<a.b.c />`, `{"forbid":["a.b.c"]}`, []string{"forbiddenElement"}},
 	}
 
@@ -328,8 +465,16 @@ func TestForbidElementsCreateElementResolution(test *testing.T) {
 		{"a bare call with no import declines", `createElement("button");`, nil},
 		{"a foreign namespace declines", `NotReact.createElement("button");`, nil},
 		{"a computed member declines", `React['createElement']("button");`, nil},
-		{"a destructured react import reports", "import {createElement} from 'react';\ncreateElement(\"button\");", []string{"forbiddenElement"}},
-		{"a destructured preact import declines", "import {createElement} from 'preact';\ncreateElement(\"button\");", nil},
+		{
+			"a destructured react import reports",
+			"import {createElement} from 'react';\ncreateElement(\"button\");",
+			[]string{"forbiddenElement"},
+		},
+		{
+			"a destructured preact import declines",
+			"import {createElement} from 'preact';\ncreateElement(\"button\");",
+			nil,
+		},
 	}
 
 	for _, testCase := range cases {
@@ -396,7 +541,9 @@ func TestDecodeForbidElementsOptions(test *testing.T) {
 
 	test.Run("both arms of the union decode", func(test *testing.T) {
 		test.Parallel()
-		decoded, decodeForbidElementsOptionsError := DecodeForbidElementsOptions([]byte(`{"forbid":["a",{"element":"b","message":"m"}]}`))
+		decoded, decodeForbidElementsOptionsError := DecodeForbidElementsOptions(
+			[]byte(`{"forbid":["a",{"element":"b","message":"m"}]}`),
+		)
 		if decodeForbidElementsOptionsError != nil {
 			test.Fatalf("unexpected error: %v", decodeForbidElementsOptionsError)
 		}
@@ -433,10 +580,14 @@ func TestDecodeForbidElementsOptions(test *testing.T) {
 
 	test.Run("a malformed body errors rather than silently emptying the list", func(test *testing.T) {
 		test.Parallel()
-		if _, decodeForbidElementsOptionsError := DecodeForbidElementsOptions([]byte(`{"forbid":`)); decodeForbidElementsOptionsError == nil {
+		if _, decodeForbidElementsOptionsError := DecodeForbidElementsOptions(
+			[]byte(`{"forbid":`),
+		); decodeForbidElementsOptionsError == nil {
 			test.Error("want an error for a truncated body")
 		}
-		if _, decodeForbidElementsOptionsError := DecodeForbidElementsOptions([]byte(`{"forbid":[1]}`)); decodeForbidElementsOptionsError == nil {
+		if _, decodeForbidElementsOptionsError := DecodeForbidElementsOptions(
+			[]byte(`{"forbid":[1]}`),
+		); decodeForbidElementsOptionsError == nil {
 			test.Error("want an error for an entry that is neither a string nor an object")
 		}
 	})

@@ -126,7 +126,9 @@ func TestTheUnseenRepositorysFunctionalRootIsDeclinedByTheTable(test *testing.T)
 func unseenDesignSystem(test *testing.T) *LoadedDesignSystem {
 	test.Helper()
 
-	entryPoint, err := filepath.Abs(filepath.Join("..", "tools", "generate_descriptor_base", "testdata", "independent_theme.css"))
+	entryPoint, err := filepath.Abs(
+		filepath.Join("..", "tools", "generate_descriptor_base", "testdata", "independent_theme.css"),
+	)
 	if err != nil {
 		test.Fatalf("resolving the unseen system's path: %v", err)
 	}
@@ -170,8 +172,13 @@ func TestARootDeclaredBothWaysKeepsBothKinds(test *testing.T) {
 		functionalForm := system.HasUtility(root, UtilityKindFunctional)
 
 		if !staticForm || !functionalForm {
-			test.Errorf("`@utility %s` and `@utility %s-*` are both declared and the system reports static=%v functional=%v",
-				root, root, staticForm, functionalForm)
+			test.Errorf(
+				"`@utility %s` and `@utility %s-*` are both declared and the system reports static=%v functional=%v",
+				root,
+				root,
+				staticForm,
+				functionalForm,
+			)
 			continue
 		}
 		bothKinds++

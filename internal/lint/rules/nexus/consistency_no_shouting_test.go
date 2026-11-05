@@ -133,7 +133,10 @@ func TestConsistencyNoShoutingKnowsTheAcronymsTheReviewFound(test *testing.T) {
 			test.Parallel()
 			result := rule_testing.Run(test, ConsistencyNoShouting, shoutingFile, testCase.sourceText)
 			rule_testing.ExpectFindings(test, result, "shoutingInComment")
-			if description := result.Diagnostics[0].Message.Description; !strings.Contains(description, `"`+testCase.token+`"`) {
+			if description := result.Diagnostics[0].Message.Description; !strings.Contains(
+				description,
+				`"`+testCase.token+`"`,
+			) {
 				test.Fatalf("expected the message to name %q, got: %s", testCase.token, description)
 			}
 		})
@@ -153,8 +156,14 @@ func TestConsistencyNoShoutingMasksASingleQuotedCapitalPhrase(test *testing.T) {
 		sourceText string
 	}{
 		{"quoted sql phrase", "// a 'RENAME COLUMN' statement is not idempotent\nexport const Value = 1;\n"},
-		{"quoted phrase at the start of the comment", "// 'ON CONFLICT DO NOTHING' keeps the first row\nexport const Value = 1;\n"},
-		{"quoted phrase before punctuation", "// the pragma reads 'SYNCHRONOUS FULL', then commits\nexport const Value = 1;\n"},
+		{
+			"quoted phrase at the start of the comment",
+			"// 'ON CONFLICT DO NOTHING' keeps the first row\nexport const Value = 1;\n",
+		},
+		{
+			"quoted phrase before punctuation",
+			"// the pragma reads 'SYNCHRONOUS FULL', then commits\nexport const Value = 1;\n",
+		},
 	}
 	for _, testCase := range silent {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -171,16 +180,32 @@ func TestConsistencyNoShoutingMasksASingleQuotedCapitalPhrase(test *testing.T) {
 	}{
 		// A plural possessive is an apostrophe after a letter. It must not open a quote that the
 		// next apostrophe closes, or the shout between them disappears.
-		{"possessive apostrophe opens nothing", "// the users' data is NEVER cached by the dogs' walker\nexport const Value = 1;\n", "NEVER"},
+		{
+			"possessive apostrophe opens nothing",
+			"// the users' data is NEVER cached by the dogs' walker\nexport const Value = 1;\n",
+			"NEVER",
+		},
 		{"contraction opens nothing", "// don't EVER cache what isn't yours\nexport const Value = 1;\n", "EVER"},
 		// The apostrophe after `BOSS` follows a letter, so it opens nothing, and the closing apostrophe
 		// after `ORDERS` must not pair with it to hide `ORDERS`.
 		{"opening quote glued to a letter", "// the BOSS'S ORDERS' wording\nexport const Value = 1;\n", "ORDERS"},
-		{"closing quote glued to a letter", "// a 'RENAME COLUMN'd table is NEVER safe\nexport const Value = 1;\n", "RENAME"},
+		{
+			"closing quote glued to a letter",
+			"// a 'RENAME COLUMN'd table is NEVER safe\nexport const Value = 1;\n",
+			"RENAME",
+		},
 		// The apostrophe hazard itself: a leading apostrophe after a space and a plural possessive
 		// later in the sentence look like a pair at both boundaries. Lowercase inside is what refuses it.
-		{"apostrophes that bracket prose", "// the '90s were LOUD and the users' data was quiet\nexport const Value = 1;\n", "LOUD"},
-		{"lowercase inside the quotes", "// the 'tis season, NEVER the 'quiet' one\nexport const Value = 1;\n", "NEVER"},
+		{
+			"apostrophes that bracket prose",
+			"// the '90s were LOUD and the users' data was quiet\nexport const Value = 1;\n",
+			"LOUD",
+		},
+		{
+			"lowercase inside the quotes",
+			"// the 'tis season, NEVER the 'quiet' one\nexport const Value = 1;\n",
+			"NEVER",
+		},
 		{"shout outside a quoted phrase", "// 'NOT NULL' is ALWAYS enforced\nexport const Value = 1;\n", "ALWAYS"},
 	}
 	for _, testCase := range fires {
@@ -188,7 +213,10 @@ func TestConsistencyNoShoutingMasksASingleQuotedCapitalPhrase(test *testing.T) {
 			test.Parallel()
 			result := rule_testing.Run(test, ConsistencyNoShouting, shoutingFile, testCase.sourceText)
 			rule_testing.ExpectFindings(test, result, "shoutingInComment")
-			if description := result.Diagnostics[0].Message.Description; !strings.Contains(description, `"`+testCase.token+`"`) {
+			if description := result.Diagnostics[0].Message.Description; !strings.Contains(
+				description,
+				`"`+testCase.token+`"`,
+			) {
 				test.Fatalf("expected the message to name %q, got: %s", testCase.token, description)
 			}
 		})
@@ -206,9 +234,15 @@ func TestConsistencyNoShoutingMasksAnIndentedCodeBlock(test *testing.T) {
 		name       string
 		sourceText string
 	}{
-		{"indented block in a block comment", "/**\n * Run it sandboxed:\n *\n *     TMPDIR=$HOME/tmp sandbox-exec -f profile.sb node run.mjs\n */\nexport const Value = 1;\n"},
+		{
+			"indented block in a block comment",
+			"/**\n * Run it sandboxed:\n *\n *     TMPDIR=$HOME/tmp sandbox-exec -f profile.sb node run.mjs\n */\nexport const Value = 1;\n",
+		},
 		{"tab-indented block", "/*\nRun it:\n\n\tHOME=/x TMPDIR=/y node run.mjs\n*/\nexport const Value = 1;\n"},
-		{"fenced block, the control", "/**\n * Run it:\n * ```\n * TMPDIR=$HOME/tmp node run.mjs\n * ```\n */\nexport const Value = 1;\n"},
+		{
+			"fenced block, the control",
+			"/**\n * Run it:\n * ```\n * TMPDIR=$HOME/tmp node run.mjs\n * ```\n */\nexport const Value = 1;\n",
+		},
 	}
 	for _, testCase := range silent {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -223,16 +257,31 @@ func TestConsistencyNoShoutingMasksAnIndentedCodeBlock(test *testing.T) {
 		sourceText string
 		token      string
 	}{
-		{"indented line straight after prose", "/*\nThis is prose\n    and you must NEVER do it\n*/\nexport const Value = 1;\n", "NEVER"},
-		{"prose after an indented block", "/**\n * Run:\n *\n *     HOME=/x run\n *\n * Then ALWAYS check.\n */\nexport const Value = 1;\n", "ALWAYS"},
-		{"a deeply indented comment line is prose", "export function run() {\n    /**\n     * You must NEVER do this.\n     */\n    return 1;\n}\n", "NEVER"},
+		{
+			"indented line straight after prose",
+			"/*\nThis is prose\n    and you must NEVER do it\n*/\nexport const Value = 1;\n",
+			"NEVER",
+		},
+		{
+			"prose after an indented block",
+			"/**\n * Run:\n *\n *     HOME=/x run\n *\n * Then ALWAYS check.\n */\nexport const Value = 1;\n",
+			"ALWAYS",
+		},
+		{
+			"a deeply indented comment line is prose",
+			"export function run() {\n    /**\n     * You must NEVER do this.\n     */\n    return 1;\n}\n",
+			"NEVER",
+		},
 	}
 	for _, testCase := range fires {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			result := rule_testing.Run(test, ConsistencyNoShouting, shoutingFile, testCase.sourceText)
 			rule_testing.ExpectFindings(test, result, "shoutingInComment")
-			if description := result.Diagnostics[0].Message.Description; !strings.Contains(description, `"`+testCase.token+`"`) {
+			if description := result.Diagnostics[0].Message.Description; !strings.Contains(
+				description,
+				`"`+testCase.token+`"`,
+			) {
 				test.Fatalf("expected the message to name %q, got: %s", testCase.token, description)
 			}
 		})
@@ -281,7 +330,10 @@ func TestConsistencyNoShoutingMasksADoubleQuoteThatWraps(test *testing.T) {
 			test.Parallel()
 			result := rule_testing.Run(test, ConsistencyNoShouting, shoutingFile, testCase.sourceText)
 			rule_testing.ExpectFindings(test, result, "shoutingInComment")
-			if description := result.Diagnostics[0].Message.Description; !strings.Contains(description, `"`+testCase.token+`"`) {
+			if description := result.Diagnostics[0].Message.Description; !strings.Contains(
+				description,
+				`"`+testCase.token+`"`,
+			) {
 				test.Fatalf("expected the message to name %q, got: %s", testCase.token, description)
 			}
 		})

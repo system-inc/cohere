@@ -29,7 +29,10 @@ func TestATypeErrorFoundAlongsideTheWalkIsReportedOnce(test *testing.T) {
 				test.Errorf("a run with a type error exited 0:\n%s", output)
 			}
 			if len(arguments) == 0 && !strings.Contains(output, "graph rebuilt") {
-				test.Fatalf("the writing run rewrote nothing, so the early check was never thrown away and this proves nothing:\n%s", output)
+				test.Fatalf(
+					"the writing run rewrote nothing, so the early check was never thrown away and this proves nothing:\n%s",
+					output,
+				)
 			}
 		})
 	}

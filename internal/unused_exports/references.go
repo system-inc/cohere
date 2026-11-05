@@ -201,7 +201,13 @@ func symbolOfDeclaration(node *ast.Node) *ast.Symbol {
 // imported names resolved through `GetAliasedSymbol` to a declaration in another file, with zero nil
 // symbols. Pointer identity is what makes a reference in one file and a declaration in another the
 // same fact.
-func FindUnreferenced(ctx context.Context, graph *program.Graph, files []*ast.SourceFile, roots *module_roots.Set, deep bool) (*Report, error) {
+func FindUnreferenced(
+	ctx context.Context,
+	graph *program.Graph,
+	files []*ast.SourceFile,
+	roots *module_roots.Set,
+	deep bool,
+) (*Report, error) {
 	report := &Report{FilesAnalyzed: len(files)}
 
 	// The closure's inputs, collected during the passes below rather than in a third walk. Both stay

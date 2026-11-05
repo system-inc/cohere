@@ -167,8 +167,13 @@ func getNestedLoc(parentNode *estree.Node, node *estree.Node, rootOffset int) (s
 		return firstTruthyString(node.Get("text"), node.Get("value")), getValueRootOffset(parentNode), true
 	}
 
-	if parameters, isNode := parentNode.Get("params").(*estree.Node); node.Type() == "media-query-list" || (isNode && parameters == node) {
-		return firstTruthyString(rawsIn(parentNode)["params"], node.Get("value")), getAtRuleParamsRootOffset(parentNode), true
+	if parameters, isNode := parentNode.Get(
+		"params",
+	).(*estree.Node); node.Type() == "media-query-list" || (isNode && parameters == node) {
+		return firstTruthyString(
+			rawsIn(parentNode)["params"],
+			node.Get("value"),
+		), getAtRuleParamsRootOffset(parentNode), true
 	}
 
 	if strings.HasPrefix(node.Type(), "selector-") {
@@ -259,7 +264,12 @@ func getSelectorText(parentNode *estree.Node, selectorNode *estree.Node) (string
 	return "", false
 }
 
-func getSelectorRootOffset(parentNode *estree.Node, selectorNode *estree.Node, selectorText string, rootOffset int) int {
+func getSelectorRootOffset(
+	parentNode *estree.Node,
+	selectorNode *estree.Node,
+	selectorText string,
+	rootOffset int,
+) int {
 	if sourceIndex, isNumber := numberProperty(selectorNode, "sourceIndex"); isNumber {
 		if _, isString := rawsIn(selectorNode)["selector"].(string); isString {
 			return rootOffset + sourceIndex

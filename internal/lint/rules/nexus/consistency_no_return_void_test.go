@@ -192,13 +192,22 @@ func TestConsistencyNoReturnVoidReportsWithoutAFix(test *testing.T) {
 		// `return 0` is a number; the operand here is a digit, which cannot start an identifier.
 		{"a numeric operand", []string{"function run() {", "    return void 0;", "}"}},
 		// As a statement, `(a, b)` would join the previous line when it has no semicolon.
-		{"a parenthesized operand", []string{"function run() {", "    start()", "    return void (first(), second());", "}"}},
+		{
+			"a parenthesized operand",
+			[]string{"function run() {", "    start()", "    return void (first(), second());", "}"},
+		},
 		{"an array operand", []string{"function run() {", "    return void [first(), second()];", "}"}},
 		{"a template operand", []string{"function run() {", "    return void `${first()}`;", "}"}},
 		{"a unary operand", []string{"function run(count: number) {", "    return void -count;", "}"}},
 		// As a statement, `function () {}()` is a declaration followed by a stray call.
-		{"a function expression operand", []string{"function run() {", "    return void function() { start(); }();", "}"}},
-		{"an async arrow operand", []string{"function run() {", "    return void async function() { start(); }();", "}"}},
+		{
+			"a function expression operand",
+			[]string{"function run() {", "    return void function() { start(); }();", "}"},
+		},
+		{
+			"an async arrow operand",
+			[]string{"function run() {", "    return void async function() { start(); }();", "}"},
+		},
 		{"parentheses around the void", []string{"function run() {", "    return (void start());", "}"}},
 		{"a comment between the tokens", []string{"function run() {", "    return void /* log it */ start();", "}"}},
 		{"no closing semicolon", []string{"function run() {", "    return void start()", "}"}},
@@ -206,7 +215,12 @@ func TestConsistencyNoReturnVoidReportsWithoutAFix(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.Run(test, ConsistencyNoReturnVoid, consistencyNoReturnVoidFile, consistencyNoReturnVoidSource(testCase.lines...))
+			result := rule_testing.Run(
+				test,
+				ConsistencyNoReturnVoid,
+				consistencyNoReturnVoidFile,
+				consistencyNoReturnVoidSource(testCase.lines...),
+			)
 			rule_testing.ExpectFindings(test, result, consistencyNoReturnVoidId)
 			if len(result.Diagnostics[0].Fixes) != 0 {
 				test.Fatalf("expected no fix, got %q", result.Diagnostics[0].Fixes[0].Text)
@@ -261,7 +275,12 @@ func TestConsistencyNoReturnVoidStaysSilent(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.Run(test, ConsistencyNoReturnVoid, "/repository/source/ConsistencyNoReturnVoid.tsx", consistencyNoReturnVoidSource(testCase.lines...))
+			result := rule_testing.Run(
+				test,
+				ConsistencyNoReturnVoid,
+				"/repository/source/ConsistencyNoReturnVoid.tsx",
+				consistencyNoReturnVoidSource(testCase.lines...),
+			)
 			rule_testing.ExpectClean(test, result)
 		})
 	}

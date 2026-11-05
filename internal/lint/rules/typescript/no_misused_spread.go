@@ -163,7 +163,8 @@ var NoMisusedSpread = rule.Rule{
 			// The string exclusion is upstream's and it is not an optimisation: TypeScript already
 			// errors on spreading a string into an object, so reporting here would double a
 			// diagnostic the compiler already gives.
-			if noMisusedSpreadIsIterable(ruleContext.TypeChecker, argumentType) && !noMisusedSpreadIsString(argumentType) {
+			if noMisusedSpreadIsIterable(ruleContext.TypeChecker, argumentType) &&
+				!noMisusedSpreadIsString(argumentType) {
 				ruleContext.ReportNode(spread, buildNoIterableSpreadInObjectMessage())
 				return
 			}
@@ -172,14 +173,16 @@ var NoMisusedSpread = rule.Rule{
 			// instance's symbol has the class as its value declaration, so the declaration arm below
 			// would otherwise report it under the wrong message. See noMisusedSpreadCopiesCompletely.
 			if noMisusedSpreadIsTypeRecurser(argumentType, func(part *checker.Type) bool {
-				return noMisusedSpreadIsClassInstance(ruleContext.TypeChecker, part) && !noMisusedSpreadCopiesCompletely(ruleContext, part)
+				return noMisusedSpreadIsClassInstance(ruleContext.TypeChecker, part) &&
+					!noMisusedSpreadCopiesCompletely(ruleContext, part)
 			}) {
 				ruleContext.ReportNode(spread, buildNoClassInstanceSpreadInObjectMessage())
 				return
 			}
 
 			if noMisusedSpreadIsTypeRecurser(argumentType, func(part *checker.Type) bool {
-				return !noMisusedSpreadIsClassInstance(ruleContext.TypeChecker, part) && noMisusedSpreadIsClassDeclaration(part)
+				return !noMisusedSpreadIsClassInstance(ruleContext.TypeChecker, part) &&
+					noMisusedSpreadIsClassDeclaration(part)
 			}) {
 				ruleContext.ReportNode(spread, buildNoClassDeclarationSpreadInObjectMessage())
 			}
@@ -260,7 +263,14 @@ func noMisusedSpreadIsIterable(typeChecker *checker.Checker, t *checker.Type) bo
 
 func noMisusedSpreadIsMap(ruleContext rule.Context, t *checker.Type) bool {
 	return noMisusedSpreadIsTypeRecurser(t, func(part *checker.Type) bool {
-		return type_checking.IsBuiltinSymbolLike(ruleContext.Program, ruleContext.TypeChecker, part, "Map", "ReadonlyMap", "WeakMap")
+		return type_checking.IsBuiltinSymbolLike(
+			ruleContext.Program,
+			ruleContext.TypeChecker,
+			part,
+			"Map",
+			"ReadonlyMap",
+			"WeakMap",
+		)
 	})
 }
 
@@ -433,7 +443,8 @@ func noMisusedSpreadDecoratorsAreOwnSource(ruleContext rule.Context, classNode *
 			continue
 		}
 		for _, modifier := range modifiers.Nodes {
-			if ast.IsDecorator(modifier) && !noMisusedSpreadDecoratorIsOwnSource(ruleContext, modifier.AsDecorator().Expression) {
+			if ast.IsDecorator(modifier) &&
+				!noMisusedSpreadDecoratorIsOwnSource(ruleContext, modifier.AsDecorator().Expression) {
 				return false
 			}
 		}
@@ -535,7 +546,12 @@ func noMisusedSpreadAwaitSuggestion(ruleContext rule.Context, argument *ast.Node
 //
 // Returns nothing when the type is a union with a non-Map constituent, matching upstream: the
 // rewrite is only sound if every constituent is a Map, and the finding is still reported without it.
-func noMisusedSpreadMapSuggestions(ruleContext rule.Context, spread *ast.Node, argument *ast.Node, argumentType *checker.Type) []rule.Suggestion {
+func noMisusedSpreadMapSuggestions(
+	ruleContext rule.Context,
+	spread *ast.Node,
+	argument *ast.Node,
+	argumentType *checker.Type,
+) []rule.Suggestion {
 	for part := range type_checking.UnionTypePartsSeq(argumentType) {
 		if !noMisusedSpreadIsMap(ruleContext, part) {
 			return nil

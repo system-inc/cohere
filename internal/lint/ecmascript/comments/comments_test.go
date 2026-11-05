@@ -166,11 +166,19 @@ func TestAllCommentsInventsNothingFromSlashesInLiterals(test *testing.T) {
 		wantTexts  []string
 	}{
 		{"two slashes inside a string", "const s = 'http://x';\n", nil},
-		{"two slashes inside a string, with a real comment after", "const s = 'http://x'; // real\n", []string{"// real"}},
+		{
+			"two slashes inside a string, with a real comment after",
+			"const s = 'http://x'; // real\n",
+			[]string{"// real"},
+		},
 		{"a slash inside a regex", "const r = /a\\/b/.test(c);\n", nil},
 		{"a division", "const d = 6 / 2;\n", nil},
 		{"a slash inside a template literal", "const t = `http://x`;\n", nil},
-		{"a comment marker inside an empty object's string neighbour", "const o = { /* c */ }; const s = '//';\n", []string{"/* c */"}},
+		{
+			"a comment marker inside an empty object's string neighbour",
+			"const o = { /* c */ }; const s = '//';\n",
+			[]string{"/* c */"},
+		},
 	}
 
 	for _, testCase := range cases {

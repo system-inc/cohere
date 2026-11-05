@@ -122,7 +122,10 @@ func (recording *RecordingFS) DirectoryExists(path tspath.RootedDirectoryPath) b
 
 func (recording *RecordingFS) GetAccessibleEntries(path tspath.RootedDirectoryPath) vfs.Entries {
 	entries := recording.underlying.GetAccessibleEntries(path)
-	recording.note(path.AsString(), len(entries.Files) > 0 || len(entries.Directories) > 0 || recording.underlying.DirectoryExists(path))
+	recording.note(
+		path.AsString(),
+		len(entries.Files) > 0 || len(entries.Directories) > 0 || recording.underlying.DirectoryExists(path),
+	)
 	return entries
 }
 
@@ -133,6 +136,7 @@ func (recording *RecordingFS) Stat(path tspath.RootedPath) vfs.FileInfo {
 }
 
 func (recording *RecordingFS) Realpath(path tspath.RootedPath) tspath.RootedPath {
-	recording.note(path.AsString(), recording.underlying.FileExists(tspath.RootedFilePath(path)) || recording.underlying.DirectoryExists(tspath.RootedDirectoryPath(path)))
+	recording.note(path.AsString(), recording.underlying.FileExists(tspath.RootedFilePath(path)) ||
+		recording.underlying.DirectoryExists(tspath.RootedDirectoryPath(path)))
 	return tspath.RootedPath(recording.underlying.Realpath(path).AsString())
 }

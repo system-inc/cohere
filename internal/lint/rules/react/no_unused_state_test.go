@@ -24,78 +24,294 @@ func TestNoUnusedStateStaysSilent(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct{ name, sourceText string }{
-		{"upstream valid 0", "\n        function StatelessFnUnaffectedTest(props) {\n          return <SomeComponent foo={props.foo} />;\n        };\n      "},
-		{"upstream valid 1", "\n        var NoStateTest = createReactClass({\n          render: function() {\n            return <SomeComponent />;\n          }\n        });\n      "},
-		{"upstream valid 2", "\n        var NoStateMethodTest = createReactClass({\n          render() {\n            return <SomeComponent />;\n          }\n        });\n      "},
-		{"upstream valid 3", "\n        var GetInitialStateTest = createReactClass({\n          getInitialState: function() {\n            return { foo: 0 };\n          },\n          render: function() {\n            return <SomeComponent foo={this.state.foo} />;\n          }\n        });\n      "},
-		{"upstream valid 4", "\n        var ComputedKeyFromVariableTest = createReactClass({\n          getInitialState: function() {\n            return { [foo]: 0 };\n          },\n          render: function() {\n            return <SomeComponent />;\n          }\n        });\n      "},
-		{"upstream valid 5", "\n        var ComputedKeyFromBooleanLiteralTest = createReactClass({\n          getInitialState: function() {\n            return { [true]: 0 };\n          },\n          render: function() {\n            return <SomeComponent foo={this.state[true]} />;\n          }\n        });\n      "},
-		{"upstream valid 6", "\n        var ComputedKeyFromNumberLiteralTest = createReactClass({\n          getInitialState: function() {\n            return { [123]: 0 };\n          },\n          render: function() {\n            return <SomeComponent foo={this.state[123]} />;\n          }\n        });\n      "},
-		{"upstream valid 7", "\n        var ComputedKeyFromExpressionTest = createReactClass({\n          getInitialState: function() {\n            return { [foo + bar]: 0 };\n          },\n          render: function() {\n            return <SomeComponent />;\n          }\n        });\n      "},
-		{"upstream valid 8", "\n        var ComputedKeyFromBinaryExpressionTest = createReactClass({\n          getInitialState: function() {\n            return { ['foo' + 'bar' * 8]: 0 };\n          },\n          render: function() {\n            return <SomeComponent />;\n          }\n        });\n      "},
-		{"upstream valid 9", "\n        var ComputedKeyFromStringLiteralTest = createReactClass({\n          getInitialState: function() {\n            return { ['foo']: 0 };\n          },\n          render: function() {\n            return <SomeComponent foo={this.state.foo} />;\n          }\n        });\n      "},
-		{"upstream valid 10", "\n        var ComputedKeyFromTemplateLiteralTest = createReactClass({\n          getInitialState: function() {\n            return { [`foo${bar}`]: 0 };\n          },\n          render: function() {\n            return <SomeComponent />;\n          }\n        });\n      "},
-		{"upstream valid 11", "\n        var ComputedKeyFromTemplateLiteralTest = createReactClass({\n          getInitialState: function() {\n            return { [`foo`]: 0 };\n          },\n          render: function() {\n            return <SomeComponent foo={this.state['foo']} />;\n          }\n        });\n      "},
-		{"upstream valid 12", "\n        var GetInitialStateMethodTest = createReactClass({\n          getInitialState() {\n            return { foo: 0 };\n          },\n          render() {\n            return <SomeComponent foo={this.state.foo} />;\n          }\n        });\n      "},
-		{"upstream valid 13", "\n        var SetStateTest = createReactClass({\n          onFooChange(newFoo) {\n            this.setState({ foo: newFoo });\n          },\n          render() {\n            return <SomeComponent foo={this.state.foo} />;\n          }\n        });\n      "},
-		{"upstream valid 14", "\n        var MultipleSetState = createReactClass({\n          getInitialState() {\n            return { foo: 0 };\n          },\n          update() {\n            this.setState({foo: 1});\n          },\n          render() {\n            return <SomeComponent onClick={this.update} foo={this.state.foo} />;\n          }\n        });\n      "},
-		{"upstream valid 15", "\n        class NoStateTest extends React.Component {\n          render() {\n            return <SomeComponent />;\n          }\n        }\n      "},
-		{"upstream valid 16", "\n        class CtorStateTest extends React.Component {\n          constructor() {\n            this.state = { foo: 0 };\n          }\n          render() {\n            return <SomeComponent foo={this.state.foo} />;\n          }\n        }\n      "},
-		{"upstream valid 17", "\n        class ComputedKeyFromVariableTest extends React.Component {\n          constructor() {\n            this.state = { [foo]: 0 };\n          }\n          render() {\n            return <SomeComponent />;\n          }\n        }\n      "},
-		{"upstream valid 18", "\n        class ComputedKeyFromBooleanLiteralTest extends React.Component {\n          constructor() {\n            this.state = { [false]: 0 };\n          }\n          render() {\n            return <SomeComponent foo={this.state['false']} />;\n          }\n        }\n      "},
-		{"upstream valid 19", "\n        class ComputedKeyFromNumberLiteralTest extends React.Component {\n          constructor() {\n            this.state = { [345]: 0 };\n          }\n          render() {\n            return <SomeComponent foo={this.state[345]} />;\n          }\n        }\n      "},
-		{"upstream valid 20", "\n        class ComputedKeyFromExpressionTest extends React.Component {\n          constructor() {\n            this.state = { [foo + bar]: 0 };\n          }\n          render() {\n            return <SomeComponent />;\n          }\n        }\n      "},
-		{"upstream valid 21", "\n        class ComputedKeyFromBinaryExpressionTest extends React.Component {\n          constructor() {\n            this.state = { [1 + 2 * 8]: 0 };\n          }\n          render() {\n            return <SomeComponent />;\n          }\n        }\n      "},
-		{"upstream valid 22", "\n        class ComputedKeyFromStringLiteralTest extends React.Component {\n          constructor() {\n            this.state = { ['foo']: 0 };\n          }\n          render() {\n            return <SomeComponent foo={this.state.foo} />;\n          }\n        }\n      "},
-		{"upstream valid 23", "\n        class ComputedKeyFromTemplateLiteralTest extends React.Component {\n          constructor() {\n            this.state = { [`foo${bar}`]: 0 };\n          }\n          render() {\n            return <SomeComponent />;\n          }\n        }\n      "},
-		{"upstream valid 24", "\n        class ComputedKeyFromTemplateLiteralTest extends React.Component {\n          constructor() {\n            this.state = { [`foo`]: 0 };\n          }\n          render() {\n            return <SomeComponent foo={this.state.foo} />;\n          }\n        }\n      "},
-		{"upstream valid 25", "\n        class SetStateTest extends React.Component {\n          onFooChange(newFoo) {\n            this.setState({ foo: newFoo });\n          }\n          render() {\n            return <SomeComponent foo={this.state.foo} />;\n          }\n        }\n      "},
-		{"upstream valid 26", "\n        class ClassPropertyStateTest extends React.Component {\n          state = { foo: 0 };\n          render() {\n            return <SomeComponent foo={this.state.foo} />;\n          }\n        }\n      "},
-		{"upstream valid 27", "\n        class OptionalChaining extends React.Component {\n          constructor() {\n            this.state = { foo: 0 };\n          }\n          render() {\n            return <SomeComponent foo={this.state?.foo} />;\n          }\n        }\n      "},
-		{"upstream valid 28", "\n        class VariableDeclarationTest extends React.Component {\n          constructor() {\n            this.state = { foo: 0 };\n          }\n          render() {\n            const foo = this.state.foo;\n            return <SomeComponent foo={foo} />;\n          }\n        }\n      "},
-		{"upstream valid 29", "\n      class DestructuringTest extends React.Component {\n        constructor() {\n          this.state = { foo: 0 };\n        }\n        render() {\n          const {foo: myFoo} = this.state;\n          return <SomeComponent foo={myFoo} />;\n        }\n      }\n    "},
-		{"upstream valid 30", "\n      class ShorthandDestructuringTest extends React.Component {\n        constructor() {\n          this.state = { foo: 0 };\n        }\n        render() {\n          const {foo} = this.state;\n          return <SomeComponent foo={foo} />;\n        }\n      }\n    "},
-		{"upstream valid 31", "\n      class AliasDeclarationTest extends React.Component {\n        constructor() {\n          this.state = { foo: 0 };\n        }\n        render() {\n          const state = this.state;\n          return <SomeComponent foo={state.foo} />;\n        }\n      }\n    "},
-		{"upstream valid 32", "\n      class AliasAssignmentTest extends React.Component {\n        constructor() {\n          this.state = { foo: 0 };\n        }\n        render() {\n          let state;\n          state = this.state;\n          return <SomeComponent foo={state.foo} />;\n        }\n      }\n    "},
-		{"upstream valid 33", "\n      class DestructuringAliasTest extends React.Component {\n        constructor() {\n          this.state = { foo: 0 };\n        }\n        render() {\n          const {state: myState} = this;\n          return <SomeComponent foo={myState.foo} />;\n        }\n      }\n    "},
-		{"upstream valid 34", "\n      class ShorthandDestructuringAliasTest extends React.Component {\n        constructor() {\n          this.state = { foo: 0 };\n        }\n        render() {\n          const {state} = this;\n          return <SomeComponent foo={state.foo} />;\n        }\n      }\n    "},
-		{"upstream valid 35", "\n      class RestPropertyTest extends React.Component {\n        constructor() {\n          this.state = {\n            foo: 0,\n            bar: 1,\n          };\n        }\n        render() {\n          const {foo, ...others} = this.state;\n          return <SomeComponent foo={foo} bar={others.bar} />;\n        }\n      }\n    "},
-		{"upstream valid 36", "\n        class DeepDestructuringTest extends React.Component {\n          state = { foo: 0, bar: 0 };\n          render() {\n            const {state: {foo, ...others}} = this;\n            return <SomeComponent foo={foo} bar={others.bar} />;\n          }\n        }\n      "},
-		{"upstream valid 37", "\n      class MethodArgFalseNegativeTest extends React.Component {\n        constructor() {\n          this.state = { foo: 0 };\n        }\n        consumeFoo(foo) {}\n        render() {\n          this.consumeFoo(this.state.foo);\n          return <SomeComponent />;\n        }\n      }\n    "},
-		{"upstream valid 38", "\n      class AssignedToObjectFalseNegativeTest extends React.Component {\n        constructor() {\n          this.state = { foo: 0 };\n        }\n        render() {\n          const obj = { foo: this.state.foo, bar: 0 };\n          return <SomeComponent bar={obj.bar} />;\n        }\n      }\n    "},
-		{"upstream valid 39", "\n      class ComputedAccessFalseNegativeTest extends React.Component {\n        constructor() {\n          this.state = { foo: 0, bar: 1 };\n        }\n        render() {\n          const bar = 'bar';\n          return <SomeComponent bar={this.state[bar]} />;\n        }\n      }\n    "},
-		{"upstream valid 40", "\n      class JsxSpreadFalseNegativeTest extends React.Component {\n        constructor() {\n          this.state = { foo: 0 };\n        }\n        render() {\n          return <SomeComponent {...this.state} />;\n        }\n      }\n    "},
-		{"upstream valid 41", "\n      class AliasedJsxSpreadFalseNegativeTest extends React.Component {\n        constructor() {\n          this.state = { foo: 0 };\n        }\n        render() {\n          const state = this.state;\n          return <SomeComponent {...state} />;\n        }\n      }\n    "},
-		{"upstream valid 42", "\n      class ObjectSpreadFalseNegativeTest extends React.Component {\n        constructor() {\n          this.state = { foo: 0 };\n        }\n        render() {\n          const attrs = { ...this.state, foo: 1 };\n          return <SomeComponent foo={attrs.foo} />;\n        }\n      }\n    "},
-		{"upstream valid 43", "\n      class ShadowingFalseNegativeTest extends React.Component {\n        constructor() {\n          this.state = { foo: 0 };\n        }\n        render() {\n          const state = this.state;\n          let foo;\n          {\n            const state = { foo: 5 };\n            foo = state.foo;\n          }\n          return <SomeComponent foo={foo} />;\n        }\n      }\n    "},
-		{"upstream valid 44", "\n      class NonRenderClassMethodFalseNegativeTest extends React.Component {\n        constructor() {\n          this.state = { foo: 0, bar: 0 };\n        }\n        doSomething() {\n          const { foo } = this.state;\n          return this.state.foo;\n        }\n        doSomethingElse() {\n          const { state: { bar }} = this;\n          return bar;\n        }\n        render() {\n          return <SomeComponent />;\n        }\n      }\n    "},
-		{"upstream valid 46", "\n        class ArrowFunctionClassMethodDestructuringFalseNegativeTest extends React.Component {\n          constructor() {\n            this.state = { foo: 0 };\n          }\n\n          doSomething = () => {\n            const { state: { foo } } = this;\n\n            return foo;\n          }\n\n          render() {\n            return <SomeComponent />;\n          }\n        }\n      "},
-		{"upstream valid 47", "\n        class ArrowFunctionClassMethodWithClassPropertyTransformFalseNegativeTest extends React.Component {\n          state = { foo: 0 };\n\n          doSomething = () => {\n            const { state:{ foo } } = this;\n\n            return foo;\n          }\n\n          render() {\n            return <SomeComponent />;\n          }\n        }\n      "},
-		{"upstream valid 48", "\n        class ArrowFunctionClassMethodDeepDestructuringFalseNegativeTest extends React.Component {\n          state = { foo: { bar: 0 } };\n\n          doSomething = () => {\n            const { state: { foo: { bar }}} = this;\n\n            return bar;\n          }\n\n          render() {\n            return <SomeComponent />;\n          }\n        }\n      "},
-		{"upstream valid 49", "\n        class ArrowFunctionClassMethodDestructuringAssignmentFalseNegativeTest extends React.Component {\n          state = { foo: 0 };\n\n          doSomething = () => {\n            const { state: { foo: bar }} = this;\n\n            return bar;\n          }\n\n          render() {\n            return <SomeComponent />;\n          }\n        }\n      "},
-		{"upstream valid 50", "\n        class ThisStateAsAnObject extends React.Component {\n          state = {\n            active: true\n          };\n\n          render() {\n            return <div className={classNames('overflowEdgeIndicator', className, this.state)} />;\n          }\n        }\n      "},
-		{"upstream valid 51", "\n        class GetDerivedStateFromPropsTest extends Component {\n          constructor(props) {\n            super(props);\n            this.state = {\n              id: 123,\n            };\n          }\n          static getDerivedStateFromProps(nextProps, otherState) {\n            if (otherState.id === nextProps.id) {\n              return {\n                selected: true,\n              };\n            }\n            return null;\n          }\n          render() {\n            return (\n              <h1>{this.state.selected ? 'Selected' : 'Not selected'}</h1>\n            );\n          }\n        }\n      "},
-		{"upstream valid 52", "\n        class ComponentDidUpdateTest extends Component {\n          constructor(props) {\n            super(props);\n            this.state = {\n              id: 123,\n            };\n          }\n\n          componentDidUpdate(someProps, someState) {\n            if (someState.id === someProps.id) {\n              doStuff();\n            }\n          }\n          render() {\n            return (\n              <h1>{this.state.selected ? 'Selected' : 'Not selected'}</h1>\n            );\n          }\n        }\n      "},
-		{"upstream valid 53", "\n        class ShouldComponentUpdateTest extends Component {\n          constructor(props) {\n            super(props);\n            this.state = {\n              id: 123,\n            };\n          }\n          shouldComponentUpdate(nextProps, nextState) {\n            return nextState.id === nextProps.id;\n          }\n          render() {\n            return (\n              <h1>{this.state.selected ? 'Selected' : 'Not selected'}</h1>\n            );\n          }\n        }\n      "},
-		{"upstream valid 54", "\n        class NestedScopesTest extends Component {\n          constructor(props) {\n            super(props);\n            this.state = {\n              id: 123,\n            };\n          }\n          shouldComponentUpdate(nextProps, nextState) {\n            return (function() {\n              return nextState.id === nextProps.id;\n            })();\n          }\n          render() {\n            return (\n              <h1>{this.state.selected ? 'Selected' : 'Not selected'}</h1>\n            );\n          }\n        }\n      "},
-		{"upstream valid 55", "\n        class Foo extends Component {\n          state = {\n            initial: 'foo',\n          }\n          handleChange = () => {\n            this.setState(state => ({\n              current: state.initial\n            }));\n          }\n          render() {\n            const { current } = this.state;\n            return <div>{current}</div>\n          }\n        }\n      "},
-		{"upstream valid 56", "\n        class Foo extends Component {\n          constructor(props) {\n            super(props);\n            this.state = {\n              initial: 'foo',\n            }\n          }\n          handleChange = () => {\n            this.setState(state => ({\n              current: state.initial\n            }));\n          }\n          render() {\n            const { current } = this.state;\n            return <div>{current}</div>\n          }\n        }\n      "},
-		{"upstream valid 57", "\n        class Foo extends Component {\n          constructor(props) {\n            super(props);\n            this.state = {\n              initial: 'foo',\n            }\n          }\n          handleChange = () => {\n            this.setState((state, props) => ({\n              current: state.initial\n            }));\n          }\n          render() {\n            const { current } = this.state;\n            return <div>{current}</div>\n          }\n        }\n      "},
-		{"upstream valid 58", "\n        var Foo = createReactClass({\n          getInitialState: function() {\n            return { initial: 'foo' };\n          },\n          handleChange: function() {\n            this.setState(state => ({\n              current: state.initial\n            }));\n          },\n          render() {\n            const { current } = this.state;\n            return <div>{current}</div>\n          }\n        });\n      "},
-		{"upstream valid 59", "\n        var Foo = createReactClass({\n          getInitialState: function() {\n            return { initial: 'foo' };\n          },\n          handleChange: function() {\n            this.setState((state, props) => ({\n              current: state.initial\n            }));\n          },\n          render() {\n            const { current } = this.state;\n            return <div>{current}</div>\n          }\n        });\n      "},
-		{"upstream valid 60", "\n        class SetStateDestructuringCallback extends Component {\n          state = {\n              used: 1, unused: 2\n          }\n          handleChange = () => {\n            this.setState(({unused}) => ({\n              used: unused * unused,\n            }));\n          }\n          render() {\n            return <div>{this.state.used}</div>\n          }\n        }\n      "},
-		{"upstream valid 61", "\n        class SetStateCallbackStateCondition extends Component {\n          state = {\n              isUsed: true,\n              foo: 'foo'\n          }\n          handleChange = () => {\n            this.setState((prevState) => (prevState.isUsed ? {foo: 'bar', isUsed: false} : {}));\n          }\n          render() {\n            return <SomeComponent foo={this.state.foo} />;\n          }\n        }\n      "},
-		{"upstream valid 62", "\n        class Foo extends Component {\n          handleChange = function() {\n            this.setState(() => ({ foo: value }));\n          }\n          render() {\n            return <SomeComponent foo={this.state.foo} />;\n          }\n        }\n      "},
-		{"upstream valid 63", "\n        class Foo extends Component {\n          handleChange = function() {\n            this.setState(state => ({ foo: value }));\n          }\n          render() {\n            return <SomeComponent foo={this.state.foo} />;\n          }\n        }\n      "},
-		{"upstream valid 64", "\n        class Foo extends Component {\n          static handleChange = () => {\n            this.setState(state => ({ foo: value }));\n          }\n          render() {\n            return <SomeComponent foo={this.state.foo} />;\n          }\n        }\n      "},
-		{"upstream valid 65", "\n        class Foo extends Component {\n          state = {\n            thisStateAliasProp,\n            thisStateAliasRestProp,\n            thisDestructStateAliasProp,\n            thisDestructStateAliasRestProp,\n            thisDestructStateDestructRestProp,\n            thisSetStateProp,\n            thisSetStateRestProp,\n          } as unknown\n\n          constructor() {\n            // other methods of defining state props\n            ((this as unknown).state as unknown) = { thisStateProp } as unknown;\n            ((this as unknown).setState as unknown)({ thisStateDestructProp } as unknown);\n            ((this as unknown).setState as unknown)(state => ({ thisDestructStateDestructProp } as unknown));\n          }\n\n          thisStateAlias() {\n            const state = (this as unknown).state as unknown;\n\n            (state as unknown).thisStateAliasProp as unknown;\n            const { ...thisStateAliasRest } = state as unknown;\n            (thisStateAliasRest as unknown).thisStateAliasRestProp as unknown;\n          }\n\n          thisDestructStateAlias() {\n            const { state } = this as unknown;\n\n            (state as unknown).thisDestructStateAliasProp as unknown;\n            const { ...thisDestructStateAliasRest } = state as unknown;\n            (thisDestructStateAliasRest as unknown).thisDestructStateAliasRestProp as unknown;\n          }\n\n          thisSetState() {\n            ((this as unknown).setState as unknown)(state => (state as unknown).thisSetStateProp as unknown);\n            ((this as unknown).setState as unknown)(({ ...thisSetStateRest }) => (thisSetStateRest as unknown).thisSetStateRestProp as unknown);\n          }\n\n          render() {\n            ((this as unknown).state as unknown).thisStateProp as unknown;\n            const { thisStateDestructProp } = (this as unknown).state as unknown;\n            const { state: { thisDestructStateDestructProp, ...thisDestructStateDestructRest } } = this as unknown;\n            (thisDestructStateDestructRest as unknown).thisDestructStateDestructRestProp as unknown;\n\n            return null;\n          }\n        }\n      "},
-		{"upstream valid 66", "\n        interface Props {}\n\n        interface State {\n          flag: boolean;\n        }\n\n        export default class RuleTest extends React.Component<Props, State> {\n          readonly state: State = {\n            flag: false,\n          };\n\n          static getDerivedStateFromProps = (props: Props, state: State) => {\n            const newState: Partial<State> = {};\n            if (!state.flag) {\n              newState.flag = true;\n            }\n            return newState;\n          };\n        }\n      "},
-		{"upstream valid 67", "\n        class Foo extends React.Component {\n          onCancel = (data) => {\n            console.log('Cancelled', data)\n            this.setState({ status: 'Cancelled. Try again?' })\n          }\n          render() {\n            const { status } = this.state;\n            return <div>{status}</div>\n          }\n        }\n      "},
-		{"upstream valid 68", "\n        class KarmaRefundPillComponent extends GenericPillComponent {\n          renderContent = () => {\n            const { action } = this.props\n\n            return (\n              <Box fontSize={[1]} mx={[2]} minWidth=\"10px\" minHeight=\"26px\" alignItems=\"center\">\n                <FormattedText\n                  fields={getKarmaClaimLevel1Fields(action)}\n                  i18nKey=\"pillTemplates.karmarefund.summary\"\n                  fontSize={[1]}\n                />\n              </Box>\n            )\n          }\n        }\n      "},
-		{"upstream valid 69", "\n        class AutoControlledComponent<P = {}, S = {}> extends UIComponent<P, S> {\n          static getDerivedStateFromProps: React.GetDerivedStateFromProps<any, any>\n        }\n      "},
-		{"upstream valid 70", "\n        export const commonMixinWrapper = ComposeComponent => class extends ComposeComponent {\n          static getDerivedStateFromProps = ComposeComponent.getDerivedStateFromProps;\n          render() { return <div />; }\n        }\n      "},
-		{"upstream valid 71", "\n        import React, { PureComponent } from 'react';\n\n        class TestNoUnusedState extends React.Component {\n          constructor(props) {\n            super(props);\n            this.state = {\n              id: null,\n            };\n          }\n\n          static getDerivedStateFromProps = (props, state) => {\n            if (state.id !== props.id) {\n              return {\n                id: props.id,\n              };\n            }\n\n            return null;\n          };\n\n          render() {\n            return <h1>{this.state.id}</h1>;\n          }\n        }\n\n        export default TestNoUnusedState;\n      "},
-		{"upstream valid 72", "\n        class Component extends React.Component {\n          static getDerivedStateFromProps = ({value, disableAnimation}: ToggleProps, {isControlled, isOn}: ToggleState) => {\n            return { isControlled, isOn };\n          };\n\n          render() {\n            const { isControlled, isOn } = this.state;\n            return <div>{isControlled ? 'controlled' : ''}{isOn ? 'on' : ''}</div>;\n          }\n        }\n      "},
+		{
+			"upstream valid 0",
+			"\n        function StatelessFnUnaffectedTest(props) {\n          return <SomeComponent foo={props.foo} />;\n        };\n      ",
+		},
+		{
+			"upstream valid 1",
+			"\n        var NoStateTest = createReactClass({\n          render: function() {\n            return <SomeComponent />;\n          }\n        });\n      ",
+		},
+		{
+			"upstream valid 2",
+			"\n        var NoStateMethodTest = createReactClass({\n          render() {\n            return <SomeComponent />;\n          }\n        });\n      ",
+		},
+		{
+			"upstream valid 3",
+			"\n        var GetInitialStateTest = createReactClass({\n          getInitialState: function() {\n            return { foo: 0 };\n          },\n          render: function() {\n            return <SomeComponent foo={this.state.foo} />;\n          }\n        });\n      ",
+		},
+		{
+			"upstream valid 4",
+			"\n        var ComputedKeyFromVariableTest = createReactClass({\n          getInitialState: function() {\n            return { [foo]: 0 };\n          },\n          render: function() {\n            return <SomeComponent />;\n          }\n        });\n      ",
+		},
+		{
+			"upstream valid 5",
+			"\n        var ComputedKeyFromBooleanLiteralTest = createReactClass({\n          getInitialState: function() {\n            return { [true]: 0 };\n          },\n          render: function() {\n            return <SomeComponent foo={this.state[true]} />;\n          }\n        });\n      ",
+		},
+		{
+			"upstream valid 6",
+			"\n        var ComputedKeyFromNumberLiteralTest = createReactClass({\n          getInitialState: function() {\n            return { [123]: 0 };\n          },\n          render: function() {\n            return <SomeComponent foo={this.state[123]} />;\n          }\n        });\n      ",
+		},
+		{
+			"upstream valid 7",
+			"\n        var ComputedKeyFromExpressionTest = createReactClass({\n          getInitialState: function() {\n            return { [foo + bar]: 0 };\n          },\n          render: function() {\n            return <SomeComponent />;\n          }\n        });\n      ",
+		},
+		{
+			"upstream valid 8",
+			"\n        var ComputedKeyFromBinaryExpressionTest = createReactClass({\n          getInitialState: function() {\n            return { ['foo' + 'bar' * 8]: 0 };\n          },\n          render: function() {\n            return <SomeComponent />;\n          }\n        });\n      ",
+		},
+		{
+			"upstream valid 9",
+			"\n        var ComputedKeyFromStringLiteralTest = createReactClass({\n          getInitialState: function() {\n            return { ['foo']: 0 };\n          },\n          render: function() {\n            return <SomeComponent foo={this.state.foo} />;\n          }\n        });\n      ",
+		},
+		{
+			"upstream valid 10",
+			"\n        var ComputedKeyFromTemplateLiteralTest = createReactClass({\n          getInitialState: function() {\n            return { [`foo${bar}`]: 0 };\n          },\n          render: function() {\n            return <SomeComponent />;\n          }\n        });\n      ",
+		},
+		{
+			"upstream valid 11",
+			"\n        var ComputedKeyFromTemplateLiteralTest = createReactClass({\n          getInitialState: function() {\n            return { [`foo`]: 0 };\n          },\n          render: function() {\n            return <SomeComponent foo={this.state['foo']} />;\n          }\n        });\n      ",
+		},
+		{
+			"upstream valid 12",
+			"\n        var GetInitialStateMethodTest = createReactClass({\n          getInitialState() {\n            return { foo: 0 };\n          },\n          render() {\n            return <SomeComponent foo={this.state.foo} />;\n          }\n        });\n      ",
+		},
+		{
+			"upstream valid 13",
+			"\n        var SetStateTest = createReactClass({\n          onFooChange(newFoo) {\n            this.setState({ foo: newFoo });\n          },\n          render() {\n            return <SomeComponent foo={this.state.foo} />;\n          }\n        });\n      ",
+		},
+		{
+			"upstream valid 14",
+			"\n        var MultipleSetState = createReactClass({\n          getInitialState() {\n            return { foo: 0 };\n          },\n          update() {\n            this.setState({foo: 1});\n          },\n          render() {\n            return <SomeComponent onClick={this.update} foo={this.state.foo} />;\n          }\n        });\n      ",
+		},
+		{
+			"upstream valid 15",
+			"\n        class NoStateTest extends React.Component {\n          render() {\n            return <SomeComponent />;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid 16",
+			"\n        class CtorStateTest extends React.Component {\n          constructor() {\n            this.state = { foo: 0 };\n          }\n          render() {\n            return <SomeComponent foo={this.state.foo} />;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid 17",
+			"\n        class ComputedKeyFromVariableTest extends React.Component {\n          constructor() {\n            this.state = { [foo]: 0 };\n          }\n          render() {\n            return <SomeComponent />;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid 18",
+			"\n        class ComputedKeyFromBooleanLiteralTest extends React.Component {\n          constructor() {\n            this.state = { [false]: 0 };\n          }\n          render() {\n            return <SomeComponent foo={this.state['false']} />;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid 19",
+			"\n        class ComputedKeyFromNumberLiteralTest extends React.Component {\n          constructor() {\n            this.state = { [345]: 0 };\n          }\n          render() {\n            return <SomeComponent foo={this.state[345]} />;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid 20",
+			"\n        class ComputedKeyFromExpressionTest extends React.Component {\n          constructor() {\n            this.state = { [foo + bar]: 0 };\n          }\n          render() {\n            return <SomeComponent />;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid 21",
+			"\n        class ComputedKeyFromBinaryExpressionTest extends React.Component {\n          constructor() {\n            this.state = { [1 + 2 * 8]: 0 };\n          }\n          render() {\n            return <SomeComponent />;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid 22",
+			"\n        class ComputedKeyFromStringLiteralTest extends React.Component {\n          constructor() {\n            this.state = { ['foo']: 0 };\n          }\n          render() {\n            return <SomeComponent foo={this.state.foo} />;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid 23",
+			"\n        class ComputedKeyFromTemplateLiteralTest extends React.Component {\n          constructor() {\n            this.state = { [`foo${bar}`]: 0 };\n          }\n          render() {\n            return <SomeComponent />;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid 24",
+			"\n        class ComputedKeyFromTemplateLiteralTest extends React.Component {\n          constructor() {\n            this.state = { [`foo`]: 0 };\n          }\n          render() {\n            return <SomeComponent foo={this.state.foo} />;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid 25",
+			"\n        class SetStateTest extends React.Component {\n          onFooChange(newFoo) {\n            this.setState({ foo: newFoo });\n          }\n          render() {\n            return <SomeComponent foo={this.state.foo} />;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid 26",
+			"\n        class ClassPropertyStateTest extends React.Component {\n          state = { foo: 0 };\n          render() {\n            return <SomeComponent foo={this.state.foo} />;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid 27",
+			"\n        class OptionalChaining extends React.Component {\n          constructor() {\n            this.state = { foo: 0 };\n          }\n          render() {\n            return <SomeComponent foo={this.state?.foo} />;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid 28",
+			"\n        class VariableDeclarationTest extends React.Component {\n          constructor() {\n            this.state = { foo: 0 };\n          }\n          render() {\n            const foo = this.state.foo;\n            return <SomeComponent foo={foo} />;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid 29",
+			"\n      class DestructuringTest extends React.Component {\n        constructor() {\n          this.state = { foo: 0 };\n        }\n        render() {\n          const {foo: myFoo} = this.state;\n          return <SomeComponent foo={myFoo} />;\n        }\n      }\n    ",
+		},
+		{
+			"upstream valid 30",
+			"\n      class ShorthandDestructuringTest extends React.Component {\n        constructor() {\n          this.state = { foo: 0 };\n        }\n        render() {\n          const {foo} = this.state;\n          return <SomeComponent foo={foo} />;\n        }\n      }\n    ",
+		},
+		{
+			"upstream valid 31",
+			"\n      class AliasDeclarationTest extends React.Component {\n        constructor() {\n          this.state = { foo: 0 };\n        }\n        render() {\n          const state = this.state;\n          return <SomeComponent foo={state.foo} />;\n        }\n      }\n    ",
+		},
+		{
+			"upstream valid 32",
+			"\n      class AliasAssignmentTest extends React.Component {\n        constructor() {\n          this.state = { foo: 0 };\n        }\n        render() {\n          let state;\n          state = this.state;\n          return <SomeComponent foo={state.foo} />;\n        }\n      }\n    ",
+		},
+		{
+			"upstream valid 33",
+			"\n      class DestructuringAliasTest extends React.Component {\n        constructor() {\n          this.state = { foo: 0 };\n        }\n        render() {\n          const {state: myState} = this;\n          return <SomeComponent foo={myState.foo} />;\n        }\n      }\n    ",
+		},
+		{
+			"upstream valid 34",
+			"\n      class ShorthandDestructuringAliasTest extends React.Component {\n        constructor() {\n          this.state = { foo: 0 };\n        }\n        render() {\n          const {state} = this;\n          return <SomeComponent foo={state.foo} />;\n        }\n      }\n    ",
+		},
+		{
+			"upstream valid 35",
+			"\n      class RestPropertyTest extends React.Component {\n        constructor() {\n          this.state = {\n            foo: 0,\n            bar: 1,\n          };\n        }\n        render() {\n          const {foo, ...others} = this.state;\n          return <SomeComponent foo={foo} bar={others.bar} />;\n        }\n      }\n    ",
+		},
+		{
+			"upstream valid 36",
+			"\n        class DeepDestructuringTest extends React.Component {\n          state = { foo: 0, bar: 0 };\n          render() {\n            const {state: {foo, ...others}} = this;\n            return <SomeComponent foo={foo} bar={others.bar} />;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid 37",
+			"\n      class MethodArgFalseNegativeTest extends React.Component {\n        constructor() {\n          this.state = { foo: 0 };\n        }\n        consumeFoo(foo) {}\n        render() {\n          this.consumeFoo(this.state.foo);\n          return <SomeComponent />;\n        }\n      }\n    ",
+		},
+		{
+			"upstream valid 38",
+			"\n      class AssignedToObjectFalseNegativeTest extends React.Component {\n        constructor() {\n          this.state = { foo: 0 };\n        }\n        render() {\n          const obj = { foo: this.state.foo, bar: 0 };\n          return <SomeComponent bar={obj.bar} />;\n        }\n      }\n    ",
+		},
+		{
+			"upstream valid 39",
+			"\n      class ComputedAccessFalseNegativeTest extends React.Component {\n        constructor() {\n          this.state = { foo: 0, bar: 1 };\n        }\n        render() {\n          const bar = 'bar';\n          return <SomeComponent bar={this.state[bar]} />;\n        }\n      }\n    ",
+		},
+		{
+			"upstream valid 40",
+			"\n      class JsxSpreadFalseNegativeTest extends React.Component {\n        constructor() {\n          this.state = { foo: 0 };\n        }\n        render() {\n          return <SomeComponent {...this.state} />;\n        }\n      }\n    ",
+		},
+		{
+			"upstream valid 41",
+			"\n      class AliasedJsxSpreadFalseNegativeTest extends React.Component {\n        constructor() {\n          this.state = { foo: 0 };\n        }\n        render() {\n          const state = this.state;\n          return <SomeComponent {...state} />;\n        }\n      }\n    ",
+		},
+		{
+			"upstream valid 42",
+			"\n      class ObjectSpreadFalseNegativeTest extends React.Component {\n        constructor() {\n          this.state = { foo: 0 };\n        }\n        render() {\n          const attrs = { ...this.state, foo: 1 };\n          return <SomeComponent foo={attrs.foo} />;\n        }\n      }\n    ",
+		},
+		{
+			"upstream valid 43",
+			"\n      class ShadowingFalseNegativeTest extends React.Component {\n        constructor() {\n          this.state = { foo: 0 };\n        }\n        render() {\n          const state = this.state;\n          let foo;\n          {\n            const state = { foo: 5 };\n            foo = state.foo;\n          }\n          return <SomeComponent foo={foo} />;\n        }\n      }\n    ",
+		},
+		{
+			"upstream valid 44",
+			"\n      class NonRenderClassMethodFalseNegativeTest extends React.Component {\n        constructor() {\n          this.state = { foo: 0, bar: 0 };\n        }\n        doSomething() {\n          const { foo } = this.state;\n          return this.state.foo;\n        }\n        doSomethingElse() {\n          const { state: { bar }} = this;\n          return bar;\n        }\n        render() {\n          return <SomeComponent />;\n        }\n      }\n    ",
+		},
+		{
+			"upstream valid 46",
+			"\n        class ArrowFunctionClassMethodDestructuringFalseNegativeTest extends React.Component {\n          constructor() {\n            this.state = { foo: 0 };\n          }\n\n          doSomething = () => {\n            const { state: { foo } } = this;\n\n            return foo;\n          }\n\n          render() {\n            return <SomeComponent />;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid 47",
+			"\n        class ArrowFunctionClassMethodWithClassPropertyTransformFalseNegativeTest extends React.Component {\n          state = { foo: 0 };\n\n          doSomething = () => {\n            const { state:{ foo } } = this;\n\n            return foo;\n          }\n\n          render() {\n            return <SomeComponent />;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid 48",
+			"\n        class ArrowFunctionClassMethodDeepDestructuringFalseNegativeTest extends React.Component {\n          state = { foo: { bar: 0 } };\n\n          doSomething = () => {\n            const { state: { foo: { bar }}} = this;\n\n            return bar;\n          }\n\n          render() {\n            return <SomeComponent />;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid 49",
+			"\n        class ArrowFunctionClassMethodDestructuringAssignmentFalseNegativeTest extends React.Component {\n          state = { foo: 0 };\n\n          doSomething = () => {\n            const { state: { foo: bar }} = this;\n\n            return bar;\n          }\n\n          render() {\n            return <SomeComponent />;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid 50",
+			"\n        class ThisStateAsAnObject extends React.Component {\n          state = {\n            active: true\n          };\n\n          render() {\n            return <div className={classNames('overflowEdgeIndicator', className, this.state)} />;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid 51",
+			"\n        class GetDerivedStateFromPropsTest extends Component {\n          constructor(props) {\n            super(props);\n            this.state = {\n              id: 123,\n            };\n          }\n          static getDerivedStateFromProps(nextProps, otherState) {\n            if (otherState.id === nextProps.id) {\n              return {\n                selected: true,\n              };\n            }\n            return null;\n          }\n          render() {\n            return (\n              <h1>{this.state.selected ? 'Selected' : 'Not selected'}</h1>\n            );\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid 52",
+			"\n        class ComponentDidUpdateTest extends Component {\n          constructor(props) {\n            super(props);\n            this.state = {\n              id: 123,\n            };\n          }\n\n          componentDidUpdate(someProps, someState) {\n            if (someState.id === someProps.id) {\n              doStuff();\n            }\n          }\n          render() {\n            return (\n              <h1>{this.state.selected ? 'Selected' : 'Not selected'}</h1>\n            );\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid 53",
+			"\n        class ShouldComponentUpdateTest extends Component {\n          constructor(props) {\n            super(props);\n            this.state = {\n              id: 123,\n            };\n          }\n          shouldComponentUpdate(nextProps, nextState) {\n            return nextState.id === nextProps.id;\n          }\n          render() {\n            return (\n              <h1>{this.state.selected ? 'Selected' : 'Not selected'}</h1>\n            );\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid 54",
+			"\n        class NestedScopesTest extends Component {\n          constructor(props) {\n            super(props);\n            this.state = {\n              id: 123,\n            };\n          }\n          shouldComponentUpdate(nextProps, nextState) {\n            return (function() {\n              return nextState.id === nextProps.id;\n            })();\n          }\n          render() {\n            return (\n              <h1>{this.state.selected ? 'Selected' : 'Not selected'}</h1>\n            );\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid 55",
+			"\n        class Foo extends Component {\n          state = {\n            initial: 'foo',\n          }\n          handleChange = () => {\n            this.setState(state => ({\n              current: state.initial\n            }));\n          }\n          render() {\n            const { current } = this.state;\n            return <div>{current}</div>\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid 56",
+			"\n        class Foo extends Component {\n          constructor(props) {\n            super(props);\n            this.state = {\n              initial: 'foo',\n            }\n          }\n          handleChange = () => {\n            this.setState(state => ({\n              current: state.initial\n            }));\n          }\n          render() {\n            const { current } = this.state;\n            return <div>{current}</div>\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid 57",
+			"\n        class Foo extends Component {\n          constructor(props) {\n            super(props);\n            this.state = {\n              initial: 'foo',\n            }\n          }\n          handleChange = () => {\n            this.setState((state, props) => ({\n              current: state.initial\n            }));\n          }\n          render() {\n            const { current } = this.state;\n            return <div>{current}</div>\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid 58",
+			"\n        var Foo = createReactClass({\n          getInitialState: function() {\n            return { initial: 'foo' };\n          },\n          handleChange: function() {\n            this.setState(state => ({\n              current: state.initial\n            }));\n          },\n          render() {\n            const { current } = this.state;\n            return <div>{current}</div>\n          }\n        });\n      ",
+		},
+		{
+			"upstream valid 59",
+			"\n        var Foo = createReactClass({\n          getInitialState: function() {\n            return { initial: 'foo' };\n          },\n          handleChange: function() {\n            this.setState((state, props) => ({\n              current: state.initial\n            }));\n          },\n          render() {\n            const { current } = this.state;\n            return <div>{current}</div>\n          }\n        });\n      ",
+		},
+		{
+			"upstream valid 60",
+			"\n        class SetStateDestructuringCallback extends Component {\n          state = {\n              used: 1, unused: 2\n          }\n          handleChange = () => {\n            this.setState(({unused}) => ({\n              used: unused * unused,\n            }));\n          }\n          render() {\n            return <div>{this.state.used}</div>\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid 61",
+			"\n        class SetStateCallbackStateCondition extends Component {\n          state = {\n              isUsed: true,\n              foo: 'foo'\n          }\n          handleChange = () => {\n            this.setState((prevState) => (prevState.isUsed ? {foo: 'bar', isUsed: false} : {}));\n          }\n          render() {\n            return <SomeComponent foo={this.state.foo} />;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid 62",
+			"\n        class Foo extends Component {\n          handleChange = function() {\n            this.setState(() => ({ foo: value }));\n          }\n          render() {\n            return <SomeComponent foo={this.state.foo} />;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid 63",
+			"\n        class Foo extends Component {\n          handleChange = function() {\n            this.setState(state => ({ foo: value }));\n          }\n          render() {\n            return <SomeComponent foo={this.state.foo} />;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid 64",
+			"\n        class Foo extends Component {\n          static handleChange = () => {\n            this.setState(state => ({ foo: value }));\n          }\n          render() {\n            return <SomeComponent foo={this.state.foo} />;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid 65",
+			"\n        class Foo extends Component {\n          state = {\n            thisStateAliasProp,\n            thisStateAliasRestProp,\n            thisDestructStateAliasProp,\n            thisDestructStateAliasRestProp,\n            thisDestructStateDestructRestProp,\n            thisSetStateProp,\n            thisSetStateRestProp,\n          } as unknown\n\n          constructor() {\n            // other methods of defining state props\n            ((this as unknown).state as unknown) = { thisStateProp } as unknown;\n            ((this as unknown).setState as unknown)({ thisStateDestructProp } as unknown);\n            ((this as unknown).setState as unknown)(state => ({ thisDestructStateDestructProp } as unknown));\n          }\n\n          thisStateAlias() {\n            const state = (this as unknown).state as unknown;\n\n            (state as unknown).thisStateAliasProp as unknown;\n            const { ...thisStateAliasRest } = state as unknown;\n            (thisStateAliasRest as unknown).thisStateAliasRestProp as unknown;\n          }\n\n          thisDestructStateAlias() {\n            const { state } = this as unknown;\n\n            (state as unknown).thisDestructStateAliasProp as unknown;\n            const { ...thisDestructStateAliasRest } = state as unknown;\n            (thisDestructStateAliasRest as unknown).thisDestructStateAliasRestProp as unknown;\n          }\n\n          thisSetState() {\n            ((this as unknown).setState as unknown)(state => (state as unknown).thisSetStateProp as unknown);\n            ((this as unknown).setState as unknown)(({ ...thisSetStateRest }) => (thisSetStateRest as unknown).thisSetStateRestProp as unknown);\n          }\n\n          render() {\n            ((this as unknown).state as unknown).thisStateProp as unknown;\n            const { thisStateDestructProp } = (this as unknown).state as unknown;\n            const { state: { thisDestructStateDestructProp, ...thisDestructStateDestructRest } } = this as unknown;\n            (thisDestructStateDestructRest as unknown).thisDestructStateDestructRestProp as unknown;\n\n            return null;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid 66",
+			"\n        interface Props {}\n\n        interface State {\n          flag: boolean;\n        }\n\n        export default class RuleTest extends React.Component<Props, State> {\n          readonly state: State = {\n            flag: false,\n          };\n\n          static getDerivedStateFromProps = (props: Props, state: State) => {\n            const newState: Partial<State> = {};\n            if (!state.flag) {\n              newState.flag = true;\n            }\n            return newState;\n          };\n        }\n      ",
+		},
+		{
+			"upstream valid 67",
+			"\n        class Foo extends React.Component {\n          onCancel = (data) => {\n            console.log('Cancelled', data)\n            this.setState({ status: 'Cancelled. Try again?' })\n          }\n          render() {\n            const { status } = this.state;\n            return <div>{status}</div>\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid 68",
+			"\n        class KarmaRefundPillComponent extends GenericPillComponent {\n          renderContent = () => {\n            const { action } = this.props\n\n            return (\n              <Box fontSize={[1]} mx={[2]} minWidth=\"10px\" minHeight=\"26px\" alignItems=\"center\">\n                <FormattedText\n                  fields={getKarmaClaimLevel1Fields(action)}\n                  i18nKey=\"pillTemplates.karmarefund.summary\"\n                  fontSize={[1]}\n                />\n              </Box>\n            )\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid 69",
+			"\n        class AutoControlledComponent<P = {}, S = {}> extends UIComponent<P, S> {\n          static getDerivedStateFromProps: React.GetDerivedStateFromProps<any, any>\n        }\n      ",
+		},
+		{
+			"upstream valid 70",
+			"\n        export const commonMixinWrapper = ComposeComponent => class extends ComposeComponent {\n          static getDerivedStateFromProps = ComposeComponent.getDerivedStateFromProps;\n          render() { return <div />; }\n        }\n      ",
+		},
+		{
+			"upstream valid 71",
+			"\n        import React, { PureComponent } from 'react';\n\n        class TestNoUnusedState extends React.Component {\n          constructor(props) {\n            super(props);\n            this.state = {\n              id: null,\n            };\n          }\n\n          static getDerivedStateFromProps = (props, state) => {\n            if (state.id !== props.id) {\n              return {\n                id: props.id,\n              };\n            }\n\n            return null;\n          };\n\n          render() {\n            return <h1>{this.state.id}</h1>;\n          }\n        }\n\n        export default TestNoUnusedState;\n      ",
+		},
+		{
+			"upstream valid 72",
+			"\n        class Component extends React.Component {\n          static getDerivedStateFromProps = ({value, disableAnimation}: ToggleProps, {isControlled, isOn}: ToggleState) => {\n            return { isControlled, isOn };\n          };\n\n          render() {\n            const { isControlled, isOn } = this.state;\n            return <div>{isControlled ? 'controlled' : ''}{isOn ? 'on' : ''}</div>;\n          }\n        }\n      ",
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -113,35 +329,162 @@ func TestNoUnusedStateFires(test *testing.T) {
 		name, sourceText string
 		messageIds       []string
 	}{
-		{"upstream invalid 0", "\n        var UnusedGetInitialStateTest = createReactClass({\n          getInitialState: function() {\n            return { foo: 0 };\n          },\n          render: function() {\n            return <SomeComponent />;\n          }\n        })\n      ", []string{"unusedStateField"}},
-		{"upstream invalid 1", "\n        var UnusedComputedStringLiteralKeyStateTest = createReactClass({\n          getInitialState: function() {\n            return { ['foo']: 0 };\n          },\n          render: function() {\n            return <SomeComponent />;\n          }\n        })\n      ", []string{"unusedStateField"}},
-		{"upstream invalid 2", "\n        var UnusedComputedTemplateLiteralKeyStateTest = createReactClass({\n          getInitialState: function() {\n            return { [`foo`]: 0 };\n          },\n          render: function() {\n            return <SomeComponent />;\n          }\n        })\n      ", []string{"unusedStateField"}},
-		{"upstream invalid 3", "\n        var UnusedComputedNumberLiteralKeyStateTest = createReactClass({\n          getInitialState: function() {\n            return { [123]: 0 };\n          },\n          render: function() {\n            return <SomeComponent />;\n          }\n        })\n      ", []string{"unusedStateField"}},
-		{"upstream invalid 4", "\n        var UnusedComputedBooleanLiteralKeyStateTest = createReactClass({\n          getInitialState: function() {\n            return { [true]: 0 };\n          },\n          render: function() {\n            return <SomeComponent />;\n          }\n        })\n      ", []string{"unusedStateField"}},
-		{"upstream invalid 5", "\n        var UnusedGetInitialStateMethodTest = createReactClass({\n          getInitialState() {\n            return { foo: 0 };\n          },\n          render() {\n            return <SomeComponent />;\n          }\n        })\n      ", []string{"unusedStateField"}},
-		{"upstream invalid 6", "\n        var UnusedSetStateTest = createReactClass({\n          onFooChange(newFoo) {\n            this.setState({ foo: newFoo });\n          },\n          render() {\n            return <SomeComponent />;\n          }\n        });\n      ", []string{"unusedStateField"}},
-		{"upstream invalid 7", "\n        class UnusedCtorStateTest extends React.Component {\n          constructor() {\n            this.state = { foo: 0 };\n          }\n          render() {\n            return <SomeComponent />;\n          }\n        }\n      ", []string{"unusedStateField"}},
-		{"upstream invalid 8", "\n        class UnusedSetStateTest extends React.Component {\n          onFooChange(newFoo) {\n            this.setState({ foo: newFoo });\n          }\n          render() {\n            return <SomeComponent />;\n          }\n        }\n      ", []string{"unusedStateField"}},
-		{"upstream invalid 9", "\n        class UnusedClassPropertyStateTest extends React.Component {\n          state = { foo: 0 };\n          render() {\n            return <SomeComponent />;\n          }\n        }\n      ", []string{"unusedStateField"}},
-		{"upstream invalid 10", "\n        class UnusedComputedStringLiteralKeyStateTest extends React.Component {\n          state = { ['foo']: 0 };\n          render() {\n            return <SomeComponent />;\n          }\n        }\n      ", []string{"unusedStateField"}},
-		{"upstream invalid 11", "\n        class UnusedComputedTemplateLiteralKeyStateTest extends React.Component {\n          state = { [`foo`]: 0 };\n          render() {\n            return <SomeComponent />;\n          }\n        }\n      ", []string{"unusedStateField"}},
-		{"upstream invalid 12", "\n        class UnusedComputedTemplateLiteralKeyStateTest extends React.Component {\n          state = { [`foo \\n bar`]: 0 };\n          render() {\n            return <SomeComponent />;\n          }\n        }\n      ", []string{"unusedStateField"}},
-		{"upstream invalid 13", "\n        class UnusedComputedBooleanLiteralKeyStateTest extends React.Component {\n          state = { [true]: 0 };\n          render() {\n            return <SomeComponent />;\n          }\n        }\n      ", []string{"unusedStateField"}},
-		{"upstream invalid 14", "\n        class UnusedComputedNumberLiteralKeyStateTest extends React.Component {\n          state = { [123]: 0 };\n          render() {\n            return <SomeComponent />;\n          }\n        }\n      ", []string{"unusedStateField"}},
-		{"upstream invalid 15", "\n        class UnusedComputedFloatLiteralKeyStateTest extends React.Component {\n          state = { [123.12]: 0 };\n          render() {\n            return <SomeComponent />;\n          }\n        }\n      ", []string{"unusedStateField"}},
-		{"upstream invalid 16", "\n        class UnusedStateWhenPropsAreSpreadTest extends React.Component {\n          constructor() {\n            this.state = { foo: 0 };\n          }\n          render() {\n            return <SomeComponent {...this.props} />;\n          }\n        }\n      ", []string{"unusedStateField"}},
-		{"upstream invalid 17", "\n        class AliasOutOfScopeTest extends React.Component {\n          constructor() {\n            this.state = { foo: 0 };\n          }\n          render() {\n            const state = this.state;\n            return <SomeComponent />;\n          }\n          someMethod() {\n            const outOfScope = state.foo;\n          }\n        }\n      ", []string{"unusedStateField"}},
-		{"upstream invalid 18", "\n        class MultipleErrorsTest extends React.Component {\n          constructor() {\n            this.state = {\n              foo: 0,\n              bar: 1,\n              baz: 2,\n              qux: 3,\n            };\n          }\n          render() {\n            let {state} = this;\n            return <SomeComponent baz={state.baz} qux={state.qux} />;\n          }\n        }\n      ", []string{"unusedStateField", "unusedStateField"}},
-		{"upstream invalid 19", "\n        class MultipleErrorsForSameKeyTest extends React.Component {\n          constructor() {\n            this.state = { foo: 0 };\n          }\n          onFooChange(newFoo) {\n            this.setState({ foo: newFoo });\n          }\n          render() {\n            return <SomeComponent />;\n          }\n        }\n      ", []string{"unusedStateField", "unusedStateField"}},
-		{"upstream invalid 20", "\n        class UnusedRestPropertyFieldTest extends React.Component {\n          constructor() {\n            this.state = {\n              foo: 0,\n              bar: 1,\n            };\n          }\n          render() {\n            const {bar, ...others} = this.state;\n            return <SomeComponent bar={bar} />;\n          }\n        }\n      ", []string{"unusedStateField"}},
-		{"upstream invalid 21", "\n        class UnusedStateArrowFunctionMethodTest extends React.Component {\n          constructor() {\n            this.state = { foo: 0 };\n          }\n          doSomething = () => {\n            return null;\n          }\n          render() {\n            return <SomeComponent />;\n          }\n        }\n      ", []string{"unusedStateField"}},
-		{"upstream invalid 23", "\n        class UnusedDeepDestructuringTest extends React.Component {\n          state = { foo: 0, bar: 0 };\n          render() {\n            const {state: {foo}} = this;\n            return <SomeComponent foo={foo} />;\n          }\n        }\n      ", []string{"unusedStateField"}},
-		{"upstream invalid 24", "\n        class FakePrevStateVariableTest extends Component {\n          constructor(props) {\n            super(props);\n            this.state = {\n              id: 123,\n              foo: 456\n            };\n          }\n\n          componentDidUpdate(someProps, someState) {\n            if (someState.id === someProps.id) {\n              const prevState = { foo: 789 };\n              console.log(prevState.foo);\n            }\n          }\n          render() {\n            return (\n              <h1>{this.state.selected ? 'Selected' : 'Not selected'}</h1>\n            );\n          }\n        }\n      ", []string{"unusedStateField"}},
-		{"upstream invalid 25", "\n        class UseStateParameterOfNonLifecycleTest extends Component {\n          constructor(props) {\n            super(props);\n            this.state = {\n              foo: 123,\n            };\n          }\n          nonLifecycle(someProps, someState) {\n            doStuff(someState.foo)\n          }\n          render() {\n            return (\n              <SomeComponent />\n            );\n          }\n        }\n      ", []string{"unusedStateField"}},
-		{"upstream invalid 26", "\n        class MissingStateParameterTest extends Component {\n          constructor(props) {\n            super(props);\n            this.state = {\n              id: 123\n            };\n          }\n\n          componentDidUpdate(someProps) {\n            const prevState = { id: 456 };\n            console.log(prevState.id);\n          }\n          render() {\n            return (\n              <h1>{this.state.selected ? 'Selected' : 'Not selected'}</h1>\n            );\n          }\n        }\n      ", []string{"unusedStateField"}},
-		{"upstream invalid 27", "\n        class Foo extends Component {\n          state = {\n            initial: 'foo',\n          }\n          handleChange = () => {\n            this.setState(() => ({\n              current: 'hi'\n            }));\n          }\n          render() {\n            const { current } = this.state;\n            return <div>{current}</div>\n          }\n        }\n      ", []string{"unusedStateField"}},
-		{"upstream invalid 28", "\n        wrap(class NotWorking extends React.Component {\n            state = {\n                dummy: null\n            };\n        });\n      ", []string{"unusedStateField"}},
-		{"upstream invalid 29", "\n        class Foo extends Component {\n          state = {\n            thisStateAliasPropUnused,\n            thisStateAliasRestPropUnused,\n            thisDestructStateAliasPropUnused,\n            thisDestructStateAliasRestPropUnused,\n            thisDestructStateDestructRestPropUnused,\n            thisSetStatePropUnused,\n            thisSetStateRestPropUnused,\n          } as unknown\n\n          constructor() {\n            // other methods of defining state props\n            ((this as unknown).state as unknown) = { thisStatePropUnused } as unknown;\n            ((this as unknown).setState as unknown)({ thisStateDestructPropUnused } as unknown);\n            ((this as unknown).setState as unknown)(state => ({ thisDestructStateDestructPropUnused } as unknown));\n          }\n\n          thisStateAlias() {\n            const state = (this as unknown).state as unknown;\n\n            (state as unknown).thisStateAliasProp as unknown;\n            const { ...thisStateAliasRest } = state as unknown;\n            (thisStateAliasRest as unknown).thisStateAliasRestProp as unknown;\n          }\n\n          thisDestructStateAlias() {\n            const { state } = this as unknown;\n\n            (state as unknown).thisDestructStateAliasProp as unknown;\n            const { ...thisDestructStateAliasRest } = state as unknown;\n            (thisDestructStateAliasRest as unknown).thisDestructStateAliasRestProp as unknown;\n          }\n\n          thisSetState() {\n            ((this as unknown).setState as unknown)(state => (state as unknown).thisSetStateProp as unknown);\n            ((this as unknown).setState as unknown)(({ ...thisSetStateRest }) => (thisSetStateRest as unknown).thisSetStateRestProp as unknown);\n          }\n\n          render() {\n            ((this as unknown).state as unknown).thisStateProp as unknown;\n            const { thisStateDestructProp } = (this as unknown).state as unknown;\n            const { state: { thisDestructStateDestructProp, ...thisDestructStateDestructRest } } = this as unknown;\n            (thisDestructStateDestructRest as unknown).thisDestructStateDestructRestProp as unknown;\n\n            return null;\n          }\n        }\n      ", []string{"unusedStateField", "unusedStateField", "unusedStateField", "unusedStateField", "unusedStateField", "unusedStateField", "unusedStateField", "unusedStateField", "unusedStateField", "unusedStateField"}},
+		{
+			"upstream invalid 0",
+			"\n        var UnusedGetInitialStateTest = createReactClass({\n          getInitialState: function() {\n            return { foo: 0 };\n          },\n          render: function() {\n            return <SomeComponent />;\n          }\n        })\n      ",
+			[]string{"unusedStateField"},
+		},
+		{
+			"upstream invalid 1",
+			"\n        var UnusedComputedStringLiteralKeyStateTest = createReactClass({\n          getInitialState: function() {\n            return { ['foo']: 0 };\n          },\n          render: function() {\n            return <SomeComponent />;\n          }\n        })\n      ",
+			[]string{"unusedStateField"},
+		},
+		{
+			"upstream invalid 2",
+			"\n        var UnusedComputedTemplateLiteralKeyStateTest = createReactClass({\n          getInitialState: function() {\n            return { [`foo`]: 0 };\n          },\n          render: function() {\n            return <SomeComponent />;\n          }\n        })\n      ",
+			[]string{"unusedStateField"},
+		},
+		{
+			"upstream invalid 3",
+			"\n        var UnusedComputedNumberLiteralKeyStateTest = createReactClass({\n          getInitialState: function() {\n            return { [123]: 0 };\n          },\n          render: function() {\n            return <SomeComponent />;\n          }\n        })\n      ",
+			[]string{"unusedStateField"},
+		},
+		{
+			"upstream invalid 4",
+			"\n        var UnusedComputedBooleanLiteralKeyStateTest = createReactClass({\n          getInitialState: function() {\n            return { [true]: 0 };\n          },\n          render: function() {\n            return <SomeComponent />;\n          }\n        })\n      ",
+			[]string{"unusedStateField"},
+		},
+		{
+			"upstream invalid 5",
+			"\n        var UnusedGetInitialStateMethodTest = createReactClass({\n          getInitialState() {\n            return { foo: 0 };\n          },\n          render() {\n            return <SomeComponent />;\n          }\n        })\n      ",
+			[]string{"unusedStateField"},
+		},
+		{
+			"upstream invalid 6",
+			"\n        var UnusedSetStateTest = createReactClass({\n          onFooChange(newFoo) {\n            this.setState({ foo: newFoo });\n          },\n          render() {\n            return <SomeComponent />;\n          }\n        });\n      ",
+			[]string{"unusedStateField"},
+		},
+		{
+			"upstream invalid 7",
+			"\n        class UnusedCtorStateTest extends React.Component {\n          constructor() {\n            this.state = { foo: 0 };\n          }\n          render() {\n            return <SomeComponent />;\n          }\n        }\n      ",
+			[]string{"unusedStateField"},
+		},
+		{
+			"upstream invalid 8",
+			"\n        class UnusedSetStateTest extends React.Component {\n          onFooChange(newFoo) {\n            this.setState({ foo: newFoo });\n          }\n          render() {\n            return <SomeComponent />;\n          }\n        }\n      ",
+			[]string{"unusedStateField"},
+		},
+		{
+			"upstream invalid 9",
+			"\n        class UnusedClassPropertyStateTest extends React.Component {\n          state = { foo: 0 };\n          render() {\n            return <SomeComponent />;\n          }\n        }\n      ",
+			[]string{"unusedStateField"},
+		},
+		{
+			"upstream invalid 10",
+			"\n        class UnusedComputedStringLiteralKeyStateTest extends React.Component {\n          state = { ['foo']: 0 };\n          render() {\n            return <SomeComponent />;\n          }\n        }\n      ",
+			[]string{"unusedStateField"},
+		},
+		{
+			"upstream invalid 11",
+			"\n        class UnusedComputedTemplateLiteralKeyStateTest extends React.Component {\n          state = { [`foo`]: 0 };\n          render() {\n            return <SomeComponent />;\n          }\n        }\n      ",
+			[]string{"unusedStateField"},
+		},
+		{
+			"upstream invalid 12",
+			"\n        class UnusedComputedTemplateLiteralKeyStateTest extends React.Component {\n          state = { [`foo \\n bar`]: 0 };\n          render() {\n            return <SomeComponent />;\n          }\n        }\n      ",
+			[]string{"unusedStateField"},
+		},
+		{
+			"upstream invalid 13",
+			"\n        class UnusedComputedBooleanLiteralKeyStateTest extends React.Component {\n          state = { [true]: 0 };\n          render() {\n            return <SomeComponent />;\n          }\n        }\n      ",
+			[]string{"unusedStateField"},
+		},
+		{
+			"upstream invalid 14",
+			"\n        class UnusedComputedNumberLiteralKeyStateTest extends React.Component {\n          state = { [123]: 0 };\n          render() {\n            return <SomeComponent />;\n          }\n        }\n      ",
+			[]string{"unusedStateField"},
+		},
+		{
+			"upstream invalid 15",
+			"\n        class UnusedComputedFloatLiteralKeyStateTest extends React.Component {\n          state = { [123.12]: 0 };\n          render() {\n            return <SomeComponent />;\n          }\n        }\n      ",
+			[]string{"unusedStateField"},
+		},
+		{
+			"upstream invalid 16",
+			"\n        class UnusedStateWhenPropsAreSpreadTest extends React.Component {\n          constructor() {\n            this.state = { foo: 0 };\n          }\n          render() {\n            return <SomeComponent {...this.props} />;\n          }\n        }\n      ",
+			[]string{"unusedStateField"},
+		},
+		{
+			"upstream invalid 17",
+			"\n        class AliasOutOfScopeTest extends React.Component {\n          constructor() {\n            this.state = { foo: 0 };\n          }\n          render() {\n            const state = this.state;\n            return <SomeComponent />;\n          }\n          someMethod() {\n            const outOfScope = state.foo;\n          }\n        }\n      ",
+			[]string{"unusedStateField"},
+		},
+		{
+			"upstream invalid 18",
+			"\n        class MultipleErrorsTest extends React.Component {\n          constructor() {\n            this.state = {\n              foo: 0,\n              bar: 1,\n              baz: 2,\n              qux: 3,\n            };\n          }\n          render() {\n            let {state} = this;\n            return <SomeComponent baz={state.baz} qux={state.qux} />;\n          }\n        }\n      ",
+			[]string{"unusedStateField", "unusedStateField"},
+		},
+		{
+			"upstream invalid 19",
+			"\n        class MultipleErrorsForSameKeyTest extends React.Component {\n          constructor() {\n            this.state = { foo: 0 };\n          }\n          onFooChange(newFoo) {\n            this.setState({ foo: newFoo });\n          }\n          render() {\n            return <SomeComponent />;\n          }\n        }\n      ",
+			[]string{"unusedStateField", "unusedStateField"},
+		},
+		{
+			"upstream invalid 20",
+			"\n        class UnusedRestPropertyFieldTest extends React.Component {\n          constructor() {\n            this.state = {\n              foo: 0,\n              bar: 1,\n            };\n          }\n          render() {\n            const {bar, ...others} = this.state;\n            return <SomeComponent bar={bar} />;\n          }\n        }\n      ",
+			[]string{"unusedStateField"},
+		},
+		{
+			"upstream invalid 21",
+			"\n        class UnusedStateArrowFunctionMethodTest extends React.Component {\n          constructor() {\n            this.state = { foo: 0 };\n          }\n          doSomething = () => {\n            return null;\n          }\n          render() {\n            return <SomeComponent />;\n          }\n        }\n      ",
+			[]string{"unusedStateField"},
+		},
+		{
+			"upstream invalid 23",
+			"\n        class UnusedDeepDestructuringTest extends React.Component {\n          state = { foo: 0, bar: 0 };\n          render() {\n            const {state: {foo}} = this;\n            return <SomeComponent foo={foo} />;\n          }\n        }\n      ",
+			[]string{"unusedStateField"},
+		},
+		{
+			"upstream invalid 24",
+			"\n        class FakePrevStateVariableTest extends Component {\n          constructor(props) {\n            super(props);\n            this.state = {\n              id: 123,\n              foo: 456\n            };\n          }\n\n          componentDidUpdate(someProps, someState) {\n            if (someState.id === someProps.id) {\n              const prevState = { foo: 789 };\n              console.log(prevState.foo);\n            }\n          }\n          render() {\n            return (\n              <h1>{this.state.selected ? 'Selected' : 'Not selected'}</h1>\n            );\n          }\n        }\n      ",
+			[]string{"unusedStateField"},
+		},
+		{
+			"upstream invalid 25",
+			"\n        class UseStateParameterOfNonLifecycleTest extends Component {\n          constructor(props) {\n            super(props);\n            this.state = {\n              foo: 123,\n            };\n          }\n          nonLifecycle(someProps, someState) {\n            doStuff(someState.foo)\n          }\n          render() {\n            return (\n              <SomeComponent />\n            );\n          }\n        }\n      ",
+			[]string{"unusedStateField"},
+		},
+		{
+			"upstream invalid 26",
+			"\n        class MissingStateParameterTest extends Component {\n          constructor(props) {\n            super(props);\n            this.state = {\n              id: 123\n            };\n          }\n\n          componentDidUpdate(someProps) {\n            const prevState = { id: 456 };\n            console.log(prevState.id);\n          }\n          render() {\n            return (\n              <h1>{this.state.selected ? 'Selected' : 'Not selected'}</h1>\n            );\n          }\n        }\n      ",
+			[]string{"unusedStateField"},
+		},
+		{
+			"upstream invalid 27",
+			"\n        class Foo extends Component {\n          state = {\n            initial: 'foo',\n          }\n          handleChange = () => {\n            this.setState(() => ({\n              current: 'hi'\n            }));\n          }\n          render() {\n            const { current } = this.state;\n            return <div>{current}</div>\n          }\n        }\n      ",
+			[]string{"unusedStateField"},
+		},
+		{
+			"upstream invalid 28",
+			"\n        wrap(class NotWorking extends React.Component {\n            state = {\n                dummy: null\n            };\n        });\n      ",
+			[]string{"unusedStateField"},
+		},
+		{
+			"upstream invalid 29",
+			"\n        class Foo extends Component {\n          state = {\n            thisStateAliasPropUnused,\n            thisStateAliasRestPropUnused,\n            thisDestructStateAliasPropUnused,\n            thisDestructStateAliasRestPropUnused,\n            thisDestructStateDestructRestPropUnused,\n            thisSetStatePropUnused,\n            thisSetStateRestPropUnused,\n          } as unknown\n\n          constructor() {\n            // other methods of defining state props\n            ((this as unknown).state as unknown) = { thisStatePropUnused } as unknown;\n            ((this as unknown).setState as unknown)({ thisStateDestructPropUnused } as unknown);\n            ((this as unknown).setState as unknown)(state => ({ thisDestructStateDestructPropUnused } as unknown));\n          }\n\n          thisStateAlias() {\n            const state = (this as unknown).state as unknown;\n\n            (state as unknown).thisStateAliasProp as unknown;\n            const { ...thisStateAliasRest } = state as unknown;\n            (thisStateAliasRest as unknown).thisStateAliasRestProp as unknown;\n          }\n\n          thisDestructStateAlias() {\n            const { state } = this as unknown;\n\n            (state as unknown).thisDestructStateAliasProp as unknown;\n            const { ...thisDestructStateAliasRest } = state as unknown;\n            (thisDestructStateAliasRest as unknown).thisDestructStateAliasRestProp as unknown;\n          }\n\n          thisSetState() {\n            ((this as unknown).setState as unknown)(state => (state as unknown).thisSetStateProp as unknown);\n            ((this as unknown).setState as unknown)(({ ...thisSetStateRest }) => (thisSetStateRest as unknown).thisSetStateRestProp as unknown);\n          }\n\n          render() {\n            ((this as unknown).state as unknown).thisStateProp as unknown;\n            const { thisStateDestructProp } = (this as unknown).state as unknown;\n            const { state: { thisDestructStateDestructProp, ...thisDestructStateDestructRest } } = this as unknown;\n            (thisDestructStateDestructRest as unknown).thisDestructStateDestructRestProp as unknown;\n\n            return null;\n          }\n        }\n      ",
+			[]string{
+				"unusedStateField",
+				"unusedStateField",
+				"unusedStateField",
+				"unusedStateField",
+				"unusedStateField",
+				"unusedStateField",
+				"unusedStateField",
+				"unusedStateField",
+				"unusedStateField",
+				"unusedStateField",
+			},
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {

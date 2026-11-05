@@ -61,7 +61,9 @@ func (nodes *Arena) node(nodeType string, start int, end int, keysAndValues []an
 		return New(nodeType, start, end, keysAndValues...)
 	}
 	nodes.count++
-	created := nodes.nodes.New(Node{nodeType: nodeType, Range: [2]int{start, end}, properties: nodes.properties.Make(len(keysAndValues) / 2)})
+	created := nodes.nodes.New(
+		Node{nodeType: nodeType, Range: [2]int{start, end}, properties: nodes.properties.Make(len(keysAndValues) / 2)},
+	)
 	for index := 0; index+1 < len(keysAndValues); index += 2 {
 		created.Set(keysAndValues[index].(string), keysAndValues[index+1])
 	}

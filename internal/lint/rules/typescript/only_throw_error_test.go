@@ -82,9 +82,17 @@ func TestOnlyThrowErrorStaysSilent(test *testing.T) {
 		{"upstream valid case 5", "\nfunction foo() {\n  return new Error();\n}\nthrow foo();\n    ", nil},
 		{"upstream valid case 6", "\nconst foo = {\n  bar: new Error(),\n};\nthrow foo.bar;\n    ", nil},
 		{"upstream valid case 7", "\nconst foo = {\n  bar: new Error(),\n};\n\nthrow foo['bar'];\n    ", nil},
-		{"upstream valid case 8", "\nconst foo = {\n  bar: new Error(),\n};\n\nconst bar = 'bar';\nthrow foo[bar];\n    ", nil},
+		{
+			"upstream valid case 8",
+			"\nconst foo = {\n  bar: new Error(),\n};\n\nconst bar = 'bar';\nthrow foo[bar];\n    ",
+			nil,
+		},
 		{"upstream valid case 9", "\nclass CustomError extends Error {}\nthrow new CustomError();\n    ", nil},
-		{"upstream valid case 10", "\nclass CustomError1 extends Error {}\nclass CustomError2 extends CustomError1 {}\nthrow new CustomError2();\n    ", nil},
+		{
+			"upstream valid case 10",
+			"\nclass CustomError1 extends Error {}\nclass CustomError2 extends CustomError1 {}\nthrow new CustomError2();\n    ",
+			nil,
+		},
 		{"upstream valid case 11", "throw (foo = new Error());", nil},
 		{"upstream valid case 12", "throw (1, 2, new Error());", nil},
 		{"upstream valid case 13", "throw 'literal' && new Error();", nil},
@@ -93,31 +101,113 @@ func TestOnlyThrowErrorStaysSilent(test *testing.T) {
 		{"upstream valid case 16", "\nfunction* foo() {\n  let index = 0;\n  throw yield index++;\n}\n    ", nil},
 		{"upstream valid case 17", "\nasync function foo() {\n  throw await bar;\n}\n    ", nil},
 		{"upstream valid case 18", "\nimport { Error } from './missing';\nthrow Error;\n    ", nil},
-		{"upstream valid case 19", "\nclass CustomError<T, C> extends Error {}\nthrow new CustomError<string, string>();\n    ", nil},
+		{
+			"upstream valid case 19",
+			"\nclass CustomError<T, C> extends Error {}\nthrow new CustomError<string, string>();\n    ",
+			nil,
+		},
 		{"upstream valid case 20", "\nclass CustomError<T = {}> extends Error {}\nthrow new CustomError();\n    ", nil},
-		{"upstream valid case 21", "\nclass CustomError<T extends object> extends Error {}\nthrow new CustomError();\n    ", nil},
-		{"upstream valid case 22", "\nfunction foo() {\n  throw Object.assign(new Error('message'), { foo: 'bar' });\n}\n    ", nil},
-		{"upstream valid case 23", "\nconst foo: Error | SyntaxError = bar();\nfunction bar() {\n  throw foo;\n}\n    ", nil},
+		{
+			"upstream valid case 21",
+			"\nclass CustomError<T extends object> extends Error {}\nthrow new CustomError();\n    ",
+			nil,
+		},
+		{
+			"upstream valid case 22",
+			"\nfunction foo() {\n  throw Object.assign(new Error('message'), { foo: 'bar' });\n}\n    ",
+			nil,
+		},
+		{
+			"upstream valid case 23",
+			"\nconst foo: Error | SyntaxError = bar();\nfunction bar() {\n  throw foo;\n}\n    ",
+			nil,
+		},
 		{"upstream valid case 24", "\ndeclare const foo: Error | string;\nthrow foo as Error;\n    ", nil},
 		{"upstream valid case 25", "throw new Error() as Error;", nil},
-		{"upstream valid case 26", "\ndeclare const nullishError: Error | undefined;\nthrow nullishError ?? new Error();\n    ", nil},
-		{"upstream valid case 27", "\ndeclare const nullishError: Error | undefined;\nthrow nullishError || new Error();\n    ", nil},
-		{"upstream valid case 28", "\ndeclare const nullishError: Error | undefined;\nthrow nullishError ? nullishError : new Error();\n    ", nil},
+		{
+			"upstream valid case 26",
+			"\ndeclare const nullishError: Error | undefined;\nthrow nullishError ?? new Error();\n    ",
+			nil,
+		},
+		{
+			"upstream valid case 27",
+			"\ndeclare const nullishError: Error | undefined;\nthrow nullishError || new Error();\n    ",
+			nil,
+		},
+		{
+			"upstream valid case 28",
+			"\ndeclare const nullishError: Error | undefined;\nthrow nullishError ? nullishError : new Error();\n    ",
+			nil,
+		},
 		{"upstream valid case 29", "\nfunction fun(value: any) {\n  throw value;\n}\n    ", nil},
 		{"upstream valid case 30", "\nfunction fun(value: unknown) {\n  throw value;\n}\n    ", nil},
 		{"upstream valid case 31", "\nfunction fun<T extends Error>(t: T): void {\n  throw t;\n}\n    ", nil},
-		{"upstream valid case 32", "\nthrow undefined;\n      ", OnlyThrowErrorOptions{Allow: []type_checking.TypeOrValueSpecifier{{From: type_checking.TypeOrValueSpecifierFromLib, Name: []string{"undefined"}}}, AllowThrowingAny: type_checking.Ref(false), AllowThrowingUnknown: type_checking.Ref(false)}},
-		{"upstream valid case 33", "\nclass CustomError implements Error {}\nthrow new CustomError();\n      ", OnlyThrowErrorOptions{Allow: []type_checking.TypeOrValueSpecifier{{From: type_checking.TypeOrValueSpecifierFromFile, Name: []string{"CustomError"}}}, AllowThrowingAny: type_checking.Ref(false), AllowThrowingUnknown: type_checking.Ref(false)}},
-		{"upstream valid case 34", "\nthrow new Map();\n      ", OnlyThrowErrorOptions{Allow: []type_checking.TypeOrValueSpecifier{{From: type_checking.TypeOrValueSpecifierFromLib, Name: []string{"Map"}}}, AllowThrowingAny: type_checking.Ref(false), AllowThrowingUnknown: type_checking.Ref(false)}},
+		{
+			"upstream valid case 32",
+			"\nthrow undefined;\n      ",
+			OnlyThrowErrorOptions{Allow: []type_checking.TypeOrValueSpecifier{
+				{From: type_checking.TypeOrValueSpecifierFromLib, Name: []string{"undefined"}},
+			}, AllowThrowingAny: type_checking.Ref(false), AllowThrowingUnknown: type_checking.Ref(false)},
+		},
+		{
+			"upstream valid case 33",
+			"\nclass CustomError implements Error {}\nthrow new CustomError();\n      ",
+			OnlyThrowErrorOptions{
+				Allow: []type_checking.TypeOrValueSpecifier{
+					{From: type_checking.TypeOrValueSpecifierFromFile, Name: []string{"CustomError"}},
+				},
+				AllowThrowingAny:     type_checking.Ref(false),
+				AllowThrowingUnknown: type_checking.Ref(false),
+			},
+		},
+		{"upstream valid case 34", "\nthrow new Map();\n      ", OnlyThrowErrorOptions{
+			Allow: []type_checking.TypeOrValueSpecifier{
+				{From: type_checking.TypeOrValueSpecifierFromLib, Name: []string{"Map"}},
+			},
+			AllowThrowingAny:     type_checking.Ref(false),
+			AllowThrowingUnknown: type_checking.Ref(false),
+		}},
 		// upstream valid case 35 is not here. It is pinned by
 		// TestOnlyThrowErrorAmbientPackageIsAHarnessLimit instead, because our fixture tsconfig
 		// cannot express the program shape it needs. See that test for the measurement.
-		{"upstream valid case 36", "\nfunction func<T1, T2>() {\n  let err: Promise<T1> | Promise<T2>;\n  throw err;\n}\n      ", OnlyThrowErrorOptions{AllowInline: []string{"Promise"}}},
-		{"upstream valid case 37", "\ntry {\n} catch (e) {\n  throw e;\n}\n      ", OnlyThrowErrorOptions{AllowRethrowing: type_checking.Ref(true), AllowThrowingAny: type_checking.Ref(false), AllowThrowingUnknown: type_checking.Ref(false)}},
-		{"upstream valid case 38", "\ntry {\n} catch (eOuter) {\n  try {\n    if (Math.random() > 0.5) {\n      throw eOuter;\n    }\n  } catch (eInner) {\n    if (Math.random() > 0.5) {\n      throw eOuter;\n    } else {\n      throw eInner;\n    }\n  }\n}\n      ", OnlyThrowErrorOptions{AllowRethrowing: type_checking.Ref(true), AllowThrowingAny: type_checking.Ref(false), AllowThrowingUnknown: type_checking.Ref(false)}},
-		{"upstream valid case 39", "\nPromise.reject('foo').catch(e => {\n  throw e;\n});\n      ", OnlyThrowErrorOptions{AllowRethrowing: type_checking.Ref(true), AllowThrowingAny: type_checking.Ref(false), AllowThrowingUnknown: type_checking.Ref(false)}},
-		{"upstream valid case 40", "\nasync function foo() {\n  throw await Promise.resolve(new Error('error'));\n}\n      ", OnlyThrowErrorOptions{AllowThrowingAny: type_checking.Ref(false)}},
-		{"upstream valid case 41", "\nfunction* foo(): Generator<number, void, Error> {\n  throw yield 303;\n}\n      ", OnlyThrowErrorOptions{AllowThrowingAny: type_checking.Ref(false)}},
+		{
+			"upstream valid case 36",
+			"\nfunction func<T1, T2>() {\n  let err: Promise<T1> | Promise<T2>;\n  throw err;\n}\n      ",
+			OnlyThrowErrorOptions{AllowInline: []string{"Promise"}},
+		},
+		{"upstream valid case 37", "\ntry {\n} catch (e) {\n  throw e;\n}\n      ", OnlyThrowErrorOptions{
+			AllowRethrowing:      type_checking.Ref(true),
+			AllowThrowingAny:     type_checking.Ref(false),
+			AllowThrowingUnknown: type_checking.Ref(false),
+		}},
+		{
+			"upstream valid case 38",
+			"\ntry {\n} catch (eOuter) {\n  try {\n    if (Math.random() > 0.5) {\n      throw eOuter;\n    }\n  } catch (eInner) {\n    if (Math.random() > 0.5) {\n      throw eOuter;\n    } else {\n      throw eInner;\n    }\n  }\n}\n      ",
+			OnlyThrowErrorOptions{
+				AllowRethrowing:      type_checking.Ref(true),
+				AllowThrowingAny:     type_checking.Ref(false),
+				AllowThrowingUnknown: type_checking.Ref(false),
+			},
+		},
+		{
+			"upstream valid case 39",
+			"\nPromise.reject('foo').catch(e => {\n  throw e;\n});\n      ",
+			OnlyThrowErrorOptions{
+				AllowRethrowing:      type_checking.Ref(true),
+				AllowThrowingAny:     type_checking.Ref(false),
+				AllowThrowingUnknown: type_checking.Ref(false),
+			},
+		},
+		{
+			"upstream valid case 40",
+			"\nasync function foo() {\n  throw await Promise.resolve(new Error('error'));\n}\n      ",
+			OnlyThrowErrorOptions{AllowThrowingAny: type_checking.Ref(false)},
+		},
+		{
+			"upstream valid case 41",
+			"\nfunction* foo(): Generator<number, void, Error> {\n  throw yield 303;\n}\n      ",
+			OnlyThrowErrorOptions{AllowThrowingAny: type_checking.Ref(false)},
+		},
 	}
 
 	for _, testCase := range cases {
@@ -165,38 +255,201 @@ func TestOnlyThrowErrorFires(test *testing.T) {
 		{"upstream invalid case 18", "throw `${err}`;", nil, []string{"object"}},
 		{"upstream invalid case 19", "\nconst err = 'error';\nthrow err;\n      ", nil, []string{"object"}},
 		{"upstream invalid case 20", "\nfunction foo(msg) {}\nthrow foo('error');\n      ", nil, []string{"object"}},
-		{"upstream invalid case 21", "\nconst foo = {\n  msg: 'error',\n};\nthrow foo.msg;\n      ", nil, []string{"object"}},
-		{"upstream invalid case 22", "\nconst foo = {\n  msg: undefined,\n};\nthrow foo.msg;\n      ", nil, []string{"undef"}},
-		{"upstream invalid case 23", "\nclass CustomError {}\nthrow new CustomError();\n      ", nil, []string{"object"}},
-		{"upstream invalid case 24", "\nclass Foo {}\nclass CustomError extends Foo {}\nthrow new CustomError();\n      ", nil, []string{"object"}},
+		{
+			"upstream invalid case 21",
+			"\nconst foo = {\n  msg: 'error',\n};\nthrow foo.msg;\n      ",
+			nil,
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 22",
+			"\nconst foo = {\n  msg: undefined,\n};\nthrow foo.msg;\n      ",
+			nil,
+			[]string{"undef"},
+		},
+		{
+			"upstream invalid case 23",
+			"\nclass CustomError {}\nthrow new CustomError();\n      ",
+			nil,
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 24",
+			"\nclass Foo {}\nclass CustomError extends Foo {}\nthrow new CustomError();\n      ",
+			nil,
+			[]string{"object"},
+		},
 		{"upstream invalid case 25", "\nconst Error = null;\nthrow Error;\n      ", nil, []string{"object"}},
-		{"upstream invalid case 26", "\nimport { Error } from './class';\nthrow new Error();\n      ", nil, []string{"object"}},
-		{"upstream invalid case 27", "\nclass CustomError<T extends object> extends Foo {}\nthrow new CustomError();\n      ", nil, []string{"object"}},
-		{"upstream invalid case 28", "\nfunction foo<T>() {\n  const res: T;\n  throw res;\n}\n      ", nil, []string{"object"}},
-		{"upstream invalid case 29", "\nfunction foo<T>(fn: () => Promise<T>) {\n  const promise = fn();\n  const res = promise.then(() => {}).catch(() => {});\n  throw res;\n}\n      ", nil, []string{"object"}},
-		{"upstream invalid case 30", "\nfunction foo() {\n  throw Object.assign({ foo: 'foo' }, { bar: 'bar' });\n}\n      ", nil, []string{"object"}},
-		{"upstream invalid case 31", "\nconst foo: Error | { bar: string } = bar();\nfunction bar() {\n  throw foo;\n}\n      ", nil, []string{"object"}},
-		{"upstream invalid case 32", "\ndeclare const foo: Error | string;\nthrow foo as string;\n      ", nil, []string{"object"}},
-		{"upstream invalid case 33", "\nfunction fun(value: any) {\n  throw value;\n}\n      ", OnlyThrowErrorOptions{AllowThrowingAny: type_checking.Ref(false)}, []string{"object"}},
-		{"upstream invalid case 34", "\nfunction fun(value: unknown) {\n  throw value;\n}\n      ", OnlyThrowErrorOptions{AllowThrowingUnknown: type_checking.Ref(false)}, []string{"object"}},
-		{"upstream invalid case 35", "\nfunction fun<T extends number>(t: T): void {\n  throw t;\n}\n      ", nil, []string{"object"}},
-		{"upstream invalid case 36", "\nfunction func<T1, T2>() {\n  let err: Promise<T1> | Promise<T2> | void;\n  throw err;\n}\n      ", OnlyThrowErrorOptions{AllowInline: []string{"Promise"}}, []string{"object"}},
-		{"upstream invalid case 37", "\nclass UnknownError implements Error {}\nthrow new UnknownError();\n      ", OnlyThrowErrorOptions{Allow: []type_checking.TypeOrValueSpecifier{{From: type_checking.TypeOrValueSpecifierFromFile, Name: []string{"CustomError"}}}, AllowThrowingAny: type_checking.Ref(false), AllowThrowingUnknown: type_checking.Ref(false)}, []string{"object"}},
-		{"upstream invalid case 38", "\nlet x = 1;\nPromise.reject('foo').catch(e => {\n  throw x;\n});\n      ", OnlyThrowErrorOptions{AllowRethrowing: type_checking.Ref(true), AllowThrowingAny: type_checking.Ref(false), AllowThrowingUnknown: type_checking.Ref(false)}, []string{"object"}},
-		{"upstream invalid case 39", "\nPromise.reject('foo').catch((...e) => {\n  throw e;\n});\n      ", OnlyThrowErrorOptions{AllowRethrowing: type_checking.Ref(true), AllowThrowingAny: type_checking.Ref(false), AllowThrowingUnknown: type_checking.Ref(false)}, []string{"object"}},
-		{"upstream invalid case 40", "\ndeclare const x: any[];\nPromise.reject('foo').catch(...x, e => {\n  throw e;\n});\n      ", OnlyThrowErrorOptions{AllowRethrowing: type_checking.Ref(true), AllowThrowingAny: type_checking.Ref(false), AllowThrowingUnknown: type_checking.Ref(false)}, []string{"object"}},
-		{"upstream invalid case 41", "\ndeclare const x: any[];\nPromise.reject('foo').then(...x, e => {\n  throw e;\n});\n      ", OnlyThrowErrorOptions{AllowRethrowing: type_checking.Ref(true), AllowThrowingAny: type_checking.Ref(false), AllowThrowingUnknown: type_checking.Ref(false)}, []string{"object"}},
-		{"upstream invalid case 42", "\ndeclare const onFulfilled: any;\ndeclare const x: any[];\nPromise.reject('foo').then(onFulfilled, ...x, e => {\n  throw e;\n});\n      ", OnlyThrowErrorOptions{AllowRethrowing: type_checking.Ref(true), AllowThrowingAny: type_checking.Ref(false), AllowThrowingUnknown: type_checking.Ref(false)}, []string{"object"}},
-		{"upstream invalid case 43", "\nPromise.reject('foo').then((...e) => {\n  throw e;\n});\n      ", OnlyThrowErrorOptions{AllowRethrowing: type_checking.Ref(true), AllowThrowingAny: type_checking.Ref(false), AllowThrowingUnknown: type_checking.Ref(false)}, []string{"object"}},
-		{"upstream invalid case 44", "\nPromise.reject('foo').then(e => {\n  throw globalThis;\n});\n      ", OnlyThrowErrorOptions{AllowRethrowing: type_checking.Ref(true), AllowThrowingAny: type_checking.Ref(false), AllowThrowingUnknown: type_checking.Ref(false)}, []string{"object"}},
-		{"upstream invalid case 45", "\nasync function foo() {\n  throw await bar;\n}\n      ", OnlyThrowErrorOptions{AllowThrowingAny: type_checking.Ref(false)}, []string{"object"}},
-		{"upstream invalid case 46", "\nasync function foo() {\n  throw await Promise.resolve<number>(303);\n}\n      ", OnlyThrowErrorOptions{AllowThrowingAny: type_checking.Ref(false)}, []string{"object"}},
+		{
+			"upstream invalid case 26",
+			"\nimport { Error } from './class';\nthrow new Error();\n      ",
+			nil,
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 27",
+			"\nclass CustomError<T extends object> extends Foo {}\nthrow new CustomError();\n      ",
+			nil,
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 28",
+			"\nfunction foo<T>() {\n  const res: T;\n  throw res;\n}\n      ",
+			nil,
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 29",
+			"\nfunction foo<T>(fn: () => Promise<T>) {\n  const promise = fn();\n  const res = promise.then(() => {}).catch(() => {});\n  throw res;\n}\n      ",
+			nil,
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 30",
+			"\nfunction foo() {\n  throw Object.assign({ foo: 'foo' }, { bar: 'bar' });\n}\n      ",
+			nil,
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 31",
+			"\nconst foo: Error | { bar: string } = bar();\nfunction bar() {\n  throw foo;\n}\n      ",
+			nil,
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 32",
+			"\ndeclare const foo: Error | string;\nthrow foo as string;\n      ",
+			nil,
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 33",
+			"\nfunction fun(value: any) {\n  throw value;\n}\n      ",
+			OnlyThrowErrorOptions{AllowThrowingAny: type_checking.Ref(false)},
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 34",
+			"\nfunction fun(value: unknown) {\n  throw value;\n}\n      ",
+			OnlyThrowErrorOptions{AllowThrowingUnknown: type_checking.Ref(false)},
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 35",
+			"\nfunction fun<T extends number>(t: T): void {\n  throw t;\n}\n      ",
+			nil,
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 36",
+			"\nfunction func<T1, T2>() {\n  let err: Promise<T1> | Promise<T2> | void;\n  throw err;\n}\n      ",
+			OnlyThrowErrorOptions{AllowInline: []string{"Promise"}},
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 37",
+			"\nclass UnknownError implements Error {}\nthrow new UnknownError();\n      ",
+			OnlyThrowErrorOptions{
+				Allow: []type_checking.TypeOrValueSpecifier{
+					{From: type_checking.TypeOrValueSpecifierFromFile, Name: []string{"CustomError"}},
+				},
+				AllowThrowingAny:     type_checking.Ref(false),
+				AllowThrowingUnknown: type_checking.Ref(false),
+			},
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 38",
+			"\nlet x = 1;\nPromise.reject('foo').catch(e => {\n  throw x;\n});\n      ",
+			OnlyThrowErrorOptions{
+				AllowRethrowing:      type_checking.Ref(true),
+				AllowThrowingAny:     type_checking.Ref(false),
+				AllowThrowingUnknown: type_checking.Ref(false),
+			},
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 39",
+			"\nPromise.reject('foo').catch((...e) => {\n  throw e;\n});\n      ",
+			OnlyThrowErrorOptions{
+				AllowRethrowing:      type_checking.Ref(true),
+				AllowThrowingAny:     type_checking.Ref(false),
+				AllowThrowingUnknown: type_checking.Ref(false),
+			},
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 40",
+			"\ndeclare const x: any[];\nPromise.reject('foo').catch(...x, e => {\n  throw e;\n});\n      ",
+			OnlyThrowErrorOptions{
+				AllowRethrowing:      type_checking.Ref(true),
+				AllowThrowingAny:     type_checking.Ref(false),
+				AllowThrowingUnknown: type_checking.Ref(false),
+			},
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 41",
+			"\ndeclare const x: any[];\nPromise.reject('foo').then(...x, e => {\n  throw e;\n});\n      ",
+			OnlyThrowErrorOptions{
+				AllowRethrowing:      type_checking.Ref(true),
+				AllowThrowingAny:     type_checking.Ref(false),
+				AllowThrowingUnknown: type_checking.Ref(false),
+			},
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 42",
+			"\ndeclare const onFulfilled: any;\ndeclare const x: any[];\nPromise.reject('foo').then(onFulfilled, ...x, e => {\n  throw e;\n});\n      ",
+			OnlyThrowErrorOptions{
+				AllowRethrowing:      type_checking.Ref(true),
+				AllowThrowingAny:     type_checking.Ref(false),
+				AllowThrowingUnknown: type_checking.Ref(false),
+			},
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 43",
+			"\nPromise.reject('foo').then((...e) => {\n  throw e;\n});\n      ",
+			OnlyThrowErrorOptions{
+				AllowRethrowing:      type_checking.Ref(true),
+				AllowThrowingAny:     type_checking.Ref(false),
+				AllowThrowingUnknown: type_checking.Ref(false),
+			},
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 44",
+			"\nPromise.reject('foo').then(e => {\n  throw globalThis;\n});\n      ",
+			OnlyThrowErrorOptions{
+				AllowRethrowing:      type_checking.Ref(true),
+				AllowThrowingAny:     type_checking.Ref(false),
+				AllowThrowingUnknown: type_checking.Ref(false),
+			},
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 45",
+			"\nasync function foo() {\n  throw await bar;\n}\n      ",
+			OnlyThrowErrorOptions{AllowThrowingAny: type_checking.Ref(false)},
+			[]string{"object"},
+		},
+		{
+			"upstream invalid case 46",
+			"\nasync function foo() {\n  throw await Promise.resolve<number>(303);\n}\n      ",
+			OnlyThrowErrorOptions{AllowThrowingAny: type_checking.Ref(false)},
+			[]string{"object"},
+		},
 	}
 
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectFindings(test, runOnlyThrowError(test, testCase.sourceText, testCase.options), testCase.wantIds...)
+			rule_testing.ExpectFindings(
+				test,
+				runOnlyThrowError(test, testCase.sourceText, testCase.options),
+				testCase.wantIds...,
+			)
 		})
 	}
 }
@@ -228,9 +481,24 @@ func TestOnlyThrowErrorSpans(test *testing.T) {
 		{"a bare string literal points at the literal", "throw 'error';", nil, []string{"'error'"}},
 		{"undefined points at the identifier", "throw undefined;", nil, []string{"undefined"}},
 		{"a new expression points at the whole construction", "throw new String('');", nil, []string{"new String('')"}},
-		{"a conditional points at the whole conditional", "declare const foo: boolean;\nthrow foo ? 'not an Error' : 'literal';", nil, []string{"foo ? 'not an Error' : 'literal'"}},
-		{"a member access points at the access", "const foo = {\n  msg: 'error',\n};\nthrow foo.msg;", nil, []string{"foo.msg"}},
-		{"an await points at the await expression", "declare const bar: number;\nasync function foo() {\n  throw await bar;\n}", OnlyThrowErrorOptions{AllowThrowingAny: type_checking.Ref(false)}, []string{"await bar"}},
+		{
+			"a conditional points at the whole conditional",
+			"declare const foo: boolean;\nthrow foo ? 'not an Error' : 'literal';",
+			nil,
+			[]string{"foo ? 'not an Error' : 'literal'"},
+		},
+		{
+			"a member access points at the access",
+			"const foo = {\n  msg: 'error',\n};\nthrow foo.msg;",
+			nil,
+			[]string{"foo.msg"},
+		},
+		{
+			"an await points at the await expression",
+			"declare const bar: number;\nasync function foo() {\n  throw await bar;\n}",
+			OnlyThrowErrorOptions{AllowThrowingAny: type_checking.Ref(false)},
+			[]string{"await bar"},
+		},
 
 		// Parentheses are skipped, matching upstream's span exactly. Measured on the installed
 		// rule: `throw ('error');` reports at columns 8..15, which excludes both parens.
@@ -352,29 +620,53 @@ func TestOnlyThrowErrorRethrowShape(test *testing.T) {
 
 		// The handler must be an arrow function. A function expression binds `this` differently and
 		// upstream's check names the arrow kind explicitly.
-		{"a function expression handler is not a rethrow", "Promise.reject('x').catch(function (e) {\n  throw e;\n});", []string{"object"}},
+		{
+			"a function expression handler is not a rethrow",
+			"Promise.reject('x').catch(function (e) {\n  throw e;\n});",
+			[]string{"object"},
+		},
 
 		// The binding must be the first parameter.
-		{"a second parameter is not the rejection value", "Promise.reject('x').catch((a, e) => {\n  throw e;\n});", []string{"object"}},
+		{
+			"a second parameter is not the rejection value",
+			"Promise.reject('x').catch((a, e) => {\n  throw e;\n});",
+			[]string{"object"},
+		},
 
 		// It must be a plain identifier parameter. A destructuring pattern binds names taken out of
 		// the rejection rather than the rejection itself.
-		{"a destructured parameter is not the rejection value", "Promise.reject('x').catch(({ e }) => {\n  throw e;\n});", []string{"object"}},
+		{
+			"a destructured parameter is not the rejection value",
+			"Promise.reject('x').catch(({ e }) => {\n  throw e;\n});",
+			[]string{"object"},
+		},
 
 		// The receiver must be thenable. Any object may have a method called `catch`, and the name
 		// alone would let a rethrow through on something that never handled a rejection.
-		{"a catch method on a non-thenable is not a rethrow", "declare const o: { catch(cb: (e: string) => void): void };\no.catch(e => {\n  throw e;\n});", []string{"object"}},
+		{
+			"a catch method on a non-thenable is not a rethrow",
+			"declare const o: { catch(cb: (e: string) => void): void };\no.catch(e => {\n  throw e;\n});",
+			[]string{"object"},
+		},
 
 		// A literal computed key resolves. Upstream reads the member name statically and a string
 		// literal subscript is one of the forms its reader accepts.
 		{"a literal computed catch resolves", "Promise.reject('x')['catch'](e => {\n  throw e;\n});", nil},
 
 		// `.then` puts the rejection handler second, so a one-argument `.then` has none.
-		{"a two-argument then rethrows from the second handler", "Promise.reject('x').then(() => {}, e => {\n  throw e;\n});", nil},
+		{
+			"a two-argument then rethrows from the second handler",
+			"Promise.reject('x').then(() => {}, e => {\n  throw e;\n});",
+			nil,
+		},
 
 		// A catch clause binding is the other rethrow shape, and a nested arrow reading the outer
 		// binding still resolves to the same declaration.
-		{"a nested arrow reading the caught value is a rethrow", "try {\n} catch (e) {\n  const f = () => {\n    throw e;\n  };\n}", nil},
+		{
+			"a nested arrow reading the caught value is a rethrow",
+			"try {\n} catch (e) {\n  const f = () => {\n    throw e;\n  };\n}",
+			nil,
+		},
 	}
 
 	for _, testCase := range cases {
@@ -443,7 +735,10 @@ func TestOnlyThrowErrorDefaultsArePermissive(test *testing.T) {
 		{
 			"a caught value is rethrown freely by default",
 			"try {\n} catch (e) {\n  throw e;\n}",
-			OnlyThrowErrorOptions{AllowRethrowing: type_checking.Ref(false), AllowThrowingUnknown: type_checking.Ref(false)},
+			OnlyThrowErrorOptions{
+				AllowRethrowing:      type_checking.Ref(false),
+				AllowThrowingUnknown: type_checking.Ref(false),
+			},
 		},
 	}
 
@@ -454,7 +749,11 @@ func TestOnlyThrowErrorDefaultsArePermissive(test *testing.T) {
 			rule_testing.ExpectClean(test, runOnlyThrowError(test, testCase.sourceText, nil))
 			// And the same source under the option turned off, which shows the default is what
 			// made the first assertion pass rather than something else about the input.
-			rule_testing.ExpectFindings(test, runOnlyThrowError(test, testCase.sourceText, testCase.strictValue), "object")
+			rule_testing.ExpectFindings(
+				test,
+				runOnlyThrowError(test, testCase.sourceText, testCase.strictValue),
+				"object",
+			)
 		})
 	}
 }
@@ -817,7 +1116,9 @@ func TestOnlyThrowErrorSpecifierComposites(test *testing.T) {
 	test.Parallel()
 
 	allowMap := OnlyThrowErrorOptions{
-		Allow:                []type_checking.TypeOrValueSpecifier{{From: type_checking.TypeOrValueSpecifierFromLib, Name: []string{"Map"}}},
+		Allow: []type_checking.TypeOrValueSpecifier{
+			{From: type_checking.TypeOrValueSpecifierFromLib, Name: []string{"Map"}},
+		},
 		AllowThrowingAny:     type_checking.Ref(false),
 		AllowThrowingUnknown: type_checking.Ref(false),
 	}
@@ -864,7 +1165,9 @@ func TestOnlyThrowErrorSpecifierDeclinesTheErrorType(test *testing.T) {
 	source := "import { thing } from './nonexistent-module-xyz';\nthrow thing;"
 
 	rule_testing.ExpectFindings(test, runOnlyThrowError(test, source, OnlyThrowErrorOptions{
-		Allow:                []type_checking.TypeOrValueSpecifier{{From: type_checking.TypeOrValueSpecifierFromLib, Name: []string{"error"}}},
+		Allow: []type_checking.TypeOrValueSpecifier{
+			{From: type_checking.TypeOrValueSpecifierFromLib, Name: []string{"error"}},
+		},
 		AllowThrowingAny:     type_checking.Ref(false),
 		AllowThrowingUnknown: type_checking.Ref(false),
 	}), "object")
@@ -964,7 +1267,10 @@ func TestOnlyThrowErrorDependsOnAnotherFile(test *testing.T) {
 	test.Parallel()
 
 	if OnlyThrowError.ProgramReads != rule.ReadsCompilerOptions|rule.ReadsDefaultLibrary {
-		test.Fatalf("OnlyThrowError must declare what IsErrorLike and the allow specifiers read; declares %s", OnlyThrowError.ProgramReads)
+		test.Fatalf(
+			"OnlyThrowError must declare what IsErrorLike and the allow specifiers read; declares %s",
+			OnlyThrowError.ProgramReads,
+		)
 	}
 
 	subject := "import { Wrapped } from './other';\nthrow new Wrapped();"

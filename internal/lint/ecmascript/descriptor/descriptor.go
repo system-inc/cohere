@@ -153,7 +153,8 @@ func descriptorCallee(callee *ast.Node) (*ast.Node, string) {
 		access := callee.AsElementAccessExpression()
 		object = access.Expression
 		argument := skipParenthesesDownward(access.ArgumentExpression)
-		if argument == nil || (argument.Kind != ast.KindStringLiteral && argument.Kind != ast.KindNoSubstitutionTemplateLiteral) {
+		if argument == nil ||
+			(argument.Kind != ast.KindStringLiteral && argument.Kind != ast.KindNoSubstitutionTemplateLiteral) {
 			return nil, ""
 		}
 		member = argument.Text()

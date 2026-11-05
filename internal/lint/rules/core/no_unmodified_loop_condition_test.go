@@ -744,7 +744,12 @@ async function watch() {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTyped(test, NoUnmodifiedLoopCondition, unmodifiedLoopFile, ambient+testCase.source)
+			result := rule_testing.RunTyped(
+				test,
+				NoUnmodifiedLoopCondition,
+				unmodifiedLoopFile,
+				ambient+testCase.source,
+			)
 			if testCase.fires {
 				rule_testing.ExpectFindings(test, result, "loopConditionNotModified")
 			} else {

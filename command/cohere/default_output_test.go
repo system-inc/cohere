@@ -28,7 +28,17 @@ func TestADefaultRunPrintsNoNotes(test *testing.T) {
 	})
 	for _, arguments := range [][]string{
 		{"init", "--quiet"},
-		{"-c", "user.email=fixture@example.com", "-c", "user.name=fixture", "commit", "--quiet", "--allow-empty", "-m", "initial"},
+		{
+			"-c",
+			"user.email=fixture@example.com",
+			"-c",
+			"user.name=fixture",
+			"commit",
+			"--quiet",
+			"--allow-empty",
+			"-m",
+			"initial",
+		},
 	} {
 		command := exec.Command("git", arguments...)
 		command.Dir = root

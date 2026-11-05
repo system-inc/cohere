@@ -29,17 +29,38 @@ func TestImportRequirePathAliasFires(test *testing.T) {
 		wantId     string
 	}{
 		{"climbs two levels", aliasImporter, "import { Thing } from '../../foundation/Thing';\n", "useAlias"},
-		{"climbs three levels", aliasImporter, "import { Thing } from '../../../source/foundation/Thing';\n", "useAlias"},
+		{
+			"climbs three levels",
+			aliasImporter,
+			"import { Thing } from '../../../source/foundation/Thing';\n",
+			"useAlias",
+		},
 		{"dynamic import climbs", aliasImporter, "const thing = import('../../foundation/Thing');\n", "useAlias"},
 		{"require climbs", aliasImporter, "const thing = require('../../foundation/Thing');\n", "useAlias"},
 		// In a strict root even a sibling must be aliased.
-		{"sibling inside a strict root", "/repository/libraries/base/source/Thing.ts", "import { Other } from './Other';\n", "useAliasInStrictRoot"},
-		{"parent inside a strict root", "/repository/libraries/base/source/deep/Thing.ts", "import { Other } from '../Other';\n", "useAliasInStrictRoot"},
+		{
+			"sibling inside a strict root",
+			"/repository/libraries/base/source/Thing.ts",
+			"import { Other } from './Other';\n",
+			"useAliasInStrictRoot",
+		},
+		{
+			"parent inside a strict root",
+			"/repository/libraries/base/source/deep/Thing.ts",
+			"import { Other } from '../Other';\n",
+			"useAliasInStrictRoot",
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, ImportRequirePathAlias, testCase.fileName, testCase.sourceText, pathAliasOptions)
+			result := rule_testing.RunWithOptions(
+				test,
+				ImportRequirePathAlias,
+				testCase.fileName,
+				testCase.sourceText,
+				pathAliasOptions,
+			)
 			rule_testing.ExpectFindings(test, result, testCase.wantId)
 		})
 	}
@@ -60,9 +81,19 @@ func TestImportRequirePathAliasStaysSilent(test *testing.T) {
 		{"already aliased", aliasImporter, "import { Thing } from '@base/source/Thing';\n", pathAliasOptions},
 		{"a package import", aliasImporter, "import * as NodePath from 'node:path';\n", pathAliasOptions},
 		// Reporting here would demand exactly what boundary-no-internal-import rejects.
-		{"an internal path must stay relative", aliasImporter, "import { Detail } from '../../internal/Detail';\n", pathAliasOptions},
+		{
+			"an internal path must stay relative",
+			aliasImporter,
+			"import { Detail } from '../../internal/Detail';\n",
+			pathAliasOptions,
+		},
 		// A path leaving the repository is not ours to name.
-		{"climbs out of the repository", "/repository/Thing.ts", "import { Thing } from '../../elsewhere/Thing';\n", pathAliasOptions},
+		{
+			"climbs out of the repository",
+			"/repository/Thing.ts",
+			"import { Thing } from '../../elsewhere/Thing';\n",
+			pathAliasOptions,
+		},
 		// No alias covers the destination, so there is nothing to suggest.
 		{"no alias covers it", aliasImporter, "import { Thing } from '../../../other/Thing';\n", pathAliasOptions},
 		{"a computed dynamic import", aliasImporter, "const thing = import(somePath);\n", pathAliasOptions},
@@ -73,14 +104,35 @@ func TestImportRequirePathAliasStaysSilent(test *testing.T) {
 		// empty root makes every path fall outside the repository. The guard is deliberate
 		// redundancy rather than the only thing holding these up, and saying so is more useful
 		// than implying a mutation would catch it.
-		{"no aliases configured", aliasImporter, "import { Thing } from '../../foundation/Thing';\n", ImportRequirePathAliasOptions{RepositoryRoot: "/repository"}},
-		{"no repository root", aliasImporter, "import { Thing } from '../../foundation/Thing';\n", ImportRequirePathAliasOptions{Aliases: pathAliasOptions.Aliases}},
-		{"file outside the repository", "/elsewhere/Thing.ts", "import { Thing } from '../../foundation/Thing';\n", pathAliasOptions},
+		{
+			"no aliases configured",
+			aliasImporter,
+			"import { Thing } from '../../foundation/Thing';\n",
+			ImportRequirePathAliasOptions{RepositoryRoot: "/repository"},
+		},
+		{
+			"no repository root",
+			aliasImporter,
+			"import { Thing } from '../../foundation/Thing';\n",
+			ImportRequirePathAliasOptions{Aliases: pathAliasOptions.Aliases},
+		},
+		{
+			"file outside the repository",
+			"/elsewhere/Thing.ts",
+			"import { Thing } from '../../foundation/Thing';\n",
+			pathAliasOptions,
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, ImportRequirePathAlias, testCase.fileName, testCase.sourceText, testCase.options)
+			result := rule_testing.RunWithOptions(
+				test,
+				ImportRequirePathAlias,
+				testCase.fileName,
+				testCase.sourceText,
+				testCase.options,
+			)
 			rule_testing.ExpectClean(test, result)
 		})
 	}
@@ -177,8 +229,13 @@ func TestImportRequirePathAliasNormalizesConfiguredDirectories(test *testing.T) 
 				RepositoryRoot: "/repository",
 				Aliases:        []PathAlias{{Directory: spelling, Alias: "@app"}},
 			}
-			result := rule_testing.RunWithOptions(test, ImportRequirePathAlias, "/repository/app/features/orders/Thing.ts",
-				"import { Helper } from '../../shared/Helper';\n", options)
+			result := rule_testing.RunWithOptions(
+				test,
+				ImportRequirePathAlias,
+				"/repository/app/features/orders/Thing.ts",
+				"import { Helper } from '../../shared/Helper';\n",
+				options,
+			)
 			rule_testing.ExpectFindings(test, result, "useAlias")
 
 			description := result.Diagnostics[0].Message.Description

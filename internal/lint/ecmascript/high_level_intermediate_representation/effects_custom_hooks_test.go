@@ -28,7 +28,13 @@ func TestCustomHookEffectsFollowModuleBindings(test *testing.T) {
 		{"shadow", `import {useData} from './hooks';`, "useData", "useData", false},
 		{"namespace shadow", `import * as Hooks from './hooks';`, "Hooks.useData", "Hooks", false},
 		{"unresolved", "", "useData", "", false},
-		{"disabled", "// @enableAssumeHooksFollowRulesOfReact:false\nimport {useData} from './hooks';", "useData", "", false},
+		{
+			"disabled",
+			"// @enableAssumeHooksFollowRulesOfReact:false\nimport {useData} from './hooks';",
+			"useData",
+			"",
+			false,
+		},
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
@@ -36,38 +42,56 @@ func TestCustomHookEffectsFollowModuleBindings(test *testing.T) {
 			if testCase.name == "local alias" {
 				alias = "const getData = useData;"
 			}
-			source := testCase.prefix + " function Component(" + testCase.parameters + ") {" + alias + "return " + testCase.callee + "({value: 0});}"
+			source := testCase.prefix +
+				" function Component(" +
+				testCase.parameters +
+				") {" +
+				alias +
+				"return " +
+				testCase.callee +
+				"({value: 0});}"
 			visited := 0
-			probe := rule.Rule{Name: "custom-hook-effects", NeedsTypeChecker: true, Run: func(ruleContext rule.Context, options any) rule.Listeners {
-				return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
-					forEachFunctionLike(node, func(node *ast.Node) {
-						if node.Name() == nil || node.Name().Text() != "Component" {
-							return
-						}
-						function := Lower(node, ruleContext.TypeChecker)
-						Construct(function)
-						effects := InferAliasingEffects(function)
-						for _, instruction := range function.Instructions {
-							switch instruction.Value.(type) {
-							case *CallExpression, *MethodCall:
-							default:
-								continue
+			probe := rule.Rule{
+				Name:             "custom-hook-effects",
+				NeedsTypeChecker: true,
+				Run: func(ruleContext rule.Context, options any) rule.Listeners {
+					return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
+						forEachFunctionLike(node, func(node *ast.Node) {
+							if node.Name() == nil || node.Name().Text() != "Component" {
+								return
 							}
-							visited++
-							var frozenResult, frozenArgument bool
-							for _, effect := range effects.Get(instruction.Id) {
-								if effect.Kind == mutation_aliasing.AliasingEffectCreate && effect.Into.Identifier == instruction.LValue.Identifier {
-									frozenResult = effect.Value == mutation_aliasing.EffectValueFrozen
+							function := Lower(node, ruleContext.TypeChecker)
+							Construct(function)
+							effects := InferAliasingEffects(function)
+							for _, instruction := range function.Instructions {
+								switch instruction.Value.(type) {
+								case *CallExpression, *MethodCall:
+								default:
+									continue
 								}
-								frozenArgument = frozenArgument || effect.Kind == mutation_aliasing.AliasingEffectFreeze
+								visited++
+								var frozenResult, frozenArgument bool
+								for _, effect := range effects.Get(instruction.Id) {
+									if effect.Kind == mutation_aliasing.AliasingEffectCreate &&
+										effect.Into.Identifier == instruction.LValue.Identifier {
+										frozenResult = effect.Value == mutation_aliasing.EffectValueFrozen
+									}
+									frozenArgument = frozenArgument ||
+										effect.Kind == mutation_aliasing.AliasingEffectFreeze
+								}
+								if frozenResult != testCase.frozen || frozenArgument != testCase.frozen {
+									test.Errorf(
+										"frozen result=%t argument=%t; want both %t",
+										frozenResult,
+										frozenArgument,
+										testCase.frozen,
+									)
+								}
 							}
-							if frozenResult != testCase.frozen || frozenArgument != testCase.frozen {
-								test.Errorf("frozen result=%t argument=%t; want both %t", frozenResult, frozenArgument, testCase.frozen)
-							}
-						}
-					})
-				}}
-			}}
+						})
+					}}
+				},
+			}
 			rule_testing.RunTypedFiles(test, probe, map[string]string{
 				"/hooks.ts":    `export function useData(value) {return value;} export function getData(value) {return value;} export default useData;`,
 				"/fixture.tsx": source,
@@ -117,26 +141,30 @@ func TestCalleeProducersAreBuiltOncePerFunction(test *testing.T) {
 	test.Parallel()
 	calls := 0
 	var builds []int
-	probe := rule.Rule{Name: "callee-producers", NeedsTypeChecker: true, Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
-			forEachFunctionLike(node, func(node *ast.Node) {
-				if node.Name() == nil || node.Name().Text() != "Component" {
-					return
-				}
-				function := Lower(node, ruleContext.TypeChecker)
-				Construct(function)
-				producers := newCalleeProducers(function)
-				inferAliasingEffects(function, producers)
-				for _, instruction := range function.Instructions {
-					switch instruction.Value.(type) {
-					case *CallExpression, *MethodCall:
-						calls++
+	probe := rule.Rule{
+		Name:             "callee-producers",
+		NeedsTypeChecker: true,
+		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+			return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
+				forEachFunctionLike(node, func(node *ast.Node) {
+					if node.Name() == nil || node.Name().Text() != "Component" {
+						return
 					}
-				}
-				builds = append(builds, producers.builds)
-			})
-		}}
-	}}
+					function := Lower(node, ruleContext.TypeChecker)
+					Construct(function)
+					producers := newCalleeProducers(function)
+					inferAliasingEffects(function, producers)
+					for _, instruction := range function.Instructions {
+						switch instruction.Value.(type) {
+						case *CallExpression, *MethodCall:
+							calls++
+						}
+					}
+					builds = append(builds, producers.builds)
+				})
+			}}
+		},
+	}
 	rule_testing.RunTypedFiles(test, probe, map[string]string{
 		"/hooks.ts": `export function useData(value) {return value;} export function getData(value) {return value;}`,
 		"/fixture.tsx": `import {useData, getData} from './hooks'; import * as Hooks from './hooks';

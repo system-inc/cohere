@@ -115,7 +115,9 @@ func ruleFinding(diagnostic rule.Diagnostic, lintConfiguration *configuration.Co
 	if sourceFile := diagnostic.SourceFile; sourceFile != nil {
 		finding.Path, finding.Line, finding.Column = diagnostic.Location()
 		if lintConfiguration != nil {
-			if setting, named := lintConfiguration.Resolve(sourceFile.FileName().AsString()).Rules[diagnostic.RuleName]; named &&
+			if setting, named := lintConfiguration.Resolve(
+				sourceFile.FileName().AsString(),
+			).Rules[diagnostic.RuleName]; named &&
 				setting.Severity == configuration.SeverityWarn {
 				finding.Severity = "warn"
 			}
@@ -188,7 +190,10 @@ func changedFilesFrom(files []edit.ChangedFile, root string) []changedFile {
 	changed := make([]changedFile, 0, len(files))
 	for _, file := range files {
 		path := file.FileName
-		if relative, relativePathError := filepath.Rel(root, file.FileName); relativePathError == nil && !strings.HasPrefix(relative, "..") {
+		if relative, relativePathError := filepath.Rel(
+			root,
+			file.FileName,
+		); relativePathError == nil && !strings.HasPrefix(relative, "..") {
 			path = relative
 		}
 		entry := changedFile{Path: path, FixedBy: file.FixesByRule}

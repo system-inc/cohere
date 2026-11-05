@@ -56,7 +56,10 @@ func printTypeScriptMappedType(path *Path, options *Options, print PrintFunc) Do
 				hasNewline(options.OriginalText, locEnd(lastComment)) {
 				separator = hardline
 			}
-			danglingCommentsDoc = append(danglingCommentsDoc, groupIn(path, concatIn(path, parts[len(parts)-1], separator)))
+			danglingCommentsDoc = append(
+				danglingCommentsDoc,
+				groupIn(path, concatIn(path, parts[len(parts)-1], separator)),
+			)
 		}
 	}
 

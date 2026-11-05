@@ -60,7 +60,8 @@ func TestABareRunFormats(test *testing.T) {
 		test.Parallel()
 		root := fixture(test)
 		output, code := runCohere(test, binary, root, "--no-fix")
-		if code == 0 || !strings.Contains(output, ugly(root)+":1:1 - --fix would rewrite this file: format [fix/would-change]") {
+		if code == 0 ||
+			!strings.Contains(output, ugly(root)+":1:1 - --fix would rewrite this file: format [fix/would-change]") {
 			test.Fatalf("exit %d, and the misformat was not a finding:\n%s", code, output)
 		}
 		if got := readForTest(test, ugly(root)); got != unformatted {

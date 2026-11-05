@@ -50,7 +50,11 @@ func TestRuleNamesFromBothGatesCollapseToTheSameName(test *testing.T) {
 	fromGate := NormalizeRuleName("nexus(consistency-no-enum)")
 	fromCohere := NormalizeRuleName("consistency-no-enum/noEnum")
 	if fromGate != fromCohere {
-		test.Fatalf("the same rule normalized to %q from the gate and %q from cohere, so no finding could ever match", fromGate, fromCohere)
+		test.Fatalf(
+			"the same rule normalized to %q from the gate and %q from cohere, so no finding could ever match",
+			fromGate,
+			fromCohere,
+		)
 	}
 }
 
@@ -112,7 +116,11 @@ func TestMatchingFindingsAreNotDifferences(test *testing.T) {
 	// different offsets within a line routinely, and keying on column would report a difference for
 	// every finding the two sides agree about.
 	if len(report.Differences) != 0 {
-		test.Fatalf("the same finding from both sides must not be a difference, got %d: %+v", len(report.Differences), report.Differences)
+		test.Fatalf(
+			"the same finding from both sides must not be a difference, got %d: %+v",
+			len(report.Differences),
+			report.Differences,
+		)
 	}
 	if len(report.Agreements) != 1 || report.Agreements[0].Shared != 1 {
 		test.Fatalf("expected one rule agreeing with one shared finding, got %+v", report.Agreements)
@@ -167,7 +175,9 @@ func TestUnportedRulesDoNotBlockAgreement(test *testing.T) {
 	provenance := provenProvenance()
 
 	notPorted := Compare(Inputs{
-		GateFindings:     []Finding{{File: "a.tsx", Line: 1, Rule: "react-component-no-multiple-primary", Side: SideGate}},
+		GateFindings: []Finding{
+			{File: "a.tsx", Line: 1, Rule: "react-component-no-multiple-primary", Side: SideGate},
+		},
 		CoherePopulation: Population{FilesWalked: 3407, Rules: 22},
 		GatePopulation:   Population{Findings: 1, FilesWalked: 3407},
 		CohereRules:      map[string]bool{},
@@ -267,7 +277,9 @@ func TestOneDirectionOfControlIsNotProven(test *testing.T) {
 		},
 	}
 	if oneDirection.ControlsProven() {
-		test.Fatal("a control in one direction only must not count as proven: a defect on the unexercised side would still report clean")
+		test.Fatal(
+			"a control in one direction only must not count as proven: a defect on the unexercised side would still report clean",
+		)
 	}
 
 	missed := provenProvenance()
@@ -334,8 +346,11 @@ func TestUnknownConfigurationDoesNotExcuseEveryRule(test *testing.T) {
 		test.Fatalf("expected one difference, got %d", len(report.Differences))
 	}
 	if got := report.Differences[0].Classification; got != ClassificationBothActive {
-		test.Fatalf("with configuration unknown, a rule cohere implements and reported must stay %q, got %q — nil must not read as disabled",
-			ClassificationBothActive, got)
+		test.Fatalf(
+			"with configuration unknown, a rule cohere implements and reported must stay %q, got %q — nil must not read as disabled",
+			ClassificationBothActive,
+			got,
+		)
 	}
 
 	report.Provenance = provenProvenance()
@@ -384,7 +399,12 @@ func TestAPluginPrefixedConfigKeyKeepsTheRuleName(test *testing.T) {
 	fromCohere := NormalizeRuleName("consistency-no-enum/noEnum")
 	fromGate := NormalizeRuleName("nexus(consistency-no-enum)")
 	if fromConfiguration != fromCohere || fromCohere != fromGate {
-		test.Fatalf("one rule normalized three ways: config %q, cohere %q, gate %q", fromConfiguration, fromCohere, fromGate)
+		test.Fatalf(
+			"one rule normalized three ways: config %q, cohere %q, gate %q",
+			fromConfiguration,
+			fromCohere,
+			fromGate,
+		)
 	}
 }
 

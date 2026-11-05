@@ -102,90 +102,339 @@ func TestUnboundMethodStaysSilentOnUpstreamPassCases(test *testing.T) {
 		{sourceText: "\nconst o = {\n  f: function (this: void) {},\n};\nconst f = o.f;\n    ", options: ""},
 		{sourceText: "\nconst { alert } = window;\n    ", options: ""},
 		{sourceText: "\nlet b = window.blur;\n    ", options: ""},
-		{sourceText: "\nfunction foo() {}\nconst fooObject = { foo };\nconst { foo: bar } = fooObject;\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ninstance.bound();\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ninstance.unbound();\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nContainsMethods.boundStatic();\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nContainsMethods.unboundStatic();\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nconst bound = instance.bound;\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nconst boundStatic = ContainsMethods;\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nconst { bound } = instance;\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nconst { boundStatic } = ContainsMethods;\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ninstance.bound();\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  unbound?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ninstance.unbound();\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  static boundStatic?: () => void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nContainsMethods.boundStatic();\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nContainsMethods.unboundStatic();\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ninstance.bound``;\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ninstance.unbound``;\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nif (instance.bound) {\n}\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nif (instance.unbound) {\n}\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nif (instance.bound !== undefined) {\n}\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nif (instance.unbound !== undefined) {\n}\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nif (ContainsMethods.boundStatic) {\n}\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nif (ContainsMethods.unboundStatic) {\n}\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nif (ContainsMethods.boundStatic !== undefined) {\n}\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nif (ContainsMethods.unboundStatic !== undefined) {\n}\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nif (ContainsMethods.boundStatic && instance) {\n}\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nif (ContainsMethods.unboundStatic && instance) {\n}\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nif (instance.bound || instance) {\n}\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nif (instance.unbound || instance) {\n}\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\n(ContainsMethods.unboundStatic && 0) || ContainsMethods;\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ninstance.bound || instance ? 1 : 0;\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ninstance.unbound || instance ? 1 : 0;\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nwhile (instance.bound) {}\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nwhile (instance.unbound) {}\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nwhile (instance.bound !== undefined) {}\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nwhile (instance.unbound !== undefined) {}\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nwhile (ContainsMethods.boundStatic) {}\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nwhile (ContainsMethods.unboundStatic) {}\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nwhile (ContainsMethods.boundStatic !== undefined) {}\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nwhile (ContainsMethods.unboundStatic !== undefined) {}\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ninstance.bound as any;\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nContainsMethods.boundStatic as any;\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ninstance.bound++;\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\n+instance.bound;\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\n++instance.bound;\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ninstance.bound--;\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\n-instance.bound;\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\n--instance.bound;\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ninstance.bound += 1;\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ninstance.bound -= 1;\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ninstance.bound *= 1;\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ninstance.bound /= 1;\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ninstance.bound || 0;\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ninstance.bound && 0;\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ninstance.bound ? 1 : 0;\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ninstance.unbound ? 1 : 0;\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nContainsMethods.boundStatic++;\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\n+ContainsMethods.boundStatic;\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\n++ContainsMethods.boundStatic;\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nContainsMethods.boundStatic--;\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\n-ContainsMethods.boundStatic;\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\n--ContainsMethods.boundStatic;\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nContainsMethods.boundStatic += 1;\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nContainsMethods.boundStatic -= 1;\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nContainsMethods.boundStatic *= 1;\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nContainsMethods.boundStatic /= 1;\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nContainsMethods.boundStatic || 0;\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ninstane.boundStatic && 0;\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nContainsMethods.boundStatic ? 1 : 0;\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nContainsMethods.unboundStatic ? 1 : 0;\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ntypeof instance.bound === 'function';\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ntypeof instance.unbound === 'function';\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ntypeof ContainsMethods.boundStatic === 'function';\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ntypeof ContainsMethods.unboundStatic === 'function';\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ninstance.unbound = () => {};\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ninstance.unbound = instance.unbound.bind(instance);\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nif (!!instance.unbound) {\n}\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nvoid instance.unbound;\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ndelete instance.unbound;\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nconst { double } = arith;\n    ", options: ""},
-		{sourceText: "\ninterface RecordA {\n  readonly type: 'A';\n  readonly a: {};\n}\ninterface RecordB {\n  readonly type: 'B';\n  readonly b: {};\n}\ntype AnyRecord = RecordA | RecordB;\n\nfunction test(obj: AnyRecord) {\n  switch (obj.type) {\n  }\n}\n    ", options: ""},
-		{sourceText: "\nclass CommunicationError {\n  constructor() {\n    const x = CommunicationError.prototype;\n  }\n}\n    ", options: ""},
+		{
+			sourceText: "\nfunction foo() {}\nconst fooObject = { foo };\nconst { foo: bar } = fooObject;\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ninstance.bound();\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ninstance.unbound();\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nContainsMethods.boundStatic();\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nContainsMethods.unboundStatic();\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nconst bound = instance.bound;\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nconst boundStatic = ContainsMethods;\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nconst { bound } = instance;\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nconst { boundStatic } = ContainsMethods;\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ninstance.bound();\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  unbound?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ninstance.unbound();\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  static boundStatic?: () => void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nContainsMethods.boundStatic();\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nContainsMethods.unboundStatic();\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ninstance.bound``;\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ninstance.unbound``;\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nif (instance.bound) {\n}\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nif (instance.unbound) {\n}\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nif (instance.bound !== undefined) {\n}\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nif (instance.unbound !== undefined) {\n}\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nif (ContainsMethods.boundStatic) {\n}\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nif (ContainsMethods.unboundStatic) {\n}\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nif (ContainsMethods.boundStatic !== undefined) {\n}\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nif (ContainsMethods.unboundStatic !== undefined) {\n}\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nif (ContainsMethods.boundStatic && instance) {\n}\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nif (ContainsMethods.unboundStatic && instance) {\n}\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nif (instance.bound || instance) {\n}\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nif (instance.unbound || instance) {\n}\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\n(ContainsMethods.unboundStatic && 0) || ContainsMethods;\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ninstance.bound || instance ? 1 : 0;\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ninstance.unbound || instance ? 1 : 0;\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nwhile (instance.bound) {}\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nwhile (instance.unbound) {}\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nwhile (instance.bound !== undefined) {}\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nwhile (instance.unbound !== undefined) {}\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nwhile (ContainsMethods.boundStatic) {}\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nwhile (ContainsMethods.unboundStatic) {}\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nwhile (ContainsMethods.boundStatic !== undefined) {}\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nwhile (ContainsMethods.unboundStatic !== undefined) {}\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ninstance.bound as any;\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nContainsMethods.boundStatic as any;\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ninstance.bound++;\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\n+instance.bound;\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\n++instance.bound;\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ninstance.bound--;\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\n-instance.bound;\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\n--instance.bound;\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ninstance.bound += 1;\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ninstance.bound -= 1;\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ninstance.bound *= 1;\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ninstance.bound /= 1;\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ninstance.bound || 0;\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ninstance.bound && 0;\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ninstance.bound ? 1 : 0;\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ninstance.unbound ? 1 : 0;\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nContainsMethods.boundStatic++;\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\n+ContainsMethods.boundStatic;\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\n++ContainsMethods.boundStatic;\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nContainsMethods.boundStatic--;\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\n-ContainsMethods.boundStatic;\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\n--ContainsMethods.boundStatic;\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nContainsMethods.boundStatic += 1;\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nContainsMethods.boundStatic -= 1;\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nContainsMethods.boundStatic *= 1;\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nContainsMethods.boundStatic /= 1;\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nContainsMethods.boundStatic || 0;\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ninstane.boundStatic && 0;\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nContainsMethods.boundStatic ? 1 : 0;\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nContainsMethods.unboundStatic ? 1 : 0;\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ntypeof instance.bound === 'function';\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ntypeof instance.unbound === 'function';\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ntypeof ContainsMethods.boundStatic === 'function';\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ntypeof ContainsMethods.unboundStatic === 'function';\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ninstance.unbound = () => {};\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ninstance.unbound = instance.unbound.bind(instance);\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nif (!!instance.unbound) {\n}\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nvoid instance.unbound;\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\ndelete instance.unbound;\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nconst { double } = arith;\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\ninterface RecordA {\n  readonly type: 'A';\n  readonly a: {};\n}\ninterface RecordB {\n  readonly type: 'B';\n  readonly b: {};\n}\ntype AnyRecord = RecordA | RecordB;\n\nfunction test(obj: AnyRecord) {\n  switch (obj.type) {\n  }\n}\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass CommunicationError {\n  constructor() {\n    const x = CommunicationError.prototype;\n  }\n}\n    ",
+			options:    "",
+		},
 		{sourceText: "\nclass CommunicationError {}\nconst x = CommunicationError.prototype;\n    ", options: ""},
-		{sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nfunction foo(instance: ContainsMethods | null) {\n  instance?.bound();\n  instance?.unbound();\n\n  if (instance?.bound) {\n  }\n  if (instance?.unbound) {\n  }\n\n  typeof instance?.bound === 'function';\n  typeof instance?.unbound === 'function';\n}\n    ", options: ""},
-		{sourceText: "\ninterface OptionalMethod {\n  mightBeDefined?(): void;\n}\n\nconst x: OptionalMethod = {};\ndeclare const myCondition: boolean;\nif (myCondition || x.mightBeDefined) {\n  console.log('hello world');\n}\n    ", options: ""},
-		{sourceText: "\nclass A {\n  unbound(): void {\n    this.unbound = undefined;\n    this.unbound = this.unbound.bind(this);\n  }\n}\n    ", options: ""},
+		{
+			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nfunction foo(instance: ContainsMethods | null) {\n  instance?.bound();\n  instance?.unbound();\n\n  if (instance?.bound) {\n  }\n  if (instance?.unbound) {\n  }\n\n  typeof instance?.bound === 'function';\n  typeof instance?.unbound === 'function';\n}\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\ninterface OptionalMethod {\n  mightBeDefined?(): void;\n}\n\nconst x: OptionalMethod = {};\ndeclare const myCondition: boolean;\nif (myCondition || x.mightBeDefined) {\n  console.log('hello world');\n}\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass A {\n  unbound(): void {\n    this.unbound = undefined;\n    this.unbound = this.unbound.bind(this);\n  }\n}\n    ",
+			options:    "",
+		},
 		{sourceText: "const { parseInt } = Number;", options: ""},
 		{sourceText: "const { log } = console;", options: ""},
 		{sourceText: "\nlet parseInt;\n({ parseInt } = Number);\n    ", options: ""},
@@ -193,30 +442,93 @@ func TestUnboundMethodStaysSilentOnUpstreamPassCases(test *testing.T) {
 		{sourceText: "\nconst foo = {\n  bar: 'bar',\n};\nconst { bar } = foo;\n    ", options: ""},
 		{sourceText: "\nclass Foo {\n  unbnound() {}\n  bar = 4;\n}\nconst { bar } = new Foo();\n    ", options: ""},
 		{sourceText: "\nclass Foo {\n  bound = () => 'foo';\n}\nconst { bound } = new Foo();\n    ", options: ""},
-		{sourceText: "\nclass Foo {\n  bound = () => 'foo';\n}\nfunction foo({ bound } = new Foo()) {}\n    ", options: ""},
-		{sourceText: "\nclass Foo {\n  bound = () => 'foo';\n}\ndeclare const bar: Foo;\nfunction foo({ bound }: Foo) {}\n    ", options: ""},
-		{sourceText: "\nclass Foo {\n  bound = () => 'foo';\n}\nclass Bar {\n  bound = () => 'bar';\n}\nfunction foo({ bound }: Foo | Bar) {}\n    ", options: ""},
-		{sourceText: "\nclass Foo {\n  bound = () => 'foo';\n}\ntype foo = ({ bound }: Foo) => void;\n    ", options: ""},
-		{sourceText: "\nclass Foo {\n  unbound = function () {};\n}\ntype foo = ({ unbound }: Foo) => void;\n    ", options: ""},
-		{sourceText: "\nclass Foo {\n  bound = () => 'foo';\n}\nclass Bar {\n  bound = () => 'bar';\n}\nfunction foo({ bound }: Foo & Bar) {}\n    ", options: ""},
-		{sourceText: "\nclass Foo {\n  unbound = function () {};\n}\ndeclare const { unbound }: Foo;\n    ", options: ""},
+		{
+			sourceText: "\nclass Foo {\n  bound = () => 'foo';\n}\nfunction foo({ bound } = new Foo()) {}\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass Foo {\n  bound = () => 'foo';\n}\ndeclare const bar: Foo;\nfunction foo({ bound }: Foo) {}\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass Foo {\n  bound = () => 'foo';\n}\nclass Bar {\n  bound = () => 'bar';\n}\nfunction foo({ bound }: Foo | Bar) {}\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass Foo {\n  bound = () => 'foo';\n}\ntype foo = ({ bound }: Foo) => void;\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass Foo {\n  unbound = function () {};\n}\ntype foo = ({ unbound }: Foo) => void;\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass Foo {\n  bound = () => 'foo';\n}\nclass Bar {\n  bound = () => 'bar';\n}\nfunction foo({ bound }: Foo & Bar) {}\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass Foo {\n  unbound = function () {};\n}\ndeclare const { unbound }: Foo;\n    ",
+			options:    "",
+		},
 		{sourceText: "declare const { unbound } = '***';", options: ""},
-		{sourceText: "\nclass Foo {\n  unbound = function () {};\n}\ntype foo = (a: (b: (c: ({ unbound }: Foo) => void) => void) => void) => void;\n    ", options: ""},
-		{sourceText: "\nclass Foo {\n  unbound = function () {};\n}\nclass Bar {\n  property: ({ unbound }: Foo) => void;\n}\n    ", options: ""},
-		{sourceText: "\nclass Foo {\n  unbound = function () {};\n}\nfunction foo<T extends ({ unbound }: Foo) => void>() {}\n    ", options: ""},
-		{sourceText: "\nclass Foo {\n  unbound = function () {};\n}\nabstract class Bar {\n  abstract foo({ unbound }: Foo);\n}\n    ", options: ""},
-		{sourceText: "\nclass Foo {\n  unbound = function () {};\n}\ndeclare class Bar {\n  foo({ unbound }: Foo);\n}\n    ", options: ""},
-		{sourceText: "\nclass Foo {\n  unbound = function () {};\n}\ndeclare function foo({ unbound }: Foo);\n    ", options: ""},
-		{sourceText: "\nclass Foo {\n  unbound = function () {};\n}\ninterface Bar {\n  foo: ({ unbound }: Foo) => void;\n}\n    ", options: ""},
-		{sourceText: "\nclass Foo {\n  unbound = function () {};\n}\ninterface Bar {\n  foo({ unbound }: Foo): void;\n}\n    ", options: ""},
-		{sourceText: "\nclass Foo {\n  unbound = function () {};\n}\ninterface Bar {\n  new ({ unbound }: Foo): Foo;\n}\n    ", options: ""},
-		{sourceText: "\nclass Foo {\n  unbound = function () {};\n}\ntype foo = new ({ unbound }: Foo) => void;\n    ", options: ""},
+		{
+			sourceText: "\nclass Foo {\n  unbound = function () {};\n}\ntype foo = (a: (b: (c: ({ unbound }: Foo) => void) => void) => void) => void;\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass Foo {\n  unbound = function () {};\n}\nclass Bar {\n  property: ({ unbound }: Foo) => void;\n}\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass Foo {\n  unbound = function () {};\n}\nfunction foo<T extends ({ unbound }: Foo) => void>() {}\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass Foo {\n  unbound = function () {};\n}\nabstract class Bar {\n  abstract foo({ unbound }: Foo);\n}\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass Foo {\n  unbound = function () {};\n}\ndeclare class Bar {\n  foo({ unbound }: Foo);\n}\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass Foo {\n  unbound = function () {};\n}\ndeclare function foo({ unbound }: Foo);\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass Foo {\n  unbound = function () {};\n}\ninterface Bar {\n  foo: ({ unbound }: Foo) => void;\n}\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass Foo {\n  unbound = function () {};\n}\ninterface Bar {\n  foo({ unbound }: Foo): void;\n}\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass Foo {\n  unbound = function () {};\n}\ninterface Bar {\n  new ({ unbound }: Foo): Foo;\n}\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass Foo {\n  unbound = function () {};\n}\ntype foo = new ({ unbound }: Foo) => void;\n    ",
+			options:    "",
+		},
 		{sourceText: "const { unbound } = { unbound: () => {} };", options: ""},
 		{sourceText: "function foo({ unbound }: { unbound: () => void } = { unbound: () => {} }) {}", options: ""},
-		{sourceText: "\nclass BaseClass {\n  x: number = 42;\n  logThis() {}\n}\nclass OtherClass extends BaseClass {\n  superLogThis: any;\n  constructor() {\n    super();\n    this.superLogThis = super.logThis;\n  }\n}\nconst oc = new OtherClass();\noc.superLogThis();\n    ", options: ""},
-		{sourceText: "\nclass Foo {\n  bound = () => {};\n}\nclass Bar {\n  bound = 1;\n}\ndeclare const union: Foo | Bar;\nconst bound = union.bound;\n    ", options: ""},
-		{sourceText: "\nclass Foo {\n  bazz() {}\n}\ndeclare const foo: Foo;\ndeclare const key: string;\nconst bound = foo[key];\n    ", options: ""},
-		{sourceText: "\nclass Foo {\n  bazz() {}\n}\ndeclare const foo: Foo;\ndeclare const bazz: string;\nfoo[bazz];\n    ", options: ""},
+		{
+			sourceText: "\nclass BaseClass {\n  x: number = 42;\n  logThis() {}\n}\nclass OtherClass extends BaseClass {\n  superLogThis: any;\n  constructor() {\n    super();\n    this.superLogThis = super.logThis;\n  }\n}\nconst oc = new OtherClass();\noc.superLogThis();\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass Foo {\n  bound = () => {};\n}\nclass Bar {\n  bound = 1;\n}\ndeclare const union: Foo | Bar;\nconst bound = union.bound;\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass Foo {\n  bazz() {}\n}\ndeclare const foo: Foo;\ndeclare const key: string;\nconst bound = foo[key];\n    ",
+			options:    "",
+		},
+		{
+			sourceText: "\nclass Foo {\n  bazz() {}\n}\ndeclare const foo: Foo;\ndeclare const bazz: string;\nfoo[bazz];\n    ",
+			options:    "",
+		},
 	}
 	for index, testCase := range cases {
 		test.Run(unboundMethodCaseName(index), func(test *testing.T) {
@@ -256,8 +568,12 @@ func TestUnboundMethodFiresOnUpstreamFailCases(test *testing.T) {
 		{
 			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nfunction foo(arg: ContainsMethods | null) {\n  const unbound = arg?.unbound;\n  arg.unbound += 1;\n  arg?.unbound as any;\n}\n      ",
 			options:    "",
-			wantIds:    []string{"unboundWithoutThisAnnotation", "unboundWithoutThisAnnotation", "unboundWithoutThisAnnotation"},
-			wantSpans:  []string{"arg?.unbound", "arg.unbound", "arg?.unbound"},
+			wantIds: []string{
+				"unboundWithoutThisAnnotation",
+				"unboundWithoutThisAnnotation",
+				"unboundWithoutThisAnnotation",
+			},
+			wantSpans: []string{"arg?.unbound", "arg.unbound", "arg?.unbound"},
 		},
 		{
 			sourceText: "\nclass ContainsMethods {\n  bound?: () => void;\n  unbound?(): void;\n\n  static boundStatic?: () => void;\n  static unboundStatic?(): void;\n}\n\nlet instance = new ContainsMethods();\n\nconst arith = {\n  double(this: void, x: number): number {\n    return x * 2;\n  },\n};\n\nconst unbound = instance.unbound;\n      ",

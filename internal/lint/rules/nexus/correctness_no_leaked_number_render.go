@@ -14,7 +14,10 @@ const correctnessNoLeakedNumberRenderId = "leakedNumberRender"
 
 // correctnessNoLeakedNumberRenderText is the rule's message, whose wording lives in
 // `policy/messages/correctness-no-leaked-number-render.json`.
-var correctnessNoLeakedNumberRenderText = policy.MessageOf("nexus/correctness-no-leaked-number-render", correctnessNoLeakedNumberRenderId)
+var correctnessNoLeakedNumberRenderText = policy.MessageOf(
+	"nexus/correctness-no-leaked-number-render",
+	correctnessNoLeakedNumberRenderId,
+)
 
 func correctnessNoLeakedNumberRenderMessage() rule.Message {
 	return rule.Message{
@@ -173,7 +176,10 @@ func correctnessNoLeakedNumberRenderFalsy(ruleContext rule.Context, expression *
 			return
 		}
 	}
-	if correctnessNoLeakedNumberRenderCanLeak(ruleContext.TypeChecker, ruleContext.TypeChecker.GetTypeAtLocation(unwrapped)) {
+	if correctnessNoLeakedNumberRenderCanLeak(
+		ruleContext.TypeChecker,
+		ruleContext.TypeChecker.GetTypeAtLocation(unwrapped),
+	) {
 		ruleContext.ReportNode(unwrapped, correctnessNoLeakedNumberRenderMessage())
 	}
 }
@@ -208,11 +214,18 @@ func correctnessNoLeakedNumberRenderCanLeak(typeChecker *checker.Checker, operan
 
 // correctnessNoLeakedNumberRenderClassify reads one part of a union. depth bounds the walk through
 // type parameter constraints, which can name each other.
-func correctnessNoLeakedNumberRenderClassify(typeChecker *checker.Checker, part *checker.Type, depth int) correctnessNoLeakedNumberRenderPart {
+func correctnessNoLeakedNumberRenderClassify(
+	typeChecker *checker.Checker,
+	part *checker.Type,
+	depth int,
+) correctnessNoLeakedNumberRenderPart {
 	switch {
 	case part == nil:
 		return correctnessNoLeakedNumberRenderDecline
-	case type_checking.IsTypeFlagSet(part, checker.TypeFlagsNullable|checker.TypeFlagsVoid|checker.TypeFlagsNever|checker.TypeFlagsBooleanLiteral):
+	case type_checking.IsTypeFlagSet(
+		part,
+		checker.TypeFlagsNullable|checker.TypeFlagsVoid|checker.TypeFlagsNever|checker.TypeFlagsBooleanLiteral,
+	):
 		return correctnessNoLeakedNumberRenderSilent
 	case type_checking.IsTypeFlagSet(part, checker.TypeFlagsNumber|checker.TypeFlagsBigInt):
 		return correctnessNoLeakedNumberRenderLeaks

@@ -167,7 +167,15 @@ func collectEdits(ctx context.Context, graph *program.Graph, files []*ast.Source
 				return false
 			}
 			if node.Kind == ast.KindIdentifier && node.Text() == plan.OldName {
-				if edit, matched := editFor(fileChecker, file, text, fileName.AsString(), node, anchor, plan.NewName); matched {
+				if edit, matched := editFor(
+					fileChecker,
+					file,
+					text,
+					fileName.AsString(),
+					node,
+					anchor,
+					plan.NewName,
+				); matched {
 					plan.Edits = append(plan.Edits, edit)
 				}
 			}

@@ -308,8 +308,11 @@ func ParseCSS(input string) ([]*Node, error) {
 					appendToBuffer(input[start:j])
 					terminated = true
 
-				case peekCharacter == byteCloseParen || peekCharacter == byteCloseBracket || peekCharacter == byteCloseCurly:
-					if len(closingBracketStack) > 0 && peekCharacter == closingBracketStack[len(closingBracketStack)-1] {
+				case peekCharacter == byteCloseParen ||
+					peekCharacter == byteCloseBracket ||
+					peekCharacter == byteCloseCurly:
+					if len(closingBracketStack) > 0 &&
+						peekCharacter == closingBracketStack[len(closingBracketStack)-1] {
 						closingBracketStack = closingBracketStack[:len(closingBracketStack)-1]
 					}
 				}
@@ -471,7 +474,8 @@ func ParseCSS(input string) ([]*Node, error) {
 		default:
 			// Leading whitespace never starts a node, which is what makes bufferStart the offset of
 			// the first meaningful byte.
-			if buffer.Len() == 0 && (currentCharacter == byteSpace || currentCharacter == byteLineBreak || currentCharacter == byteTab) {
+			if buffer.Len() == 0 &&
+				(currentCharacter == byteSpace || currentCharacter == byteLineBreak || currentCharacter == byteTab) {
 				continue
 			}
 			if buffer.Len() == 0 {

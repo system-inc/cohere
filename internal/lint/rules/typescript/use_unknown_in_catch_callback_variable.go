@@ -180,7 +180,10 @@ var UseUnknownInCatchCallbackVariable = rule.Rule{
 						switch {
 						case checker.Checker_isArrayType(ruleContext.TypeChecker, firstParameterType),
 							checker.IsTupleType(firstParameterType):
-							typeArguments := checker.Checker_getTypeArguments(ruleContext.TypeChecker, firstParameterType)
+							typeArguments := checker.Checker_getTypeArguments(
+								ruleContext.TypeChecker,
+								firstParameterType,
+							)
 							if len(typeArguments) == 0 {
 								// `...args: []` has no element type to judge, so there is no badly
 								// typed catch variable here. Upstream indexes [0] unguarded and
@@ -366,7 +369,10 @@ func useUnknownSkipParentheses(node *ast.Node) *ast.Node {
 // prefer-promise-reject-errors and only-throw-error, which share the upstream helper, but this rule
 // reaches further than those two do: they accept a string literal only, so they lose the `const`
 // spelling as well, and the checker recovers it here at no cost.
-func useUnknownStaticMemberAccess(typeChecker *checker.Checker, callee *ast.Node) (receiver *ast.Node, propertyName string) {
+func useUnknownStaticMemberAccess(
+	typeChecker *checker.Checker,
+	callee *ast.Node,
+) (receiver *ast.Node, propertyName string) {
 	switch {
 	case ast.IsPropertyAccessExpression(callee):
 		name := callee.AsPropertyAccessExpression().Name()

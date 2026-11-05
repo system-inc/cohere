@@ -796,7 +796,13 @@ func TestConcurrencyNoLostUpdateReplaysTheAtomicUpdatesCorpus(test *testing.T) {
 		}
 		result := rule_testing.RunTyped(test, ConcurrencyNoLostUpdate, concurrencyNoLostUpdateFile, testCase.source)
 		if len(result.Diagnostics) != testCase.lostUpdate {
-			test.Errorf("case %d: got %d findings, want %d (%v)", index, len(result.Diagnostics), testCase.lostUpdate, result.MessageIds())
+			test.Errorf(
+				"case %d: got %d findings, want %d (%v)",
+				index,
+				len(result.Diagnostics),
+				testCase.lostUpdate,
+				result.MessageIds(),
+			)
 		}
 	}
 	// The control: a replay in which nothing reports would pass every silent row above.

@@ -86,7 +86,10 @@ func TestNoPrototypeBuiltinsStaysSilent(test *testing.T) {
 		{"propertyIsEnumerable through the prototype", "Object.prototype.propertyIsEnumerable.call(foo, 'bar')"},
 		{"hasOwnProperty applied through the prototype", "Object.prototype.hasOwnProperty.apply(foo, ['bar'])"},
 		{"isPrototypeOf applied through the prototype", "Object.prototype.isPrototypeOf.apply(foo, ['bar'])"},
-		{"propertyIsEnumerable applied through the prototype", "Object.prototype.propertyIsEnumerable.apply(foo, ['bar'])"},
+		{
+			"propertyIsEnumerable applied through the prototype",
+			"Object.prototype.propertyIsEnumerable.apply(foo, ['bar'])",
+		},
 		// An access is not a call, and the call that matters is the outermost property.
 		{"a bare access with no call", "foo.hasOwnProperty"},
 		{"a call on a different property beyond it", "foo.hasOwnProperty.bar()"},
@@ -112,7 +115,10 @@ func TestNoPrototypeBuiltinsStaysSilent(test *testing.T) {
 		{"a numeric subscript", "foo[1]('bar')"},
 		{"a null subscript", "foo[null]('bar')"},
 		// A private field is a different property that merely spells the same word.
-		{"a private field spelling the same name", "class C { #hasOwnProperty; foo() { obj.#hasOwnProperty('bar'); } }"},
+		{
+			"a private field spelling the same name",
+			"class C { #hasOwnProperty; foo() { obj.#hasOwnProperty('bar'); } }",
+		},
 		// A key computed at runtime is not statically knowable, even when its value would match.
 		{"a concatenated key", "foo['hasOwn' + 'Property']('bar')"},
 		{"a substituting template key", "foo[`hasOwnProperty${''}`]('bar')"},

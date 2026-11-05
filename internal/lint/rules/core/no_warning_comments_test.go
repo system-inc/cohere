@@ -55,52 +55,254 @@ func runNoWarningComments(test *testing.T, testCase noWarningCommentsCase) rule_
 func noWarningCommentsFiresCases() []noWarningCommentsCase {
 	return []noWarningCommentsCase{
 		{"// fixme", nil, []string{"unexpectedComment"}, []string{"fixme"}},
-		{"// any fixme", NoWarningCommentsOptions{Location: NoWarningCommentsAnywhere}, []string{"unexpectedComment"}, []string{"fixme"}},
-		{"// any fixme", NoWarningCommentsOptions{Terms: []string{"fixme"}, Location: NoWarningCommentsAnywhere}, []string{"unexpectedComment"}, []string{"fixme"}},
-		{"// any FIXME", NoWarningCommentsOptions{Terms: []string{"fixme"}, Location: NoWarningCommentsAnywhere}, []string{"unexpectedComment"}, []string{"fixme"}},
-		{"// any fIxMe", NoWarningCommentsOptions{Terms: []string{"fixme"}, Location: NoWarningCommentsAnywhere}, []string{"unexpectedComment"}, []string{"fixme"}},
-		{"/* any fixme */", NoWarningCommentsOptions{Terms: []string{"FIXME"}, Location: NoWarningCommentsAnywhere}, []string{"unexpectedComment"}, []string{"FIXME"}},
-		{"/* any FIXME */", NoWarningCommentsOptions{Terms: []string{"FIXME"}, Location: NoWarningCommentsAnywhere}, []string{"unexpectedComment"}, []string{"FIXME"}},
-		{"/* any fIxMe */", NoWarningCommentsOptions{Terms: []string{"FIXME"}, Location: NoWarningCommentsAnywhere}, []string{"unexpectedComment"}, []string{"FIXME"}},
-		{"// any fixme or todo", NoWarningCommentsOptions{Terms: []string{"fixme", "todo"}, Location: NoWarningCommentsAnywhere}, []string{"unexpectedComment", "unexpectedComment"}, []string{"fixme", "todo"}},
-		{"/* any fixme or todo */", NoWarningCommentsOptions{Terms: []string{"fixme", "todo"}, Location: NoWarningCommentsAnywhere}, []string{"unexpectedComment", "unexpectedComment"}, []string{"fixme", "todo"}},
-		{"/* any fixme or todo */", NoWarningCommentsOptions{Location: NoWarningCommentsAnywhere}, []string{"unexpectedComment", "unexpectedComment"}, []string{"todo", "fixme"}},
+		{
+			"// any fixme",
+			NoWarningCommentsOptions{Location: NoWarningCommentsAnywhere},
+			[]string{"unexpectedComment"},
+			[]string{"fixme"},
+		},
+		{
+			"// any fixme",
+			NoWarningCommentsOptions{Terms: []string{"fixme"}, Location: NoWarningCommentsAnywhere},
+			[]string{"unexpectedComment"},
+			[]string{"fixme"},
+		},
+		{
+			"// any FIXME",
+			NoWarningCommentsOptions{Terms: []string{"fixme"}, Location: NoWarningCommentsAnywhere},
+			[]string{"unexpectedComment"},
+			[]string{"fixme"},
+		},
+		{
+			"// any fIxMe",
+			NoWarningCommentsOptions{Terms: []string{"fixme"}, Location: NoWarningCommentsAnywhere},
+			[]string{"unexpectedComment"},
+			[]string{"fixme"},
+		},
+		{
+			"/* any fixme */",
+			NoWarningCommentsOptions{Terms: []string{"FIXME"}, Location: NoWarningCommentsAnywhere},
+			[]string{"unexpectedComment"},
+			[]string{"FIXME"},
+		},
+		{
+			"/* any FIXME */",
+			NoWarningCommentsOptions{Terms: []string{"FIXME"}, Location: NoWarningCommentsAnywhere},
+			[]string{"unexpectedComment"},
+			[]string{"FIXME"},
+		},
+		{
+			"/* any fIxMe */",
+			NoWarningCommentsOptions{Terms: []string{"FIXME"}, Location: NoWarningCommentsAnywhere},
+			[]string{"unexpectedComment"},
+			[]string{"FIXME"},
+		},
+		{
+			"// any fixme or todo",
+			NoWarningCommentsOptions{Terms: []string{"fixme", "todo"}, Location: NoWarningCommentsAnywhere},
+			[]string{"unexpectedComment", "unexpectedComment"},
+			[]string{"fixme", "todo"},
+		},
+		{
+			"/* any fixme or todo */",
+			NoWarningCommentsOptions{Terms: []string{"fixme", "todo"}, Location: NoWarningCommentsAnywhere},
+			[]string{"unexpectedComment", "unexpectedComment"},
+			[]string{"fixme", "todo"},
+		},
+		{
+			"/* any fixme or todo */",
+			NoWarningCommentsOptions{Location: NoWarningCommentsAnywhere},
+			[]string{"unexpectedComment", "unexpectedComment"},
+			[]string{"todo", "fixme"},
+		},
 		{"/* fixme and todo */", nil, []string{"unexpectedComment"}, []string{"fixme"}},
-		{"/* fixme and todo */", NoWarningCommentsOptions{Location: NoWarningCommentsAnywhere}, []string{"unexpectedComment", "unexpectedComment"}, []string{"todo", "fixme"}},
-		{"/* any fixme */", NoWarningCommentsOptions{Location: NoWarningCommentsAnywhere}, []string{"unexpectedComment"}, []string{"fixme"}},
-		{"/* fixme! */", NoWarningCommentsOptions{Terms: []string{"fixme"}}, []string{"unexpectedComment"}, []string{"fixme"}},
+		{
+			"/* fixme and todo */",
+			NoWarningCommentsOptions{Location: NoWarningCommentsAnywhere},
+			[]string{"unexpectedComment", "unexpectedComment"},
+			[]string{"todo", "fixme"},
+		},
+		{
+			"/* any fixme */",
+			NoWarningCommentsOptions{Location: NoWarningCommentsAnywhere},
+			[]string{"unexpectedComment"},
+			[]string{"fixme"},
+		},
+		{
+			"/* fixme! */",
+			NoWarningCommentsOptions{Terms: []string{"fixme"}},
+			[]string{"unexpectedComment"},
+			[]string{"fixme"},
+		},
 		// #7mztrdd: the pattern is read as JavaScript reads upstream's `/^[\s]*todo\b/iu`, whose `\s` takes in the
 		// no-break space and the byte order mark (Node: true for both), and a `-` decoration is escaped, so it is one
 		// character to skip rather than a range (Node: true on "- todo" under ["*", "-", "/"]).
 		{"//\u00a0TODO later", nil, []string{"unexpectedComment"}, []string{"todo"}},
 		{"//\ufeffTODO later", nil, []string{"unexpectedComment"}, []string{"todo"}},
-		{"/*- todo */", NoWarningCommentsOptions{Decoration: []string{"*", "-", "/"}}, []string{"unexpectedComment"}, []string{"todo"}},
-		{"// regex [litera|$]", NoWarningCommentsOptions{Terms: []string{"[litera|$]"}, Location: NoWarningCommentsAnywhere}, []string{"unexpectedComment"}, []string{"[litera|$]"}},
-		{"/* eslint one-var: 2 */", NoWarningCommentsOptions{Terms: []string{"eslint"}}, []string{"unexpectedComment"}, []string{"eslint"}},
-		{"/* eslint one-var: 2 */", NoWarningCommentsOptions{Terms: []string{"one"}, Location: NoWarningCommentsAnywhere}, []string{"unexpectedComment"}, []string{"one"}},
-		{"/* any block comment with TODO, FIXME or XXX */", NoWarningCommentsOptions{Location: NoWarningCommentsAnywhere}, []string{"unexpectedComment", "unexpectedComment", "unexpectedComment"}, []string{"todo", "fixme", "xxx"}},
-		{"/* any block comment with (TODO, FIXME's or XXX!) */", NoWarningCommentsOptions{Location: NoWarningCommentsAnywhere}, []string{"unexpectedComment", "unexpectedComment", "unexpectedComment"}, []string{"todo", "fixme", "xxx"}},
-		{"/** \n *any block comment \n*with (TODO, FIXME's or XXX!) **/", NoWarningCommentsOptions{Location: NoWarningCommentsAnywhere}, []string{"unexpectedComment", "unexpectedComment", "unexpectedComment"}, []string{"todo", "fixme", "xxx"}},
-		{"// any comment with TODO, FIXME or XXX", NoWarningCommentsOptions{Location: NoWarningCommentsAnywhere}, []string{"unexpectedComment", "unexpectedComment", "unexpectedComment"}, []string{"todo", "fixme", "xxx"}},
-		{"// TODO: something small", NoWarningCommentsOptions{Location: NoWarningCommentsAnywhere}, []string{"unexpectedComment"}, []string{"todo"}},
-		{"// TODO: something really longer than 40 characters", NoWarningCommentsOptions{Location: NoWarningCommentsAnywhere}, []string{"unexpectedComment"}, []string{"todo"}},
-		{"/* TODO: something \n really longer than 40 characters \n and also a new line */", NoWarningCommentsOptions{Location: NoWarningCommentsAnywhere}, []string{"unexpectedComment"}, []string{"todo"}},
-		{"// TODO: small", NoWarningCommentsOptions{Location: NoWarningCommentsAnywhere}, []string{"unexpectedComment"}, []string{"todo"}},
-		{"// https://github.com/eslint/eslint/pull/13522#discussion_r470293411 TODO", NoWarningCommentsOptions{Location: NoWarningCommentsAnywhere}, []string{"unexpectedComment"}, []string{"todo"}},
-		{"// Comment ending with term followed by punctuation TODO!", NoWarningCommentsOptions{Terms: []string{"todo"}, Location: NoWarningCommentsAnywhere}, []string{"unexpectedComment"}, []string{"todo"}},
-		{"// Comment ending with term including punctuation TODO!", NoWarningCommentsOptions{Terms: []string{"todo!"}, Location: NoWarningCommentsAnywhere}, []string{"unexpectedComment"}, []string{"todo!"}},
-		{"// Comment ending with term including punctuation followed by more TODO!!!", NoWarningCommentsOptions{Terms: []string{"todo!"}, Location: NoWarningCommentsAnywhere}, []string{"unexpectedComment"}, []string{"todo!"}},
-		{"// !TODO comment starting with term preceded by punctuation", NoWarningCommentsOptions{Terms: []string{"todo"}, Location: NoWarningCommentsAnywhere}, []string{"unexpectedComment"}, []string{"todo"}},
-		{"// !TODO comment starting with term including punctuation", NoWarningCommentsOptions{Terms: []string{"!todo"}, Location: NoWarningCommentsAnywhere}, []string{"unexpectedComment"}, []string{"!todo"}},
-		{"// !!!TODO comment starting with term including punctuation preceded by more", NoWarningCommentsOptions{Terms: []string{"!todo"}, Location: NoWarningCommentsAnywhere}, []string{"unexpectedComment"}, []string{"!todo"}},
-		{"// FIX!term ending with punctuation followed word character", NoWarningCommentsOptions{Terms: []string{"FIX!"}, Location: NoWarningCommentsAnywhere}, []string{"unexpectedComment"}, []string{"FIX!"}},
-		{"// Term starting with punctuation preceded word character!FIX", NoWarningCommentsOptions{Terms: []string{"!FIX"}, Location: NoWarningCommentsAnywhere}, []string{"unexpectedComment"}, []string{"!FIX"}},
-		{"//!XXX comment starting with no spaces (anywhere)", NoWarningCommentsOptions{Terms: []string{"!xxx"}, Location: NoWarningCommentsAnywhere}, []string{"unexpectedComment"}, []string{"!xxx"}},
-		{"//!XXX comment starting with no spaces (start)", NoWarningCommentsOptions{Terms: []string{"!xxx"}, Location: NoWarningCommentsStart}, []string{"unexpectedComment"}, []string{"!xxx"}},
-		{"/*\nTODO undecorated multi-line block comment (start)\n*/", NoWarningCommentsOptions{Terms: []string{"todo"}, Location: NoWarningCommentsStart}, []string{"unexpectedComment"}, []string{"todo"}},
-		{"///// TODO decorated single-line comment with decoration array \n /////", NoWarningCommentsOptions{Terms: []string{"todo"}, Location: NoWarningCommentsStart, Decoration: []string{"*", "/"}}, []string{"unexpectedComment"}, []string{"todo"}},
-		{"///*/*/ TODO decorated single-line comment with multiple decoration characters (start) \n /////", NoWarningCommentsOptions{Terms: []string{"todo"}, Location: NoWarningCommentsStart, Decoration: []string{"*", "/"}}, []string{"unexpectedComment"}, []string{"todo"}},
-		{"//**TODO term starts with a decoration character", NoWarningCommentsOptions{Terms: []string{"*todo"}, Location: NoWarningCommentsStart, Decoration: []string{"*"}}, []string{"unexpectedComment"}, []string{"*todo"}},
+		{
+			"/*- todo */",
+			NoWarningCommentsOptions{Decoration: []string{"*", "-", "/"}},
+			[]string{"unexpectedComment"},
+			[]string{"todo"},
+		},
+		{
+			"// regex [litera|$]",
+			NoWarningCommentsOptions{Terms: []string{"[litera|$]"}, Location: NoWarningCommentsAnywhere},
+			[]string{"unexpectedComment"},
+			[]string{"[litera|$]"},
+		},
+		{
+			"/* eslint one-var: 2 */",
+			NoWarningCommentsOptions{Terms: []string{"eslint"}},
+			[]string{"unexpectedComment"},
+			[]string{"eslint"},
+		},
+		{
+			"/* eslint one-var: 2 */",
+			NoWarningCommentsOptions{Terms: []string{"one"}, Location: NoWarningCommentsAnywhere},
+			[]string{"unexpectedComment"},
+			[]string{"one"},
+		},
+		{
+			"/* any block comment with TODO, FIXME or XXX */",
+			NoWarningCommentsOptions{Location: NoWarningCommentsAnywhere},
+			[]string{"unexpectedComment", "unexpectedComment", "unexpectedComment"},
+			[]string{"todo", "fixme", "xxx"},
+		},
+		{
+			"/* any block comment with (TODO, FIXME's or XXX!) */",
+			NoWarningCommentsOptions{Location: NoWarningCommentsAnywhere},
+			[]string{"unexpectedComment", "unexpectedComment", "unexpectedComment"},
+			[]string{"todo", "fixme", "xxx"},
+		},
+		{
+			"/** \n *any block comment \n*with (TODO, FIXME's or XXX!) **/",
+			NoWarningCommentsOptions{Location: NoWarningCommentsAnywhere},
+			[]string{"unexpectedComment", "unexpectedComment", "unexpectedComment"},
+			[]string{"todo", "fixme", "xxx"},
+		},
+		{
+			"// any comment with TODO, FIXME or XXX",
+			NoWarningCommentsOptions{Location: NoWarningCommentsAnywhere},
+			[]string{"unexpectedComment", "unexpectedComment", "unexpectedComment"},
+			[]string{"todo", "fixme", "xxx"},
+		},
+		{
+			"// TODO: something small",
+			NoWarningCommentsOptions{Location: NoWarningCommentsAnywhere},
+			[]string{"unexpectedComment"},
+			[]string{"todo"},
+		},
+		{
+			"// TODO: something really longer than 40 characters",
+			NoWarningCommentsOptions{Location: NoWarningCommentsAnywhere},
+			[]string{"unexpectedComment"},
+			[]string{"todo"},
+		},
+		{
+			"/* TODO: something \n really longer than 40 characters \n and also a new line */",
+			NoWarningCommentsOptions{Location: NoWarningCommentsAnywhere},
+			[]string{"unexpectedComment"},
+			[]string{"todo"},
+		},
+		{
+			"// TODO: small",
+			NoWarningCommentsOptions{Location: NoWarningCommentsAnywhere},
+			[]string{"unexpectedComment"},
+			[]string{"todo"},
+		},
+		{
+			"// https://github.com/eslint/eslint/pull/13522#discussion_r470293411 TODO",
+			NoWarningCommentsOptions{Location: NoWarningCommentsAnywhere},
+			[]string{"unexpectedComment"},
+			[]string{"todo"},
+		},
+		{
+			"// Comment ending with term followed by punctuation TODO!",
+			NoWarningCommentsOptions{Terms: []string{"todo"}, Location: NoWarningCommentsAnywhere},
+			[]string{"unexpectedComment"},
+			[]string{"todo"},
+		},
+		{
+			"// Comment ending with term including punctuation TODO!",
+			NoWarningCommentsOptions{Terms: []string{"todo!"}, Location: NoWarningCommentsAnywhere},
+			[]string{"unexpectedComment"},
+			[]string{"todo!"},
+		},
+		{
+			"// Comment ending with term including punctuation followed by more TODO!!!",
+			NoWarningCommentsOptions{Terms: []string{"todo!"}, Location: NoWarningCommentsAnywhere},
+			[]string{"unexpectedComment"},
+			[]string{"todo!"},
+		},
+		{
+			"// !TODO comment starting with term preceded by punctuation",
+			NoWarningCommentsOptions{Terms: []string{"todo"}, Location: NoWarningCommentsAnywhere},
+			[]string{"unexpectedComment"},
+			[]string{"todo"},
+		},
+		{
+			"// !TODO comment starting with term including punctuation",
+			NoWarningCommentsOptions{Terms: []string{"!todo"}, Location: NoWarningCommentsAnywhere},
+			[]string{"unexpectedComment"},
+			[]string{"!todo"},
+		},
+		{
+			"// !!!TODO comment starting with term including punctuation preceded by more",
+			NoWarningCommentsOptions{Terms: []string{"!todo"}, Location: NoWarningCommentsAnywhere},
+			[]string{"unexpectedComment"},
+			[]string{"!todo"},
+		},
+		{
+			"// FIX!term ending with punctuation followed word character",
+			NoWarningCommentsOptions{Terms: []string{"FIX!"}, Location: NoWarningCommentsAnywhere},
+			[]string{"unexpectedComment"},
+			[]string{"FIX!"},
+		},
+		{
+			"// Term starting with punctuation preceded word character!FIX",
+			NoWarningCommentsOptions{Terms: []string{"!FIX"}, Location: NoWarningCommentsAnywhere},
+			[]string{"unexpectedComment"},
+			[]string{"!FIX"},
+		},
+		{
+			"//!XXX comment starting with no spaces (anywhere)",
+			NoWarningCommentsOptions{Terms: []string{"!xxx"}, Location: NoWarningCommentsAnywhere},
+			[]string{"unexpectedComment"},
+			[]string{"!xxx"},
+		},
+		{
+			"//!XXX comment starting with no spaces (start)",
+			NoWarningCommentsOptions{Terms: []string{"!xxx"}, Location: NoWarningCommentsStart},
+			[]string{"unexpectedComment"},
+			[]string{"!xxx"},
+		},
+		{
+			"/*\nTODO undecorated multi-line block comment (start)\n*/",
+			NoWarningCommentsOptions{Terms: []string{"todo"}, Location: NoWarningCommentsStart},
+			[]string{"unexpectedComment"},
+			[]string{"todo"},
+		},
+		{"///// TODO decorated single-line comment with decoration array \n /////", NoWarningCommentsOptions{
+			Terms:      []string{"todo"},
+			Location:   NoWarningCommentsStart,
+			Decoration: []string{"*", "/"},
+		}, []string{"unexpectedComment"}, []string{"todo"}},
+		{
+			"///*/*/ TODO decorated single-line comment with multiple decoration characters (start) \n /////",
+			NoWarningCommentsOptions{
+				Terms:      []string{"todo"},
+				Location:   NoWarningCommentsStart,
+				Decoration: []string{"*", "/"},
+			},
+			[]string{"unexpectedComment"},
+			[]string{"todo"},
+		},
+		{"//**TODO term starts with a decoration character", NoWarningCommentsOptions{
+			Terms:      []string{"*todo"},
+			Location:   NoWarningCommentsStart,
+			Decoration: []string{"*"},
+		}, []string{"unexpectedComment"}, []string{"*todo"}},
 	}
 }
 
@@ -110,19 +312,49 @@ func noWarningCommentsSilentCases() []noWarningCommentsCase {
 		{"// any comment", NoWarningCommentsOptions{Terms: []string{"fixme", "todo"}}, nil, nil},
 		{"// any comment", nil, nil, nil},
 		{"// any comment", NoWarningCommentsOptions{Location: NoWarningCommentsAnywhere}, nil, nil},
-		{"// any comment with TODO, FIXME or XXX", NoWarningCommentsOptions{Location: NoWarningCommentsStart}, nil, nil},
+		{
+			"// any comment with TODO, FIXME or XXX",
+			NoWarningCommentsOptions{Location: NoWarningCommentsStart},
+			nil,
+			nil,
+		},
 		{"// any comment with TODO, FIXME or XXX", nil, nil, nil},
 		{"/* any block comment */", NoWarningCommentsOptions{Terms: []string{"fixme"}}, nil, nil},
 		{"/* any block comment */", NoWarningCommentsOptions{Terms: []string{"fixme", "todo"}}, nil, nil},
 		{"/* any block comment */", nil, nil, nil},
 		{"/* any block comment */", NoWarningCommentsOptions{Location: NoWarningCommentsAnywhere}, nil, nil},
-		{"/* any block comment with TODO, FIXME or XXX */", NoWarningCommentsOptions{Location: NoWarningCommentsStart}, nil, nil},
+		{
+			"/* any block comment with TODO, FIXME or XXX */",
+			NoWarningCommentsOptions{Location: NoWarningCommentsStart},
+			nil,
+			nil,
+		},
 		{"/* any block comment with TODO, FIXME or XXX */", nil, nil, nil},
 		{"/* any block comment with (TODO, FIXME's or XXX!) */", nil, nil, nil},
-		{"// comments containing terms as substrings like TodoMVC", NoWarningCommentsOptions{Terms: []string{"todo"}, Location: NoWarningCommentsAnywhere}, nil, nil},
-		{"// special regex characters don't cause a problem", NoWarningCommentsOptions{Terms: []string{"[aeiou]"}, Location: NoWarningCommentsAnywhere}, nil, nil},
-		{"/*eslint no-warning-comments: [2, { \"terms\": [\"todo\", \"fixme\", \"any other term\"], \"location\": \"anywhere\" }]*/\n\nvar x = 10;\n", nil, nil, nil},
-		{"/*eslint no-warning-comments: [2, { \"terms\": [\"todo\", \"fixme\", \"any other term\"], \"location\": \"anywhere\" }]*/\n\nvar x = 10;\n", NoWarningCommentsOptions{Location: NoWarningCommentsAnywhere}, nil, nil},
+		{
+			"// comments containing terms as substrings like TodoMVC",
+			NoWarningCommentsOptions{Terms: []string{"todo"}, Location: NoWarningCommentsAnywhere},
+			nil,
+			nil,
+		},
+		{
+			"// special regex characters don't cause a problem",
+			NoWarningCommentsOptions{Terms: []string{"[aeiou]"}, Location: NoWarningCommentsAnywhere},
+			nil,
+			nil,
+		},
+		{
+			"/*eslint no-warning-comments: [2, { \"terms\": [\"todo\", \"fixme\", \"any other term\"], \"location\": \"anywhere\" }]*/\n\nvar x = 10;\n",
+			nil,
+			nil,
+			nil,
+		},
+		{
+			"/*eslint no-warning-comments: [2, { \"terms\": [\"todo\", \"fixme\", \"any other term\"], \"location\": \"anywhere\" }]*/\n\nvar x = 10;\n",
+			NoWarningCommentsOptions{Location: NoWarningCommentsAnywhere},
+			nil,
+			nil,
+		},
 		{"// foo", NoWarningCommentsOptions{Terms: []string{"foo-bar"}}, nil, nil},
 		{"/** multi-line block comment with lines starting with\nTODO\nFIXME or\nXXX\n*/", nil, nil, nil},
 		{"//!TODO ", NoWarningCommentsOptions{Decoration: []string{"*"}}, nil, nil},
@@ -440,7 +672,9 @@ func TestDecodeNoWarningCommentsOptions(test *testing.T) {
 	} {
 		test.Run(raw+" is refused", func(test *testing.T) {
 			test.Parallel()
-			if _, decodeNoWarningCommentsOptionsError := DecodeNoWarningCommentsOptions([]byte(raw)); decodeNoWarningCommentsOptionsError == nil {
+			if _, decodeNoWarningCommentsOptionsError := DecodeNoWarningCommentsOptions(
+				[]byte(raw),
+			); decodeNoWarningCommentsOptionsError == nil {
 				test.Errorf("%s decoded; upstream's schema refuses it", raw)
 			}
 		})
@@ -448,14 +682,18 @@ func TestDecodeNoWarningCommentsOptions(test *testing.T) {
 
 	test.Run("a multi-character decoration is rejected", func(test *testing.T) {
 		test.Parallel()
-		if _, decodeNoWarningCommentsOptionsError := DecodeNoWarningCommentsOptions([]byte(`{"decoration":["**"]}`)); decodeNoWarningCommentsOptionsError == nil {
+		if _, decodeNoWarningCommentsOptionsError := DecodeNoWarningCommentsOptions(
+			[]byte(`{"decoration":["**"]}`),
+		); decodeNoWarningCommentsOptionsError == nil {
 			test.Error("a two-character decoration decoded, which would widen the class")
 		}
 	})
 
 	test.Run("a whitespace decoration is rejected", func(test *testing.T) {
 		test.Parallel()
-		if _, decodeNoWarningCommentsOptionsError := DecodeNoWarningCommentsOptions([]byte(`{"decoration":[" "]}`)); decodeNoWarningCommentsOptionsError == nil {
+		if _, decodeNoWarningCommentsOptionsError := DecodeNoWarningCommentsOptions(
+			[]byte(`{"decoration":[" "]}`),
+		); decodeNoWarningCommentsOptionsError == nil {
 			test.Error("a whitespace decoration decoded")
 		}
 	})

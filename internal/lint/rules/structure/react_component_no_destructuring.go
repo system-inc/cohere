@@ -22,22 +22,34 @@ func messageNoDestructuring() rule.Message {
 
 // messageNoDestructuringFromPropsSourceText is the rule's `noDestructuringFromPropsSource` message,
 // whose wording lives in `policy/messages/react-component-no-destructuring.json`.
-var messageNoDestructuringFromPropsSourceText = policy.MessageOf("structure/react-component-no-destructuring", "noDestructuringFromPropsSource")
+var messageNoDestructuringFromPropsSourceText = policy.MessageOf(
+	"structure/react-component-no-destructuring",
+	"noDestructuringFromPropsSource",
+)
 
 // messageNoDestructuringFromPropsSource is the finding, rendered when it is reported so the text
 // comes from the current catalog.
 func messageNoDestructuringFromPropsSource() rule.Message {
-	return rule.Message{Id: messageNoDestructuringFromPropsSourceText.Id, Description: messageNoDestructuringFromPropsSourceText.Render(nil)}
+	return rule.Message{
+		Id:          messageNoDestructuringFromPropsSourceText.Id,
+		Description: messageNoDestructuringFromPropsSourceText.Render(nil),
+	}
 }
 
 // messageRequirePropertiesSuffixText is the rule's `requirePropertiesSuffix` message, whose wording
 // lives in `policy/messages/react-component-no-destructuring.json`.
-var messageRequirePropertiesSuffixText = policy.MessageOf("structure/react-component-no-destructuring", "requirePropertiesSuffix")
+var messageRequirePropertiesSuffixText = policy.MessageOf(
+	"structure/react-component-no-destructuring",
+	"requirePropertiesSuffix",
+)
 
 // messageRequirePropertiesSuffix is the finding, rendered when it is reported so the text comes
 // from the current catalog.
 func messageRequirePropertiesSuffix() rule.Message {
-	return rule.Message{Id: messageRequirePropertiesSuffixText.Id, Description: messageRequirePropertiesSuffixText.Render(nil)}
+	return rule.Message{
+		Id:          messageRequirePropertiesSuffixText.Id,
+		Description: messageRequirePropertiesSuffixText.Render(nil),
+	}
 }
 
 // messageSemanticSpreadNameText is the rule's `semanticSpreadName` message, whose wording lives in

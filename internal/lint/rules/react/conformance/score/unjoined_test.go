@@ -107,6 +107,9 @@ func TestUnjoinedMessageIdsAreEnumerated(test *testing.T) {
 	// Pinned. A new unjoined id appearing means either a rule grew a message or the join went stale,
 	// and both deserve a deliberate look rather than silent absorption into the failure count.
 	if len(keys) != 0 {
-		test.Errorf("the message join drops %d distinct ids; enumerate them above and either join or state each", len(keys))
+		test.Errorf(
+			"the message join drops %d distinct ids; enumerate them above and either join or state each",
+			len(keys),
+		)
 	}
 }

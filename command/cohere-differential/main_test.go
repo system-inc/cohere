@@ -31,8 +31,15 @@ func TestAControlWhereItsRuleCannotFireIsRefused(test *testing.T) {
 		RelativePath: filepath.Join("linted", "Planted.ts"),
 		Rule:         "consistency-no-enum",
 	}
-	if checkControlsAreLintableError := checkControlsAreLintable(lintConfiguration, []differential.Control{lintable}, nil); checkControlsAreLintableError != nil {
-		test.Fatalf("a control on a linted path with an enabled rule must be accepted: %v", checkControlsAreLintableError)
+	if checkControlsAreLintableError := checkControlsAreLintable(
+		lintConfiguration,
+		[]differential.Control{lintable},
+		nil,
+	); checkControlsAreLintableError != nil {
+		test.Fatalf(
+			"a control on a linted path with an enabled rule must be accepted: %v",
+			checkControlsAreLintableError,
+		)
 	}
 
 	ignoredPath := lintable
@@ -78,14 +85,24 @@ func TestAnOverrideThatScopesTheRuleOffIsCaught(test *testing.T) {
 		RelativePath: filepath.Join("generated", "Planted.ts"),
 		Rule:         "consistency-no-enum",
 	}
-	if checkControlsAreLintableError := checkControlsAreLintable(lintConfiguration, []differential.Control{control}, nil); checkControlsAreLintableError == nil {
-		test.Fatal("a control under an override that turns its rule off must be refused, even though the base config enables the rule")
+	if checkControlsAreLintableError := checkControlsAreLintable(
+		lintConfiguration,
+		[]differential.Control{control},
+		nil,
+	); checkControlsAreLintableError == nil {
+		test.Fatal(
+			"a control under an override that turns its rule off must be refused, even though the base config enables the rule",
+		)
 	}
 
 	// The same rule and the same config, outside the override's scope, must still be accepted.
 	elsewhere := control
 	elsewhere.RelativePath = filepath.Join("source", "Planted.ts")
-	if checkControlsAreLintableError := checkControlsAreLintable(lintConfiguration, []differential.Control{elsewhere}, nil); checkControlsAreLintableError != nil {
+	if checkControlsAreLintableError := checkControlsAreLintable(
+		lintConfiguration,
+		[]differential.Control{elsewhere},
+		nil,
+	); checkControlsAreLintableError != nil {
 		test.Fatalf("the override must not reject a control outside its scope: %v", checkControlsAreLintableError)
 	}
 }

@@ -61,7 +61,11 @@ func (oracle *proseWrapOracle) format(text string, options formatoptions.Options
 	})
 }
 
-func (oracle *proseWrapOracle) formatLive(text string, options formatoptions.Options, proseWrap string) (string, error) {
+func (oracle *proseWrapOracle) formatLive(
+	text string,
+	options formatoptions.Options,
+	proseWrap string,
+) (string, error) {
 	oracle.runtime.Set("__source", text)
 	oracle.runtime.Set("__proseWrap", proseWrap)
 	oracle.runtime.Set("__printWidth", options.PrintWidth)
@@ -125,7 +129,13 @@ func TestProseWrapFixturesMatchOracle(test *testing.T) {
 					continue
 				}
 				if actual != expected {
-					test.Errorf("%s, variant %d, %q: %s", proseWrap, variantIndex, input, differential.FirstDifference(expected, actual))
+					test.Errorf(
+						"%s, variant %d, %q: %s",
+						proseWrap,
+						variantIndex,
+						input,
+						differential.FirstDifference(expected, actual),
+					)
 				}
 			}
 		}

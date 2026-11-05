@@ -63,7 +63,12 @@ type typeGraphParts struct {
 //
 // Computed once per graph. A walk keyed on both fingerprints asked for it twice, about 45ms each on ahra
 // and all of it before the first worker starts (#zqsdzbq). The callers only read what it returns.
-func (graph *Graph) typeGraph() ([sha256.Size]byte, map[tspath.PathKey][]tspath.PathKey, map[tspath.PathKey][sha256.Size]byte, map[tspath.PathKey][sha256.Size]byte) {
+func (graph *Graph) typeGraph() (
+	[sha256.Size]byte,
+	map[tspath.PathKey][]tspath.PathKey,
+	map[tspath.PathKey][sha256.Size]byte,
+	map[tspath.PathKey][sha256.Size]byte,
+) {
 	graph.typeGraphOnce.Do(func() {
 		parts := &graph.typeGraphParts
 		parts.global, parts.edges, parts.contents, parts.resolutions = graph.computeTypeGraph()
@@ -71,7 +76,12 @@ func (graph *Graph) typeGraph() ([sha256.Size]byte, map[tspath.PathKey][]tspath.
 	return graph.typeGraphParts.global, graph.typeGraphParts.edges, graph.typeGraphParts.contents, graph.typeGraphParts.resolutions
 }
 
-func (graph *Graph) computeTypeGraph() ([sha256.Size]byte, map[tspath.PathKey][]tspath.PathKey, map[tspath.PathKey][sha256.Size]byte, map[tspath.PathKey][sha256.Size]byte) {
+func (graph *Graph) computeTypeGraph() (
+	[sha256.Size]byte,
+	map[tspath.PathKey][]tspath.PathKey,
+	map[tspath.PathKey][sha256.Size]byte,
+	map[tspath.PathKey][sha256.Size]byte,
+) {
 	allFiles := graph.Program.GetSourceFiles()
 	projectFiles := graph.ProjectFiles()
 
@@ -94,7 +104,10 @@ func (graph *Graph) computeTypeGraph() ([sha256.Size]byte, map[tspath.PathKey][]
 	for _, path := range globalPaths {
 		stable[path] = graph.Anchor.Stable(string(path))
 	}
-	sort.Slice(globalPaths, func(first, second int) bool { return stable[globalPaths[first]] < stable[globalPaths[second]] })
+	sort.Slice(
+		globalPaths,
+		func(first, second int) bool { return stable[globalPaths[first]] < stable[globalPaths[second]] },
+	)
 	for _, path := range globalPaths {
 		sum := contents[path]
 		global.Write([]byte(stable[path]))
@@ -136,7 +149,10 @@ func (graph *Graph) resolutionSums(isProject map[tspath.PathKey]bool) map[tspath
 			if resolution != nil {
 				target = graph.Anchor.Stable(resolution.ResolvedFileName.AsString())
 			}
-			entries[fromPath] = append(entries[fromPath], fmt.Sprintf("module\x00%s\x00%d\x00%s", key.Name, key.Mode, target))
+			entries[fromPath] = append(
+				entries[fromPath],
+				fmt.Sprintf("module\x00%s\x00%d\x00%s", key.Name, key.Mode, target),
+			)
 		}
 	}
 	for fromPath, references := range graph.Program.GetResolvedTypeReferenceDirectives() {
@@ -148,7 +164,10 @@ func (graph *Graph) resolutionSums(isProject map[tspath.PathKey]bool) map[tspath
 			if reference != nil {
 				target = graph.Anchor.Stable(reference.ResolvedFileName.AsString())
 			}
-			entries[fromPath] = append(entries[fromPath], fmt.Sprintf("type\x00%s\x00%d\x00%s", key.Name, key.Mode, target))
+			entries[fromPath] = append(
+				entries[fromPath],
+				fmt.Sprintf("type\x00%s\x00%d\x00%s", key.Name, key.Mode, target),
+			)
 		}
 	}
 	sums := make(map[tspath.PathKey][sha256.Size]byte, len(isProject))
@@ -264,7 +283,10 @@ func fingerprintComponents(anchor PathAnchor, projectFiles []*ast.SourceFile, ed
 		for _, member := range members {
 			stableMembers[member] = anchor.Stable(string(member))
 		}
-		sort.Slice(members, func(first, second int) bool { return stableMembers[members[first]] < stableMembers[members[second]] })
+		sort.Slice(
+			members,
+			func(first, second int) bool { return stableMembers[members[first]] < stableMembers[members[second]] },
+		)
 
 		component := len(componentSums)
 		dependencies := map[int]bool{}

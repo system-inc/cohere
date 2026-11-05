@@ -345,9 +345,15 @@ func (analysis *HoistableAnalysis) hoistableAt(block static_single_assignment.Bl
 // The second is the load-bearing one and it is a deduction rather than an assumption: if
 // `props.a.b` executed without throwing, then `props.a` was not nullish at that point, so `props.a`
 // is hoistable to anywhere that dominates it.
-func collectNonNullsInBlocks(function *Function, temporaries temporaries, ranges *mutation_aliasing.MutableRanges,
-	identity ScopeIdentity, scopes *ReactiveScopes, registry *pathRegistry,
-	hoistableFromOptionals map[static_single_assignment.BlockId]ReactiveScopeDependency) map[static_single_assignment.BlockId]map[int]bool {
+func collectNonNullsInBlocks(
+	function *Function,
+	temporaries temporaries,
+	ranges *mutation_aliasing.MutableRanges,
+	identity ScopeIdentity,
+	scopes *ReactiveScopes,
+	registry *pathRegistry,
+	hoistableFromOptionals map[static_single_assignment.BlockId]ReactiveScopeDependency,
+) map[static_single_assignment.BlockId]map[int]bool {
 	known := map[int]bool{}
 	invoked := CollectAssumedInvokedFunctions(function)
 
@@ -570,8 +576,14 @@ func maybeNonNullInInstruction(value InstructionValue,
 // The `end > start + 1` test is upstream's and is not a tidy-up of `end > start`: a range spanning a
 // single instruction describes a value written once and never mutated, which is immutable for this
 // purpose despite having a non-empty range.
-func isImmutableAtInstruction(function *Function, id static_single_assignment.IdentifierId, order static_single_assignment.EvaluationOrder,
-	ranges *mutation_aliasing.MutableRanges, identity ScopeIdentity, scopes *ReactiveScopes) bool {
+func isImmutableAtInstruction(
+	function *Function,
+	id static_single_assignment.IdentifierId,
+	order static_single_assignment.EvaluationOrder,
+	ranges *mutation_aliasing.MutableRanges,
+	identity ScopeIdentity,
+	scopes *ReactiveScopes,
+) bool {
 	if isKnownImmutableParameter(function, id) {
 		return true
 	}
@@ -688,9 +700,15 @@ func propagateNonNull(function *Function, blocks map[static_single_assignment.Bl
 // here only if it was non-null on EVERY path that reaches here. An empty neighbour list therefore
 // contributes the empty set rather than everything, which is why `doneSets` being empty short
 // circuits to no contribution rather than to a universal one.
-func recursivelyPropagateNonNull(id static_single_assignment.BlockId, direction propagationDirection,
-	state map[static_single_assignment.BlockId]traversalState, working map[static_single_assignment.BlockId]map[int]bool, function *Function,
-	successors map[static_single_assignment.BlockId][]static_single_assignment.BlockId, registry *pathRegistry) bool {
+func recursivelyPropagateNonNull(
+	id static_single_assignment.BlockId,
+	direction propagationDirection,
+	state map[static_single_assignment.BlockId]traversalState,
+	working map[static_single_assignment.BlockId]map[int]bool,
+	function *Function,
+	successors map[static_single_assignment.BlockId][]static_single_assignment.BlockId,
+	registry *pathRegistry,
+) bool {
 	if _, seen := state[id]; seen {
 		return false
 	}

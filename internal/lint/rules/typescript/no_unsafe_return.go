@@ -121,7 +121,12 @@ func checkUnsafeReturn(ruleContext rule.Context, returnNode *ast.Node, reporting
 	if returnNodeType == nil {
 		return
 	}
-	anyType := type_checking.DiscriminateAnyType(returnNodeType, ruleContext.TypeChecker, ruleContext.Program, returnNode)
+	anyType := type_checking.DiscriminateAnyType(
+		returnNodeType,
+		ruleContext.TypeChecker,
+		ruleContext.Program,
+		returnNode,
+	)
 	constrainedReturnNodeType := type_checking.GetConstrainedTypeAtLocation(ruleContext.TypeChecker, returnNode)
 
 	functionType := unsafeReturnFunctionType(ruleContext, functionNode)

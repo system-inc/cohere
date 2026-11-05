@@ -40,20 +40,62 @@ func TestNoDangerWithChildrenFires(test *testing.T) {
 		name       string
 		sourceText string
 	}{
-		{"the danger prop and children between the tags", "\n        <div dangerouslySetInnerHTML={{ __html: \"HTML\" }}>\n            Children\n        </div>\n        "},
-		{"the danger prop and a children prop", "<div dangerouslySetInnerHTML={{ __html: \"HTML\" }} children=\"Children\" />"},
-		{"a spread carrying danger, with children between the tags", "\n        const props = { dangerouslySetInnerHTML: { __html: \"HTML\" } };\n        <div {...props}>Children</div>\n        "},
-		{"a spread carrying both danger and children", "\n        const props = { children: \"Children\", dangerouslySetInnerHTML: { __html: \"HTML\" } };\n        <div {...props} />\n        "},
-		{"a component with the danger prop and children between the tags", "\n        <Hello dangerouslySetInnerHTML={{ __html: \"HTML\" }}>\n            Children\n        </Hello>\n        "},
-		{"a component with the danger prop and a children prop", "<Hello dangerouslySetInnerHTML={{ __html: \"HTML\" }} children=\"Children\" />"},
-		{"a component whose only child is a single space", "<Hello dangerouslySetInnerHTML={{ __html: \"HTML\" }}> </Hello>"},
-		{"createElement with danger in the props and a third argument", "\n        React.createElement(\n            \"div\",\n            { dangerouslySetInnerHTML: { __html: \"HTML\" } },\n            \"Children\"\n        );\n        "},
-		{"createElement with danger and children both in the props", "\n        React.createElement(\n            \"div\",\n            {\n                dangerouslySetInnerHTML: { __html: \"HTML\" },\n                children: \"Children\",\n            }\n        );\n        "},
-		{"a component through createElement with danger and a third argument", "\n        React.createElement(\n            \"Hello\",\n            { dangerouslySetInnerHTML: { __html: \"HTML\" } },\n            \"Children\"\n        );\n        "},
-		{"a component through createElement with danger and children in the props", "\n        React.createElement(\n            \"Hello\",\n            {\n                dangerouslySetInnerHTML: { __html: \"HTML\" },\n                children: \"Children\",\n            }\n        );\n        "},
-		{"a spread variable carrying danger, with a third argument", "\n        const props = { dangerouslySetInnerHTML: { __html: \"HTML\" } };\n        React.createElement(\"div\", props, \"Children\");\n        "},
-		{"a spread variable carrying both danger and children", "\n        const props = { children: \"Children\", dangerouslySetInnerHTML: { __html: \"HTML\" } };\n        React.createElement(\"div\", props);\n        "},
-		{"a chain of spreads reaching children two levels down", "\n        const moreProps = { children: \"Children\" };\n        const otherProps = { ...moreProps };\n        const props = { ...otherProps, dangerouslySetInnerHTML: { __html: \"HTML\" } };\n        React.createElement(\"div\", props);\n        "},
+		{
+			"the danger prop and children between the tags",
+			"\n        <div dangerouslySetInnerHTML={{ __html: \"HTML\" }}>\n            Children\n        </div>\n        ",
+		},
+		{
+			"the danger prop and a children prop",
+			"<div dangerouslySetInnerHTML={{ __html: \"HTML\" }} children=\"Children\" />",
+		},
+		{
+			"a spread carrying danger, with children between the tags",
+			"\n        const props = { dangerouslySetInnerHTML: { __html: \"HTML\" } };\n        <div {...props}>Children</div>\n        ",
+		},
+		{
+			"a spread carrying both danger and children",
+			"\n        const props = { children: \"Children\", dangerouslySetInnerHTML: { __html: \"HTML\" } };\n        <div {...props} />\n        ",
+		},
+		{
+			"a component with the danger prop and children between the tags",
+			"\n        <Hello dangerouslySetInnerHTML={{ __html: \"HTML\" }}>\n            Children\n        </Hello>\n        ",
+		},
+		{
+			"a component with the danger prop and a children prop",
+			"<Hello dangerouslySetInnerHTML={{ __html: \"HTML\" }} children=\"Children\" />",
+		},
+		{
+			"a component whose only child is a single space",
+			"<Hello dangerouslySetInnerHTML={{ __html: \"HTML\" }}> </Hello>",
+		},
+		{
+			"createElement with danger in the props and a third argument",
+			"\n        React.createElement(\n            \"div\",\n            { dangerouslySetInnerHTML: { __html: \"HTML\" } },\n            \"Children\"\n        );\n        ",
+		},
+		{
+			"createElement with danger and children both in the props",
+			"\n        React.createElement(\n            \"div\",\n            {\n                dangerouslySetInnerHTML: { __html: \"HTML\" },\n                children: \"Children\",\n            }\n        );\n        ",
+		},
+		{
+			"a component through createElement with danger and a third argument",
+			"\n        React.createElement(\n            \"Hello\",\n            { dangerouslySetInnerHTML: { __html: \"HTML\" } },\n            \"Children\"\n        );\n        ",
+		},
+		{
+			"a component through createElement with danger and children in the props",
+			"\n        React.createElement(\n            \"Hello\",\n            {\n                dangerouslySetInnerHTML: { __html: \"HTML\" },\n                children: \"Children\",\n            }\n        );\n        ",
+		},
+		{
+			"a spread variable carrying danger, with a third argument",
+			"\n        const props = { dangerouslySetInnerHTML: { __html: \"HTML\" } };\n        React.createElement(\"div\", props, \"Children\");\n        ",
+		},
+		{
+			"a spread variable carrying both danger and children",
+			"\n        const props = { children: \"Children\", dangerouslySetInnerHTML: { __html: \"HTML\" } };\n        React.createElement(\"div\", props);\n        ",
+		},
+		{
+			"a chain of spreads reaching children two levels down",
+			"\n        const moreProps = { children: \"Children\" };\n        const otherProps = { ...moreProps };\n        const props = { ...otherProps, dangerouslySetInnerHTML: { __html: \"HTML\" } };\n        React.createElement(\"div\", props);\n        ",
+		},
 	}
 
 	for _, testCase := range cases {
@@ -85,19 +127,46 @@ func TestNoDangerWithChildrenStaysSilent(test *testing.T) {
 		{"a spread of a variable this file does not declare", "<div {...props} />"},
 		{"the danger prop with no children at all", "<div dangerouslySetInnerHTML={{ __html: \"HTML\" }} />"},
 		{"a children prop with no danger prop", "<div children=\"Children\" />"},
-		{"a spread whose object carries danger and no children", "\n        const props = { dangerouslySetInnerHTML: { __html: \"HTML\" } };\n        <div {...props} />\n        "},
-		{"a spread whose object carries children and no danger", "\n        const moreProps = { className: \"eslint\" };\n        const props = { children: \"Children\", ...moreProps };\n        <div {...props} />\n        "},
-		{"a rest binding element, which is not a variable declaration", "\n        const otherProps = { children: \"Children\" };\n        const { a, b, ...props } = otherProps;\n        <div {...props} />\n        "},
+		{
+			"a spread whose object carries danger and no children",
+			"\n        const props = { dangerouslySetInnerHTML: { __html: \"HTML\" } };\n        <div {...props} />\n        ",
+		},
+		{
+			"a spread whose object carries children and no danger",
+			"\n        const moreProps = { className: \"eslint\" };\n        const props = { children: \"Children\", ...moreProps };\n        <div {...props} />\n        ",
+		},
+		{
+			"a rest binding element, which is not a variable declaration",
+			"\n        const otherProps = { children: \"Children\" };\n        const { a, b, ...props } = otherProps;\n        <div {...props} />\n        ",
+		},
 		{"a component with children and no danger prop", "<Hello>Children</Hello>"},
-		{"a component with the danger prop and no children", "<Hello dangerouslySetInnerHTML={{ __html: \"HTML\" }} />"},
-		{"a component whose only child is a formatting newline", "\n        <Hello dangerouslySetInnerHTML={{ __html: \"HTML\" }}>\n        </Hello>\n        "},
-		{"createElement with danger in the props and no third argument", "React.createElement(\"div\", { dangerouslySetInnerHTML: { __html: \"HTML\" } });"},
+		{
+			"a component with the danger prop and no children",
+			"<Hello dangerouslySetInnerHTML={{ __html: \"HTML\" }} />",
+		},
+		{
+			"a component whose only child is a formatting newline",
+			"\n        <Hello dangerouslySetInnerHTML={{ __html: \"HTML\" }}>\n        </Hello>\n        ",
+		},
+		{
+			"createElement with danger in the props and no third argument",
+			"React.createElement(\"div\", { dangerouslySetInnerHTML: { __html: \"HTML\" } });",
+		},
 		{"createElement with children but empty props", "React.createElement(\"div\", {}, \"Children\");"},
-		{"a component through createElement with danger and no children", "React.createElement(\"Hello\", { dangerouslySetInnerHTML: { __html: \"HTML\" } });"},
-		{"a component through createElement with children but empty props", "React.createElement(\"Hello\", {}, \"Children\");"},
+		{
+			"a component through createElement with danger and no children",
+			"React.createElement(\"Hello\", { dangerouslySetInnerHTML: { __html: \"HTML\" } });",
+		},
+		{
+			"a component through createElement with children but empty props",
+			"React.createElement(\"Hello\", {}, \"Children\");",
+		},
 		{"a spread of undefined, which resolves to no declaration", "<Hello {...undefined}>Children</Hello>"},
 		{"undefined in the props position of createElement", "React.createElement(\"Hello\", undefined, \"Children\")"},
-		{"a self-referential spread, which upstream guards against as a cycle", "\n        const props = {...props, scratch: {mode: 'edit'}};\n        const component = shallow(<TaskEditableTitle {...props} />);\n        "},
+		{
+			"a self-referential spread, which upstream guards against as a cycle",
+			"\n        const props = {...props, scratch: {mode: 'edit'}};\n        const component = shallow(<TaskEditableTitle {...props} />);\n        ",
+		},
 	}
 
 	for _, testCase := range cases {

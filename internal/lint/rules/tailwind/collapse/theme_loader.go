@@ -261,7 +261,11 @@ func (loader *themeLoader) ingestThemeBlock(node *Node, path string) error {
 		if child.Kind == KindDeclaration && strings.HasPrefix(child.Property, "--") {
 			// The property is unescaped on the way in, so `--color-a\/b` is stored as
 			// `--color-a/b`. GetOptions and MarkUsedVariable unescape their arguments to match.
-			if addError := loader.theme.Add(unescapeCSSIdentifier(child.Property), child.Value, options); addError != nil {
+			if addError := loader.theme.Add(
+				unescapeCSSIdentifier(child.Property),
+				child.Value,
+				options,
+			); addError != nil {
 				walkErr = fmt.Errorf("%s: %w", path, addError)
 				return WalkStop
 			}

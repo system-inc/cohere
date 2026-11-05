@@ -45,7 +45,13 @@ func TestFormattingFromTheGuardsTreePrintsWhatParsingAgainPrints(test *testing.T
 			return given, nil
 		}
 		noProposals := func(string, string) ([]edit.Proposal, error) { return nil, nil }
-		if _, fixAndTransformTextError := edit.FixAndTransformText(fileName, text, noProposals, capture, 1); fixAndTransformTextError != nil || guards == nil {
+		if _, fixAndTransformTextError := edit.FixAndTransformText(
+			fileName,
+			text,
+			noProposals,
+			capture,
+			1,
+		); fixAndTransformTextError != nil || guards == nil {
 			// A file the guard refuses never reaches the formatter.
 			continue
 		}
@@ -97,7 +103,14 @@ func moduleRootOf(test *testing.T) string {
 // typeScriptFilesUnder is every .ts and .tsx file under roots, the extensions with a printer that takes a tree,
 // outside dependency, build and cache directories and the TypeScript checkout.
 func typeScriptFilesUnder(roots []string) []string {
-	skipped := map[string]bool{"node_modules": true, ".git": true, ".cache": true, ".next": true, "dist": true, "TypeScript": true}
+	skipped := map[string]bool{
+		"node_modules": true,
+		".git":         true,
+		".cache":       true,
+		".next":        true,
+		"dist":         true,
+		"TypeScript":   true,
+	}
 	var files []string
 	for _, root := range roots {
 		filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {

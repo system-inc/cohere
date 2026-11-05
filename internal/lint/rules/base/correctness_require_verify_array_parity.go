@@ -81,7 +81,10 @@ var verifyKnownNonValueDecorators = func() map[string]struct{} {
 
 // correctnessRequireVerifyArrayParityText is the rule's message, whose wording lives in
 // `policy/messages/correctness-require-verify-array-parity.json`.
-var correctnessRequireVerifyArrayParityText = policy.MessageOf("base/correctness-require-verify-array-parity", "missingArrayRule")
+var correctnessRequireVerifyArrayParityText = policy.MessageOf(
+	"base/correctness-require-verify-array-parity",
+	"missingArrayRule",
+)
 
 // CorrectnessRequireVerifyArrayParity requires an array-typed property with value-level rules to declare an
 // array-level rule too.

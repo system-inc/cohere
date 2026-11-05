@@ -31,7 +31,10 @@ func TestTypeDiagnosticsReplayOnlyWhatAnEditCannotReach(test *testing.T) {
 			test.Fatal(writeError)
 		}
 	}
-	write("tsconfig.json", `{"compilerOptions":{"strict":true,"noEmit":true,"target":"es2022","module":"esnext","moduleResolution":"bundler"},"include":["source"]}`)
+	write(
+		"tsconfig.json",
+		`{"compilerOptions":{"strict":true,"noEmit":true,"target":"es2022","module":"esnext","moduleResolution":"bundler"},"include":["source"]}`,
+	)
 	write("CohereSettings.json", `{"rules":{"no-debugger":"error"}}`)
 	write("package.json", `{"name":"fixture","private":true,"type":"module"}`)
 	write(".gitignore", ".cache/\nnode_modules/\n")
@@ -75,7 +78,11 @@ func TestTypeDiagnosticsReplayOnlyWhatAnEditCannotReach(test *testing.T) {
 		}
 		match := replayed.FindStringSubmatch(warm)
 		if match == nil {
-			test.Fatalf("%s: the warm run replayed no file's semantic diagnostics, so it proves nothing about replaying:\n%s", step.name, warm)
+			test.Fatalf(
+				"%s: the warm run replayed no file's semantic diagnostics, so it proves nothing about replaying:\n%s",
+				step.name,
+				warm,
+			)
 		}
 		// Ignored: the pattern captures digits only.
 		if count, _ := strconv.Atoi(match[1]); count > step.mostReplayed {
@@ -102,7 +109,10 @@ func TestTypeDiagnosticsReplayOnAScopedRun(test *testing.T) {
 			test.Fatal(writeError)
 		}
 	}
-	write("tsconfig.json", `{"compilerOptions":{"strict":true,"noEmit":true,"target":"es2022","module":"esnext","moduleResolution":"bundler"},"include":["source"]}`)
+	write(
+		"tsconfig.json",
+		`{"compilerOptions":{"strict":true,"noEmit":true,"target":"es2022","module":"esnext","moduleResolution":"bundler"},"include":["source"]}`,
+	)
 	write("CohereSettings.json", `{"rules":{"no-debugger":"error"}}`)
 	write("package.json", `{"name":"fixture","private":true,"type":"module"}`)
 	write(".gitignore", ".cache/\nnode_modules/\n")
@@ -143,7 +153,13 @@ func TestTypeDiagnosticsReplayOnAScopedRun(test *testing.T) {
 			replayedCount, _ := strconv.Atoi(clause[1])
 			total, _ := strconv.Atoi(clause[2]) // Ignored: digits only, as above.
 			if replayedCount > total || total != 1 {
-				test.Errorf("%s: the replay clause counts %d of %d files on a run scoped to one:\n%s", step.name, replayedCount, total, warm)
+				test.Errorf(
+					"%s: the replay clause counts %d of %d files on a run scoped to one:\n%s",
+					step.name,
+					replayedCount,
+					total,
+					warm,
+				)
 			}
 		}
 		// This fixture has no build info, so no file has a recorded declaration signature and every shape is
@@ -151,7 +167,11 @@ func TestTypeDiagnosticsReplayOnAScopedRun(test *testing.T) {
 		// checked again rather than replayed. That it is checked, and agrees with cold above, is the claim here.
 		// Shape replay across a body edit is proven where a real signature is recorded (shape_reuse_test.go).
 		if step.name == "a body edit" && clause != nil && clause[1] != "0" {
-			test.Fatalf("%s: the scoped run replayed its one file across a body edit to a content-keyed import:\n%s", step.name, warm)
+			test.Fatalf(
+				"%s: the scoped run replayed its one file across a body edit to a content-keyed import:\n%s",
+				step.name,
+				warm,
+			)
 		}
 		if step.name == "a body edit" && !strings.Contains(warm, "keyed on content") {
 			test.Fatalf("%s: the run does not say its shapes are keyed on content:\n%s", step.name, warm)
@@ -177,7 +197,10 @@ func TestTypeDiagnosticsDoNotReplayAcrossCompilerOptions(test *testing.T) {
 		}
 	}
 	tsconfig := func(strict bool) string {
-		return fmt.Sprintf(`{"compilerOptions":{"strict":%t,"noEmit":true,"target":"es2022","module":"esnext","moduleResolution":"bundler"},"include":["source"]}`, strict)
+		return fmt.Sprintf(
+			`{"compilerOptions":{"strict":%t,"noEmit":true,"target":"es2022","module":"esnext","moduleResolution":"bundler"},"include":["source"]}`,
+			strict,
+		)
 	}
 	write("tsconfig.json", tsconfig(false))
 	write("CohereSettings.json", `{"rules":{"no-debugger":"error"}}`)
@@ -225,13 +248,19 @@ func TestARunWhoseFixRewritesAFileStillReplays(test *testing.T) {
 			test.Fatal(writeError)
 		}
 	}
-	write("tsconfig.json", `{"compilerOptions":{"strict":true,"noEmit":true,"target":"es2022","module":"esnext","moduleResolution":"bundler"},"include":["source"]}`)
+	write(
+		"tsconfig.json",
+		`{"compilerOptions":{"strict":true,"noEmit":true,"target":"es2022","module":"esnext","moduleResolution":"bundler"},"include":["source"]}`,
+	)
 	write("CohereSettings.json", `{"rules":{"no-debugger":"error"}}`)
 	write("package.json", `{"name":"fixture","private":true,"type":"module"}`)
 	write(".gitignore", ".cache/\nnode_modules/\n")
 	write("source/a.ts", "export function value(): number {\n    return 1;\n}\n")
 	for index := range 6 {
-		write(fmt.Sprintf("source/c%d.ts", index), fmt.Sprintf("import { value } from './a';\nexport const c%d: number = value() + %d;\n", index, index))
+		write(
+			fmt.Sprintf("source/c%d.ts", index),
+			fmt.Sprintf("import { value } from './a';\nexport const c%d: number = value() + %d;\n", index, index),
+		)
 	}
 	runCohere(test, binary, root)
 	runCohere(test, binary, root)
@@ -257,6 +286,10 @@ func TestARunWhoseFixRewritesAFileStillReplays(test *testing.T) {
 		return strings.Join(kept, "\n")
 	}
 	if findings(warm) != findings(cold) {
-		test.Errorf("the run after the rewrite found something other than a run with no cache:\n--- warm\n%s\n--- cold\n%s", warm, cold)
+		test.Errorf(
+			"the run after the rewrite found something other than a run with no cache:\n--- warm\n%s\n--- cold\n%s",
+			warm,
+			cold,
+		)
 	}
 }

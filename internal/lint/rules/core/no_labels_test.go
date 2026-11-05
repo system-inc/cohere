@@ -35,7 +35,10 @@ func TestNoLabelsStaysSilent(test *testing.T) {
 		{"while (true) { continue; }", nil},
 		{"A: while (a) { break A; }", NoLabelsOptions{AllowLoop: true, AllowSwitch: false}},
 		{"A: do { if (b) { break A; } } while (a);", NoLabelsOptions{AllowLoop: true, AllowSwitch: false}},
-		{"A: for (var a in obj) { for (;;) { switch (a) { case 0: continue A; } } }", NoLabelsOptions{AllowLoop: true, AllowSwitch: false}},
+		{
+			"A: for (var a in obj) { for (;;) { switch (a) { case 0: continue A; } } }",
+			NoLabelsOptions{AllowLoop: true, AllowSwitch: false},
+		},
 		{"A: switch (a) { case 0: break A; }", NoLabelsOptions{AllowLoop: false, AllowSwitch: true}},
 	}
 
@@ -70,20 +73,68 @@ func TestNoLabelsFires(test *testing.T) {
 		{"A: break A;", nil, []string{"unexpectedLabel", "unexpectedLabelInBreak"}},
 		{"A: { if (foo()) { break A; } bar(); };", nil, []string{"unexpectedLabel", "unexpectedLabelInBreak"}},
 		{"A: if (a) { if (foo()) { break A; } bar(); };", nil, []string{"unexpectedLabel", "unexpectedLabelInBreak"}},
-		{"A: switch (a) { case 0: break A; default: break; };", nil, []string{"unexpectedLabel", "unexpectedLabelInBreak"}},
-		{"A: switch (a) { case 0: B: { break A; } default: break; };", nil, []string{"unexpectedLabel", "unexpectedLabel", "unexpectedLabelInBreak"}},
+		{
+			"A: switch (a) { case 0: break A; default: break; };",
+			nil,
+			[]string{"unexpectedLabel", "unexpectedLabelInBreak"},
+		},
+		{
+			"A: switch (a) { case 0: B: { break A; } default: break; };",
+			nil,
+			[]string{"unexpectedLabel", "unexpectedLabel", "unexpectedLabelInBreak"},
+		},
 		{"A: var foo = 0;", NoLabelsOptions{AllowLoop: true, AllowSwitch: false}, []string{"unexpectedLabel"}},
-		{"A: break A;", NoLabelsOptions{AllowLoop: true, AllowSwitch: false}, []string{"unexpectedLabel", "unexpectedLabelInBreak"}},
-		{"A: { if (foo()) { break A; } bar(); };", NoLabelsOptions{AllowLoop: true, AllowSwitch: false}, []string{"unexpectedLabel", "unexpectedLabelInBreak"}},
-		{"A: if (a) { if (foo()) { break A; } bar(); };", NoLabelsOptions{AllowLoop: true, AllowSwitch: false}, []string{"unexpectedLabel", "unexpectedLabelInBreak"}},
-		{"A: switch (a) { case 0: break A; default: break; };", NoLabelsOptions{AllowLoop: true, AllowSwitch: false}, []string{"unexpectedLabel", "unexpectedLabelInBreak"}},
+		{
+			"A: break A;",
+			NoLabelsOptions{AllowLoop: true, AllowSwitch: false},
+			[]string{"unexpectedLabel", "unexpectedLabelInBreak"},
+		},
+		{
+			"A: { if (foo()) { break A; } bar(); };",
+			NoLabelsOptions{AllowLoop: true, AllowSwitch: false},
+			[]string{"unexpectedLabel", "unexpectedLabelInBreak"},
+		},
+		{
+			"A: if (a) { if (foo()) { break A; } bar(); };",
+			NoLabelsOptions{AllowLoop: true, AllowSwitch: false},
+			[]string{"unexpectedLabel", "unexpectedLabelInBreak"},
+		},
+		{
+			"A: switch (a) { case 0: break A; default: break; };",
+			NoLabelsOptions{AllowLoop: true, AllowSwitch: false},
+			[]string{"unexpectedLabel", "unexpectedLabelInBreak"},
+		},
 		{"A: var foo = 0;", NoLabelsOptions{AllowLoop: false, AllowSwitch: true}, []string{"unexpectedLabel"}},
-		{"A: break A;", NoLabelsOptions{AllowLoop: false, AllowSwitch: true}, []string{"unexpectedLabel", "unexpectedLabelInBreak"}},
-		{"A: { if (foo()) { break A; } bar(); };", NoLabelsOptions{AllowLoop: false, AllowSwitch: true}, []string{"unexpectedLabel", "unexpectedLabelInBreak"}},
-		{"A: if (a) { if (foo()) { break A; } bar(); };", NoLabelsOptions{AllowLoop: false, AllowSwitch: true}, []string{"unexpectedLabel", "unexpectedLabelInBreak"}},
-		{"A: while (a) { break A; }", NoLabelsOptions{AllowLoop: false, AllowSwitch: true}, []string{"unexpectedLabel", "unexpectedLabelInBreak"}},
-		{"A: do { if (b) { break A; } } while (a);", NoLabelsOptions{AllowLoop: false, AllowSwitch: true}, []string{"unexpectedLabel", "unexpectedLabelInBreak"}},
-		{"A: for (var a in obj) { for (;;) { switch (a) { case 0: break A; } } }", NoLabelsOptions{AllowLoop: false, AllowSwitch: true}, []string{"unexpectedLabel", "unexpectedLabelInBreak"}},
+		{
+			"A: break A;",
+			NoLabelsOptions{AllowLoop: false, AllowSwitch: true},
+			[]string{"unexpectedLabel", "unexpectedLabelInBreak"},
+		},
+		{
+			"A: { if (foo()) { break A; } bar(); };",
+			NoLabelsOptions{AllowLoop: false, AllowSwitch: true},
+			[]string{"unexpectedLabel", "unexpectedLabelInBreak"},
+		},
+		{
+			"A: if (a) { if (foo()) { break A; } bar(); };",
+			NoLabelsOptions{AllowLoop: false, AllowSwitch: true},
+			[]string{"unexpectedLabel", "unexpectedLabelInBreak"},
+		},
+		{
+			"A: while (a) { break A; }",
+			NoLabelsOptions{AllowLoop: false, AllowSwitch: true},
+			[]string{"unexpectedLabel", "unexpectedLabelInBreak"},
+		},
+		{
+			"A: do { if (b) { break A; } } while (a);",
+			NoLabelsOptions{AllowLoop: false, AllowSwitch: true},
+			[]string{"unexpectedLabel", "unexpectedLabelInBreak"},
+		},
+		{
+			"A: for (var a in obj) { for (;;) { switch (a) { case 0: break A; } } }",
+			NoLabelsOptions{AllowLoop: false, AllowSwitch: true},
+			[]string{"unexpectedLabel", "unexpectedLabelInBreak"},
+		},
 	}
 
 	for _, testCase := range cases {

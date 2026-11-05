@@ -13,11 +13,21 @@ func customHookSignature(function *Function) effectSignature {
 		if sourceFile := ast.GetSourceFileOfNode(function.Node); sourceFile != nil {
 			firstLine, _, _ := strings.Cut(sourceFile.Text(), "\n")
 			if strings.Contains(firstLine, "@enableAssumeHooksFollowRulesOfReact:false") {
-				return effectSignature{Receiver: EffectRead, Rest: EffectConditionallyMutate, HasRest: true, Result: mutation_aliasing.EffectValueMutable}
+				return effectSignature{
+					Receiver: EffectRead,
+					Rest:     EffectConditionallyMutate,
+					HasRest:  true,
+					Result:   mutation_aliasing.EffectValueMutable,
+				}
 			}
 		}
 	}
-	return effectSignature{Receiver: EffectRead, Rest: EffectFreeze, HasRest: true, Result: mutation_aliasing.EffectValueFrozen}
+	return effectSignature{
+		Receiver: EffectRead,
+		Rest:     EffectFreeze,
+		HasRest:  true,
+		Result:   mutation_aliasing.EffectValueFrozen,
+	}
 }
 
 // calleeProducers is the table isModuleHookCall resolves a callee through: each value's producing
@@ -43,7 +53,10 @@ func newCalleeProducers(function *Function) *calleeProducers {
 func (producers *calleeProducers) producer(identifier static_single_assignment.IdentifierId) InstructionValue {
 	if producers.table == nil {
 		producers.builds++
-		producers.table = make(map[static_single_assignment.IdentifierId]InstructionValue, len(producers.function.Instructions))
+		producers.table = make(
+			map[static_single_assignment.IdentifierId]InstructionValue,
+			len(producers.function.Instructions),
+		)
 		for _, candidate := range producers.function.Instructions {
 			if candidate == nil {
 				continue

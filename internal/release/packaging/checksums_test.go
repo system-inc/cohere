@@ -84,7 +84,10 @@ func TestChecksumsRefuseAPackageWithNothingToCheck(test *testing.T) {
 	test.Parallel()
 
 	output := test.TempDir()
-	if createDirectoryError := os.MkdirAll(filepath.Join(output, "cohere-linux-x64", "bin"), 0o755); createDirectoryError != nil {
+	if createDirectoryError := os.MkdirAll(
+		filepath.Join(output, "cohere-linux-x64", "bin"),
+		0o755,
+	); createDirectoryError != nil {
 		test.Fatal(createDirectoryError)
 	}
 	if checksums, checksumsError := Checksums(output, []string{"cohere-linux-x64"}); checksumsError == nil {
@@ -104,7 +107,10 @@ func TestChecksumsRefuseALinkInBin(test *testing.T) {
 	}
 	output := test.TempDir()
 	stageFixturePlatform(test, output, Target{GoOperatingSystem: "linux", GoArchitecture: "amd64"})
-	if symlinkError := os.Symlink("/bin/sh", filepath.Join(output, "cohere-linux-x64", "bin", "shell")); symlinkError != nil {
+	if symlinkError := os.Symlink(
+		"/bin/sh",
+		filepath.Join(output, "cohere-linux-x64", "bin", "shell"),
+	); symlinkError != nil {
 		test.Fatal(symlinkError)
 	}
 	if checksums, checksumsError := Checksums(output, []string{"cohere-linux-x64"}); checksumsError == nil {
@@ -127,7 +133,10 @@ func TestDispatcherPublishesItsChecksums(test *testing.T) {
 	if err != nil {
 		test.Fatal(err)
 	}
-	staged, err := buildDispatcherPackage(Options{ModuleDirectory: module, OutputDirectory: test.TempDir(), Version: "1.0.0"}, placeholderChecksums)
+	staged, err := buildDispatcherPackage(
+		Options{ModuleDirectory: module, OutputDirectory: test.TempDir(), Version: "1.0.0"},
+		placeholderChecksums,
+	)
 	if err != nil {
 		test.Fatal(err)
 	}
@@ -139,7 +148,10 @@ func TestDispatcherPublishesItsChecksums(test *testing.T) {
 		test.Fatalf("the dispatcher holds %q, not the sums it was given", shipped)
 	}
 
-	if _, buildDispatcherPackageError := buildDispatcherPackage(Options{ModuleDirectory: module, OutputDirectory: test.TempDir(), Version: "1.0.0"}, nil); buildDispatcherPackageError == nil {
+	if _, buildDispatcherPackageError := buildDispatcherPackage(
+		Options{ModuleDirectory: module, OutputDirectory: test.TempDir(), Version: "1.0.0"},
+		nil,
+	); buildDispatcherPackageError == nil {
 		test.Fatalf("a dispatcher was staged with no checksums, and its launcher would run nothing anywhere")
 	}
 }
@@ -155,7 +167,10 @@ func TestLauncherRunsAnIntactRelease(test *testing.T) {
 	result.requireRan(test, "--version")
 
 	if _, statError := os.Stat(installation.verdictPath(test)); statError != nil {
-		test.Fatalf("a passing check left no remembered verdict, so every run would hash the binaries again: %v", statError)
+		test.Fatalf(
+			"a passing check left no remembered verdict, so every run would hash the binaries again: %v",
+			statError,
+		)
 	}
 }
 
@@ -183,7 +198,11 @@ func TestLauncherRefusesATamperAfterAVerdictIsRemembered(test *testing.T) {
 		test.Fatal(err)
 	}
 	flipByte(test, installation.binary)
-	if changeTimesError := os.Chtimes(installation.binary, before.ModTime(), before.ModTime()); changeTimesError != nil {
+	if changeTimesError := os.Chtimes(
+		installation.binary,
+		before.ModTime(),
+		before.ModTime(),
+	); changeTimesError != nil {
 		test.Fatal(changeTimesError)
 	}
 	after, err := os.Stat(installation.binary)
@@ -250,7 +269,10 @@ func TestLauncherRefusesChecksumsThatDoNotListThisPlatform(test *testing.T) {
 	installation := stageInstalledRelease(test)
 	writeFile(test, installation.checksums, string(placeholderChecksums))
 	if strings.Contains(string(placeholderChecksums), installation.directoryName+"/") {
-		test.Fatalf("the placeholder lists %s, so this would not test a platform the sums leave out", installation.directoryName)
+		test.Fatalf(
+			"the placeholder lists %s, so this would not test a platform the sums leave out",
+			installation.directoryName,
+		)
 	}
 	installation.run(test, "--version").requireRefused(test, installation.checksums, "lists no binary for")
 }
@@ -306,10 +328,15 @@ type installedRelease struct {
 func stageInstalledRelease(test *testing.T) installedRelease {
 	test.Helper()
 	if runtime.GOOS == "windows" {
-		test.Skip("the fixture binary is a shell script; the Windows package is proven by check-platform-package.sh on Windows")
+		test.Skip(
+			"the fixture binary is a shell script; the Windows package is proven by check-platform-package.sh on Windows",
+		)
 	}
 	if _, lookPathError := exec.LookPath("node"); lookPathError != nil {
-		test.Fatalf("node is not installed, and the launcher is a Node script, so it cannot be tested: %v", lookPathError)
+		test.Fatalf(
+			"node is not installed, and the launcher is a Node script, so it cannot be tested: %v",
+			lookPathError,
+		)
 	}
 
 	// Through every link, as Node resolves the launcher and the package, so the paths its messages name
@@ -330,7 +357,10 @@ func stageInstalledRelease(test *testing.T) installedRelease {
 	if err != nil {
 		test.Fatal(err)
 	}
-	dispatcher, err := buildDispatcherPackage(Options{ModuleDirectory: module, OutputDirectory: output, Version: "1.0.0"}, checksums)
+	dispatcher, err := buildDispatcherPackage(
+		Options{ModuleDirectory: module, OutputDirectory: output, Version: "1.0.0"},
+		checksums,
+	)
 	if err != nil {
 		test.Fatal(err)
 	}
@@ -393,13 +423,22 @@ func (installation installedRelease) run(test *testing.T, argument string, envir
 	} else if runError != nil {
 		test.Fatalf("running the launcher: %v", runError)
 	}
-	return launcherRun{exitCode: exitCode, standardOutput: standardOutput.String(), standardError: standardError.String()}
+	return launcherRun{
+		exitCode:       exitCode,
+		standardOutput: standardOutput.String(),
+		standardError:  standardError.String(),
+	}
 }
 
 func (result launcherRun) requireRan(test *testing.T, argument string) {
 	test.Helper()
 	if result.exitCode != 0 || !strings.Contains(result.standardOutput, "fixture ran: "+argument) {
-		test.Fatalf("the launcher did not run the intact binary: exit %d\nstdout: %s\nstderr: %s", result.exitCode, result.standardOutput, result.standardError)
+		test.Fatalf(
+			"the launcher did not run the intact binary: exit %d\nstdout: %s\nstderr: %s",
+			result.exitCode,
+			result.standardOutput,
+			result.standardError,
+		)
 	}
 }
 
@@ -408,7 +447,12 @@ func (result launcherRun) requireRan(test *testing.T, argument string) {
 func (result launcherRun) requireRefused(test *testing.T, file string, reason string) {
 	test.Helper()
 	if result.exitCode == 0 {
-		test.Fatalf("the launcher exited zero over %s\nstdout: %s\nstderr: %s", file, result.standardOutput, result.standardError)
+		test.Fatalf(
+			"the launcher exited zero over %s\nstdout: %s\nstderr: %s",
+			file,
+			result.standardOutput,
+			result.standardError,
+		)
 	}
 	if strings.Contains(strings.ToLower(result.standardOutput), "fixture ran") {
 		test.Fatalf("the launcher refused, but only after running the binary:\n%s", result.standardOutput)

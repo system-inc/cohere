@@ -19,11 +19,14 @@ import (
 // TestEveryDeclaredKeyHasASettingsCase fails on a declared key with no entry here, so an option that
 // lands later gets its settings case in the same commit.
 var settingsSamples = map[string][2]string{
-	"entryPoint":             {`"./settings.css"`, `"./options.css"`},
-	"tailwindConfig":         {`"./settings.css"`, `"./options.css"`},
-	"cwd":                    {`"settings"`, `"options"`},
-	"tsconfig":               {`"settings.json"`, `"options.json"`},
-	"selectors":              {`[{"kind":"attribute","name":"fromSettings"}]`, `[{"kind":"callee","name":"fromOptions"}]`},
+	"entryPoint":     {`"./settings.css"`, `"./options.css"`},
+	"tailwindConfig": {`"./settings.css"`, `"./options.css"`},
+	"cwd":            {`"settings"`, `"options"`},
+	"tsconfig":       {`"settings.json"`, `"options.json"`},
+	"selectors": {
+		`[{"kind":"attribute","name":"fromSettings"}]`,
+		`[{"kind":"callee","name":"fromOptions"}]`,
+	},
 	"attributes":             {`["fromSettings"]`, `["fromOptions"]`},
 	"callees":                {`["fromSettings"]`, `["fromOptions"]`},
 	"variables":              {`["fromSettings"]`, `["fromOptions"]`},
@@ -192,8 +195,15 @@ func TestSplitTailwindSettingsRefusesWhatNoRuleReads(test *testing.T) {
 	}
 	for _, testCase := range testCases {
 		_, splitTailwindSettingsError := splitTailwindSettings([]byte(testCase.block))
-		if splitTailwindSettingsError == nil || !strings.Contains(splitTailwindSettingsError.Error(), testCase.refused) {
-			test.Errorf("%s: %s was not refused naming %s: %v", testCase.name, testCase.block, testCase.refused, splitTailwindSettingsError)
+		if splitTailwindSettingsError == nil ||
+			!strings.Contains(splitTailwindSettingsError.Error(), testCase.refused) {
+			test.Errorf(
+				"%s: %s was not refused naming %s: %v",
+				testCase.name,
+				testCase.block,
+				testCase.refused,
+				splitTailwindSettingsError,
+			)
 		}
 	}
 
@@ -251,7 +261,11 @@ func TestAnOutsiderIsReadWithUpstreamsDefaults(test *testing.T) {
 		`const Panel = twc.section((properties) => { return properties.open ? 'p-2 p-2' : 'p-4'; });`,
 	}
 	for _, source := range read {
-		rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoDuplicateClasses, "Component.tsx", source, decoded), "duplicateClass")
+		rule_testing.ExpectFindings(
+			test,
+			rule_testing.RunWithOptions(test, NoDuplicateClasses, "Component.tsx", source, decoded),
+			"duplicateClass",
+		)
 	}
 	unread := []string{
 		`const merged = mergeClassNames('flex flex');`,
@@ -261,7 +275,10 @@ func TestAnOutsiderIsReadWithUpstreamsDefaults(test *testing.T) {
 		`const Card = twc.div(function named() { return 'flex flex'; });`,
 	}
 	for _, source := range unread {
-		rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoDuplicateClasses, "Component.tsx", source, decoded))
+		rule_testing.ExpectClean(
+			test,
+			rule_testing.RunWithOptions(test, NoDuplicateClasses, "Component.tsx", source, decoded),
+		)
 	}
 }
 
@@ -282,14 +299,21 @@ func TestOurSettingsReadOurMatchers(test *testing.T) {
 		`const element = <div className="flex flex" />;`,
 	}
 	for _, source := range read {
-		rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoDuplicateClasses, "Component.tsx", source, decoded), "duplicateClass")
+		rule_testing.ExpectFindings(
+			test,
+			rule_testing.RunWithOptions(test, NoDuplicateClasses, "Component.tsx", source, decoded),
+			"duplicateClass",
+		)
 	}
 	unread := []string{
 		`const merged = cn('flex flex');`,
 		`const classes = 'flex flex';`,
 	}
 	for _, source := range unread {
-		rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoDuplicateClasses, "Component.tsx", source, decoded))
+		rule_testing.ExpectClean(
+			test,
+			rule_testing.RunWithOptions(test, NoDuplicateClasses, "Component.tsx", source, decoded),
+		)
 	}
 }
 
@@ -300,8 +324,20 @@ func TestAnEmptyKindReadsNothingOfIt(test *testing.T) {
 	if err != nil {
 		test.Fatal(err)
 	}
-	rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoDuplicateClasses, "Component.tsx", `const merged = cn('flex flex');`, decoded))
-	rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoDuplicateClasses, "Component.tsx", `const classNames = 'flex flex';`, decoded), "duplicateClass")
+	rule_testing.ExpectClean(test, rule_testing.RunWithOptions(
+		test,
+		NoDuplicateClasses,
+		"Component.tsx",
+		`const merged = cn('flex flex');`,
+		decoded,
+	))
+	rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(
+		test,
+		NoDuplicateClasses,
+		"Component.tsx",
+		`const classNames = 'flex flex';`,
+		decoded,
+	), "duplicateClass")
 }
 
 // TestNamesMatchAsUpstreamsMatchesName pins utils.js's matchesName: the pattern's first match must
@@ -367,7 +403,11 @@ func TestCalleeNameAndPathIsUpstreamsGetESCalleeName(test *testing.T) {
 	for _, testCase := range testCases {
 		source := "class C extends B { m() { " + testCase.callee + "('flex'); super.cn('flex'); } }"
 		fileName := tspath.NormalizePath("/Component.tsx")
-		sourceFile := parser.ParseSourceFile(ast.SourceFileParseOptions{FileName: tspath.RootedFilePath(fileName), PathKey: tspath.PathKey(fileName)}, source, core.ScriptKindTSX)
+		sourceFile := parser.ParseSourceFile(
+			ast.SourceFileParseOptions{FileName: tspath.RootedFilePath(fileName), PathKey: tspath.PathKey(fileName)},
+			source,
+			core.ScriptKindTSX,
+		)
 		var calls []*ast.Node
 		var walk func(node *ast.Node) bool
 		walk = func(node *ast.Node) bool {
@@ -382,10 +422,22 @@ func TestCalleeNameAndPathIsUpstreamsGetESCalleeName(test *testing.T) {
 			test.Fatalf("%s: found %d calls, want 2", testCase.callee, len(calls))
 		}
 		if name, path := calleeNameAndPath(calls[0]); name != testCase.name || path != testCase.path {
-			test.Errorf("%s: name %q path %q, want %q and %q", testCase.callee, name, path, testCase.name, testCase.path)
+			test.Errorf(
+				"%s: name %q path %q, want %q and %q",
+				testCase.callee,
+				name,
+				path,
+				testCase.name,
+				testCase.path,
+			)
 		}
 		if name := calleeName(calls[0]); name != testCase.name {
-			test.Errorf("%s: calleeName %q, want %q, the name calleeNameAndPath gives", testCase.callee, name, testCase.name)
+			test.Errorf(
+				"%s: calleeName %q, want %q, the name calleeNameAndPath gives",
+				testCase.callee,
+				name,
+				testCase.name,
+			)
 		}
 		if name, path := calleeNameAndPath(calls[1]); name != "" || path != "" || calleeName(calls[1]) != "" {
 			test.Errorf("super.cn: name %q path %q, want neither", name, path)

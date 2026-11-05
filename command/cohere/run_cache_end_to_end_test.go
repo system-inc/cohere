@@ -86,7 +86,9 @@ func TestRunCacheEndToEnd(test *testing.T) {
 	// so it comes off before a comparison and is required or forbidden separately per scenario.
 	// The types phase's clause says how many files' semantic diagnostics were replayed; a cold run never has it.
 	typesClause := regexp.MustCompile(`; \d+ of \d+ files' semantic diagnostics replayed from cache`)
-	layerTwoClause := regexp.MustCompile(`; \d+ of \d+ files replayed from cache( \(type-aware rules ran again on \d+ of them, shape-keyed on \d+\))?( \(design-system rules ran again on \d+ of them\))?( \(derived rules ran again on \d+ of them\))?`)
+	layerTwoClause := regexp.MustCompile(
+		`; \d+ of \d+ files replayed from cache( \(type-aware rules ran again on \d+ of them, shape-keyed on \d+\))?( \(design-system rules ran again on \d+ of them\))?( \(derived rules ran again on \d+ of them\))?`,
+	)
 	// A cold run is a `--no-cache` run, which says so in a line no cached run prints.
 	cacheOffLine := regexp.MustCompile(`(?m)^  cache: off, by --no-cache.*\n`)
 	// A cached run says how many shapes it keyed on content (#5txm9gg); a cold run keys none, so the line is
@@ -103,7 +105,13 @@ func TestRunCacheEndToEnd(test *testing.T) {
 	footerLine := regexp.MustCompile(`(?m)^(✓ 💎|✗ ☠️) .*\n?`)
 	normalized := func(output string) string {
 		output = foldNodeCounts(missLine.ReplaceAllString(contentKeyedLine.ReplaceAllString(output, ""), ""))
-		return typesClause.ReplaceAllString(footerLine.ReplaceAllString(totalLine.ReplaceAllString(cacheOffLine.ReplaceAllString(layerTwoClause.ReplaceAllString(durations.ReplaceAllString(output, "T"), ""), ""), ""), ""), "")
+		return typesClause.ReplaceAllString(footerLine.ReplaceAllString(totalLine.ReplaceAllString(
+			cacheOffLine.ReplaceAllString(
+				layerTwoClause.ReplaceAllString(durations.ReplaceAllString(output, "T"), ""),
+				"",
+			),
+			"",
+		), ""), "")
 	}
 	keepLines := func(output string, drop ...string) string {
 		kept := []string{}
@@ -119,13 +127,34 @@ func TestRunCacheEndToEnd(test *testing.T) {
 	// invocation, which a replay deliberately does not print. Its own framing comes off first. The footer is
 	// the invocation's too, with its own time, and a replay renders its own (required below).
 	verdict := func(cold string) string {
-		return keepLines(cold, "graph built in ", "types: ", "lint: ", "phases: ", "  total ", "  memory: ", "  cache: off, by --no-cache", "✓ 💎 ", "✗ ☠️ ")
+		return keepLines(
+			cold,
+			"graph built in ",
+			"types: ",
+			"lint: ",
+			"phases: ",
+			"  total ",
+			"  memory: ",
+			"  cache: off, by --no-cache",
+			"✓ 💎 ",
+			"✗ ☠️ ",
+		)
 	}
 	// A replay says which run a phase's line came from; that label comes off before the comparison,
 	// and is required separately below so a replay that lost it fails.
-	provenance := regexp.MustCompile(`^(fix|format scope|nested repositories) \(from the cached run at \d\d:\d\d:\d\d\): `)
+	provenance := regexp.MustCompile(
+		`^(fix|format scope|nested repositories) \(from the cached run at \d\d:\d\d:\d\d\): `,
+	)
 	replayBody := func(replay string) string {
-		lines := strings.Split(keepLines(contentKeyedLine.ReplaceAllString(replay, ""), "cached: ", "phases: replayed ", "  this run: ", "  memory: ", "✓ 💎 ", "✗ ☠️ "), "\n")
+		lines := strings.Split(keepLines(
+			contentKeyedLine.ReplaceAllString(replay, ""),
+			"cached: ",
+			"phases: replayed ",
+			"  this run: ",
+			"  memory: ",
+			"✓ 💎 ",
+			"✗ ☠️ ",
+		), "\n")
 		for index, line := range lines {
 			lines[index] = provenance.ReplaceAllString(line, "$1: ")
 		}
@@ -155,7 +184,11 @@ func TestRunCacheEndToEnd(test *testing.T) {
 				}
 				time.Sleep(10 * time.Millisecond)
 				fixture.write("source/a.ts", "export const a: string = 1;\n")
-				if changeTimesError := os.Chtimes(filepath.Join(fixture.root, "source/a.ts"), information.ModTime(), information.ModTime()); changeTimesError != nil {
+				if changeTimesError := os.Chtimes(
+					filepath.Join(fixture.root, "source/a.ts"),
+					information.ModTime(),
+					information.ModTime(),
+				); changeTimesError != nil {
 					fixture.t.Fatal(changeTimesError)
 				}
 			}},
@@ -171,35 +204,56 @@ func TestRunCacheEndToEnd(test *testing.T) {
 			func(fixture *runCacheFixture) { fixture.remove("source/nested/b.ts") }},
 		{"the lint config changed", false, nil,
 			func(fixture *runCacheFixture) {
-				fixture.write("CohereSettings.json", `{"rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off","no-debugger":"error","no-var":"error","prefer-const":"error"}}`)
+				fixture.write(
+					"CohereSettings.json",
+					`{"rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off","no-debugger":"error","no-var":"error","prefer-const":"error"}}`,
+				)
 			}},
 		// Only the base is edited, and it is untracked, so git reports the same changed files before and
 		// after and the scope fact cannot see it. The run cache's declared inputs and the findings
 		// cache's key must each name every file in the extends chain, or both replay the old verdict.
 		{"a base the lint config extends changed", false,
 			func(fixture *runCacheFixture) {
-				fixture.write("lint/base.json", `{"rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off","no-debugger":"error","no-var":"error"}}`)
-				fixture.write("CohereSettings.json", `{"extends":"./lint/base.json","rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off"}}`)
+				fixture.write(
+					"lint/base.json",
+					`{"rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off","no-debugger":"error","no-var":"error"}}`,
+				)
+				fixture.write(
+					"CohereSettings.json",
+					`{"extends":"./lint/base.json","rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off"}}`,
+				)
 			},
 			func(fixture *runCacheFixture) {
-				fixture.write("lint/base.json", `{"rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off","no-debugger":"error","no-var":"error","prefer-const":"error"}}`)
+				fixture.write(
+					"lint/base.json",
+					`{"rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off","no-debugger":"error","no-var":"error","prefer-const":"error"}}`,
+				)
 			}},
 		// The two above under a config that names its sets, which is read on its own goroutine beside the graph
 		// build (lintConfigAhead) rather than after it. The read moved; the declaration of what it read did not,
 		// and these show the run cache still names the config and the base it extends on that path.
 		{"the lint config changed, on a config read ahead of the build", false,
 			func(fixture *runCacheFixture) {
-				fixture.write("CohereSettings.json", `{"extends":["cohere:react"],"rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off","no-debugger":"error","no-var":"error"}}`)
+				fixture.write(
+					"CohereSettings.json",
+					`{"extends":["cohere:react"],"rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off","no-debugger":"error","no-var":"error"}}`,
+				)
 				fixture.requireConfigReadAhead()
 			},
 			func(fixture *runCacheFixture) {
-				fixture.write("CohereSettings.json", `{"extends":["cohere:react"],"rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off","no-debugger":"error","no-var":"error","prefer-const":"error"}}`)
+				fixture.write(
+					"CohereSettings.json",
+					`{"extends":["cohere:react"],"rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off","no-debugger":"error","no-var":"error","prefer-const":"error"}}`,
+				)
 			}},
 		{"a base the lint config extends changed, on a config read ahead of the build", false,
 			func(fixture *runCacheFixture) {
 				// A base beside a set may configure only rules no set in the chain does, so it holds one of its own.
 				fixture.write("lint/base.json", `{"rules":{"no-console":"off"}}`)
-				fixture.write("CohereSettings.json", `{"extends":["cohere:react","./lint/base.json"],"rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off"}}`)
+				fixture.write(
+					"CohereSettings.json",
+					`{"extends":["cohere:react","./lint/base.json"],"rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off"}}`,
+				)
 				fixture.requireConfigReadAhead()
 			},
 			func(fixture *runCacheFixture) {
@@ -207,7 +261,10 @@ func TestRunCacheEndToEnd(test *testing.T) {
 			}},
 		{"the tsconfig changed", false, nil,
 			func(fixture *runCacheFixture) {
-				fixture.write("tsconfig.json", `{"compilerOptions":{"strict":false,"noEmit":true,"target":"es2022","module":"esnext","moduleResolution":"bundler","incremental":true,"tsBuildInfoFile":".cache/ts/tsconfig.tsbuildinfo"},"include":["source"]}`)
+				fixture.write(
+					"tsconfig.json",
+					`{"compilerOptions":{"strict":false,"noEmit":true,"target":"es2022","module":"esnext","moduleResolution":"bundler","incremental":true,"tsBuildInfoFile":".cache/ts/tsconfig.tsbuildinfo"},"include":["source"]}`,
+				)
 			}},
 		{"package.json edited in place", true, nil,
 			func(fixture *runCacheFixture) {
@@ -247,14 +304,22 @@ func TestRunCacheEndToEnd(test *testing.T) {
 			replayedAny := layerTwoClause.MatchString(afterChange)
 			printedLint := regexp.MustCompile(`(?m)^lint: `).MatchString(afterChange)
 			if scenario.layerTwo && printedLint && !replayedAny {
-				test.Errorf("the run after the change served nothing from the findings cache, though its other files were unchanged:\n%s", afterChange)
+				test.Errorf(
+					"the run after the change served nothing from the findings cache, though its other files were unchanged:\n%s",
+					afterChange,
+				)
 			}
 			if !scenario.layerTwo && replayedAny {
 				test.Fatalf("the findings cache served files after a change to its key:\n%s", afterChange)
 			}
 			if normalized(afterChange) != normalized(cold) || afterChangeExit != coldExit {
-				test.Fatalf("the run after the change differs from a cold run (exit %d against %d):\n--- after the change\n%s\n--- cold\n%s",
-					afterChangeExit, coldExit, afterChange, cold)
+				test.Fatalf(
+					"the run after the change differs from a cold run (exit %d against %d):\n--- after the change\n%s\n--- cold\n%s",
+					afterChangeExit,
+					coldExit,
+					afterChange,
+					cold,
+				)
 			}
 
 			next, nextExit := fixture.run(true)
@@ -267,8 +332,13 @@ func TestRunCacheEndToEnd(test *testing.T) {
 				test.Fatalf("the replay printed the fix line as though the fix phase had just run:\n%s", next)
 			}
 			if replayBody(next) != verdict(cold) || nextExit != coldExit {
-				test.Fatalf("the replay is not the cold run's verdict (exit %d against %d):\n--- replay\n%s\n--- cold verdict\n%s",
-					nextExit, coldExit, replayBody(next), verdict(cold))
+				test.Fatalf(
+					"the replay is not the cold run's verdict (exit %d against %d):\n--- replay\n%s\n--- cold verdict\n%s",
+					nextExit,
+					coldExit,
+					replayBody(next),
+					verdict(cold),
+				)
 			}
 			// And it ends on a footer of its own, which says it was replayed rather than claiming the cold run's.
 			if !regexp.MustCompile(`(?m)^(✓ 💎|✗ ☠️) [0-9.]+s(?: •[^\n]*)? • replayed`).MatchString(next) {
@@ -305,8 +375,13 @@ func TestRunCacheEndToEnd(test *testing.T) {
 			replayed, replayedExit := fixture.run(true)
 			cold, coldExit := fixture.run(false)
 			if isRunCacheReplay(replayed) && (replayBody(replayed) != verdict(cold) || replayedExit != coldExit) {
-				test.Fatalf("the replay is not the cold run's verdict (exit %d against %d):\n--- replay\n%s\n--- cold verdict\n%s",
-					replayedExit, coldExit, replayBody(replayed), verdict(cold))
+				test.Fatalf(
+					"the replay is not the cold run's verdict (exit %d against %d):\n--- replay\n%s\n--- cold verdict\n%s",
+					replayedExit,
+					coldExit,
+					replayBody(replayed),
+					verdict(cold),
+				)
 			}
 		})
 	}
@@ -350,8 +425,13 @@ func TestRunCacheEndToEnd(test *testing.T) {
 		}
 		cold, coldExit := fixture.run(false, "--no-fix")
 		if replayBody(replayed) != verdict(cold) || replayedExit != coldExit {
-			test.Fatalf("the --no-fix replay is not the cold --no-fix verdict (exit %d against %d):\n--- replay\n%s\n--- cold verdict\n%s",
-				replayedExit, coldExit, replayBody(replayed), verdict(cold))
+			test.Fatalf(
+				"the --no-fix replay is not the cold --no-fix verdict (exit %d against %d):\n--- replay\n%s\n--- cold verdict\n%s",
+				replayedExit,
+				coldExit,
+				replayBody(replayed),
+				verdict(cold),
+			)
 		}
 		if bare, _ := fixture.run(true); !isRunCacheReplay(bare) {
 			test.Fatalf("the bare run lost its own recording to the --no-fix one:\n%s", bare)
@@ -384,7 +464,10 @@ func TestRunCacheEndToEnd(test *testing.T) {
 			test.Fatal(walkError)
 		}
 		// Every run here leaves formatting out (see run), so the bare run is recorded as `--no-format`.
-		if dump, _ := fixture.run(true, "--cache-dump"); !strings.Contains(dump, "runs: ") || !strings.Contains(dump, "--no-format: recorded ") {
+		if dump, _ := fixture.run(
+			true,
+			"--cache-dump",
+		); !strings.Contains(dump, "runs: ") || !strings.Contains(dump, "--no-format: recorded ") {
 			test.Fatalf("--cache-dump did not show the bare run it just recorded:\n%s", dump)
 		}
 		for _, table := range tables {
@@ -402,11 +485,18 @@ func TestRunCacheEndToEnd(test *testing.T) {
 			test.Fatalf("a corrupt table replayed:\n%s", discarded)
 		}
 		if !strings.Contains(discarded, "note: cache table discarded") {
-			test.Fatalf("the discard was silent, so a table thrown away every run would look merely cold:\n%s", discarded)
+			test.Fatalf(
+				"the discard was silent, so a table thrown away every run would look merely cold:\n%s",
+				discarded,
+			)
 		}
 		withoutNote := keepLines(discarded, "note: cache table discarded")
 		if normalized(withoutNote) != normalized(cold) || discardedExit != coldExit {
-			test.Fatalf("the run after the discard differs from a cold run:\n--- after discard\n%s\n--- cold\n%s", discarded, cold)
+			test.Fatalf(
+				"the run after the discard differs from a cold run:\n--- after discard\n%s\n--- cold\n%s",
+				discarded,
+				cold,
+			)
 		}
 		if again, _ := fixture.run(true); !isRunCacheReplay(again) || strings.Contains(again, "discarded") {
 			test.Fatalf("the run after the discard did not write a table the next run could replay:\n%s", again)
@@ -424,11 +514,20 @@ func TestFindingsCacheKeysNoHtmlLinkForPagesOnItsConfiguredPagesDirectory(test *
 	test.Parallel()
 	binary := buildCohere(test)
 	fixture := newRunCacheFixture(test, binary)
-	fixture.write("tsconfig.json", `{"compilerOptions":{"strict":true,"noEmit":true,"target":"es2022","module":"esnext","moduleResolution":"bundler","jsx":"preserve","incremental":true,"tsBuildInfoFile":".cache/ts/tsconfig.tsbuildinfo"},"include":["source"]}`)
-	fixture.write("CohereSettings.json", `{"plugins":["@next"],"rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off",`+
-		`"no-debugger":"error","@next/next/no-html-link-for-pages":["error","custom"]}}`)
+	fixture.write(
+		"tsconfig.json",
+		`{"compilerOptions":{"strict":true,"noEmit":true,"target":"es2022","module":"esnext","moduleResolution":"bundler","jsx":"preserve","incremental":true,"tsBuildInfoFile":".cache/ts/tsconfig.tsbuildinfo"},"include":["source"]}`,
+	)
+	fixture.write(
+		"CohereSettings.json",
+		`{"plugins":["@next"],"rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off",`+
+			`"no-debugger":"error","@next/next/no-html-link-for-pages":["error","custom"]}}`,
+	)
 	// Without React's types an intrinsic element is a type error, and a run whose types bail never lints.
-	fixture.write("source/jsx.d.ts", "declare namespace JSX {\n    interface IntrinsicElements {\n        [elementName: string]: unknown;\n    }\n}\n")
+	fixture.write(
+		"source/jsx.d.ts",
+		"declare namespace JSX {\n    interface IntrinsicElements {\n        [elementName: string]: unknown;\n    }\n}\n",
+	)
 	fixture.write("source/link.tsx", "export const TeamLink = () => <a href=\"/team\">Team</a>;\n")
 	fixture.write("custom/about.tsx", "export {};\n")
 	fixture.write("pages/team.tsx", "export {};\n")
@@ -442,8 +541,12 @@ func TestFindingsCacheKeysNoHtmlLinkForPagesOnItsConfiguredPagesDirectory(test *
 		output = lintLine.ReplaceAllString(durations.ReplaceAllString(output, "T"), "")
 		kept := []string{}
 		for _, line := range strings.Split(output, "\n") {
-			if !strings.HasPrefix(line, "  ") && !strings.HasPrefix(line, "✓") && !strings.HasPrefix(line, "✗") &&
-				!strings.HasPrefix(line, "cache: ") && !strings.HasPrefix(line, "graph built in ") && !strings.HasPrefix(line, "types: ") &&
+			if !strings.HasPrefix(line, "  ") &&
+				!strings.HasPrefix(line, "✓") &&
+				!strings.HasPrefix(line, "✗") &&
+				!strings.HasPrefix(line, "cache: ") &&
+				!strings.HasPrefix(line, "graph built in ") &&
+				!strings.HasPrefix(line, "types: ") &&
 				!strings.HasPrefix(line, "phases: ") {
 				kept = append(kept, line)
 			}
@@ -469,7 +572,13 @@ func TestFindingsCacheKeysNoHtmlLinkForPagesOnItsConfiguredPagesDirectory(test *
 		test.Errorf("an edit outside the routes ran the derived rule again on replayed files:\n%s", warm)
 	}
 	if verdict(warm) != verdict(cold) || warmExit != coldExit {
-		test.Fatalf("the warm run differs from a cold one (exit %d against %d):\n--- warm\n%s\n--- cold\n%s", warmExit, coldExit, warm, cold)
+		test.Fatalf(
+			"the warm run differs from a cold one (exit %d against %d):\n--- warm\n%s\n--- cold\n%s",
+			warmExit,
+			coldExit,
+			warm,
+			cold,
+		)
 	}
 
 	// A page added under the configured directory: no file the rule checks changed, and the anchor now reports.
@@ -477,17 +586,31 @@ func TestFindingsCacheKeysNoHtmlLinkForPagesOnItsConfiguredPagesDirectory(test *
 	warm, warmExit = fixture.run(true, "--no-fix")
 	cold, coldExit = fixture.run(false, "--no-fix")
 	if isRunCacheReplay(warm) {
-		test.Fatalf("a page added under the configured directory was not noticed, and the run was replayed whole:\n%s", warm)
+		test.Fatalf(
+			"a page added under the configured directory was not noticed, and the run was replayed whole:\n%s",
+			warm,
+		)
 	}
 	if !strings.Contains(cold, finding) {
-		test.Fatalf("a cold run does not report the anchor after its page was added, so this case proves nothing:\n%s", cold)
+		test.Fatalf(
+			"a cold run does not report the anchor after its page was added, so this case proves nothing:\n%s",
+			cold,
+		)
 	}
 	if !strings.Contains(lintLine.FindString(warm), "derived rules ran again") {
-		test.Errorf("a page added under the configured directory did not run the derived rule again on the replayed files:\n%s", warm)
+		test.Errorf(
+			"a page added under the configured directory did not run the derived rule again on the replayed files:\n%s",
+			warm,
+		)
 	}
 	if verdict(warm) != verdict(cold) || warmExit != coldExit {
-		test.Fatalf("after a page was added the warm run differs from a cold one (exit %d against %d):\n--- warm\n%s\n--- cold\n%s",
-			warmExit, coldExit, warm, cold)
+		test.Fatalf(
+			"after a page was added the warm run differs from a cold one (exit %d against %d):\n--- warm\n%s\n--- cold\n%s",
+			warmExit,
+			coldExit,
+			warm,
+			cold,
+		)
 	}
 }
 
@@ -504,8 +627,14 @@ type runCacheFixture struct {
 func newRunCacheFixture(test *testing.T, binary string) *runCacheFixture {
 	test.Helper()
 	fixture := &runCacheFixture{t: test, binary: binary, root: test.TempDir(), home: test.TempDir()}
-	fixture.write("tsconfig.json", `{"compilerOptions":{"strict":true,"noEmit":true,"target":"es2022","module":"esnext","moduleResolution":"bundler","incremental":true,"tsBuildInfoFile":".cache/ts/tsconfig.tsbuildinfo"},"include":["source"]}`)
-	fixture.write("CohereSettings.json", `{"rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off","no-debugger":"error","no-var":"error"}}`)
+	fixture.write(
+		"tsconfig.json",
+		`{"compilerOptions":{"strict":true,"noEmit":true,"target":"es2022","module":"esnext","moduleResolution":"bundler","incremental":true,"tsBuildInfoFile":".cache/ts/tsconfig.tsbuildinfo"},"include":["source"]}`,
+	)
+	fixture.write(
+		"CohereSettings.json",
+		`{"rules":{"nexus/consistency-no-ambiguous-identifier":"off","@typescript-eslint/no-inferrable-types":"off","no-debugger":"error","no-var":"error"}}`,
+	)
 	fixture.write("package.json", `{"name":"fixture","private":true,"type":"module"}`)
 	fixture.write(".gitignore", ".cache/\nnode_modules/\n")
 	fixture.write("source/a.ts", "export const a: number = 1;\n")
@@ -597,7 +726,10 @@ func (fixture *runCacheFixture) establishHit(arguments ...string) {
 	fixture.t.Helper()
 	fixture.run(true, arguments...)
 	if output, _ := fixture.run(true, arguments...); !isRunCacheReplay(output) {
-		fixture.t.Fatalf("an unchanged tree did not replay, so nothing below can show a change was noticed:\n%s", output)
+		fixture.t.Fatalf(
+			"an unchanged tree did not replay, so nothing below can show a change was noticed:\n%s",
+			output,
+		)
 	}
 }
 

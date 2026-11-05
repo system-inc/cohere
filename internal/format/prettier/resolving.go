@@ -38,7 +38,10 @@ type Resolving struct {
 // config cohere refuses, stops the run before any phase does work, rather than failing on the first
 // file after the fix phase has begun.
 func NewResolving(startDirectory string) (*Resolving, error) {
-	resolving := &Resolving{engines: map[formatoptions.Options]*Engine{}, byDirectory: map[string]formatoptions.Resolution{}}
+	resolving := &Resolving{
+		engines:     map[formatoptions.Options]*Engine{},
+		byDirectory: map[string]formatoptions.Resolution{},
+	}
 	resolution, err := resolving.resolve(startDirectory)
 	if err != nil {
 		return nil, err

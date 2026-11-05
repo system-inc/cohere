@@ -126,7 +126,10 @@ func (reactiveContext *reactiveContext) schedule(block static_single_assignment.
 	id := reactiveContext.nextScheduleId
 	reactiveContext.nextScheduleId++
 	reactiveContext.scheduled[block] = true
-	reactiveContext.stack = append(reactiveContext.stack, controlFlowTarget{block: block, id: id, kind: kind, ownsBlock: true})
+	reactiveContext.stack = append(
+		reactiveContext.stack,
+		controlFlowTarget{block: block, id: id, kind: kind, ownsBlock: true},
+	)
 	return id
 }
 
@@ -190,7 +193,9 @@ func (reactiveContext *reactiveContext) unscheduleAll(ids []int) {
 // The `hasPrecedingLoop` tracking is what separates the second from the third, and getting it wrong
 // produces a program that breaks out of the wrong loop while passing any test that only checks
 // which statements exist.
-func (reactiveContext *reactiveContext) breakTarget(block static_single_assignment.BlockId) (ReactiveTerminalTargetKind, bool) {
+func (reactiveContext *reactiveContext) breakTarget(
+	block static_single_assignment.BlockId,
+) (ReactiveTerminalTargetKind, bool) {
 	hasPrecedingLoop := false
 	for index := len(reactiveContext.stack) - 1; index >= 0; index-- {
 		target := reactiveContext.stack[index]
@@ -218,7 +223,9 @@ func (reactiveContext *reactiveContext) breakTarget(block static_single_assignme
 }
 
 // continueTarget decides how a goto to a loop's back edge should be printed.
-func (reactiveContext *reactiveContext) continueTarget(block static_single_assignment.BlockId) (ReactiveTerminalTargetKind, bool) {
+func (reactiveContext *reactiveContext) continueTarget(
+	block static_single_assignment.BlockId,
+) (ReactiveTerminalTargetKind, bool) {
 	hasPrecedingLoop := false
 	for index := len(reactiveContext.stack) - 1; index >= 0; index-- {
 		target := reactiveContext.stack[index]
@@ -528,7 +535,11 @@ func (reactiveContext *reactiveContext) visitTerminal(block *BasicBlock, into *R
 		reactiveContext.emitGoto(terminal, into)
 
 	case *If:
-		fallthroughId, scheduled := reactiveContext.scheduleFallthrough(terminal.Fallthrough, controlFlowIf, &scheduleIds)
+		fallthroughId, scheduled := reactiveContext.scheduleFallthrough(
+			terminal.Fallthrough,
+			controlFlowIf,
+			&scheduleIds,
+		)
 		consequent := reactiveContext.traverse(terminal.Consequent)
 		var alternate *ReactiveBlock
 		if terminal.Alternate != terminal.Fallthrough {
@@ -563,7 +574,11 @@ func (reactiveContext *reactiveContext) visitTerminal(block *BasicBlock, into *R
 		})
 
 	case *Switch:
-		fallthroughId, scheduled := reactiveContext.scheduleFallthrough(terminal.Fallthrough, controlFlowSwitch, &scheduleIds)
+		fallthroughId, scheduled := reactiveContext.scheduleFallthrough(
+			terminal.Fallthrough,
+			controlFlowSwitch,
+			&scheduleIds,
+		)
 		// # Cases are walked in REVERSE, and each is scheduled AFTER it is traversed
 		//
 		// Both halves are upstream's and both are load-bearing. A `switch` with fallthrough has
@@ -666,7 +681,11 @@ func (reactiveContext *reactiveContext) visitTerminal(block *BasicBlock, into *R
 		reactiveContext.visitFallthrough(fallthroughId, into)
 
 	case *Label:
-		fallthroughId, scheduled := reactiveContext.scheduleFallthrough(terminal.Fallthrough, controlFlowIf, &scheduleIds)
+		fallthroughId, scheduled := reactiveContext.scheduleFallthrough(
+			terminal.Fallthrough,
+			controlFlowIf,
+			&scheduleIds,
+		)
 		body := reactiveContext.traverse(terminal.Block)
 		reactiveContext.unscheduleAll(scheduleIds)
 		*into = append(*into, &ReactiveTerminalStatement{
@@ -676,7 +695,11 @@ func (reactiveContext *reactiveContext) visitTerminal(block *BasicBlock, into *R
 		reactiveContext.visitFallthrough(fallthroughId, into)
 
 	case *Try:
-		fallthroughId, scheduled := reactiveContext.scheduleFallthrough(terminal.Fallthrough, controlFlowIf, &scheduleIds)
+		fallthroughId, scheduled := reactiveContext.scheduleFallthrough(
+			terminal.Fallthrough,
+			controlFlowIf,
+			&scheduleIds,
+		)
 		reactiveContext.catchHandlers[terminal.Handler] = true
 		body := reactiveContext.traverse(terminal.Block)
 		handler := reactiveContext.traverse(terminal.Handler)
@@ -691,7 +714,11 @@ func (reactiveContext *reactiveContext) visitTerminal(block *BasicBlock, into *R
 		reactiveContext.visitFallthrough(fallthroughId, into)
 
 	case *Scope:
-		fallthroughId, scheduled := reactiveContext.scheduleFallthrough(terminal.Fallthrough, controlFlowIf, &scheduleIds)
+		fallthroughId, scheduled := reactiveContext.scheduleFallthrough(
+			terminal.Fallthrough,
+			controlFlowIf,
+			&scheduleIds,
+		)
 		if scheduled {
 			// Recorded only when this terminal actually claimed the block. If an enclosing construct
 			// already owns it, the break belongs to that construct and eliding it here would drop a
@@ -951,7 +978,9 @@ func (reactiveContext *reactiveContext) valueJoinPlace(continuation static_singl
 // visitTestValueBlock follows nested value terminals until it reaches the Branch that selects the
 // current composite expression's arms. Nested chains such as `a?.b?.c` require returning the final
 // block rather than assuming the terminal's Test block itself owns that branch.
-func (reactiveContext *reactiveContext) visitTestValueBlock(block static_single_assignment.BlockId) (reactiveValueBlockResult, *Branch,
+func (reactiveContext *reactiveContext) visitTestValueBlock(
+	block static_single_assignment.BlockId,
+) (reactiveValueBlockResult, *Branch,
 	bool) {
 	test, ok := reactiveContext.visitValueBlock(block)
 	if !ok {
@@ -972,7 +1001,9 @@ func (reactiveContext *reactiveContext) visitTestValueBlock(block static_single_
 // temporary is erased exactly as upstream erases it: ReactiveFunction has compound values instead
 // of the join phi that StoreLocal feeds, so the store becomes a LoadLocal of its input and the
 // enclosing composite instruction takes its lvalue.
-func (reactiveContext *reactiveContext) visitValueBlock(block static_single_assignment.BlockId) (reactiveValueBlockResult, bool) {
+func (reactiveContext *reactiveContext) visitValueBlock(
+	block static_single_assignment.BlockId,
+) (reactiveValueBlockResult, bool) {
 	basic := reactiveContext.block(block)
 	if basic == nil || reactiveContext.emitted[basic.Id] {
 		return reactiveValueBlockResult{}, false
@@ -1079,8 +1110,11 @@ func (reactiveContext *reactiveContext) reactiveInstructions(ids []InstructionId
 //
 // Returns the block to visit as a sibling afterwards, and whether this call is the one that claimed
 // it. A fallthrough already scheduled by an enclosing construct is that construct's to emit.
-func (reactiveContext *reactiveContext) scheduleFallthrough(block static_single_assignment.BlockId, kind controlFlowKind,
-	ids *[]int) (static_single_assignment.BlockId, bool) {
+func (reactiveContext *reactiveContext) scheduleFallthrough(
+	block static_single_assignment.BlockId,
+	kind controlFlowKind,
+	ids *[]int,
+) (static_single_assignment.BlockId, bool) {
 	if reactiveContext.isScheduled(block) {
 		return 0, false
 	}
@@ -1089,8 +1123,10 @@ func (reactiveContext *reactiveContext) scheduleFallthrough(block static_single_
 }
 
 // scheduleLoopTargets claims a loop's fallthrough and its continue block together.
-func (reactiveContext *reactiveContext) scheduleLoopTargets(fallthrough_, continueBlock static_single_assignment.BlockId,
-	ids *[]int) static_single_assignment.BlockId {
+func (reactiveContext *reactiveContext) scheduleLoopTargets(
+	fallthrough_, continueBlock static_single_assignment.BlockId,
+	ids *[]int,
+) static_single_assignment.BlockId {
 	owns := !reactiveContext.isScheduled(fallthrough_)
 	*ids = append(*ids, reactiveContext.scheduleLoop(fallthrough_, continueBlock))
 	if !owns {
@@ -1172,8 +1208,12 @@ func (reactiveContext *reactiveContext) emitGoto(terminal *Goto, into *ReactiveB
 // structured extractor does not understand. It preserves the test and both arms as a statement
 // subtree, then emits the continuation as a sibling. The source-expression form is lost, but no
 // graph instructions are guessed away.
-func (reactiveContext *reactiveContext) emitValueTerminal(fallthrough_ static_single_assignment.BlockId, into *ReactiveBlock,
-	ids *[]int, test static_single_assignment.BlockId) {
+func (reactiveContext *reactiveContext) emitValueTerminal(
+	fallthrough_ static_single_assignment.BlockId,
+	into *ReactiveBlock,
+	ids *[]int,
+	test static_single_assignment.BlockId,
+) {
 	blockId, _ := reactiveContext.scheduleFallthrough(fallthrough_, controlFlowIf, ids)
 	// The test block, walked while the fallthrough is SCHEDULED.
 	//

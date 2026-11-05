@@ -31,7 +31,11 @@ func TestOneFixFormatRunSettlesAPrintedArrow(test *testing.T) {
 	}
 	written := readForTest(test, filepath.Join(root, "Probe.ts"))
 	if !strings.Contains(written, "register(function() {\n    console.log('ready');\n});") {
-		test.Fatalf("the arrow the printer broke across lines was not repaired in the same run:\n%s\noutput:\n%s", written, output)
+		test.Fatalf(
+			"the arrow the printer broke across lines was not repaired in the same run:\n%s\noutput:\n%s",
+			written,
+			output,
+		)
 	}
 
 	output, code = runCohere(test, binary, root, "--no-fix", "--format", "Probe.ts")
@@ -62,7 +66,10 @@ func TestAFixToARecordedFileIsFormatted(test *testing.T) {
 	// No rule asks for a fix, so the formatted file is recorded at its own bytes (the settings files are
 	// formatted alongside it).
 	output, code := runCohere(test, binary, root, "--fix", "--format")
-	if code != 0 || readForTest(test, filepath.Join(root, "Producer.ts")) != "export function value(): number {\n  debugger;\n  return 1;\n}\n" {
+	if code != 0 || readForTest(
+		test,
+		filepath.Join(root, "Producer.ts"),
+	) != "export function value(): number {\n  debugger;\n  return 1;\n}\n" {
 		test.Fatalf("the run before the rule changed the formatted file, exit %d:\n%s", code, output)
 	}
 	output, _ = runCohere(test, binary, root, "--no-fix", "--format")
@@ -77,7 +84,10 @@ func TestAFixToARecordedFileIsFormatted(test *testing.T) {
 	if code != 0 {
 		test.Fatalf("the writing run exited %d:\n%s", code, output)
 	}
-	if got := readForTest(test, filepath.Join(root, "Producer.ts")); got != "export function value(): number {\n  return 1;\n}\n" {
+	if got := readForTest(
+		test,
+		filepath.Join(root, "Producer.ts"),
+	); got != "export function value(): number {\n  return 1;\n}\n" {
 		test.Fatalf("the fix to a recorded file was written unformatted:\n%q\noutput:\n%s", got, output)
 	}
 

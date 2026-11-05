@@ -96,7 +96,8 @@ func IsDeclaredByADependency(symbol *ast.Symbol) bool {
 // not by how it is spelled (#kk5kk04).
 func IsDependencyDeclaration(declaration *ast.Node) bool {
 	file := ast.GetSourceFileOfNode(declaration)
-	return file != nil && (file.IsDeclarationFile || strings.Contains(strings.ReplaceAll(file.FileName().AsString(), "\\", "/"), "/node_modules/"))
+	return file != nil && (file.IsDeclarationFile ||
+		strings.Contains(strings.ReplaceAll(file.FileName().AsString(), "\\", "/"), "/node_modules/"))
 }
 
 // HasDeclarations reports whether the checker supplied any declarations, without exposing syntax.
@@ -140,5 +141,7 @@ func IsResolvedSymbol(typeChecker *checker.Checker, symbol *ast.Symbol) bool {
 // type (an unconstrained literal). Type queries may have already lost the missing
 // name's symbol; naming rules still cannot infer ownership from that error.
 func IsUnresolvedType(valueType *checker.Type) bool {
-	return valueType != nil && valueType.Flags()&checker.TypeFlagsAny != 0 && valueType.AsIntrinsicType().IntrinsicName() == "error"
+	return valueType != nil &&
+		valueType.Flags()&checker.TypeFlagsAny != 0 &&
+		valueType.AsIntrinsicType().IntrinsicName() == "error"
 }

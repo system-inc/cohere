@@ -21,8 +21,8 @@
 //
 // `-check` regenerates and fails when the committed fixture disagrees, which is what makes a
 // Tailwind upgrade that changes parsing show up as a failing gate instead of a silent behavior
-// change. Like the other internal/lint/rules/tailwind/tools/generate_* tools, nothing invokes it automatically; it is a manual
-// gate.
+// change. Like the other internal/lint/rules/tailwind/tools/generate_* tools, nothing invokes it automatically; it is a
+// manual gate.
 //
 // Node is required to run it and never to use the result.
 package main
@@ -38,10 +38,22 @@ import (
 )
 
 func main() {
-	packageRoot := flag.String("package-root", "", "path to the tailwindcss package root (the directory holding package.json)")
+	packageRoot := flag.String(
+		"package-root",
+		"",
+		"path to the tailwindcss package root (the directory holding package.json)",
+	)
 	corpusRoot := flag.String("corpus-root", "", "path to a repository to scan for the classes it actually writes")
-	themeEntry := flag.String("theme-entry", "", "path to the repository's CSS entry point, so its own @utility and @theme blocks are in the tables")
-	output := flag.String("output", filepath.Join("internal", "tailwind", "testdata", "candidate_fixtures.json"), "where to write the fixture")
+	themeEntry := flag.String(
+		"theme-entry",
+		"",
+		"path to the repository's CSS entry point, so its own @utility and @theme blocks are in the tables",
+	)
+	output := flag.String(
+		"output",
+		filepath.Join("internal", "tailwind", "testdata", "candidate_fixtures.json"),
+		"where to write the fixture",
+	)
 	check := flag.Bool("check", false, "regenerate and fail if the committed fixture disagrees")
 	flag.Parse()
 

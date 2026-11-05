@@ -37,12 +37,24 @@ var (
 	// design system's stylesheets, and its installed packages.
 	Ahra = Corpus{Name: "ahra", Variable: "COHERE_CORPUS_AHRA", What: "a checkout of ahra (private)"}
 	// Structure is a checkout of Structure, which is private, for the TypeScript under its source/.
-	Structure = Corpus{Name: "structure", Variable: "COHERE_CORPUS_STRUCTURE", What: "a checkout of Structure (private)"}
+	Structure = Corpus{
+		Name:     "structure",
+		Variable: "COHERE_CORPUS_STRUCTURE",
+		What:     "a checkout of Structure (private)",
+	}
 	// Connected is a checkout of www-connected-app, which is private, for its design system.
-	Connected = Corpus{Name: "connected", Variable: "COHERE_CORPUS_CONNECTED", What: "a checkout of www-connected-app (private)"}
+	Connected = Corpus{
+		Name:     "connected",
+		Variable: "COHERE_CORPUS_CONNECTED",
+		What:     "a checkout of www-connected-app (private)",
+	}
 	// PrettierFork is a checkout of the Prettier fork cohere's formatter is held to, with its node_modules
 	// installed, for the oracles that run its parsers.
-	PrettierFork = Corpus{Name: "prettier-fork", Variable: "COHERE_PRETTIER_FORK", What: "a checkout of the Prettier fork, with node_modules"}
+	PrettierFork = Corpus{
+		Name:     "prettier-fork",
+		Variable: "COHERE_PRETTIER_FORK",
+		What:     "a checkout of the Prettier fork, with node_modules",
+	}
 )
 
 // All is every corpus, in the order the gate names them.
@@ -58,7 +70,12 @@ func (corpus Corpus) Root(test testing.TB) string {
 	}
 	information, statError := os.Stat(root)
 	if statError != nil || !information.IsDir() {
-		test.Fatalf("%s is set to %s, which is not a directory, so this test cannot read %s", corpus.Variable, root, corpus.What)
+		test.Fatalf(
+			"%s is set to %s, which is not a directory, so this test cannot read %s",
+			corpus.Variable,
+			root,
+			corpus.What,
+		)
 	}
 	return root
 }
@@ -94,7 +111,12 @@ func Spelled(spelling string) (corpus Corpus, inside string, spelled bool, err e
 			return candidate, match[2], true, nil
 		}
 	}
-	return Corpus{}, "", true, fmt.Errorf("%s names the corpus %q, which is no corpus; the corpora are %s", spelling, match[1], corpusNames())
+	return Corpus{}, "", true, fmt.Errorf(
+		"%s names the corpus %q, which is no corpus; the corpora are %s",
+		spelling,
+		match[1],
+		corpusNames(),
+	)
 }
 
 // Resolve is the path a "<corpus>:<path in it>" spelling names. When the corpus is unset it skips naming
@@ -123,7 +145,10 @@ func Resolve(test testing.TB, spelling string) string {
 		path := filepath.Join(root, filepath.FromSlash(spelling))
 		// A path that climbs out of the repository would let a fixture depend on a sibling checkout
 		// while looking portable, and read nothing on a machine without one.
-		if inside, relativePathError := filepath.Rel(root, path); relativePathError != nil || inside == ".." || strings.HasPrefix(inside, ".."+string(filepath.Separator)) {
+		if inside, relativePathError := filepath.Rel(
+			root,
+			path,
+		); relativePathError != nil || inside == ".." || strings.HasPrefix(inside, ".."+string(filepath.Separator)) {
 			test.Fatalf("%q climbs out of this repository, so it reads the same on no other machine: spell it "+
 				"<corpus>:<path in it>, or give a path inside this repository", spelling)
 		}
@@ -155,7 +180,10 @@ func RepositoryRoot() (string, error) {
 		contents, readError := os.ReadFile(filepath.Join(directory, "go.mod"))
 		if readError == nil {
 			for _, line := range strings.Split(string(contents), "\n") {
-				if module, isModule := strings.CutPrefix(strings.TrimSpace(line), "module "); isModule && strings.TrimSpace(module) == repositoryModule {
+				if module, isModule := strings.CutPrefix(
+					strings.TrimSpace(line),
+					"module ",
+				); isModule && strings.TrimSpace(module) == repositoryModule {
 					return directory, nil
 				}
 			}
@@ -193,7 +221,13 @@ func locate(spelling string, lookup func(string) string, configurationPath func(
 		root = configuration[corpus.Name]
 	}
 	if root == "" {
-		return "", fmt.Errorf("%s needs %s: set %s, or name %q in the corpora file", spelling, corpus.What, corpus.Variable, corpus.Name)
+		return "", fmt.Errorf(
+			"%s needs %s: set %s, or name %q in the corpora file",
+			spelling,
+			corpus.What,
+			corpus.Variable,
+			corpus.Name,
+		)
 	}
 	return filepath.Join(root, filepath.FromSlash(inside)), nil
 }

@@ -284,7 +284,10 @@ func TestNoUnsafeAssignmentFiresOnUpstreamFailCases(test *testing.T) {
 			isJsx:      false,
 			wantIds:    []string{"unsafeObjectPattern", "anyAssignment"},
 			wantSpans:  []string{"{ y: z }", "x: spooky"},
-			wantTexts:  []string{"Unsafe object destructuring of a property with an error typed value.", "Unsafe assignment of an error typed value."},
+			wantTexts: []string{
+				"Unsafe object destructuring of a property with an error typed value.",
+				"Unsafe assignment of an error typed value.",
+			},
 		},
 		{
 			sourceText: "\nlet value: number;\n\nvalue = spooky;\n      ",
@@ -319,7 +322,9 @@ func TestNoUnsafeAssignmentFiresOnUpstreamFailCases(test *testing.T) {
 			isJsx:      true,
 			wantIds:    []string{"unsafeAssignment"},
 			wantSpans:  []string{"x: Map<string, string> = new Map<string, any>()"},
-			wantTexts:  []string{"Unsafe assignment of type `Map<string, any>` to a variable of type `Map<string, string>`."},
+			wantTexts: []string{
+				"Unsafe assignment of type `Map<string, any>` to a variable of type `Map<string, string>`.",
+			},
 		},
 		{
 			sourceText: "const x: Set<string[]> = new Set<any[]>();",
@@ -333,7 +338,9 @@ func TestNoUnsafeAssignmentFiresOnUpstreamFailCases(test *testing.T) {
 			isJsx:      true,
 			wantIds:    []string{"unsafeAssignment"},
 			wantSpans:  []string{"x: Set<Set<Set<string>>> = new Set<Set<Set<any>>>()"},
-			wantTexts:  []string{"Unsafe assignment of type `Set<Set<Set<any>>>` to a variable of type `Set<Set<Set<string>>>`."},
+			wantTexts: []string{
+				"Unsafe assignment of type `Set<Set<Set<any>>>` to a variable of type `Set<Set<Set<string>>>`.",
+			},
 		},
 		{
 			sourceText: "const [x] = [1] as [any];",
@@ -578,7 +585,9 @@ func TestNoUnsafeAssignmentFiresOnUpstreamFailCases(test *testing.T) {
 			isJsx:      true,
 			wantIds:    []string{"unsafeAssignment"},
 			wantSpans:  []string{"y: new Set<Set<Set<any>>>()"},
-			wantTexts:  []string{"Unsafe assignment of type `Set<Set<Set<any>>>` to a variable of type `Set<Set<Set<string>>>`."},
+			wantTexts: []string{
+				"Unsafe assignment of type `Set<Set<Set<any>>>` to a variable of type `Set<Set<Set<string>>>`.",
+			},
 		},
 		{
 			sourceText: "const x = { ...(1 as any) };",

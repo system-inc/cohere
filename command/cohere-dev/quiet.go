@@ -57,7 +57,11 @@ func readQuiet(directory string) (quietWindow, bool, error) {
 	until, holder, _ := strings.Cut(strings.TrimSpace(string(contents)), "\n")
 	ends, err := time.Parse(time.RFC3339, strings.TrimSpace(until))
 	if err != nil {
-		return quietWindow{}, false, fmt.Errorf("the quiet window marker %s does not start with when it ends: %q", quietPath(directory), until)
+		return quietWindow{}, false, fmt.Errorf(
+			"the quiet window marker %s does not start with when it ends: %q",
+			quietPath(directory),
+			until,
+		)
 	}
 	return quietWindow{until: ends, holder: strings.TrimSpace(holder)}, true, nil
 }
@@ -74,10 +78,19 @@ func quietHolds(directory string, now time.Time) (bool, string) {
 		return false, ""
 	}
 	if now.Before(window.until) {
-		return true, fmt.Sprintf("a quiet window holds until %s (%s): %s", window.until.Format("15:04:05"), quietPath(directory), window.holder)
+		return true, fmt.Sprintf(
+			"a quiet window holds until %s (%s): %s",
+			window.until.Format("15:04:05"),
+			quietPath(directory),
+			window.holder,
+		)
 	}
-	return false, fmt.Sprintf("a quiet window marker expired at %s and was passed over (%s): %s", window.until.Format("15:04:05"),
-		quietPath(directory), window.holder)
+	return false, fmt.Sprintf(
+		"a quiet window marker expired at %s and was passed over (%s): %s",
+		window.until.Format("15:04:05"),
+		quietPath(directory),
+		window.holder,
+	)
 }
 
 // quiet is `cohere-dev quiet on [--for <duration>] [why]`, `quiet off`, and bare `quiet`, which says whether
@@ -129,7 +142,12 @@ func quietOn(directory string, arguments []string, now time.Time) int {
 		}
 		parsed, parseDurationError := time.ParseDuration(arguments[1])
 		if parseDurationError != nil || parsed <= 0 || parsed > quietLongest {
-			fmt.Fprintf(streams.Errors, "cohere-dev: --for is %q, want a duration above 0 and at most %s, like 30m\n", arguments[1], quietLongest)
+			fmt.Fprintf(
+				streams.Errors,
+				"cohere-dev: --for is %q, want a duration above 0 and at most %s, like 30m\n",
+				arguments[1],
+				quietLongest,
+			)
 			return 2
 		}
 		length = parsed
@@ -146,7 +164,11 @@ func quietOn(directory string, arguments []string, now time.Time) int {
 	working, _ := os.Getwd()
 	holder := fmt.Sprintf("opened in %s at %s: %s", working, now.Format("15:04:05"), why)
 	temporary := filepath.Join(directory, "."+quietFile)
-	if writeError := os.WriteFile(temporary, []byte(until.Format(time.RFC3339)+"\n"+holder+"\n"), 0o644); writeError != nil {
+	if writeError := os.WriteFile(
+		temporary,
+		[]byte(until.Format(time.RFC3339)+"\n"+holder+"\n"),
+		0o644,
+	); writeError != nil {
 		fmt.Fprintf(streams.Errors, "cohere-dev: opening the quiet window: %v\n", writeError)
 		return 1
 	}
@@ -154,8 +176,11 @@ func quietOn(directory string, arguments []string, now time.Time) int {
 		fmt.Fprintf(streams.Errors, "cohere-dev: opening the quiet window: %v\n", renameError)
 		return 1
 	}
-	fmt.Fprintf(streams.Output, "quiet window open until %s: the Go build cache trim holds off; release it with cohere-dev quiet off\n",
-		until.Format("15:04:05"))
+	fmt.Fprintf(
+		streams.Output,
+		"quiet window open until %s: the Go build cache trim holds off; release it with cohere-dev quiet off\n",
+		until.Format("15:04:05"),
+	)
 	return 0
 }
 

@@ -396,7 +396,8 @@ func variantsAreEqual(left ParsedVariant, right ParsedVariant) bool {
 	if (left.Modifier == nil) != (right.Modifier == nil) {
 		return false
 	}
-	if left.Modifier != nil && (left.Modifier.Kind != right.Modifier.Kind || left.Modifier.Value != right.Modifier.Value) {
+	if left.Modifier != nil &&
+		(left.Modifier.Kind != right.Modifier.Kind || left.Modifier.Value != right.Modifier.Value) {
 		return false
 	}
 	if (left.Variant == nil) != (right.Variant == nil) {
@@ -666,7 +667,8 @@ func breakpointBucket(value string) string {
 // `40rem`, which is the ordinary case here rather than an edge one.
 func leadingInteger(value string) (int, bool) {
 	index := 0
-	for index < len(value) && (value[index] == ' ' || value[index] == '\t' || value[index] == '\n' || value[index] == '\r') {
+	for index < len(value) &&
+		(value[index] == ' ' || value[index] == '\t' || value[index] == '\n' || value[index] == '\r') {
 		index++
 	}
 

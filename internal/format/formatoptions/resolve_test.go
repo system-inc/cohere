@@ -45,7 +45,10 @@ func TestResolveFindsTheNearestSettingsAbove(test *testing.T) {
 	if resolution.Source != filepath.Join(root, SettingsFileName) {
 		test.Fatalf("resolved from %q, want the root %s", resolution.Source, SettingsFileName)
 	}
-	if resolution.Options.TabWidth != 4 || resolution.Options.PrintWidth != 120 || !resolution.Options.SingleQuote || !resolution.Options.BracketSameLine {
+	if resolution.Options.TabWidth != 4 ||
+		resolution.Options.PrintWidth != 120 ||
+		!resolution.Options.SingleQuote ||
+		!resolution.Options.BracketSameLine {
 		test.Fatalf("options %+v did not take the Nexus tier's format block", resolution.Options)
 	}
 }
@@ -56,8 +59,16 @@ func TestTheHouseBlockResolvesThroughTheTiers(test *testing.T) {
 	test.Parallel()
 	root := test.TempDir()
 	writeFile(test, filepath.Join(root, "nexus", NexusTierFileName), `{"rules": {}, "format": `+houseBlock+`}`)
-	writeFile(test, filepath.Join(root, "structure", "StructureCohereSettings.json"), `{"extends": "../nexus/`+NexusTierFileName+`", "rules": {}}`)
-	writeFile(test, filepath.Join(root, SettingsFileName), `{"extends": "./structure/StructureCohereSettings.json", "rules": {}}`)
+	writeFile(
+		test,
+		filepath.Join(root, "structure", "StructureCohereSettings.json"),
+		`{"extends": "../nexus/`+NexusTierFileName+`", "rules": {}}`,
+	)
+	writeFile(
+		test,
+		filepath.Join(root, SettingsFileName),
+		`{"extends": "./structure/StructureCohereSettings.json", "rules": {}}`,
+	)
 
 	resolution, resolveError := Resolve(filepath.Join(root, "source"))
 	if resolveError != nil {
@@ -87,9 +98,18 @@ func TestOurTiersRefuseAFormatBlockOutsideTheNexusTier(test *testing.T) {
 		files   map[string]string
 		refused string
 	}{
-		{"the project restating the house block", map[string]string{SettingsFileName: `{"extends": "cohere:system-inc/structure", "format": ` + houseBlock + `}`}, SettingsFileName},
-		{"the project's own empty block", map[string]string{SettingsFileName: `{"extends": "cohere:system-inc/base", "format": {}}`}, SettingsFileName},
-		{"a base between the project and the set", map[string]string{SettingsFileName: `{"extends": "./shared/Shared.json"}`, "shared/Shared.json": `{"extends": "cohere:system-inc/structure", "format": {"printWidth": 100}}`}, filepath.Join("shared", "Shared.json")},
+		{"the project restating the house block", map[string]string{
+			SettingsFileName: `{"extends": "cohere:system-inc/structure", "format": ` + houseBlock + `}`,
+		}, SettingsFileName},
+		{
+			"the project's own empty block",
+			map[string]string{SettingsFileName: `{"extends": "cohere:system-inc/base", "format": {}}`},
+			SettingsFileName,
+		},
+		{"a base between the project and the set", map[string]string{
+			SettingsFileName:     `{"extends": "./shared/Shared.json"}`,
+			"shared/Shared.json": `{"extends": "cohere:system-inc/structure", "format": {"printWidth": 100}}`,
+		}, filepath.Join("shared", "Shared.json")},
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
@@ -101,8 +121,13 @@ func TestOurTiersRefuseAFormatBlockOutsideTheNexusTier(test *testing.T) {
 			if resolveError == nil {
 				test.Fatalf("a format block in %s resolved to %+v", testCase.refused, resolution.Options)
 			}
-			if !strings.Contains(resolveError.Error(), filepath.Join(root, testCase.refused)) || !strings.Contains(resolveError.Error(), "only the Nexus tier") {
-				test.Fatalf("refusal %v does not name %s as the file holding a format block outside the Nexus tier", resolveError, testCase.refused)
+			if !strings.Contains(resolveError.Error(), filepath.Join(root, testCase.refused)) ||
+				!strings.Contains(resolveError.Error(), "only the Nexus tier") {
+				test.Fatalf(
+					"refusal %v does not name %s as the file holding a format block outside the Nexus tier",
+					resolveError,
+					testCase.refused,
+				)
 			}
 		})
 	}
@@ -127,14 +152,20 @@ func TestZeroConfigIsTheHouseFormat(test *testing.T) {
 	if houseResolutionError != nil {
 		test.Fatal(houseResolutionError)
 	}
-	if house.Options.TabWidth != 4 || house.Options.PrintWidth != 120 || !house.Options.SingleQuote || !house.HouseIgnoreDeclared {
+	if house.Options.TabWidth != 4 ||
+		house.Options.PrintWidth != 120 ||
+		!house.Options.SingleQuote ||
+		!house.HouseIgnoreDeclared {
 		test.Fatalf("the house resolution %+v is not cohere:typescript's block", house)
 	}
 
 	for name, files := range map[string]map[string]string{
-		"settings extending nothing":         {SettingsFileName: `{"rules": {}}`},
-		"a chain of the project's own files": {SettingsFileName: `{"extends": "./base/Base.json"}`, "base/Base.json": `{"rules": {}}`},
-		"a cohere set that is not ours":      {SettingsFileName: `{"extends": "cohere:react"}`},
+		"settings extending nothing": {SettingsFileName: `{"rules": {}}`},
+		"a chain of the project's own files": {
+			SettingsFileName: `{"extends": "./base/Base.json"}`,
+			"base/Base.json": `{"rules": {}}`,
+		},
+		"a cohere set that is not ours": {SettingsFileName: `{"extends": "cohere:react"}`},
 	} {
 		test.Run(name, func(test *testing.T) {
 			test.Parallel()
@@ -146,7 +177,9 @@ func TestZeroConfigIsTheHouseFormat(test *testing.T) {
 			if resolveError != nil {
 				test.Fatal(resolveError)
 			}
-			if resolution.Options != house.Options || strings.Join(resolution.HouseIgnore, ",") != strings.Join(house.HouseIgnore, ",") || !resolution.HouseIgnoreDeclared {
+			if resolution.Options != house.Options ||
+				strings.Join(resolution.HouseIgnore, ",") != strings.Join(house.HouseIgnore, ",") ||
+				!resolution.HouseIgnoreDeclared {
 				test.Fatalf("resolved %+v, want the house format and list", resolution)
 			}
 			if resolution.Source != filepath.Join(root, SettingsFileName) {
@@ -171,10 +204,26 @@ func TestAnOutsidersOwnBlockIsAppliedOverPrettiersDefaults(test *testing.T) {
 		want   func(options *Options)
 		ignore string
 	}{
-		{"an empty block", map[string]string{SettingsFileName: `{"extends": "cohere:typescript", "format": {}}`}, func(*Options) {}, strings.Join(house.HouseIgnore, ",")},
-		{"a block of its own", map[string]string{SettingsFileName: `{"format": {"printWidth": 100, "ignore": ["generated/"]}}`}, func(options *Options) { options.PrintWidth = 100 }, "generated/"},
-		{"a base's block", map[string]string{SettingsFileName: `{"extends": "./base/Base.json"}`, "base/Base.json": `{"format": {"semi": false}}`}, func(options *Options) { options.Semi = false }, strings.Join(house.HouseIgnore, ",")},
-		{"the project's block over its base's", map[string]string{SettingsFileName: `{"extends": "./base/Base.json", "format": {"tabWidth": 8}}`, "base/Base.json": `{"format": {"semi": false}}`}, func(options *Options) { options.TabWidth = 8 }, strings.Join(house.HouseIgnore, ",")},
+		{
+			"an empty block",
+			map[string]string{SettingsFileName: `{"extends": "cohere:typescript", "format": {}}`},
+			func(*Options) {},
+			strings.Join(house.HouseIgnore, ","),
+		},
+		{
+			"a block of its own",
+			map[string]string{SettingsFileName: `{"format": {"printWidth": 100, "ignore": ["generated/"]}}`},
+			func(options *Options) { options.PrintWidth = 100 },
+			"generated/",
+		},
+		{"a base's block", map[string]string{
+			SettingsFileName: `{"extends": "./base/Base.json"}`,
+			"base/Base.json": `{"format": {"semi": false}}`,
+		}, func(options *Options) { options.Semi = false }, strings.Join(house.HouseIgnore, ",")},
+		{"the project's block over its base's", map[string]string{
+			SettingsFileName: `{"extends": "./base/Base.json", "format": {"tabWidth": 8}}`,
+			"base/Base.json": `{"format": {"semi": false}}`,
+		}, func(options *Options) { options.TabWidth = 8 }, strings.Join(house.HouseIgnore, ",")},
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
@@ -241,10 +290,19 @@ func TestAChainRefusesWhatOneFileWouldBeRefusedFor(test *testing.T) {
 func TestALeftoverIsRefusedEvenWhenItAgrees(test *testing.T) {
 	test.Parallel()
 	for name, leftover := range map[string]struct{ file, contents string }{
-		"package.json, the house options":        {"package.json", `{"name": "x", "prettier": {"tabWidth": 4, "singleQuote": true, "printWidth": 120}}`},
-		"package.json, with the Tailwind plugin": {"package.json", `{"name": "x", "prettier": {"plugins": ["prettier-plugin-tailwindcss"], "tabWidth": 4, "singleQuote": true, "printWidth": 120, "tailwindFunctions": ["mergeClassNames"]}}`},
-		".prettierrc, the house options":         {".prettierrc", `{"tabWidth": 4, "singleQuote": true, "printWidth": 120}`},
-		"package.json, an empty prettier key":    {"package.json", `{"name": "x", "prettier": {}}`},
+		"package.json, the house options": {
+			"package.json",
+			`{"name": "x", "prettier": {"tabWidth": 4, "singleQuote": true, "printWidth": 120}}`,
+		},
+		"package.json, with the Tailwind plugin": {
+			"package.json",
+			`{"name": "x", "prettier": {"plugins": ["prettier-plugin-tailwindcss"], "tabWidth": 4, "singleQuote": true, "printWidth": 120, "tailwindFunctions": ["mergeClassNames"]}}`,
+		},
+		".prettierrc, the house options": {
+			".prettierrc",
+			`{"tabWidth": 4, "singleQuote": true, "printWidth": 120}`,
+		},
+		"package.json, an empty prettier key": {"package.json", `{"name": "x", "prettier": {}}`},
 	} {
 		test.Run(name, func(test *testing.T) {
 			test.Parallel()
@@ -253,9 +311,15 @@ func TestALeftoverIsRefusedEvenWhenItAgrees(test *testing.T) {
 			writeFile(test, filepath.Join(root, leftover.file), leftover.contents)
 			resolution, resolveError := Resolve(root)
 			if !errors.Is(resolveError, ErrPrettierConfigRemains) {
-				test.Fatalf("a leftover %s resolved to %+v, %v; want it refused", leftover.file, resolution.Options, resolveError)
+				test.Fatalf(
+					"a leftover %s resolved to %+v, %v; want it refused",
+					leftover.file,
+					resolution.Options,
+					resolveError,
+				)
 			}
-			if !strings.Contains(resolveError.Error(), filepath.Join(root, leftover.file)) || !strings.Contains(resolveError.Error(), "delete it") {
+			if !strings.Contains(resolveError.Error(), filepath.Join(root, leftover.file)) ||
+				!strings.Contains(resolveError.Error(), "delete it") {
 				test.Fatalf("refusal %v does not name %s and say to delete it", resolveError, leftover.file)
 			}
 		})
@@ -268,8 +332,14 @@ func TestALeftoverBelowTheSettingsIsRefused(test *testing.T) {
 	test.Parallel()
 	root := test.TempDir()
 	project(test, root, houseBlock)
-	writeFile(test, filepath.Join(root, "packages", "inner", "package.json"), `{"name": "inner", "prettier": {"printWidth": 120}}`)
-	if _, resolveError := Resolve(filepath.Join(root, "packages", "inner", "source")); !errors.Is(resolveError, ErrPrettierConfigRemains) {
+	writeFile(
+		test,
+		filepath.Join(root, "packages", "inner", "package.json"),
+		`{"name": "inner", "prettier": {"printWidth": 120}}`,
+	)
+	if _, resolveError := Resolve(
+		filepath.Join(root, "packages", "inner", "source"),
+	); !errors.Is(resolveError, ErrPrettierConfigRemains) {
 		test.Fatalf("a leftover below the settings was not refused: %v", resolveError)
 	}
 }
@@ -280,10 +350,16 @@ func TestNothingConfiguredIsTheHouseNotPrettier(test *testing.T) {
 	test.Parallel()
 	resolution, resolveError := Resolve(test.TempDir())
 	if resolveError != nil {
-		test.Skipf("something above the temp directory configures formatting (%v), so this machine cannot test the empty case", resolveError)
+		test.Skipf(
+			"something above the temp directory configures formatting (%v), so this machine cannot test the empty case",
+			resolveError,
+		)
 	}
 	if resolution.Source != "" {
-		test.Skipf("settings exist above the temp directory (%s), so this machine cannot test the empty case", resolution.Source)
+		test.Skipf(
+			"settings exist above the temp directory (%s), so this machine cannot test the empty case",
+			resolution.Source,
+		)
 	}
 	if resolution.Options.TabWidth != 4 || resolution.Options.PrintWidth != 120 || !resolution.HouseIgnoreDeclared {
 		test.Fatalf("nothing configured resolved to %+v, want the house format and list", resolution)
@@ -299,13 +375,37 @@ func TestResolveRefusesEveryOptionNobodyChose(test *testing.T) {
 		files    map[string]string
 		leftover bool
 	}{
-		"unknown option":             {files: map[string]string{SettingsFileName: extendsNexus, NexusTierFileName: `{"format": {"quoteProps": "consistent"}}`}},
-		"plugin key in the block":    {files: map[string]string{SettingsFileName: extendsNexus, NexusTierFileName: `{"format": {"plugins": ["prettier-plugin-tailwindcss"]}}`}},
-		"crlf":                       {files: map[string]string{SettingsFileName: extendsNexus, NexusTierFileName: `{"format": {"endOfLine": "crlf"}}`}},
-		"package.json":               {files: map[string]string{SettingsFileName: extendsNexus, NexusTierFileName: `{"format": {"tabWidth": 4}}`, "package.json": `{"prettier": {"tabWidth": 2}}`}, leftover: true},
-		".prettierrc":                {files: map[string]string{SettingsFileName: extendsNexus, NexusTierFileName: `{"format": {"tabWidth": 4}}`, ".prettierrc": `{"printWidth": 100, "tabWidth": 4}`}, leftover: true},
-		"old config and no settings": {files: map[string]string{"package.json": `{"prettier": {"tabWidth": 4}}`}, leftover: true},
-		"javascript config":          {files: map[string]string{SettingsFileName: extendsNexus, NexusTierFileName: `{"format": {}}`, "prettier.config.js": `module.exports = {}`}, leftover: true},
+		"unknown option": {files: map[string]string{
+			SettingsFileName:  extendsNexus,
+			NexusTierFileName: `{"format": {"quoteProps": "consistent"}}`,
+		}},
+		"plugin key in the block": {files: map[string]string{
+			SettingsFileName:  extendsNexus,
+			NexusTierFileName: `{"format": {"plugins": ["prettier-plugin-tailwindcss"]}}`,
+		}},
+		"crlf": {files: map[string]string{
+			SettingsFileName:  extendsNexus,
+			NexusTierFileName: `{"format": {"endOfLine": "crlf"}}`,
+		}},
+		"package.json": {files: map[string]string{
+			SettingsFileName:  extendsNexus,
+			NexusTierFileName: `{"format": {"tabWidth": 4}}`,
+			"package.json":    `{"prettier": {"tabWidth": 2}}`,
+		}, leftover: true},
+		".prettierrc": {files: map[string]string{
+			SettingsFileName:  extendsNexus,
+			NexusTierFileName: `{"format": {"tabWidth": 4}}`,
+			".prettierrc":     `{"printWidth": 100, "tabWidth": 4}`,
+		}, leftover: true},
+		"old config and no settings": {
+			files:    map[string]string{"package.json": `{"prettier": {"tabWidth": 4}}`},
+			leftover: true,
+		},
+		"javascript config": {files: map[string]string{
+			SettingsFileName:     extendsNexus,
+			NexusTierFileName:    `{"format": {}}`,
+			"prettier.config.js": `module.exports = {}`,
+		}, leftover: true},
 	} {
 		test.Run(name, func(test *testing.T) {
 			test.Parallel()
@@ -318,7 +418,12 @@ func TestResolveRefusesEveryOptionNobodyChose(test *testing.T) {
 				test.Fatalf("resolved %+v from %s, want a refusal", resolution.Options, resolution.Source)
 			}
 			if errors.Is(resolveError, ErrPrettierConfigRemains) != testCase.leftover {
-				test.Fatalf("refusal %v: leftover-config sentinel %v, want %v", resolveError, errors.Is(resolveError, ErrPrettierConfigRemains), testCase.leftover)
+				test.Fatalf(
+					"refusal %v: leftover-config sentinel %v, want %v",
+					resolveError,
+					errors.Is(resolveError, ErrPrettierConfigRemains),
+					testCase.leftover,
+				)
 			}
 		})
 	}
@@ -363,7 +468,9 @@ func TestTheHouseIgnoreListRidesInTheFormatBlock(test *testing.T) {
 	if err != nil {
 		test.Fatal(err)
 	}
-	if !resolution.HouseIgnoreDeclared || strings.Join(resolution.HouseIgnore, ",") != "pnpm-lock.yaml,*.sqlite" || resolution.Options.TabWidth != 4 {
+	if !resolution.HouseIgnoreDeclared ||
+		strings.Join(resolution.HouseIgnore, ",") != "pnpm-lock.yaml,*.sqlite" ||
+		resolution.Options.TabWidth != 4 {
 		test.Fatalf("resolved %+v, want the house list beside tab width 4", resolution)
 	}
 
@@ -374,13 +481,17 @@ func TestTheHouseIgnoreListRidesInTheFormatBlock(test *testing.T) {
 	if err != nil {
 		test.Fatal(err)
 	}
-	if resolution, resolveError := Resolve(undeclared); resolveError != nil || !resolution.HouseIgnoreDeclared || strings.Join(resolution.HouseIgnore, ",") != strings.Join(house.HouseIgnore, ",") {
+	if resolution, resolveError := Resolve(undeclared); resolveError != nil ||
+		!resolution.HouseIgnoreDeclared ||
+		strings.Join(resolution.HouseIgnore, ",") != strings.Join(house.HouseIgnore, ",") {
 		test.Fatalf("a block without the key did not keep the house list: %+v, %v", resolution, resolveError)
 	}
 
 	malformed := test.TempDir()
 	project(test, malformed, `{"tabWidth": 4, "ignore": "pnpm-lock.yaml"}`)
-	if _, resolveError := Resolve(malformed); resolveError == nil || !strings.Contains(resolveError.Error(), NexusTierFileName) {
+	if _, resolveError := Resolve(
+		malformed,
+	); resolveError == nil || !strings.Contains(resolveError.Error(), NexusTierFileName) {
 		test.Fatalf("an ignore that is not a list was accepted or not named: %v", resolveError)
 	}
 
@@ -391,8 +502,16 @@ func TestTheHouseIgnoreListRidesInTheFormatBlock(test *testing.T) {
 func TestIgnorePatternsResolveWithTheOptions(test *testing.T) {
 	test.Parallel()
 	root := test.TempDir()
-	writeFile(test, filepath.Join(root, "nexus", NexusTierFileName), `{"rules": {}, "ignorePatterns": ["**/generated/**"], "format": `+houseBlock+`}`)
-	writeFile(test, filepath.Join(root, SettingsFileName), `{"extends": "./nexus/`+NexusTierFileName+`", "rules": {}, "ignorePatterns": ["data/**"]}`)
+	writeFile(
+		test,
+		filepath.Join(root, "nexus", NexusTierFileName),
+		`{"rules": {}, "ignorePatterns": ["**/generated/**"], "format": `+houseBlock+`}`,
+	)
+	writeFile(
+		test,
+		filepath.Join(root, SettingsFileName),
+		`{"extends": "./nexus/`+NexusTierFileName+`", "rules": {}, "ignorePatterns": ["data/**"]}`,
+	)
 	resolution, resolveError := Resolve(root)
 	if resolveError != nil {
 		test.Fatal(resolveError)
@@ -415,11 +534,18 @@ func TestADroppedKeyCanNeverReachPrettiersDefaults(test *testing.T) {
 		test.Fatal(resolveError)
 	}
 	if resolution.Options == PrettierDefaults() || resolution.Options.PrintWidth != 120 {
-		test.Fatalf("settings that say nothing about formatting resolved to %+v, want the house format", resolution.Options)
+		test.Fatalf(
+			"settings that say nothing about formatting resolved to %+v, want the house format",
+			resolution.Options,
+		)
 	}
 
 	neverMoved := test.TempDir()
-	writeFile(test, filepath.Join(neverMoved, "package.json"), `{"name": "x", "prettier": {"tabWidth": 4, "printWidth": 120}}`)
+	writeFile(
+		test,
+		filepath.Join(neverMoved, "package.json"),
+		`{"name": "x", "prettier": {"tabWidth": 4, "printWidth": 120}}`,
+	)
 	if resolution, resolveError := Resolve(neverMoved); resolveError == nil {
 		test.Fatalf("old config with no settings resolved to %+v", resolution.Options)
 	}
@@ -434,8 +560,12 @@ func resolveUnremembered(directory string) (Resolution, error) {
 			return Resolution{}, prettierConfigurationInError
 		}
 		if found {
-			return Resolution{}, fmt.Errorf("%s: %w; delete it, since cohere reads format options only from a \"format\" block in %s",
-				leftover, ErrPrettierConfigRemains, SettingsFileName)
+			return Resolution{}, fmt.Errorf(
+				"%s: %w; delete it, since cohere reads format options only from a \"format\" block in %s",
+				leftover,
+				ErrPrettierConfigRemains,
+				SettingsFileName,
+			)
 		}
 		path := filepath.Join(current, SettingsFileName)
 		if _, statError := os.Stat(path); statError == nil {
@@ -461,7 +591,14 @@ func TestAResolverAnswersAsResolveDidOnOurTrees(test *testing.T) {
 	if len(trees) == 0 {
 		test.Skip("COHERE_RESOLVE_TREES names no tree")
 	}
-	skipped := map[string]bool{".git": true, "node_modules": true, ".cache": true, ".next": true, "data": true, "dist": true}
+	skipped := map[string]bool{
+		".git":         true,
+		"node_modules": true,
+		".cache":       true,
+		".next":        true,
+		"data":         true,
+		"dist":         true,
+	}
 	for _, root := range trees {
 		test.Run(root, func(test *testing.T) {
 			test.Parallel()
@@ -493,7 +630,11 @@ func TestAResolverAnswersAsResolveDidOnOurTrees(test *testing.T) {
 				test.Fatal(walkError)
 			}
 			if directories < 50 {
-				test.Fatalf("compared only %d directories under %s, so the comparison measured nothing", directories, root)
+				test.Fatalf(
+					"compared only %d directories under %s, so the comparison measured nothing",
+					directories,
+					root,
+				)
 			}
 			test.Logf("%d directories identical, %d of them refusals", directories, refusals)
 		})
@@ -547,7 +688,9 @@ func TestARememberedParentDoesNotAnswerForAChildWithLeftoverConfig(test *testing
 	if _, resolveError := resolver.Resolve(filepath.Join(root, "packages")); resolveError != nil {
 		test.Fatal(resolveError)
 	}
-	if _, resolveError := resolver.Resolve(filepath.Join(root, "packages", "inner", "source")); !errors.Is(resolveError, ErrPrettierConfigRemains) {
+	if _, resolveError := resolver.Resolve(
+		filepath.Join(root, "packages", "inner", "source"),
+	); !errors.Is(resolveError, ErrPrettierConfigRemains) {
 		test.Fatalf("a child with a leftover resolved through its remembered parent: %v", resolveError)
 	}
 }

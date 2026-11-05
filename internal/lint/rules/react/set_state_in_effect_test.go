@@ -190,8 +190,8 @@ func TestSetStateInEffectStaysSilent(test *testing.T) {
 		//
 		// This was the rule's one known false positive, pinned in the reporting list so that the day
 		// the ref exemption's control half landed it would fail and say what to change. It did, twice:
-		// `high_level_intermediate_representation.ControlDominators` supplied the frontier, and tainting a store's own lvalue supplied the
-		// value half for `const previousX = previousXRef.current`.
+		// `high_level_intermediate_representation.ControlDominators` supplied the frontier, and tainting a store's own
+		// lvalue supplied the value half for `const previousX = previousXRef.current`.
 		//
 		// Moved here rather than deleted, because the fixture is upstream's and its passing is the
 		// measurement that the two halves together reproduce upstream's behaviour on the shape they
@@ -380,7 +380,10 @@ func TestSetStateInEffectPointsAtTheSetterCall(test *testing.T) {
 func TestSetStateInEffectMessage(test *testing.T) {
 	test.Parallel()
 
-	result := runSetStateInEffect(test, "import {useEffect, useState} from \"./react\";\nfunction Component() {\n  const [state, setState] = useState(0);\n  useEffect(() => {\n    setState(1);\n  });\n  return state;\n}\n")
+	result := runSetStateInEffect(
+		test,
+		"import {useEffect, useState} from \"./react\";\nfunction Component() {\n  const [state, setState] = useState(0);\n  useEffect(() => {\n    setState(1);\n  });\n  return state;\n}\n",
+	)
 	if len(result.Diagnostics) != 1 {
 		test.Fatalf("expected exactly one finding, got %d", len(result.Diagnostics))
 	}
@@ -410,7 +413,12 @@ func TestSetStateInEffectMessage(test *testing.T) {
 func TestSetStateInEffectRequiresTheTypedHarness(test *testing.T) {
 	test.Parallel()
 
-	result := rule_testing.Run(test, SetStateInEffect, "a.tsx", "import {useEffect, useState} from \"./react\";\nfunction Component() {\n  const [state, setState] = useState(0);\n  useEffect(() => {\n    setState(1);\n  });\n  return state;\n}\n")
+	result := rule_testing.Run(
+		test,
+		SetStateInEffect,
+		"a.tsx",
+		"import {useEffect, useState} from \"./react\";\nfunction Component() {\n  const [state, setState] = useState(0);\n  useEffect(() => {\n    setState(1);\n  });\n  return state;\n}\n",
+	)
 	rule_testing.ExpectClean(test, result)
 }
 
@@ -429,12 +437,18 @@ func TestSetStateInEffectSpreadArgument(test *testing.T) {
 	test.Parallel()
 
 	// A bare spread of an unknown array. Upstream silent, and the guard is what makes us silent.
-	rule_testing.ExpectClean(test, runSetStateInEffect(test, "import {useEffect, useState} from \"./react\";\nfunction Component({args}: {args: [() => void]}) {\n  const [state, setState] = useState(0);\n  useEffect(...args);\n  return state;\n}\n"))
+	rule_testing.ExpectClean(test, runSetStateInEffect(
+		test,
+		"import {useEffect, useState} from \"./react\";\nfunction Component({args}: {args: [() => void]}) {\n  const [state, setState] = useState(0);\n  useEffect(...args);\n  return state;\n}\n",
+	))
 
 	// A spread of an array literal holding a callback that does call a setter. This is the input
 	// that separates the two versions: the callback is a real setter-calling closure, so without
 	// the spread guard the first argument reads as one.
-	rule_testing.ExpectClean(test, runSetStateInEffect(test, "import {useEffect, useState} from \"./react\";\nfunction Component() {\n  const [state, setState] = useState(0);\n  const args: [() => void] = [() => { setState(1); }];\n  useEffect(...args);\n  return state;\n}\n"))
+	rule_testing.ExpectClean(test, runSetStateInEffect(
+		test,
+		"import {useEffect, useState} from \"./react\";\nfunction Component() {\n  const [state, setState] = useState(0);\n  const args: [() => void] = [() => { setState(1); }];\n  useEffect(...args);\n  return state;\n}\n",
+	))
 }
 
 // TestSetStateInEffectDescendsIntoNestedFunctions pins the walk over `Function.Functions`.
@@ -454,10 +468,16 @@ func TestSetStateInEffectDescendsIntoNestedFunctions(test *testing.T) {
 
 	// A nested component. The outer function is not a component itself, so nothing would look
 	// inside it without the descent.
-	rule_testing.ExpectFindings(test, runSetStateInEffect(test, "import {useEffect, useState} from \"./react\";\nfunction Outer() {\n  function Inner() {\n    const [state, setState] = useState(0);\n    useEffect(() => {\n      setState(1);\n    });\n    return state;\n  }\n  return Inner;\n}\n"), setStateInEffect)
+	rule_testing.ExpectFindings(test, runSetStateInEffect(
+		test,
+		"import {useEffect, useState} from \"./react\";\nfunction Outer() {\n  function Inner() {\n    const [state, setState] = useState(0);\n    useEffect(() => {\n      setState(1);\n    });\n    return state;\n  }\n  return Inner;\n}\n",
+	), setStateInEffect)
 
 	// A nested custom hook, which upstream admits through the same gate for a different reason.
-	rule_testing.ExpectFindings(test, runSetStateInEffect(test, "import {useEffect, useState} from \"./react\";\nfunction Outer() {\n  function useInner() {\n    const [state, setState] = useState(0);\n    useEffect(() => {\n      setState(1);\n    });\n    return state;\n  }\n  return useInner;\n}\n"), setStateInEffect)
+	rule_testing.ExpectFindings(test, runSetStateInEffect(
+		test,
+		"import {useEffect, useState} from \"./react\";\nfunction Outer() {\n  function useInner() {\n    const [state, setState] = useState(0);\n    useEffect(() => {\n      setState(1);\n    });\n    return state;\n  }\n  return useInner;\n}\n",
+	), setStateInEffect)
 }
 
 // TestSetStateInEffectDeclinesACallbackClosingOverNoSetter pins the `anyOperandIsSetter` gate.
@@ -475,7 +495,10 @@ func TestSetStateInEffectDescendsIntoNestedFunctions(test *testing.T) {
 func TestSetStateInEffectDeclinesACallbackClosingOverNoSetter(test *testing.T) {
 	test.Parallel()
 
-	rule_testing.ExpectClean(test, runSetStateInEffect(test, "import {useEffect} from \"./react\";\nfunction Component({onTick}: {onTick: () => void}) {\n  useEffect(() => {\n    onTick();\n  });\n  return null;\n}\n"))
+	rule_testing.ExpectClean(test, runSetStateInEffect(
+		test,
+		"import {useEffect} from \"./react\";\nfunction Component({onTick}: {onTick: () => void}) {\n  useEffect(() => {\n    onTick();\n  });\n  return null;\n}\n",
+	))
 }
 
 // TestSetStateInEffectSeesThroughManualMemoization pins the `useCallback` / `useMemo` erasure.
@@ -497,8 +520,8 @@ func TestSetStateInEffectDeclinesACallbackClosingOverNoSetter(test *testing.T) {
 // transcribed faithfully from that validator -- was faithful to a function whose input had not
 // been prepared the same way.
 //
-// The fix is entirely in the input: `high_level_intermediate_representation.ForFunctionWithoutManualMemoization` runs the erasure
-// before this rule reads the graph. The rule itself is unchanged, because it already carries
+// The fix is entirely in the input: `high_level_intermediate_representation.ForFunctionWithoutManualMemoization` runs
+// the erasure before this rule reads the graph. The rule itself is unchanged, because it already carries
 // setter-ness across `LoadLocal`, which is exactly what the `useCallback` rewrite produces.
 //
 // # Why the async cases are here
@@ -581,16 +604,25 @@ func TestSetStateInEffectReachesThroughAMemoizedCallbackThatReturnsAFunction(tes
 	const setStateInEffect = "setStateInEffect"
 
 	// The case itself. Was the failing-shape fixture; now asserts the fix.
-	rule_testing.ExpectFindings(test, runSetStateInEffect(test, "import {useEffect, useMemo, useState} from \"./react\";\n\nfunction Component() {\n  const [state, setState] = useState(0);\n  const bump = useMemo(() => () => {\n    setState(1);\n  }, []);\n  useEffect(() => {\n    bump();\n  }, [bump]);\n  return state;\n}\n"), setStateInEffect)
+	rule_testing.ExpectFindings(test, runSetStateInEffect(
+		test,
+		"import {useEffect, useMemo, useState} from \"./react\";\n\nfunction Component() {\n  const [state, setState] = useState(0);\n  const bump = useMemo(() => () => {\n    setState(1);\n  }, []);\n  useEffect(() => {\n    bump();\n  }, [bump]);\n  return state;\n}\n",
+	), setStateInEffect)
 
 	// A `useMemo` returning a value rather than a function has no setter to reach, and inlining its
 	// callback must not invent one. This is the case that would break first if the splice ever
 	// spliced something it should not.
-	rule_testing.ExpectClean(test, runSetStateInEffect(test, "import {useEffect, useMemo, useState} from \"./react\";\n\nfunction Component() {\n  const [state] = useState(0);\n  const doubled = useMemo(() => state * 2, [state]);\n  useEffect(() => {\n    console.info(doubled);\n  }, [doubled]);\n  return doubled;\n}\n"))
+	rule_testing.ExpectClean(test, runSetStateInEffect(
+		test,
+		"import {useEffect, useMemo, useState} from \"./react\";\n\nfunction Component() {\n  const [state] = useState(0);\n  const doubled = useMemo(() => state * 2, [state]);\n  useEffect(() => {\n    console.info(doubled);\n  }, [doubled]);\n  return doubled;\n}\n",
+	))
 
 	// A programmer-written IIFE, which nothing marks and which the pass has always inlined. Silent
 	// because there is no setter in it, not because it was declined.
-	rule_testing.ExpectClean(test, runSetStateInEffect(test, "import {useEffect, useState} from \"./react\";\n\nfunction Component() {\n  const [state] = useState(0);\n  const value = (function() {\n    return 1;\n  })();\n  useEffect(() => {\n    console.info(value);\n  }, [value]);\n  return state + value;\n}\n"))
+	rule_testing.ExpectClean(test, runSetStateInEffect(
+		test,
+		"import {useEffect, useState} from \"./react\";\n\nfunction Component() {\n  const [state] = useState(0);\n  const value = (function() {\n    return 1;\n  })();\n  useEffect(() => {\n    console.info(value);\n  }, [value]);\n  return state + value;\n}\n",
+	))
 }
 
 // TestSetStateInEffectDeclinesMemoizationItDoesNotReach records where the erasure still stops.
@@ -603,14 +635,23 @@ func TestSetStateInEffectDeclinesMemoizationItDoesNotReach(test *testing.T) {
 	test.Parallel()
 
 	// A closure through an ordinary function. Silent in both, so the erasure is not "any call".
-	rule_testing.ExpectClean(test, runSetStateInEffect(test, "import {useEffect, useState} from \"./react\";\n\nfunction identity<T>(callback: T): T {\n  return callback;\n}\n\nfunction Component() {\n  const [state, setState] = useState(0);\n  const bump = identity(() => {\n    setState(1);\n  });\n  useEffect(() => {\n    bump();\n  }, [bump]);\n  return state;\n}\n"))
+	rule_testing.ExpectClean(test, runSetStateInEffect(
+		test,
+		"import {useEffect, useState} from \"./react\";\n\nfunction identity<T>(callback: T): T {\n  return callback;\n}\n\nfunction Component() {\n  const [state, setState] = useState(0);\n  const bump = identity(() => {\n    setState(1);\n  });\n  useEffect(() => {\n    bump();\n  }, [bump]);\n  return state;\n}\n",
+	))
 
 	// A closure through a custom hook. Silent in both, for the same reason.
-	rule_testing.ExpectClean(test, runSetStateInEffect(test, "import {useEffect, useState} from \"./react\";\n\nfunction useWrap<T>(callback: T): T {\n  return callback;\n}\n\nfunction Component() {\n  const [state, setState] = useState(0);\n  const bump = useWrap(() => {\n    setState(1);\n  });\n  useEffect(() => {\n    bump();\n  }, [bump]);\n  return state;\n}\n"))
+	rule_testing.ExpectClean(test, runSetStateInEffect(
+		test,
+		"import {useEffect, useState} from \"./react\";\n\nfunction useWrap<T>(callback: T): T {\n  return callback;\n}\n\nfunction Component() {\n  const [state, setState] = useState(0);\n  const bump = useWrap(() => {\n    setState(1);\n  });\n  useEffect(() => {\n    bump();\n  }, [bump]);\n  return state;\n}\n",
+	))
 
 	// A useCallback closing over no setter: the erasure does not make every memoized callback
 	// suspect.
-	rule_testing.ExpectClean(test, runSetStateInEffect(test, "import {useCallback, useEffect, useState} from \"./react\";\n\nfunction Component() {\n  const [state] = useState(0);\n  const log = useCallback(() => {\n    console.info(\"x\");\n  }, []);\n  useEffect(() => {\n    log();\n  }, [log]);\n  return state;\n}\n"))
+	rule_testing.ExpectClean(test, runSetStateInEffect(
+		test,
+		"import {useCallback, useEffect, useState} from \"./react\";\n\nfunction Component() {\n  const [state] = useState(0);\n  const log = useCallback(() => {\n    console.info(\"x\");\n  }, []);\n  useEffect(() => {\n    log();\n  }, [log]);\n  return state;\n}\n",
+	))
 }
 
 // TestSetStateInEffectGatesTheSecondLoweringWithoutLosingFindings pins the fast path.
@@ -630,7 +671,10 @@ func TestSetStateInEffectGatesTheSecondLoweringWithoutLosingFindings(test *testi
 
 	// The namespace spelling: the span names `useCallback` only through a member access, and the
 	// pass recognises it through its `react` sidemap rather than a bare identifier.
-	rule_testing.ExpectFindings(test, runSetStateInEffect(test, "import * as React from \"./react\";\n\nfunction Component() {\n  const [state, setState] = React.useState(0);\n  const bump = React.useCallback(() => {\n    setState(1);\n  }, []);\n  React.useEffect(() => {\n    bump();\n  }, [bump]);\n  return state;\n}\n"), setStateInEffect)
+	rule_testing.ExpectFindings(test, runSetStateInEffect(
+		test,
+		"import * as React from \"./react\";\n\nfunction Component() {\n  const [state, setState] = React.useState(0);\n  const bump = React.useCallback(() => {\n    setState(1);\n  }, []);\n  React.useEffect(() => {\n    bump();\n  }, [bump]);\n  return state;\n}\n",
+	), setStateInEffect)
 
 	// Escaped spellings: each reaches the erasure through cooked identifier or string text while
 	// the span never holds the name's letters in a row, so a substring-only gate handed this rule
@@ -647,7 +691,10 @@ func TestSetStateInEffectGatesTheSecondLoweringWithoutLosingFindings(test *testi
 	// The control: no memo call at all, so this takes the gate's fast path and must still report
 	// through the shared lowering. Without this, a gate that returned `nil` on its fast path would
 	// look correct from the case above alone.
-	rule_testing.ExpectFindings(test, runSetStateInEffect(test, "import {useEffect, useState} from \"./react\";\n\nfunction Component() {\n  const [state, setState] = useState(0);\n  const bump = () => {\n    setState(1);\n  };\n  useEffect(() => {\n    bump();\n  }, [bump]);\n  return state;\n}\n"), setStateInEffect)
+	rule_testing.ExpectFindings(test, runSetStateInEffect(
+		test,
+		"import {useEffect, useState} from \"./react\";\n\nfunction Component() {\n  const [state, setState] = useState(0);\n  const bump = () => {\n    setState(1);\n  };\n  useEffect(() => {\n    bump();\n  }, [bump]);\n  return state;\n}\n",
+	), setStateInEffect)
 }
 
 // TestSetStateInEffectRenamedMemoImportIsAKnownDivergence records a gap the gate does not cause.
@@ -666,7 +713,10 @@ func TestSetStateInEffectGatesTheSecondLoweringWithoutLosingFindings(test *testi
 func TestSetStateInEffectRenamedMemoImportIsAKnownDivergence(test *testing.T) {
 	test.Parallel()
 
-	rule_testing.ExpectClean(test, runSetStateInEffect(test, "import {useCallback as useCached, useEffect, useState} from \"./react\";\n\nfunction Component() {\n  const [state, setState] = useState(0);\n  const bump = useCached(() => {\n    setState(1);\n  }, []);\n  useEffect(() => {\n    bump();\n  }, [bump]);\n  return state;\n}\n"))
+	rule_testing.ExpectClean(test, runSetStateInEffect(
+		test,
+		"import {useCallback as useCached, useEffect, useState} from \"./react\";\n\nfunction Component() {\n  const [state, setState] = useState(0);\n  const bump = useCached(() => {\n    setState(1);\n  }, []);\n  useEffect(() => {\n    bump();\n  }, [bump]);\n  return state;\n}\n",
+	))
 }
 
 // TestSetStateInEffectJudgesOnlyWhatReactCompiles pins the component-or-hook gate (#1pmwkmv).
@@ -677,7 +727,13 @@ func TestSetStateInEffectRenamedMemoImportIsAKnownDivergence(test *testing.T) {
 func TestSetStateInEffectJudgesOnlyWhatReactCompiles(test *testing.T) {
 	test.Parallel()
 
-	rule_testing.ExpectClean(test, runSetStateInEffect(test, "import {useEffect, useState} from \"./react\";\n\nexport function notAComponent() {\n  const [state, setState] = useState(0);\n  useEffect(() => {\n    setState(1);\n  });\n  return state;\n}\n"))
+	rule_testing.ExpectClean(test, runSetStateInEffect(
+		test,
+		"import {useEffect, useState} from \"./react\";\n\nexport function notAComponent() {\n  const [state, setState] = useState(0);\n  useEffect(() => {\n    setState(1);\n  });\n  return state;\n}\n",
+	))
 
-	rule_testing.ExpectFindings(test, runSetStateInEffect(test, "import {useEffect, useState} from \"./react\";\n\nexport function wrapper() {\n  function Component() {\n    const [state, setState] = useState(0);\n    useEffect(() => {\n      setState(1);\n    });\n    return state;\n  }\n  return Component;\n}\n"), "setStateInEffect")
+	rule_testing.ExpectFindings(test, runSetStateInEffect(
+		test,
+		"import {useEffect, useState} from \"./react\";\n\nexport function wrapper() {\n  function Component() {\n    const [state, setState] = useState(0);\n    useEffect(() => {\n      setState(1);\n    });\n    return state;\n  }\n  return Component;\n}\n",
+	), "setStateInEffect")
 }

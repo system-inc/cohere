@@ -21,7 +21,13 @@ func printReturnOrThrowArgument(path *Path, options *Options, print PrintFunc) D
 		return concatIn(path, "(", indentIn(path, concatIn(path, hardline, argumentDoc)), hardline, ")")
 	}
 	if isBinaryish(current) {
-		return groupIn(path, concatIn(path, ifBreak("(", ""), indentIn(path, concatIn(path, softline, argumentDoc)), softline, ifBreak(")", "")))
+		return groupIn(path, concatIn(
+			path,
+			ifBreak("(", ""),
+			indentIn(path, concatIn(path, softline, argumentDoc)),
+			softline,
+			ifBreak(")", ""),
+		))
 	}
 	return argumentDoc
 }
@@ -296,7 +302,11 @@ func printKey(path *Path, options *Options, print PrintFunc) Doc {
 			name = javaScriptNumberString(value)
 		}
 		printed := printString(jsonStringify(name), options)
-		return call(path, func(path *Path) Doc { return printing.PrintComments(path, concatIn(path, printed), options, nil) }, property)
+		return call(
+			path,
+			func(path *Path) Doc { return printing.PrintComments(path, concatIn(path, printed), options, nil) },
+			property,
+		)
 	}
 	if shouldUnquoteKey(path, options) {
 		value := getKey(current).String("value")
@@ -304,7 +314,11 @@ func printKey(path *Path, options *Options, print PrintFunc) Doc {
 		if leadingDigit.MatchString(value) {
 			printed = printNumber(value)
 		}
-		return call(path, func(path *Path) Doc { return printing.PrintComments(path, concatIn(path, printed), options, nil) }, property)
+		return call(
+			path,
+			func(path *Path) Doc { return printing.PrintComments(path, concatIn(path, printed), options, nil) },
+			property,
+		)
 	}
 	return print(property, nil)
 }
@@ -317,7 +331,10 @@ func isEs5IdentifierName(value string) bool {
 		return false
 	}
 	for index, character := range value {
-		isStart := character == '$' || character == '_' || unicode.IsLetter(character) || unicode.Is(unicode.Nl, character)
+		isStart := character == '$' ||
+			character == '_' ||
+			unicode.IsLetter(character) ||
+			unicode.Is(unicode.Nl, character)
 		if index == 0 {
 			if !isStart {
 				return false

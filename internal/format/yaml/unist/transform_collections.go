@@ -44,7 +44,10 @@ func (context *context) transformMap(mapNode *compose.Node, properties []*cst.To
 		throwTypeError("undefined", "position")
 	}
 	return context.createMapping(
-		context.createPosition(context.position(mappingItems[0]).start, context.position(mappingItems[len(mappingItems)-1]).end),
+		context.createPosition(
+			context.position(mappingItems[0]).start,
+			context.position(mappingItems[len(mappingItems)-1]).end,
+		),
 		context.transformContentProperties(mapNode, properties), mappingItems)
 }
 
@@ -104,7 +107,10 @@ func (context *context) transformSeq(seq *compose.Node, properties []*cst.Token)
 		throwTypeError("undefined", "position")
 	}
 	return context.createSequence(
-		context.createPosition(context.position(sequenceItems[0]).start, context.position(sequenceItems[len(sequenceItems)-1]).end),
+		context.createPosition(
+			context.position(sequenceItems[0]).start,
+			context.position(sequenceItems[len(sequenceItems)-1]).end,
+		),
 		context.transformContentProperties(seq, properties), sequenceItems)
 }
 
@@ -121,8 +127,11 @@ func (context *context) transformItemValue(itemNode *compose.Node, properties []
 	}
 	sourceItem := itemNode.SrcItem
 	mappingItem := context.transformPair(itemNode, sourceItem, context.createMappingItem)
-	return context.createMapping(context.position(mappingItem), context.transformContentProperties(itemNode.Key, properties),
-		[]*Node{mappingItem})
+	return context.createMapping(
+		context.position(mappingItem),
+		context.transformContentProperties(itemNode.Key, properties),
+		[]*Node{mappingItem},
+	)
 }
 
 // transformFlowMap is upstream's transformFlowMap.
@@ -179,7 +188,11 @@ func (context *context) transformFlowSeq(flowSequence *compose.Node, properties 
 	for index, item := range flowSequence.Items {
 		sourceItem := itemAt(sourceToken.Items, index)
 		if isBlockMappingOfImmediateChildOfFlowSequence(item, sourceItem) {
-			flowSequenceItems[index] = context.transformPair(item.Items[len(item.Items)-1], sourceItem, context.createFlowMappingItem)
+			flowSequenceItems[index] = context.transformPair(
+				item.Items[len(item.Items)-1],
+				sourceItem,
+				context.createFlowMappingItem,
+			)
 			continue
 		}
 		if !compose.IsPair(item) {
@@ -224,7 +237,10 @@ func (context *context) transformFlowSeq(flowSequence *compose.Node, properties 
 		throwError("Expected flow-seq-end token")
 	}
 	return context.createFlowSequence(
-		context.transformRange(sourceToken.FlowStart.Offset, flowSequenceEndToken.Offset+len(flowSequenceEndToken.Source)),
+		context.transformRange(
+			sourceToken.FlowStart.Offset,
+			flowSequenceEndToken.Offset+len(flowSequenceEndToken.Source),
+		),
 		context.transformContentProperties(flowSequence, properties), flowSequenceItems)
 }
 
@@ -245,7 +261,11 @@ func isBlockMappingOfImmediateChildOfFlowSequence(item *compose.Node, sourceItem
 }
 
 // transformPair is upstream's transformPair (pair.mjs).
-func (context *context) transformPair(pair *compose.Node, sourceItem *cst.CollectionItem, createNode createItemFunc) *Node {
+func (context *context) transformPair(
+	pair *compose.Node,
+	sourceItem *cst.CollectionItem,
+	createNode createItemFunc,
+) *Node {
 	if sourceItem == nil {
 		throwTypeError("undefined", "start")
 	}
@@ -336,7 +356,14 @@ func (context *context) transformPair(pair *compose.Node, sourceItem *cst.Collec
 
 // transformAstPair is upstream's transformAstPair. Upstream's additionalKeyData and additionalValueData
 // are { range, props }: the ranges, nil for null, and the prop tokens.
-func (context *context) transformAstPair(pair *compose.Node, createNode createItemFunc, keyRange []int, keyProperties []*cst.Token, valueRange []int, valueProperties []*cst.Token) *Node {
+func (context *context) transformAstPair(
+	pair *compose.Node,
+	createNode createItemFunc,
+	keyRange []int,
+	keyProperties []*cst.Token,
+	valueRange []int,
+	valueProperties []*cst.Token,
+) *Node {
 	var keyContent *Node
 	if !isEmptyNode(pair.Key, keyProperties) {
 		keyContent = context.transformNode(pair.Key, keyProperties)

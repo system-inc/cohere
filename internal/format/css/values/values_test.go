@@ -51,15 +51,29 @@ func TestParseShapes(test *testing.T) {
 
 	// A signed number splits into value and unit, and its sourceIndex is the merged word's last token.
 	if nodes[0].String("value") != "-5" || nodes[0].String("unit") != "px" || nodes[0].Get("sourceIndex") != 1 {
-		test.Errorf("-5px: got value %q unit %q sourceIndex %v", nodes[0].String("value"), nodes[0].String("unit"), nodes[0].Get("sourceIndex"))
+		test.Errorf(
+			"-5px: got value %q unit %q sourceIndex %v",
+			nodes[0].String("value"),
+			nodes[0].String("unit"),
+			nodes[0].Get("sourceIndex"),
+		)
 	}
 	// --foo is "--" and "foo" merged, indexed at "foo"; loc.js's fixValueWordLoc undoes that.
 	if nodes[1].String("value") != "--foo" || nodes[1].Get("sourceIndex") != 7 || raws(nodes[1])["before"] != " " {
-		test.Errorf("--foo: got value %q sourceIndex %v raws %v", nodes[1].String("value"), nodes[1].Get("sourceIndex"), raws(nodes[1]))
+		test.Errorf(
+			"--foo: got value %q sourceIndex %v raws %v",
+			nodes[1].String("value"),
+			nodes[1].Get("sourceIndex"),
+			raws(nodes[1]),
+		)
 	}
 	// A function holds its parens and arguments, and is balanced again at the end.
 	function := nodes[2].List("nodes")
-	if len(function) != 5 || !function[0].Is("paren") || !function[2].Is("operator") || !function[4].Is("paren") || nodes[2].Get("unbalanced") != float64(0) {
+	if len(function) != 5 ||
+		!function[0].Is("paren") ||
+		!function[2].Is("operator") ||
+		!function[4].Is("paren") ||
+		nodes[2].Get("unbalanced") != float64(0) {
 		test.Errorf("calc: got %d children, unbalanced %v", len(function), nodes[2].Get("unbalanced"))
 	}
 	// The operator's sourceIndex is its token's end line, 1, not its index.
@@ -70,7 +84,12 @@ func TestParseShapes(test *testing.T) {
 		test.Errorf("#fff: want isHex and isColor")
 	}
 	if nodes[4].String("value") != "a" || !nodes[4].Bool("quoted") || raws(nodes[4])["quote"] != "\"" {
-		test.Errorf("string: got %q quoted %v raws %v", nodes[4].String("value"), nodes[4].Get("quoted"), raws(nodes[4]))
+		test.Errorf(
+			"string: got %q quoted %v raws %v",
+			nodes[4].String("value"),
+			nodes[4].Get("quoted"),
+			raws(nodes[4]),
+		)
 	}
 	if nodes[5].String("value") != " c " || nodes[5].Bool("inline") {
 		test.Errorf("comment: got %q inline %v", nodes[5].String("value"), nodes[5].Get("inline"))
@@ -87,12 +106,22 @@ func TestParseShapes(test *testing.T) {
 
 	// sourceIndex is bytes; columns stay UTF-16 units.
 	multibyte := parseNodes(test, "\xc3\xa9 \xf0\x9f\x98\x80x b")
-	if multibyte[1].Get("sourceIndex") != 3 || multibyte[2].Get("sourceIndex") != 9 || sourceColumn(test, multibyte[2], "start") != 7 {
-		test.Errorf("non-ASCII: got sourceIndex %v and %v, column %v", multibyte[1].Get("sourceIndex"), multibyte[2].Get("sourceIndex"), sourceColumn(test, multibyte[2], "start"))
+	if multibyte[1].Get("sourceIndex") != 3 ||
+		multibyte[2].Get("sourceIndex") != 9 ||
+		sourceColumn(test, multibyte[2], "start") != 7 {
+		test.Errorf(
+			"non-ASCII: got sourceIndex %v and %v, column %v",
+			multibyte[1].Get("sourceIndex"),
+			multibyte[2].Get("sourceIndex"),
+			sourceColumn(test, multibyte[2], "start"),
+		)
 	}
 
 	// Inline comments only in loose mode.
-	if comment := parseNodes(test, "a // b")[1]; !comment.Is("comment") || !comment.Bool("inline") || comment.String("value") != " b" {
+	if comment := parseNodes(
+		test,
+		"a // b",
+	)[1]; !comment.Is("comment") || !comment.Bool("inline") || comment.String("value") != " b" {
 		test.Errorf("inline comment: got %s %q", comment.Type(), comment.String("value"))
 	}
 	// Outside loose mode url() arguments become one word.
@@ -100,7 +129,9 @@ func TestParseShapes(test *testing.T) {
 	if parseError != nil {
 		test.Fatal(parseError)
 	}
-	if url := strict.List("nodes")[0].List("nodes")[0].List("nodes"); len(url) != 3 || url[1].String("value") != "a b" || url[1].Has("isHex") {
+	if url := strict.List("nodes")[0].List("nodes")[0].List(
+		"nodes",
+	); len(url) != 3 || url[1].String("value") != "a b" || url[1].Has("isHex") {
 		test.Errorf("strict url: got %d children", len(url))
 	}
 }

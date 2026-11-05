@@ -12,7 +12,10 @@ const correctnessNoGlobalListenerTargetAssertionId = "globalListenerTargetAssert
 
 // correctnessNoGlobalListenerTargetAssertionText is the rule's message, whose wording lives in
 // `policy/messages/correctness-no-global-listener-target-assertion.json`.
-var correctnessNoGlobalListenerTargetAssertionText = policy.MessageOf("nexus/correctness-no-global-listener-target-assertion", correctnessNoGlobalListenerTargetAssertionId)
+var correctnessNoGlobalListenerTargetAssertionText = policy.MessageOf(
+	"nexus/correctness-no-global-listener-target-assertion",
+	correctnessNoGlobalListenerTargetAssertionId,
+)
 
 func correctnessNoGlobalListenerTargetAssertionMessage() rule.Message {
 	return rule.Message{
@@ -121,7 +124,11 @@ var CorrectnessNoGlobalListenerTargetAssertion = rule.Rule{
 				var visit func(current *ast.Node) bool
 				visit = func(current *ast.Node) bool {
 					if current.Kind == ast.KindPropertyAccessExpression {
-						if assertion := correctnessNoGlobalListenerTargetAssertionAt(ruleContext, current, event); assertion != nil {
+						if assertion := correctnessNoGlobalListenerTargetAssertionAt(
+							ruleContext,
+							current,
+							event,
+						); assertion != nil {
 							ruleContext.ReportNode(assertion, correctnessNoGlobalListenerTargetAssertionMessage())
 						}
 					}
@@ -146,7 +153,9 @@ var correctnessNoGlobalListenerTargetAssertionGeneralTypes = map[string]bool{
 func correctnessNoGlobalListenerTargetAssertionHandler(ruleContext rule.Context, call *ast.Node) *ast.Node {
 	expression := call.AsCallExpression()
 	callee := ast.SkipParentheses(expression.Expression)
-	if callee.Kind != ast.KindPropertyAccessExpression || expression.Arguments == nil || len(expression.Arguments.Nodes) < 2 {
+	if callee.Kind != ast.KindPropertyAccessExpression ||
+		expression.Arguments == nil ||
+		len(expression.Arguments.Nodes) < 2 {
 		return nil
 	}
 	access := callee.AsPropertyAccessExpression()
@@ -157,8 +166,14 @@ func correctnessNoGlobalListenerTargetAssertionHandler(ruleContext rule.Context,
 	if receiver.Kind != ast.KindIdentifier || (receiver.Text() != "document" && receiver.Text() != "window") {
 		return nil
 	}
-	if !correctnessNoGlobalListenerTargetAssertionIsGlobalVariable(ruleContext, ruleContext.TypeChecker.GetSymbolAtLocation(receiver)) ||
-		!correctnessNoGlobalListenerTargetAssertionFromDefaultLibrary(ruleContext, ruleContext.TypeChecker.GetSymbolAtLocation(access.Name())) {
+	if !correctnessNoGlobalListenerTargetAssertionIsGlobalVariable(
+		ruleContext,
+		ruleContext.TypeChecker.GetSymbolAtLocation(receiver),
+	) ||
+		!correctnessNoGlobalListenerTargetAssertionFromDefaultLibrary(
+			ruleContext,
+			ruleContext.TypeChecker.GetSymbolAtLocation(access.Name()),
+		) {
 		return nil
 	}
 	handler := ast.SkipParentheses(expression.Arguments.Nodes[1])
@@ -184,7 +199,10 @@ func correctnessNoGlobalListenerTargetAssertionHandler(ruleContext rule.Context,
 	case ast.KindVariableDeclaration:
 		list := declaration.Parent
 		initializer := declaration.AsVariableDeclaration().Initializer
-		if list == nil || list.Kind != ast.KindVariableDeclarationList || list.Flags&ast.NodeFlagsConst == 0 || initializer == nil {
+		if list == nil ||
+			list.Kind != ast.KindVariableDeclarationList ||
+			list.Flags&ast.NodeFlagsConst == 0 ||
+			initializer == nil {
 			return nil
 		}
 		initializer = ast.SkipParentheses(initializer)
@@ -228,16 +246,25 @@ func correctnessNoGlobalListenerTargetAssertionFromDefaultLibrary(ruleContext ru
 // correctnessNoGlobalListenerTargetAssertionAt is the assertion to report around one property access,
 // when the access is the event's own `target` and an assertion around it names a specific element
 // type the checker does not already know the target to be.
-func correctnessNoGlobalListenerTargetAssertionAt(ruleContext rule.Context, access *ast.Node, event *ast.Symbol) *ast.Node {
+func correctnessNoGlobalListenerTargetAssertionAt(
+	ruleContext rule.Context,
+	access *ast.Node,
+	event *ast.Symbol,
+) *ast.Node {
 	property := access.AsPropertyAccessExpression()
 	if property.Name().Kind != ast.KindIdentifier || property.Name().Text() != "target" {
 		return nil
 	}
 	object := ast.SkipParentheses(property.Expression)
-	if object.Kind != ast.KindIdentifier || object.Text() != event.Name || ruleContext.TypeChecker.GetSymbolAtLocation(object) != event {
+	if object.Kind != ast.KindIdentifier ||
+		object.Text() != event.Name ||
+		ruleContext.TypeChecker.GetSymbolAtLocation(object) != event {
 		return nil
 	}
-	if !correctnessNoGlobalListenerTargetAssertionFromDefaultLibrary(ruleContext, ruleContext.TypeChecker.GetSymbolAtLocation(property.Name())) {
+	if !correctnessNoGlobalListenerTargetAssertionFromDefaultLibrary(
+		ruleContext,
+		ruleContext.TypeChecker.GetSymbolAtLocation(property.Name()),
+	) {
 		return nil
 	}
 	known := ruleContext.TypeChecker.GetTypeAtLocation(access)
@@ -254,7 +281,10 @@ func correctnessNoGlobalListenerTargetAssertionAt(ruleContext rule.Context, acce
 			if asserted == nil || !correctnessNoGlobalListenerTargetAssertionIsSpecific(ruleContext, asserted) {
 				continue
 			}
-			if known != nil && ruleContext.TypeChecker.IsTypeAssignableTo(ruleContext.TypeChecker.GetNonNullableType(known), ruleContext.TypeChecker.GetNonNullableType(asserted)) {
+			if known != nil && ruleContext.TypeChecker.IsTypeAssignableTo(
+				ruleContext.TypeChecker.GetNonNullableType(known),
+				ruleContext.TypeChecker.GetNonNullableType(asserted),
+			) {
 				return nil
 			}
 			return outer
@@ -293,7 +323,8 @@ func correctnessNoGlobalListenerTargetAssertionExtendsElement(ruleContext rule.C
 		current := queue[0]
 		queue = queue[1:]
 		declared := checker.Checker_getDeclaredTypeOfSymbol(ruleContext.TypeChecker, current)
-		if declared == nil || checker.Type_objectFlags(declared)&(checker.ObjectFlagsInterface|checker.ObjectFlagsClass) == 0 {
+		if declared == nil ||
+			checker.Type_objectFlags(declared)&(checker.ObjectFlagsInterface|checker.ObjectFlagsClass) == 0 {
 			continue
 		}
 		for _, base := range checker.Checker_getBaseTypes(ruleContext.TypeChecker, declared) {
@@ -301,7 +332,8 @@ func correctnessNoGlobalListenerTargetAssertionExtendsElement(ruleContext rule.C
 			if baseSymbol == nil || seen[baseSymbol] {
 				continue
 			}
-			if baseSymbol.Name == "Element" && correctnessNoGlobalListenerTargetAssertionFromDefaultLibrary(ruleContext, baseSymbol) {
+			if baseSymbol.Name == "Element" &&
+				correctnessNoGlobalListenerTargetAssertionFromDefaultLibrary(ruleContext, baseSymbol) {
 				return true
 			}
 			seen[baseSymbol] = true

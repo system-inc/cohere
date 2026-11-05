@@ -12,7 +12,14 @@ import (
 func TestTheSnapshotIsWholeAndTheVersionItSays(test *testing.T) {
 	test.Parallel()
 	root := TailwindPackageRoot()
-	for _, name := range []string{"index.css", "theme.css", "preflight.css", "utilities.css", "LICENSE", "package.json"} {
+	for _, name := range []string{
+		"index.css",
+		"theme.css",
+		"preflight.css",
+		"utilities.css",
+		"LICENSE",
+		"package.json",
+	} {
 		if _, statError := os.Stat(filepath.Join(root, name)); statError != nil {
 			test.Errorf("the snapshot is missing %s: %v", name, statError)
 		}
@@ -41,7 +48,11 @@ func TestTheSnapshotIsWholeAndTheVersionItSays(test *testing.T) {
 func TestTheSourceDirectoryIsFoundUnderEitherBuild(test *testing.T) {
 	test.Parallel()
 	root := test.TempDir()
-	if writeError := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module "+modulePath+"\n\ngo 1.27\n"), 0o644); writeError != nil {
+	if writeError := os.WriteFile(
+		filepath.Join(root, "go.mod"),
+		[]byte("module "+modulePath+"\n\ngo 1.27\n"),
+		0o644,
+	); writeError != nil {
 		test.Fatal(writeError)
 	}
 	working := filepath.Join(root, "internal", "lint", "rules", "tailwind")
@@ -49,15 +60,24 @@ func TestTheSourceDirectoryIsFoundUnderEitherBuild(test *testing.T) {
 		test.Fatal(createDirectoryError)
 	}
 	want := filepath.Join(root, "internal", "lint", "rules", "tailwind", "vendored")
-	for _, file := range []string{filepath.Join(want, "vendored.go"), modulePath + "/internal/lint/rules/tailwind/vendored/vendored.go"} {
+	for _, file := range []string{
+		filepath.Join(want, "vendored.go"),
+		modulePath + "/internal/lint/rules/tailwind/vendored/vendored.go",
+	} {
 		if got, sourceDirectoryError := sourceDirectory(file, working); sourceDirectoryError != nil || got != want {
 			test.Errorf("%s gave %q (%v), want %q", file, got, sourceDirectoryError, want)
 		}
 	}
-	if _, sourceDirectoryError := sourceDirectory("example.com/other/vendored.go", working); sourceDirectoryError == nil {
+	if _, sourceDirectoryError := sourceDirectory(
+		"example.com/other/vendored.go",
+		working,
+	); sourceDirectoryError == nil {
 		test.Error("a file outside cohere's module was resolved")
 	}
-	if _, sourceDirectoryError := sourceDirectory(modulePath+"/internal/x.go", test.TempDir()); sourceDirectoryError == nil {
+	if _, sourceDirectoryError := sourceDirectory(
+		modulePath+"/internal/x.go",
+		test.TempDir(),
+	); sourceDirectoryError == nil {
 		test.Error("a module path was resolved with no go.mod above the working directory")
 	}
 }

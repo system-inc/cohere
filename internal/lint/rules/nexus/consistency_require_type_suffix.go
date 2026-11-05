@@ -22,9 +22,18 @@ var (
 // The rule's messages, one handle per id, whose wording lives in
 // `policy/messages/consistency-require-type-suffix.json`.
 var (
-	consistencyRequireTypeSuffixNoTypeAliasSuffixText = policy.MessageOf("nexus/consistency-require-type-suffix", "noTypeAliasSuffix")
-	consistencyRequireTypeSuffixNoInterfaceSuffixText = policy.MessageOf("nexus/consistency-require-type-suffix", "noInterfaceSuffix")
-	consistencyRequireTypeSuffixNoConstEnumSuffixText = policy.MessageOf("nexus/consistency-require-type-suffix", "noConstEnumSuffix")
+	consistencyRequireTypeSuffixNoTypeAliasSuffixText = policy.MessageOf(
+		"nexus/consistency-require-type-suffix",
+		"noTypeAliasSuffix",
+	)
+	consistencyRequireTypeSuffixNoInterfaceSuffixText = policy.MessageOf(
+		"nexus/consistency-require-type-suffix",
+		"noInterfaceSuffix",
+	)
+	consistencyRequireTypeSuffixNoConstEnumSuffixText = policy.MessageOf(
+		"nexus/consistency-require-type-suffix",
+		"noConstEnumSuffix",
+	)
 )
 
 func messageNoTypeAliasSuffix(name string) rule.Message {

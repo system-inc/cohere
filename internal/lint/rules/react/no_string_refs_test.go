@@ -43,13 +43,55 @@ func TestNoStringRefsFires(test *testing.T) {
 		checkThisRefs      bool
 		findings           []string
 	}{
-		{"upstream invalid 0", "\n        var Hello = createReactClass({\n          componentDidMount: function() {\n            var component = this.refs.hello;\n          },\n          render: function() {\n            return <div>Hello {this.props.name}</div>;\n          }\n        });\n      ", false, true, []string{"thisRefsDeprecated"}},
-		{"upstream invalid 1", "\n        var Hello = createReactClass({\n          render: function() {\n            return <div ref=\"hello\">Hello {this.props.name}</div>;\n          }\n        });\n      ", false, true, []string{"stringInRefDeprecated"}},
-		{"upstream invalid 2", "\n        var Hello = createReactClass({\n          render: function() {\n            return <div ref={'hello'}>Hello {this.props.name}</div>;\n          }\n        });\n      ", false, true, []string{"stringInRefDeprecated"}},
-		{"upstream invalid 3", "\n        var Hello = createReactClass({\n          componentDidMount: function() {\n            var component = this.refs.hello;\n          },\n          render: function() {\n            return <div ref=\"hello\">Hello {this.props.name}</div>;\n          }\n        });\n      ", false, true, []string{"thisRefsDeprecated", "stringInRefDeprecated"}},
-		{"upstream invalid 4", "\n        var Hello = createReactClass({\n          componentDidMount: function() {\n          var component = this.refs.hello;\n          },\n          render: function() {\n            return <div ref={`hello`}>Hello {this.props.name}</div>;\n          }\n        });\n      ", true, true, []string{"thisRefsDeprecated", "stringInRefDeprecated"}},
-		{"upstream invalid 5", "\n        var Hello = createReactClass({\n          componentDidMount: function() {\n          var component = this.refs.hello;\n          },\n          render: function() {\n            return <div ref={`hello${index}`}>Hello {this.props.name}</div>;\n          }\n        });\n      ", true, true, []string{"thisRefsDeprecated", "stringInRefDeprecated"}},
-		{"upstream invalid 6", "\n        var Hello = createReactClass({\n          componentDidMount: function() {\n          var component = this.refs.hello;\n          },\n          render: function() {\n            return <div ref={`hello${index}`}>Hello {this.props.name}</div>;\n          }\n        });\n      ", true, false, []string{"stringInRefDeprecated"}},
+		{
+			"upstream invalid 0",
+			"\n        var Hello = createReactClass({\n          componentDidMount: function() {\n            var component = this.refs.hello;\n          },\n          render: function() {\n            return <div>Hello {this.props.name}</div>;\n          }\n        });\n      ",
+			false,
+			true,
+			[]string{"thisRefsDeprecated"},
+		},
+		{
+			"upstream invalid 1",
+			"\n        var Hello = createReactClass({\n          render: function() {\n            return <div ref=\"hello\">Hello {this.props.name}</div>;\n          }\n        });\n      ",
+			false,
+			true,
+			[]string{"stringInRefDeprecated"},
+		},
+		{
+			"upstream invalid 2",
+			"\n        var Hello = createReactClass({\n          render: function() {\n            return <div ref={'hello'}>Hello {this.props.name}</div>;\n          }\n        });\n      ",
+			false,
+			true,
+			[]string{"stringInRefDeprecated"},
+		},
+		{
+			"upstream invalid 3",
+			"\n        var Hello = createReactClass({\n          componentDidMount: function() {\n            var component = this.refs.hello;\n          },\n          render: function() {\n            return <div ref=\"hello\">Hello {this.props.name}</div>;\n          }\n        });\n      ",
+			false,
+			true,
+			[]string{"thisRefsDeprecated", "stringInRefDeprecated"},
+		},
+		{
+			"upstream invalid 4",
+			"\n        var Hello = createReactClass({\n          componentDidMount: function() {\n          var component = this.refs.hello;\n          },\n          render: function() {\n            return <div ref={`hello`}>Hello {this.props.name}</div>;\n          }\n        });\n      ",
+			true,
+			true,
+			[]string{"thisRefsDeprecated", "stringInRefDeprecated"},
+		},
+		{
+			"upstream invalid 5",
+			"\n        var Hello = createReactClass({\n          componentDidMount: function() {\n          var component = this.refs.hello;\n          },\n          render: function() {\n            return <div ref={`hello${index}`}>Hello {this.props.name}</div>;\n          }\n        });\n      ",
+			true,
+			true,
+			[]string{"thisRefsDeprecated", "stringInRefDeprecated"},
+		},
+		{
+			"upstream invalid 6",
+			"\n        var Hello = createReactClass({\n          componentDidMount: function() {\n          var component = this.refs.hello;\n          },\n          render: function() {\n            return <div ref={`hello${index}`}>Hello {this.props.name}</div>;\n          }\n        });\n      ",
+			true,
+			false,
+			[]string{"stringInRefDeprecated"},
+		},
 	}
 
 	for _, testCase := range cases {
@@ -80,10 +122,30 @@ func TestNoStringRefsStaysSilent(test *testing.T) {
 		noTemplateLiterals bool
 		checkThisRefs      bool
 	}{
-		{"upstream valid 0", "\n        var Hello = createReactClass({\n          componentDidMount: function() {\n            var component = this.hello;\n          },\n          render: function() {\n            return <div ref={c => this.hello = c}>Hello {this.props.name}</div>;\n          }\n        });\n      ", false, false},
-		{"upstream valid 1", "\n        var Hello = createReactClass({\n          render: function() {\n            return <div ref={`hello`}>Hello {this.props.name}</div>;\n          }\n        });\n      ", false, false},
-		{"upstream valid 2", "\n        var Hello = createReactClass({\n          render: function() {\n            return <div ref={`hello${index}`}>Hello {this.props.name}</div>;\n          }\n        });\n      ", false, false},
-		{"upstream valid 3", "\n        var Hello = createReactClass({\n          componentDidMount: function() {\n            var component = this.refs.hello;\n          },\n          render: function() {\n            return <div>Hello {this.props.name}</div>;\n          }\n        });\n      ", false, false},
+		{
+			"upstream valid 0",
+			"\n        var Hello = createReactClass({\n          componentDidMount: function() {\n            var component = this.hello;\n          },\n          render: function() {\n            return <div ref={c => this.hello = c}>Hello {this.props.name}</div>;\n          }\n        });\n      ",
+			false,
+			false,
+		},
+		{
+			"upstream valid 1",
+			"\n        var Hello = createReactClass({\n          render: function() {\n            return <div ref={`hello`}>Hello {this.props.name}</div>;\n          }\n        });\n      ",
+			false,
+			false,
+		},
+		{
+			"upstream valid 2",
+			"\n        var Hello = createReactClass({\n          render: function() {\n            return <div ref={`hello${index}`}>Hello {this.props.name}</div>;\n          }\n        });\n      ",
+			false,
+			false,
+		},
+		{
+			"upstream valid 3",
+			"\n        var Hello = createReactClass({\n          componentDidMount: function() {\n            var component = this.refs.hello;\n          },\n          render: function() {\n            return <div>Hello {this.props.name}</div>;\n          }\n        });\n      ",
+			false,
+			false,
+		},
 	}
 
 	for _, testCase := range cases {
@@ -538,7 +600,9 @@ func TestDecodeNoStringRefsOptions(test *testing.T) {
 		})
 	}
 
-	if _, decodeNoStringRefsOptionsError := DecodeNoStringRefsOptions([]byte("not json")); decodeNoStringRefsOptionsError == nil {
+	if _, decodeNoStringRefsOptionsError := DecodeNoStringRefsOptions(
+		[]byte("not json"),
+	); decodeNoStringRefsOptionsError == nil {
 		test.Error("decoding malformed input returned no error")
 	}
 }

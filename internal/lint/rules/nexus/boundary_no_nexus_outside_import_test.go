@@ -52,17 +52,37 @@ func TestBoundaryNoNexusOutsideImportStaysSilent(test *testing.T) {
 		{"lookalike base", nexusFile, "import { Thing } from '@basement/Thing';\n"},
 
 		// Outside nexus, every one of these is legal, so the rule must decline the file entirely.
-		{"outside nexus static", "/repository/libraries/structure/source/Thing.ts", "import { Thing } from '@project/ProjectSettings';\n"},
-		{"outside nexus dynamic", "/repository/source/Thing.ts", "export async function load() {\n    return await import('@structure/source/Thing');\n}\n"},
+		{
+			"outside nexus static",
+			"/repository/libraries/structure/source/Thing.ts",
+			"import { Thing } from '@project/ProjectSettings';\n",
+		},
+		{
+			"outside nexus dynamic",
+			"/repository/source/Thing.ts",
+			"export async function load() {\n    return await import('@structure/source/Thing');\n}\n",
+		},
 
 		// A path that merely mentions nexus is not the nexus library.
-		{"nexus lookalike path", "/repository/libraries/nexus-template/source/Thing.ts", "import { Thing } from '@project/ProjectSettings';\n"},
+		{
+			"nexus lookalike path",
+			"/repository/libraries/nexus-template/source/Thing.ts",
+			"import { Thing } from '@project/ProjectSettings';\n",
+		},
 
 		// A computed specifier has no string to read, and the rule must not crash reaching for one.
-		{"computed dynamic import", nexusFile, "export async function load(name: string) {\n    return await import(name);\n}\n"},
+		{
+			"computed dynamic import",
+			nexusFile,
+			"export async function load(name: string) {\n    return await import(name);\n}\n",
+		},
 
 		// A method named require is not the CommonJS require.
-		{"method named require", nexusFile, "declare const loader: { require(name: string): unknown };\nconst thing = loader.require('@base/source/Thing');\n"},
+		{
+			"method named require",
+			nexusFile,
+			"declare const loader: { require(name: string): unknown };\nconst thing = loader.require('@base/source/Thing');\n",
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {

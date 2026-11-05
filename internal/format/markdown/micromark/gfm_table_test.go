@@ -144,9 +144,12 @@ func TestGfmTableEvents(test *testing.T) {
 
 // gfmTableAlignOracleScript is the event oracle's script, describing only each table's `_align`, which the
 // event descriptions leave out and mdast-util-gfm-table reads.
-var gfmTableAlignOracleScript = strings.Replace(oracleScript,
+var gfmTableAlignOracleScript = strings.Replace(
+	oracleScript,
 	`return events.map(([kind, token]) => describe(kind, token));`,
-	`return events.filter(([kind, token]) => kind === "enter" && token.type === "table").map(([, token]) => token._align.join(","));`, 1)
+	`return events.filter(([kind, token]) => kind === "enter" && token.type === "table").map(([, token]) => token._align.join(","));`,
+	1,
+)
 
 // TestGfmTableAlignMatchesUpstream compares every fixture's table alignments with upstream's `_align`.
 func TestGfmTableAlignMatchesUpstream(test *testing.T) {
@@ -159,7 +162,11 @@ func TestGfmTableAlignMatchesUpstream(test *testing.T) {
 	}
 	directory := test.TempDir()
 	script := filepath.Join(directory, "align.mjs")
-	if writeError := os.WriteFile(script, []byte(strings.ReplaceAll(gfmTableAlignOracleScript, "FORK", forkRoot(test))), 0o644); writeError != nil {
+	if writeError := os.WriteFile(
+		script,
+		[]byte(strings.ReplaceAll(gfmTableAlignOracleScript, "FORK", forkRoot(test))),
+		0o644,
+	); writeError != nil {
 		test.Fatal(writeError)
 	}
 	encoded, err := json.Marshal(gfmTableFixtures)

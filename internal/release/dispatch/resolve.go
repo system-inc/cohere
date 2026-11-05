@@ -101,7 +101,10 @@ func ResolveWorkingTree(paths Paths, packagePath string) (string, bool, error) {
 	// hash is recorded beside it and compared instead. Skipping this would serve a stale binary from
 	// a stable path, which is the same lie as a wrong hash.
 	binaryPath := paths.DevelopmentBinaryPath()
-	if upToDate, developmentBinaryIsCurrentError := developmentBinaryIsCurrent(paths, hash); developmentBinaryIsCurrentError != nil {
+	if upToDate, developmentBinaryIsCurrentError := developmentBinaryIsCurrent(
+		paths,
+		hash,
+	); developmentBinaryIsCurrentError != nil {
 		return "", false, developmentBinaryIsCurrentError
 	} else if upToDate {
 		return binaryPath, false, nil

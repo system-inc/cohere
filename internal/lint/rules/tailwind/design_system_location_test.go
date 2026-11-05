@@ -53,7 +53,9 @@ func runLocationFixture(test *testing.T, options NoUnknownClassesOptions) rule_t
 		"app/globals.css":               `@import "tailwindcss";`,
 		"packages/web/design/brand.css": "@import \"tailwindcss\";\n@utility brand-glow { color: red; }",
 	}
-	return rule_testing.RunTypedFilesWithSetupAndOptions(test, NoUnknownClasses, files, "Component.tsx", options, func(root string) {
+	return rule_testing.RunTypedFilesWithSetupAndOptions(test, NoUnknownClasses, files, "Component.tsx", options, func(
+		root string,
+	) {
 		modules := filepath.Join(root, "node_modules")
 		if createDirectoryError := os.MkdirAll(modules, 0o755); createDirectoryError != nil {
 			test.Fatalf("creating node_modules: %v", createDirectoryError)
@@ -108,7 +110,10 @@ func TestDesignSystemIsCachedPerLocation(test *testing.T) {
 		NoListener:   rule.NoListenerAnswersInRun,
 		Run: func(ruleContext rule.Context, options any) rule.Listeners {
 			for _, location := range []DesignSystemLocation{{}, {ConfigPath: "packages/web/design/brand.css"}, {}} {
-				entryPoints = append(entryPoints, filepath.Base(DesignSystemForProgramAt(ruleContext.Program, location).EntryPoint))
+				entryPoints = append(
+					entryPoints,
+					filepath.Base(DesignSystemForProgramAt(ruleContext.Program, location).EntryPoint),
+				)
 			}
 			return nil
 		},

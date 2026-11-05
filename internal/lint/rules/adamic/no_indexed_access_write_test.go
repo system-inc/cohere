@@ -78,7 +78,16 @@ test<{ readonly value: 1 }>();`,
 			}
 			rule_testing.ExpectClean(test, runAdamic(test, indexedAccessSubject(), source))
 			// Plant a concrete source into the same slot: each clean fixture must expose a refusal.
-			plant := strings.NewReplacer("source.value", "2", "source[key]", "2", "source.inner.value", "2", "return source;", "return { value: 2 };").Replace(source)
+			plant := strings.NewReplacer(
+				"source.value",
+				"2",
+				"source[key]",
+				"2",
+				"source.inner.value",
+				"2",
+				"return source;",
+				"return { value: 2 };",
+			).Replace(source)
 			result := runAdamic(test, indexedAccessSubject(), plant)
 			rule_testing.ExpectFindings(test, result, "indexedAccessWrite")
 			expectSpans(test, plant, result, "2")
@@ -138,7 +147,9 @@ func TestIndexedAccessWriteEdgesStayClean(test *testing.T) {
 		},
 		"method accepts constraint": {
 			`function make<T extends { readonly value: number }>(source: T): { put(value: number): T['value'] } { return { put(value: number): T['value'] { return source.value; } }; }`,
-			"put(value: number): T['value'] { return source.value; }", "put(value: T['value']): T['value'] { return value; }", "put",
+			"put(value: number): T['value'] { return source.value; }",
+			"put(value: T['value']): T['value'] { return value; }",
+			"put",
 		},
 	} {
 		test.Run(name, func(test *testing.T) {

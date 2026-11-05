@@ -198,7 +198,10 @@ func TestNoUnassignedVarsNeedsTheTypedHarness(test *testing.T) {
 	if !NoUnassignedVars.NeedsTypeChecker {
 		test.Fatal("the rule stopped declaring NeedsTypeChecker, so the engine will not lock the file")
 	}
-	rule_testing.ExpectClean(test, rule_testing.Run(test, NoUnassignedVars, unassignedVarsFile, "let user; greet(user);"))
+	rule_testing.ExpectClean(
+		test,
+		rule_testing.Run(test, NoUnassignedVars, unassignedVarsFile, "let user; greet(user);"),
+	)
 }
 
 // Every write shape, each one a way this rule could report a variable that is in fact assigned.

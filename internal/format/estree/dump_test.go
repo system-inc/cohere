@@ -137,11 +137,18 @@ func TestConvertAgreesWithPrettier(test *testing.T) {
 				break
 			}
 		}
-		if difference := firstDifference(want["ast"], got["ast"], "ast") + firstDifference(want["comments"], got["comments"], "comments"); difference == "" {
+		if difference := firstDifference(want["ast"], got["ast"], "ast") +
+			firstDifference(want["comments"], got["comments"], "comments"); difference == "" {
 			identical++
 		}
 	}
-	test.Logf("%d files, %d identical, %d different, %d the fork could not parse", len(files), identical, different, refused)
+	test.Logf(
+		"%d files, %d identical, %d different, %d the fork could not parse",
+		len(files),
+		identical,
+		different,
+		refused,
+	)
 	if refused > len(files)/10 {
 		test.Errorf("the fork refused %d of %d files; the comparison is thinner than it looks", refused, len(files))
 	}
@@ -196,7 +203,14 @@ func firstDifference(want any, got any, path string) string {
 			wantValue, wantPresent := typed[key]
 			gotValue, gotPresent := other[key]
 			if wantPresent != gotPresent {
-				return fmt.Sprintf("%s.%s: present in the fork %v, in Go %v (%s)", path, key, wantPresent, gotPresent, typed["type"])
+				return fmt.Sprintf(
+					"%s.%s: present in the fork %v, in Go %v (%s)",
+					path,
+					key,
+					wantPresent,
+					gotPresent,
+					typed["type"],
+				)
 			}
 			if difference := firstDifference(wantValue, gotValue, path+"."+key); difference != "" {
 				return difference
@@ -209,7 +223,11 @@ func firstDifference(want any, got any, path string) string {
 			return fmt.Sprintf("%s: want %d elements, got %v", path, len(typed), got)
 		}
 		for index := range typed {
-			if difference := firstDifference(typed[index], other[index], fmt.Sprintf("%s[%d]", path, index)); difference != "" {
+			if difference := firstDifference(
+				typed[index],
+				other[index],
+				fmt.Sprintf("%s[%d]", path, index),
+			); difference != "" {
 				return difference
 			}
 		}

@@ -219,7 +219,14 @@ func TestTest(test *testing.T) {
 				test.Fatalf("Compile(%q, %q) = %v", testCase.source, testCase.flags, compileError)
 			}
 			if got := re.Test(testCase.subject); got != testCase.want {
-				test.Errorf("/%s/%s.test(%q) = %v, want %v", testCase.source, testCase.flags, testCase.subject, got, testCase.want)
+				test.Errorf(
+					"/%s/%s.test(%q) = %v, want %v",
+					testCase.source,
+					testCase.flags,
+					testCase.subject,
+					got,
+					testCase.want,
+				)
 			}
 		})
 	}
@@ -277,7 +284,13 @@ func TestCompileRejects(test *testing.T) {
 			test.Parallel()
 			_, compileError := Compile(testCase.source, testCase.flags)
 			if !errors.Is(compileError, testCase.is) {
-				test.Errorf("Compile(%q, %q) error = %v, want %v", testCase.source, testCase.flags, compileError, testCase.is)
+				test.Errorf(
+					"Compile(%q, %q) error = %v, want %v",
+					testCase.source,
+					testCase.flags,
+					compileError,
+					testCase.is,
+				)
 			}
 		})
 	}
@@ -329,7 +342,9 @@ func TestTestOrTimeoutFailsOpen(test *testing.T) {
 		test.Fatal("the match settled inside the bound, so there is nothing to fail open on")
 	}
 	if !re.TestOrTimeout(subject) {
-		test.Error("TestOrTimeout read a bound match as no match, which is what turns a skipped report into a false positive")
+		test.Error(
+			"TestOrTimeout read a bound match as no match, which is what turns a skipped report into a false positive",
+		)
 	}
 }
 

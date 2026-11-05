@@ -104,5 +104,8 @@ func printTable(path *astPath, options *options, print printing.PrintFunc) doc.D
 
 	// Only if the --prose-wrap never is set and it exceeds the print width.
 	compactTable := printTableContents(true)
-	return doc.Concat{doc.BreakParent, doc.NewGroup(doc.NewIfBreak(compactTable, alignedTable, nil), doc.GroupOptions{})}
+	return doc.Concat{
+		doc.BreakParent,
+		doc.NewGroup(doc.NewIfBreak(compactTable, alignedTable, nil), doc.GroupOptions{}),
+	}
 }

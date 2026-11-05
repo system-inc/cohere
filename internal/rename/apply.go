@@ -173,7 +173,12 @@ func Write(out io.Writer, plan *Plan, applied bool) {
 	if len(plan.Blind) == 0 {
 		fmt.Fprintf(out, "no string literal in the program spells %q.\n", plan.OldName)
 	} else {
-		fmt.Fprintf(out, "%d string literals spell %q, and a string-keyed use is invisible to the\n", len(plan.Blind), plan.OldName)
+		fmt.Fprintf(
+			out,
+			"%d string literals spell %q, and a string-keyed use is invisible to the\n",
+			len(plan.Blind),
+			plan.OldName,
+		)
 		fmt.Fprintf(out, "type checker. If any of these is a property key or a dynamic lookup, this rename did NOT\n")
 		fmt.Fprintf(out, "touch it and the result compiles while being wrong at runtime. Read them:\n")
 		for _, blind := range plan.Blind {
@@ -188,7 +193,12 @@ func Write(out io.Writer, plan *Plan, applied bool) {
 
 // WriteCandidates prints the symbols a bare name resolved to, when it resolved to more than one.
 func WriteCandidates(out io.Writer, name string, candidates []Candidate) {
-	fmt.Fprintf(out, "%q names %d different symbols, so this rename is ambiguous and was refused.\n\n", name, len(candidates))
+	fmt.Fprintf(
+		out,
+		"%q names %d different symbols, so this rename is ambiguous and was refused.\n\n",
+		name,
+		len(candidates),
+	)
 	for _, candidate := range candidates {
 		fmt.Fprintf(out, "  %s:%d:%d  %s\n", candidate.FileName, candidate.Line, candidate.Column, candidate.Kind)
 	}

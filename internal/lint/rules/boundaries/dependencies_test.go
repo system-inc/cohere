@@ -91,7 +91,13 @@ var projectLayout = map[string]string{
 	"node_modules/worker-kit/workers/api/index.d.ts": "export declare const kit: number;",
 }
 
-func runCase(test *testing.T, layout map[string]string, subjectFile string, source string, options DependenciesOptions) rule_testing.Result {
+func runCase(
+	test *testing.T,
+	layout map[string]string,
+	subjectFile string,
+	source string,
+	options DependenciesOptions,
+) rule_testing.Result {
 	test.Helper()
 	files := map[string]string{subjectFile: source}
 	for name, contents := range layout {
@@ -126,7 +132,12 @@ func expectEveryRelativeImportResolves(test *testing.T, layout map[string]string
 		_, isFile := layout[target+".ts"]
 		_, isIndex := layout[target+"/index.ts"]
 		if !isFile && !isIndex {
-			test.Fatalf("%q from %s reaches no file in the layout (%s), so this clean case checked nothing", match[1], file, target)
+			test.Fatalf(
+				"%q from %s reaches no file in the layout (%s), so this clean case checked nothing",
+				match[1],
+				file,
+				target,
+			)
 		}
 	}
 }
@@ -158,29 +169,109 @@ func TestDependenciesBasePackageBoundary(test *testing.T) {
 
 	runCases(test, baseLayout, options, []dependencyCase{
 		// api reaches nothing, in every shape upstream sees a dependency.
-		{"api imports foundation", apiFile, "import { Base } from '../../../foundation/base/Base';\nexport const x = Base;", []string{"noPolicyAllows"}},
-		{"api imports a foundation type", apiFile, "import type { Base } from '../../../foundation/base/Base';\nexport type X = Base;", []string{"noPolicyAllows"}},
-		{"api imports the command line", apiFile, "import { CompileCommand } from '../../../../command-line/commands/CompileCommand';\nexport const x = CompileCommand;", []string{"noPolicyAllows"}},
-		{"api re-exports all of foundation", apiFile, "export * from '../../../foundation/base/Base';", []string{"noPolicyAllows"}},
-		{"api re-exports from foundation", apiFile, "export { Base } from '../../../foundation/base/Base';", []string{"noPolicyAllows"}},
-		{"api imports foundation dynamically", apiFile, "export const x = import('../../../foundation/base/Base');", []string{"noPolicyAllows"}},
-		{"api imports foundation for its side effects", apiFile, "import '../../../foundation/base/Base';", []string{"noPolicyAllows"}},
+		{
+			"api imports foundation",
+			apiFile,
+			"import { Base } from '../../../foundation/base/Base';\nexport const x = Base;",
+			[]string{"noPolicyAllows"},
+		},
+		{
+			"api imports a foundation type",
+			apiFile,
+			"import type { Base } from '../../../foundation/base/Base';\nexport type X = Base;",
+			[]string{"noPolicyAllows"},
+		},
+		{
+			"api imports the command line",
+			apiFile,
+			"import { CompileCommand } from '../../../../command-line/commands/CompileCommand';\nexport const x = CompileCommand;",
+			[]string{"noPolicyAllows"},
+		},
+		{
+			"api re-exports all of foundation",
+			apiFile,
+			"export * from '../../../foundation/base/Base';",
+			[]string{"noPolicyAllows"},
+		},
+		{
+			"api re-exports from foundation",
+			apiFile,
+			"export { Base } from '../../../foundation/base/Base';",
+			[]string{"noPolicyAllows"},
+		},
+		{
+			"api imports foundation dynamically",
+			apiFile,
+			"export const x = import('../../../foundation/base/Base');",
+			[]string{"noPolicyAllows"},
+		},
+		{
+			"api imports foundation for its side effects",
+			apiFile,
+			"import '../../../foundation/base/Base';",
+			[]string{"noPolicyAllows"},
+		},
 
 		// What upstream never checks.
-		{"api imports itself", apiFile, "import { RpcClientDriver } from './driver/RpcClientDriver';\nexport const x = RpcClientDriver;", nil},
-		{"api imports a module, which is no element", apiFile, "import { AccountModule } from '../../../modules/account/AccountModule';\nexport const x = AccountModule;", nil},
-		{"api imports nexus, which is no element", apiFile, "import { DueDate } from '../../../../libraries/nexus/source/time/DueDate';\nexport const x = DueDate;", nil},
+		{
+			"api imports itself",
+			apiFile,
+			"import { RpcClientDriver } from './driver/RpcClientDriver';\nexport const x = RpcClientDriver;",
+			nil,
+		},
+		{
+			"api imports a module, which is no element",
+			apiFile,
+			"import { AccountModule } from '../../../modules/account/AccountModule';\nexport const x = AccountModule;",
+			nil,
+		},
+		{
+			"api imports nexus, which is no element",
+			apiFile,
+			"import { DueDate } from '../../../../libraries/nexus/source/time/DueDate';\nexport const x = DueDate;",
+			nil,
+		},
 		{"api imports a package", apiFile, "import { z } from 'zod';\nexport const x = z;", nil},
-		{"api imports a file that does not exist", apiFile, "import { Missing } from '../../../foundation/base/DoesNotExist';\nexport const x = Missing;", nil},
+		{
+			"api imports a file that does not exist",
+			apiFile,
+			"import { Missing } from '../../../foundation/base/DoesNotExist';\nexport const x = Missing;",
+			nil,
+		},
 
 		// foundation may reach api and nothing else.
-		{"foundation imports api", foundationFile, "import { RpcClientDriver } from '../../api/rpc/client/driver/RpcClientDriver';\nexport const x = RpcClientDriver;", nil},
-		{"foundation imports the command line", foundationFile, "import { CompileCommand } from '../../../command-line/commands/CompileCommand';\nexport const x = CompileCommand;", []string{"noPolicyAllows"}},
-		{"foundation imports a module", foundationFile, "import { AccountModule } from '../../modules/account/AccountModule';\nexport const x = AccountModule;", nil},
-		{"foundation imports across its own folders", foundationFile, "import { Base } from './Base';\nimport { Entity } from '../entity/Entity';\nexport const x = [Base, Entity];", nil},
+		{
+			"foundation imports api",
+			foundationFile,
+			"import { RpcClientDriver } from '../../api/rpc/client/driver/RpcClientDriver';\nexport const x = RpcClientDriver;",
+			nil,
+		},
+		{
+			"foundation imports the command line",
+			foundationFile,
+			"import { CompileCommand } from '../../../command-line/commands/CompileCommand';\nexport const x = CompileCommand;",
+			[]string{"noPolicyAllows"},
+		},
+		{
+			"foundation imports a module",
+			foundationFile,
+			"import { AccountModule } from '../../modules/account/AccountModule';\nexport const x = AccountModule;",
+			nil,
+		},
+		{
+			"foundation imports across its own folders",
+			foundationFile,
+			"import { Base } from './Base';\nimport { Entity } from '../entity/Entity';\nexport const x = [Base, Entity];",
+			nil,
+		},
 
 		// A file that is no element is never checked, whatever it imports.
-		{"a module imports the command line", "libraries/base/source/modules/account/AccountService.ts", "import { CompileCommand } from '../../../command-line/commands/CompileCommand';\nexport const x = CompileCommand;", nil},
+		{
+			"a module imports the command line",
+			"libraries/base/source/modules/account/AccountService.ts",
+			"import { CompileCommand } from '../../../command-line/commands/CompileCommand';\nexport const x = CompileCommand;",
+			nil,
+		},
 	})
 }
 
@@ -191,22 +282,77 @@ func TestDependenciesProjectModuleBoundary(test *testing.T) {
 	options := decodeForTest(test, projectModuleOptions)
 
 	runCases(test, projectLayout, options, []dependencyCase{
-		{"a module imports a worker", moduleFile, "import { ApiWorker } from '../../../workers/api/ApiWorker';\nexport const x = ApiWorker;", []string{"policyMessage"}},
-		{"a module imports a worker's type", moduleFile, "import type { ApiWorker } from '../../../workers/api/ApiWorker';\nexport type X = ApiWorker;", []string{"policyMessage"}},
-		{"a module imports a worker's index", moduleFile, "import { ApiWorker } from '../../../workers/api/index';\nexport const x = ApiWorker;", []string{"policyMessage"}},
-		{"a module imports a worker dynamically", moduleFile, "export const x = import('../../../workers/api/ApiWorker');", []string{"policyMessage"}},
+		{
+			"a module imports a worker",
+			moduleFile,
+			"import { ApiWorker } from '../../../workers/api/ApiWorker';\nexport const x = ApiWorker;",
+			[]string{"policyMessage"},
+		},
+		{
+			"a module imports a worker's type",
+			moduleFile,
+			"import type { ApiWorker } from '../../../workers/api/ApiWorker';\nexport type X = ApiWorker;",
+			[]string{"policyMessage"},
+		},
+		{
+			"a module imports a worker's index",
+			moduleFile,
+			"import { ApiWorker } from '../../../workers/api/index';\nexport const x = ApiWorker;",
+			[]string{"policyMessage"},
+		},
+		{
+			"a module imports a worker dynamically",
+			moduleFile,
+			"export const x = import('../../../workers/api/ApiWorker');",
+			[]string{"policyMessage"},
+		},
 
 		// Upstream matches a pattern against the right-hand end of a path, so a folder named `workers`
 		// anywhere is a worker. Measured on the installed build with `source/*`, which claimed
 		// libraries/base/source/foundation as its own element.
-		{"a module imports a nested workers folder", moduleFile, "import { Thing } from '../../../vendor/workers/thing/Thing';\nexport const x = Thing;", []string{"policyMessage"}},
+		{
+			"a module imports a nested workers folder",
+			moduleFile,
+			"import { Thing } from '../../../vendor/workers/thing/Thing';\nexport const x = Thing;",
+			[]string{"policyMessage"},
+		},
 
-		{"a module imports common source", moduleFile, "import type { AnalyticsAccessRoleType } from '../../common/AnalyticsAccessRoleType';\nexport type X = AnalyticsAccessRoleType;", nil},
-		{"a module imports another module", moduleFile, "import { Ga4AdsService } from '../ads-platform/Ga4AdsService';\nexport const x = Ga4AdsService;", nil},
-		{"a module imports a package laid out like a worker", moduleFile, "import { kit } from 'worker-kit';\nexport const x = kit;", nil},
-		{"a module imports Base", moduleFile, "import { Base } from '../../../libraries/base/source/foundation/base/Base';\nexport const x = Base;", nil},
-		{"a worker imports another worker", "workers/api/Routes.ts", "import { ChatWorker } from '../chat/ChatWorker';\nexport const x = ChatWorker;", nil},
-		{"common source imports a worker", "source/common/Helper.ts", "import { ApiWorker } from '../../workers/api/ApiWorker';\nexport const x = ApiWorker;", nil},
+		{
+			"a module imports common source",
+			moduleFile,
+			"import type { AnalyticsAccessRoleType } from '../../common/AnalyticsAccessRoleType';\nexport type X = AnalyticsAccessRoleType;",
+			nil,
+		},
+		{
+			"a module imports another module",
+			moduleFile,
+			"import { Ga4AdsService } from '../ads-platform/Ga4AdsService';\nexport const x = Ga4AdsService;",
+			nil,
+		},
+		{
+			"a module imports a package laid out like a worker",
+			moduleFile,
+			"import { kit } from 'worker-kit';\nexport const x = kit;",
+			nil,
+		},
+		{
+			"a module imports Base",
+			moduleFile,
+			"import { Base } from '../../../libraries/base/source/foundation/base/Base';\nexport const x = Base;",
+			nil,
+		},
+		{
+			"a worker imports another worker",
+			"workers/api/Routes.ts",
+			"import { ChatWorker } from '../chat/ChatWorker';\nexport const x = ChatWorker;",
+			nil,
+		},
+		{
+			"common source imports a worker",
+			"source/common/Helper.ts",
+			"import { ApiWorker } from '../../workers/api/ApiWorker';\nexport const x = ApiWorker;",
+			nil,
+		},
 	})
 }
 
@@ -214,7 +360,13 @@ func TestDependenciesProjectModuleBoundary(test *testing.T) {
 func TestDependenciesUsesThePolicyMessage(test *testing.T) {
 	test.Parallel()
 	options := decodeForTest(test, projectModuleOptions)
-	result := runCase(test, projectLayout, moduleFile, "import { ApiWorker } from '../../../workers/api/ApiWorker';\nexport const x = ApiWorker;", options)
+	result := runCase(
+		test,
+		projectLayout,
+		moduleFile,
+		"import { ApiWorker } from '../../../workers/api/ApiWorker';\nexport const x = ApiWorker;",
+		options,
+	)
 	rule_testing.ExpectFindings(test, result, "policyMessage")
 	if result.Diagnostics[0].Message.Description != projectModuleMessage {
 		test.Fatalf("expected the policy's message verbatim, got %q", result.Diagnostics[0].Message.Description)
@@ -224,8 +376,17 @@ func TestDependenciesUsesThePolicyMessage(test *testing.T) {
 // A policy that matched by disallow without a message of its own still says which layers.
 func TestDependenciesWordsAnUnmessagedDisallow(test *testing.T) {
 	test.Parallel()
-	options := decodeForTest(test, strings.Replace(projectModuleOptions, `, "message": "`+projectModuleMessage+`"`, "", 1))
-	result := runCase(test, projectLayout, moduleFile, "import { ApiWorker } from '../../../workers/api/ApiWorker';\nexport const x = ApiWorker;", options)
+	options := decodeForTest(
+		test,
+		strings.Replace(projectModuleOptions, `, "message": "`+projectModuleMessage+`"`, "", 1),
+	)
+	result := runCase(
+		test,
+		projectLayout,
+		moduleFile,
+		"import { ApiWorker } from '../../../workers/api/ApiWorker';\nexport const x = ApiWorker;",
+		options,
+	)
 	rule_testing.ExpectFindings(test, result, "policyDisallows")
 	description := result.Diagnostics[0].Message.Description
 	if !strings.Contains(description, `"project-module"`) || !strings.Contains(description, `"project-worker"`) {
@@ -247,7 +408,13 @@ func TestDependenciesLastMatchingPolicyDecides(test *testing.T) {
 			{"type": "cli", "pattern": "libraries/base/command-line/**"}
 		]
 	}`)
-	result := runCase(test, baseLayout, foundationFile, "import { CompileCommand } from '../../../command-line/commands/CompileCommand';\nexport const x = CompileCommand;", options)
+	result := runCase(
+		test,
+		baseLayout,
+		foundationFile,
+		"import { CompileCommand } from '../../../command-line/commands/CompileCommand';\nexport const x = CompileCommand;",
+		options,
+	)
 	rule_testing.ExpectFindings(test, result, "policyDisallows")
 
 	reversed := decodeForTest(test, `{
@@ -261,7 +428,13 @@ func TestDependenciesLastMatchingPolicyDecides(test *testing.T) {
 			{"type": "cli", "pattern": "libraries/base/command-line/**"}
 		]
 	}`)
-	rule_testing.ExpectClean(test, runCase(test, baseLayout, foundationFile, "import { CompileCommand } from '../../../command-line/commands/CompileCommand';\nexport const x = CompileCommand;", reversed))
+	rule_testing.ExpectClean(test, runCase(
+		test,
+		baseLayout,
+		foundationFile,
+		"import { CompileCommand } from '../../../command-line/commands/CompileCommand';\nexport const x = CompileCommand;",
+		reversed,
+	))
 }
 
 // An entry's own from wins over its policy's, field by field. Measured on the installed build: a policy
@@ -275,10 +448,20 @@ func TestDependenciesEntrySelectorWinsOverThePolicys(test *testing.T) {
 	]`
 	source := "import { CompileCommand } from '../../../command-line/commands/CompileCommand';\nexport const x = CompileCommand;"
 
-	entryWins := decodeForTest(test, `{"default": "allow", "policies": [{"from": {"element": {"type": "cli"}}, "disallow": {"from": {"element": {"type": "foundation"}}, "to": {"element": {"type": "cli"}}}}], `+elements+`}`)
+	entryWins := decodeForTest(
+		test,
+		`{"default": "allow", "policies": [{"from": {"element": {"type": "cli"}}, "disallow": {"from": {"element": {"type": "foundation"}}, "to": {"element": {"type": "cli"}}}}], `+
+			elements+
+			`}`,
+	)
 	rule_testing.ExpectFindings(test, runCase(test, baseLayout, foundationFile, source, entryWins), "policyDisallows")
 
-	outerOnly := decodeForTest(test, `{"default": "allow", "policies": [{"from": {"element": {"type": "cli"}}, "disallow": {"to": {"element": {"type": "cli"}}}}], `+elements+`}`)
+	outerOnly := decodeForTest(
+		test,
+		`{"default": "allow", "policies": [{"from": {"element": {"type": "cli"}}, "disallow": {"to": {"element": {"type": "cli"}}}}], `+
+			elements+
+			`}`,
+	)
 	rule_testing.ExpectClean(test, runCase(test, baseLayout, foundationFile, source, outerOnly))
 }
 
@@ -291,15 +474,31 @@ func TestDependenciesEntryTypesWinOverThePolicys(test *testing.T) {
 		{"type": "cli", "pattern": "libraries/base/command-line/**"}
 	]`
 	source := "import { CompileCommand } from '../../../command-line/commands/CompileCommand';\nexport const x = CompileCommand;"
-	options := decodeForTest(test, `{"default": "allow", "policies": [{"to": {"element": {"types": {"anyOf": ["foundation"]}}}, "disallow": {"to": {"element": {"types": {"anyOf": ["cli"]}}}}}], `+elements+`}`)
+	options := decodeForTest(
+		test,
+		`{"default": "allow", "policies": [{"to": {"element": {"types": {"anyOf": ["foundation"]}}}, "disallow": {"to": {"element": {"types": {"anyOf": ["cli"]}}}}}], `+
+			elements+
+			`}`,
+	)
 	rule_testing.ExpectFindings(test, runCase(test, baseLayout, foundationFile, source, options), "policyDisallows")
 }
 
 // A rule-level message words every violation no policy words itself.
 func TestDependenciesUsesTheRuleMessageWhenNoPolicyHasOne(test *testing.T) {
 	test.Parallel()
-	options := decodeForTest(test, strings.Replace(basePackageOptions, `"default": "disallow",`, `"default": "disallow", "message": "Layers point one way.",`, 1))
-	result := runCase(test, baseLayout, apiFile, "import { Base } from '../../../foundation/base/Base';\nexport const x = Base;", options)
+	options := decodeForTest(test, strings.Replace(
+		basePackageOptions,
+		`"default": "disallow",`,
+		`"default": "disallow", "message": "Layers point one way.",`,
+		1,
+	))
+	result := runCase(
+		test,
+		baseLayout,
+		apiFile,
+		"import { Base } from '../../../foundation/base/Base';\nexport const x = Base;",
+		options,
+	)
 	rule_testing.ExpectFindings(test, result, "policyMessage")
 	if result.Diagnostics[0].Message.Description != "Layers point one way." {
 		test.Fatalf("expected the rule's message, got %q", result.Diagnostics[0].Message.Description)
@@ -319,7 +518,10 @@ func TestDependenciesReportsAtTheSpecifier(test *testing.T) {
 	if strings.TrimSpace(span) != "'../../../foundation/base/Base'" {
 		test.Fatalf("expected the finding on the specifier, got %q", span)
 	}
-	line, _ := scanner.GetECMALineAndByteOffsetOfPosition(result.SourceFile, scanner.SkipTrivia(text, result.Diagnostics[0].Range.Pos()))
+	line, _ := scanner.GetECMALineAndByteOffsetOfPosition(
+		result.SourceFile,
+		scanner.SkipTrivia(text, result.Diagnostics[0].Range.Pos()),
+	)
 	if line != 1 {
 		test.Fatalf("expected the finding on the import's line (2), got line %d", line+1)
 	}
@@ -330,7 +532,13 @@ func TestDependenciesReportsAtTheSpecifier(test *testing.T) {
 func TestDependenciesRequireInTypeScriptIsTheMeasuredDivergence(test *testing.T) {
 	test.Parallel()
 	options := decodeForTest(test, basePackageOptions)
-	result := runCase(test, baseLayout, apiFile, "declare const require: (name: string) => unknown;\nexport const x = require('../../../foundation/base/Base');", options)
+	result := runCase(
+		test,
+		baseLayout,
+		apiFile,
+		"declare const require: (name: string) => unknown;\nexport const x = require('../../../foundation/base/Base');",
+		options,
+	)
 	rule_testing.ExpectClean(test, result)
 }
 
@@ -352,13 +560,31 @@ func TestDependenciesElementMembership(test *testing.T) {
 		{"source/Thing.ts", project, "", "", false},
 		{"workers/api/ApiWorker.ts", project, "project-worker", "workers/api", true},
 		// The right-hand matching upstream documents, and that Base's project block depends on.
-		{"libraries/base/source/foundation/base/Base.ts", project, "project-source", "libraries/base/source/foundation", true},
-		{"libraries/base/source/modules/account/AccountModule.ts", project, "project-module", "libraries/base/source/modules/account", true},
+		{
+			"libraries/base/source/foundation/base/Base.ts",
+			project,
+			"project-source",
+			"libraries/base/source/foundation",
+			true,
+		},
+		{
+			"libraries/base/source/modules/account/AccountModule.ts",
+			project,
+			"project-module",
+			"libraries/base/source/modules/account",
+			true,
+		},
 		// micromatch's default keeps `*` and `**` out of a dot segment.
 		{"workers/api/.wrangler/state.ts", project, "", "", false},
 		{"workers/.hidden/state.ts", project, "", "", false},
 		// The shortest matching suffix wins, so a workers folder inside a module is a worker.
-		{"source/modules/chat/workers/api/Thing.ts", project, "project-worker", "source/modules/chat/workers/api", true},
+		{
+			"source/modules/chat/workers/api/Thing.ts",
+			project,
+			"project-worker",
+			"source/modules/chat/workers/api",
+			true,
+		},
 		{"libraries/base/source/api/rpc/client/RpcClient.ts", base, "api", "libraries/base/source/api", true},
 		{"libraries/base/source/foundation/base/Base.ts", base, "foundation", "libraries/base/source/foundation", true},
 		{"libraries/base/command-line/base-cli.ts", base, "cli", "libraries/base/command-line", true},
@@ -384,19 +610,57 @@ func TestDependenciesRefusesWhatItDoesNotPort(test *testing.T) {
 	}{
 		{"no options", ``, "needs its options"},
 		{"no elements", `{"default": "disallow"}`, "has no elements"},
-		{"a legacy string selector", `{"policies": [{"from": "api", "allow": "api"}], ` + elements + `}`, "legacy string selectors"},
-		{"a captured selector", `{"policies": [{"from": {"element": {"type": "api", "captured": {"name": "x"}}}, "allow": {"to": {"element": {"type": "api"}}}}], ` + elements + `}`, "captured"},
-		{"a file selector", `{"policies": [{"from": {"file": {"path": "x"}}, "allow": {"to": {"element": {"type": "api"}}}}], ` + elements + `}`, "file"},
-		{"an allOf query", `{"policies": [{"from": {"element": {"types": {"allOf": ["api"]}}}, "allow": {"to": {"element": {"type": "api"}}}}], ` + elements + `}`, "allOf"},
-		{"a type pattern", `{"policies": [{"from": {"element": {"type": "api*"}}, "allow": {"to": {"element": {"type": "api"}}}}], ` + elements + `}`, "micromatch pattern"},
+		{
+			"a legacy string selector",
+			`{"policies": [{"from": "api", "allow": "api"}], ` + elements + `}`,
+			"legacy string selectors",
+		},
+		{
+			"a captured selector",
+			`{"policies": [{"from": {"element": {"type": "api", "captured": {"name": "x"}}}, "allow": {"to": {"element": {"type": "api"}}}}], ` +
+				elements +
+				`}`,
+			"captured",
+		},
+		{
+			"a file selector",
+			`{"policies": [{"from": {"file": {"path": "x"}}, "allow": {"to": {"element": {"type": "api"}}}}], ` +
+				elements +
+				`}`,
+			"file",
+		},
+		{
+			"an allOf query",
+			`{"policies": [{"from": {"element": {"types": {"allOf": ["api"]}}}, "allow": {"to": {"element": {"type": "api"}}}}], ` +
+				elements +
+				`}`,
+			"allOf",
+		},
+		{
+			"a type pattern",
+			`{"policies": [{"from": {"element": {"type": "api*"}}, "allow": {"to": {"element": {"type": "api"}}}}], ` +
+				elements +
+				`}`,
+			"micromatch pattern",
+		},
 		{"a templated message", `{"message": "{{from.type}} may not", ` + elements + `}`, "template"},
 		{"the legacy rules key", `{"rules": [], ` + elements + `}`, "rules"},
 		{"checkInternals true", `{"checkInternals": true, ` + elements + `}`, "checkInternals"},
 		{"file mode", `{"elements": [{"type": "api", "pattern": "api/**", "mode": "file"}]}`, "folder mode"},
 		{"a brace pattern", `{"elements": [{"type": "api", "pattern": "{api,client}/**"}]}`, "brace or extglob"},
 		{"a basePattern", `{"elements": [{"type": "api", "pattern": "api/**", "basePattern": "x"}]}`, "basePattern"},
-		{"a dependency selector", `{"policies": [{"dependency": {"kind": "type"}, "allow": {"to": {"element": {"type": "api"}}}}], ` + elements + `}`, "dependency"},
-		{"a policy that decides nothing", `{"policies": [{"from": {"element": {"type": "api"}}}], ` + elements + `}`, "neither allow nor disallow"},
+		{
+			"a dependency selector",
+			`{"policies": [{"dependency": {"kind": "type"}, "allow": {"to": {"element": {"type": "api"}}}}], ` +
+				elements +
+				`}`,
+			"dependency",
+		},
+		{
+			"a policy that decides nothing",
+			`{"policies": [{"from": {"element": {"type": "api"}}}], ` + elements + `}`,
+			"neither allow nor disallow",
+		},
 		{"an unknown default", `{"default": "deny", ` + elements + `}`, "default"},
 	}
 	for _, testCase := range cases {
@@ -407,7 +671,11 @@ func TestDependenciesRefusesWhatItDoesNotPort(test *testing.T) {
 				test.Fatalf("expected a refusal mentioning %q, the options loaded", testCase.wantErr)
 			}
 			if !strings.Contains(decodeDependenciesOptionsError.Error(), testCase.wantErr) {
-				test.Fatalf("expected a refusal mentioning %q, got %v", testCase.wantErr, decodeDependenciesOptionsError)
+				test.Fatalf(
+					"expected a refusal mentioning %q, got %v",
+					testCase.wantErr,
+					decodeDependenciesOptionsError,
+				)
 			}
 		})
 	}
@@ -417,7 +685,10 @@ func TestDependenciesRefusesWhatItDoesNotPort(test *testing.T) {
 func TestDependenciesDecodesBasesOwnBlocksAndAnchorsTheRoot(test *testing.T) {
 	test.Parallel()
 	for _, raw := range []string{basePackageOptions, projectModuleOptions} {
-		decoded, decodeDependenciesOptionsError := decodeDependenciesOptions([]byte(raw), rule.OptionsBase{ConfigDirectory: "/repo", ProjectRoot: "/elsewhere"})
+		decoded, decodeDependenciesOptionsError := decodeDependenciesOptions(
+			[]byte(raw),
+			rule.OptionsBase{ConfigDirectory: "/repo", ProjectRoot: "/elsewhere"},
+		)
 		if decodeDependenciesOptionsError != nil {
 			test.Fatalf("Base's own block was refused: %v", decodeDependenciesOptionsError)
 		}
@@ -429,7 +700,10 @@ func TestDependenciesDecodesBasesOwnBlocksAndAnchorsTheRoot(test *testing.T) {
 			test.Fatalf("expected the root at the config's directory, got %q", root)
 		}
 	}
-	decoded, decodeDependenciesOptionsError := decodeDependenciesOptions([]byte(projectModuleOptions), rule.OptionsBase{ProjectRoot: "/project"})
+	decoded, decodeDependenciesOptionsError := decodeDependenciesOptions(
+		[]byte(projectModuleOptions),
+		rule.OptionsBase{ProjectRoot: "/project"},
+	)
 	if decodeDependenciesOptionsError != nil {
 		test.Fatal(decodeDependenciesOptionsError)
 	}

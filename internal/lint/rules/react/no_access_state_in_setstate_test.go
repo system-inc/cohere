@@ -28,16 +28,43 @@ func TestNoAccessStateInSetstateStaysSilent(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct{ name, sourceText string }{
-		{"upstream valid 0", "\n        var Hello = createReactClass({\n          onClick: function() {\n            this.setState(state => ({value: state.value + 1}))\n          }\n        });\n      "},
-		{"upstream valid 1", "\n        var Hello = createReactClass({\n          multiplyValue: function(obj) {\n            return obj.value*2\n          },\n          onClick: function() {\n            var value = this.state.value\n            this.multiplyValue({ value: value })\n          }\n        });\n      "},
-		{"upstream valid 2", "\n        var SearchForm = createReactClass({\n          render: function () {\n            return (\n              <div>\n                {(function () {\n                  if (this.state.prompt) {\n                    return <div>{this.state.prompt}</div>\n                  }\n                }).call(this)}\n              </div>\n            );\n          }\n        });\n      "},
-		{"upstream valid 3", "\n        var Hello = createReactClass({\n          onClick: function() {\n            this.setState({}, () => console.log(this.state));\n          }\n        });\n      "},
-		{"upstream valid 4", "\n        var Hello = createReactClass({\n          onClick: function() {\n            this.setState({}, () => 1 + 1);\n          }\n        });\n      "},
-		{"upstream valid 5", "\n        var Hello = createReactClass({\n          onClick: function() {\n            var nextValueNotUsed = this.state.value + 1\n            var nextValue = 2\n            this.setState({value: nextValue})\n          }\n        });\n      "},
+		{
+			"upstream valid 0",
+			"\n        var Hello = createReactClass({\n          onClick: function() {\n            this.setState(state => ({value: state.value + 1}))\n          }\n        });\n      ",
+		},
+		{
+			"upstream valid 1",
+			"\n        var Hello = createReactClass({\n          multiplyValue: function(obj) {\n            return obj.value*2\n          },\n          onClick: function() {\n            var value = this.state.value\n            this.multiplyValue({ value: value })\n          }\n        });\n      ",
+		},
+		{
+			"upstream valid 2",
+			"\n        var SearchForm = createReactClass({\n          render: function () {\n            return (\n              <div>\n                {(function () {\n                  if (this.state.prompt) {\n                    return <div>{this.state.prompt}</div>\n                  }\n                }).call(this)}\n              </div>\n            );\n          }\n        });\n      ",
+		},
+		{
+			"upstream valid 3",
+			"\n        var Hello = createReactClass({\n          onClick: function() {\n            this.setState({}, () => console.log(this.state));\n          }\n        });\n      ",
+		},
+		{
+			"upstream valid 4",
+			"\n        var Hello = createReactClass({\n          onClick: function() {\n            this.setState({}, () => 1 + 1);\n          }\n        });\n      ",
+		},
+		{
+			"upstream valid 5",
+			"\n        var Hello = createReactClass({\n          onClick: function() {\n            var nextValueNotUsed = this.state.value + 1\n            var nextValue = 2\n            this.setState({value: nextValue})\n          }\n        });\n      ",
+		},
 		{"upstream valid 6", "\n        function testFunction({a, b}) {\n        };\n      "},
-		{"upstream valid 7", "\n        class ComponentA extends React.Component {\n          state = {\n            greeting: 'hello',\n          };\n\n          myFunc = () => {\n            this.setState({ greeting: 'hi' }, () => this.doStuff());\n          };\n\n          doStuff = () => {\n            console.log(this.state.greeting);\n          };\n        }\n      "},
-		{"upstream valid 8", "\n        class Foo extends Abstract {\n          update = () => {\n            const result = this.getResult ( this.state.foo );\n            return this.setState ({ result });\n          };\n        }\n      "},
-		{"upstream valid 9", "\n        class StateContainer extends Container {\n          anything() {\n            return this.setState({value: this.state.value + 1})\n          }\n        };\n      "},
+		{
+			"upstream valid 7",
+			"\n        class ComponentA extends React.Component {\n          state = {\n            greeting: 'hello',\n          };\n\n          myFunc = () => {\n            this.setState({ greeting: 'hi' }, () => this.doStuff());\n          };\n\n          doStuff = () => {\n            console.log(this.state.greeting);\n          };\n        }\n      ",
+		},
+		{
+			"upstream valid 8",
+			"\n        class Foo extends Abstract {\n          update = () => {\n            const result = this.getResult ( this.state.foo );\n            return this.setState ({ result });\n          };\n        }\n      ",
+		},
+		{
+			"upstream valid 9",
+			"\n        class StateContainer extends Container {\n          anything() {\n            return this.setState({value: this.state.value + 1})\n          }\n        };\n      ",
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -55,15 +82,51 @@ func TestNoAccessStateInSetstateFires(test *testing.T) {
 		name, sourceText string
 		messageIds       []string
 	}{
-		{"upstream invalid 0", "\n        var Hello = createReactClass({\n          onClick: function() {\n            this.setState({value: this.state.value + 1})\n          }\n        });\n      ", []string{"useCallback"}},
-		{"upstream invalid 1", "\n        var Hello = createReactClass({\n          onClick: function() {\n            this.setState(() => ({value: this.state.value + 1}))\n          }\n        });\n      ", []string{"useCallback"}},
-		{"upstream invalid 2", "\n        var Hello = createReactClass({\n          onClick: function() {\n            var nextValue = this.state.value + 1\n            this.setState({value: nextValue})\n          }\n        });\n      ", []string{"useCallback"}},
-		{"upstream invalid 3", "\n        var Hello = createReactClass({\n          onClick: function() {\n            var {state, ...rest} = this\n            this.setState({value: state.value + 1})\n          }\n        });\n      ", []string{"useCallback"}},
-		{"upstream invalid 4", "\n        function nextState(state) {\n          return {value: state.value + 1}\n        }\n        var Hello = createReactClass({\n          onClick: function() {\n            this.setState(nextState(this.state))\n          }\n        });\n      ", []string{"useCallback"}},
-		{"upstream invalid 5", "\n        var Hello = createReactClass({\n          onClick: function() {\n            this.setState(this.state, () => 1 + 1);\n          }\n        });\n      ", []string{"useCallback"}},
-		{"upstream invalid 6", "\n        var Hello = createReactClass({\n          onClick: function() {\n            this.setState(this.state, () => console.log(this.state));\n          }\n        });\n      ", []string{"useCallback"}},
-		{"upstream invalid 7", "\n        var Hello = createReactClass({\n          nextState: function() {\n            return {value: this.state.value + 1}\n          },\n          onClick: function() {\n            this.setState(nextState())\n          }\n        });\n      ", []string{"useCallback"}},
-		{"upstream invalid 8", "\n        class Hello extends React.Component {\n          onClick() {\n            this.setState(this.state, () => console.log(this.state));\n          }\n        }\n      ", []string{"useCallback"}},
+		{
+			"upstream invalid 0",
+			"\n        var Hello = createReactClass({\n          onClick: function() {\n            this.setState({value: this.state.value + 1})\n          }\n        });\n      ",
+			[]string{"useCallback"},
+		},
+		{
+			"upstream invalid 1",
+			"\n        var Hello = createReactClass({\n          onClick: function() {\n            this.setState(() => ({value: this.state.value + 1}))\n          }\n        });\n      ",
+			[]string{"useCallback"},
+		},
+		{
+			"upstream invalid 2",
+			"\n        var Hello = createReactClass({\n          onClick: function() {\n            var nextValue = this.state.value + 1\n            this.setState({value: nextValue})\n          }\n        });\n      ",
+			[]string{"useCallback"},
+		},
+		{
+			"upstream invalid 3",
+			"\n        var Hello = createReactClass({\n          onClick: function() {\n            var {state, ...rest} = this\n            this.setState({value: state.value + 1})\n          }\n        });\n      ",
+			[]string{"useCallback"},
+		},
+		{
+			"upstream invalid 4",
+			"\n        function nextState(state) {\n          return {value: state.value + 1}\n        }\n        var Hello = createReactClass({\n          onClick: function() {\n            this.setState(nextState(this.state))\n          }\n        });\n      ",
+			[]string{"useCallback"},
+		},
+		{
+			"upstream invalid 5",
+			"\n        var Hello = createReactClass({\n          onClick: function() {\n            this.setState(this.state, () => 1 + 1);\n          }\n        });\n      ",
+			[]string{"useCallback"},
+		},
+		{
+			"upstream invalid 6",
+			"\n        var Hello = createReactClass({\n          onClick: function() {\n            this.setState(this.state, () => console.log(this.state));\n          }\n        });\n      ",
+			[]string{"useCallback"},
+		},
+		{
+			"upstream invalid 7",
+			"\n        var Hello = createReactClass({\n          nextState: function() {\n            return {value: this.state.value + 1}\n          },\n          onClick: function() {\n            this.setState(nextState())\n          }\n        });\n      ",
+			[]string{"useCallback"},
+		},
+		{
+			"upstream invalid 8",
+			"\n        class Hello extends React.Component {\n          onClick() {\n            this.setState(this.state, () => console.log(this.state));\n          }\n        }\n      ",
+			[]string{"useCallback"},
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {

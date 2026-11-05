@@ -487,7 +487,10 @@ func literalValueText(node *ast.Node, raw string) string {
 // binding cannot change. Otherwise the destination decides: only a parent that could bind more
 // tightly than what is moving in needs them.
 func movedInterpolationText(ruleContext rule.Context, template *ast.Node, interpolation *ast.Node) string {
-	code := ruleContext.SourceFile.Text()[rule.TokenRange(ruleContext.SourceFile, interpolation).Pos():interpolation.End()]
+	code := ruleContext.SourceFile.Text()[rule.TokenRange(
+		ruleContext.SourceFile,
+		interpolation,
+	).Pos():interpolation.End()]
 	if type_checking.IsStrongPrecedenceNode(interpolation) {
 		return code
 	}

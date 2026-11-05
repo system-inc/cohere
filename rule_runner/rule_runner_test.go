@@ -50,7 +50,11 @@ func buildProject(test *testing.T, files map[string]string) *program.Graph {
 
 // walkAndRun is subject's findings on files twice, through cohere's own walk and through RunRule, on one program,
 // each sorted by place. The walk is the reference because it is what every cohere run reports through.
-func walkAndRun(test *testing.T, files map[string]string, subject rule.Rule) (walked []rule_runner.Finding, ran []rule_runner.Finding) {
+func walkAndRun(
+	test *testing.T,
+	files map[string]string,
+	subject rule.Rule,
+) (walked []rule_runner.Finding, ran []rule_runner.Finding) {
 	test.Helper()
 	graph := buildProject(test, files)
 	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{subject})
@@ -59,7 +63,13 @@ func walkAndRun(test *testing.T, files map[string]string, subject rule.Rule) (wa
 	}
 	for _, diagnostic := range result.Diagnostics {
 		fileName, line, column := diagnostic.Location()
-		walked = append(walked, rule_runner.Finding{Rule: diagnostic.RuleName, File: fileName, Line: line, Column: column, Message: diagnostic.Message.Description})
+		walked = append(walked, rule_runner.Finding{
+			Rule:    diagnostic.RuleName,
+			File:    fileName,
+			Line:    line,
+			Column:  column,
+			Message: diagnostic.Message.Description,
+		})
 	}
 	typeChecker, done := graph.Program.GetTypeChecker(context.Background())
 	ran, err = rule_runner.RunRule(graph.Program, typeChecker, graph.ProjectFiles(), subject.Name)
@@ -138,9 +148,17 @@ func TestRunRuleFindsWhatTheWalkFindsForTheRelationRules(test *testing.T) {
 	} {
 		test.Run(testCase.subject.Name, func(test *testing.T) {
 			test.Parallel()
-			want, got := walkAndRun(test, map[string]string{"tsconfig.json": configuration, "Main.ts": testCase.source}, testCase.subject)
+			want, got := walkAndRun(
+				test,
+				map[string]string{"tsconfig.json": configuration, "Main.ts": testCase.source},
+				testCase.subject,
+			)
 			if len(want) != 1 {
-				test.Fatalf("the walk found %d findings, want exactly 1 (the hole, not its sound neighbour): %+v", len(want), want)
+				test.Fatalf(
+					"the walk found %d findings, want exactly 1 (the hole, not its sound neighbour): %+v",
+					len(want),
+					want,
+				)
 			}
 			if !slices.Equal(got, want) {
 				test.Errorf("RunRule found\n%+v\nthe walk found\n%+v", got, want)
@@ -157,14 +175,24 @@ func TestRunRuleRefusesARuleOffTheAllowlist(test *testing.T) {
 	defer done()
 
 	// Allowed first: a refusal that refused everything would pass both cases below.
-	if _, runRuleError := rule_runner.RunRule(graph.Program, typeChecker, graph.ProjectFiles(), nexus.CorrectnessNoImportCycleLoadTimeRead.Name); runRuleError != nil {
+	if _, runRuleError := rule_runner.RunRule(
+		graph.Program,
+		typeChecker,
+		graph.ProjectFiles(),
+		nexus.CorrectnessNoImportCycleLoadTimeRead.Name,
+	); runRuleError != nil {
 		test.Fatalf("the allowed rule was refused: %v", runRuleError)
 	}
 	for _, name := range []string{"no-console", "nexus/correctness-no-such-rule"} {
 		findings, runRuleError := rule_runner.RunRule(graph.Program, typeChecker, graph.ProjectFiles(), name)
 		var notAllowed rule_runner.NotAllowedError
 		if !errors.As(runRuleError, &notAllowed) || notAllowed.Rule != name {
-			test.Errorf("%s: got findings %v and error %v, want NotAllowedError naming it", name, findings, runRuleError)
+			test.Errorf(
+				"%s: got findings %v and error %v, want NotAllowedError naming it",
+				name,
+				findings,
+				runRuleError,
+			)
 		}
 	}
 }

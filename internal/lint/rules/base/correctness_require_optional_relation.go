@@ -11,7 +11,10 @@ import (
 
 // correctnessRequireOptionalRelationText is the rule's message, whose wording lives in
 // `policy/messages/correctness-require-optional-relation.json`.
-var correctnessRequireOptionalRelationText = policy.MessageOf("base/correctness-require-optional-relation", "mustBeOptional")
+var correctnessRequireOptionalRelationText = policy.MessageOf(
+	"base/correctness-require-optional-relation",
+	"mustBeOptional",
+)
 
 // relationDecorators is the source rule's `RelationDecorators` set.
 //

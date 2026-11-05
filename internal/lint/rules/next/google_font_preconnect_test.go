@@ -108,8 +108,8 @@ func TestGoogleFontPreconnectIsSilent(test *testing.T) {
 	}
 }
 
-// TestGoogleFontPreconnectDecodesEntities reads its attribute as ESLint does, with HTML entities decoded: typescript-estree decodes a
-// JSX attribute string before any rule sees it. Each row's verdict is the installed
+// TestGoogleFontPreconnectDecodesEntities reads its attribute as ESLint does, with HTML entities decoded:
+// typescript-estree decodes a JSX attribute string before any rule sees it. Each row's verdict is the installed
 // @next/eslint-plugin-next 16.3.1's under the typescript-eslint parser (#51y9jh2).
 func TestGoogleFontPreconnectDecodesEntities(test *testing.T) {
 	test.Parallel()
@@ -119,8 +119,16 @@ func TestGoogleFontPreconnectDecodesEntities(test *testing.T) {
 		source string
 		ids    []string
 	}{
-		{`encoded slashes in the font host`, `export const Test = () => <link href="https:&#47;&#47;fonts.gstatic.com" />;`, []string{messageGoogleFontPreconnect.Id}},
-		{`an encoded letter in rel`, `export const Test = () => <link rel="pre&#99;onnect" href="https://fonts.gstatic.com" />;`, []string{}},
+		{
+			`encoded slashes in the font host`,
+			`export const Test = () => <link href="https:&#47;&#47;fonts.gstatic.com" />;`,
+			[]string{messageGoogleFontPreconnect.Id},
+		},
+		{
+			`an encoded letter in rel`,
+			`export const Test = () => <link rel="pre&#99;onnect" href="https://fonts.gstatic.com" />;`,
+			[]string{},
+		},
 	} {
 		test.Run(row.name, func(test *testing.T) {
 			test.Parallel()

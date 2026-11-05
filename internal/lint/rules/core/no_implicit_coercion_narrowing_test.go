@@ -46,7 +46,11 @@ func compileErrors(test *testing.T, source string) []string {
 	test.Helper()
 	directory := test.TempDir()
 	configuration := `{"compilerOptions":{"strict":true,"target":"ES2022","lib":["ES2022"],"moduleDetection":"force","types":[],"noEmit":true},"include":["*.ts"]}`
-	if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration), 0o644); writeError != nil {
+	if writeError := os.WriteFile(
+		filepath.Join(directory, "tsconfig.json"),
+		[]byte(configuration),
+		0o644,
+	); writeError != nil {
 		test.Fatal(writeError)
 	}
 	fileName := filepath.Join(directory, "fixture.ts")
@@ -143,7 +147,10 @@ func TestNoImplicitCoercionFixKeepsNarrowing(test *testing.T) {
 		name   string
 		source string
 	}{
-		{name: "a number that may be undefined", source: "const hasCount = !!count;\nexport const next = hasCount ? count + 1 : 0;\n"},
+		{
+			name:   "a number that may be undefined",
+			source: "const hasCount = !!count;\nexport const next = hasCount ? count + 1 : 0;\n",
+		},
 		// A plain `boolean` is no longer here: it is already a boolean, so `!!flag` converts nothing
 		// and the rule is silent (#vsy2eym). Beside undefined, `false` is still a falsy value no
 		// comparison removes.

@@ -23,10 +23,18 @@ func TestNoCaseDeclarationsReportsLexicalDeclarations(test *testing.T) {
 		{"await using", `async function g() { switch (a) { case 1: await using resource = acquire(); break; } }`, 1},
 		{"two declarations in one clause", `switch (a) { case 1: let x = 1; const y = 2; break; }`, 2},
 		{"declarations in separate clauses", `switch (a) { case 1: let x = 1; break; case 2: const y = 2; break; }`, 2},
-		{"a block earlier in the clause does not scope a later declaration", `switch (a) { case 1: {} function f() {} break; }`, 1},
+		{
+			"a block earlier in the clause does not scope a later declaration",
+			`switch (a) { case 1: {} function f() {} break; }`,
+			1,
+		},
 		{"declaration in a fallen-through arm", `switch (a) { case 1: case 2: let x = 1; }`, 1},
 		{"nested switch", `switch (a) { case 1: switch (b) { case 2: let x = 1; break; } break; }`, 1},
-		{"multiple declarators in one statement is one statement", `switch (a) { case 1: let x = 1, y = 2; break; }`, 1},
+		{
+			"multiple declarators in one statement is one statement",
+			`switch (a) { case 1: let x = 1, y = 2; break; }`,
+			1,
+		},
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
@@ -58,7 +66,10 @@ func TestNoCaseDeclarationsAcceptsScopedAndHoistedDeclarations(test *testing.T) 
 		{"clause with no statements", `switch (a) { case 1: case 2: {} }`},
 		{"declaration nested in an if", `switch (a) { case 1: if (a) { const x = 1; } break; }`},
 		{"declaration nested in a loop", `switch (a) { case 1: for (const x of xs) {} break; }`},
-		{"declaration inside a function body in the clause", `switch (a) { case 1: (() => { const x = 1; })(); break; }`},
+		{
+			"declaration inside a function body in the clause",
+			`switch (a) { case 1: (() => { const x = 1; })(); break; }`,
+		},
 		{"type and interface are erased", `switch (a) { case 1: type T = string; interface I { value: T } break; }`},
 		{"enum and namespace emit into hoisted bindings", `switch (a) { case 1: enum E { A } namespace N {} break; }`},
 		{"declare const emits nothing", `switch (a) { case 1: declare const d: number; break; }`},

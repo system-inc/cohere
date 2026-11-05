@@ -81,7 +81,12 @@ func TestApplyPruneRemovesOnlyThePlanAndLeavesFrozenACandidate(test *testing.T) 
 			planned = planned || file.Name == name
 		}
 		if planned != os.IsNotExist(statErr) {
-			test.Errorf("%s: planned=%v, but on disk the file %s", name, planned, map[bool]string{true: "is gone", false: "is still there"}[os.IsNotExist(statErr)])
+			test.Errorf(
+				"%s: planned=%v, but on disk the file %s",
+				name,
+				planned,
+				map[bool]string{true: "is gone", false: "is still there"}[os.IsNotExist(statErr)],
+			)
 		}
 	}
 
@@ -135,7 +140,11 @@ func TestPruneRemovesStaleExtractionsAndKeepsWhatABuildCanReach(test *testing.T)
 	inUse := directory(paths.CompilerDirectory(), "inuseinuseinuseinuseinuseinuseinuseinuse", 10*time.Minute)
 	stale := directory(paths.CompilerDirectory(), "stalestalestalestalestalestalestalestale", 5*time.Hour)
 	abandoned := directory(paths.CompilerDirectory(), "stalestalestalestalestalestalestalestale.partial-1", 5*time.Hour)
-	extracting := directory(paths.CompilerDirectory(), "freshfreshfreshfreshfreshfreshfreshfresh.partial-2", time.Minute)
+	extracting := directory(
+		paths.CompilerDirectory(),
+		"freshfreshfreshfreshfreshfreshfreshfresh.partial-2",
+		time.Minute,
+	)
 	killed := directory(paths.SnapshotDirectory(), "58cd5d457ebf-1999002027", 3*time.Hour)
 	building := directory(paths.SnapshotDirectory(), "58cd5d457ebf-1130357668", 2*time.Minute)
 
@@ -178,7 +187,12 @@ func TestPruneRemovesStaleExtractionsAndKeepsWhatABuildCanReach(test *testing.T)
 	}
 
 	// Without the current compiler named, nothing says which one a build reads, so none is planned.
-	if unknown, planPruneError := PlanPrune(paths, nil, "", now); planPruneError != nil || len(unknown.StaleCompilers) != 0 {
+	if unknown, planPruneError := PlanPrune(
+		paths,
+		nil,
+		"",
+		now,
+	); planPruneError != nil || len(unknown.StaleCompilers) != 0 {
 		test.Fatalf("with no current compiler, planned %v (err %v)", unknown.StaleCompilers, planPruneError)
 	}
 }
@@ -244,7 +258,10 @@ func TestEnsureCompilerMarksAReusedExtractionInUse(test *testing.T) {
 		test.Fatal(err)
 	}
 	if time.Since(information.ModTime()) > time.Minute {
-		test.Fatalf("a reused extraction still reads as last used at %s, so a prune would take it mid-build", information.ModTime())
+		test.Fatalf(
+			"a reused extraction still reads as last used at %s, so a prune would take it mid-build",
+			information.ModTime(),
+		)
 	}
 }
 
@@ -289,7 +306,12 @@ func TestAPruneThatRemovesNothingSaysHowManyItLookedAt(test *testing.T) {
 	}
 
 	// The other direction: a listing that cannot be read is an error, never an empty plan.
-	if _, planPruneError := PlanPrune(Paths{CacheDirectory: filepath.Join(test.TempDir(), "absent")}, nil, "", pruneNow); planPruneError == nil {
+	if _, planPruneError := PlanPrune(
+		Paths{CacheDirectory: filepath.Join(test.TempDir(), "absent")},
+		nil,
+		"",
+		pruneNow,
+	); planPruneError == nil {
 		test.Fatal("a missing binary cache planned as if it were empty")
 	}
 }
@@ -299,7 +321,10 @@ func TestAPruneThatRemovesNothingSaysHowManyItLookedAt(test *testing.T) {
 func seedPruneCache(test *testing.T) (Paths, map[string]time.Duration) {
 	test.Helper()
 	paths := Paths{ModuleDirectory: test.TempDir(), CacheDirectory: test.TempDir()}
-	if createDirectoryError := os.MkdirAll(filepath.Join(paths.BinaryDirectory(), "a-subdirectory"), 0o755); createDirectoryError != nil {
+	if createDirectoryError := os.MkdirAll(
+		filepath.Join(paths.BinaryDirectory(), "a-subdirectory"),
+		0o755,
+	); createDirectoryError != nil {
 		test.Fatal(createDirectoryError)
 	}
 
@@ -319,7 +344,13 @@ func seedPruneCache(test *testing.T) (Paths, map[string]time.Duration) {
 	// Named keepers, older than everything, so only their names protect them. Listed here rather than
 	// read from prunedByName: a fixture built from the map under test changes with it, so dropping a
 	// keeper from the map also dropped it from the fixture and the test passed. That happened.
-	for _, name := range []string{"cohere-dev", "cohere-dev.hash", "cohere-dispatch", "cohere-swift-current", "cohere-swift-current.tmp"} {
+	for _, name := range []string{
+		"cohere-dev",
+		"cohere-dev.hash",
+		"cohere-dispatch",
+		"cohere-swift-current",
+		"cohere-swift-current.tmp",
+	} {
 		ages[name] = 500 * time.Hour
 	}
 	ages["something-else"] = 500 * time.Hour

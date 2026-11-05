@@ -100,7 +100,9 @@ func TestNoUnusedVarsMessageIdAndDescription(test *testing.T) {
 
 			var options any
 			if testCase.options != "" {
-				decoded, decodeNoUnusedVariablesOptionsError := DecodeNoUnusedVarsOptions(json.RawMessage(testCase.options))
+				decoded, decodeNoUnusedVariablesOptionsError := DecodeNoUnusedVarsOptions(
+					json.RawMessage(testCase.options),
+				)
 				if decodeNoUnusedVariablesOptionsError != nil {
 					test.Fatalf("decoding failed: %v", decodeNoUnusedVariablesOptionsError)
 				}
@@ -157,7 +159,13 @@ func TestNoUnusedVarsReportsAtTheLastWrite(test *testing.T) {
 			end := int(result.Diagnostics[0].Range.End())
 			name := source[start:end]
 			if !strings.HasPrefix(source[start:], testCase.want) || !strings.HasPrefix(testCase.want, name) {
-				test.Errorf("finding points at %q followed by %q, want the %q at the start of %q", name, source[end:min(end+12, len(source))], name, testCase.want)
+				test.Errorf(
+					"finding points at %q followed by %q, want the %q at the start of %q",
+					name,
+					source[end:min(end+12, len(source))],
+					name,
+					testCase.want,
+				)
 			}
 		})
 	}
@@ -202,7 +210,9 @@ func TestDecodeNoUnusedVarsOptions(test *testing.T) {
 		if decoded.CaughtErrors != "all" {
 			test.Errorf("caughtErrors default is %q, want %q", decoded.CaughtErrors, "all")
 		}
-		if decoded.VarsIgnorePattern != "" || decoded.ArgsIgnorePattern != "" || decoded.CaughtErrorsIgnorePattern != "" {
+		if decoded.VarsIgnorePattern != "" ||
+			decoded.ArgsIgnorePattern != "" ||
+			decoded.CaughtErrorsIgnorePattern != "" {
 			test.Error("an absent ignore pattern must stay absent, which ignores nothing, ESLint's default")
 		}
 	})
@@ -243,12 +253,20 @@ func TestNoUnusedVarsIgnoresNoNameByDefault(test *testing.T) {
 
 	// The control on the other side: a configured pattern still exempts, so the reports above come
 	// from the missing default rather than from a rule that stopped reading patterns.
-	options, decodeNoUnusedVariablesOptionsError := DecodeNoUnusedVarsOptions(json.RawMessage(`{"varsIgnorePattern":"^_","argsIgnorePattern":"^_"}`))
+	options, decodeNoUnusedVariablesOptionsError := DecodeNoUnusedVarsOptions(
+		json.RawMessage(`{"varsIgnorePattern":"^_","argsIgnorePattern":"^_"}`),
+	)
 	if decodeNoUnusedVariablesOptionsError != nil {
 		test.Fatalf("decoding failed: %v", decodeNoUnusedVariablesOptionsError)
 	}
-	rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoUnusedVars, "a.ts", "const _deliberate = 1;", options))
-	rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoUnusedVars, "a.ts", "function f(_unused: number) {} f(1);", options))
+	rule_testing.ExpectClean(
+		test,
+		rule_testing.RunTypedWithOptions(test, NoUnusedVars, "a.ts", "const _deliberate = 1;", options),
+	)
+	rule_testing.ExpectClean(
+		test,
+		rule_testing.RunTypedWithOptions(test, NoUnusedVars, "a.ts", "function f(_unused: number) {} f(1);", options),
+	)
 }
 
 // TestNoUnusedVarsJsxFactoryImport pins the exemption that removed 510 false positives from our own
@@ -534,7 +552,12 @@ func TestNoUnusedVarsReExportFromModuleIsNotALocalRead(test *testing.T) {
 func TestNoUnusedVarsCaughtErrorsHaveNoDefaultIgnorePattern(test *testing.T) {
 	test.Parallel()
 
-	if result := rule_testing.RunTyped(test, NoUnusedVars, "a.ts", "try {} catch(_) { }"); len(result.Diagnostics) != 1 {
+	if result := rule_testing.RunTyped(
+		test,
+		NoUnusedVars,
+		"a.ts",
+		"try {} catch(_) { }",
+	); len(result.Diagnostics) != 1 {
 		test.Errorf("caughtErrorsIgnorePattern has no default, so `catch(_)` reports; got %d",
 			len(result.Diagnostics))
 	}
@@ -543,7 +566,13 @@ func TestNoUnusedVarsCaughtErrorsHaveNoDefaultIgnorePattern(test *testing.T) {
 	if err != nil {
 		test.Fatalf("decoding failed: %v", err)
 	}
-	if result := rule_testing.RunTypedWithOptions(test, NoUnusedVars, "a.ts", "try {} catch(_) { }", varsOnly); len(result.Diagnostics) != 1 {
+	if result := rule_testing.RunTypedWithOptions(
+		test,
+		NoUnusedVars,
+		"a.ts",
+		"try {} catch(_) { }",
+		varsOnly,
+	); len(result.Diagnostics) != 1 {
 		test.Errorf("varsIgnorePattern does not cover a caught error; got %d", len(result.Diagnostics))
 	}
 	// And configuring its own pattern turns it off.
@@ -551,7 +580,13 @@ func TestNoUnusedVarsCaughtErrorsHaveNoDefaultIgnorePattern(test *testing.T) {
 	if err != nil {
 		test.Fatalf("decoding failed: %v", err)
 	}
-	if result := rule_testing.RunTypedWithOptions(test, NoUnusedVars, "a.ts", "try {} catch(_) { }", options); len(result.Diagnostics) != 0 {
+	if result := rule_testing.RunTypedWithOptions(
+		test,
+		NoUnusedVars,
+		"a.ts",
+		"try {} catch(_) { }",
+		options,
+	); len(result.Diagnostics) != 0 {
 		test.Errorf("an explicit caughtErrorsIgnorePattern ignores it; got %d", len(result.Diagnostics))
 	}
 }
@@ -573,17 +608,53 @@ func TestNoUnusedVarsReportsAValueUsedOnlyAsAType(test *testing.T) {
 		ids    []string
 	}{
 		{"typeof", "const foo: number = 1;\n\nexport type Foo = typeof foo;\n", []string{"usedOnlyAsType"}},
-		{"typeof inside a union", "const foo: number = 1;\n\nexport type Foo = typeof foo | string;\n", []string{"usedOnlyAsType"}},
-		{"typeof inside an intersection", "const foo: number = 1;\n\nexport type Foo = (typeof foo | string) & { __brand: 'foo' };\n", []string{"usedOnlyAsType"}},
-		{"typeof of a member", "const foo = {\n  bar: {\n    baz: 123,\n  },\n};\n\nexport type Bar = typeof foo.bar;\n", []string{"usedOnlyAsType"}},
-		{"an indexed typeof", "const foo = {\n  bar: {\n    baz: 123,\n  },\n};\n\nexport type Bar = (typeof foo)['bar'];\n", []string{"usedOnlyAsType"}},
-		{"a parameter read only by its own return type", "export const myTypeGuard2 = (data2: unknown): typeof data2 => {\n  return true;\n};\n", []string{"usedOnlyAsType"}},
-		{"a type predicate's parameter", "export const myTypeGuard = (data: unknown): data is string => {\n  return true;\n};\n", []string{"usedOnlyAsType"}},
-		{"keyof typeof", "const defaults = { a: 1 };\nexport type Key = keyof typeof defaults;\n", []string{"usedOnlyAsType"}},
-		{"a function behind ReturnType", "function make() { return 1; }\nexport type Made = ReturnType<typeof make>;\n", []string{"usedOnlyAsType"}},
+		{
+			"typeof inside a union",
+			"const foo: number = 1;\n\nexport type Foo = typeof foo | string;\n",
+			[]string{"usedOnlyAsType"},
+		},
+		{
+			"typeof inside an intersection",
+			"const foo: number = 1;\n\nexport type Foo = (typeof foo | string) & { __brand: 'foo' };\n",
+			[]string{"usedOnlyAsType"},
+		},
+		{
+			"typeof of a member",
+			"const foo = {\n  bar: {\n    baz: 123,\n  },\n};\n\nexport type Bar = typeof foo.bar;\n",
+			[]string{"usedOnlyAsType"},
+		},
+		{
+			"an indexed typeof",
+			"const foo = {\n  bar: {\n    baz: 123,\n  },\n};\n\nexport type Bar = (typeof foo)['bar'];\n",
+			[]string{"usedOnlyAsType"},
+		},
+		{
+			"a parameter read only by its own return type",
+			"export const myTypeGuard2 = (data2: unknown): typeof data2 => {\n  return true;\n};\n",
+			[]string{"usedOnlyAsType"},
+		},
+		{
+			"a type predicate's parameter",
+			"export const myTypeGuard = (data: unknown): data is string => {\n  return true;\n};\n",
+			[]string{"usedOnlyAsType"},
+		},
+		{
+			"keyof typeof",
+			"const defaults = { a: 1 };\nexport type Key = keyof typeof defaults;\n",
+			[]string{"usedOnlyAsType"},
+		},
+		{
+			"a function behind ReturnType",
+			"function make() { return 1; }\nexport type Made = ReturnType<typeof make>;\n",
+			[]string{"usedOnlyAsType"},
+		},
 
 		// A value read anywhere is read, and an export is a use.
-		{"read as a value too", "const defaults = { a: 1 };\nexport type Defaults = typeof defaults;\nconsole.log(defaults);\n", nil},
+		{
+			"read as a value too",
+			"const defaults = { a: 1 };\nexport type Defaults = typeof defaults;\nconsole.log(defaults);\n",
+			nil,
+		},
 		{"exported", "export const defaults = { a: 1 };\nexport type Defaults = typeof defaults;\n", nil},
 		// A type-only import can only ever be read by a type query, so the query is its use.
 		{"a type-only import read by typeof", "import type { foo } from 'foo';\nexport type Foo = typeof foo;\n", nil},
@@ -618,14 +689,36 @@ func TestNoUnusedVarsJudgesOverrideParametersAsTypeScriptEslintDoes(test *testin
 		want   []string
 	}{
 		// DailyMetricsScheduledExecutable.ts:47 and SystemLogReportScheduledExecutable.ts:74.
-		{"an override's unused only parameter", base + "export class Child extends Base {\n    override shouldRun(_previousRun: number | null): boolean { return true; }\n}\n", []string{"_previousRun"}},
+		{
+			"an override's unused only parameter",
+			base +
+				"export class Child extends Base {\n    override shouldRun(_previousRun: number | null): boolean { return true; }\n}\n",
+			[]string{"_previousRun"},
+		},
 		// FakeStripePaymentProcessor.ts:122: the defaulted _options reports and shields _appliedDiscount.
-		{"an override's trailing defaulted parameter", base + "export class Child extends Base {\n    override create(items: string[], _appliedDiscount: number[], _options: object = {}): number { return items.length; }\n}\n", []string{"_options"}},
+		{
+			"an override's trailing defaulted parameter",
+			base +
+				"export class Child extends Base {\n    override create(items: string[], _appliedDiscount: number[], _options: object = {}): number { return items.length; }\n}\n",
+			[]string{"_options"},
+		},
 		// oxc's clean case, withheld from the corpus because typescript-eslint reports it.
-		{"oxc's override case", "class Foo {\n    public method(a: number, b: number): number { return a + b; }\n}\nclass Bar extends Foo {\n    public override method(a: number, b: number): number { return a; }\n}\nnew Bar();\n", []string{"b"}},
+		{
+			"oxc's override case",
+			"class Foo {\n    public method(a: number, b: number): number { return a + b; }\n}\nclass Bar extends Foo {\n    public override method(a: number, b: number): number { return a; }\n}\nnew Bar();\n",
+			[]string{"b"},
+		},
 		// The shield, both ways: a default after b shields b; without the default, both report.
-		{"a defaulted parameter shields the one before it", "export function run(a: number, b: string, c: object = {}): number { return a; }\n", []string{"c"}},
-		{"without the default, both trailing parameters report", "export function run(a: number, b: string, c: object): number { return a; }\n", []string{"b", "c"}},
+		{
+			"a defaulted parameter shields the one before it",
+			"export function run(a: number, b: string, c: object = {}): number { return a; }\n",
+			[]string{"c"},
+		},
+		{
+			"without the default, both trailing parameters report",
+			"export function run(a: number, b: string, c: object): number { return a; }\n",
+			[]string{"b", "c"},
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -663,19 +756,71 @@ func TestNoUnusedVarsTreatsADecoratedClassOrParameterAsUsed(test *testing.T) {
 		source string
 		want   []string
 	}{
-		{"a class declared only so its class decorator runs", decorators + "export function check(): void {\n    @Table('conflict')\n    class TwoFlags {}\n}\n", nil},
-		{"the same class without the decorator still reports", decorators + "export function check(): void {\n    class TwoFlags {}\n}\n", []string{"TwoFlags"}},
-		{"a decorator on a member does not make the class used", decorators + "export function check(): void {\n    class TwoFlags {\n        @Column() declare a: string;\n    }\n}\n", []string{"TwoFlags"}},
-		{"a parameter declared only so its decorator records it", decorators + "export class Resolver {\n    tickets(@Argument('pagination') pagination: number): string { return 'ok'; }\n}\n", nil},
-		{"the same parameter without the decorator still reports", decorators + "export class Resolver {\n    tickets(pagination: number): string { return 'ok'; }\n}\n", []string{"pagination"}},
-		{"a decorated parameter does not exempt the undecorated one after it", decorators + "export class Resolver {\n    tickets(@Argument('pagination') pagination: number, extra: string): string { return 'ok'; }\n}\n", []string{"extra"}},
-		{"a decorated parameter shields the undecorated ones before it", decorators + "export class Resolver {\n    tickets(input: string, first: number, @Argument('context') context: object): string { return 'ok'; }\n}\n", nil},
-		{"under args all, the undecorated ones before it still report", decorators + "export class Resolver {\n    tickets(input: string, @Argument('context') context: object): string { return 'ok'; }\n}\n", []string{"input"}},
-		{"a decorated parameter is used even under args all", decorators + "export class Resolver {\n    tickets(@Argument('pagination') pagination: number, used: string): string { return used; }\n}\n", nil},
+		{
+			"a class declared only so its class decorator runs",
+			decorators + "export function check(): void {\n    @Table('conflict')\n    class TwoFlags {}\n}\n",
+			nil,
+		},
+		{
+			"the same class without the decorator still reports",
+			decorators + "export function check(): void {\n    class TwoFlags {}\n}\n",
+			[]string{"TwoFlags"},
+		},
+		{
+			"a decorator on a member does not make the class used",
+			decorators +
+				"export function check(): void {\n    class TwoFlags {\n        @Column() declare a: string;\n    }\n}\n",
+			[]string{"TwoFlags"},
+		},
+		{
+			"a parameter declared only so its decorator records it",
+			decorators +
+				"export class Resolver {\n    tickets(@Argument('pagination') pagination: number): string { return 'ok'; }\n}\n",
+			nil,
+		},
+		{
+			"the same parameter without the decorator still reports",
+			decorators + "export class Resolver {\n    tickets(pagination: number): string { return 'ok'; }\n}\n",
+			[]string{"pagination"},
+		},
+		{
+			"a decorated parameter does not exempt the undecorated one after it",
+			decorators +
+				"export class Resolver {\n    tickets(@Argument('pagination') pagination: number, extra: string): string { return 'ok'; }\n}\n",
+			[]string{"extra"},
+		},
+		{
+			"a decorated parameter shields the undecorated ones before it",
+			decorators +
+				"export class Resolver {\n    tickets(input: string, first: number, @Argument('context') context: object): string { return 'ok'; }\n}\n",
+			nil,
+		},
+		{
+			"under args all, the undecorated ones before it still report",
+			decorators +
+				"export class Resolver {\n    tickets(input: string, @Argument('context') context: object): string { return 'ok'; }\n}\n",
+			[]string{"input"},
+		},
+		{
+			"a decorated parameter is used even under args all",
+			decorators +
+				"export class Resolver {\n    tickets(@Argument('pagination') pagination: number, used: string): string { return used; }\n}\n",
+			nil,
+		},
 		// The decorator records the parameter's position, which a name inside its pattern does not hold, so
 		// that name is still judged, as ESLint judges it; the pattern still holds the position (#s48y8eg).
-		{"a name destructured out of a decorated parameter is still judged", decorators + "export class Resolver {\n    tickets(@Argument('page') { size }: { size: number }): string { return 'ok'; }\n}\n", []string{"size"}},
-		{"a decorated destructured parameter shields the ones before it", decorators + "export class Resolver {\n    tickets(input: string, @Argument('page') { size }: { size: number }): string { return 'ok'; }\n}\n", []string{"size"}},
+		{
+			"a name destructured out of a decorated parameter is still judged",
+			decorators +
+				"export class Resolver {\n    tickets(@Argument('page') { size }: { size: number }): string { return 'ok'; }\n}\n",
+			[]string{"size"},
+		},
+		{
+			"a decorated destructured parameter shields the ones before it",
+			decorators +
+				"export class Resolver {\n    tickets(input: string, @Argument('page') { size }: { size: number }): string { return 'ok'; }\n}\n",
+			[]string{"size"},
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -720,7 +865,11 @@ func TestNoUnusedVarsIgnoreRestSiblings(test *testing.T) {
 		{"const { a = 1, ...rest } = o;\nuse(rest);", []string{"unusedVar a"}, []string{"unusedVar a"}},
 		{"const { a: b = 1, ...rest } = o;\nuse(rest);", []string{"unusedVar b"}, []string{"unusedVar b"}},
 		{"const { a, ...rest } = o;", []string{"unusedVar rest"}, []string{"unusedVar a", "unusedVar rest"}},
-		{"const { a, b: { c }, ...rest } = n;\nuse(rest);", []string{"unusedVar c"}, []string{"unusedVar a", "unusedVar c"}},
+		{
+			"const { a, b: { c }, ...rest } = n;\nuse(rest);",
+			[]string{"unusedVar c"},
+			[]string{"unusedVar a", "unusedVar c"},
+		},
 		{"const { x: { a, ...inner }, ...outer } = n;\nuse(inner, outer);", nil, []string{"unusedVar a"}},
 		{"const { a, b } = o;\nuse(a);", []string{"unusedVar b"}, []string{"unusedVar b"}},
 		{"const [a, ...rest] = list;\nuse(rest);", []string{"unusedVar a"}, []string{"unusedVar a"}},
@@ -729,9 +878,17 @@ func TestNoUnusedVarsIgnoreRestSiblings(test *testing.T) {
 		{"let a;\nlet rest;\n({ a = 1, ...rest } = o);\nuse(rest);", []string{"unusedVar a"}, []string{"unusedVar a"}},
 		{"let a;\nlet rest;\n({ x: (a), ...rest } = o);\nuse(rest);", nil, []string{"unusedVar a"}},
 		{"let a;\nlet rest;\n({ a, rest } = o);\nuse(rest);", []string{"unusedVar a"}, []string{"unusedVar a"}},
-		{"function f({ a, ...rest }: Record<string, number>) {\n  return rest;\n}\nuse(f);", nil, []string{"unusedVar a"}},
+		{
+			"function f({ a, ...rest }: Record<string, number>) {\n  return rest;\n}\nuse(f);",
+			nil,
+			[]string{"unusedVar a"},
+		},
 		{"for (const { a, ...rest } of list2) {\n  use(rest);\n}", nil, []string{"unusedVar a"}},
-		{"const { a, ...rest } = o;\ntype A = typeof a;\nuse(rest);\nexport type { A };", nil, []string{"usedOnlyAsType a"}},
+		{
+			"const { a, ...rest } = o;\ntype A = typeof a;\nuse(rest);\nexport type { A };",
+			nil,
+			[]string{"usedOnlyAsType a"},
+		},
 		{"const { [key]: a, ...rest } = o;\nuse(rest);", nil, []string{"unusedVar a"}},
 		{"const { 'quoted': a, ...rest } = o;\nuse(rest);", nil, []string{"unusedVar a"}},
 	}
@@ -790,15 +947,25 @@ func TestNoUnusedVarsAutofixRemovalWritesUpstreamsEdit(test *testing.T) {
 		source string
 		want   string
 	}{
-		{"one specifier beside a used one", "import { Unused, Used } from 'module';\nexport { Used };\n", "import {  Used } from 'module';\nexport { Used };\n"},
+		{
+			"one specifier beside a used one",
+			"import { Unused, Used } from 'module';\nexport { Used };\n",
+			"import {  Used } from 'module';\nexport { Used };\n",
+		},
 		{"the whole declaration and its line", "import { Unused } from 'module';\nexport {};\n", "export {};\n"},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedFilesWithSetupAndOptions(test, NoUnusedVars, map[string]string{"file.ts": testCase.source}, "file.ts", options,
+			result := rule_testing.RunTypedFilesWithSetupAndOptions(test, NoUnusedVars, map[string]string{
+				"file.ts": testCase.source,
+			}, "file.ts", options,
 				func(directory string) {
-					if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(noUnusedVarsOptionsCorpusTsconfig), 0o644); writeError != nil {
+					if writeError := os.WriteFile(
+						filepath.Join(directory, "tsconfig.json"),
+						[]byte(noUnusedVarsOptionsCorpusTsconfig),
+						0o644,
+					); writeError != nil {
 						test.Fatal(writeError)
 					}
 				})
@@ -811,13 +978,21 @@ func TestNoUnusedVarsAutofixRemovalWritesUpstreamsEdit(test *testing.T) {
 	if err != nil {
 		test.Fatal(err)
 	}
-	result := rule_testing.RunTypedFilesWithSetupAndOptions(test, NoUnusedVars, map[string]string{"file.ts": "import { Unused } from 'module';\nexport {};\n"}, "file.ts", defaults,
+	result := rule_testing.RunTypedFilesWithSetupAndOptions(test, NoUnusedVars, map[string]string{
+		"file.ts": "import { Unused } from 'module';\nexport {};\n",
+	}, "file.ts", defaults,
 		func(directory string) {
-			if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(noUnusedVarsOptionsCorpusTsconfig), 0o644); writeError != nil {
+			if writeError := os.WriteFile(
+				filepath.Join(directory, "tsconfig.json"),
+				[]byte(noUnusedVarsOptionsCorpusTsconfig),
+				0o644,
+			); writeError != nil {
 				test.Fatal(writeError)
 			}
 		})
-	if len(result.Diagnostics) != 1 || len(result.Diagnostics[0].Fixes) != 0 || len(result.Diagnostics[0].Suggestions) != 1 {
+	if len(result.Diagnostics) != 1 ||
+		len(result.Diagnostics[0].Fixes) != 0 ||
+		len(result.Diagnostics[0].Suggestions) != 1 {
 		test.Fatalf("the default gives %+v, want one finding with one suggestion and no fix", result.Diagnostics)
 	}
 }

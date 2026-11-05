@@ -73,29 +73,154 @@ func consistentTypeDefinitionsCases() []consistentTypeDefinitionsCase {
 		{"type A = { x: number } & B & C;", "type", []string{}, nil},
 		{"type A = { x: number } & B<T1> & C<T2>;", "type", []string{}, nil},
 		{"\nexport type W<T> = {\n  x: T;\n};\n      ", "type", []string{}, nil},
-		{"type T = { x: number; };", "interface", []string{"interfaceOverType"}, consistentTypeDefinitionsPointer("interface T { x: number; }")},
-		{"type T={ x: number; };", "interface", []string{"interfaceOverType"}, consistentTypeDefinitionsPointer("interface T { x: number; }")},
-		{"type T=                         { x: number; };", "interface", []string{"interfaceOverType"}, consistentTypeDefinitionsPointer("interface T { x: number; }")},
-		{"type T /* comment */={ x: number; };", "interface", []string{"interfaceOverType"}, consistentTypeDefinitionsPointer("interface T /* comment */ { x: number; }")},
-		{"\nexport type W<T> = {\n  x: T;\n};\n      ", "interface", []string{"interfaceOverType"}, consistentTypeDefinitionsPointer("\nexport interface W<T> {\n  x: T;\n}\n      ")},
-		{"interface T { x: number; }", "type", []string{"typeOverInterface"}, consistentTypeDefinitionsPointer("type T = { x: number; }")},
-		{"interface T{ x: number; }", "type", []string{"typeOverInterface"}, consistentTypeDefinitionsPointer("type T = { x: number; }")},
-		{"interface T                          { x: number; }", "type", []string{"typeOverInterface"}, consistentTypeDefinitionsPointer("type T = { x: number; }")},
-		{"interface A extends B, C { x: number; };", "type", []string{"typeOverInterface"}, consistentTypeDefinitionsPointer("type A = { x: number; } & B & C;")},
-		{"interface A extends B<T1>, C<T2> { x: number; };", "type", []string{"typeOverInterface"}, consistentTypeDefinitionsPointer("type A = { x: number; } & B<T1> & C<T2>;")},
-		{"\nexport interface W<T> {\n  x: T;\n}\n      ", "type", []string{"typeOverInterface"}, consistentTypeDefinitionsPointer("\nexport type W<T> = {\n  x: T;\n}\n      ")},
-		{"\nnamespace JSX {\n  interface Array<T> {\n    foo(x: (x: number) => T): T[];\n  }\n}\n      ", "type", []string{"typeOverInterface"}, consistentTypeDefinitionsPointer("\nnamespace JSX {\n  type Array<T> = {\n    foo(x: (x: number) => T): T[];\n  }\n}\n      ")},
-		{"\nglobal {\n  interface Array<T> {\n    foo(x: (x: number) => T): T[];\n  }\n}\n      ", "type", []string{"typeOverInterface"}, consistentTypeDefinitionsPointer("\nglobal {\n  type Array<T> = {\n    foo(x: (x: number) => T): T[];\n  }\n}\n      ")},
-		{"\ndeclare global {\n  interface Array<T> {\n    foo(x: (x: number) => T): T[];\n  }\n}\n      ", "type", []string{"typeOverInterface"}, nil},
-		{"\ndeclare global {\n  namespace Foo {\n    interface Bar {}\n  }\n}\n      ", "type", []string{"typeOverInterface"}, nil},
-		{"\nexport default interface Test {\n  bar(): string;\n  foo(): number;\n}\n      ", "type", []string{"typeOverInterface"}, consistentTypeDefinitionsPointer("\ntype Test = {\n  bar(): string;\n  foo(): number;\n}\nexport default Test\n      ")},
-		{"\nexport declare type Test = {\n  foo: string;\n  bar: string;\n};\n      ", "interface", []string{"interfaceOverType"}, consistentTypeDefinitionsPointer("\nexport declare interface Test {\n  foo: string;\n  bar: string;\n}\n      ")},
-		{"\nexport declare interface Test {\n  foo: string;\n  bar: string;\n}\n      ", "type", []string{"typeOverInterface"}, consistentTypeDefinitionsPointer("\nexport declare type Test = {\n  foo: string;\n  bar: string;\n}\n      ")},
-		{"\ntype Foo = ({\n  a: string;\n});\n      ", "interface", []string{"interfaceOverType"}, consistentTypeDefinitionsPointer("\ninterface Foo {\n  a: string;\n}\n      ")},
-		{"\ntype Foo = ((((((((({\n  a: string;\n})))))))));\n      ", "interface", []string{"interfaceOverType"}, consistentTypeDefinitionsPointer("\ninterface Foo {\n  a: string;\n}\n      ")},
-		{"\ntype Foo = {\n  a: string;\n}\n      ", "interface", []string{"interfaceOverType"}, consistentTypeDefinitionsPointer("\ninterface Foo {\n  a: string;\n}\n      ")},
-		{"\ntype Foo = {\n  a: string;\n}\ntype Bar = string;\n      ", "interface", []string{"interfaceOverType"}, consistentTypeDefinitionsPointer("\ninterface Foo {\n  a: string;\n}\ntype Bar = string;\n      ")},
-		{"\ntype Foo = ((({\n  a: string;\n})))\n\nconst bar = 1;\n      ", "interface", []string{"interfaceOverType"}, consistentTypeDefinitionsPointer("\ninterface Foo {\n  a: string;\n}\n\nconst bar = 1;\n      ")},
+		{
+			"type T = { x: number; };",
+			"interface",
+			[]string{"interfaceOverType"},
+			consistentTypeDefinitionsPointer("interface T { x: number; }"),
+		},
+		{
+			"type T={ x: number; };",
+			"interface",
+			[]string{"interfaceOverType"},
+			consistentTypeDefinitionsPointer("interface T { x: number; }"),
+		},
+		{
+			"type T=                         { x: number; };",
+			"interface",
+			[]string{"interfaceOverType"},
+			consistentTypeDefinitionsPointer("interface T { x: number; }"),
+		},
+		{
+			"type T /* comment */={ x: number; };",
+			"interface",
+			[]string{"interfaceOverType"},
+			consistentTypeDefinitionsPointer("interface T /* comment */ { x: number; }"),
+		},
+		{
+			"\nexport type W<T> = {\n  x: T;\n};\n      ",
+			"interface",
+			[]string{"interfaceOverType"},
+			consistentTypeDefinitionsPointer("\nexport interface W<T> {\n  x: T;\n}\n      "),
+		},
+		{
+			"interface T { x: number; }",
+			"type",
+			[]string{"typeOverInterface"},
+			consistentTypeDefinitionsPointer("type T = { x: number; }"),
+		},
+		{
+			"interface T{ x: number; }",
+			"type",
+			[]string{"typeOverInterface"},
+			consistentTypeDefinitionsPointer("type T = { x: number; }"),
+		},
+		{
+			"interface T                          { x: number; }",
+			"type",
+			[]string{"typeOverInterface"},
+			consistentTypeDefinitionsPointer("type T = { x: number; }"),
+		},
+		{
+			"interface A extends B, C { x: number; };",
+			"type",
+			[]string{"typeOverInterface"},
+			consistentTypeDefinitionsPointer("type A = { x: number; } & B & C;"),
+		},
+		{
+			"interface A extends B<T1>, C<T2> { x: number; };",
+			"type",
+			[]string{"typeOverInterface"},
+			consistentTypeDefinitionsPointer("type A = { x: number; } & B<T1> & C<T2>;"),
+		},
+		{
+			"\nexport interface W<T> {\n  x: T;\n}\n      ",
+			"type",
+			[]string{"typeOverInterface"},
+			consistentTypeDefinitionsPointer("\nexport type W<T> = {\n  x: T;\n}\n      "),
+		},
+		{
+			"\nnamespace JSX {\n  interface Array<T> {\n    foo(x: (x: number) => T): T[];\n  }\n}\n      ",
+			"type",
+			[]string{"typeOverInterface"},
+			consistentTypeDefinitionsPointer(
+				"\nnamespace JSX {\n  type Array<T> = {\n    foo(x: (x: number) => T): T[];\n  }\n}\n      ",
+			),
+		},
+		{
+			"\nglobal {\n  interface Array<T> {\n    foo(x: (x: number) => T): T[];\n  }\n}\n      ",
+			"type",
+			[]string{"typeOverInterface"},
+			consistentTypeDefinitionsPointer(
+				"\nglobal {\n  type Array<T> = {\n    foo(x: (x: number) => T): T[];\n  }\n}\n      ",
+			),
+		},
+		{
+			"\ndeclare global {\n  interface Array<T> {\n    foo(x: (x: number) => T): T[];\n  }\n}\n      ",
+			"type",
+			[]string{"typeOverInterface"},
+			nil,
+		},
+		{
+			"\ndeclare global {\n  namespace Foo {\n    interface Bar {}\n  }\n}\n      ",
+			"type",
+			[]string{"typeOverInterface"},
+			nil,
+		},
+		{
+			"\nexport default interface Test {\n  bar(): string;\n  foo(): number;\n}\n      ",
+			"type",
+			[]string{"typeOverInterface"},
+			consistentTypeDefinitionsPointer(
+				"\ntype Test = {\n  bar(): string;\n  foo(): number;\n}\nexport default Test\n      ",
+			),
+		},
+		{
+			"\nexport declare type Test = {\n  foo: string;\n  bar: string;\n};\n      ",
+			"interface",
+			[]string{"interfaceOverType"},
+			consistentTypeDefinitionsPointer(
+				"\nexport declare interface Test {\n  foo: string;\n  bar: string;\n}\n      ",
+			),
+		},
+		{
+			"\nexport declare interface Test {\n  foo: string;\n  bar: string;\n}\n      ",
+			"type",
+			[]string{"typeOverInterface"},
+			consistentTypeDefinitionsPointer(
+				"\nexport declare type Test = {\n  foo: string;\n  bar: string;\n}\n      ",
+			),
+		},
+		{
+			"\ntype Foo = ({\n  a: string;\n});\n      ",
+			"interface",
+			[]string{"interfaceOverType"},
+			consistentTypeDefinitionsPointer("\ninterface Foo {\n  a: string;\n}\n      "),
+		},
+		{
+			"\ntype Foo = ((((((((({\n  a: string;\n})))))))));\n      ",
+			"interface",
+			[]string{"interfaceOverType"},
+			consistentTypeDefinitionsPointer("\ninterface Foo {\n  a: string;\n}\n      "),
+		},
+		{
+			"\ntype Foo = {\n  a: string;\n}\n      ",
+			"interface",
+			[]string{"interfaceOverType"},
+			consistentTypeDefinitionsPointer("\ninterface Foo {\n  a: string;\n}\n      "),
+		},
+		{
+			"\ntype Foo = {\n  a: string;\n}\ntype Bar = string;\n      ",
+			"interface",
+			[]string{"interfaceOverType"},
+			consistentTypeDefinitionsPointer("\ninterface Foo {\n  a: string;\n}\ntype Bar = string;\n      "),
+		},
+		{
+			"\ntype Foo = ((({\n  a: string;\n})))\n\nconst bar = 1;\n      ",
+			"interface",
+			[]string{"interfaceOverType"},
+			consistentTypeDefinitionsPointer("\ninterface Foo {\n  a: string;\n}\n\nconst bar = 1;\n      "),
+		},
 	}
 }
 
@@ -223,7 +348,9 @@ func TestConsistentTypeDefinitionsDecoderDefaultsToInterface(test *testing.T) {
 	rule_testing.ExpectClean(test, silent)
 
 	// And a bad value fails loudly rather than silencing the rule.
-	if _, decodeConsistentTypeDefinitionsOptionsError := DecodeConsistentTypeDefinitionsOptions([]byte(`"neither"`)); decodeConsistentTypeDefinitionsOptionsError == nil {
+	if _, decodeConsistentTypeDefinitionsOptionsError := DecodeConsistentTypeDefinitionsOptions(
+		[]byte(`"neither"`),
+	); decodeConsistentTypeDefinitionsOptionsError == nil {
 		test.Error("expected the decoder to refuse an unknown style")
 	}
 }
@@ -280,14 +407,24 @@ func TestConsistentTypeDefinitionsKeepsTheDeclarationModifiers(test *testing.T) 
 		{"type", "declare interface Foo { a: string }\n", "declare type Foo = { a: string }\n"},
 		{"type", "/** Doc. */\nexport interface Foo { a: string }\n", "/** Doc. */\nexport type Foo = { a: string }\n"},
 		{"type", "export /* c */ interface Foo { a: string }\n", "export /* c */ type Foo = { a: string }\n"},
-		{"type", "namespace N {\n  export interface Foo { a: string }\n}\n", "namespace N {\n  export type Foo = { a: string }\n}\n"},
+		{
+			"type",
+			"namespace N {\n  export interface Foo { a: string }\n}\n",
+			"namespace N {\n  export type Foo = { a: string }\n}\n",
+		},
 		{"interface", "export type Foo = { a: string };\n", "export interface Foo { a: string }\n"},
 		{"interface", "declare type Foo = { a: string };\n", "declare interface Foo { a: string }\n"},
-		{"interface", "/** Doc. */\nexport type Foo = { a: string };\n", "/** Doc. */\nexport interface Foo { a: string }\n"},
+		{
+			"interface",
+			"/** Doc. */\nexport type Foo = { a: string };\n",
+			"/** Doc. */\nexport interface Foo { a: string }\n",
+		},
 		{"interface", "export /* c */ type Foo = { a: string };\n", "export /* c */ interface Foo { a: string }\n"},
 	}
 	for _, testCase := range cases {
-		decoded, decodeConsistentTypeDefinitionsOptionsError := DecodeConsistentTypeDefinitionsOptions([]byte(`"` + testCase.style + `"`))
+		decoded, decodeConsistentTypeDefinitionsOptionsError := DecodeConsistentTypeDefinitionsOptions(
+			[]byte(`"` + testCase.style + `"`),
+		)
 		if decodeConsistentTypeDefinitionsOptionsError != nil {
 			test.Fatal(decodeConsistentTypeDefinitionsOptionsError)
 		}

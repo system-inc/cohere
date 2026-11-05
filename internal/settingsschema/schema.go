@@ -87,7 +87,10 @@ func document(ruleNames []string, nexusTier bool) (*schemaNode, error) {
 	for _, key := range configuration.TopLevelKeys() {
 		description, described := topLevelDescriptions[key.Name]
 		if !described {
-			return nil, fmt.Errorf("settingsschema: the loader accepts %q and nothing describes it; add it to topLevelDescriptions", key.Name)
+			return nil, fmt.Errorf(
+				"settingsschema: the loader accepts %q and nothing describes it; add it to topLevelDescriptions",
+				key.Name,
+			)
 		}
 		shape, keyShapeError := keyShape(key)
 		if keyShapeError != nil {
@@ -156,7 +159,10 @@ func keyShape(key configuration.TopLevelKey) (*schemaNode, error) {
 	if key.Field == nil {
 		shape, known := ignoredKeyShapes[key.Name]
 		if !known {
-			return nil, fmt.Errorf("settingsschema: the loader accepts %q without decoding it, and ignoredKeyShapes does not say what it holds", key.Name)
+			return nil, fmt.Errorf(
+				"settingsschema: the loader accepts %q without decoding it, and ignoredKeyShapes does not say what it holds",
+				key.Name,
+			)
 		}
 		return shape(), nil
 	}
@@ -199,17 +205,25 @@ func typeShape(name string, fieldType reflect.Type) (*schemaNode, error) {
 		return &schemaNode{Type: "string"}, nil
 	case fieldType == stringSliceType:
 		return &schemaNode{Type: "array", Items: &schemaNode{Type: "string"}}, nil
-	case fieldType.Kind() == reflect.Map && fieldType.Key().Kind() == reflect.String && fieldType.Elem().Kind() == reflect.String:
+	case fieldType.Kind() == reflect.Map &&
+		fieldType.Key().Kind() == reflect.String &&
+		fieldType.Elem().Kind() == reflect.String:
 		return &schemaNode{
 			Type:                 "object",
 			AdditionalProperties: &additionalProperties{schema: &schemaNode{Type: "string", MinLength: 1}},
 		}, nil
-	case fieldType.Kind() == reflect.Map && fieldType.Key().Kind() == reflect.String && fieldType.Elem() == configuration.RuleValueType:
+	case fieldType.Kind() == reflect.Map &&
+		fieldType.Key().Kind() == reflect.String &&
+		fieldType.Elem() == configuration.RuleValueType:
 		return &schemaNode{Reference: "#/$defs/rules"}, nil
 	case fieldType.Kind() == reflect.Slice && fieldType.Elem().Kind() == reflect.Struct:
 		return &schemaNode{Type: "array", Items: &schemaNode{Reference: "#/$defs/override"}}, nil
 	}
-	return nil, fmt.Errorf("settingsschema: %q decodes into %s, which the schema has no shape for; teach typeShape", name, fieldType)
+	return nil, fmt.Errorf(
+		"settingsschema: %q decodes into %s, which the schema has no shape for; teach typeShape",
+		name,
+		fieldType,
+	)
 }
 
 // goShape is the Go engine's block, as internal/goengine/settings reads it: rules alone, each a severity or
@@ -287,7 +301,10 @@ func definitions(ruleNames []string) (map[string]*schemaNode, error) {
 		}
 		description, described := overrideDescriptions[field.Name]
 		if !described {
-			return nil, fmt.Errorf("settingsschema: an override accepts %q and nothing describes it; add it to overrideDescriptions", field.Name)
+			return nil, fmt.Errorf(
+				"settingsschema: an override accepts %q and nothing describes it; add it to overrideDescriptions",
+				field.Name,
+			)
 		}
 		shape.Description = description
 		overrideProperties[field.Name] = shape

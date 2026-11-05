@@ -415,10 +415,15 @@ func TestNoImportAssignNeedsTheTypedHarness(test *testing.T) {
 	test.Parallel()
 
 	if !NoImportAssign.NeedsTypeChecker {
-		test.Fatal("the rule no longer declares NeedsTypeChecker, so the fixtures above may be running against a nil checker")
+		test.Fatal(
+			"the rule no longer declares NeedsTypeChecker, so the fixtures above may be running against a nil checker",
+		)
 	}
 	result := rule_testing.Run(test, NoImportAssign, importAssignFile, "import mod from 'mod'; mod = 0")
 	if len(result.Diagnostics) != 0 {
-		test.Fatalf("the untyped harness produced %d findings, so this test no longer proves what it claims", len(result.Diagnostics))
+		test.Fatalf(
+			"the untyped harness produced %d findings, so this test no longer proves what it claims",
+			len(result.Diagnostics),
+		)
 	}
 }

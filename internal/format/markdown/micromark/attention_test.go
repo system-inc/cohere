@@ -128,7 +128,8 @@ var attentionFixtures = []string{
 	"**foo **bar baz**\n",
 	"*foo *bar baz*\n",
 
-	// start and inside: a lone sequence (a `*` or `* ` opening a line would be a list), end of input in the sequence, every length up to past use.
+	// start and inside: a lone sequence (a `*` or `* ` opening a line would be a list), end of input in the sequence,
+	// every length up to past use.
 	"a *",
 	"_",
 	"**",

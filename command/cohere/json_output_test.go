@@ -17,7 +17,15 @@ func TestJSONLines(test *testing.T) {
 	test.Parallel()
 	var out bytes.Buffer
 	stream := bufio.NewWriter(&out)
-	finding := runFinding{Path: "/repo/a.ts", Line: 3, Column: 7, Severity: "error", Rule: "prefer-const", MessageID: "useConst", Message: "Use const."}
+	finding := runFinding{
+		Path:      "/repo/a.ts",
+		Line:      3,
+		Column:    7,
+		Severity:  "error",
+		Rule:      "prefer-const",
+		MessageID: "useConst",
+		Message:   "Use const.",
+	}
 	writeJSONLine(stream, findingAsJSON(finding))
 	for _, line := range changedFilesAsJSON([]changedFile{
 		{Path: "b.ts", Fixed: true, Formatted: true, FixedBy: map[string]int{"prefer-const": 2, "object-shorthand": 1}},
@@ -86,7 +94,9 @@ func TestJSONSummary(test *testing.T) {
 	if !reflect.DeepEqual(decoded, want) {
 		test.Errorf("the summary line:\n got %+v\nwant %+v", decoded, want)
 	}
-	if replay := summaryAsJSON(runSummary{Total: 50 * time.Millisecond, Cache: cacheUse{Replayed: true}}); !replay.Cache.Replayed || replay.Verdict != "pass" {
+	if replay := summaryAsJSON(
+		runSummary{Total: 50 * time.Millisecond, Cache: cacheUse{Replayed: true}},
+	); !replay.Cache.Replayed || replay.Verdict != "pass" {
 		test.Errorf("a replay's summary: %+v", replay)
 	}
 }

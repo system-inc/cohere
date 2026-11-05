@@ -92,7 +92,9 @@ var TypeAwareRules = map[string]bool{
 // match `react-dom`, `@testing-library/react`, and a local `./react-utils`. That over-match would
 // move fixtures out of `VerdictUnresolvableTypes` and into `failed`, inflating the failure count
 // with cases that are really corpus artifacts, an error in the direction that looks like rigor.
-var reactImportPattern = regexp.MustCompile(`(?m)(?:^|\n)\s*import\b[^\n;]*?['"]react['"]|require\(\s*['"]react['"]\s*\)`)
+var reactImportPattern = regexp.MustCompile(
+	`(?m)(?:^|\n)\s*import\b[^\n;]*?['"]react['"]|require\(\s*['"]react['"]\s*\)`,
+)
 
 // hookCallPattern matches a call to something named like a hook.
 var hookCallPattern = regexp.MustCompile(`\buse[A-Z]\w*\s*\(`)

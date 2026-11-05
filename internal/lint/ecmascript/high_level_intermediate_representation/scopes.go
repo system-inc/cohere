@@ -261,7 +261,11 @@ func AssignReactiveScopes(function *Function) *ReactiveScopes {
 // which is upstream's `identifier.mutableRange = scope.range`. The input table is not modified;
 // `MemberRanges` below is the rewritten view, kept separate so a caller can still see what a value's
 // range was before entanglement widened it.
-func AssignReactiveScopesWithSets(function *Function, ranges *mutation_aliasing.MutableRanges, set *DisjointSet) *ReactiveScopes {
+func AssignReactiveScopesWithSets(
+	function *Function,
+	ranges *mutation_aliasing.MutableRanges,
+	set *DisjointSet,
+) *ReactiveScopes {
 	scopes := &ReactiveScopes{}
 	if function == nil || set == nil {
 		return scopes

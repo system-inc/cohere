@@ -98,7 +98,8 @@ func TestStatusShowsTheLandLock(test *testing.T) {
 		}
 		return string(output)
 	}
-	if output := status(); !strings.Contains(output, "land lock: free") || !strings.Contains(output, "land line: 0 waiting") {
+	if output := status(); !strings.Contains(output, "land lock: free") ||
+		!strings.Contains(output, "land line: 0 waiting") {
 		test.Errorf("status does not show a free land lock:\n%s", output)
 	}
 	held, err := takeSlot(land, 1, "landing 1234abcd from a worktree")
@@ -111,7 +112,8 @@ func TestStatusShowsTheLandLock(test *testing.T) {
 		test.Fatal(err)
 	}
 	defer ticket.leave()
-	if output := status(); !strings.Contains(output, "land lock: pid") || !strings.Contains(output, "landing 1234abcd") ||
+	if output := status(); !strings.Contains(output, "land lock: pid") ||
+		!strings.Contains(output, "landing 1234abcd") ||
 		!strings.Contains(output, "land line: 1 waiting") {
 		test.Errorf("status does not show the land lock's holder and its line:\n%s", output)
 	}

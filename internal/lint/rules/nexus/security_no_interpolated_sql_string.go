@@ -18,8 +18,14 @@ const securityNoInterpolatedSqlValueId = "interpolatedSqlValue"
 // The rule's two messages, whose wording lives in `policy/messages/security-no-interpolated-sql-string.json`,
 // the quoted one shared with the Swift twin.
 var (
-	securityNoInterpolatedSqlStringText = policy.MessageOf("nexus/security-no-interpolated-sql-string", securityNoInterpolatedSqlStringId)
-	securityNoInterpolatedSqlValueText  = policy.MessageOf("nexus/security-no-interpolated-sql-string", securityNoInterpolatedSqlValueId)
+	securityNoInterpolatedSqlStringText = policy.MessageOf(
+		"nexus/security-no-interpolated-sql-string",
+		securityNoInterpolatedSqlStringId,
+	)
+	securityNoInterpolatedSqlValueText = policy.MessageOf(
+		"nexus/security-no-interpolated-sql-string",
+		securityNoInterpolatedSqlValueId,
+	)
 )
 
 // SecurityNoInterpolatedSqlString reports a value interpolated inside the single quotes of a SQL string
@@ -190,20 +196,34 @@ var SecurityNoInterpolatedSqlString = rule.Rule{
 				}
 				for _, spanIndex := range quotedSpans {
 					expression := template.TemplateSpans.Nodes[spanIndex].AsTemplateSpan().Expression
-					if !securityNoInterpolatedSqlStringCanHoldQuote(ruleContext.TypeChecker, ruleContext.TypeChecker.GetTypeAtLocation(expression), 0) {
+					if !securityNoInterpolatedSqlStringCanHoldQuote(
+						ruleContext.TypeChecker,
+						ruleContext.TypeChecker.GetTypeAtLocation(expression),
+						0,
+					) {
 						continue
 					}
 					if securityNoInterpolatedSqlStringIsEscaped(ruleContext, expression) {
 						continue
 					}
-					ruleContext.ReportNode(expression, rule.Message{Id: securityNoInterpolatedSqlStringId, Description: securityNoInterpolatedSqlStringText.Render(nil)})
+					ruleContext.ReportNode(expression, rule.Message{
+						Id:          securityNoInterpolatedSqlStringId,
+						Description: securityNoInterpolatedSqlStringText.Render(nil),
+					})
 				}
 				for _, spanIndex := range bareSpans {
 					expression := template.TemplateSpans.Nodes[spanIndex].AsTemplateSpan().Expression
-					if !securityNoInterpolatedSqlStringCanHoldText(ruleContext.TypeChecker, ruleContext.TypeChecker.GetTypeAtLocation(expression), 0) {
+					if !securityNoInterpolatedSqlStringCanHoldText(
+						ruleContext.TypeChecker,
+						ruleContext.TypeChecker.GetTypeAtLocation(expression),
+						0,
+					) {
 						continue
 					}
-					ruleContext.ReportNode(expression, rule.Message{Id: securityNoInterpolatedSqlValueId, Description: securityNoInterpolatedSqlValueText.Render(nil)})
+					ruleContext.ReportNode(expression, rule.Message{
+						Id:          securityNoInterpolatedSqlValueId,
+						Description: securityNoInterpolatedSqlValueText.Render(nil),
+					})
 				}
 			},
 		}
@@ -252,7 +272,8 @@ func securityNoInterpolatedSqlStringReadStatement(texts []string) ([]int, []int)
 	if !certain {
 		return nil, nil
 	}
-	if statement.KeywordCount < 2 && !securityNoInterpolatedSqlStringSelfConfirmingKeywords[securityNoInterpolatedSqlStringLeadingWord(texts[0])] {
+	if statement.KeywordCount < 2 &&
+		!securityNoInterpolatedSqlStringSelfConfirmingKeywords[securityNoInterpolatedSqlStringLeadingWord(texts[0])] {
 		return nil, nil
 	}
 	return statement.QuotedSpans, statement.BareSpans
@@ -286,7 +307,9 @@ func securityNoInterpolatedSqlStringCanHoldText(typeChecker *checker.Checker, va
 			}
 		case flags&checker.TypeFlagsInstantiable != 0:
 			constraint := checker.Checker_getBaseConstraintOfType(typeChecker, part)
-			if constraint == nil || constraint == part || securityNoInterpolatedSqlStringCanHoldText(typeChecker, constraint, depth+1) {
+			if constraint == nil ||
+				constraint == part ||
+				securityNoInterpolatedSqlStringCanHoldText(typeChecker, constraint, depth+1) {
 				return true
 			}
 		}
@@ -392,7 +415,11 @@ func securityNoInterpolatedSqlStringReadString(texts []string, startTextIndex in
 
 // securityNoInterpolatedSqlStringCanHoldQuote says whether a value of this type can print a single
 // quote or a backslash into the text around it. `depth` bounds the walk through template literal holes.
-func securityNoInterpolatedSqlStringCanHoldQuote(typeChecker *checker.Checker, valueType *checker.Type, depth int) bool {
+func securityNoInterpolatedSqlStringCanHoldQuote(
+	typeChecker *checker.Checker,
+	valueType *checker.Type,
+	depth int,
+) bool {
 	if valueType == nil || depth > 8 {
 		return false
 	}
@@ -469,7 +496,8 @@ func securityNoInterpolatedSqlStringIsEscaped(ruleContext rule.Context, expressi
 		return false
 	}
 	initializer := declaration.AsVariableDeclaration().Initializer
-	return initializer != nil && securityNoInterpolatedSqlStringIsEscapeChain(ruleContext, ast.SkipParentheses(initializer))
+	return initializer != nil &&
+		securityNoInterpolatedSqlStringIsEscapeChain(ruleContext, ast.SkipParentheses(initializer))
 }
 
 // securityNoInterpolatedSqlStringIsEscapeChain says whether an expression's last two calls are a

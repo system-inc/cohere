@@ -53,7 +53,9 @@ func TestCompilerRulesLowerEverySyntaxShape(test *testing.T) {
 	for shapeName, shape := range compilerRuleSyntaxShapes {
 		sources := map[string]string{
 			"component": "export function Component(props) {\n  " + shape + "\n  return <div>{props.kind}</div>;\n}\n",
-			"hook":      "export function useShape(props) {\n  " + shape + "\n  return useMemo(() => props.kind, [props.kind]);\n}\n",
+			"hook": "export function useShape(props) {\n  " +
+				shape +
+				"\n  return useMemo(() => props.kind, [props.kind]);\n}\n",
 		}
 		for host, source := range sources {
 			for _, compilerRule := range compilerRulesLoweringEverySyntax {

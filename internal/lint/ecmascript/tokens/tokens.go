@@ -33,7 +33,10 @@ func Of(sourceFile *ast.SourceFile, node *ast.Node) List {
 	var list List
 	tokenScanner := scanner.GetScannerForSourceFile(sourceFile, nodeRange.Pos())
 	for tokenScanner.Token() != ast.KindEndOfFile && tokenScanner.TokenStart() < nodeRange.End() {
-		list = append(list, Token{Kind: tokenScanner.Token(), Start: tokenScanner.TokenStart(), End: tokenScanner.TokenEnd()})
+		list = append(
+			list,
+			Token{Kind: tokenScanner.Token(), Start: tokenScanner.TokenStart(), End: tokenScanner.TokenEnd()},
+		)
 		tokenScanner.Scan()
 	}
 	return list

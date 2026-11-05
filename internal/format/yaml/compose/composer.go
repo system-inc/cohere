@@ -207,7 +207,10 @@ func (composer *Composer) next(token *cst.Token, yield func(*Document) bool) boo
 	case "doc-end":
 		if composer.doc == nil {
 			message := "Unexpected doc-end without preceding document"
-			composer.errors = append(composer.errors, newYAMLParseError(getErrorPos(token), "UNEXPECTED_TOKEN", message))
+			composer.errors = append(
+				composer.errors,
+				newYAMLParseError(getErrorPos(token), "UNEXPECTED_TOKEN", message),
+			)
 			break
 		}
 		composer.doc.Directives.DocEnd = true

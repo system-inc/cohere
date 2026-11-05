@@ -226,7 +226,10 @@ func withoutVCSStamping(environment []string) []string {
 // unkeyed literals of another package's struct passed cohere-dev test and failed plain go vet (#kr2yp54).
 func withEveryVetCheck(arguments []string) []string {
 	for _, argument := range arguments {
-		if argument == "-vet" || argument == "--vet" || strings.HasPrefix(argument, "-vet=") || strings.HasPrefix(argument, "--vet=") {
+		if argument == "-vet" ||
+			argument == "--vet" ||
+			strings.HasPrefix(argument, "-vet=") ||
+			strings.HasPrefix(argument, "--vet=") {
 			return arguments
 		}
 	}

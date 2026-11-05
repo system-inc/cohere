@@ -127,7 +127,11 @@ func oracleParse(test testing.TB, texts []string) []oracleResult {
 		test.Skip("node is not installed; the parse oracle needs it")
 	}
 	script := filepath.Join(test.TempDir(), "parse.mjs")
-	if writeError := os.WriteFile(script, []byte(strings.ReplaceAll(oracleScript, "FORK", forkRoot(test))), 0o644); writeError != nil {
+	if writeError := os.WriteFile(
+		script,
+		[]byte(strings.ReplaceAll(oracleScript, "FORK", forkRoot(test))),
+		0o644,
+	); writeError != nil {
 		test.Fatal(writeError)
 	}
 	results := make([]oracleResult, 0, len(texts))
@@ -215,7 +219,12 @@ func (comparison *comparison) list(path string, name string, mine []*Node, their
 	if mine == nil || theirs == nil {
 		// encoding/json decodes null as a nil slice and [] as an empty one.
 		if (mine == nil) != (theirs == nil) {
-			comparison.differ(path, "%s: one side is null, the other an array (the port's is nil: %v)", name, mine == nil)
+			comparison.differ(
+				path,
+				"%s: one side is null, the other an array (the port's is nil: %v)",
+				name,
+				mine == nil,
+			)
 		}
 		return
 	}
@@ -264,7 +273,8 @@ func (comparison *comparison) node(path string, mine *Node, theirs *jsonNode) {
 	}
 	comparison.point(path, "start", mine.Position.Start, theirs.Position.Start)
 	comparison.point(path, "end", mine.Position.End, theirs.Position.End)
-	if hasLeadingCommentsField(mine.NodeType) != has("leadingComments") || hasTrailingCommentField(mine.NodeType) != has("trailingComment") ||
+	if hasLeadingCommentsField(mine.NodeType) != has("leadingComments") ||
+		hasTrailingCommentField(mine.NodeType) != has("trailingComment") ||
 		hasChildrenField(mine.NodeType) != has("children") {
 		comparison.differ(path, "the port's field predicates disagree with upstream's keys %v", theirs.Keys)
 	}
@@ -312,7 +322,9 @@ func compareParse(text string, expected oracleResult) []string {
 	offsets := newUnitOffsets(text, nil)
 	if expected.Error != nil {
 		if parseError == nil {
-			return []string{fmt.Sprintf("upstream throws %s: %s; the port parses", expected.Error.Name, expected.Error.Message)}
+			return []string{
+				fmt.Sprintf("upstream throws %s: %s; the port parses", expected.Error.Name, expected.Error.Message),
+			}
 		}
 		name, message := "", parseError.Error()
 		var syntaxError *SyntaxError
@@ -324,8 +336,16 @@ func compareParse(text string, expected oracleResult) []string {
 				return []string{"upstream's YAMLSyntaxError has no position"}
 			}
 			want := Position{
-				Start: Point{Line: expected.Error.Position.Start.Line, Column: expected.Error.Position.Start.Column, Offset: offsets.byteOffset(expected.Error.Position.Start.Offset)},
-				End:   Point{Line: expected.Error.Position.End.Line, Column: expected.Error.Position.End.Column, Offset: offsets.byteOffset(expected.Error.Position.End.Offset)},
+				Start: Point{
+					Line:   expected.Error.Position.Start.Line,
+					Column: expected.Error.Position.Start.Column,
+					Offset: offsets.byteOffset(expected.Error.Position.Start.Offset),
+				},
+				End: Point{
+					Line:   expected.Error.Position.End.Line,
+					Column: expected.Error.Position.End.Column,
+					Offset: offsets.byteOffset(expected.Error.Position.End.Offset),
+				},
 			}
 			if syntaxError.Position != want {
 				return []string{fmt.Sprintf("the error's position is %+v, upstream's %+v", syntaxError.Position, want)}
@@ -334,7 +354,13 @@ func compareParse(text string, expected oracleResult) []string {
 			name, message = thrown.Name, thrown.Message
 		}
 		if name != expected.Error.Name || message != expected.Error.Message {
-			return []string{fmt.Sprintf("the port fails with %s: %s; upstream throws %s: %s", name, message, expected.Error.Name, expected.Error.Message)}
+			return []string{fmt.Sprintf(
+				"the port fails with %s: %s; upstream throws %s: %s",
+				name,
+				message,
+				expected.Error.Name,
+				expected.Error.Message,
+			)}
 		}
 		return nil
 	}
@@ -366,7 +392,13 @@ func compareParse(text string, expected oracleResult) []string {
 }
 
 // compareAll parses every text both ways and reports the first few that differ.
-func compareAll(test *testing.T, label string, names []string, texts []string, maximumReported int) (failures int, errored int) {
+func compareAll(
+	test *testing.T,
+	label string,
+	names []string,
+	texts []string,
+	maximumReported int,
+) (failures int, errored int) {
 	test.Helper()
 	expected := oracleParse(test, texts)
 	for index, text := range texts {

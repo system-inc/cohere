@@ -153,7 +153,11 @@ func Register(registrations ...Registration) {
 			panic("rule.Register: a rule was registered with an empty name, so the config could never address it")
 		}
 		decoders := 0
-		for _, set := range []bool{registration.Decode != nil, registration.DecodeOptionList != nil, registration.DecodeAt != nil} {
+		for _, set := range []bool{
+			registration.Decode != nil,
+			registration.DecodeOptionList != nil,
+			registration.DecodeAt != nil,
+		} {
 			if set {
 				decoders++
 			}

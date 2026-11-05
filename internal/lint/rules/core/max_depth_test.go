@@ -43,23 +43,63 @@ func TestMaxDepthFires(test *testing.T) {
 		settings any
 		findings int
 	}{
-		{source: "function foo() { if (true) { if (false) { if (true) { } } } }", settings: maxDepthOf("2"), findings: 1},
-		{source: "var foo = () => { if (true) { if (false) { if (true) { } } } }", settings: maxDepthOf("2"), findings: 1},
+		{
+			source:   "function foo() { if (true) { if (false) { if (true) { } } } }",
+			settings: maxDepthOf("2"),
+			findings: 1,
+		},
+		{
+			source:   "var foo = () => { if (true) { if (false) { if (true) { } } } }",
+			settings: maxDepthOf("2"),
+			findings: 1,
+		},
 		{source: "function foo() { if (true) {} else { for(;;) {} } }", settings: maxDepthOf("1"), findings: 1},
-		{source: "function foo() { if (a) {} else if (b) {} if (c) { if (d) {} } }", settings: maxDepthOf("1"), findings: 1},
+		{
+			source:   "function foo() { if (a) {} else if (b) {} if (c) { if (d) {} } }",
+			settings: maxDepthOf("1"),
+			findings: 1,
+		},
 		{source: "if (a) if (b) {}", settings: maxDepthOf("1"), findings: 1},
 		{source: "function foo() { while (true) { if (true) {} } }", settings: maxDepthOf("1"), findings: 1},
 		{source: "function foo() { if (a) { switch (b) { case 1: foo(); } } }", settings: maxDepthOf("1"), findings: 1},
 		{source: "function foo() { for (let x of foo) { if (true) {} } }", settings: maxDepthOf("1"), findings: 1},
-		{source: "function foo() { while (true) { if (true) { if (false) { } } } }", settings: maxDepthOf("1"), findings: 2},
-		{source: "function foo() { if (true) { if (false) { if (true) { if (false) { if (true) { } } } } } }", settings: nil, findings: 1},
-		{source: "function foo() { if (true) { if (false) { if (true) { } } } }", settings: maxDepthOf("{\"max\": 2}"), findings: 1},
-		{source: "function foo() { if (a) { if (b) { if (c) { if (d) { if (e) {} } } } } }", settings: maxDepthOf("{}"), findings: 1},
+		{
+			source:   "function foo() { while (true) { if (true) { if (false) { } } } }",
+			settings: maxDepthOf("1"),
+			findings: 2,
+		},
+		{
+			source:   "function foo() { if (true) { if (false) { if (true) { if (false) { if (true) { } } } } } }",
+			settings: nil,
+			findings: 1,
+		},
+		{
+			source:   "function foo() { if (true) { if (false) { if (true) { } } } }",
+			settings: maxDepthOf("{\"max\": 2}"),
+			findings: 1,
+		},
+		{
+			source:   "function foo() { if (a) { if (b) { if (c) { if (d) { if (e) {} } } } } }",
+			settings: maxDepthOf("{}"),
+			findings: 1,
+		},
 		{source: "function foo() { if (true) {} }", settings: maxDepthOf("{\"max\": 0}"), findings: 1},
 		{source: "class C { static { if (1) { if (2) { if (3) {} } } } }", settings: maxDepthOf("2"), findings: 1},
-		{source: "if (1) { class C { static { if (1) { if (2) { if (3) {} } } } } }", settings: maxDepthOf("2"), findings: 1},
-		{source: "function foo() { if (1) { class C { static { if (1) { if (2) { if (3) {} } } } } } }", settings: maxDepthOf("2"), findings: 1},
-		{source: "function foo() { if (1) { class C { static { if (1) { if (2) {} } } } if (2) { if (3) {} } } }", settings: maxDepthOf("2"), findings: 1},
+		{
+			source:   "if (1) { class C { static { if (1) { if (2) { if (3) {} } } } } }",
+			settings: maxDepthOf("2"),
+			findings: 1,
+		},
+		{
+			source:   "function foo() { if (1) { class C { static { if (1) { if (2) { if (3) {} } } } } } }",
+			settings: maxDepthOf("2"),
+			findings: 1,
+		},
+		{
+			source:   "function foo() { if (1) { class C { static { if (1) { if (2) {} } } } if (2) { if (3) {} } } }",
+			settings: maxDepthOf("2"),
+			findings: 1,
+		},
 	}
 
 	for _, testCase := range cases {
@@ -88,16 +128,28 @@ func TestMaxDepthStaysSilent(test *testing.T) {
 		settings any
 	}{
 		{source: "function foo() { if (true) { if (false) { if (true) { } } } }", settings: maxDepthOf("3")},
-		{source: "function foo() { if (true) { } else if (false) { } else if (true) { } else if (false) {} }", settings: maxDepthOf("3")},
+		{
+			source:   "function foo() { if (true) { } else if (false) { } else if (true) { } else if (false) {} }",
+			settings: maxDepthOf("3"),
+		},
 		{source: "var foo = () => { if (true) { if (false) { if (true) { } } } }", settings: maxDepthOf("3")},
 		{source: "function foo() { if (true) { if (false) { if (true) { } } } }", settings: nil},
 		{source: "function foo() { if (true) { if (false) { if (true) { } } } }", settings: maxDepthOf("{\"max\": 3}")},
 		{source: "class C { static { if (1) { if (2) {} } } }", settings: maxDepthOf("2")},
 		{source: "class C { static { if (1) { if (2) {} } if (1) { if (2) {} } } }", settings: maxDepthOf("2")},
-		{source: "class C { static { if (1) { if (2) {} } } static { if (1) { if (2) {} } } }", settings: maxDepthOf("2")},
+		{
+			source:   "class C { static { if (1) { if (2) {} } } static { if (1) { if (2) {} } } }",
+			settings: maxDepthOf("2"),
+		},
 		{source: "if (1) { class C { static { if (1) { if (2) {} } } } }", settings: maxDepthOf("2")},
-		{source: "function foo() { if (1) { class C { static { if (1) { if (2) {} } } } } }", settings: maxDepthOf("2")},
-		{source: "function foo() { if (1) { if (2) { class C { static { if (1) { if (2) {} } if (1) { if (2) {} } } } } } if (1) { if (2) {} } }", settings: maxDepthOf("2")},
+		{
+			source:   "function foo() { if (1) { class C { static { if (1) { if (2) {} } } } } }",
+			settings: maxDepthOf("2"),
+		},
+		{
+			source:   "function foo() { if (1) { if (2) { class C { static { if (1) { if (2) {} } if (1) { if (2) {} } } } } } if (1) { if (2) {} } }",
+			settings: maxDepthOf("2"),
+		},
 	}
 
 	for _, testCase := range cases {

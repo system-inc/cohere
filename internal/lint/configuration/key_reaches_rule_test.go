@@ -35,7 +35,9 @@ func TestKeyReachesRuleRunsOneWay(test *testing.T) {
 
 	// The resolver must agree with the predicate on the case that caused the incident.
 	configuration := &Config{Rules: map[string]RuleSetting{"no-unused-vars": {Severity: SeverityError}}}
-	if status, _ := configuration.Resolve("a.ts").StatusOf("@typescript-eslint/no-unused-vars"); status != StatusUnconfigured {
+	if status, _ := configuration.Resolve("a.ts").StatusOf(
+		"@typescript-eslint/no-unused-vars",
+	); status != StatusUnconfigured {
 		test.Errorf("a bare key configured the prefixed rule, status %v", status)
 	}
 }

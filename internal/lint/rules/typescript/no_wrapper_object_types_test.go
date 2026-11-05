@@ -39,8 +39,11 @@ func TestNoWrapperObjectTypesFires(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectFindings(test, rule_testing.Run(test, NoWrapperObjectTypes, wrapperObjectFile, testCase.sourceText),
-				"bannedWrapperObjectType")
+			rule_testing.ExpectFindings(
+				test,
+				rule_testing.Run(test, NoWrapperObjectTypes, wrapperObjectFile, testCase.sourceText),
+				"bannedWrapperObjectType",
+			)
 		})
 	}
 }
@@ -78,7 +81,11 @@ func TestNoWrapperObjectTypesFixesToThePrimitive(test *testing.T) {
 		{"Object", "export let value: Object;\n", "export let value: object;\n"},
 		{"Symbol", "export let value: Symbol;\n", "export let value: symbol;\n"},
 		// The fix replaces only the name, leaving the rest of the annotation intact.
-		{"inside a property type", "export let value: { property: Number };\n", "export let value: { property: number };\n"},
+		{
+			"inside a property type",
+			"export let value: { property: Number };\n",
+			"export let value: { property: number };\n",
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -97,7 +104,12 @@ func TestNoWrapperObjectTypesFixesToThePrimitive(test *testing.T) {
 func TestNoWrapperObjectTypesOffersNoFixForImplements(test *testing.T) {
 	test.Parallel()
 
-	result := rule_testing.Run(test, NoWrapperObjectTypes, wrapperObjectFile, "export class MyClass implements Number {}\n")
+	result := rule_testing.Run(
+		test,
+		NoWrapperObjectTypes,
+		wrapperObjectFile,
+		"export class MyClass implements Number {}\n",
+	)
 	if len(result.Diagnostics) != 1 {
 		test.Fatalf("expected one finding, got %d", len(result.Diagnostics))
 	}
@@ -146,7 +158,10 @@ func TestNoWrapperObjectTypesStaysSilent(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.Run(test, NoWrapperObjectTypes, wrapperObjectFile, testCase.sourceText))
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.Run(test, NoWrapperObjectTypes, wrapperObjectFile, testCase.sourceText),
+			)
 		})
 	}
 }

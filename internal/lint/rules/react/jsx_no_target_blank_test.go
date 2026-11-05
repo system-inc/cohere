@@ -62,139 +62,571 @@ func TestJsxNoTargetBlankFires(test *testing.T) {
 		wantIds    []string
 		wantFixed  string
 	}{
-		{"upstream invalid-0", "<a target=\"_blank\" href=\"https://example.com/1\"></a>", "", []string{"noTargetBlankWithoutNoreferrer"}, "<a target=\"_blank\" href=\"https://example.com/1\" rel=\"noreferrer\"></a>"},
-		{"upstream invalid-1", "<a target=\"_blank\" rel=\"\" href=\"https://example.com/2\"></a>", "", []string{"noTargetBlankWithoutNoreferrer"}, "<a target=\"_blank\" rel=\"noreferrer\" href=\"https://example.com/2\"></a>"},
-		{"upstream invalid-2", "<a target=\"_blank\" rel={0} href=\"https://example.com/3\"></a>", "", []string{"noTargetBlankWithoutNoreferrer"}, "<a target=\"_blank\" rel=\"noreferrer\" href=\"https://example.com/3\"></a>"},
-		{"upstream invalid-3", "<a target=\"_blank\" rel={1} href=\"https://example.com/3\"></a>", "", []string{"noTargetBlankWithoutNoreferrer"}, "<a target=\"_blank\" rel=\"noreferrer\" href=\"https://example.com/3\"></a>"},
-		{"upstream invalid-4", "<a target=\"_blank\" rel={false} href=\"https://example.com/4\"></a>", "", []string{"noTargetBlankWithoutNoreferrer"}, "<a target=\"_blank\" rel=\"noreferrer\" href=\"https://example.com/4\"></a>"},
-		{"upstream invalid-5", "<a target=\"_blank\" rel={null} href=\"https://example.com/5\"></a>", "", []string{"noTargetBlankWithoutNoreferrer"}, "<a target=\"_blank\" rel=\"noreferrer\" href=\"https://example.com/5\"></a>"},
-		{"upstream invalid-6", "<a target=\"_blank\" rel=\"noopenernoreferrer\" href=\"https://example.com/6\"></a>", "", []string{"noTargetBlankWithoutNoreferrer"}, "<a target=\"_blank\" rel=\"noopener noreferrer\" href=\"https://example.com/6\"></a>"},
-		{"upstream invalid-7", "<a target=\"_blank\" rel=\"no referrer\" href=\"https://example.com/7\"></a>", "", []string{"noTargetBlankWithoutNoreferrer"}, "<a target=\"_blank\" rel=\"no referrer noreferrer\" href=\"https://example.com/7\"></a>"},
-		{"upstream invalid-8", "<a target=\"_BLANK\" href=\"https://example.com/8\"></a>", "", []string{"noTargetBlankWithoutNoreferrer"}, "<a target=\"_BLANK\" href=\"https://example.com/8\" rel=\"noreferrer\"></a>"},
-		{"upstream invalid-9", "<a target=\"_blank\" href=\"//example.com/9\"></a>", "", []string{"noTargetBlankWithoutNoreferrer"}, "<a target=\"_blank\" href=\"//example.com/9\" rel=\"noreferrer\"></a>"},
-		{"upstream invalid-10", "<a target=\"_blank\" href=\"//example.com/10\" rel={true}></a>", "", []string{"noTargetBlankWithoutNoreferrer"}, "<a target=\"_blank\" href=\"//example.com/10\" rel=\"noreferrer\"></a>"},
-		{"upstream invalid-11", "<a target=\"_blank\" href=\"//example.com/11\" rel={3}></a>", "", []string{"noTargetBlankWithoutNoreferrer"}, "<a target=\"_blank\" href=\"//example.com/11\" rel=\"noreferrer\"></a>"},
-		{"upstream invalid-12", "<a target=\"_blank\" href=\"//example.com/12\" rel={null}></a>", "", []string{"noTargetBlankWithoutNoreferrer"}, "<a target=\"_blank\" href=\"//example.com/12\" rel=\"noreferrer\"></a>"},
-		{"upstream invalid-13", "<a target=\"_blank\" href=\"//example.com/13\" rel={getRel()}></a>", "", []string{"noTargetBlankWithoutNoreferrer"}, ""},
-		{"upstream invalid-14", "<a target=\"_blank\" href=\"//example.com/14\" rel={\"noopenernoreferrer\"}></a>", "", []string{"noTargetBlankWithoutNoreferrer"}, "<a target=\"_blank\" href=\"//example.com/14\" rel={\"noopener noreferrer\"}></a>"},
-		{"upstream invalid-15", "<a target={\"_blank\"} href={\"//example.com/15\"} rel={\"noopenernoreferrer\"}></a>", "", []string{"noTargetBlankWithoutNoreferrer"}, "<a target={\"_blank\"} href={\"//example.com/15\"} rel={\"noopener noreferrer\"}></a>"},
-		{"upstream invalid-16", "<a target={\"_blank\"} href={\"//example.com/16\"} rel={\"noopenernoreferrernoreferrernoreferrernoreferrernoreferrer\"}></a>", "", []string{"noTargetBlankWithoutNoreferrer"}, "<a target={\"_blank\"} href={\"//example.com/16\"} rel={\"noopener noreferrer\"}></a>"},
-		{"upstream invalid-17", "<a target=\"_blank\" href=\"//example.com/17\" rel></a>", "", []string{"noTargetBlankWithoutNoreferrer"}, "<a target=\"_blank\" href=\"//example.com/17\" rel=\"noreferrer\"></a>"},
-		{"upstream invalid-18", "<a target=\"_blank\" href={ dynamicLink }></a>", "", []string{"noTargetBlankWithoutNoreferrer"}, "<a target=\"_blank\" href={ dynamicLink } rel=\"noreferrer\"></a>"},
-		{"upstream invalid-19", "<a target={'_blank'} href=\"//example.com/18\"></a>", "", []string{"noTargetBlankWithoutNoreferrer"}, "<a target={'_blank'} href=\"//example.com/18\" rel=\"noreferrer\"></a>"},
-		{"upstream invalid-20", "<a target={\"_blank\"} href=\"//example.com/19\"></a>", "", []string{"noTargetBlankWithoutNoreferrer"}, "<a target={\"_blank\"} href=\"//example.com/19\" rel=\"noreferrer\"></a>"},
-		{"upstream invalid-21", "<a href=\"https://example.com/20\" target=\"_blank\" rel></a>", "{\"allowReferrer\": true}", []string{"noTargetBlankWithoutNoopener"}, "<a href=\"https://example.com/20\" target=\"_blank\" rel=\"noopener\"></a>"},
-		{"upstream invalid-22", "<a href=\"https://example.com/20\" target=\"_blank\"></a>", "{\"allowReferrer\": true}", []string{"noTargetBlankWithoutNoopener"}, "<a href=\"https://example.com/20\" target=\"_blank\" rel=\"noopener\"></a>"},
-		{"upstream invalid-23", "<a target=\"_blank\" href={ dynamicLink }></a>", "{\"enforceDynamicLinks\": \"always\"}", []string{"noTargetBlankWithoutNoreferrer"}, "<a target=\"_blank\" href={ dynamicLink } rel=\"noreferrer\"></a>"},
-		{"upstream invalid-24", "<a {...someObject}></a>", "{\"enforceDynamicLinks\": \"always\", \"warnOnSpreadAttributes\": true}", []string{"noTargetBlankWithoutNoreferrer"}, ""},
-		{"upstream invalid-25", "<a {...someObject} target=\"_blank\"></a>", "{\"enforceDynamicLinks\": \"always\", \"warnOnSpreadAttributes\": true}", []string{"noTargetBlankWithoutNoreferrer"}, ""},
-		{"upstream invalid-26", "<a href=\"foobar\" {...someObject} target=\"_blank\"></a>", "{\"enforceDynamicLinks\": \"always\", \"warnOnSpreadAttributes\": true}", []string{"noTargetBlankWithoutNoreferrer"}, ""},
-		{"upstream invalid-27", "<a href=\"foobar\" target=\"_blank\" rel=\"noreferrer\" {...someObject}></a>", "{\"enforceDynamicLinks\": \"always\", \"warnOnSpreadAttributes\": true}", []string{"noTargetBlankWithoutNoreferrer"}, ""},
-		{"upstream invalid-28", "<a href=\"foobar\" target=\"_blank\" {...someObject}></a>", "{\"enforceDynamicLinks\": \"always\", \"warnOnSpreadAttributes\": true}", []string{"noTargetBlankWithoutNoreferrer"}, ""},
-		{"upstream invalid-31", "<a href=\"some-link\" {...otherProps} target=\"some-non-blank-target\"></a>", "{\"warnOnSpreadAttributes\": true}", []string{"noTargetBlankWithoutNoreferrer"}, ""},
-		{"upstream invalid-32", "<a href=\"some-link\" target=\"some-non-blank-target\" {...otherProps}></a>", "{\"warnOnSpreadAttributes\": true}", []string{"noTargetBlankWithoutNoreferrer"}, ""},
-		{"upstream invalid-33", "<a target=\"_blank\" href=\"//example.com\" rel></a>", "{\"links\": true}", []string{"noTargetBlankWithoutNoreferrer"}, "<a target=\"_blank\" href=\"//example.com\" rel=\"noreferrer\"></a>"},
-		{"upstream invalid-34", "<a target=\"_blank\" href=\"//example.com\" rel></a>", "{\"links\": true, \"forms\": true}", []string{"noTargetBlankWithoutNoreferrer"}, "<a target=\"_blank\" href=\"//example.com\" rel=\"noreferrer\"></a>"},
-		{"upstream invalid-35", "<a target=\"_blank\" href=\"//example.com\" rel></a>", "{\"links\": true, \"forms\": false}", []string{"noTargetBlankWithoutNoreferrer"}, "<a target=\"_blank\" href=\"//example.com\" rel=\"noreferrer\"></a>"},
-		{"upstream invalid-36", "<form method=\"POST\" action=\"https://example.com\" target=\"_blank\"></form>", "{\"forms\": true}", []string{"noTargetBlankWithoutNoreferrer"}, ""},
-		{"upstream invalid-37", "<form method=\"POST\" action=\"https://example.com\" rel=\"\" target=\"_blank\"></form>", "{\"forms\": true}", []string{"noTargetBlankWithoutNoreferrer"}, ""},
-		{"upstream invalid-38", "<form method=\"POST\" action=\"https://example.com\" rel=\"noopenernoreferrer\" target=\"_blank\"></form>", "{\"forms\": true}", []string{"noTargetBlankWithoutNoreferrer"}, ""},
-		{"upstream invalid-39", "<form method=\"POST\" action=\"https://example.com\" rel=\"noopenernoreferrer\" target=\"_blank\"></form>", "{\"forms\": true, \"links\": false}", []string{"noTargetBlankWithoutNoreferrer"}, ""},
-		{"upstream invalid-40", "<a href={href} target=\"_blank\" rel={isExternal ? \"undefined\" : \"undefined\"} />", "", []string{"noTargetBlankWithoutNoreferrer"}, ""},
-		{"upstream invalid-41", "<a href={href} target=\"_blank\" rel={isExternal ? \"noopener\" : undefined} />", "", []string{"noTargetBlankWithoutNoreferrer"}, ""},
-		{"upstream invalid-42", "<a href={href} target=\"_blank\" rel={isExternal ? \"undefined\" : \"noopener\"} />", "", []string{"noTargetBlankWithoutNoreferrer"}, ""},
-		{"upstream invalid-43", "<a href={href} target={isExternal ? \"_blank\" : undefined} rel={isExternal ? undefined : \"noopener noreferrer\"} />", "", []string{"noTargetBlankWithoutNoreferrer"}, ""},
-		{"upstream invalid-44", "<a href={href} target=\"_blank\" rel={isExternal ? 3 : \"noopener noreferrer\"} />", "", []string{"noTargetBlankWithoutNoreferrer"}, ""},
-		{"upstream invalid-45", "<a href={href} target=\"_blank\" rel={isExternal ? \"noopener noreferrer\" : \"3\"} />", "", []string{"noTargetBlankWithoutNoreferrer"}, ""},
-		{"upstream invalid-46", "<a href={href} target=\"_blank\" rel={isExternal ? \"noopener\" : \"2\"} />", "{\"allowReferrer\": true}", []string{"noTargetBlankWithoutNoopener"}, ""},
-		{"upstream invalid-47", "<form action={action} target=\"_blank\" />", "{\"allowReferrer\": true, \"forms\": true}", []string{"noTargetBlankWithoutNoopener"}, ""},
-		{"upstream invalid-48", "<form action={action} target=\"_blank\" />", "{\"forms\": true}", []string{"noTargetBlankWithoutNoreferrer"}, ""},
-		{"upstream invalid-49", "<form action={action} {...spread} />", "{\"forms\": true, \"warnOnSpreadAttributes\": true}", []string{"noTargetBlankWithoutNoreferrer"}, ""},
+		{
+			"upstream invalid-0",
+			"<a target=\"_blank\" href=\"https://example.com/1\"></a>",
+			"",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"<a target=\"_blank\" href=\"https://example.com/1\" rel=\"noreferrer\"></a>",
+		},
+		{
+			"upstream invalid-1",
+			"<a target=\"_blank\" rel=\"\" href=\"https://example.com/2\"></a>",
+			"",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"<a target=\"_blank\" rel=\"noreferrer\" href=\"https://example.com/2\"></a>",
+		},
+		{
+			"upstream invalid-2",
+			"<a target=\"_blank\" rel={0} href=\"https://example.com/3\"></a>",
+			"",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"<a target=\"_blank\" rel=\"noreferrer\" href=\"https://example.com/3\"></a>",
+		},
+		{
+			"upstream invalid-3",
+			"<a target=\"_blank\" rel={1} href=\"https://example.com/3\"></a>",
+			"",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"<a target=\"_blank\" rel=\"noreferrer\" href=\"https://example.com/3\"></a>",
+		},
+		{
+			"upstream invalid-4",
+			"<a target=\"_blank\" rel={false} href=\"https://example.com/4\"></a>",
+			"",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"<a target=\"_blank\" rel=\"noreferrer\" href=\"https://example.com/4\"></a>",
+		},
+		{
+			"upstream invalid-5",
+			"<a target=\"_blank\" rel={null} href=\"https://example.com/5\"></a>",
+			"",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"<a target=\"_blank\" rel=\"noreferrer\" href=\"https://example.com/5\"></a>",
+		},
+		{
+			"upstream invalid-6",
+			"<a target=\"_blank\" rel=\"noopenernoreferrer\" href=\"https://example.com/6\"></a>",
+			"",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"<a target=\"_blank\" rel=\"noopener noreferrer\" href=\"https://example.com/6\"></a>",
+		},
+		{
+			"upstream invalid-7",
+			"<a target=\"_blank\" rel=\"no referrer\" href=\"https://example.com/7\"></a>",
+			"",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"<a target=\"_blank\" rel=\"no referrer noreferrer\" href=\"https://example.com/7\"></a>",
+		},
+		{
+			"upstream invalid-8",
+			"<a target=\"_BLANK\" href=\"https://example.com/8\"></a>",
+			"",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"<a target=\"_BLANK\" href=\"https://example.com/8\" rel=\"noreferrer\"></a>",
+		},
+		{
+			"upstream invalid-9",
+			"<a target=\"_blank\" href=\"//example.com/9\"></a>",
+			"",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"<a target=\"_blank\" href=\"//example.com/9\" rel=\"noreferrer\"></a>",
+		},
+		{
+			"upstream invalid-10",
+			"<a target=\"_blank\" href=\"//example.com/10\" rel={true}></a>",
+			"",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"<a target=\"_blank\" href=\"//example.com/10\" rel=\"noreferrer\"></a>",
+		},
+		{
+			"upstream invalid-11",
+			"<a target=\"_blank\" href=\"//example.com/11\" rel={3}></a>",
+			"",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"<a target=\"_blank\" href=\"//example.com/11\" rel=\"noreferrer\"></a>",
+		},
+		{
+			"upstream invalid-12",
+			"<a target=\"_blank\" href=\"//example.com/12\" rel={null}></a>",
+			"",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"<a target=\"_blank\" href=\"//example.com/12\" rel=\"noreferrer\"></a>",
+		},
+		{
+			"upstream invalid-13",
+			"<a target=\"_blank\" href=\"//example.com/13\" rel={getRel()}></a>",
+			"",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"",
+		},
+		{
+			"upstream invalid-14",
+			"<a target=\"_blank\" href=\"//example.com/14\" rel={\"noopenernoreferrer\"}></a>",
+			"",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"<a target=\"_blank\" href=\"//example.com/14\" rel={\"noopener noreferrer\"}></a>",
+		},
+		{
+			"upstream invalid-15",
+			"<a target={\"_blank\"} href={\"//example.com/15\"} rel={\"noopenernoreferrer\"}></a>",
+			"",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"<a target={\"_blank\"} href={\"//example.com/15\"} rel={\"noopener noreferrer\"}></a>",
+		},
+		{
+			"upstream invalid-16",
+			"<a target={\"_blank\"} href={\"//example.com/16\"} rel={\"noopenernoreferrernoreferrernoreferrernoreferrernoreferrer\"}></a>",
+			"",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"<a target={\"_blank\"} href={\"//example.com/16\"} rel={\"noopener noreferrer\"}></a>",
+		},
+		{
+			"upstream invalid-17",
+			"<a target=\"_blank\" href=\"//example.com/17\" rel></a>",
+			"",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"<a target=\"_blank\" href=\"//example.com/17\" rel=\"noreferrer\"></a>",
+		},
+		{
+			"upstream invalid-18",
+			"<a target=\"_blank\" href={ dynamicLink }></a>",
+			"",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"<a target=\"_blank\" href={ dynamicLink } rel=\"noreferrer\"></a>",
+		},
+		{
+			"upstream invalid-19",
+			"<a target={'_blank'} href=\"//example.com/18\"></a>",
+			"",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"<a target={'_blank'} href=\"//example.com/18\" rel=\"noreferrer\"></a>",
+		},
+		{
+			"upstream invalid-20",
+			"<a target={\"_blank\"} href=\"//example.com/19\"></a>",
+			"",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"<a target={\"_blank\"} href=\"//example.com/19\" rel=\"noreferrer\"></a>",
+		},
+		{
+			"upstream invalid-21",
+			"<a href=\"https://example.com/20\" target=\"_blank\" rel></a>",
+			"{\"allowReferrer\": true}",
+			[]string{"noTargetBlankWithoutNoopener"},
+			"<a href=\"https://example.com/20\" target=\"_blank\" rel=\"noopener\"></a>",
+		},
+		{
+			"upstream invalid-22",
+			"<a href=\"https://example.com/20\" target=\"_blank\"></a>",
+			"{\"allowReferrer\": true}",
+			[]string{"noTargetBlankWithoutNoopener"},
+			"<a href=\"https://example.com/20\" target=\"_blank\" rel=\"noopener\"></a>",
+		},
+		{
+			"upstream invalid-23",
+			"<a target=\"_blank\" href={ dynamicLink }></a>",
+			"{\"enforceDynamicLinks\": \"always\"}",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"<a target=\"_blank\" href={ dynamicLink } rel=\"noreferrer\"></a>",
+		},
+		{
+			"upstream invalid-24",
+			"<a {...someObject}></a>",
+			"{\"enforceDynamicLinks\": \"always\", \"warnOnSpreadAttributes\": true}",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"",
+		},
+		{
+			"upstream invalid-25",
+			"<a {...someObject} target=\"_blank\"></a>",
+			"{\"enforceDynamicLinks\": \"always\", \"warnOnSpreadAttributes\": true}",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"",
+		},
+		{
+			"upstream invalid-26",
+			"<a href=\"foobar\" {...someObject} target=\"_blank\"></a>",
+			"{\"enforceDynamicLinks\": \"always\", \"warnOnSpreadAttributes\": true}",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"",
+		},
+		{
+			"upstream invalid-27",
+			"<a href=\"foobar\" target=\"_blank\" rel=\"noreferrer\" {...someObject}></a>",
+			"{\"enforceDynamicLinks\": \"always\", \"warnOnSpreadAttributes\": true}",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"",
+		},
+		{
+			"upstream invalid-28",
+			"<a href=\"foobar\" target=\"_blank\" {...someObject}></a>",
+			"{\"enforceDynamicLinks\": \"always\", \"warnOnSpreadAttributes\": true}",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"",
+		},
+		{
+			"upstream invalid-31",
+			"<a href=\"some-link\" {...otherProps} target=\"some-non-blank-target\"></a>",
+			"{\"warnOnSpreadAttributes\": true}",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"",
+		},
+		{
+			"upstream invalid-32",
+			"<a href=\"some-link\" target=\"some-non-blank-target\" {...otherProps}></a>",
+			"{\"warnOnSpreadAttributes\": true}",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"",
+		},
+		{
+			"upstream invalid-33",
+			"<a target=\"_blank\" href=\"//example.com\" rel></a>",
+			"{\"links\": true}",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"<a target=\"_blank\" href=\"//example.com\" rel=\"noreferrer\"></a>",
+		},
+		{
+			"upstream invalid-34",
+			"<a target=\"_blank\" href=\"//example.com\" rel></a>",
+			"{\"links\": true, \"forms\": true}",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"<a target=\"_blank\" href=\"//example.com\" rel=\"noreferrer\"></a>",
+		},
+		{
+			"upstream invalid-35",
+			"<a target=\"_blank\" href=\"//example.com\" rel></a>",
+			"{\"links\": true, \"forms\": false}",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"<a target=\"_blank\" href=\"//example.com\" rel=\"noreferrer\"></a>",
+		},
+		{
+			"upstream invalid-36",
+			"<form method=\"POST\" action=\"https://example.com\" target=\"_blank\"></form>",
+			"{\"forms\": true}",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"",
+		},
+		{
+			"upstream invalid-37",
+			"<form method=\"POST\" action=\"https://example.com\" rel=\"\" target=\"_blank\"></form>",
+			"{\"forms\": true}",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"",
+		},
+		{
+			"upstream invalid-38",
+			"<form method=\"POST\" action=\"https://example.com\" rel=\"noopenernoreferrer\" target=\"_blank\"></form>",
+			"{\"forms\": true}",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"",
+		},
+		{
+			"upstream invalid-39",
+			"<form method=\"POST\" action=\"https://example.com\" rel=\"noopenernoreferrer\" target=\"_blank\"></form>",
+			"{\"forms\": true, \"links\": false}",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"",
+		},
+		{
+			"upstream invalid-40",
+			"<a href={href} target=\"_blank\" rel={isExternal ? \"undefined\" : \"undefined\"} />",
+			"",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"",
+		},
+		{
+			"upstream invalid-41",
+			"<a href={href} target=\"_blank\" rel={isExternal ? \"noopener\" : undefined} />",
+			"",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"",
+		},
+		{
+			"upstream invalid-42",
+			"<a href={href} target=\"_blank\" rel={isExternal ? \"undefined\" : \"noopener\"} />",
+			"",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"",
+		},
+		{
+			"upstream invalid-43",
+			"<a href={href} target={isExternal ? \"_blank\" : undefined} rel={isExternal ? undefined : \"noopener noreferrer\"} />",
+			"",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"",
+		},
+		{
+			"upstream invalid-44",
+			"<a href={href} target=\"_blank\" rel={isExternal ? 3 : \"noopener noreferrer\"} />",
+			"",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"",
+		},
+		{
+			"upstream invalid-45",
+			"<a href={href} target=\"_blank\" rel={isExternal ? \"noopener noreferrer\" : \"3\"} />",
+			"",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"",
+		},
+		{
+			"upstream invalid-46",
+			"<a href={href} target=\"_blank\" rel={isExternal ? \"noopener\" : \"2\"} />",
+			"{\"allowReferrer\": true}",
+			[]string{"noTargetBlankWithoutNoopener"},
+			"",
+		},
+		{
+			"upstream invalid-47",
+			"<form action={action} target=\"_blank\" />",
+			"{\"allowReferrer\": true, \"forms\": true}",
+			[]string{"noTargetBlankWithoutNoopener"},
+			"",
+		},
+		{
+			"upstream invalid-48",
+			"<form action={action} target=\"_blank\" />",
+			"{\"forms\": true}",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"",
+		},
+		{
+			"upstream invalid-49",
+			"<form action={action} {...spread} />",
+			"{\"forms\": true, \"warnOnSpreadAttributes\": true}",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"",
+		},
 
 		// --- cases upstream does not cover, each measured against the installed build 7.37.5 ---
 
 		// The `_blank` comparison is case-insensitive; upstream lowercases before comparing.
-		{"t1", "<a target='_BLANK' href='http://x.com'></a>", "", []string{"noTargetBlankWithoutNoreferrer"}, "<a target='_BLANK' href='http://x.com' rel=\"noreferrer\"></a>"},
+		{
+			"t1",
+			"<a target='_BLANK' href='http://x.com'></a>",
+			"",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"<a target='_BLANK' href='http://x.com' rel=\"noreferrer\"></a>",
+		},
 
 		// A `mailto:` scheme matches `/^(?:\w+:|\/\/)/` and counts as external. Reads as over-broad
 		// and is upstream's judgment; `tel:` below is the same mechanism.
-		{"t2", "<a target='_blank' href='mailto:a@b.c'></a>", "", []string{"noTargetBlankWithoutNoreferrer"}, "<a target='_blank' href='mailto:a@b.c' rel=\"noreferrer\"></a>"},
+		{
+			"t2",
+			"<a target='_blank' href='mailto:a@b.c'></a>",
+			"",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"<a target='_blank' href='mailto:a@b.c' rel=\"noreferrer\"></a>",
+		},
 
 		// A protocol-relative href, the second half of the same pattern.
-		{"t3", "<a target='_blank' href='//example.com'></a>", "", []string{"noTargetBlankWithoutNoreferrer"}, "<a target='_blank' href='//example.com' rel=\"noreferrer\"></a>"},
+		{
+			"t3",
+			"<a target='_blank' href='//example.com'></a>",
+			"",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"<a target='_blank' href='//example.com' rel=\"noreferrer\"></a>",
+		},
 
 		// The last target decides. `findLastIndex`, not `indexOf`, and a first-match search would call
 		// this clean.
-		{"t4", "<a target='_self' target='_blank' href='http://x.com'></a>", "", []string{"noTargetBlankWithoutNoreferrer"}, "<a target='_self' target='_blank' href='http://x.com' rel=\"noreferrer\"></a>"},
+		{
+			"t4",
+			"<a target='_self' target='_blank' href='http://x.com'></a>",
+			"",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"<a target='_self' target='_blank' href='http://x.com' rel=\"noreferrer\"></a>",
+		},
 
 		// The judgment reads the last rel and the fixer repairs the first. Upstream uses
 		// `findLastIndex` for one and `find` for the other, so this reports on the trailing `rel="x"`
 		// and rewrites the leading `rel="noreferrer"`. Reproduced rather than unified; the fix column
 		// is what pins which one moved.
-		{"t6", "<a href='http://x.com' target='_blank' rel='noreferrer' rel='x'></a>", "", []string{"noTargetBlankWithoutNoreferrer"}, "<a href='http://x.com' target='_blank' rel=\"noreferrer\" rel='x'></a>"},
+		{
+			"t6",
+			"<a href='http://x.com' target='_blank' rel='noreferrer' rel='x'></a>",
+			"",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"<a href='http://x.com' target='_blank' rel=\"noreferrer\" rel='x'></a>",
+		},
 
 		// A template literal with a substitution: only `quasis[0]` is read, which is empty here, so the
 		// trailing `noreferrer` is invisible and this reports. Its substitution-free twin is clean below.
-		{"t8", "<a href='http://x.com' target='_blank' rel={`${x} noreferrer`}></a>", "", []string{"noTargetBlankWithoutNoreferrer"}, ""},
+		{
+			"t8",
+			"<a href='http://x.com' target='_blank' rel={`${x} noreferrer`}></a>",
+			"",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"",
+		},
 
 		// The conditional pairing, wrong branch. Same test as the target, and the branch that pairs with
 		// `_blank` is the insecure one.
-		{"t12", "<a href='http://x.com' target={c ? '_blank' : '_self'} rel={c ? 'x' : 'noreferrer'}></a>", "", []string{"noTargetBlankWithoutNoreferrer"}, ""},
+		{
+			"t12",
+			"<a href='http://x.com' target={c ? '_blank' : '_self'} rel={c ? 'x' : 'noreferrer'}></a>",
+			"",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"",
+		},
 
 		// The conditional pairing declined: the tests differ, so both rel branches must be secure.
-		{"t13", "<a href='http://x.com' target={c ? '_blank' : '_self'} rel={d ? 'noreferrer' : 'x'}></a>", "", []string{"noTargetBlankWithoutNoreferrer"}, ""},
+		{
+			"t13",
+			"<a href='http://x.com' target={c ? '_blank' : '_self'} rel={d ? 'noreferrer' : 'x'}></a>",
+			"",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"",
+		},
 
 		// `rel={undefined}` is an identifier in JavaScript, not a literal, so it misses upstream's
 		// non-string-literal branch and gets no fix. Upstream's own comment names undefined in that
 		// branch and the code cannot reach it. The three literals below do get the fix.
-		{"t14", "<a href='http://x.com' target='_blank' rel={undefined}></a>", "", []string{"noTargetBlankWithoutNoreferrer"}, ""},
-		{"t15", "<a href='http://x.com' target='_blank' rel={null}></a>", "", []string{"noTargetBlankWithoutNoreferrer"}, "<a href='http://x.com' target='_blank' rel=\"noreferrer\"></a>"},
-		{"t16", "<a href='http://x.com' target='_blank' rel={5}></a>", "", []string{"noTargetBlankWithoutNoreferrer"}, "<a href='http://x.com' target='_blank' rel=\"noreferrer\"></a>"},
-		{"t17", "<a href='http://x.com' target='_blank' rel={true}></a>", "", []string{"noTargetBlankWithoutNoreferrer"}, "<a href='http://x.com' target='_blank' rel=\"noreferrer\"></a>"},
+		{
+			"t14",
+			"<a href='http://x.com' target='_blank' rel={undefined}></a>",
+			"",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"",
+		},
+		{
+			"t15",
+			"<a href='http://x.com' target='_blank' rel={null}></a>",
+			"",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"<a href='http://x.com' target='_blank' rel=\"noreferrer\"></a>",
+		},
+		{
+			"t16",
+			"<a href='http://x.com' target='_blank' rel={5}></a>",
+			"",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"<a href='http://x.com' target='_blank' rel=\"noreferrer\"></a>",
+		},
+		{
+			"t17",
+			"<a href='http://x.com' target='_blank' rel={true}></a>",
+			"",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"<a href='http://x.com' target='_blank' rel=\"noreferrer\"></a>",
+		},
 
 		// A bare `rel` with no value: the fix inserts `="noreferrer"` after the attribute.
-		{"t18", "<a href='http://x.com' target='_blank' rel></a>", "", []string{"noTargetBlankWithoutNoreferrer"}, "<a href='http://x.com' target='_blank' rel=\"noreferrer\"></a>"},
+		{
+			"t18",
+			"<a href='http://x.com' target='_blank' rel></a>",
+			"",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"<a href='http://x.com' target='_blank' rel=\"noreferrer\"></a>",
+		},
 
 		// `links: false` changes nothing. `configuration.links` is set by the rule and read nowhere in
 		// its body; both spellings and no options at all report identically. Upstream defect,
 		// reproduced, and this pair is what would fail if a later reader wired it up.
-		{"t19", "<a target='_blank' href='http://x.com'></a>", "{\"links\": false}", []string{"noTargetBlankWithoutNoreferrer"}, "<a target='_blank' href='http://x.com' rel=\"noreferrer\"></a>"},
-		{"t20", "<a target='_blank' href='http://x.com'></a>", "{\"links\": true}", []string{"noTargetBlankWithoutNoreferrer"}, "<a target='_blank' href='http://x.com' rel=\"noreferrer\"></a>"},
+		{
+			"t19",
+			"<a target='_blank' href='http://x.com'></a>",
+			"{\"links\": false}",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"<a target='_blank' href='http://x.com' rel=\"noreferrer\"></a>",
+		},
+		{
+			"t20",
+			"<a target='_blank' href='http://x.com'></a>",
+			"{\"links\": true}",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"<a target='_blank' href='http://x.com' rel=\"noreferrer\"></a>",
+		},
 
 		// A form under `{forms: true, allowReferrer: true}` with `rel="noopener"`. It reports, because
 		// the form arm calls `hasSecureRel(node)` with one argument so `allowReferrer` arrives
 		// undefined inside it, while the message id is chosen outside the call and still switches. So
 		// the finding says noopener would do and noopener did not do. Upstream inconsistency, reproduced.
-		{"t21", "<form target='_blank' action='http://x.com' rel='noopener'></form>", "{\"forms\": true, \"allowReferrer\": true}", []string{"noTargetBlankWithoutNoopener"}, ""},
+		{
+			"t21",
+			"<form target='_blank' action='http://x.com' rel='noopener'></form>",
+			"{\"forms\": true, \"allowReferrer\": true}",
+			[]string{"noTargetBlankWithoutNoopener"},
+			"",
+		},
 
 		// The form arm reports with no fix, where the link arm ships one. The empty fix column is the
 		// assertion.
-		{"t22", "<form target='_blank' action='http://x.com'></form>", "{\"forms\": true}", []string{"noTargetBlankWithoutNoreferrer"}, ""},
+		{
+			"t22",
+			"<form target='_blank' action='http://x.com'></form>",
+			"{\"forms\": true}",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"",
+		},
 
 		// Under `warnOnSpreadAttributes` a `rel` written before a spread stops counting as secure, and
 		// the fix still repairs it. Its flagless twin is clean below.
-		{"t23", "<a rel='noreferrer' {...p} target='_blank' href='http://x.com'></a>", "{\"warnOnSpreadAttributes\": true}", []string{"noTargetBlankWithoutNoreferrer"}, "<a rel=\"noreferrer\" {...p} target='_blank' href='http://x.com'></a>"},
+		{
+			"t23",
+			"<a rel='noreferrer' {...p} target='_blank' href='http://x.com'></a>",
+			"{\"warnOnSpreadAttributes\": true}",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"<a rel=\"noreferrer\" {...p} target='_blank' href='http://x.com'></a>",
+		},
 
 		// A spread and no target at all: `targetIndex` is -1, which is less than the spread index, so
 		// the element is dangerous and the fix is declined.
-		{"t25", "<a {...p} href='http://x.com'></a>", "{\"warnOnSpreadAttributes\": true}", []string{"noTargetBlankWithoutNoreferrer"}, ""},
+		{
+			"t25",
+			"<a {...p} href='http://x.com'></a>",
+			"{\"warnOnSpreadAttributes\": true}",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"",
+		},
 
 		// A target before a spread: reportable under the flag, and the fixer declines because the spread
 		// may be supplying the real target.
-		{"t26", "<a target='_blank' {...p} href='http://x.com'></a>", "{\"warnOnSpreadAttributes\": true}", []string{"noTargetBlankWithoutNoreferrer"}, ""},
+		{
+			"t26",
+			"<a target='_blank' {...p} href='http://x.com'></a>",
+			"{\"warnOnSpreadAttributes\": true}",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"",
+		},
 
 		// A self-closing element. Our parser gives it a distinct kind with no JsxOpeningElement inside,
 		// so a rule listening on only one kind would be silent here.
-		{"t29", "<a target='_blank' href='http://x.com' />", "", []string{"noTargetBlankWithoutNoreferrer"}, "<a target='_blank' href='http://x.com' rel=\"noreferrer\" />"},
-		{"t33", "<a target='_blank' href='tel:123'></a>", "", []string{"noTargetBlankWithoutNoreferrer"}, "<a target='_blank' href='tel:123' rel=\"noreferrer\"></a>"},
+		{
+			"t29",
+			"<a target='_blank' href='http://x.com' />",
+			"",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"<a target='_blank' href='http://x.com' rel=\"noreferrer\" />",
+		},
+		{
+			"t33",
+			"<a target='_blank' href='tel:123'></a>",
+			"",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"<a target='_blank' href='tel:123' rel=\"noreferrer\"></a>",
+		},
 
 		// An empty string in a conditional branch fails upstream's truthiness guard, so only the
 		// `_blank` branch decides and this reports.
-		{"t36", "<a target={c ? '' : '_blank'} href='http://x.com'></a>", "", []string{"noTargetBlankWithoutNoreferrer"}, "<a target={c ? '' : '_blank'} href='http://x.com' rel=\"noreferrer\"></a>"},
+		{
+			"t36",
+			"<a target={c ? '' : '_blank'} href='http://x.com'></a>",
+			"",
+			[]string{"noTargetBlankWithoutNoreferrer"},
+			"<a target={c ? '' : '_blank'} href='http://x.com' rel=\"noreferrer\"></a>",
+		},
 
 		// Under `allowReferrer` the inserted value is `noopener`, not `noreferrer`. Only the two insert
 		// arms read `relValue`; all three replace arms hardcode `noreferrer`.
-		{"t38", "<a target='_blank' href='http://x.com'></a>", "{\"allowReferrer\": true}", []string{"noTargetBlankWithoutNoopener"}, "<a target='_blank' href='http://x.com' rel=\"noopener\"></a>"},
+		{
+			"t38",
+			"<a target='_blank' href='http://x.com'></a>",
+			"{\"allowReferrer\": true}",
+			[]string{"noTargetBlankWithoutNoopener"},
+			"<a target='_blank' href='http://x.com' rel=\"noopener\"></a>",
+		},
 	}
 
 	for _, testCase := range cases {
@@ -251,8 +683,16 @@ func TestJsxNoTargetBlankStaysSilent(test *testing.T) {
 		{"upstream valid-12", "<a href={`foobar`} target={`_blank`} rel={`noreferrer`}></a>", ""},
 		{"upstream valid-13", "<a target=\"_blank\" {...spreadProps} rel=\"noopener noreferrer\"></a>", ""},
 		{"upstream valid-14", "<a target=\"_blank\" {...spreadProps} rel=\"noreferrer\"></a>", ""},
-		{"upstream valid-15", "<a {...spreadProps} target=\"_blank\" rel=\"noopener noreferrer\" href=\"https://example.com\">s</a>", ""},
-		{"upstream valid-16", "<a {...spreadProps} target=\"_blank\" rel=\"noreferrer\" href=\"https://example.com\">s</a>", ""},
+		{
+			"upstream valid-15",
+			"<a {...spreadProps} target=\"_blank\" rel=\"noopener noreferrer\" href=\"https://example.com\">s</a>",
+			"",
+		},
+		{
+			"upstream valid-16",
+			"<a {...spreadProps} target=\"_blank\" rel=\"noreferrer\" href=\"https://example.com\">s</a>",
+			"",
+		},
 		{"upstream valid-17", "<a target=\"_blank\" rel=\"noopener noreferrer\" {...spreadProps}></a>", ""},
 		{"upstream valid-18", "<a target=\"_blank\" rel=\"noreferrer\" {...spreadProps}></a>", ""},
 		{"upstream valid-19", "<p target=\"_blank\"></p>", ""},
@@ -268,39 +708,131 @@ func TestJsxNoTargetBlankStaysSilent(test *testing.T) {
 		{"upstream valid-29", "<a target={'targetValue'} href=\"/absolute/path\"></a>", ""},
 		{"upstream valid-30", "<a target={\"targetValue\"} href=\"/absolute/path\"></a>", ""},
 		{"upstream valid-31", "<a target={null} href=\"//example.com\"></a>", ""},
-		{"upstream valid-32", "<a {...someObject} href=\"/absolute/path\"></a>", "{\"enforceDynamicLinks\": \"always\", \"warnOnSpreadAttributes\": true}"},
-		{"upstream valid-33", "<a {...someObject} rel=\"noreferrer\"></a>", "{\"enforceDynamicLinks\": \"always\", \"warnOnSpreadAttributes\": true}"},
-		{"upstream valid-34", "<a {...someObject} rel=\"noreferrer\" target=\"_blank\"></a>", "{\"enforceDynamicLinks\": \"always\", \"warnOnSpreadAttributes\": true}"},
-		{"upstream valid-35", "<a {...someObject} href=\"foobar\" target=\"_blank\"></a>", "{\"enforceDynamicLinks\": \"always\", \"warnOnSpreadAttributes\": true}"},
+		{
+			"upstream valid-32",
+			"<a {...someObject} href=\"/absolute/path\"></a>",
+			"{\"enforceDynamicLinks\": \"always\", \"warnOnSpreadAttributes\": true}",
+		},
+		{
+			"upstream valid-33",
+			"<a {...someObject} rel=\"noreferrer\"></a>",
+			"{\"enforceDynamicLinks\": \"always\", \"warnOnSpreadAttributes\": true}",
+		},
+		{
+			"upstream valid-34",
+			"<a {...someObject} rel=\"noreferrer\" target=\"_blank\"></a>",
+			"{\"enforceDynamicLinks\": \"always\", \"warnOnSpreadAttributes\": true}",
+		},
+		{
+			"upstream valid-35",
+			"<a {...someObject} href=\"foobar\" target=\"_blank\"></a>",
+			"{\"enforceDynamicLinks\": \"always\", \"warnOnSpreadAttributes\": true}",
+		},
 		{"upstream valid-36", "<a target=\"_blank\" href={ dynamicLink }></a>", "{\"enforceDynamicLinks\": \"never\"}"},
-		{"upstream valid-37", "<a target={\"_blank\"} href={ dynamicLink }></a>", "{\"enforceDynamicLinks\": \"never\"}"},
+		{
+			"upstream valid-37",
+			"<a target={\"_blank\"} href={ dynamicLink }></a>",
+			"{\"enforceDynamicLinks\": \"never\"}",
+		},
 		{"upstream valid-38", "<a target={'_blank'} href={ dynamicLink }></a>", "{\"enforceDynamicLinks\": \"never\"}"},
-		{"upstream valid-39", "<Link target=\"_blank\" href={ dynamicLink }></Link>", "{\"enforceDynamicLinks\": \"never\"}"}, // upstream sets linkComponents; cohere reads no React settings, so this is the unconfigured answer
-		{"upstream valid-40", "<Link target=\"_blank\" to={ dynamicLink }></Link>", "{\"enforceDynamicLinks\": \"never\"}"},   // upstream sets linkComponents; cohere reads no React settings, so this is the unconfigured answer
-		{"upstream valid-41", "<Link target=\"_blank\" to={ dynamicLink }></Link>", "{\"enforceDynamicLinks\": \"never\"}"},   // upstream sets linkComponents; cohere reads no React settings, so this is the unconfigured answer
-		{"upstream valid-42", "<a href=\"foobar\" target=\"_blank\" rel=\"noopener\"></a>", "{\"allowReferrer\": true}"},
-		{"upstream valid-43", "<a href=\"foobar\" target=\"_blank\" rel=\"noreferrer\"></a>", "{\"allowReferrer\": true}"},
+		{
+			"upstream valid-39",
+			"<Link target=\"_blank\" href={ dynamicLink }></Link>",
+			"{\"enforceDynamicLinks\": \"never\"}",
+		}, // upstream sets linkComponents; cohere reads no React settings, so this is the unconfigured answer
+		{
+			"upstream valid-40",
+			"<Link target=\"_blank\" to={ dynamicLink }></Link>",
+			"{\"enforceDynamicLinks\": \"never\"}",
+		}, // upstream sets linkComponents; cohere reads no React settings, so this is the unconfigured answer
+		{
+			"upstream valid-41",
+			"<Link target=\"_blank\" to={ dynamicLink }></Link>",
+			"{\"enforceDynamicLinks\": \"never\"}",
+		}, // upstream sets linkComponents; cohere reads no React settings, so this is the unconfigured answer
+		{
+			"upstream valid-42",
+			"<a href=\"foobar\" target=\"_blank\" rel=\"noopener\"></a>",
+			"{\"allowReferrer\": true}",
+		},
+		{
+			"upstream valid-43",
+			"<a href=\"foobar\" target=\"_blank\" rel=\"noreferrer\"></a>",
+			"{\"allowReferrer\": true}",
+		},
 		{"upstream valid-44", "<a target={3} />", ""},
 		{"upstream valid-45", "<a href=\"some-link\" {...otherProps} target=\"some-non-blank-target\"></a>", ""},
 		{"upstream valid-46", "<a href=\"some-link\" target=\"some-non-blank-target\" {...otherProps}></a>", ""},
 		{"upstream valid-47", "<a target=\"_blank\" href=\"/absolute/path\"></a>", "{\"forms\": false}"},
-		{"upstream valid-48", "<a target=\"_blank\" href=\"/absolute/path\"></a>", "{\"forms\": false, \"links\": true}"},
+		{
+			"upstream valid-48",
+			"<a target=\"_blank\" href=\"/absolute/path\"></a>",
+			"{\"forms\": false, \"links\": true}",
+		},
 		{"upstream valid-49", "<form action=\"https://example.com\" target=\"_blank\"></form>", ""},
-		{"upstream valid-50", "<form action=\"https://example.com\" target=\"_blank\" rel=\"noopener noreferrer\"></form>", "{\"forms\": true}"},
-		{"upstream valid-51", "<form action=\"https://example.com\" target=\"_blank\" rel=\"noopener noreferrer\"></form>", "{\"forms\": true, \"links\": false}"},
+		{
+			"upstream valid-50",
+			"<form action=\"https://example.com\" target=\"_blank\" rel=\"noopener noreferrer\"></form>",
+			"{\"forms\": true}",
+		},
+		{
+			"upstream valid-51",
+			"<form action=\"https://example.com\" target=\"_blank\" rel=\"noopener noreferrer\"></form>",
+			"{\"forms\": true, \"links\": false}",
+		},
 		{"upstream valid-52", "<a href target=\"_blank\"/>", ""},
-		{"upstream valid-53", "<a href={href} target={isExternal ? \"_blank\" : undefined} rel=\"noopener noreferrer\" />", ""},
-		{"upstream valid-54", "<a href={href} target={isExternal ? undefined : \"_blank\"} rel={isExternal ? \"noreferrer\" : \"noopener noreferrer\"} />", ""},
-		{"upstream valid-55", "<a href={href} target={isExternal ? undefined : \"_blank\"} rel={isExternal ? \"noreferrer noopener\" : \"noreferrer\"} />", ""},
-		{"upstream valid-56", "<a href={href} target=\"_blank\" rel={isExternal ? \"noreferrer\" : \"noopener\"} />", "{\"allowReferrer\": true}"},
-		{"upstream valid-57", "<a href={href} target={isExternal ? \"_blank\" : undefined} rel={isExternal ? \"noreferrer\" : undefined} />", ""},
-		{"upstream valid-58", "<a href={href} target={isSelf ? \"_self\" : \"_blank\"} rel={isSelf ? undefined : \"noreferrer\"} />", ""},
-		{"upstream valid-59", "<a href={href} target={isSelf ? \"_self\" : \"\"} rel={isSelf ? undefined : \"\"} />", ""},
-		{"upstream valid-60", "<a href={href} target={isExternal ? \"_blank\" : undefined} rel={isExternal ? \"noopener noreferrer\" : undefined} />", ""},
+		{
+			"upstream valid-53",
+			"<a href={href} target={isExternal ? \"_blank\" : undefined} rel=\"noopener noreferrer\" />",
+			"",
+		},
+		{
+			"upstream valid-54",
+			"<a href={href} target={isExternal ? undefined : \"_blank\"} rel={isExternal ? \"noreferrer\" : \"noopener noreferrer\"} />",
+			"",
+		},
+		{
+			"upstream valid-55",
+			"<a href={href} target={isExternal ? undefined : \"_blank\"} rel={isExternal ? \"noreferrer noopener\" : \"noreferrer\"} />",
+			"",
+		},
+		{
+			"upstream valid-56",
+			"<a href={href} target=\"_blank\" rel={isExternal ? \"noreferrer\" : \"noopener\"} />",
+			"{\"allowReferrer\": true}",
+		},
+		{
+			"upstream valid-57",
+			"<a href={href} target={isExternal ? \"_blank\" : undefined} rel={isExternal ? \"noreferrer\" : undefined} />",
+			"",
+		},
+		{
+			"upstream valid-58",
+			"<a href={href} target={isSelf ? \"_self\" : \"_blank\"} rel={isSelf ? undefined : \"noreferrer\"} />",
+			"",
+		},
+		{
+			"upstream valid-59",
+			"<a href={href} target={isSelf ? \"_self\" : \"\"} rel={isSelf ? undefined : \"\"} />",
+			"",
+		},
+		{
+			"upstream valid-60",
+			"<a href={href} target={isExternal ? \"_blank\" : undefined} rel={isExternal ? \"noopener noreferrer\" : undefined} />",
+			"",
+		},
 		{"upstream valid-61", "<form action={action} />", "{\"forms\": true}"},
 		{"upstream valid-62", "<form action={action} {...spread} />", "{\"forms\": true}"},
-		{"upstream invalid-29", "<Link target=\"_blank\" href={ dynamicLink }></Link>", "{\"enforceDynamicLinks\": \"always\"}"}, // upstream sets linkComponents; cohere reads no React settings, so this is the unconfigured answer
-		{"upstream invalid-30", "<Link target=\"_blank\" to={ dynamicLink }></Link>", "{\"enforceDynamicLinks\": \"always\"}"},   // upstream sets linkComponents; cohere reads no React settings, so this is the unconfigured answer
+		{
+			"upstream invalid-29",
+			"<Link target=\"_blank\" href={ dynamicLink }></Link>",
+			"{\"enforceDynamicLinks\": \"always\"}",
+		}, // upstream sets linkComponents; cohere reads no React settings, so this is the unconfigured answer
+		{
+			"upstream invalid-30",
+			"<Link target=\"_blank\" to={ dynamicLink }></Link>",
+			"{\"enforceDynamicLinks\": \"always\"}",
+		}, // upstream sets linkComponents; cohere reads no React settings, so this is the unconfigured answer
 
 		// --- cases upstream does not cover, each measured against the installed build 7.37.5 ---
 
@@ -463,7 +995,9 @@ func TestDecodeJsxNoTargetBlankOptions(test *testing.T) {
 		})
 	}
 
-	if _, decodeJsxNoTargetBlankOptionsError := DecodeJsxNoTargetBlankOptions([]byte("not json")); decodeJsxNoTargetBlankOptionsError == nil {
+	if _, decodeJsxNoTargetBlankOptionsError := DecodeJsxNoTargetBlankOptions(
+		[]byte("not json"),
+	); decodeJsxNoTargetBlankOptionsError == nil {
 		test.Error("malformed input should error rather than silently producing defaults")
 	}
 }

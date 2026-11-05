@@ -114,7 +114,12 @@ func TestVerifyOptionalParityFires(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			source := verifyDecoratorPreamble + testCase.source
-			result := rule_testing.RunTyped(test, CorrectnessRequireVerifyOptionalParity, correctnessRequireVerifyOptionalParityFile, source)
+			result := rule_testing.RunTyped(
+				test,
+				CorrectnessRequireVerifyOptionalParity,
+				correctnessRequireVerifyOptionalParityFile,
+				source,
+			)
 			rule_testing.ExpectFindings(test, result, testCase.messageId)
 
 			// The span. Upstream reports the property's key rather than the whole property, so a

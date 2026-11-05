@@ -25,7 +25,9 @@ func TestARetiredGraphRecordsNothing(test *testing.T) {
 	backgroundContext := context.Background()
 	build := func() *program.Graph {
 		test.Helper()
-		graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+		graph, buildError := program.Build(
+			program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory},
+		)
 		if buildError != nil {
 			test.Fatalf("building: %v", buildError)
 		}

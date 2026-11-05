@@ -44,62 +44,188 @@ func TestRestrictTemplateExpressionsStaysSilent(test *testing.T) {
 		{sourceText: "\nconst arg = 'foo';\nconst msg = `arg = ${arg}`;\n    ", wire: ""},
 		{sourceText: "\nconst arg = 'foo';\nconst msg = `arg = ${arg || 'default'}`;\n    ", wire: ""},
 		{sourceText: "\nfunction test<T extends string>(arg: T) {\n  return `arg = ${arg}`;\n}\n    ", wire: ""},
-		{sourceText: "\nfunction test<T extends string & { _kind: 'MyBrandedString' }>(arg: T) {\n  return `arg = ${arg}`;\n}\n    ", wire: ""},
+		{
+			sourceText: "\nfunction test<T extends string & { _kind: 'MyBrandedString' }>(arg: T) {\n  return `arg = ${arg}`;\n}\n    ",
+			wire:       "",
+		},
 		{sourceText: "\ntag`arg = ${null}`;\n    ", wire: ""},
 		{sourceText: "\nconst arg = {};\ntag`arg = ${arg}`;\n    ", wire: ""},
 		{sourceText: "\nconst arg = 123;\nconst msg = `arg = ${arg}`;\n      ", wire: "{\"allowNumber\": true}"},
-		{sourceText: "\nconst arg = 123;\nconst msg = `arg = ${arg || 'default'}`;\n      ", wire: "{\"allowNumber\": true}"},
-		{sourceText: "\nconst arg = 123n;\nconst msg = `arg = ${arg || 'default'}`;\n      ", wire: "{\"allowNumber\": true}"},
-		{sourceText: "\nfunction test<T extends number>(arg: T) {\n  return `arg = ${arg}`;\n}\n      ", wire: "{\"allowNumber\": true}"},
-		{sourceText: "\nfunction test<T extends number & { _kind: 'MyBrandedNumber' }>(arg: T) {\n  return `arg = ${arg}`;\n}\n      ", wire: "{\"allowNumber\": true}"},
-		{sourceText: "\nfunction test<T extends bigint>(arg: T) {\n  return `arg = ${arg}`;\n}\n      ", wire: "{\"allowNumber\": true}"},
-		{sourceText: "\nfunction test<T extends string | number>(arg: T) {\n  return `arg = ${arg}`;\n}\n      ", wire: "{\"allowNumber\": true}"},
+		{
+			sourceText: "\nconst arg = 123;\nconst msg = `arg = ${arg || 'default'}`;\n      ",
+			wire:       "{\"allowNumber\": true}",
+		},
+		{
+			sourceText: "\nconst arg = 123n;\nconst msg = `arg = ${arg || 'default'}`;\n      ",
+			wire:       "{\"allowNumber\": true}",
+		},
+		{
+			sourceText: "\nfunction test<T extends number>(arg: T) {\n  return `arg = ${arg}`;\n}\n      ",
+			wire:       "{\"allowNumber\": true}",
+		},
+		{
+			sourceText: "\nfunction test<T extends number & { _kind: 'MyBrandedNumber' }>(arg: T) {\n  return `arg = ${arg}`;\n}\n      ",
+			wire:       "{\"allowNumber\": true}",
+		},
+		{
+			sourceText: "\nfunction test<T extends bigint>(arg: T) {\n  return `arg = ${arg}`;\n}\n      ",
+			wire:       "{\"allowNumber\": true}",
+		},
+		{
+			sourceText: "\nfunction test<T extends string | number>(arg: T) {\n  return `arg = ${arg}`;\n}\n      ",
+			wire:       "{\"allowNumber\": true}",
+		},
 		{sourceText: "\nconst arg = true;\nconst msg = `arg = ${arg}`;\n      ", wire: "{\"allowBoolean\": true}"},
-		{sourceText: "\nconst arg = true;\nconst msg = `arg = ${arg || 'default'}`;\n      ", wire: "{\"allowBoolean\": true}"},
-		{sourceText: "\nfunction test<T extends boolean>(arg: T) {\n  return `arg = ${arg}`;\n}\n      ", wire: "{\"allowBoolean\": true}"},
-		{sourceText: "\nfunction test<T extends string | boolean>(arg: T) {\n  return `arg = ${arg}`;\n}\n      ", wire: "{\"allowBoolean\": true}"},
+		{
+			sourceText: "\nconst arg = true;\nconst msg = `arg = ${arg || 'default'}`;\n      ",
+			wire:       "{\"allowBoolean\": true}",
+		},
+		{
+			sourceText: "\nfunction test<T extends boolean>(arg: T) {\n  return `arg = ${arg}`;\n}\n      ",
+			wire:       "{\"allowBoolean\": true}",
+		},
+		{
+			sourceText: "\nfunction test<T extends string | boolean>(arg: T) {\n  return `arg = ${arg}`;\n}\n      ",
+			wire:       "{\"allowBoolean\": true}",
+		},
 		{sourceText: "\nconst arg = [];\nconst msg = `arg = ${arg}`;\n      ", wire: "{\"allowArray\": true}"},
-		{sourceText: "\nconst arg = [];\nconst msg = `arg = ${arg || 'default'}`;\n      ", wire: "{\"allowArray\": true}"},
-		{sourceText: "\nfunction test<T extends string[]>(arg: T) {\n  return `arg = ${arg}`;\n}\n      ", wire: "{\"allowArray\": true}"},
-		{sourceText: "\ndeclare const arg: [number, string];\nconst msg = `arg = ${arg}`;\n      ", wire: "{\"allowArray\": true}"},
-		{sourceText: "\nconst arg = [1, 'a'] as const;\nconst msg = `arg = ${arg || 'default'}`;\n      ", wire: "{\"allowArray\": true}"},
-		{sourceText: "\nfunction test<T extends [string, string]>(arg: T) {\n  return `arg = ${arg}`;\n}\n      ", wire: "{\"allowArray\": true}"},
-		{sourceText: "\ndeclare const arg: [number | undefined, string];\nconst msg = `arg = ${arg}`;\n      ", wire: "{\"allowArray\": true, \"allowNullish\": true}"},
-		{sourceText: "\ndeclare const arg: string[][];\nconst msg = `arg = ${arg}`;\n      ", wire: "{\"allowArray\": true}"},
-		{sourceText: "\ndeclare const arg: never[];\nconst msg = `arg = ${arg}`;\n      ", wire: "{\"allowArray\": true, \"allowNever\": true}"},
-		{sourceText: "\ndeclare const arg: any[];\nconst msg = `arg = ${arg}`;\n      ", wire: "{\"allowAny\": true, \"allowArray\": true}"},
+		{
+			sourceText: "\nconst arg = [];\nconst msg = `arg = ${arg || 'default'}`;\n      ",
+			wire:       "{\"allowArray\": true}",
+		},
+		{
+			sourceText: "\nfunction test<T extends string[]>(arg: T) {\n  return `arg = ${arg}`;\n}\n      ",
+			wire:       "{\"allowArray\": true}",
+		},
+		{
+			sourceText: "\ndeclare const arg: [number, string];\nconst msg = `arg = ${arg}`;\n      ",
+			wire:       "{\"allowArray\": true}",
+		},
+		{
+			sourceText: "\nconst arg = [1, 'a'] as const;\nconst msg = `arg = ${arg || 'default'}`;\n      ",
+			wire:       "{\"allowArray\": true}",
+		},
+		{
+			sourceText: "\nfunction test<T extends [string, string]>(arg: T) {\n  return `arg = ${arg}`;\n}\n      ",
+			wire:       "{\"allowArray\": true}",
+		},
+		{
+			sourceText: "\ndeclare const arg: [number | undefined, string];\nconst msg = `arg = ${arg}`;\n      ",
+			wire:       "{\"allowArray\": true, \"allowNullish\": true}",
+		},
+		{
+			sourceText: "\ndeclare const arg: string[][];\nconst msg = `arg = ${arg}`;\n      ",
+			wire:       "{\"allowArray\": true}",
+		},
+		{
+			sourceText: "\ndeclare const arg: never[];\nconst msg = `arg = ${arg}`;\n      ",
+			wire:       "{\"allowArray\": true, \"allowNever\": true}",
+		},
+		{
+			sourceText: "\ndeclare const arg: any[];\nconst msg = `arg = ${arg}`;\n      ",
+			wire:       "{\"allowAny\": true, \"allowArray\": true}",
+		},
 		{sourceText: "\nconst arg: any = 123;\nconst msg = `arg = ${arg}`;\n      ", wire: "{\"allowAny\": true}"},
-		{sourceText: "\nconst arg: any = undefined;\nconst msg = `arg = ${arg || 'some-default'}`;\n      ", wire: "{\"allowAny\": true}"},
-		{sourceText: "\nconst user = JSON.parse('{ \"name\": \"foo\" }');\nconst msg = `arg = ${user.name}`;\n      ", wire: "{\"allowAny\": true}"},
-		{sourceText: "\nconst user = JSON.parse('{ \"name\": \"foo\" }');\nconst msg = `arg = ${user.name || 'the user with no name'}`;\n      ", wire: "{\"allowAny\": true}"},
+		{
+			sourceText: "\nconst arg: any = undefined;\nconst msg = `arg = ${arg || 'some-default'}`;\n      ",
+			wire:       "{\"allowAny\": true}",
+		},
+		{
+			sourceText: "\nconst user = JSON.parse('{ \"name\": \"foo\" }');\nconst msg = `arg = ${user.name}`;\n      ",
+			wire:       "{\"allowAny\": true}",
+		},
+		{
+			sourceText: "\nconst user = JSON.parse('{ \"name\": \"foo\" }');\nconst msg = `arg = ${user.name || 'the user with no name'}`;\n      ",
+			wire:       "{\"allowAny\": true}",
+		},
 		{sourceText: "\nconst arg = null;\nconst msg = `arg = ${arg}`;\n      ", wire: "{\"allowNullish\": true}"},
-		{sourceText: "\ndeclare const arg: string | null | undefined;\nconst msg = `arg = ${arg}`;\n      ", wire: "{\"allowNullish\": true}"},
-		{sourceText: "\nfunction test<T extends null | undefined>(arg: T) {\n  return `arg = ${arg}`;\n}\n      ", wire: "{\"allowNullish\": true}"},
-		{sourceText: "\nfunction test<T extends string | null>(arg: T) {\n  return `arg = ${arg}`;\n}\n      ", wire: "{\"allowNullish\": true}"},
-		{sourceText: "\nconst arg = new RegExp('foo');\nconst msg = `arg = ${arg}`;\n      ", wire: "{\"allowRegExp\": true}"},
+		{
+			sourceText: "\ndeclare const arg: string | null | undefined;\nconst msg = `arg = ${arg}`;\n      ",
+			wire:       "{\"allowNullish\": true}",
+		},
+		{
+			sourceText: "\nfunction test<T extends null | undefined>(arg: T) {\n  return `arg = ${arg}`;\n}\n      ",
+			wire:       "{\"allowNullish\": true}",
+		},
+		{
+			sourceText: "\nfunction test<T extends string | null>(arg: T) {\n  return `arg = ${arg}`;\n}\n      ",
+			wire:       "{\"allowNullish\": true}",
+		},
+		{
+			sourceText: "\nconst arg = new RegExp('foo');\nconst msg = `arg = ${arg}`;\n      ",
+			wire:       "{\"allowRegExp\": true}",
+		},
 		{sourceText: "\nconst arg = /foo/;\nconst msg = `arg = ${arg}`;\n      ", wire: "{\"allowRegExp\": true}"},
-		{sourceText: "\ndeclare const arg: string | RegExp;\nconst msg = `arg = ${arg}`;\n      ", wire: "{\"allowRegExp\": true}"},
-		{sourceText: "\nfunction test<T extends RegExp>(arg: T) {\n  return `arg = ${arg}`;\n}\n      ", wire: "{\"allowRegExp\": true}"},
-		{sourceText: "\nfunction test<T extends string | RegExp>(arg: T) {\n  return `arg = ${arg}`;\n}\n      ", wire: "{\"allowRegExp\": true}"},
-		{sourceText: "\ndeclare const value: never;\nconst stringy = `${value}`;\n      ", wire: "{\"allowNever\": true}"},
-		{sourceText: "\nconst arg = 'hello';\nconst msg = typeof arg === 'string' ? arg : `arg = ${arg}`;\n      ", wire: "{\"allowNever\": true}"},
-		{sourceText: "\nfunction test(arg: 'one' | 'two') {\n  switch (arg) {\n    case 'one':\n      return 1;\n    case 'two':\n      return 2;\n    default:\n      throw new Error(`Unrecognised arg: ${arg}`);\n  }\n}\n      ", wire: "{\"allowNever\": true}"},
-		{sourceText: "\n// more variants may be added to Foo in the future\ntype Foo = { type: 'a'; value: number };\n\nfunction checkFoosAreMatching(foo1: Foo, foo2: Foo) {\n  if (foo1.type !== foo2.type) {\n    // since Foo currently only has one variant, this code is never run, and `foo1.type` has type `never`.\n    throw new Error(`expected ${foo1.type}, found ${foo2.type}`);\n  }\n}\n      ", wire: "{\"allowNever\": true}"},
-		{sourceText: "\ntype All = string | number | boolean | null | undefined | RegExp | never;\nfunction test<T extends All>(arg: T) {\n  return `arg = ${arg}`;\n}\n      ", wire: "{\"allowBoolean\": true, \"allowNever\": true, \"allowNullish\": true, \"allowNumber\": true, \"allowRegExp\": true}"},
-		{sourceText: "const msg = `arg = ${Promise.resolve()}`;", wire: "{\"allow\": [{\"from\": \"lib\", \"name\": \"Promise\"}]}"},
+		{
+			sourceText: "\ndeclare const arg: string | RegExp;\nconst msg = `arg = ${arg}`;\n      ",
+			wire:       "{\"allowRegExp\": true}",
+		},
+		{
+			sourceText: "\nfunction test<T extends RegExp>(arg: T) {\n  return `arg = ${arg}`;\n}\n      ",
+			wire:       "{\"allowRegExp\": true}",
+		},
+		{
+			sourceText: "\nfunction test<T extends string | RegExp>(arg: T) {\n  return `arg = ${arg}`;\n}\n      ",
+			wire:       "{\"allowRegExp\": true}",
+		},
+		{
+			sourceText: "\ndeclare const value: never;\nconst stringy = `${value}`;\n      ",
+			wire:       "{\"allowNever\": true}",
+		},
+		{
+			sourceText: "\nconst arg = 'hello';\nconst msg = typeof arg === 'string' ? arg : `arg = ${arg}`;\n      ",
+			wire:       "{\"allowNever\": true}",
+		},
+		{
+			sourceText: "\nfunction test(arg: 'one' | 'two') {\n  switch (arg) {\n    case 'one':\n      return 1;\n    case 'two':\n      return 2;\n    default:\n      throw new Error(`Unrecognised arg: ${arg}`);\n  }\n}\n      ",
+			wire:       "{\"allowNever\": true}",
+		},
+		{
+			sourceText: "\n// more variants may be added to Foo in the future\ntype Foo = { type: 'a'; value: number };\n\nfunction checkFoosAreMatching(foo1: Foo, foo2: Foo) {\n  if (foo1.type !== foo2.type) {\n    // since Foo currently only has one variant, this code is never run, and `foo1.type` has type `never`.\n    throw new Error(`expected ${foo1.type}, found ${foo2.type}`);\n  }\n}\n      ",
+			wire:       "{\"allowNever\": true}",
+		},
+		{
+			sourceText: "\ntype All = string | number | boolean | null | undefined | RegExp | never;\nfunction test<T extends All>(arg: T) {\n  return `arg = ${arg}`;\n}\n      ",
+			wire:       "{\"allowBoolean\": true, \"allowNever\": true, \"allowNullish\": true, \"allowNumber\": true, \"allowRegExp\": true}",
+		},
+		{
+			sourceText: "const msg = `arg = ${Promise.resolve()}`;",
+			wire:       "{\"allow\": [{\"from\": \"lib\", \"name\": \"Promise\"}]}",
+		},
 		{sourceText: "const msg = `arg = ${new Error()}`;", wire: ""},
 		{sourceText: "const msg = `arg = ${false}`;", wire: ""},
 		{sourceText: "const msg = `arg = ${null}`;", wire: ""},
 		{sourceText: "const msg = `arg = ${undefined}`;", wire: ""},
 		{sourceText: "const msg = `arg = ${123}`;", wire: ""},
 		{sourceText: "const msg = `arg = ${'abc'}`;", wire: ""},
-		{sourceText: "\nclass Base {}\nclass Derived extends Base {}\nconst foo = new Base();\nconst bar = new Derived();\n`${foo}${bar}`;\n      ", wire: "{\"allow\": [{\"from\": \"file\", \"name\": \"Base\"}]}"},
-		{sourceText: "\nclass Base {}\nclass Derived extends Base {}\nclass DerivedTwice extends Derived {}\nconst value = new DerivedTwice();\n`${value}`;\n      ", wire: "{\"allow\": [{\"from\": \"file\", \"name\": \"Base\"}]}"},
-		{sourceText: "\ninterface Base {\n  value: string;\n}\ninterface Derived extends Base {\n  extra: number;\n}\ndeclare const obj: Derived;\n`${obj}`;\n      ", wire: "{\"allow\": [{\"from\": \"file\", \"name\": \"Base\"}]}"},
-		{sourceText: "\ninterface Base {\n  value: string;\n}\ninterface Other {\n  other: number;\n}\ninterface Derived extends Base, Other {\n  extra: boolean;\n}\ndeclare const obj: Derived;\n`${obj}`;\n      ", wire: "{\"allow\": [{\"from\": \"file\", \"name\": \"Base\"}]}"},
-		{sourceText: "\ninterface Base {\n  value: string;\n}\ninterface Other {\n  other: number;\n}\ninterface Derived extends Base, Other {\n  extra: boolean;\n}\ndeclare const obj: Derived;\n`${obj}`;\n      ", wire: "{\"allow\": [{\"from\": \"file\", \"name\": \"Other\"}]}"},
-		{sourceText: "\ninterface Root {\n  root: string;\n}\ninterface Another {\n  another: string;\n}\ninterface Base extends Root, Another {\n  value: string;\n}\ninterface Other {\n  other: number;\n}\ninterface Derived extends Base, Other {\n  extra: boolean;\n}\ndeclare const obj: Derived;\n`${obj}`;\n      ", wire: "{\"allow\": [{\"from\": \"file\", \"name\": \"Another\"}]}"},
-		{sourceText: "\ntype Custom = { value: string };\ndeclare const obj: Custom;\n`${obj}`;\n      ", wire: "{\"allow\": [{\"from\": \"file\", \"name\": \"Custom\"}]}"},
+		{
+			sourceText: "\nclass Base {}\nclass Derived extends Base {}\nconst foo = new Base();\nconst bar = new Derived();\n`${foo}${bar}`;\n      ",
+			wire:       "{\"allow\": [{\"from\": \"file\", \"name\": \"Base\"}]}",
+		},
+		{
+			sourceText: "\nclass Base {}\nclass Derived extends Base {}\nclass DerivedTwice extends Derived {}\nconst value = new DerivedTwice();\n`${value}`;\n      ",
+			wire:       "{\"allow\": [{\"from\": \"file\", \"name\": \"Base\"}]}",
+		},
+		{
+			sourceText: "\ninterface Base {\n  value: string;\n}\ninterface Derived extends Base {\n  extra: number;\n}\ndeclare const obj: Derived;\n`${obj}`;\n      ",
+			wire:       "{\"allow\": [{\"from\": \"file\", \"name\": \"Base\"}]}",
+		},
+		{
+			sourceText: "\ninterface Base {\n  value: string;\n}\ninterface Other {\n  other: number;\n}\ninterface Derived extends Base, Other {\n  extra: boolean;\n}\ndeclare const obj: Derived;\n`${obj}`;\n      ",
+			wire:       "{\"allow\": [{\"from\": \"file\", \"name\": \"Base\"}]}",
+		},
+		{
+			sourceText: "\ninterface Base {\n  value: string;\n}\ninterface Other {\n  other: number;\n}\ninterface Derived extends Base, Other {\n  extra: boolean;\n}\ndeclare const obj: Derived;\n`${obj}`;\n      ",
+			wire:       "{\"allow\": [{\"from\": \"file\", \"name\": \"Other\"}]}",
+		},
+		{
+			sourceText: "\ninterface Root {\n  root: string;\n}\ninterface Another {\n  another: string;\n}\ninterface Base extends Root, Another {\n  value: string;\n}\ninterface Other {\n  other: number;\n}\ninterface Derived extends Base, Other {\n  extra: boolean;\n}\ndeclare const obj: Derived;\n`${obj}`;\n      ",
+			wire:       "{\"allow\": [{\"from\": \"file\", \"name\": \"Another\"}]}",
+		},
+		{
+			sourceText: "\ntype Custom = { value: string };\ndeclare const obj: Custom;\n`${obj}`;\n      ",
+			wire:       "{\"allow\": [{\"from\": \"file\", \"name\": \"Custom\"}]}",
+		},
 
 		// A generic class or interface extending an allowed base. The base types live on the type
 		// reference's target rather than on the reference itself, so without that hop the allowlist

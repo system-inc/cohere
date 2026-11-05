@@ -279,7 +279,9 @@ func TestBuildFailsLoudly(test *testing.T) {
 			"tsconfig.json": `{"compilerOptions": {"target": "ES2022",, "strict": true}}`,
 			"main.ts":       "export const value = 1;\n",
 		})
-		if _, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory}); buildError == nil {
+		if _, buildError := program.Build(
+			program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory},
+		); buildError == nil {
 			test.Fatal("a tsconfig with a JSON syntax error built a program instead of failing")
 		}
 	})
@@ -293,7 +295,9 @@ func TestBuildFailsLoudly(test *testing.T) {
 			"tsconfig.json": `{"compilerOptions": {"target": "NotARealTarget"}}`,
 			"main.ts":       "export const value = 1;\n",
 		})
-		graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+		graph, buildError := program.Build(
+			program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory},
+		)
 		if buildError != nil {
 			test.Fatalf("an invalid option value refused the build: %v", buildError)
 		}
@@ -342,7 +346,9 @@ func TestDiagnosticsReportsRealTypeErrors(test *testing.T) {
 			"main.ts":       "const value: number = 'not a number';\n",
 		})
 
-		graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+		graph, buildError := program.Build(
+			program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory},
+		)
 		if buildError != nil {
 			test.Fatalf("building: %v", buildError)
 		}
@@ -372,7 +378,9 @@ func TestDiagnosticsReportsRealTypeErrors(test *testing.T) {
 			"main.ts":       "const value: number = 42;\nexport default value;\n",
 		})
 
-		graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+		graph, buildError := program.Build(
+			program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory},
+		)
 		if buildError != nil {
 			test.Fatalf("building: %v", buildError)
 		}
@@ -477,7 +485,11 @@ func TestAPanickingRuleLosesOnlyItsOwnVerdictOnTheFile(test *testing.T) {
 		},
 	}
 
-	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{panicsInAListener, panicsInRun, witness})
+	result, err := graph.Walk(
+		context.Background(),
+		graph.ProjectFiles(),
+		[]rule.Rule{panicsInAListener, panicsInRun, witness},
+	)
 	if err != nil {
 		test.Fatalf("a panic in one rule ended the whole walk: %v", err)
 	}
@@ -566,8 +578,13 @@ func TestAProgramARuleKeepsPastItsFileIsEnded(test *testing.T) {
 		func() {
 			defer func() {
 				message := fmt.Sprint(recover())
-				if !strings.Contains(message, "after the file it was given ended") || !strings.Contains(message, keeper.Name) {
-					test.Errorf("program %d, kept past its file, read without the ended refusal naming the rule: %s", index, message)
+				if !strings.Contains(message, "after the file it was given ended") ||
+					!strings.Contains(message, keeper.Name) {
+					test.Errorf(
+						"program %d, kept past its file, read without the ended refusal naming the rule: %s",
+						index,
+						message,
+					)
 				}
 			}()
 			view.Options()
@@ -608,7 +625,11 @@ func TestAWalkWithoutAPanicReportsNoCrashedFile(test *testing.T) {
 	}
 
 	if len(result.Coverage.FilesCrashed) != 0 || len(result.Coverage.RulesCrashed) != 0 {
-		test.Errorf("a clean walk reported %d crashed files and %d rule crashes", len(result.Coverage.FilesCrashed), len(result.Coverage.RulesCrashed))
+		test.Errorf(
+			"a clean walk reported %d crashed files and %d rule crashes",
+			len(result.Coverage.FilesCrashed),
+			len(result.Coverage.RulesCrashed),
+		)
 	}
 }
 

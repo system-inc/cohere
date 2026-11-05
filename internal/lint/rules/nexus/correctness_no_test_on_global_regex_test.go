@@ -53,7 +53,11 @@ func correctnessNoTestOnGlobalRegexExpect(test *testing.T, result rule_testing.R
 			test.Fatalf("unexpected message id %q", diagnostic.Message.Id)
 		}
 		if len(diagnostic.Fixes) != 0 || len(diagnostic.Suggestions) != 0 {
-			test.Fatalf("expected no fix and no suggestion, got %d and %d", len(diagnostic.Fixes), len(diagnostic.Suggestions))
+			test.Fatalf(
+				"expected no fix and no suggestion, got %d and %d",
+				len(diagnostic.Fixes),
+				len(diagnostic.Suggestions),
+			)
 		}
 		got = append(got, text[diagnostic.Range.Pos():diagnostic.Range.End()])
 	}
@@ -120,7 +124,10 @@ func TestCorrectnessNoTestOnGlobalRegexFiresOnUnpatchedAhraOsWisdom(test *testin
 func TestCorrectnessNoTestOnGlobalRegexStaysSilentOnFixedAhraOsWisdom(test *testing.T) {
 	test.Parallel()
 
-	rule_testing.ExpectClean(test, correctnessNoTestOnGlobalRegexRun(test, correctnessNoTestOnGlobalRegexCompLeak(false, true)))
+	rule_testing.ExpectClean(
+		test,
+		correctnessNoTestOnGlobalRegexRun(test, correctnessNoTestOnGlobalRegexCompLeak(false, true)),
+	)
 }
 
 func TestCorrectnessNoTestOnGlobalRegexFires(test *testing.T) {
@@ -318,7 +325,10 @@ func TestCorrectnessNoTestOnGlobalRegexStaysSilent(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 
-			rule_testing.ExpectClean(test, correctnessNoTestOnGlobalRegexRun(test, correctnessNoTestOnGlobalRegexSource(testCase.lines...)))
+			rule_testing.ExpectClean(
+				test,
+				correctnessNoTestOnGlobalRegexRun(test, correctnessNoTestOnGlobalRegexSource(testCase.lines...)),
+			)
 		})
 	}
 }

@@ -100,7 +100,11 @@ func codePoints(mapped string) []rune {
 	result := make([]rune, 0, len(units))
 	for index := 0; index < len(units); index++ {
 		unit := units[index]
-		if utf16.IsSurrogate(rune(unit)) && unit < 0xDC00 && index+1 < len(units) && units[index+1] >= 0xDC00 && units[index+1] <= 0xDFFF {
+		if utf16.IsSurrogate(rune(unit)) &&
+			unit < 0xDC00 &&
+			index+1 < len(units) &&
+			units[index+1] >= 0xDC00 &&
+			units[index+1] <= 0xDFFF {
 			result = append(result, utf16.DecodeRune(rune(unit), rune(units[index+1])))
 			index++
 			continue

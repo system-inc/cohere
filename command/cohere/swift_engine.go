@@ -96,16 +96,28 @@ var swiftEnginePlatform = release.Target{GoOperatingSystem: runtime.GOOS, GoArch
 func resolveSwiftEngineBinary(location projectLocation, provenance release.Provenance) (string, string, error) {
 	if named := os.Getenv(dispatch.SwiftEngineOverrideVariable); named != "" {
 		if !isRegularFile(named) {
-			return "", "", fmt.Errorf("%s names %s, which is not a file, so nothing was checked", dispatch.SwiftEngineOverrideVariable, named)
+			return "", "", fmt.Errorf(
+				"%s names %s, which is not a file, so nothing was checked",
+				dispatch.SwiftEngineOverrideVariable,
+				named,
+			)
 		}
-		fmt.Fprintf(streams.Errors, "cohere: running the Swift engine %s named by %s, not one built from the sources on disk\n",
-			named, dispatch.SwiftEngineOverrideVariable)
+		fmt.Fprintf(
+			streams.Errors,
+			"cohere: running the Swift engine %s named by %s, not one built from the sources on disk\n",
+			named,
+			dispatch.SwiftEngineOverrideVariable,
+		)
 		return named, "", nil
 	}
 
 	if !release.ShipsSwiftEngine(swiftEnginePlatform.GoOperatingSystem) {
-		return "", "", fmt.Errorf("Swift is not available on this platform (%s): %s ships only for macOS, so nothing in %s was checked",
-			swiftEnginePlatform, release.SwiftEngineFileName, location.Root)
+		return "", "", fmt.Errorf(
+			"Swift is not available on this platform (%s): %s ships only for macOS, so nothing in %s was checked",
+			swiftEnginePlatform,
+			release.SwiftEngineFileName,
+			location.Root,
+		)
 	}
 
 	if !provenance.IsDevelopment() {
@@ -115,10 +127,18 @@ func resolveSwiftEngineBinary(location projectLocation, provenance release.Prove
 
 	moduleDirectory, err := dispatch.FindModuleDirectory()
 	if err != nil {
-		return "", "", fmt.Errorf("%s is a Swift package, and the Swift engine is built from a cohere checkout: %w", location.Root, err)
+		return "", "", fmt.Errorf(
+			"%s is a Swift package, and the Swift engine is built from a cohere checkout: %w",
+			location.Root,
+			err,
+		)
 	}
 	commit := committedSwiftSource(provenance)
-	binaryPath, _, err := dispatch.ResolveSwiftEngine(dispatch.DefaultPaths(moduleDirectory), commit, engineContractVersion)
+	binaryPath, _, err := dispatch.ResolveSwiftEngine(
+		dispatch.DefaultPaths(moduleDirectory),
+		commit,
+		engineContractVersion,
+	)
 	if err != nil {
 		return "", "", err
 	}
@@ -136,15 +156,21 @@ func resolveSwiftEngineBinary(location projectLocation, provenance release.Prove
 func shippedSwiftEngine(provenance release.Provenance) (string, error) {
 	executable, executableError := os.Executable()
 	if executableError != nil {
-		return "", fmt.Errorf("finding this cohere's own executable, beside which its Swift engine ships: %w", executableError)
+		return "", fmt.Errorf(
+			"finding this cohere's own executable, beside which its Swift engine ships: %w",
+			executableError,
+		)
 	}
 	if resolved, resolveSymlinksError := filepath.EvalSymlinks(executable); resolveSymlinksError == nil {
 		executable = resolved
 	}
 	binaryPath := filepath.Join(filepath.Dir(executable), release.SwiftEngineFileName)
 	if !isRegularFile(binaryPath) {
-		return "", fmt.Errorf("this cohere %s install has no Swift engine: expected %s, which the macOS package ships beside cohere, so nothing was checked; reinstall cohere",
-			provenance.Version, binaryPath)
+		return "", fmt.Errorf(
+			"this cohere %s install has no Swift engine: expected %s, which the macOS package ships beside cohere, so nothing was checked; reinstall cohere",
+			provenance.Version,
+			binaryPath,
+		)
 	}
 	return binaryPath, nil
 }

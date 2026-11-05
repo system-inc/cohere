@@ -138,7 +138,10 @@ func TestDumpDifferences(test *testing.T) {
 		test.Log(report.Summary())
 
 		// The whole root names the directory, because nested corpora share basenames (three are nexus).
-		corpus := filepath.Join(output, strings.ReplaceAll(strings.Trim(root, string(filepath.Separator)), string(filepath.Separator), "_"))
+		corpus := filepath.Join(
+			output,
+			strings.ReplaceAll(strings.Trim(root, string(filepath.Separator)), string(filepath.Separator), "_"),
+		)
 		var summary strings.Builder
 		summary.WriteString(report.Summary())
 		results := append([]FileResult(nil), report.Files...)
@@ -182,7 +185,11 @@ func TestDumpDifferences(test *testing.T) {
 		if createDirectoryError := os.MkdirAll(corpus, 0o755); createDirectoryError != nil {
 			test.Fatal(createDirectoryError)
 		}
-		if writeError := os.WriteFile(filepath.Join(corpus, "summary.txt"), []byte(summary.String()), 0o644); writeError != nil {
+		if writeError := os.WriteFile(
+			filepath.Join(corpus, "summary.txt"),
+			[]byte(summary.String()),
+			0o644,
+		); writeError != nil {
 			test.Fatal(writeError)
 		}
 	}

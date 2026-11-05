@@ -115,18 +115,25 @@ func (state *primitiveConstraintState) visit(function *Function) {
 			case *LoadGlobal, *ObjectExpression, *ArrayExpression, *RegExpLiteral, *ObjectMethod, *NewExpression:
 				state.bind(left, primitiveConstraintOther)
 			case *PropertyLoad:
-				if value.Property == "current" || state.kinds[state.root(key(value.Object))] != primitiveConstraintUnknown {
+				if value.Property == "current" ||
+					state.kinds[state.root(key(value.Object))] != primitiveConstraintUnknown {
 					state.bind(left, primitiveConstraintOther)
 				}
 			case *ComputedLoad:
 				state.bind(left, primitiveConstraintOther)
 			case *CallExpression:
 				state.bind(key(value.Callee), primitiveConstraintOther)
-				if value.CalleeOrigin.Module == "react" && (value.CalleeOrigin.Export == "useRef" || value.CalleeOrigin.Export == "useState" || value.CalleeOrigin.Export == "useReducer" || value.CalleeOrigin.Export == "useCallback") {
+				if value.CalleeOrigin.Module == "react" && (value.CalleeOrigin.Export == "useRef" ||
+					value.CalleeOrigin.Export == "useState" ||
+					value.CalleeOrigin.Export == "useReducer" ||
+					value.CalleeOrigin.Export == "useCallback") {
 					state.bind(left, primitiveConstraintOther)
 				}
 			case *MethodCall:
-				if value.CalleeOrigin.Module == "react" && (value.CalleeOrigin.Export == "useRef" || value.CalleeOrigin.Export == "useState" || value.CalleeOrigin.Export == "useReducer" || value.CalleeOrigin.Export == "useCallback") {
+				if value.CalleeOrigin.Module == "react" && (value.CalleeOrigin.Export == "useRef" ||
+					value.CalleeOrigin.Export == "useState" ||
+					value.CalleeOrigin.Export == "useReducer" ||
+					value.CalleeOrigin.Export == "useCallback") {
 					state.bind(left, primitiveConstraintOther)
 				}
 			case *FunctionExpression:
@@ -164,7 +171,9 @@ func inferPrimitivePropertyReads(function *Function) map[static_single_assignmen
 			if instruction == nil {
 				continue
 			}
-			if _, property := instruction.Value.(*PropertyLoad); property && state.kinds[state.root(primitiveConstraintKey{function, instruction.LValue.Identifier})] == primitiveConstraintPrimitive {
+			if _, property := instruction.Value.(*PropertyLoad); property && state.kinds[state.root(
+				primitiveConstraintKey{function, instruction.LValue.Identifier},
+			)] == primitiveConstraintPrimitive {
 				result[instruction.LValue.Identifier] = true
 			}
 		}

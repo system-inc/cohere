@@ -96,7 +96,10 @@ func TestSSAVerifierDetectsEachViolationClass(test *testing.T) {
 	test.Parallel()
 
 	build := func() *Function {
-		fn := lowerTypedForSSA(test, "export function f(){ let y = 2; if (y > 1) { y = 1; } else { y = 2; } let x = y; return x; }\n")
+		fn := lowerTypedForSSA(
+			test,
+			"export function f(){ let y = 2; if (y > 1) { y = 1; } else { y = 2; } let x = y; return x; }\n",
+		)
 		Construct(fn)
 		if v := VerifySSA(fn); len(v) != 0 {
 			test.Fatalf("baseline should be clean, got %v", v)
@@ -223,22 +226,46 @@ func TestSSAAcrossEveryControlFlowConstruct(test *testing.T) {
 
 	cases := []struct{ name, code string }{
 		{"for-in", "export function f(o: any){ let n = 0; for (const k in o) { n = n + 1; } return n; }\n"},
-		{"labeled-break", "export function f(){ let n = 0; outer: for (let i = 0; i < 3; i++) { while (true) { n = n + 1; break outer; } } return n; }\n"},
-		{"labeled-continue", "export function f(){ let n = 0; outer: for (let i = 0; i < 3; i++) { for (let j = 0; j < 3; j++) { n = n + 1; continue outer; } } return n; }\n"},
-		{"nested-loop", "export function f(){ let s = 0; for (let i = 0; i < 3; i++) { for (let j = 0; j < 3; j++) { s = s + i * j; } } return s; }\n"},
+		{
+			"labeled-break",
+			"export function f(){ let n = 0; outer: for (let i = 0; i < 3; i++) { while (true) { n = n + 1; break outer; } } return n; }\n",
+		},
+		{
+			"labeled-continue",
+			"export function f(){ let n = 0; outer: for (let i = 0; i < 3; i++) { for (let j = 0; j < 3; j++) { n = n + 1; continue outer; } } return n; }\n",
+		},
+		{
+			"nested-loop",
+			"export function f(){ let s = 0; for (let i = 0; i < 3; i++) { for (let j = 0; j < 3; j++) { s = s + i * j; } } return s; }\n",
+		},
 		{"do-while", "export function f(){ let x = 0; do { x = x + 1; } while (x < 5); return x; }\n"},
 		{"for-of", "export function f(a: number[]){ let t = 0; for (const v of a) { t = t + v; } return t; }\n"},
-		{"switch-fallthrough", "export function f(n: number){ let r = 0; switch (n) { case 1: r = 1; case 2: r = r + 2; break; default: r = 9; } return r; }\n"},
-		{"try-catch-finally", "export function f(){ let x = 0; try { x = 1; } catch (e) { x = 2; } finally { x = x + 1; } return x; }\n"},
-		{"loop-with-break", "export function f(a: number[]){ let t = 0; for (const v of a) { if (v < 0) { break; } t = t + v; } return t; }\n"},
-		{"loop-with-continue", "export function f(a: number[]){ let t = 0; for (const v of a) { if (v < 0) { continue; } t = t + v; } return t; }\n"},
+		{
+			"switch-fallthrough",
+			"export function f(n: number){ let r = 0; switch (n) { case 1: r = 1; case 2: r = r + 2; break; default: r = 9; } return r; }\n",
+		},
+		{
+			"try-catch-finally",
+			"export function f(){ let x = 0; try { x = 1; } catch (e) { x = 2; } finally { x = x + 1; } return x; }\n",
+		},
+		{
+			"loop-with-break",
+			"export function f(a: number[]){ let t = 0; for (const v of a) { if (v < 0) { break; } t = t + v; } return t; }\n",
+		},
+		{
+			"loop-with-continue",
+			"export function f(a: number[]){ let t = 0; for (const v of a) { if (v < 0) { continue; } t = t + v; } return t; }\n",
+		},
 		{"ternary", "export function f(b: boolean){ let x = b ? 1 : 2; return x; }\n"},
 		{"logical", "export function f(b: boolean, c: boolean){ let x = b && c; let y = b || c; return x ? y : x; }\n"},
 		{"nested-function", "export function f(){ let n = 1; const g = () => { return n; }; n = 2; return g(); }\n"},
 		{"reassigned-param", "export function f(a: number){ if (a > 0) { a = a * 2; } return a; }\n"},
 		{"shadowed", "export function f(){ let y = 1; { let y = 2; y = y + 1; } y = y + 5; return y; }\n"},
 		{"update-operators", "export function f(){ let i = 0; i++; ++i; i--; return i; }\n"},
-		{"destructuring", "export function f(o: {a: number, b: number}){ let { a, b } = o; if (a > b) { a = b; } return a + b; }\n"},
+		{
+			"destructuring",
+			"export function f(o: {a: number, b: number}){ let { a, b } = o; if (a > b) { a = b; } return a + b; }\n",
+		},
 	}
 	for _, one := range cases {
 		test.Run(one.name, func(test *testing.T) {

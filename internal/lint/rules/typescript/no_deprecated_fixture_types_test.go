@@ -62,7 +62,11 @@ func installFixtureReact(test *testing.T, types string) func(string) {
 			"index.d.ts":   types,
 		}
 		for name, contents := range files {
-			if writeError := os.WriteFile(filepath.Join(packageDirectory, name), []byte(contents), 0o644); writeError != nil {
+			if writeError := os.WriteFile(
+				filepath.Join(packageDirectory, name),
+				[]byte(contents),
+				0o644,
+			); writeError != nil {
 				test.Fatal(writeError)
 			}
 		}

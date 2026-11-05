@@ -10,7 +10,11 @@ import (
 
 // correctnessRequireBlockingStandardStreamsFingerprintOf is the rule's program fingerprint over a fixture,
 // read through the Program the walk hands the rule, viewed under its own reads.
-func correctnessRequireBlockingStandardStreamsFingerprintOf(test *testing.T, files map[string]string, subject string) [sha256.Size]byte {
+func correctnessRequireBlockingStandardStreamsFingerprintOf(
+	test *testing.T,
+	files map[string]string,
+	subject string,
+) [sha256.Size]byte {
 	test.Helper()
 	var fingerprint [sha256.Size]byte
 	probe := CorrectnessRequireBlockingStandardStreams

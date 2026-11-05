@@ -53,10 +53,13 @@ func printUnionType(path *Path, options *Options, print PrintFunc, args *printAr
 	}
 
 	if isMultipleTupleTypeElement(path) {
-		return groupIn(path, concatIn(path, indentIn(path, concatIn(path, ifBreak(concatIn(path, "(", softline), ""), printed)),
-			softline,
-			ifBreak(")", ""),
-		))
+		return groupIn(
+			path,
+			concatIn(path, indentIn(path, concatIn(path, ifBreak(concatIn(path, "(", softline), ""), printed)),
+				softline,
+				ifBreak(")", ""),
+			),
+		)
 	}
 
 	// Already indent in parent

@@ -78,7 +78,10 @@ func DecodeNoEmptyObjectTypeOptions(raw []byte) (any, error) {
 		case "always", "never", "with-single-extends":
 			options.AllowInterfaces = *wire.AllowInterfaces
 		default:
-			return options, fmt.Errorf("allowInterfaces is %q, and upstream takes always, never or with-single-extends", *wire.AllowInterfaces)
+			return options, fmt.Errorf(
+				"allowInterfaces is %q, and upstream takes always, never or with-single-extends",
+				*wire.AllowInterfaces,
+			)
 		}
 	}
 	if wire.AllowObjectTypes != nil {
@@ -86,13 +89,20 @@ func DecodeNoEmptyObjectTypeOptions(raw []byte) (any, error) {
 		case "always", "never":
 			options.AllowObjectTypes = *wire.AllowObjectTypes
 		default:
-			return options, fmt.Errorf("allowObjectTypes is %q, and upstream takes always or never", *wire.AllowObjectTypes)
+			return options, fmt.Errorf(
+				"allowObjectTypes is %q, and upstream takes always or never",
+				*wire.AllowObjectTypes,
+			)
 		}
 	}
 	if wire.AllowWithName != nil && *wire.AllowWithName != "" {
 		tester, compileError := esregexp.Compile(*wire.AllowWithName, "u")
 		if compileError != nil {
-			return options, fmt.Errorf("allowWithName %q is not a JavaScript regular expression under the u flag: %w", *wire.AllowWithName, compileError)
+			return options, fmt.Errorf(
+				"allowWithName %q is not a JavaScript regular expression under the u flag: %w",
+				*wire.AllowWithName,
+				compileError,
+			)
 		}
 		options.AllowWithName = *wire.AllowWithName
 		options.allowWithNameTester = tester
@@ -202,10 +212,15 @@ func checkEmptyInterface(ruleContext rule.Context, settings NoEmptyObjectTypeOpt
 	}
 	supertype := rule.TokenRange(ruleContext.SourceFile, extended[0])
 	ruleContext.ReportNodeWithSuggestions(name, messageEmptyInterfaceWithSuper,
-		emptyInterfaceRewrite(ruleContext, node, ruleContext.SourceFile.Text()[supertype.Pos():supertype.End()], rule.Message{
-			Id:          "replaceEmptyInterfaceWithSuper",
-			Description: "Replace the empty interface with a type alias of the type it extends.",
-		}),
+		emptyInterfaceRewrite(
+			ruleContext,
+			node,
+			ruleContext.SourceFile.Text()[supertype.Pos():supertype.End()],
+			rule.Message{
+				Id:          "replaceEmptyInterfaceWithSuper",
+				Description: "Replace the empty interface with a type alias of the type it extends.",
+			},
+		),
 	)
 }
 
@@ -214,7 +229,12 @@ func checkEmptyInterface(ruleContext rule.Context, settings NoEmptyObjectTypeOpt
 // Upstream replaces its TSInterfaceDeclaration node, which an `export` wraps rather than starts, so an
 // `export` stays in front of the alias. A `declare` is part of the node and goes with it: `export declare
 // interface X {}` becomes `export type X = object`. Measured on the installed rule.
-func emptyInterfaceRewrite(ruleContext rule.Context, node *ast.Node, target string, message rule.Message) rule.Suggestion {
+func emptyInterfaceRewrite(
+	ruleContext rule.Context,
+	node *ast.Node,
+	target string,
+	message rule.Message,
+) rule.Suggestion {
 	text := ruleContext.SourceFile.Text()
 	declaration := node.AsInterfaceDeclaration()
 	name := declaration.Name()

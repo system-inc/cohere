@@ -21,7 +21,9 @@ func TestTwinSpelledAndCoreSpelledDirectivesBothSilenceTheCoreRule(test *testing
 		test.Run(named, func(test *testing.T) {
 			test.Parallel()
 
-			source := "export function run() {\n    // eslint-disable-next-line " + named + " -- the cycle cannot run early\n    return later();\n}\nfunction later() {\n    return 1;\n}\n"
+			source := "export function run() {\n    // eslint-disable-next-line " +
+				named +
+				" -- the cycle cannot run early\n    return later();\n}\nfunction later() {\n    return 1;\n}\n"
 			index := Build(source)
 			if !index.Suppresses("no-use-before-define", strings.Index(source, "later();")) {
 				test.Fatalf("a directive naming %s did not silence no-use-before-define on the line below", named)

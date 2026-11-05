@@ -12,6 +12,10 @@ import (
 )
 
 // ParseSourceFile parses one file into an AST, with no program and no type information.
-func ParseSourceFile(options ast.SourceFileParseOptions, sourceText string, scriptKind core.ScriptKind) *ast.SourceFile {
+func ParseSourceFile(
+	options ast.SourceFileParseOptions,
+	sourceText string,
+	scriptKind core.ScriptKind,
+) *ast.SourceFile {
 	return parser.ParseSourceFile(options, sourceText, scriptKind)
 }

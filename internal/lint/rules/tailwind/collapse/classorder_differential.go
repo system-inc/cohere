@@ -380,7 +380,10 @@ func (report Report) Trustworthy() (bool, []string) {
 	}
 
 	if !report.ControlsProven() {
-		reasons = append(reasons, "no control fired in both silent directions, so the harness has not been shown able to detect a difference")
+		reasons = append(
+			reasons,
+			"no control fired in both silent directions, so the harness has not been shown able to detect a difference",
+		)
 	}
 	for _, result := range report.Controls {
 		if result.Detected {
@@ -425,7 +428,9 @@ func (report Report) RepositoriesDiverge() (bool, string) {
 	}
 	return true, fmt.Sprintf(
 		"%d shared registry classes read identically, %d read differently, and %d classes exist in only one system",
-		report.SystemDivergence.SharedRegistryClasses, report.SystemDivergence.DivergentReadings, report.SystemDivergence.UniqueToOneSystem,
+		report.SystemDivergence.SharedRegistryClasses,
+		report.SystemDivergence.DivergentReadings,
+		report.SystemDivergence.UniqueToOneSystem,
 	)
 }
 
@@ -552,7 +557,13 @@ type SystemCases struct {
 // `internal/differential` plants before running: two passes over a population that can change
 // between them is a window, and the corrupted side must be measured against exactly the answers the
 // honest side was measured against or the detection count means something else.
-func Compare(tailwindVersion string, systems []SystemCases, divergence SystemDivergence, goSide ReadingSource, controls []Control) Report {
+func Compare(
+	tailwindVersion string,
+	systems []SystemCases,
+	divergence SystemDivergence,
+	goSide ReadingSource,
+	controls []Control,
+) Report {
 	report := Report{
 		TailwindVersion:  tailwindVersion,
 		GoSideName:       goSide.Name(),
@@ -708,7 +719,9 @@ func AcknowledgedIndex(acknowledged []AcknowledgedDivergence) map[string]Acknowl
 	for _, one := range acknowledged {
 		// Go whitespace: a reason written in cohere's own Go source, which no JavaScript tool reads.
 		if strings.TrimSpace(one.Reason) == "" {
-			panic("tailwind: acknowledged divergence for " + one.ClassName + " has no reason; an unreasoned acknowledgement is a suppression")
+			panic("tailwind: acknowledged divergence for " +
+				one.ClassName +
+				" has no reason; an unreasoned acknowledgement is a suppression")
 		}
 		index[acknowledgedKey(one.ClassName, one.Outcome)] = one
 	}

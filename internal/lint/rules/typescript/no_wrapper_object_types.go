@@ -107,7 +107,11 @@ var NoWrapperObjectTypes = rule.Rule{
 					return
 				}
 
-				ruleContext.ReportNodeWithFixes(name, messageBannedWrapperObjectType, ruleContext.ReplaceNode(name, primitive))
+				ruleContext.ReportNodeWithFixes(
+					name,
+					messageBannedWrapperObjectType,
+					ruleContext.ReplaceNode(name, primitive),
+				)
 			},
 		}
 	},

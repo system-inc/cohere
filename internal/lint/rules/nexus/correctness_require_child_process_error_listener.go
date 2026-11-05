@@ -14,7 +14,10 @@ const correctnessRequireChildProcessErrorListenerId = "childProcessWithoutErrorL
 
 // correctnessRequireChildProcessErrorListenerText is the rule's message, whose wording lives in
 // `policy/messages/correctness-require-child-process-error-listener.json`.
-var correctnessRequireChildProcessErrorListenerText = policy.MessageOf("nexus/correctness-require-child-process-error-listener", correctnessRequireChildProcessErrorListenerId)
+var correctnessRequireChildProcessErrorListenerText = policy.MessageOf(
+	"nexus/correctness-require-child-process-error-listener",
+	correctnessRequireChildProcessErrorListenerId,
+)
 
 func correctnessRequireChildProcessErrorListenerMessage() rule.Message {
 	return rule.Message{
@@ -178,7 +181,10 @@ var correctnessRequireChildProcessErrorListenerReturnsEmitter = map[string]bool{
 // correctnessRequireChildProcessErrorListenerFollow reads what the surroundings of one expression
 // holding a child do with it, following the chain of emitter methods that hand the child back. For
 // Bound, it also returns the identifier the child is stored in.
-func correctnessRequireChildProcessErrorListenerFollow(ruleContext rule.Context, expression *ast.Node) (correctnessRequireChildProcessErrorListenerFate, *ast.Node) {
+func correctnessRequireChildProcessErrorListenerFollow(
+	ruleContext rule.Context,
+	expression *ast.Node,
+) (correctnessRequireChildProcessErrorListenerFate, *ast.Node) {
 	current := expression
 	for {
 		current = correctnessRequireChildProcessErrorListenerOutermost(current)
@@ -188,8 +194,10 @@ func correctnessRequireChildProcessErrorListenerFollow(ruleContext rule.Context,
 		}
 		switch parent.Kind {
 		case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
-			if (parent.Kind == ast.KindPropertyAccessExpression && parent.AsPropertyAccessExpression().Expression != current) ||
-				(parent.Kind == ast.KindElementAccessExpression && parent.AsElementAccessExpression().Expression != current) {
+			if (parent.Kind == ast.KindPropertyAccessExpression &&
+				parent.AsPropertyAccessExpression().Expression != current) ||
+				(parent.Kind == ast.KindElementAccessExpression &&
+					parent.AsElementAccessExpression().Expression != current) {
 				// The child is the subscript, `table[child]`, a key into something else.
 				return correctnessRequireChildProcessErrorListenerEscaped, nil
 			}
@@ -247,7 +255,9 @@ func correctnessRequireChildProcessErrorListenerFollow(ruleContext rule.Context,
 					return correctnessRequireChildProcessErrorListenerNeither, nil
 				}
 			case ast.KindEqualsToken:
-				if target := ast.SkipParentheses(binary.Left); binary.Right == current && target.Kind == ast.KindIdentifier {
+				if target := ast.SkipParentheses(
+					binary.Left,
+				); binary.Right == current && target.Kind == ast.KindIdentifier {
 					return correctnessRequireChildProcessErrorListenerBound, target
 				}
 			}
@@ -328,7 +338,9 @@ func correctnessRequireChildProcessErrorListenerVariableIsHandled(ruleContext ru
 				if module.IsExported(statement) {
 					return true
 				}
-				if statement.Parent != nil && statement.Parent.Kind == ast.KindSourceFile && !ast.IsExternalModule(sourceFile) {
+				if statement.Parent != nil &&
+					statement.Parent.Kind == ast.KindSourceFile &&
+					!ast.IsExternalModule(sourceFile) {
 					return true
 				}
 			}
@@ -349,7 +361,11 @@ func correctnessRequireChildProcessErrorListenerVariableIsHandled(ruleContext ru
 			return true
 		}
 		if node.Kind == ast.KindIdentifier && node.Text() == name && !declarationNames[node] {
-			if fate := correctnessRequireChildProcessErrorListenerReference(ruleContext, node, symbol); fate == correctnessRequireChildProcessErrorListenerHandled ||
+			if fate := correctnessRequireChildProcessErrorListenerReference(
+				ruleContext,
+				node,
+				symbol,
+			); fate == correctnessRequireChildProcessErrorListenerHandled ||
 				fate == correctnessRequireChildProcessErrorListenerEscaped {
 				handled = true
 				return true
@@ -365,7 +381,11 @@ func correctnessRequireChildProcessErrorListenerVariableIsHandled(ruleContext ru
 // correctnessRequireChildProcessErrorListenerReference reads one identifier spelled like the
 // variable: Neither when it is another binding, a type position or a write into the variable, and
 // otherwise what its surroundings do with the child.
-func correctnessRequireChildProcessErrorListenerReference(ruleContext rule.Context, identifier *ast.Node, symbol *ast.Symbol) correctnessRequireChildProcessErrorListenerFate {
+func correctnessRequireChildProcessErrorListenerReference(
+	ruleContext rule.Context,
+	identifier *ast.Node,
+	symbol *ast.Symbol,
+) correctnessRequireChildProcessErrorListenerFate {
 	parent := identifier.Parent
 	if parent != nil {
 		switch parent.Kind {
@@ -394,8 +414,10 @@ func correctnessRequireChildProcessErrorListenerReference(ruleContext rule.Conte
 		return correctnessRequireChildProcessErrorListenerNeither
 	}
 	outer := correctnessRequireChildProcessErrorListenerOutermost(identifier)
-	if assignment := outer.Parent; assignment != nil && assignment.Kind == ast.KindBinaryExpression &&
-		assignment.AsBinaryExpression().Left == outer && ast.IsAssignmentOperator(assignment.AsBinaryExpression().OperatorToken.Kind) {
+	if assignment := outer.Parent; assignment != nil &&
+		assignment.Kind == ast.KindBinaryExpression &&
+		assignment.AsBinaryExpression().Left == outer &&
+		ast.IsAssignmentOperator(assignment.AsBinaryExpression().OperatorToken.Kind) {
 		// A write into the variable: the child it held, if any, is not read here.
 		return correctnessRequireChildProcessErrorListenerNeither
 	}

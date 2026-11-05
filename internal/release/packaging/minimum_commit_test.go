@@ -21,7 +21,16 @@ func gitIn(test *testing.T, directory string, arguments ...string) string {
 
 // gitRun is gitIn for a fixture built outside any one test, which has no *testing.T to fail.
 func gitRun(directory string, arguments ...string) (string, error) {
-	command := exec.Command("git", append([]string{"-C", directory, "-c", "user.name=test", "-c", "user.email=test@example.com", "-c", "commit.gpgsign=false"}, arguments...)...)
+	command := exec.Command("git", append([]string{
+		"-C",
+		directory,
+		"-c",
+		"user.name=test",
+		"-c",
+		"user.email=test@example.com",
+		"-c",
+		"commit.gpgsign=false",
+	}, arguments...)...)
 	output, outputError := command.CombinedOutput()
 	if outputError != nil {
 		return "", fmt.Errorf("git %s: %w\n%s", strings.Join(arguments, " "), outputError, output)

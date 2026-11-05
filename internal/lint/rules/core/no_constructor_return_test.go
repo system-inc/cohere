@@ -55,7 +55,8 @@ func TestNoConstructorReturnFires(test *testing.T) {
 		{"class C { private constructor() { return 1 } }", 1},
 		// an overload signature has no body, so only the implementation reports
 		{"class C { constructor(); constructor() { return 1 } }", 1},
-		// the inner constructor reports and the outer contributes nothing; this is the case that separates a walk stopping at the first function-like ancestor from one that keeps going
+		// the inner constructor reports and the outer contributes nothing; this is the case that separates a walk
+		// stopping at the first function-like ancestor from one that keeps going
 		{"class C { constructor() { class D { constructor() { return 1 } } } }", 1},
 		// two findings from one input, which a fixture asserting one per input would get wrong
 		{"class C { constructor() { if (a) { return 1 } else { return 2 } } }", 2},
@@ -133,11 +134,13 @@ func TestNoConstructorReturnStaysSilent(test *testing.T) {
 		"class C { constructor() { { return } } }",
 
 		// added by this port, each measured against the installed rule
-		// an object literal method named `constructor` is a plain method; our parser gives it KindMethodDeclaration and upstream is silent
+		// an object literal method named `constructor` is a plain method; our parser gives it KindMethodDeclaration and
+		// upstream is silent
 		"({ constructor() { return 1 } })",
 		// a property whose key is spelled `constructor`, silent upstream
 		"({ constructor: function() { return 1 } })",
-		// a static method named `constructor`; our parser calls it KindConstructor, so this is the false positive the modifier guard exists for
+		// a static method named `constructor`; our parser calls it KindConstructor, so this is the false positive the
+		// modifier guard exists for
 		"class C { static constructor() { return 1 } }",
 		// static and computed, silent upstream
 		"class C { static ['constructor']() { return 1 } }",
@@ -190,7 +193,10 @@ func TestNoConstructorReturnSpansTheWholeStatement(test *testing.T) {
 	}{
 		{"class C { constructor() { return '' } }", []string{"return ''"}},
 		{"class C { constructor() { if (a) { return 1 } else { return 2 } } }", []string{"return 1", "return 2"}},
-		{"class C { constructor() { switch(x) { case 1: return a; case 2: return; default: return c } } }", []string{"return a;", "return c"}},
+		{
+			"class C { constructor() { switch(x) { case 1: return a; case 2: return; default: return c } } }",
+			[]string{"return a;", "return c"},
+		},
 	}
 
 	for _, testCase := range cases {

@@ -161,7 +161,10 @@ var NoUnsafeUnaryMinus = rule.Rule{
 				argType := type_checking.GetConstrainedTypeAtLocation(ruleContext.TypeChecker, expr.Operand)
 
 				for t := range type_checking.UnionTypePartsSeq(argType) {
-					if !type_checking.IsTypeFlagSet(t, checker.TypeFlagsAny|checker.TypeFlagsNever|checker.TypeFlagsBigIntLike|checker.TypeFlagsNumberLike) {
+					if !type_checking.IsTypeFlagSet(
+						t,
+						checker.TypeFlagsAny|checker.TypeFlagsNever|checker.TypeFlagsBigIntLike|checker.TypeFlagsNumberLike,
+					) {
 						ruleContext.ReportNode(node, buildUnaryMinusMessage(ruleContext.TypeChecker.TypeToString(t)))
 						break
 					}
@@ -175,7 +178,10 @@ var NoUnsafeUnaryMinus = rule.Rule{
 // is tsgolint's behavior and differs observably from `@typescript-eslint`. See the note above.
 func buildUnaryMinusMessage(t string) rule.Message {
 	return rule.Message{
-		Id:          "unaryMinus",
-		Description: fmt.Sprintf("Argument of unary negation should be assignable to number | bigint but is %v instead.", t),
+		Id: "unaryMinus",
+		Description: fmt.Sprintf(
+			"Argument of unary negation should be assignable to number | bigint but is %v instead.",
+			t,
+		),
 	}
 }

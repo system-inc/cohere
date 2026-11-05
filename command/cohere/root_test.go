@@ -110,7 +110,11 @@ func TestLocateProjectWalksUpToTheNearestTsconfig(test *testing.T) {
 		}
 		modules := filepath.Join(root, "modules")
 		if location.Root != modules || location.ArgumentBase != modules {
-			test.Errorf("--directory was not both the root and the base: root %s, base %s", location.Root, location.ArgumentBase)
+			test.Errorf(
+				"--directory was not both the root and the base: root %s, base %s",
+				location.Root,
+				location.ArgumentBase,
+			)
 		}
 		// Discovery would have found the real tsconfig above; an explicit directory must not.
 		if location.ConfigFileName != filepath.Join(modules, "tsconfig.json") {
@@ -176,7 +180,11 @@ func TestLocateProjectFindsSwiftPackages(test *testing.T) {
 		"projects/macos/Sources/App/tsconfig.json/empty": "",
 	})
 	request := func(workingDirectory string) locationRequest {
-		return locationRequest{WorkingDirectory: workingDirectory, ConfigFileName: projectMarker, LintConfigFileName: "CohereSettings.json"}
+		return locationRequest{
+			WorkingDirectory:   workingDirectory,
+			ConfigFileName:     projectMarker,
+			LintConfigFileName: "CohereSettings.json",
+		}
 	}
 	macos := filepath.Join(root, "projects", "macos")
 
@@ -186,11 +194,31 @@ func TestLocateProjectFindsSwiftPackages(test *testing.T) {
 		wantRoot   string
 		wantEngine projectEngine
 	}{
-		{"a Swift package under a TypeScript root is the Swift package's", filepath.Join(macos, "Sources", "App"), macos, engineSwift},
+		{
+			"a Swift package under a TypeScript root is the Swift package's",
+			filepath.Join(macos, "Sources", "App"),
+			macos,
+			engineSwift,
+		},
 		{"the TypeScript root is still TypeScript's", root, root, engineTypeScript},
-		{"a vendored package is its own root", filepath.Join(macos, "Vendor", "Term", "Sources"), filepath.Join(macos, "Vendor", "Term"), engineSwift},
-		{"a TypeScript project inside a Swift package is TypeScript's", filepath.Join(macos, "web"), filepath.Join(macos, "web"), engineTypeScript},
-		{"a directory holding both markers is TypeScript's", filepath.Join(root, "projects", "both"), filepath.Join(root, "projects", "both"), engineTypeScript},
+		{
+			"a vendored package is its own root",
+			filepath.Join(macos, "Vendor", "Term", "Sources"),
+			filepath.Join(macos, "Vendor", "Term"),
+			engineSwift,
+		},
+		{
+			"a TypeScript project inside a Swift package is TypeScript's",
+			filepath.Join(macos, "web"),
+			filepath.Join(macos, "web"),
+			engineTypeScript,
+		},
+		{
+			"a directory holding both markers is TypeScript's",
+			filepath.Join(root, "projects", "both"),
+			filepath.Join(root, "projects", "both"),
+			engineTypeScript,
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -200,7 +228,13 @@ func TestLocateProjectFindsSwiftPackages(test *testing.T) {
 				test.Fatal(locateProjectError)
 			}
 			if location.Root != testCase.wantRoot || location.Engine != testCase.wantEngine {
-				test.Errorf("root %s engine %s, want root %s engine %s", location.Root, location.Engine, testCase.wantRoot, testCase.wantEngine)
+				test.Errorf(
+					"root %s engine %s, want root %s engine %s",
+					location.Root,
+					location.Engine,
+					testCase.wantRoot,
+					testCase.wantEngine,
+				)
 			}
 			// A Swift root carries no tsconfig path, so nothing downstream can build a graph from one.
 			if location.Engine == engineSwift && location.ConfigFileName != "" {
@@ -228,7 +262,10 @@ func TestLocateProjectFindsSwiftPackages(test *testing.T) {
 	test.Run("--directory reads the markers of the directory it names", func(test *testing.T) {
 		test.Parallel()
 		location, locateProjectError := locateProject(locationRequest{
-			WorkingDirectory: root, Directory: "projects/macos", ConfigFileName: projectMarker, LintConfigFileName: "CohereSettings.json",
+			WorkingDirectory:   root,
+			Directory:          "projects/macos",
+			ConfigFileName:     projectMarker,
+			LintConfigFileName: "CohereSettings.json",
 		})
 		if locateProjectError != nil {
 			test.Fatal(locateProjectError)
@@ -250,7 +287,11 @@ func TestLocateProjectFindsSwiftPackages(test *testing.T) {
 			test.Fatal(locateProjectError)
 		}
 		if location.Root != root || location.Engine != engineTypeScript {
-			test.Errorf("an explicit tsconfig inside a Swift package: root %s engine %s", location.Root, location.Engine)
+			test.Errorf(
+				"an explicit tsconfig inside a Swift package: root %s engine %s",
+				location.Root,
+				location.Engine,
+			)
 		}
 	})
 }
@@ -320,7 +361,9 @@ func TestEngineAtRanksTheFourMarkers(test *testing.T) {
 	// The workspace in one directory with its module is the root there, and the walk stops at it rather than
 	// reading the go.work above, whose use names it.
 	workspaceAndModule := filepath.Join(root, "workspace-and-module")
-	location, locateProjectError := locateProject(locationRequest{WorkingDirectory: workspaceAndModule, ConfigFileName: projectMarker})
+	location, locateProjectError := locateProject(
+		locationRequest{WorkingDirectory: workspaceAndModule, ConfigFileName: projectMarker},
+	)
 	if locateProjectError != nil {
 		test.Fatal(locateProjectError)
 	}

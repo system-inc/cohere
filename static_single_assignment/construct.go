@@ -405,7 +405,11 @@ func (builder *ssaBuilder[G, F, B, P]) valueAt(place P, blockId BlockId) Identif
 // MayThrow emits such edges, and latent in cohere, which emits none. Its fix lands here: snapshot the
 // block's definitions before its throwing instruction while walking it, and answer an Exceptional
 // edge from the snapshot.
-func (builder *ssaBuilder[G, F, B, P]) valueFromPredecessor(place P, predecessor BlockId, blockId BlockId) IdentifierId {
+func (builder *ssaBuilder[G, F, B, P]) valueFromPredecessor(
+	place P,
+	predecessor BlockId,
+	blockId BlockId,
+) IdentifierId {
 	return builder.valueAt(place, predecessor)
 }
 

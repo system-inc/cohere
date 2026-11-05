@@ -82,7 +82,11 @@ func Write(record Record) error {
 		if createDirectoryError := os.MkdirAll(directory, 0o755); createDirectoryError != nil {
 			return createDirectoryError
 		}
-		file, openError := os.OpenFile(filepath.Join(directory, fmt.Sprintf("capture-%d.jsonl", os.Getpid())), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+		file, openError := os.OpenFile(
+			filepath.Join(directory, fmt.Sprintf("capture-%d.jsonl", os.Getpid())),
+			os.O_CREATE|os.O_APPEND|os.O_WRONLY,
+			0o644,
+		)
 		if openError != nil {
 			return openError
 		}

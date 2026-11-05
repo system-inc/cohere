@@ -1360,7 +1360,11 @@ func TestArrayTypeDeclinesAHeritageClause(test *testing.T) {
 		{"interface I extends Array<string> {}", 0, "an interface extends clause is not a type position"},
 		{"interface I extends ReadonlyArray<string> {}", 0, "nor is a readonly one"},
 		{"class C implements Array<string> {}", 0, "nor is a class implements clause"},
-		{"class C extends Array<string> {}", 0, "a class extends clause is a different node kind and was already declined"},
+		{
+			"class C extends Array<string> {}",
+			0,
+			"a class extends clause is a different node kind and was already declined",
+		},
 		{"let x: Array<string>;", 1, "the control: an ordinary type position does report"},
 	}
 	for index, testCase := range cases {
@@ -1946,7 +1950,13 @@ func TestArrayTypeDecoderRefusesWhatUpstreamRefuses(test *testing.T) {
 			test.Fatalf("decoding the options gave %T, expected ArrayTypeOptions", decoded)
 		}
 		if options.Default != accepted.default_ || options.Readonly != accepted.readonly {
-			test.Errorf("%s decoded to %+v, want %s and %s", accepted.wire, options, accepted.default_, accepted.readonly)
+			test.Errorf(
+				"%s decoded to %+v, want %s and %s",
+				accepted.wire,
+				options,
+				accepted.default_,
+				accepted.readonly,
+			)
 		}
 	}
 	for _, refused := range []struct{ wire, named string }{
@@ -1961,7 +1971,12 @@ func TestArrayTypeDecoderRefusesWhatUpstreamRefuses(test *testing.T) {
 			continue
 		}
 		if !strings.Contains(decodeArrayTypeOptionsError.Error(), refused.named) {
-			test.Errorf("%s was refused without naming %s: %v", refused.wire, refused.named, decodeArrayTypeOptionsError)
+			test.Errorf(
+				"%s was refused without naming %s: %v",
+				refused.wire,
+				refused.named,
+				decodeArrayTypeOptionsError,
+			)
 		}
 	}
 }

@@ -34,8 +34,14 @@ func TestNoRenderReturnValueFires(test *testing.T) {
 	}{
 		// The eight upstream fail cases, verbatim.
 		{"a variable declarator", "var Hello = ReactDOM.render(<div />, document.body);"},
-		{"an object property", "\n                    var o = {\n                      inst: ReactDOM.render(<div />, document.body)\n                    };\n                  "},
-		{"a return statement", "\n                    function render () {\n                      return ReactDOM.render(<div />, document.body)\n                    }\n                  "},
+		{
+			"an object property",
+			"\n                    var o = {\n                      inst: ReactDOM.render(<div />, document.body)\n                    };\n                  ",
+		},
+		{
+			"a return statement",
+			"\n                    function render () {\n                      return ReactDOM.render(<div />, document.body)\n                    }\n                  ",
+		},
 		{"an arrow expression body with parameters", "var render = (a, b) => ReactDOM.render(a, b)"},
 		{"assignment to a member", "this.o = ReactDOM.render(<div />, document.body);"},
 		{"assignment to a variable", "var v; v = ReactDOM.render(<div />, document.body);"},
@@ -98,14 +104,23 @@ func TestNoRenderReturnValueStaysSilent(test *testing.T) {
 		// The nine upstream pass cases, verbatim. Two are byte-identical duplicates upstream, kept
 		// as written rather than deduplicated.
 		{"a bare call statement", "ReactDOM.render(<div />, document.body);"},
-		{"a ref callback assigning a local", "\n                    let node;\n                    ReactDOM.render(<div ref={ref => node = ref}/>, document.body);\n                  "},
+		{
+			"a ref callback assigning a local",
+			"\n                    let node;\n                    ReactDOM.render(<div ref={ref => node = ref}/>, document.body);\n                  ",
+		},
 		{"a ref callback assigning a member", "ReactDOM.render(<div ref={ref => this.node = ref}/>, document.body);"},
 		{"React.render rather than ReactDOM", "React.render(<div ref={ref => this.node = ref}/>, document.body);"},
-		{"React.render rather than ReactDOM, again", "React.render(<div ref={ref => this.node = ref}/>, document.body);"},
+		{
+			"React.render rather than ReactDOM, again",
+			"React.render(<div ref={ref => this.node = ref}/>, document.body);",
+		},
 		{"React.render assigned", "var foo = React.render(<div />, root);"},
 		{"a bare render call assigned", "var foo = render(<div />, root)"},
 		{"a misspelled property on a similar name", "var foo = ReactDom.renderder(<div />, root)"},
-		{"an unrelated ReactDOM method", "export const foo = () => ({ destroy: ({ dom }) => { ReactDOM.unmountComponentAtNode(dom); } });"},
+		{
+			"an unrelated ReactDOM method",
+			"export const foo = () => ({ destroy: ({ dom }) => { ReactDOM.unmountComponentAtNode(dom); } });",
+		},
 
 		// Invented. These four are genuine uses of the return value that upstream does not report,
 		// and they are the whole answer to what this rule decides. A port that inferred its parent
@@ -135,7 +150,10 @@ func TestNoRenderReturnValueStaysSilent(test *testing.T) {
 		// it is a genuine miss rather than a case upstream thinks is fine. Measured silent on
 		// oxlint, in a file that imports react-dom and reports on the unaliased call two lines
 		// above. Reproduced rather than improved on; see the checker note on the rule.
-		{"an aliased receiver", "import ReactDOM from 'react-dom';\nvar RD = ReactDOM;\nvar b = RD.render(<div />, x);"},
+		{
+			"an aliased receiver",
+			"import ReactDOM from 'react-dom';\nvar RD = ReactDOM;\nvar b = RD.render(<div />, x);",
+		},
 	}
 
 	for _, testCase := range cases {

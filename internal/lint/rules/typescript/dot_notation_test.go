@@ -71,9 +71,15 @@ func TestDotNotationUpstreamCorpus(test *testing.T) {
 				test.Fatalf("decoding %q: %v", row.options, decodeDotNotationOptionsError)
 			}
 			configuration := dotNotationTsconfig(test, row.flag)
-			result := rule_testing.RunTypedFilesWithSetupAndOptions(test, DotNotation, map[string]string{"file.ts": row.source}, "file.ts", options,
+			result := rule_testing.RunTypedFilesWithSetupAndOptions(test, DotNotation, map[string]string{
+				"file.ts": row.source,
+			}, "file.ts", options,
 				func(directory string) {
-					if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration), 0o644); writeError != nil {
+					if writeError := os.WriteFile(
+						filepath.Join(directory, "tsconfig.json"),
+						[]byte(configuration),
+						0o644,
+					); writeError != nil {
 						test.Fatal(writeError)
 					}
 				})
@@ -122,7 +128,11 @@ entity['clearChangedFields']();
 	if err != nil {
 		test.Fatal(err)
 	}
-	rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, DotNotation, "Case.ts", source, unconfigured), "useDot")
+	rule_testing.ExpectFindings(
+		test,
+		rule_testing.RunTypedWithOptions(test, DotNotation, "Case.ts", source, unconfigured),
+		"useDot",
+	)
 
 	allowed, err := DecodeDotNotationOptions([]byte(`{"allowProtectedClassPropertyAccess": true}`))
 	if err != nil {
@@ -136,7 +146,9 @@ entity['clearChangedFields']();
 func TestDotNotationOptionsDecode(test *testing.T) {
 	test.Parallel()
 
-	if _, decodeDotNotationOptionsError := DecodeDotNotationOptions([]byte(`{"allowProtectedPropertyAccess": true}`)); decodeDotNotationOptionsError == nil {
+	if _, decodeDotNotationOptionsError := DecodeDotNotationOptions(
+		[]byte(`{"allowProtectedPropertyAccess": true}`),
+	); decodeDotNotationOptionsError == nil {
 		test.Error("a misspelled option decoded, so it would silently do nothing")
 	}
 	decoded, decodeDotNotationOptionsError := DecodeDotNotationOptions(nil)
@@ -147,8 +159,11 @@ func TestDotNotationOptionsDecode(test *testing.T) {
 	if !isType {
 		test.Fatalf("decoding the options gave %T, expected DotNotationOptions", decoded)
 	}
-	if options.AllowKeywords == nil || !*options.AllowKeywords ||
-		options.AllowIndexSignaturePropertyAccess || options.AllowPrivateClassPropertyAccess || options.AllowProtectedClassPropertyAccess {
+	if options.AllowKeywords == nil ||
+		!*options.AllowKeywords ||
+		options.AllowIndexSignaturePropertyAccess ||
+		options.AllowPrivateClassPropertyAccess ||
+		options.AllowProtectedClassPropertyAccess {
 		test.Errorf("the defaults are %+v", options)
 	}
 }

@@ -57,7 +57,9 @@ func newInput(css string) *input {
 	in := &input{css: css}
 
 	// if (this.css[0] === '\uFEFF' || this.css[0] === '\uFFFE'): U+FEFF is EF BB BF in UTF-8, U+FFFE EF BF BE.
-	if len(in.css) >= 3 && in.css[0] == 0xEF && ((in.css[1] == 0xBB && in.css[2] == 0xBF) || (in.css[1] == 0xBF && in.css[2] == 0xBE)) {
+	if len(in.css) >= 3 &&
+		in.css[0] == 0xEF &&
+		((in.css[1] == 0xBB && in.css[2] == 0xBF) || (in.css[1] == 0xBF && in.css[2] == 0xBE)) {
 		in.hasBOM = true
 		in.css = in.css[3:]
 	} else {
@@ -225,5 +227,10 @@ func (*CssSyntaxError) Name() string { return "CssSyntaxError" }
 
 // Error is setMessage's message: no plugin, no file, so "<css input>:line:column: reason".
 func (syntaxError *CssSyntaxError) Error() string {
-	return "<css input>:" + strconv.Itoa(syntaxError.Line) + ":" + strconv.Itoa(syntaxError.Column) + ": " + syntaxError.Reason
+	return "<css input>:" +
+		strconv.Itoa(syntaxError.Line) +
+		":" +
+		strconv.Itoa(syntaxError.Column) +
+		": " +
+		syntaxError.Reason
 }

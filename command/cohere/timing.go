@@ -38,11 +38,21 @@ func printTimings(out *bufio.Writer, timings *program.Timings, lintDuration time
 	if account.Unavailable != "" {
 		// No CPU is not zero CPU. A table of zeros would read as every rule being free, so the CPU
 		// columns are left out and the reason given, and the counts, which were still counted, stay.
-		fmt.Fprintf(out, "\ntiming: no rule CPU this run, because %s. The counts below are real; the CPU columns are left out rather than shown as zero.\n",
-			account.Unavailable)
+		fmt.Fprintf(
+			out,
+			"\ntiming: no rule CPU this run, because %s. The counts below are real; the CPU columns are left out rather than shown as zero.\n",
+			account.Unavailable,
+		)
 		fmt.Fprintf(out, "  %-42s %8s %8s %8s\n", "rule", "files", "nodes", "found")
 		for _, timing := range sorted {
-			fmt.Fprintf(out, "  %-42s %8d %8d %8d\n", timing.Name, timing.FilesListened, timing.NodesOffered, timing.Findings)
+			fmt.Fprintf(
+				out,
+				"  %-42s %8d %8d %8d\n",
+				timing.Name,
+				timing.FilesListened,
+				timing.NodesOffered,
+				timing.Findings,
+			)
 		}
 		return
 	}
@@ -60,10 +70,14 @@ func printTimings(out *bufio.Writer, timings *program.Timings, lintDuration time
 	if account.Calls > 0 {
 		perCall = account.InstrumentCPU / time.Duration(account.Calls)
 	}
-	fmt.Fprintf(out, "  (a rule that waits, sleeps or is descheduled costs nothing here. Each of the %d measured calls "+
-		"costs about %dns to measure, subtracted from every row and counted once below. Compare rules to each other: "+
-		"the measurement makes a --timing run slower than a real one.)\n",
-		account.Calls, perCall.Nanoseconds())
+	fmt.Fprintf(
+		out,
+		"  (a rule that waits, sleeps or is descheduled costs nothing here. Each of the %d measured calls "+
+			"costs about %dns to measure, subtracted from every row and counted once below. Compare rules to each other: "+
+			"the measurement makes a --timing run slower than a real one.)\n",
+		account.Calls,
+		perCall.Nanoseconds(),
+	)
 	printCoverage(out, timings)
 	fmt.Fprintf(out, "  %-42s %9s %9s %9s %8s %8s %8s\n",
 		"rule", "cpu", "setup", "listen", "files", "nodes", "found")
@@ -151,7 +165,10 @@ func printTimingNotes(out *bufio.Writer, sorted []program.RuleTiming) {
 
 		perNode := ""
 		if timing.NodesOffered > 0 {
-			perNode = fmt.Sprintf(", %.0fns per node", float64(timing.TotalCPU().Nanoseconds())/float64(timing.NodesOffered))
+			perNode = fmt.Sprintf(
+				", %.0fns per node",
+				float64(timing.TotalCPU().Nanoseconds())/float64(timing.NodesOffered),
+			)
 		}
 		fmt.Fprintf(out,
 			"  note: %s saw the most nodes of any rule (%d%s), so compare a rule's cost against this one, not against its own node count\n",
@@ -307,32 +324,62 @@ func printCoverage(out *bufio.Writer, timings *program.Timings) {
 // loader, and a number for either would be a guess presented as a measurement. What the loads and the
 // disk leave of the program's wall is resolution and the loader's bookkeeping together, and the last
 // line says so.
-func printGraphTiming(out *bufio.Writer, timing *program.GraphTiming, buildDuration time.Duration, contentPackOpened time.Duration, checkers int) {
+func printGraphTiming(
+	out *bufio.Writer,
+	timing *program.GraphTiming,
+	buildDuration time.Duration,
+	contentPackOpened time.Duration,
+	checkers int,
+) {
 	accounted := contentPackOpened + timing.Config + timing.Program + timing.Verify
 	builds := ""
 	if timing.Builds > 1 {
 		builds = fmt.Sprintf(" (%d builds: the first one's files moved under it)", timing.Builds)
 	}
-	fmt.Fprintf(out, "graph timing: %s wall = content pack %s + tsconfig %s + program %s + verify %s + %s elsewhere%s\n",
-		formatMilliseconds(buildDuration), formatMilliseconds(contentPackOpened), formatMilliseconds(timing.Config),
-		formatMilliseconds(timing.Program), formatMilliseconds(timing.Verify),
-		formatMilliseconds(max(buildDuration-accounted, 0)), builds)
+	fmt.Fprintf(
+		out,
+		"graph timing: %s wall = content pack %s + tsconfig %s + program %s + verify %s + %s elsewhere%s\n",
+		formatMilliseconds(buildDuration),
+		formatMilliseconds(contentPackOpened),
+		formatMilliseconds(timing.Config),
+		formatMilliseconds(timing.Program),
+		formatMilliseconds(timing.Verify),
+		formatMilliseconds(max(buildDuration-accounted, 0)),
+		builds,
+	)
 	fmt.Fprintf(out, "  tsconfig, its include patterns enumerated: disk %s summed over %s\n",
 		formatMilliseconds(timing.ConfigDisk.Summed()), describeDiskCalls(timing.ConfigDisk))
 	pack := "no content pack"
 	if timing.PackServed+timing.PackRead > 0 {
-		pack = fmt.Sprintf("the content pack served %d of the reads and %d were read from disk", timing.PackServed, timing.PackRead)
+		pack = fmt.Sprintf(
+			"the content pack served %d of the reads and %d were read from disk",
+			timing.PackServed,
+			timing.PackRead,
+		)
 	}
 	if timing.CheckedAnswers > 0 {
-		pack += fmt.Sprintf("; %d existence checks and stats, config's and program's, were answered from the run cache's check rather than by the disk", timing.CheckedAnswers)
+		pack += fmt.Sprintf(
+			"; %d existence checks and stats, config's and program's, were answered from the run cache's check rather than by the disk",
+			timing.CheckedAnswers,
+		)
 	}
-	fmt.Fprintf(out, "  program, summed over the compiler's parallel loaders: %d files loaded (each a read and a parse) in %s; "+
-		"disk %s over %s; %s\n",
-		timing.SourceFileLoads, formatMilliseconds(timing.SourceFileSummed),
-		formatMilliseconds(timing.ProgramDisk.Summed()), describeDiskCalls(timing.ProgramDisk), pack)
-	fmt.Fprintf(out, "  (summed times run past the program's %s wall because the loaders run at once; parse and import "+
-		"resolution happen inside one load and are not split, so what the loads leave of the wall is resolution "+
-		"and the loader's own work together)\n", formatMilliseconds(timing.Program))
+	fmt.Fprintf(
+		out,
+		"  program, summed over the compiler's parallel loaders: %d files loaded (each a read and a parse) in %s; "+
+			"disk %s over %s; %s\n",
+		timing.SourceFileLoads,
+		formatMilliseconds(timing.SourceFileSummed),
+		formatMilliseconds(timing.ProgramDisk.Summed()),
+		describeDiskCalls(timing.ProgramDisk),
+		pack,
+	)
+	fmt.Fprintf(
+		out,
+		"  (summed times run past the program's %s wall because the loaders run at once; parse and import "+
+			"resolution happen inside one load and are not split, so what the loads leave of the wall is resolution "+
+			"and the loader's own work together)\n",
+		formatMilliseconds(timing.Program),
+	)
 	// The count every later phase runs at, said where a reader timing the run looks: by default one per core
 	// up to 12, where the measured wall stops improving (program.defaultCheckerCount, #xwv641q).
 	fmt.Fprintf(out, "  checkers: %d, on %d cores\n", checkers, runtime.GOMAXPROCS(0))
@@ -354,7 +401,10 @@ func describeDiskCalls(disk program.DiskTiming) string {
 		if kind.calls.Count == 0 {
 			continue
 		}
-		parts = append(parts, fmt.Sprintf("%d %s %s", kind.calls.Count, kind.name, formatMilliseconds(kind.calls.Summed)))
+		parts = append(
+			parts,
+			fmt.Sprintf("%d %s %s", kind.calls.Count, kind.name, formatMilliseconds(kind.calls.Summed)),
+		)
 	}
 	if len(parts) == 0 {
 		// Said, rather than printing an empty list that reads like a sentence cut off: a build answered

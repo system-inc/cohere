@@ -172,7 +172,11 @@ func TestFlattensBinaryContinuationInCallArguments(test *testing.T) {
 		test.Fatal("could not parse")
 	}
 	if formatted != want {
-		test.Fatalf("continuation indentation changed shape; the differential report needs updating.\ngot:\n%s\nwant:\n%s", formatted, want)
+		test.Fatalf(
+			"continuation indentation changed shape; the differential report needs updating.\ngot:\n%s\nwant:\n%s",
+			formatted,
+			want,
+		)
 	}
 }
 

@@ -45,10 +45,46 @@ func TestNoUnsafeFires(test *testing.T) {
 		wantIds      []string
 	}{
 		// Upstream, verbatim.
-		{"unprefixed lifecycle methods on a class component under checkAliases", "\n\t\t\t        class Foo extends React.Component {\n\t\t\t          componentWillMount() {}\n\t\t\t          componentWillReceiveProps() {}\n\t\t\t          componentWillUpdate() {}\n\t\t\t        }\n\t\t\t      ", true, []string{messageUnsafeComponentWillMount.Id, messageUnsafeComponentWillReceiveProps.Id, messageUnsafeComponentWillUpdate.Id}},
-		{"unprefixed lifecycle properties on a createReactClass component under checkAliases", "\n\t\t\t        const Foo = createReactClass({\n\t\t\t          componentWillMount: function() {},\n\t\t\t          componentWillReceiveProps: function() {},\n\t\t\t          componentWillUpdate: function() {},\n\t\t\t        });\n\t\t\t      ", true, []string{messageUnsafeComponentWillMount.Id, messageUnsafeComponentWillReceiveProps.Id, messageUnsafeComponentWillUpdate.Id}},
-		{"prefixed lifecycle methods on a class component", "\n\t\t\t        class Foo extends React.Component {\n\t\t\t          UNSAFE_componentWillMount() {}\n\t\t\t          UNSAFE_componentWillReceiveProps() {}\n\t\t\t          UNSAFE_componentWillUpdate() {}\n\t\t\t        }\n\t\t\t      ", false, []string{messageUnsafeComponentWillMount.Id, messageUnsafeComponentWillReceiveProps.Id, messageUnsafeComponentWillUpdate.Id}},
-		{"prefixed lifecycle properties on a createReactClass component", "\n\t\t\t        const Foo = createReactClass({\n\t\t\t          UNSAFE_componentWillMount: function() {},\n\t\t\t          UNSAFE_componentWillReceiveProps: function() {},\n\t\t\t          UNSAFE_componentWillUpdate: function() {},\n\t\t\t        });\n\t\t\t      ", false, []string{messageUnsafeComponentWillMount.Id, messageUnsafeComponentWillReceiveProps.Id, messageUnsafeComponentWillUpdate.Id}},
+		{
+			"unprefixed lifecycle methods on a class component under checkAliases",
+			"\n\t\t\t        class Foo extends React.Component {\n\t\t\t          componentWillMount() {}\n\t\t\t          componentWillReceiveProps() {}\n\t\t\t          componentWillUpdate() {}\n\t\t\t        }\n\t\t\t      ",
+			true,
+			[]string{
+				messageUnsafeComponentWillMount.Id,
+				messageUnsafeComponentWillReceiveProps.Id,
+				messageUnsafeComponentWillUpdate.Id,
+			},
+		},
+		{
+			"unprefixed lifecycle properties on a createReactClass component under checkAliases",
+			"\n\t\t\t        const Foo = createReactClass({\n\t\t\t          componentWillMount: function() {},\n\t\t\t          componentWillReceiveProps: function() {},\n\t\t\t          componentWillUpdate: function() {},\n\t\t\t        });\n\t\t\t      ",
+			true,
+			[]string{
+				messageUnsafeComponentWillMount.Id,
+				messageUnsafeComponentWillReceiveProps.Id,
+				messageUnsafeComponentWillUpdate.Id,
+			},
+		},
+		{
+			"prefixed lifecycle methods on a class component",
+			"\n\t\t\t        class Foo extends React.Component {\n\t\t\t          UNSAFE_componentWillMount() {}\n\t\t\t          UNSAFE_componentWillReceiveProps() {}\n\t\t\t          UNSAFE_componentWillUpdate() {}\n\t\t\t        }\n\t\t\t      ",
+			false,
+			[]string{
+				messageUnsafeComponentWillMount.Id,
+				messageUnsafeComponentWillReceiveProps.Id,
+				messageUnsafeComponentWillUpdate.Id,
+			},
+		},
+		{
+			"prefixed lifecycle properties on a createReactClass component",
+			"\n\t\t\t        const Foo = createReactClass({\n\t\t\t          UNSAFE_componentWillMount: function() {},\n\t\t\t          UNSAFE_componentWillReceiveProps: function() {},\n\t\t\t          UNSAFE_componentWillUpdate: function() {},\n\t\t\t        });\n\t\t\t      ",
+			false,
+			[]string{
+				messageUnsafeComponentWillMount.Id,
+				messageUnsafeComponentWillReceiveProps.Id,
+				messageUnsafeComponentWillUpdate.Id,
+			},
+		},
 		// The two cases below are upstream pass cases recorded here as reporting, deliberately.
 		//
 		// Each is clean upstream only because its tester block configures
@@ -61,8 +97,26 @@ func TestNoUnsafeFires(test *testing.T) {
 		// it produces 0, in the same session against the same file. The cases are pinned as reporting,
 		// which is upstream's answer under the configuration we can actually produce, and the reasoning
 		// is here so the next reader neither deletes them nor breaks the rule to green them.
-		{"upstream's eighth pass case, clean only under a React version we cannot configure", "\n\t\t\t        class Foo extends React.Component {\n\t\t\t          UNSAFE_componentWillMount() {}\n\t\t\t          UNSAFE_componentWillReceiveProps() {}\n\t\t\t          UNSAFE_componentWillUpdate() {}\n\t\t\t        }\n\t\t\t      ", false, []string{messageUnsafeComponentWillMount.Id, messageUnsafeComponentWillReceiveProps.Id, messageUnsafeComponentWillUpdate.Id}},
-		{"upstream's tenth pass case, clean only under a React version we cannot configure", "\n\t\t\t        const Foo = createReactClass({\n\t\t\t          UNSAFE_componentWillMount: function() {},\n\t\t\t          UNSAFE_componentWillReceiveProps: function() {},\n\t\t\t          UNSAFE_componentWillUpdate: function() {},\n\t\t\t        });\n\t\t\t      ", false, []string{messageUnsafeComponentWillMount.Id, messageUnsafeComponentWillReceiveProps.Id, messageUnsafeComponentWillUpdate.Id}},
+		{
+			"upstream's eighth pass case, clean only under a React version we cannot configure",
+			"\n\t\t\t        class Foo extends React.Component {\n\t\t\t          UNSAFE_componentWillMount() {}\n\t\t\t          UNSAFE_componentWillReceiveProps() {}\n\t\t\t          UNSAFE_componentWillUpdate() {}\n\t\t\t        }\n\t\t\t      ",
+			false,
+			[]string{
+				messageUnsafeComponentWillMount.Id,
+				messageUnsafeComponentWillReceiveProps.Id,
+				messageUnsafeComponentWillUpdate.Id,
+			},
+		},
+		{
+			"upstream's tenth pass case, clean only under a React version we cannot configure",
+			"\n\t\t\t        const Foo = createReactClass({\n\t\t\t          UNSAFE_componentWillMount: function() {},\n\t\t\t          UNSAFE_componentWillReceiveProps: function() {},\n\t\t\t          UNSAFE_componentWillUpdate: function() {},\n\t\t\t        });\n\t\t\t      ",
+			false,
+			[]string{
+				messageUnsafeComponentWillMount.Id,
+				messageUnsafeComponentWillReceiveProps.Id,
+				messageUnsafeComponentWillUpdate.Id,
+			},
+		},
 
 		// Everything below is ours rather than upstream's, and every one was measured on the release
 		// oxlint binary rather than reasoned about. They cover the discriminations our abstract syntax
@@ -71,38 +125,113 @@ func TestNoUnsafeFires(test *testing.T) {
 
 		// The component bases, all four spellings. Upstream's corpus writes only `React.Component`, so
 		// nothing imported covers the bare identifiers or the pure variant.
-		{"a class extending the bare Component identifier", "class Foo extends Component {\n  UNSAFE_componentWillMount() {}\n}\n", false, []string{messageUnsafeComponentWillMount.Id}},
-		{"a class extending the bare PureComponent identifier", "class Foo extends PureComponent {\n  UNSAFE_componentWillMount() {}\n}\n", false, []string{messageUnsafeComponentWillMount.Id}},
-		{"a class extending React.PureComponent", "class Foo extends React.PureComponent {\n  UNSAFE_componentWillMount() {}\n}\n", false, []string{messageUnsafeComponentWillMount.Id}},
-		{"a class expression extending React.Component", "const Foo = class extends React.Component {\n  UNSAFE_componentWillMount() {}\n};\n", false, []string{messageUnsafeComponentWillMount.Id}},
+		{
+			"a class extending the bare Component identifier",
+			"class Foo extends Component {\n  UNSAFE_componentWillMount() {}\n}\n",
+			false,
+			[]string{messageUnsafeComponentWillMount.Id},
+		},
+		{
+			"a class extending the bare PureComponent identifier",
+			"class Foo extends PureComponent {\n  UNSAFE_componentWillMount() {}\n}\n",
+			false,
+			[]string{messageUnsafeComponentWillMount.Id},
+		},
+		{
+			"a class extending React.PureComponent",
+			"class Foo extends React.PureComponent {\n  UNSAFE_componentWillMount() {}\n}\n",
+			false,
+			[]string{messageUnsafeComponentWillMount.Id},
+		},
+		{
+			"a class expression extending React.Component",
+			"const Foo = class extends React.Component {\n  UNSAFE_componentWillMount() {}\n};\n",
+			false,
+			[]string{messageUnsafeComponentWillMount.Id},
+		},
 		// The namespaced factory spelling of the one accepted name. oxc's `is_es5_component` keys both
 		// arms on `createReactClass`, so this counts while `React.createClass` does not; both measured.
-		{"the namespaced createReactClass factory", "const Foo = React.createReactClass({\n  UNSAFE_componentWillUpdate: function() {},\n});\n", false, []string{messageUnsafeComponentWillUpdate.Id}},
+		{
+			"the namespaced createReactClass factory",
+			"const Foo = React.createReactClass({\n  UNSAFE_componentWillUpdate: function() {},\n});\n",
+			false,
+			[]string{messageUnsafeComponentWillUpdate.Id},
+		},
 		// Parentheses are skipped on the factory callee and nowhere else. The two silent heritage
 		// spellings are in the clean list below; all three were measured in one invocation.
-		{"a parenthesized createReactClass callee", "const Foo = (createReactClass)({\n  UNSAFE_componentWillMount: function() {},\n});\n", false, []string{messageUnsafeComponentWillMount.Id}},
+		{
+			"a parenthesized createReactClass callee",
+			"const Foo = (createReactClass)({\n  UNSAFE_componentWillMount: function() {},\n});\n",
+			false,
+			[]string{messageUnsafeComponentWillMount.Id},
+		},
 		// The key is resolved statically rather than matched as an identifier. oxc calls
 		// `static_name()`, which answers for a string-literal key and for a computed key holding one.
 		// A port matching only the identifier spelling loses both findings, and reading `Text()` on the
 		// computed one crashes the linter outright.
-		{"a computed lifecycle key holding a string literal", "class Foo extends React.Component {\n  [\"UNSAFE_componentWillMount\"]() {}\n}\n", false, []string{messageUnsafeComponentWillMount.Id}},
-		{"a string-literal lifecycle key", "class Foo extends React.Component {\n  \"UNSAFE_componentWillReceiveProps\"() {}\n}\n", false, []string{messageUnsafeComponentWillReceiveProps.Id}},
+		{
+			"a computed lifecycle key holding a string literal",
+			"class Foo extends React.Component {\n  [\"UNSAFE_componentWillMount\"]() {}\n}\n",
+			false,
+			[]string{messageUnsafeComponentWillMount.Id},
+		},
+		{
+			"a string-literal lifecycle key",
+			"class Foo extends React.Component {\n  \"UNSAFE_componentWillReceiveProps\"() {}\n}\n",
+			false,
+			[]string{messageUnsafeComponentWillReceiveProps.Id},
+		},
 		// Nothing asks what kind of member carries the name. A static method is not a lifecycle method
 		// at all and reports, and both accessors report, because oxc reaches all three through one
 		// `MethodDefinition` arm and never asks. Reproduced rather than corrected.
-		{"a static method named for the lifecycle", "class Foo extends React.Component {\n  static UNSAFE_componentWillUpdate() {}\n}\n", false, []string{messageUnsafeComponentWillUpdate.Id}},
-		{"a getter named for the lifecycle", "class Foo extends React.Component {\n  get UNSAFE_componentWillMount() { return 1; }\n}\n", false, []string{messageUnsafeComponentWillMount.Id}},
-		{"a setter named for the lifecycle", "class Foo extends React.Component {\n  set UNSAFE_componentWillMount(v) {}\n}\n", false, []string{messageUnsafeComponentWillMount.Id}},
+		{
+			"a static method named for the lifecycle",
+			"class Foo extends React.Component {\n  static UNSAFE_componentWillUpdate() {}\n}\n",
+			false,
+			[]string{messageUnsafeComponentWillUpdate.Id},
+		},
+		{
+			"a getter named for the lifecycle",
+			"class Foo extends React.Component {\n  get UNSAFE_componentWillMount() { return 1; }\n}\n",
+			false,
+			[]string{messageUnsafeComponentWillMount.Id},
+		},
+		{
+			"a setter named for the lifecycle",
+			"class Foo extends React.Component {\n  set UNSAFE_componentWillMount(v) {}\n}\n",
+			false,
+			[]string{messageUnsafeComponentWillMount.Id},
+		},
 		// Upstream's ownership hole on the object arm. The walk stops at the first factory call above
 		// the property, however far away and whatever lies between, so an unrelated object literal
 		// nested inside a `createReactClass` call is judged as that component's own lifecycle property.
 		// Its class-component twin is in the clean list, and the pair is the whole asymmetry.
-		{"an unrelated object literal nested inside a createReactClass component", "const Foo = createReactClass({\n  render: function() {\n    const notMine = { UNSAFE_componentWillMount: function() {} };\n    return null;\n  },\n});\n", false, []string{messageUnsafeComponentWillMount.Id}},
+		{
+			"an unrelated object literal nested inside a createReactClass component",
+			"const Foo = createReactClass({\n  render: function() {\n    const notMine = { UNSAFE_componentWillMount: function() {} };\n    return null;\n  },\n});\n",
+			false,
+			[]string{messageUnsafeComponentWillMount.Id},
+		},
 		// checkAliases widens to the three unprefixed spellings and to nothing else, so a name that is
 		// neither family stays silent under it. The prefixed spellings are unaffected by the flag.
-		{"an unprefixed lifecycle method under checkAliases", "class Foo extends React.Component {\n  componentWillReceiveProps() {}\n}\n", true, []string{messageUnsafeComponentWillReceiveProps.Id}},
-		{"a prefixed lifecycle method under checkAliases", "class Foo extends React.Component {\n  UNSAFE_componentWillUpdate() {}\n}\n", true, []string{messageUnsafeComponentWillUpdate.Id}},
-		{"an unprefixed lifecycle property on a createReactClass component under checkAliases", "const Foo = createReactClass({\n  componentWillUpdate: function() {},\n});\n", true, []string{messageUnsafeComponentWillUpdate.Id}},
+		{
+			"an unprefixed lifecycle method under checkAliases",
+			"class Foo extends React.Component {\n  componentWillReceiveProps() {}\n}\n",
+			true,
+			[]string{messageUnsafeComponentWillReceiveProps.Id},
+		},
+		{
+			"a prefixed lifecycle method under checkAliases",
+			"class Foo extends React.Component {\n  UNSAFE_componentWillUpdate() {}\n}\n",
+			true,
+			[]string{messageUnsafeComponentWillUpdate.Id},
+		},
+		{
+			"an unprefixed lifecycle property on a createReactClass component under checkAliases",
+			"const Foo = createReactClass({\n  componentWillUpdate: function() {},\n});\n",
+			true,
+			[]string{messageUnsafeComponentWillUpdate.Id},
+		},
 	}
 
 	for _, testCase := range cases {
@@ -130,21 +259,53 @@ func TestNoUnsafeStaysSilent(test *testing.T) {
 		checkAliases bool
 	}{
 		// Upstream, verbatim.
-		{"a class component using only safe lifecycle methods", "\n\t\t\t        class Foo extends React.Component {\n\t\t\t          componentDidUpdate() {}\n\t\t\t          render() {}\n\t\t\t        }\n\t\t\t      ", false},
-		{"a createReactClass component using only safe lifecycle methods", "\n\t\t\t        const Foo = createReactClass({\n\t\t\t          componentDidUpdate: function() {},\n\t\t\t          render: function() {}\n\t\t\t        });\n\t\t\t      ", false},
+		{
+			"a class component using only safe lifecycle methods",
+			"\n\t\t\t        class Foo extends React.Component {\n\t\t\t          componentDidUpdate() {}\n\t\t\t          render() {}\n\t\t\t        }\n\t\t\t      ",
+			false,
+		},
+		{
+			"a createReactClass component using only safe lifecycle methods",
+			"\n\t\t\t        const Foo = createReactClass({\n\t\t\t          componentDidUpdate: function() {},\n\t\t\t          render: function() {}\n\t\t\t        });\n\t\t\t      ",
+			false,
+		},
 		// The ownership gate. `Bar` is not a React component base, so neither spelling reports however
 		// the members are named. These two are the structural half of upstream's pass list.
-		{"unprefixed lifecycle methods on a class extending something that is not a component", "\n\t\t\t        class Foo extends Bar {\n\t\t\t          componentWillMount() {}\n\t\t\t          componentWillReceiveProps() {}\n\t\t\t          componentWillUpdate() {}\n\t\t\t        }\n\t\t\t      ", false},
-		{"prefixed lifecycle methods on a class extending something that is not a component", "\n\t\t\t        class Foo extends Bar {\n\t\t\t          UNSAFE_componentWillMount() {}\n\t\t\t          UNSAFE_componentWillReceiveProps() {}\n\t\t\t          UNSAFE_componentWillUpdate() {}\n\t\t\t        }\n\t\t\t      ", false},
+		{
+			"unprefixed lifecycle methods on a class extending something that is not a component",
+			"\n\t\t\t        class Foo extends Bar {\n\t\t\t          componentWillMount() {}\n\t\t\t          componentWillReceiveProps() {}\n\t\t\t          componentWillUpdate() {}\n\t\t\t        }\n\t\t\t      ",
+			false,
+		},
+		{
+			"prefixed lifecycle methods on a class extending something that is not a component",
+			"\n\t\t\t        class Foo extends Bar {\n\t\t\t          UNSAFE_componentWillMount() {}\n\t\t\t          UNSAFE_componentWillReceiveProps() {}\n\t\t\t          UNSAFE_componentWillUpdate() {}\n\t\t\t        }\n\t\t\t      ",
+			false,
+		},
 		// The same gate on the object arm. `bar(...)` is not the factory, so the walk finds nothing.
-		{"unprefixed lifecycle properties on an object passed to an unrelated factory", "\n\t\t\t        const Foo = bar({\n\t\t\t          componentWillMount: function() {},\n\t\t\t          componentWillReceiveProps: function() {},\n\t\t\t          componentWillUpdate: function() {},\n\t\t\t        });\n\t\t\t      ", false},
-		{"prefixed lifecycle properties on an object passed to an unrelated factory", "\n\t\t\t        const Foo = bar({\n\t\t\t          UNSAFE_componentWillMount: function() {},\n\t\t\t          UNSAFE_componentWillReceiveProps: function() {},\n\t\t\t          UNSAFE_componentWillUpdate: function() {},\n\t\t\t        });\n\t\t\t      ", false},
+		{
+			"unprefixed lifecycle properties on an object passed to an unrelated factory",
+			"\n\t\t\t        const Foo = bar({\n\t\t\t          componentWillMount: function() {},\n\t\t\t          componentWillReceiveProps: function() {},\n\t\t\t          componentWillUpdate: function() {},\n\t\t\t        });\n\t\t\t      ",
+			false,
+		},
+		{
+			"prefixed lifecycle properties on an object passed to an unrelated factory",
+			"\n\t\t\t        const Foo = bar({\n\t\t\t          UNSAFE_componentWillMount: function() {},\n\t\t\t          UNSAFE_componentWillReceiveProps: function() {},\n\t\t\t          UNSAFE_componentWillUpdate: function() {},\n\t\t\t        });\n\t\t\t      ",
+			false,
+		},
 		// These two are real components carrying the real deprecated names, and they are clean purely
 		// because `checkAliases` defaults to false. Each is byte-identical to a fail case above that
 		// differs only in the flag, which is the pair that pins the option surface exists at all. Our
 		// inventory records this rule as taking no options; these two cases are why that is wrong.
-		{"unprefixed lifecycle methods on a real class component with checkAliases left off", "\n\t\t\t        class Foo extends React.Component {\n\t\t\t          componentWillMount() {}\n\t\t\t          componentWillReceiveProps() {}\n\t\t\t          componentWillUpdate() {}\n\t\t\t        }\n\t\t\t      ", false},
-		{"unprefixed lifecycle properties on a real createReactClass component with checkAliases left off", "\n\t\t\t        const Foo = createReactClass({\n\t\t\t          componentWillMount: function() {},\n\t\t\t          componentWillReceiveProps: function() {},\n\t\t\t          componentWillUpdate: function() {},\n\t\t\t        });\n\t\t\t      ", false},
+		{
+			"unprefixed lifecycle methods on a real class component with checkAliases left off",
+			"\n\t\t\t        class Foo extends React.Component {\n\t\t\t          componentWillMount() {}\n\t\t\t          componentWillReceiveProps() {}\n\t\t\t          componentWillUpdate() {}\n\t\t\t        }\n\t\t\t      ",
+			false,
+		},
+		{
+			"unprefixed lifecycle properties on a real createReactClass component with checkAliases left off",
+			"\n\t\t\t        const Foo = createReactClass({\n\t\t\t          componentWillMount: function() {},\n\t\t\t          componentWillReceiveProps: function() {},\n\t\t\t          componentWillUpdate: function() {},\n\t\t\t        });\n\t\t\t      ",
+			false,
+		},
 
 		// Everything below is ours rather than upstream's, and every one was measured on the release
 		// oxlint binary rather than reasoned about.
@@ -153,54 +314,122 @@ func TestNoUnsafeStaysSilent(test *testing.T) {
 		// looks at `PropertyDefinition`, so all three field spellings are silent. This is a real
 		// difference from the sibling rule `no-will-update-set-state`, which does reach class fields,
 		// and both ports are faithful to their own upstream.
-		{"an arrow-valued lifecycle class field", "class Foo extends React.Component {\n  UNSAFE_componentWillMount = () => {};\n}\n", false},
-		{"a function-expression-valued lifecycle class field", "class Foo extends React.Component {\n  UNSAFE_componentWillReceiveProps = function() {};\n}\n", false},
-		{"a bare lifecycle class field with no initializer", "class Foo extends React.Component {\n  UNSAFE_componentWillUpdate;\n}\n", false},
+		{
+			"an arrow-valued lifecycle class field",
+			"class Foo extends React.Component {\n  UNSAFE_componentWillMount = () => {};\n}\n",
+			false,
+		},
+		{
+			"a function-expression-valued lifecycle class field",
+			"class Foo extends React.Component {\n  UNSAFE_componentWillReceiveProps = function() {};\n}\n",
+			false,
+		},
+		{
+			"a bare lifecycle class field with no initializer",
+			"class Foo extends React.Component {\n  UNSAFE_componentWillUpdate;\n}\n",
+			false,
+		},
 		// The heritage clause is read without skipping parentheses, matching `heritage_expression()`
 		// followed by `as_member_expression()`, neither of which sees through one. Our tree keeps the
 		// parenthesis as a real node exactly where oxc's declines it, so both spellings are silent here
 		// for the same reason they are silent upstream. Measured alongside the reporting
 		// `(createReactClass)(...)` case in the fires list, in one invocation.
-		{"a parenthesized React.Component heritage expression", "class Foo extends (React.Component) {\n  UNSAFE_componentWillMount() {}\n}\n", false},
-		{"a parenthesized receiver inside the heritage expression", "class Foo extends (React).Component {\n  UNSAFE_componentWillMount() {}\n}\n", false},
+		{
+			"a parenthesized React.Component heritage expression",
+			"class Foo extends (React.Component) {\n  UNSAFE_componentWillMount() {}\n}\n",
+			false,
+		},
+		{
+			"a parenthesized receiver inside the heritage expression",
+			"class Foo extends (React).Component {\n  UNSAFE_componentWillMount() {}\n}\n",
+			false,
+		},
 		// The shelf's `IsEs5ComponentCall` accepts both of these and oxc accepts neither, because
 		// `is_es5_component` keys both arms on the single constant `createReactClass`. Reaching for the
 		// shelf would report here and no imported fixture writes either spelling.
-		{"a bare createClass factory", "const Foo = createClass({\n  UNSAFE_componentWillMount: function() {},\n});\n", false},
-		{"the React.createClass factory", "const Foo = React.createClass({\n  UNSAFE_componentWillMount: function() {},\n});\n", false},
+		{
+			"a bare createClass factory",
+			"const Foo = createClass({\n  UNSAFE_componentWillMount: function() {},\n});\n",
+			false,
+		},
+		{
+			"the React.createClass factory",
+			"const Foo = React.createClass({\n  UNSAFE_componentWillMount: function() {},\n});\n",
+			false,
+		},
 		// Another namespace's Component is somebody else's base class.
-		{"a class extending another namespace's Component", "class Foo extends Foo2.Component {\n  UNSAFE_componentWillMount() {}\n}\n", false},
+		{
+			"a class extending another namespace's Component",
+			"class Foo extends Foo2.Component {\n  UNSAFE_componentWillMount() {}\n}\n",
+			false,
+		},
 
 		// Both of these were found by a mutation sweep rather than by reading, and both are measured
 		// silent on the release binary. Widening either receiver check survived the whole imported
 		// corpus and every case above, because upstream writes neither spelling.
-		{"a namespaced createReactClass on a receiver that is not React", "const Foo = Bar.createReactClass({\n  UNSAFE_componentWillMount: function() {},\n});\n", false},
-		{"a class extending a React member that is not a component base", "class Foo extends React.Anything {\n  UNSAFE_componentWillMount() {}\n}\n", false},
+		{
+			"a namespaced createReactClass on a receiver that is not React",
+			"const Foo = Bar.createReactClass({\n  UNSAFE_componentWillMount: function() {},\n});\n",
+			false,
+		},
+		{
+			"a class extending a React member that is not a component base",
+			"class Foo extends React.Anything {\n  UNSAFE_componentWillMount() {}\n}\n",
+			false,
+		},
 
 		// A TypeScript `implements` clause is a heritage clause too, and oxc never sees it: it reads
 		// `heritage_expression()`, which is the superclass alone. Dropping the token check survived
 		// every other case in this file, and both spellings are measured silent on the release
 		// binary. The second is the one that matters, because it carries a real extends clause as
 		// well and so cannot be declined by the absence of heritage.
-		{"a lifecycle method on a class implementing a Component interface", "interface Component {}\nclass Foo implements Component {\n  UNSAFE_componentWillMount() {}\n}\n", false},
-		{"a class extending a non-component while implementing Component", "interface Component {}\nclass Foo extends Bar implements Component {\n  UNSAFE_componentWillMount() {}\n}\n", false},
+		{
+			"a lifecycle method on a class implementing a Component interface",
+			"interface Component {}\nclass Foo implements Component {\n  UNSAFE_componentWillMount() {}\n}\n",
+			false,
+		},
+		{
+			"a class extending a non-component while implementing Component",
+			"interface Component {}\nclass Foo extends Bar implements Component {\n  UNSAFE_componentWillMount() {}\n}\n",
+			false,
+		},
 		// The object arm never asks about a class. A lifecycle-shaped property on a plain object
 		// nested inside a real class component is silent, while the identical property nested inside a
 		// `createReactClass` call reports. That pair is the whole ownership asymmetry and its reporting
 		// half is in the fires list.
-		{"an unrelated object literal nested inside a class component", "class Foo extends React.Component {\n  render() {\n    const notMine = { UNSAFE_componentWillMount: function() {} };\n    return null;\n  }\n}\n", false},
-		{"a lifecycle-shaped property on a bare top-level object literal", "const Foo = { UNSAFE_componentWillMount: function() {} };\n", false},
+		{
+			"an unrelated object literal nested inside a class component",
+			"class Foo extends React.Component {\n  render() {\n    const notMine = { UNSAFE_componentWillMount: function() {} };\n    return null;\n  }\n}\n",
+			false,
+		},
+		{
+			"a lifecycle-shaped property on a bare top-level object literal",
+			"const Foo = { UNSAFE_componentWillMount: function() {} };\n",
+			false,
+		},
 		// A class with no heritage clause at all is the shape the ownership gate mostly exists to stay
 		// silent on.
-		{"a lifecycle method on a class extending nothing", "class Foo {\n  UNSAFE_componentWillMount() {}\n}\n", false},
+		{
+			"a lifecycle method on a class extending nothing",
+			"class Foo {\n  UNSAFE_componentWillMount() {}\n}\n",
+			false,
+		},
 		// checkAliases widens to exactly three names. A neighbouring lifecycle method that was never
 		// deprecated stays silent under it, which pins that the flag is a name list rather than a
 		// prefix-stripping rule.
-		{"a safe lifecycle method under checkAliases", "class Foo extends React.Component {\n  componentDidMount() {}\n  componentWillUnmount() {}\n}\n", true},
+		{
+			"a safe lifecycle method under checkAliases",
+			"class Foo extends React.Component {\n  componentDidMount() {}\n  componentWillUnmount() {}\n}\n",
+			true,
+		},
 		// A computed key that names nothing statically resolves to no name, so the rule must decline it
 		// rather than panic. `ast.TryGetTextOfPropertyName` answers false here where `Text()` would
 		// crash the whole run.
-		{"a computed lifecycle key holding a non-literal expression", "const key = whatever;\nclass Foo extends React.Component {\n  [key]() {}\n}\n", false},
+		{
+			"a computed lifecycle key holding a non-literal expression",
+			"const key = whatever;\nclass Foo extends React.Component {\n  [key]() {}\n}\n",
+			false,
+		},
 	}
 
 	for _, testCase := range cases {

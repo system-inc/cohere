@@ -204,7 +204,10 @@ func TestLocalizationNoUntranslatedValueStaysSilent(test *testing.T) {
 		spanish string
 	}{
 		{"a real translation", "export default {\n    Greeting: 'Hola que tal',\n};\n"},
-		{"real translations at every depth", "export default {\n    Greeting: 'Hola que tal',\n    Nested: {\n        Title: 'Bienvenido a casa',\n        Deep: {\n            Label: 'Seguir comprando',\n        },\n    },\n};\n"},
+		{
+			"real translations at every depth",
+			"export default {\n    Greeting: 'Hola que tal',\n    Nested: {\n        Title: 'Bienvenido a casa',\n        Deep: {\n            Label: 'Seguir comprando',\n        },\n    },\n};\n",
+		},
 		// Short strings are genuinely identical in many languages. Without the length floor every
 		// 'OK' and 'Email' in the tree reports, and a rule that cries wolf gets switched off.
 		{"a short value identical to English", "export default {\n    Ok: 'OK',\n};\n"},
@@ -346,7 +349,10 @@ func TestLocalizationNoUntranslatedValueLeavesALocaleNamedFileOutsideASetQuiet(t
 	for _, relativePath := range []string{"source/fr.ts", "translations-archive/fr.ts", "locales/fr.ts"} {
 		test.Run(relativePath, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, runOnTranslations(test, map[string]string{relativePath: copied}, relativePath))
+			rule_testing.ExpectClean(
+				test,
+				runOnTranslations(test, map[string]string{relativePath: copied}, relativePath),
+			)
 		})
 	}
 }
@@ -359,10 +365,17 @@ func TestLocalizationNoUntranslatedValueLeavesAHelperInASetQuiet(test *testing.T
 	const copied = "export default {\n    Greeting: 'Hello there',\n};\n"
 	rule_testing.ExpectFindings(test, runOnTranslations(test, map[string]string{"translations/fr.ts": copied},
 		"translations/fr.ts"), "missingEnglishSibling")
-	for _, relativePath := range []string{"translations/TranslationTemplate.ts", "translations/index.ts", "translations/locales.ts"} {
+	for _, relativePath := range []string{
+		"translations/TranslationTemplate.ts",
+		"translations/index.ts",
+		"translations/locales.ts",
+	} {
 		test.Run(relativePath, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, runOnTranslations(test, map[string]string{relativePath: copied}, relativePath))
+			rule_testing.ExpectClean(
+				test,
+				runOnTranslations(test, map[string]string{relativePath: copied}, relativePath),
+			)
 		})
 	}
 }

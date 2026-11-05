@@ -11,10 +11,16 @@ const correctnessNoWriteOnlyCollectionId = "writeOnlyCollection"
 
 // correctnessNoWriteOnlyCollectionText is the rule's message, whose wording lives in
 // `policy/messages/correctness-no-write-only-collection.json`.
-var correctnessNoWriteOnlyCollectionText = policy.MessageOf("nexus/correctness-no-write-only-collection", correctnessNoWriteOnlyCollectionId)
+var correctnessNoWriteOnlyCollectionText = policy.MessageOf(
+	"nexus/correctness-no-write-only-collection",
+	correctnessNoWriteOnlyCollectionId,
+)
 
 func correctnessNoWriteOnlyCollectionMessage() rule.Message {
-	return rule.Message{Id: correctnessNoWriteOnlyCollectionId, Description: correctnessNoWriteOnlyCollectionText.Render(nil)}
+	return rule.Message{
+		Id:          correctnessNoWriteOnlyCollectionId,
+		Description: correctnessNoWriteOnlyCollectionText.Render(nil),
+	}
 }
 
 // CorrectnessNoWriteOnlyCollection reports a local array, Map or Set that is filled and never read.
@@ -120,7 +126,9 @@ func correctnessNoWriteOnlyCollectionCheck(ruleContext rule.Context, declaration
 		if node.Kind == ast.KindIdentifier && node != name && node.Text() == name.Text() {
 			resolved := ruleContext.TypeChecker.GetSymbolAtLocation(node)
 			if parent := node.Parent; parent != nil && parent.Kind == ast.KindShorthandPropertyAssignment {
-				if valueSymbol := ruleContext.TypeChecker.GetShorthandAssignmentValueSymbol(parent); valueSymbol != nil {
+				if valueSymbol := ruleContext.TypeChecker.GetShorthandAssignmentValueSymbol(
+					parent,
+				); valueSymbol != nil {
 					resolved = valueSymbol
 				}
 			}
@@ -166,7 +174,10 @@ func correctnessNoWriteOnlyCollectionKind(ruleContext rule.Context, initializer 
 		if constructor.Kind != ast.KindIdentifier || (constructor.Text() != "Map" && constructor.Text() != "Set") {
 			return ""
 		}
-		if !rule.IsSymbolFromDefaultLibrary(ruleContext.Program, ruleContext.TypeChecker.GetSymbolAtLocation(constructor)) {
+		if !rule.IsSymbolFromDefaultLibrary(
+			ruleContext.Program,
+			ruleContext.TypeChecker.GetSymbolAtLocation(constructor),
+		) {
 			return ""
 		}
 		return constructor.Text()

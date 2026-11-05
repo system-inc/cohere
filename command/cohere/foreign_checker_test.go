@@ -69,7 +69,11 @@ func TestEveryFileWalkedOnAForeignCheckerFindsTheSame(test *testing.T) {
 		historyTree[name] = contents
 	}
 
-	roots := map[string]string{"type-aware findings": fixture(findingsTree), "type errors": fixture(typeErrorTree), "check history": fixture(historyTree)}
+	roots := map[string]string{
+		"type-aware findings": fixture(findingsTree),
+		"type errors":         fixture(typeErrorTree),
+		"check history":       fixture(historyTree),
+	}
 	for index, root := range filepath.SplitList(os.Getenv("COHERE_FOREIGN_TREES")) {
 		roots["tree "+string(rune('1'+index))+" "+filepath.Base(root)] = root
 	}
@@ -89,7 +93,9 @@ func TestEveryFileWalkedOnAForeignCheckerFindsTheSame(test *testing.T) {
 		requireChildRan(test, runError)
 		if foreign {
 			// The instrument has to have moved the files, or an identical run proves nothing.
-			if match := moved.FindStringSubmatch(string(output)); match == nil || match[1] == "0" || match[1] != match[2] {
+			if match := moved.FindStringSubmatch(
+				string(output),
+			); match == nil || match[1] == "0" || match[1] != match[2] {
 				test.Fatalf("the foreign run did not walk every file on a foreign checker (%v):\n%s", match, output)
 			}
 		}
@@ -105,8 +111,14 @@ func TestEveryFileWalkedOnAForeignCheckerFindsTheSame(test *testing.T) {
 			for _, threads := range []string{"4", "16"} {
 				foreign := run(test, root, true, threads)
 				if strings.Join(home, "\n") != strings.Join(foreign, "\n") {
-					test.Fatalf("walked on foreign checkers at %s threads, %d lines differ from %d on one checker\n--- one checker\n%s\n--- foreign\n%s",
-						threads, len(foreign), len(home), strings.Join(home, "\n"), strings.Join(foreign, "\n"))
+					test.Fatalf(
+						"walked on foreign checkers at %s threads, %d lines differ from %d on one checker\n--- one checker\n%s\n--- foreign\n%s",
+						threads,
+						len(foreign),
+						len(home),
+						strings.Join(home, "\n"),
+						strings.Join(foreign, "\n"),
+					)
 				}
 			}
 			test.Logf("%d findings and type diagnostics, identical on foreign checkers at 4 and 16 threads", len(home))

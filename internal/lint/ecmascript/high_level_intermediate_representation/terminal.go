@@ -5,8 +5,8 @@
 // `pruneAlwaysInvalidatingScopes`) construct. All four are ported, and each records its decision as
 // `ReactiveScopeBlock.Pruned` rather than as a terminal, so nothing here needs the variant. `Scope` was absent for
 // the same reason until `BuildReactiveScopeTerminals` landed to construct it; see that terminal's
-// comment for why the cost was paid at that moment and not earlier. See high_level_intermediate_representation.go's package comment for
-// the rule that puts JSX in the core instruction set and kept these outside it.
+// comment for why the cost was paid at that moment and not earlier. See high_level_intermediate_representation.go's
+// package comment for the rule that puts JSX in the core instruction set and kept these outside it.
 //
 // # Fallthrough, and why every structured terminal carries one
 //
@@ -300,8 +300,8 @@ type MaybeThrow struct {
 //
 // # Why this variant exists now, when the package comment said it might never
 //
-// `high_level_intermediate_representation.go` records the rule: a variant belongs in the core set when LOWERING must produce it, and
-// behind a seam when only a LATER PASS would, and it names the moment to pay the cost as "if
+// `high_level_intermediate_representation.go` records the rule: a variant belongs in the core set when LOWERING must
+// produce it, and behind a seam when only a LATER PASS would, and it names the moment to pay the cost as "if
 // reactive scopes are ever built". They are built. Four stages before this one declined to add the
 // variant early and were right to: a terminal nothing constructs is worse than no terminal, because
 // consumers switch on it and get an arm that never fires. `Optional` is the standing example in this

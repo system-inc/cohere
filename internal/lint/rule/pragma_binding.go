@@ -25,8 +25,17 @@ type pragmaBindingReader struct {
 // Only a bool leaves the reader. Its per-file cache memoizes ancestor coverage, so every ancestor is
 // examined once across all lookups; symbol answers are memoized too. Recognition is linear in the
 // distinct declarations and header nodes read across a file walk.
-func IsReactPragmaBinding(home *ast.SourceFile, typeChecker *checker.Checker, cache *FileCache, identifier *ast.Node) bool {
-	reader := pragmaBindingReader{home: home, coverage: Cached(cache, "rule.IsReactPragmaBinding.coverage", func() map[*ast.Node]pragmaCoverage { return map[*ast.Node]pragmaCoverage{} })}
+func IsReactPragmaBinding(
+	home *ast.SourceFile,
+	typeChecker *checker.Checker,
+	cache *FileCache,
+	identifier *ast.Node,
+) bool {
+	reader := pragmaBindingReader{home: home, coverage: Cached(
+		cache,
+		"rule.IsReactPragmaBinding.coverage",
+		func() map[*ast.Node]pragmaCoverage { return map[*ast.Node]pragmaCoverage{} },
+	)}
 	if home == nil || identifier == nil || reader.cover(identifier).root != home.AsNode() {
 		// Invariant: every caller hands an identifier from the file its rule is walking, which is the only
 		// file the findings cache keys this answer on.
@@ -39,7 +48,11 @@ func IsReactPragmaBinding(home *ast.SourceFile, typeChecker *checker.Checker, ca
 	if symbol == nil {
 		return false
 	}
-	answers := Cached(cache, "rule.IsReactPragmaBinding.answers", func() map[*ast.Symbol]bool { return map[*ast.Symbol]bool{} })
+	answers := Cached(
+		cache,
+		"rule.IsReactPragmaBinding.answers",
+		func() map[*ast.Symbol]bool { return map[*ast.Symbol]bool{} },
+	)
 	if answer, found := answers[symbol]; found {
 		return answer
 	}
@@ -88,7 +101,10 @@ func (reader *pragmaBindingReader) requireHeader(node *ast.Node) {
 	if coverage.root != reader.home.AsNode() && coverage.inside {
 		// Invariant: foreign syntax is read only outside a SignatureEntry body cut, the part the fingerprint
 		// covers; a read inside one would serve a stale finding, so the walk reports it and refuses caching.
-		panic(fmt.Sprintf("rule.IsReactPragmaBinding read foreign syntax inside a SignatureEntry body cut at %d", node.Pos()))
+		panic(fmt.Sprintf(
+			"rule.IsReactPragmaBinding read foreign syntax inside a SignatureEntry body cut at %d",
+			node.Pos(),
+		))
 	}
 }
 

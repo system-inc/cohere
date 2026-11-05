@@ -27,7 +27,13 @@ func Format(fileName string, text string, options formatoptions.Options, textToD
 
 // formatWithProseWrap is Format with proseWrap given. formatoptions.Options does not carry it and none of our
 // repositories sets it, so only the tests reach always and never.
-func formatWithProseWrap(fileName string, text string, options formatoptions.Options, proseWrap string, textToDoc printing.TextToDoc) (string, error) {
+func formatWithProseWrap(
+	fileName string,
+	text string,
+	options formatoptions.Options,
+	proseWrap string,
+	textToDoc printing.TextToDoc,
+) (string, error) {
 	// coreFormat: `if (!originalText || originalText.trim().length === 0)`, before parsing.
 	if trim(text) == "" {
 		return "", nil

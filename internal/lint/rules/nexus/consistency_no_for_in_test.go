@@ -112,7 +112,10 @@ func TestConsistencyNoForInReportsEveryForIn(test *testing.T) {
 			// header rather than the comment or blank line above it.
 			for _, diagnostic := range result.Diagnostics {
 				if !strings.HasPrefix(sourceText[diagnostic.Range.Pos():], "for(") {
-					test.Fatalf("finding starts at %q, not at the for keyword", sourceText[diagnostic.Range.Pos():][:10])
+					test.Fatalf(
+						"finding starts at %q, not at the for keyword",
+						sourceText[diagnostic.Range.Pos():][:10],
+					)
 				}
 			}
 		})
@@ -160,7 +163,12 @@ func TestConsistencyNoForInStaysSilent(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.Run(test, ConsistencyNoForIn, consistencyNoForInFile, strings.Join(testCase.lines, "\n")+"\n")
+			result := rule_testing.Run(
+				test,
+				ConsistencyNoForIn,
+				consistencyNoForInFile,
+				strings.Join(testCase.lines, "\n")+"\n",
+			)
 			rule_testing.ExpectClean(test, result)
 		})
 	}

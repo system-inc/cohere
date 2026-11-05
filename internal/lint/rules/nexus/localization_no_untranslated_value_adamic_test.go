@@ -30,7 +30,11 @@ func TestAnAdamicTranslationFileFindsItsEnglishSibling(test *testing.T) {
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectSameFindings(test, control, runOnTranslations(test, testCase.files, "_translations/fr.a"))
+			rule_testing.ExpectSameFindings(
+				test,
+				control,
+				runOnTranslations(test, testCase.files, "_translations/fr.a"),
+			)
 		})
 	}
 

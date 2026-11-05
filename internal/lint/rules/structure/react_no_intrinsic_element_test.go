@@ -137,7 +137,10 @@ func TestReactNoAnchorElementStaysSilent(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.Run(test, ReactElementNoAnchor, testCase.fileName, testCase.sourceText))
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.Run(test, ReactElementNoAnchor, testCase.fileName, testCase.sourceText),
+			)
 		})
 	}
 }
@@ -189,7 +192,10 @@ func TestReactNoHorizontalRuleElementStaysSilent(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.Run(test, ReactElementNoHorizontalRule, testCase.fileName, testCase.sourceText))
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.Run(test, ReactElementNoHorizontalRule, testCase.fileName, testCase.sourceText),
+			)
 		})
 	}
 }

@@ -300,7 +300,10 @@ var RelatedGetterSetterPairs = rule.Rule{
 				// The getter's return type, unwrapped past parentheses. TSESTree has no
 				// parenthesized-type node, so upstream reports `string` for `(string)` and
 				// reporting `member.Type()` here would span the parens instead. See the span note.
-				ruleContext.ReportNode(ast.SkipTypeParentheses(candidate.getter.Type()), messageRelatedGetterSetterPairs)
+				ruleContext.ReportNode(
+					ast.SkipTypeParentheses(candidate.getter.Type()),
+					messageRelatedGetterSetterPairs,
+				)
 			}
 		}
 

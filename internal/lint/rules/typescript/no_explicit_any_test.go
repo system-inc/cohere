@@ -115,29 +115,98 @@ func TestNoExplicitAnyStaysSilent(test *testing.T) {
 		{"upstream clean 5", "function greet(): Array<Array<string>> {}"},
 		{"upstream clean 6", "function greet(): Array<string[]> {}"},
 		{"upstream clean 7", "function greet(param: Array<string>): Array<string> {}"},
-		{"upstream clean 8", "\n                class Greeter {\n                  message: string;\n                }\n                    "},
-		{"upstream clean 9", "\n                class Greeter {\n                  message: Array<string>;\n                }\n                    "},
-		{"upstream clean 10", "\n                class Greeter {\n                  message: string[];\n                }\n                    "},
-		{"upstream clean 11", "\n                class Greeter {\n                  message: Array<Array<string>>;\n                }\n                    "},
-		{"upstream clean 12", "\n                class Greeter {\n                  message: Array<string[]>;\n                }\n                    "},
-		{"upstream clean 13", "\n                interface Greeter {\n                  message: string;\n                }\n                    "},
-		{"upstream clean 14", "\n                interface Greeter {\n                  message: Array<string>;\n                }\n                    "},
-		{"upstream clean 15", "\n                interface Greeter {\n                  message: string[];\n                }\n                    "},
-		{"upstream clean 16", "\n                interface Greeter {\n                  message: Array<Array<string>>;\n                }\n                    "},
-		{"upstream clean 17", "\n                interface Greeter {\n                  message: Array<string[]>;\n                }\n                    "},
-		{"upstream clean 18", "\n                type obj = {\n                  message: string;\n                };\n                    "},
-		{"upstream clean 19", "\n                type obj = {\n                  message: Array<string>;\n                };\n                    "},
-		{"upstream clean 20", "\n                type obj = {\n                  message: string[];\n                };\n                    "},
-		{"upstream clean 21", "\n                type obj = {\n                  message: Array<Array<string>>;\n                };\n                    "},
-		{"upstream clean 22", "\n                type obj = {\n                  message: Array<string[]>;\n                };\n                    "},
-		{"upstream clean 23", "\n                type obj = {\n                  message: string | number;\n                };\n                    "},
-		{"upstream clean 24", "\n                type obj = {\n                  message: string | Array<string>;\n                };\n                    "},
-		{"upstream clean 25", "\n                type obj = {\n                  message: string | string[];\n                };\n                    "},
-		{"upstream clean 26", "\n                type obj = {\n                  message: string | Array<Array<string>>;\n                };\n                    "},
-		{"upstream clean 27", "\n                type obj = {\n                  message: string & number;\n                };\n                    "},
-		{"upstream clean 28", "\n                type obj = {\n                  message: string & Array<string>;\n                };\n                    "},
-		{"upstream clean 29", "\n                type obj = {\n                  message: string & string[];\n                };\n                    "},
-		{"upstream clean 30", "\n                type obj = {\n                  message: string & Array<Array<string>>;\n                };\n                    "},
+		{
+			"upstream clean 8",
+			"\n                class Greeter {\n                  message: string;\n                }\n                    ",
+		},
+		{
+			"upstream clean 9",
+			"\n                class Greeter {\n                  message: Array<string>;\n                }\n                    ",
+		},
+		{
+			"upstream clean 10",
+			"\n                class Greeter {\n                  message: string[];\n                }\n                    ",
+		},
+		{
+			"upstream clean 11",
+			"\n                class Greeter {\n                  message: Array<Array<string>>;\n                }\n                    ",
+		},
+		{
+			"upstream clean 12",
+			"\n                class Greeter {\n                  message: Array<string[]>;\n                }\n                    ",
+		},
+		{
+			"upstream clean 13",
+			"\n                interface Greeter {\n                  message: string;\n                }\n                    ",
+		},
+		{
+			"upstream clean 14",
+			"\n                interface Greeter {\n                  message: Array<string>;\n                }\n                    ",
+		},
+		{
+			"upstream clean 15",
+			"\n                interface Greeter {\n                  message: string[];\n                }\n                    ",
+		},
+		{
+			"upstream clean 16",
+			"\n                interface Greeter {\n                  message: Array<Array<string>>;\n                }\n                    ",
+		},
+		{
+			"upstream clean 17",
+			"\n                interface Greeter {\n                  message: Array<string[]>;\n                }\n                    ",
+		},
+		{
+			"upstream clean 18",
+			"\n                type obj = {\n                  message: string;\n                };\n                    ",
+		},
+		{
+			"upstream clean 19",
+			"\n                type obj = {\n                  message: Array<string>;\n                };\n                    ",
+		},
+		{
+			"upstream clean 20",
+			"\n                type obj = {\n                  message: string[];\n                };\n                    ",
+		},
+		{
+			"upstream clean 21",
+			"\n                type obj = {\n                  message: Array<Array<string>>;\n                };\n                    ",
+		},
+		{
+			"upstream clean 22",
+			"\n                type obj = {\n                  message: Array<string[]>;\n                };\n                    ",
+		},
+		{
+			"upstream clean 23",
+			"\n                type obj = {\n                  message: string | number;\n                };\n                    ",
+		},
+		{
+			"upstream clean 24",
+			"\n                type obj = {\n                  message: string | Array<string>;\n                };\n                    ",
+		},
+		{
+			"upstream clean 25",
+			"\n                type obj = {\n                  message: string | string[];\n                };\n                    ",
+		},
+		{
+			"upstream clean 26",
+			"\n                type obj = {\n                  message: string | Array<Array<string>>;\n                };\n                    ",
+		},
+		{
+			"upstream clean 27",
+			"\n                type obj = {\n                  message: string & number;\n                };\n                    ",
+		},
+		{
+			"upstream clean 28",
+			"\n                type obj = {\n                  message: string & Array<string>;\n                };\n                    ",
+		},
+		{
+			"upstream clean 29",
+			"\n                type obj = {\n                  message: string & string[];\n                };\n                    ",
+		},
+		{
+			"upstream clean 30",
+			"\n                type obj = {\n                  message: string & Array<Array<string>>;\n                };\n                    ",
+		},
 	}
 
 	for _, testCase := range testCases {
@@ -162,7 +231,10 @@ func TestNoExplicitAnyIgnoreRestArgsStaysSilent(test *testing.T) {
 		name       string
 		sourceText string
 	}{
-		{"upstream rest 1", "\n                        function foo(a: number, ...rest: any[]): void {\n                          return;\n                        }\n                      "},
+		{
+			"upstream rest 1",
+			"\n                        function foo(a: number, ...rest: any[]): void {\n                          return;\n                        }\n                      ",
+		},
 		{"upstream rest 2", "function foo1(...args: any[]) {}"},
 		{"upstream rest 3", "const bar1 = function (...args: any[]) {};"},
 		{"upstream rest 4", "const baz1 = (...args: any[]) => {};"},
@@ -175,10 +247,22 @@ func TestNoExplicitAnyIgnoreRestArgsStaysSilent(test *testing.T) {
 		{"upstream rest 11", "function foo4(...args: ReadonlyArray<any>) {}"},
 		{"upstream rest 12", "const bar4 = function (...args: ReadonlyArray<any>) {};"},
 		{"upstream rest 13", "const baz4 = (...args: ReadonlyArray<any>) => {};"},
-		{"upstream rest 14", "\n                interface Qux1 {\n                  (...args: any[]): void;\n                }\n                      "},
-		{"upstream rest 15", "\n                interface Qux2 {\n                  (...args: readonly any[]): void;\n                }\n                      "},
-		{"upstream rest 16", "\n                interface Qux3 {\n                  (...args: Array<any>): void;\n                }\n                      "},
-		{"upstream rest 17", "\n                interface Qux4 {\n                  (...args: ReadonlyArray<any>): void;\n                }\n                      "},
+		{
+			"upstream rest 14",
+			"\n                interface Qux1 {\n                  (...args: any[]): void;\n                }\n                      ",
+		},
+		{
+			"upstream rest 15",
+			"\n                interface Qux2 {\n                  (...args: readonly any[]): void;\n                }\n                      ",
+		},
+		{
+			"upstream rest 16",
+			"\n                interface Qux3 {\n                  (...args: Array<any>): void;\n                }\n                      ",
+		},
+		{
+			"upstream rest 17",
+			"\n                interface Qux4 {\n                  (...args: ReadonlyArray<any>): void;\n                }\n                      ",
+		},
 		{"upstream rest 18", "function quux1(fn: (...args: any[]) => void): void {}"},
 		{"upstream rest 19", "function quux2(fn: (...args: readonly any[]) => void): void {}"},
 		{"upstream rest 20", "function quux3(fn: (...args: Array<any>) => void): void {}"},
@@ -195,14 +279,38 @@ func TestNoExplicitAnyIgnoreRestArgsStaysSilent(test *testing.T) {
 		{"upstream rest 31", "type Corge2 = new (...args: readonly any[]) => void;"},
 		{"upstream rest 32", "type Corge3 = new (...args: Array<any>) => void;"},
 		{"upstream rest 33", "type Corge4 = new (...args: ReadonlyArray<any>) => void;"},
-		{"upstream rest 34", "\n                interface Grault1 {\n                  new (...args: any[]): void;\n                }\n                      "},
-		{"upstream rest 35", "\n                interface Grault2 {\n                  new (...args: readonly any[]): void;\n                }\n                      "},
-		{"upstream rest 36", "\n                interface Grault3 {\n                  new (...args: Array<any>): void;\n                }\n                      "},
-		{"upstream rest 37", "\n                interface Grault4 {\n                  new (...args: ReadonlyArray<any>): void;\n                }\n                      "},
-		{"upstream rest 38", "\n                interface Garply1 {\n                  f(...args: any[]): void;\n                }\n                      "},
-		{"upstream rest 39", "\n                interface Garply2 {\n                  f(...args: readonly any[]): void;\n                }\n                      "},
-		{"upstream rest 40", "\n                interface Garply3 {\n                  f(...args: Array<any>): void;\n                }\n                      "},
-		{"upstream rest 41", "\n                interface Garply4 {\n                  f(...args: ReadonlyArray<any>): void;\n                }\n                      "},
+		{
+			"upstream rest 34",
+			"\n                interface Grault1 {\n                  new (...args: any[]): void;\n                }\n                      ",
+		},
+		{
+			"upstream rest 35",
+			"\n                interface Grault2 {\n                  new (...args: readonly any[]): void;\n                }\n                      ",
+		},
+		{
+			"upstream rest 36",
+			"\n                interface Grault3 {\n                  new (...args: Array<any>): void;\n                }\n                      ",
+		},
+		{
+			"upstream rest 37",
+			"\n                interface Grault4 {\n                  new (...args: ReadonlyArray<any>): void;\n                }\n                      ",
+		},
+		{
+			"upstream rest 38",
+			"\n                interface Garply1 {\n                  f(...args: any[]): void;\n                }\n                      ",
+		},
+		{
+			"upstream rest 39",
+			"\n                interface Garply2 {\n                  f(...args: readonly any[]): void;\n                }\n                      ",
+		},
+		{
+			"upstream rest 40",
+			"\n                interface Garply3 {\n                  f(...args: Array<any>): void;\n                }\n                      ",
+		},
+		{
+			"upstream rest 41",
+			"\n                interface Garply4 {\n                  f(...args: ReadonlyArray<any>): void;\n                }\n                      ",
+		},
 		{"upstream rest 42", "declare function waldo1(...args: any[]): void;"},
 		{"upstream rest 43", "declare function waldo2(...args: readonly any[]): void;"},
 		{"upstream rest 44", "declare function waldo3(...args: Array<any>): void;"},
@@ -281,7 +389,10 @@ func TestNoExplicitAnyIgnoreRestArgsIsWhatSilencesThem(test *testing.T) {
 			test.Parallel()
 			result := rule_testing.Run(test, NoExplicitAny, explicitAnyFile, sourceText)
 			if len(result.Diagnostics) == 0 {
-				test.Fatalf("expected the rest-parameter `any` to report with ignoreRestArgs off, got silence for %q", sourceText)
+				test.Fatalf(
+					"expected the rest-parameter `any` to report with ignoreRestArgs off, got silence for %q",
+					sourceText,
+				)
 			}
 		})
 	}
@@ -330,7 +441,12 @@ func TestNoExplicitAnyPointsAtTheKeywordItself(test *testing.T) {
 					test.Errorf("finding %d covered %q, wanted %q", index, reported, testCase.wantSpans[index])
 				}
 				if diagnostic.Range.Pos() != testCase.wantStarts[index] {
-					test.Errorf("finding %d started at %d, wanted %d", index, diagnostic.Range.Pos(), testCase.wantStarts[index])
+					test.Errorf(
+						"finding %d started at %d, wanted %d",
+						index,
+						diagnostic.Range.Pos(),
+						testCase.wantStarts[index],
+					)
 				}
 			}
 		})
@@ -463,7 +579,10 @@ func TestNoExplicitAnyDeclinesJavaScriptFiles(test *testing.T) {
 	for _, testCase := range testCases {
 		test.Run(testCase.fileName+" "+testCase.sourceText, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.Run(test, NoExplicitAny, testCase.fileName, testCase.sourceText))
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.Run(test, NoExplicitAny, testCase.fileName, testCase.sourceText),
+			)
 		})
 	}
 }

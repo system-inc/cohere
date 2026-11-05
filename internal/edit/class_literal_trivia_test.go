@@ -38,7 +38,12 @@ func TestATailwindFixAfterTriviaNoLongerTakesTheFileBatchDown(test *testing.T) {
 		");\n" +
 		"export const roots = [NodeFileSystem];\n"
 
-	result, fixTextError := FixText("Component.tsx", source, proposeFromRules(tailwind.NoDuplicateClasses, nexus.ImportRequireNodeNamespace), DefaultMaxPasses)
+	result, fixTextError := FixText(
+		"Component.tsx",
+		source,
+		proposeFromRules(tailwind.NoDuplicateClasses, nexus.ImportRequireNodeNamespace),
+		DefaultMaxPasses,
+	)
 	if fixTextError != nil {
 		test.Fatalf("unexpected error: %v", fixTextError)
 	}

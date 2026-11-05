@@ -316,7 +316,10 @@ func analyzeCompiledFunction(ruleContext rule.Context, function *high_level_inte
 // The defect this replaced was invisible in the obvious fixture: with no leading newline the
 // element's raw start coincides with the tag identifier's start, so the span read correctly. oxc's
 // tester writes its cases with a leading newline, which is the only reason it was caught.
-func identifierNode(function *high_level_intermediate_representation.Function, id static_single_assignment.IdentifierId) *ast.Node {
+func identifierNode(
+	function *high_level_intermediate_representation.Function,
+	id static_single_assignment.IdentifierId,
+) *ast.Node {
 	if function == nil || int(id) >= len(function.Identifiers) {
 		return nil
 	}
@@ -333,7 +336,11 @@ func identifierNode(function *high_level_intermediate_representation.Function, i
 // put, so it is quoted into the message instead. Read from the source text rather than rebuilt from
 // the representation, because the representation holds values rather than syntax and
 // `props.foo.bar()` has no readable spelling there.
-func staticComponentsMessage(ruleContext rule.Context, function *high_level_intermediate_representation.Function, creator static_single_assignment.IdentifierId) rule.Message {
+func staticComponentsMessage(
+	ruleContext rule.Context,
+	function *high_level_intermediate_representation.Function,
+	creator static_single_assignment.IdentifierId,
+) rule.Message {
 	created := ""
 	if node := identifierNode(function, creator); node != nil && ruleContext.SourceFile != nil {
 		span := rule.TokenRange(ruleContext.SourceFile, node)
@@ -367,9 +374,9 @@ func staticComponentsMessage(ruleContext rule.Context, function *high_level_inte
 // or call a hook. Measured: `function Widget() { const C = mk(); return C; }` is capitalized and is
 // still not compiled, because it returns a value rather than an element.
 //
-// The name half is deliberately taken from `high_level_intermediate_representation.Function.Kind` rather than recomputed, so this rule
-// and the representation cannot drift into disagreeing about what a component name is. Upstream's
-// test is `is_ascii_uppercase`, and `classifyFunction` is ASCII too, so they agree today.
+// The name half is deliberately taken from `high_level_intermediate_representation.Function.Kind` rather than
+// recomputed, so this rule and the representation cannot drift into disagreeing about what a component name is.
+// Upstream's test is `is_ascii_uppercase`, and `classifyFunction` is ASCII too, so they agree today.
 func isCompilationUnit(function *high_level_intermediate_representation.Function) bool {
 	if function == nil || function.Kind == high_level_intermediate_representation.FunctionKindOther {
 		return false

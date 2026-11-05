@@ -52,7 +52,11 @@ func correctnessNoWriteOnlyCollectionExpect(test *testing.T, result rule_testing
 			test.Fatalf("unexpected message id %q", diagnostic.Message.Id)
 		}
 		if len(diagnostic.Fixes) != 0 || len(diagnostic.Suggestions) != 0 {
-			test.Fatalf("expected no fix and no suggestion, got %d and %d", len(diagnostic.Fixes), len(diagnostic.Suggestions))
+			test.Fatalf(
+				"expected no fix and no suggestion, got %d and %d",
+				len(diagnostic.Fixes),
+				len(diagnostic.Suggestions),
+			)
 		}
 		got = append(got, text[diagnostic.Range.Pos():diagnostic.Range.End()])
 	}
@@ -126,7 +130,10 @@ func TestCorrectnessNoWriteOnlyCollectionFiresOnProfileCommitsStore(test *testin
 func TestCorrectnessNoWriteOnlyCollectionStaysSilentOnFixedProfileCommitsStore(test *testing.T) {
 	test.Parallel()
 
-	rule_testing.ExpectClean(test, correctnessNoWriteOnlyCollectionRun(test, correctnessNoWriteOnlyCollectionHybridSearch(true)))
+	rule_testing.ExpectClean(
+		test,
+		correctnessNoWriteOnlyCollectionRun(test, correctnessNoWriteOnlyCollectionHybridSearch(true)),
+	)
 }
 
 func TestCorrectnessNoWriteOnlyCollectionFires(test *testing.T) {
@@ -191,7 +198,10 @@ func TestCorrectnessNoWriteOnlyCollectionFires(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 
-			result := correctnessNoWriteOnlyCollectionRun(test, correctnessNoWriteOnlyCollectionSource(testCase.lines...))
+			result := correctnessNoWriteOnlyCollectionRun(
+				test,
+				correctnessNoWriteOnlyCollectionSource(testCase.lines...),
+			)
 			correctnessNoWriteOnlyCollectionExpect(test, result, testCase.want...)
 		})
 	}
@@ -331,7 +341,10 @@ func TestCorrectnessNoWriteOnlyCollectionStaysSilent(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 
-			rule_testing.ExpectClean(test, correctnessNoWriteOnlyCollectionRun(test, correctnessNoWriteOnlyCollectionSource(testCase.lines...)))
+			rule_testing.ExpectClean(
+				test,
+				correctnessNoWriteOnlyCollectionRun(test, correctnessNoWriteOnlyCollectionSource(testCase.lines...)),
+			)
 		})
 	}
 }

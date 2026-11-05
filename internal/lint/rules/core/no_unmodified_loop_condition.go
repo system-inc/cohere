@@ -194,7 +194,12 @@ func reportUnmodifiedLoopConditions(ruleContext rule.Context) {
 				if condition.modified {
 					break
 				}
-				condition.modified = unmodifiedLoopHasModifierInLoop(ruleContext, condition, modifier, referencesByDeclaration)
+				condition.modified = unmodifiedLoopHasModifierInLoop(
+					ruleContext,
+					condition,
+					modifier,
+					referencesByDeclaration,
+				)
 			}
 		}
 

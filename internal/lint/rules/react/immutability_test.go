@@ -620,13 +620,41 @@ func TestImmutabilityReasonSelectsTheMessage(test *testing.T) {
 		clause string
 	}{
 		{"props", "function Component(props) {\n  props.a = 1;\n  return <div />;\n}\n", "prop or a hook argument"},
-		{"state", "import {useState} from 'react';\nfunction Component() {\n  const [s] = useState({});\n  s.a = 1;\n  return <div />;\n}\n", "came from `useState`"},
-		{"reducer", "import {useReducer} from 'react';\nfunction Component() {\n  const [s, d] = useReducer(r, {});\n  s.a = 1;\n  return <div />;\n}\n", "came from `useReducer`"},
-		{"context", "import {useContext} from 'react';\nfunction Component() {\n  const c = useContext(C);\n  c.a = 1;\n  return <div />;\n}\n", "came from `useContext`"},
-		{"hook return", "function Component() {\n  const h = useThing();\n  h.a = 1;\n  return <div />;\n}\n", "came from a hook"},
-		{"hook argument", "function Component() {\n  const o = {};\n  useThing(o);\n  o.a = 1;\n  return <div />;\n}\n", "already passed to a hook"},
-		{"global", "const g = {};\nfunction Component() {\n  g.a = 1;\n  return <div />;\n}\n", "declared outside the component"},
-		{"jsx captured", "function Component() {\n  const o = {};\n  const el = <Foo x={o} />;\n  o.a = 1;\n  return el;\n}\n", "already used in JSX"},
+		{
+			"state",
+			"import {useState} from 'react';\nfunction Component() {\n  const [s] = useState({});\n  s.a = 1;\n  return <div />;\n}\n",
+			"came from `useState`",
+		},
+		{
+			"reducer",
+			"import {useReducer} from 'react';\nfunction Component() {\n  const [s, d] = useReducer(r, {});\n  s.a = 1;\n  return <div />;\n}\n",
+			"came from `useReducer`",
+		},
+		{
+			"context",
+			"import {useContext} from 'react';\nfunction Component() {\n  const c = useContext(C);\n  c.a = 1;\n  return <div />;\n}\n",
+			"came from `useContext`",
+		},
+		{
+			"hook return",
+			"function Component() {\n  const h = useThing();\n  h.a = 1;\n  return <div />;\n}\n",
+			"came from a hook",
+		},
+		{
+			"hook argument",
+			"function Component() {\n  const o = {};\n  useThing(o);\n  o.a = 1;\n  return <div />;\n}\n",
+			"already passed to a hook",
+		},
+		{
+			"global",
+			"const g = {};\nfunction Component() {\n  g.a = 1;\n  return <div />;\n}\n",
+			"declared outside the component",
+		},
+		{
+			"jsx captured",
+			"function Component() {\n  const o = {};\n  const el = <Foo x={o} />;\n  o.a = 1;\n  return el;\n}\n",
+			"already used in JSX",
+		},
 	}
 
 	for _, testCase := range cases {
@@ -669,9 +697,9 @@ func TestImmutabilityConvergenceEqualityIgnoresReasons(test *testing.T) {
 
 // TestImmutabilityJoinIsNotAnOrdering pins the third element.
 //
-// `internal/utilities/hir/high_level_intermediate_representation.go` carries a warning addressed to this rule: a dataflow pass whose join
-// is "take the larger constant" is self-consistent, passes its own tests, and is wrong, because
-// `Frozen` joined with `Mutable` is `MaybeFrozen`, an element that is neither operand. Every row
+// `internal/utilities/hir/high_level_intermediate_representation.go` carries a warning addressed to this rule: a
+// dataflow pass whose join is "take the larger constant" is self-consistent, passes its own tests, and is wrong,
+// because `Frozen` joined with `Mutable` is `MaybeFrozen`, an element that is neither operand. Every row
 // here was measured against React's executable with the compilation gate held constant.
 func TestImmutabilityJoinIsNotAnOrdering(test *testing.T) {
 	test.Parallel()
@@ -686,7 +714,12 @@ func TestImmutabilityJoinIsNotAnOrdering(test *testing.T) {
 		{"mutable with mutable stays mutable", immutabilityMutable, immutabilityMutable, immutabilityMutable},
 		{"frozen with frozen stays frozen", immutabilityFrozen, immutabilityFrozen, immutabilityFrozen},
 		{"frozen with primitive is frozen", immutabilityFrozen, immutabilityPrimitive, immutabilityFrozen},
-		{"a global joined with a mutable is NOT absorbing", immutabilityGlobal, immutabilityMutable, immutabilityMutable},
+		{
+			"a global joined with a mutable is NOT absorbing",
+			immutabilityGlobal,
+			immutabilityMutable,
+			immutabilityMutable,
+		},
 		{"frozen with context is maybe frozen", immutabilityFrozen, immutabilityContext, immutabilityMaybeFrozen},
 		{"maybe frozen absorbs everything", immutabilityMaybeFrozen, immutabilityPrimitive, immutabilityMaybeFrozen},
 	}
@@ -766,7 +799,11 @@ it('counts', () => {
 `
 	rule_testing.ExpectClean(test, rule_testing.RunTyped(test, Immutability, "component.tsx", testVariables))
 
-	nested := rule_testing.RunTyped(test, Immutability, "component.tsx", `declare function it(name: string, body: () => void): void;
+	nested := rule_testing.RunTyped(
+		test,
+		Immutability,
+		"component.tsx",
+		`declare function it(name: string, body: () => void): void;
 it('own local', () => {
   function Page() {
     let local = 0;
@@ -774,7 +811,8 @@ it('own local', () => {
   }
   return Page;
 });
-`)
+`,
+	)
 	topLevel := rule_testing.RunTyped(test, Immutability, "component.tsx", `export function Page() {
   let local = 0;
   return <button onClick={() => { local = 1; }}>{local}</button>;

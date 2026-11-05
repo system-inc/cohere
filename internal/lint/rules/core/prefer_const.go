@@ -365,7 +365,11 @@ func reportConstCandidates(ruleContext rule.Context, settings PreferConstOptions
 		}
 		if listIsFixable && !*fixAlreadyOffered {
 			*fixAlreadyOffered = true
-			ruleContext.ReportNodeWithFixes(candidate.reportAt, messagePreferConst, letKeywordToConst(ruleContext, list))
+			ruleContext.ReportNodeWithFixes(
+				candidate.reportAt,
+				messagePreferConst,
+				letKeywordToConst(ruleContext, list),
+			)
 			continue
 		}
 		ruleContext.ReportNode(candidate.reportAt, messagePreferConst)
@@ -449,7 +453,9 @@ func judgeConstCandidate(ruleContext rule.Context, settings PreferConstOptions, 
 		return nil
 	}
 	candidate := &constCandidate{reportAt: writes[0]}
-	if pattern := ast.SkipParentheses(assignment.AsBinaryExpression().Left); pattern.Kind == ast.KindArrayLiteralExpression ||
+	if pattern := ast.SkipParentheses(
+		assignment.AsBinaryExpression().Left,
+	); pattern.Kind == ast.KindArrayLiteralExpression ||
 		pattern.Kind == ast.KindObjectLiteralExpression {
 		candidate.assignment = assignment
 	}

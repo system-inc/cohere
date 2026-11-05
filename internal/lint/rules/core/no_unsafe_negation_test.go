@@ -92,10 +92,26 @@ func TestNoUnsafeNegationStaysSilent(test *testing.T) {
 		// An empty options object still has to default the option to false, which a decoder that
 		// treated "present but unset" as true would get wrong.
 		{"less or equal, empty options object", "! a <= b", NoUnsafeNegationOptions{}},
-		{"greater or equal, option explicitly off", "foo = ! a >= b;", NoUnsafeNegationOptions{EnforceForOrderingRelations: false}},
-		{"a parenthesised negation before an ordering operator", "foo = (!a) >= b;", NoUnsafeNegationOptions{EnforceForOrderingRelations: true}},
-		{"an ordering comparison with no negation", "a <= b", NoUnsafeNegationOptions{EnforceForOrderingRelations: true}},
-		{"the whole ordering comparison negated", "!(a < b)", NoUnsafeNegationOptions{EnforceForOrderingRelations: true}},
+		{
+			"greater or equal, option explicitly off",
+			"foo = ! a >= b;",
+			NoUnsafeNegationOptions{EnforceForOrderingRelations: false},
+		},
+		{
+			"a parenthesised negation before an ordering operator",
+			"foo = (!a) >= b;",
+			NoUnsafeNegationOptions{EnforceForOrderingRelations: true},
+		},
+		{
+			"an ordering comparison with no negation",
+			"a <= b",
+			NoUnsafeNegationOptions{EnforceForOrderingRelations: true},
+		},
+		{
+			"the whole ordering comparison negated",
+			"!(a < b)",
+			NoUnsafeNegationOptions{EnforceForOrderingRelations: true},
+		},
 		{"greater than with no negation", "foo = a > b;", NoUnsafeNegationOptions{EnforceForOrderingRelations: true}},
 	}
 
@@ -134,7 +150,11 @@ func TestNoUnsafeNegationDeclinesOtherOperatorsAndOtherUnaries(test *testing.T) 
 		{"loose equality is not relational", "!a == b", nil},
 		{"strict inequality is not relational", "!a !== b", nil},
 		{"addition is not relational", "!a + b", nil},
-		{"equality stays out with the option on", "!a === b", NoUnsafeNegationOptions{EnforceForOrderingRelations: true}},
+		{
+			"equality stays out with the option on",
+			"!a === b",
+			NoUnsafeNegationOptions{EnforceForOrderingRelations: true},
+		},
 		{"unary minus is not a logical not", "-a in b", nil},
 		{"bitwise not is not a logical not", "~a in b", nil},
 		{"unary plus is not a logical not", "+a in b", nil},
@@ -143,7 +163,11 @@ func TestNoUnsafeNegationDeclinesOtherOperatorsAndOtherUnaries(test *testing.T) 
 		{"a double negation before an ordering operator, option off", "!!a < b", nil},
 		// The negation on the right operand is not the hazard: `a in !b` groups as written.
 		{"a negation on the right operand", "a in !b", nil},
-		{"a negation on the right of an ordering operator", "a < !b", NoUnsafeNegationOptions{EnforceForOrderingRelations: true}},
+		{
+			"a negation on the right of an ordering operator",
+			"a < !b",
+			NoUnsafeNegationOptions{EnforceForOrderingRelations: true},
+		},
 	}
 
 	for _, testCase := range cases {
@@ -240,7 +264,13 @@ func TestNoUnsafeNegationSuggestsBothRewrites(test *testing.T) {
 		{"a parenthesised operand", "!(a) in b", nil, "!((a) in b)", "(!(a)) in b"},
 		{"instanceof", "!a instanceof b", nil, "!(a instanceof b)", "(!a) instanceof b"},
 		{"instanceof in parentheses", "(!a instanceof b)", nil, "(!(a instanceof b))", "((!a) instanceof b)"},
-		{"a parenthesised operand before instanceof", "!(a) instanceof b", nil, "!((a) instanceof b)", "(!(a)) instanceof b"},
+		{
+			"a parenthesised operand before instanceof",
+			"!(a) instanceof b",
+			nil,
+			"!((a) instanceof b)",
+			"(!(a)) instanceof b",
+		},
 		{"less than, option on", "if (! a < b) {}",
 			NoUnsafeNegationOptions{EnforceForOrderingRelations: true}, "if (!(a < b)) {}", "if ((! a) < b) {}"},
 		{"greater than, option on", "while (! a > b) {}",

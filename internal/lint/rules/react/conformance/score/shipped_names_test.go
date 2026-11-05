@@ -16,7 +16,10 @@ func TestEveryWiredRuleIsAShippedRule(test *testing.T) {
 	test.Parallel()
 	for _, upstream := range UpstreamNames() {
 		if _, shipped := react_conformance.ShippedRules[upstream]; !shipped {
-			test.Errorf("rule %q is wired in the engine but absent from ShippedRules, so its fixtures would be classified as unshipped", upstream)
+			test.Errorf(
+				"rule %q is wired in the engine but absent from ShippedRules, so its fixtures would be classified as unshipped",
+				upstream,
+			)
 		}
 		if Rules[upstream].Rule.Name == "" {
 			test.Errorf("rule %q is wired with no underlying cohere rule", upstream)
@@ -38,7 +41,12 @@ func TestWiredRuleNamesMatchTheRegisteredRule(test *testing.T) {
 	for _, upstream := range UpstreamNames() {
 		want := react_conformance.ShippedRules[upstream]
 		if got := Rules[upstream].Rule.Name; got != want {
-			test.Errorf("engine wires %q to cohere rule %q, but ShippedRules says %q implements it", upstream, got, want)
+			test.Errorf(
+				"engine wires %q to cohere rule %q, but ShippedRules says %q implements it",
+				upstream,
+				got,
+				want,
+			)
 		}
 	}
 }

@@ -83,7 +83,11 @@ var NoHtmlLinkForPages = rule.Rule{
 		if ruleContext.Program == nil {
 			return nil
 		}
-		model := noHtmlLinkForPagesRouteModelFor(ruleContext.Program, ruleContext.Program.GetCurrentDirectory(), settings)
+		model := noHtmlLinkForPagesRouteModelFor(
+			ruleContext.Program,
+			ruleContext.Program.GetCurrentDirectory(),
+			settings,
+		)
 		if !model.found {
 			return nil
 		}
@@ -97,7 +101,11 @@ var NoHtmlLinkForPages = rule.Rule{
 			// Upstream's order: target, then href, then download. Each finds the first attribute
 			// by that exact name, as `attributes.find` does, and reads only a plain string value,
 			// so `target={"_blank"}` does not exempt and `href={"/about"}` is not read.
-			if target, found := jsx.StringAttributeValue(attributes, "target", jsx.MatchExactly); found && target == "_blank" {
+			if target, found := jsx.StringAttributeValue(
+				attributes,
+				"target",
+				jsx.MatchExactly,
+			); found && target == "_blank" {
 				return
 			}
 			href, found := jsx.StringAttributeValue(attributes, "href", jsx.MatchExactly)
@@ -115,7 +123,9 @@ var NoHtmlLinkForPages = rule.Rule{
 				return
 			}
 			// Outgoing links are ignored.
-			if strings.HasPrefix(hrefPath, "http://") || strings.HasPrefix(hrefPath, "https://") || strings.HasPrefix(hrefPath, "//") {
+			if strings.HasPrefix(hrefPath, "http://") ||
+				strings.HasPrefix(hrefPath, "https://") ||
+				strings.HasPrefix(hrefPath, "//") {
 				return
 			}
 

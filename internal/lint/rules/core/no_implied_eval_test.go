@@ -151,9 +151,18 @@ func TestNoImpliedEvalFires(test *testing.T) {
 		{source: "global.setTimeout(1 + ';' + 1)", ids: []string{"impliedEval"}},
 		{source: "global.global.setTimeout(1 + ';' + 1)", ids: []string{"impliedEval"}},
 		{source: "globalThis.setTimeout('foo' + bar)", ids: []string{"impliedEval"}},
-		{source: "setTimeout('foo' + (function() {\n   setTimeout(helper);\n   execScript('str');\n   return 'bar';\n})())", ids: []string{"impliedEval", "execScript"}},
-		{source: "window.setTimeout('foo' + (function() {\n   setTimeout(helper);\n   window.execScript('str');\n   return 'bar';\n})())", ids: []string{"impliedEval", "execScript"}},
-		{source: "global.setTimeout('foo' + (function() {\n   setTimeout(helper);\n   global.execScript('str');\n   return 'bar';\n})())", ids: []string{"impliedEval", "execScript"}},
+		{
+			source: "setTimeout('foo' + (function() {\n   setTimeout(helper);\n   execScript('str');\n   return 'bar';\n})())",
+			ids:    []string{"impliedEval", "execScript"},
+		},
+		{
+			source: "window.setTimeout('foo' + (function() {\n   setTimeout(helper);\n   window.execScript('str');\n   return 'bar';\n})())",
+			ids:    []string{"impliedEval", "execScript"},
+		},
+		{
+			source: "global.setTimeout('foo' + (function() {\n   setTimeout(helper);\n   global.execScript('str');\n   return 'bar';\n})())",
+			ids:    []string{"impliedEval", "execScript"},
+		},
 		{source: "window?.setTimeout('code', 0)", ids: []string{"impliedEval"}},
 		{source: "(window?.setTimeout)('code', 0)", ids: []string{"impliedEval"}},
 		{source: "window?.execScript('code')", ids: []string{"execScript"}},
@@ -241,9 +250,15 @@ func TestNoImpliedEvalStaysSilentWithGlobalsDeclared(test *testing.T) {
 		{source: "setTimeout(function() { return 'foobar'; }, 10)"},
 		{source: "var window; window.setTimeout('foo', 100);"},
 		{source: "var global; global.setTimeout('foo', 100);"},
-		{source: "\n\t\t\tfunction execScript(string) {\n\t\t\t\tconsole.log(\"This is not your grandparent's execScript().\");\n\t\t\t}\n\n\t\t\texecScript('wibble');\n\t\t\t"},
-		{source: "\n\t\t\tfunction setTimeout(string) {\n\t\t\t\tconsole.log(\"This is not your grandparent's setTimeout().\");\n\t\t\t}\n\n\t\t\tsetTimeout('wibble');\n\t\t\t"},
-		{source: "\n\t\t\tfunction setInterval(string) {\n\t\t\t\tconsole.log(\"This is not your grandparent's setInterval().\");\n\t\t\t}\n\n\t\t\tsetInterval('wibble');\n\t\t\t"},
+		{
+			source: "\n\t\t\tfunction execScript(string) {\n\t\t\t\tconsole.log(\"This is not your grandparent's execScript().\");\n\t\t\t}\n\n\t\t\texecScript('wibble');\n\t\t\t",
+		},
+		{
+			source: "\n\t\t\tfunction setTimeout(string) {\n\t\t\t\tconsole.log(\"This is not your grandparent's setTimeout().\");\n\t\t\t}\n\n\t\t\tsetTimeout('wibble');\n\t\t\t",
+		},
+		{
+			source: "\n\t\t\tfunction setInterval(string) {\n\t\t\t\tconsole.log(\"This is not your grandparent's setInterval().\");\n\t\t\t}\n\n\t\t\tsetInterval('wibble');\n\t\t\t",
+		},
 		{source: "self.setTimeout;"},
 		{source: "self.setTimeout = foo;"},
 		{source: "self['setTimeout'];"},
@@ -301,11 +316,21 @@ func TestNoImpliedEvalStaysSilentWithoutGlobalsDeclared(test *testing.T) {
 		{source: "function foo(global) { global.setTimeout('foo', 100); }"},
 		{source: "foo('', window.setTimeout);"},
 		{source: "foo('', global.setTimeout);"},
-		{source: "\n\t\t\tfunction outer() {\n\t\t\t\tfunction setTimeout(string) {\n\t\t\t\t\tconsole.log(\"Shadowed setTimeout\");\n\t\t\t\t}\n\t\t\t\tsetTimeout('code');\n\t\t\t}\n\t\t\t"},
-		{source: "\n\t\t\tfunction outer() {\n\t\t\t\tfunction setInterval(string) {\n\t\t\t\t\tconsole.log(\"Shadowed setInterval\");\n\t\t\t\t}\n\t\t\t\tsetInterval('code');\n\t\t\t}\n\t\t\t"},
-		{source: "\n\t\t\tfunction outer() {\n\t\t\t\tfunction execScript(string) {\n\t\t\t\t\tconsole.log(\"Shadowed execScript\");\n\t\t\t\t}\n\t\t\t\texecScript('code');\n\t\t\t}\n\t\t\t"},
-		{source: "\n\t\t\t{\n\t\t\t\tconst setTimeout = function(string) {\n\t\t\t\t\tconsole.log(\"Block-scoped setTimeout\");\n\t\t\t\t};\n\t\t\t\tsetTimeout('code');\n\t\t\t}\n\t\t\t"},
-		{source: "\n\t\t\t{\n\t\t\t\tconst setInterval = function(string) {\n\t\t\t\t\tconsole.log(\"Block-scoped setInterval\");\n\t\t\t\t};\n\t\t\t\tsetInterval('code');\n\t\t\t}\n\t\t\t"},
+		{
+			source: "\n\t\t\tfunction outer() {\n\t\t\t\tfunction setTimeout(string) {\n\t\t\t\t\tconsole.log(\"Shadowed setTimeout\");\n\t\t\t\t}\n\t\t\t\tsetTimeout('code');\n\t\t\t}\n\t\t\t",
+		},
+		{
+			source: "\n\t\t\tfunction outer() {\n\t\t\t\tfunction setInterval(string) {\n\t\t\t\t\tconsole.log(\"Shadowed setInterval\");\n\t\t\t\t}\n\t\t\t\tsetInterval('code');\n\t\t\t}\n\t\t\t",
+		},
+		{
+			source: "\n\t\t\tfunction outer() {\n\t\t\t\tfunction execScript(string) {\n\t\t\t\t\tconsole.log(\"Shadowed execScript\");\n\t\t\t\t}\n\t\t\t\texecScript('code');\n\t\t\t}\n\t\t\t",
+		},
+		{
+			source: "\n\t\t\t{\n\t\t\t\tconst setTimeout = function(string) {\n\t\t\t\t\tconsole.log(\"Block-scoped setTimeout\");\n\t\t\t\t};\n\t\t\t\tsetTimeout('code');\n\t\t\t}\n\t\t\t",
+		},
+		{
+			source: "\n\t\t\t{\n\t\t\t\tconst setInterval = function(string) {\n\t\t\t\t\tconsole.log(\"Block-scoped setInterval\");\n\t\t\t\t};\n\t\t\t\tsetInterval('code');\n\t\t\t}\n\t\t\t",
+		},
 		{source: "setTimeout('code');"},
 		{source: "setInterval('code');"},
 		{source: "execScript('code');"},
@@ -313,7 +338,9 @@ func TestNoImpliedEvalStaysSilentWithoutGlobalsDeclared(test *testing.T) {
 		{source: "foo.self.setTimeout('foo', 100);"},
 		{source: "function foo(self) { self.setTimeout('foo', 100); }"},
 		{source: "foo('', self.setTimeout);"},
-		{source: "\n\t\t\tfunction outer() {\n\t\t\t\tfunction self() {\n\t\t\t\t\tconsole.log(\"Shadowed self\");\n\t\t\t\t}\n\t\t\t\tself.setTimeout('code');\n\t\t\t}"},
+		{
+			source: "\n\t\t\tfunction outer() {\n\t\t\t\tfunction self() {\n\t\t\t\t\tconsole.log(\"Shadowed self\");\n\t\t\t\t}\n\t\t\t\tself.setTimeout('code');\n\t\t\t}",
+		},
 		{source: "self.setTimeout('code');"},
 	}
 
@@ -718,7 +745,12 @@ func TestNoImpliedEvalRequiresTheTypedHarness(test *testing.T) {
 	}
 
 	// The untyped harness hands the rule a nil checker. It must decline rather than guess.
-	if result := rule_testing.Run(test, NoImpliedEval, "input.ts", `setTimeout("x = 1;");`); len(result.Diagnostics) != 0 {
+	if result := rule_testing.Run(
+		test,
+		NoImpliedEval,
+		"input.ts",
+		`setTimeout("x = 1;");`,
+	); len(result.Diagnostics) != 0 {
 		test.Errorf("the untyped harness must produce no findings, got %d", len(result.Diagnostics))
 	}
 

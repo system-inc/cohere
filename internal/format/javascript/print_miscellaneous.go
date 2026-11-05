@@ -132,7 +132,11 @@ func printDanglingCommentsInList(path *Path, options *Options, filter func(Node)
 	if hasComment(current, commentDangling|commentLine, filter) {
 		closing = hardline
 	}
-	return concatIn(path, indentIn(path, concatIn(path, softline, printing.PrintDanglingComments(path, options, printing.DanglingOptions[Node]{Filter: filter}))),
+	return concatIn(path, indentIn(path, concatIn(
+		path,
+		softline,
+		printing.PrintDanglingComments(path, options, printing.DanglingOptions[Node]{Filter: filter}),
+	)),
 		closing,
 	)
 }

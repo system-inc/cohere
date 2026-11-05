@@ -120,7 +120,9 @@ func spinFor(test *testing.T, cpu time.Duration) {
 	test.Helper()
 	start, known := threadCPU()
 	if !known {
-		test.Skip("this platform has no thread CPU clock, so --timing reports no CPU here and the meter has nothing to test")
+		test.Skip(
+			"this platform has no thread CPU clock, so --timing reports no CPU here and the meter has nothing to test",
+		)
 	}
 	for {
 		if now, _ := threadCPU(); now-start >= cpu {

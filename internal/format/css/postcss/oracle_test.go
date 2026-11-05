@@ -71,22 +71,46 @@ type parseFixture struct {
 var parseFixtures = []parseFixture{
 	// Rules and nesting.
 	{name: "one rule", text: "a{b:c}"},
-	{name: "nested rules", text: ".a {\n  color: red;\n  .b { color: blue }\n  &:hover { x: y; }\n  > li { a: b }\n}\n"},
+	{
+		name: "nested rules",
+		text: ".a {\n  color: red;\n  .b { color: blue }\n  &:hover { x: y; }\n  > li { a: b }\n}\n",
+	},
 	{name: "deep nesting with at-rules", text: ".a { @media (x) { .b { @supports (y) { c: d } } } }"},
 	{name: "empty rules", text: "a{} b { } c {\n}\n{}\n{ a: b }"},
 	{name: "selector lists", text: "a,\nb , c>d~e+f, [x=\"y\"], :is(a, b)::before {}"},
 	{name: "selector with brackets and parens", text: "a[title=\"x}y\"], a:not([x]) , a:nth-child(2n+1){b:c}"},
 	{name: "hacks", text: "a{_b:c;*d:e}"},
-	{name: "progid", text: "a{filter:progid:DXImageTransform.Microsoft.gradient(startColorstr='#1', endColorstr='#2')}"},
+	{
+		name: "progid",
+		text: "a{filter:progid:DXImageTransform.Microsoft.gradient(startColorstr='#1', endColorstr='#2')}",
+	},
 
 	// At-rules.
-	{name: "import", text: "@import url(foo.css);\n@import 'a.css' screen;\n@import \"b.css\" layer(x) supports(display: grid);"},
+	{
+		name: "import",
+		text: "@import url(foo.css);\n@import 'a.css' screen;\n@import \"b.css\" layer(x) supports(display: grid);",
+	},
 	{name: "charset", text: "@charset \"utf-8\";"},
-	{name: "media", text: "@media (min-width: 100px) and (max-width:200px) { a { b: c } }\n@media screen{}\n@media print,screen{a{b:c}}"},
-	{name: "font-face", text: "@font-face{font-family:x;src:url(a.woff2) format('woff2'),url(\"b.woff\") format(\"woff\");font-display:swap}"},
-	{name: "layer statements and blocks", text: "@layer base, components, utilities;\n@layer base { html { a: b } }\n@layer { }"},
-	{name: "tailwind at-rules", text: "@import \"tailwindcss\";\n@theme inline {\n  --color-x: red;\n  --font-*: initial;\n}\n@custom-variant dark (&:where(.dark, .dark *));\n@utility tab-4 { tab-size: 4; }\n.a { @apply flex items-center; }\n@source \"../node_modules\";"},
-	{name: "keyframes", text: "@keyframes spin { from { transform: rotate(0deg) } 50.5% { opacity: .5 } to { transform: rotate(360deg) } }"},
+	{
+		name: "media",
+		text: "@media (min-width: 100px) and (max-width:200px) { a { b: c } }\n@media screen{}\n@media print,screen{a{b:c}}",
+	},
+	{
+		name: "font-face",
+		text: "@font-face{font-family:x;src:url(a.woff2) format('woff2'),url(\"b.woff\") format(\"woff\");font-display:swap}",
+	},
+	{
+		name: "layer statements and blocks",
+		text: "@layer base, components, utilities;\n@layer base { html { a: b } }\n@layer { }",
+	},
+	{
+		name: "tailwind at-rules",
+		text: "@import \"tailwindcss\";\n@theme inline {\n  --color-x: red;\n  --font-*: initial;\n}\n@custom-variant dark (&:where(.dark, .dark *));\n@utility tab-4 { tab-size: 4; }\n.a { @apply flex items-center; }\n@source \"../node_modules\";",
+	},
+	{
+		name: "keyframes",
+		text: "@keyframes spin { from { transform: rotate(0deg) } 50.5% { opacity: .5 } to { transform: rotate(360deg) } }",
+	},
 	{name: "supports", text: "@supports (display:grid) and (not (display:inline-grid)){a{b:c}}"},
 	{name: "at-rule closed by brace", text: "a { @apply x y }\nb { @apply z   }\nc { @foo /* c */ }"},
 	{name: "at-rule at end of file", text: "@foo bar"},
@@ -119,7 +143,10 @@ var parseFixtures = []parseFixture{
 	{name: "colon in value after another word", text: "a{b:c url(x:y)}"},
 
 	// Comments everywhere.
-	{name: "comments everywhere", text: "/* a */ a /* b */ , c /* c */ { /* d */ b /* e */ : /* f */ c /* g */ ; /* h */ } /* i */"},
+	{
+		name: "comments everywhere",
+		text: "/* a */ a /* b */ , c /* c */ { /* d */ b /* e */ : /* f */ c /* g */ ; /* h */ } /* i */",
+	},
 	{name: "comment inside a value", text: "a{b:c/* x */d; e:f, /* y */ g; h:i /* z */; j:/* k */l}"},
 	{name: "comment with one safe neighbor", text: "a /* x */b, c/* y */ d{e:f /* z */g; h:i/* w */ j}"},
 	{name: "comments in selectors", text: "a/* x */,b{} a /* x */{} a,/* x */b{} a/* x */b{}"},
@@ -139,7 +166,10 @@ var parseFixtures = []parseFixture{
 	{name: "url with spaces", text: "a{b:url( foo.png )}"},
 	{name: "url single quoted", text: "a{b:url('a b.png')}"},
 	{name: "url double quoted", text: "a{b:url(\"x\")}"},
-	{name: "url data", text: "a{b:url(data:image/svg+xml;charset=utf8,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%3E)}"},
+	{
+		name: "url data",
+		text: "a{b:url(data:image/svg+xml;charset=utf8,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%3E)}",
+	},
 	{name: "url with escaped paren", text: "a{b:url(a\\)b)}"},
 	{name: "url empty", text: "a{b:url()}"},
 	{name: "url with newline", text: "a { b: url(foo\n) }"},
@@ -151,7 +181,10 @@ var parseFixtures = []parseFixture{
 	// the tokenizer's buffer, so which of two errors the second, unclosed one raises.
 	{name: "line terminator then url", text: "a{b:x(\xe2\x80\xa8\n\nurl) (y}", malformed: true},
 	{name: "nested parens", text: "a{b:calc(1px + (2px * var(--x, 3px)))}"},
-	{name: "square brackets", text: "a{grid-template-areas: [a] \"b\"; grid-template-columns: [full-start] 1fr [full-end]}"},
+	{
+		name: "square brackets",
+		text: "a{grid-template-areas: [a] \"b\"; grid-template-columns: [full-start] 1fr [full-end]}",
+	},
 
 	// Custom properties.
 	{name: "custom property json-like", text: "a{--x:{a:b}}"},
@@ -183,8 +216,14 @@ var parseFixtures = []parseFixture{
 	{name: "CRLF", text: "a {\r\n  b: c;\r\n}\r\n@media x {\r\n  d { e: f }\r\n}\r\n"},
 	{name: "CR only", text: "a{\rb:c\r}\r"},
 	{name: "form feed", text: "a{\fb:c\f}"},
-	{name: "non-ASCII", text: ".\xc3\xa9 { content: \"\xe6\x97\xa5\xe6\x9c\xac\xe8\xaa\x9e \xf0\x9f\x98\x80\"; --x: \xf0\x9f\x98\x80; } /* \xe2\x9c\x93 */ \xf0\x9f\x98\x80 { a: b }"},
-	{name: "non-ASCII positions across lines", text: "a{b:c}\n\xf0\x9f\x98\x80{x:y}\n@media \xf0\x9f\x98\x80{}\n\xf0\x9f\x98\x80\xf0\x9f\x98\x80 { z: \xf0\x9f\x98\x80 }"},
+	{
+		name: "non-ASCII",
+		text: ".\xc3\xa9 { content: \"\xe6\x97\xa5\xe6\x9c\xac\xe8\xaa\x9e \xf0\x9f\x98\x80\"; --x: \xf0\x9f\x98\x80; } /* \xe2\x9c\x93 */ \xf0\x9f\x98\x80 { a: b }",
+	},
+	{
+		name: "non-ASCII positions across lines",
+		text: "a{b:c}\n\xf0\x9f\x98\x80{x:y}\n@media \xf0\x9f\x98\x80{}\n\xf0\x9f\x98\x80\xf0\x9f\x98\x80 { z: \xf0\x9f\x98\x80 }",
+	},
 	{name: "escapes", text: "a\\:b{c:d} .\\31 0{} a{b:\\\\} .a\\\\b{} .x\\{{}"},
 	{name: "escaped astral character", text: ".a\\\xf0\x9f\x98\x80{b:c}"},
 	{name: "hex escape then space", text: ".\\E9 x{}"},
@@ -378,10 +417,22 @@ func TestParseAgreesWithPostcss(test *testing.T) {
 			identical++
 		}
 	}
-	test.Logf("%d compared (%d corpus files, %d fixtures): %d identical, %d refused by both with the same error, %d different; %d corpus files refused",
-		len(inputs), corpusFiles, len(parseFixtures), identical, refusedByBoth, different, corpusRefused)
+	test.Logf(
+		"%d compared (%d corpus files, %d fixtures): %d identical, %d refused by both with the same error, %d different; %d corpus files refused",
+		len(inputs),
+		corpusFiles,
+		len(parseFixtures),
+		identical,
+		refusedByBoth,
+		different,
+		corpusRefused,
+	)
 	if corpusRefused > corpusFiles/10 {
-		test.Errorf("postcss refused %d of %d corpus files; the comparison is thinner than it looks", corpusRefused, corpusFiles)
+		test.Errorf(
+			"postcss refused %d of %d corpus files; the comparison is thinner than it looks",
+			corpusRefused,
+			corpusFiles,
+		)
 	}
 }
 
@@ -449,7 +500,11 @@ func dumpParseValue(value any, offsets func(int) int) any {
 				startOffset, startIsInt := start["offset"].(int)
 				endOffset, endIsInt := end["offset"].(int)
 				if !startIsInt || !endIsInt {
-					result["range"] = fmt.Sprintf("source offsets %#v and %#v are not both ints", start["offset"], end["offset"])
+					result["range"] = fmt.Sprintf(
+						"source offsets %#v and %#v are not both ints",
+						start["offset"],
+						end["offset"],
+					)
 					return result
 				}
 				wantRange = [2]int{startOffset, endOffset}
@@ -550,7 +605,15 @@ func firstParseDifference(want any, got any, path string) string {
 			wantValue, wantPresent := typed[key]
 			gotValue, gotPresent := other[key]
 			if wantPresent != gotPresent {
-				return fmt.Sprintf("%s.%s: present in postcss %v (%v), in Go %v (%v)", path, key, wantPresent, wantValue, gotPresent, gotValue)
+				return fmt.Sprintf(
+					"%s.%s: present in postcss %v (%v), in Go %v (%v)",
+					path,
+					key,
+					wantPresent,
+					wantValue,
+					gotPresent,
+					gotValue,
+				)
 			}
 			if difference := firstParseDifference(wantValue, gotValue, path+"."+key); difference != "" {
 				return difference
@@ -563,7 +626,11 @@ func firstParseDifference(want any, got any, path string) string {
 			return fmt.Sprintf("%s: want %d elements %v, got %v", path, len(typed), typed, got)
 		}
 		for index := range typed {
-			if difference := firstParseDifference(typed[index], other[index], fmt.Sprintf("%s[%d]", path, index)); difference != "" {
+			if difference := firstParseDifference(
+				typed[index],
+				other[index],
+				fmt.Sprintf("%s[%d]", path, index),
+			); difference != "" {
 				return difference
 			}
 		}

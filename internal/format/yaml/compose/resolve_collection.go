@@ -43,7 +43,12 @@ func resolveBlockMap(composition *composeContext, bm *cst.Token, onError onError
 		if implicitKey {
 			if key != nil {
 				if key.Type == "block-seq" {
-					onError(offset, "BLOCK_AS_IMPLICIT_KEY", "A block sequence may not be used as an implicit map key", false)
+					onError(
+						offset,
+						"BLOCK_AS_IMPLICIT_KEY",
+						"A block sequence may not be used as an implicit map key",
+						false,
+					)
 				} else if key.HasIndent() && key.Indent != bm.Indent {
 					onError(offset, "BAD_INDENT", startColMsg, false)
 				}
@@ -96,11 +101,20 @@ func resolveBlockMap(composition *composeContext, bm *cst.Token, onError onError
 		if valueProperties.found != nil {
 			if implicitKey {
 				if value != nil && value.Type == "block-map" && !valueProperties.hasNewline {
-					onError(offset, "BLOCK_AS_IMPLICIT_KEY", "Nested mappings are not allowed in compact mappings", false)
+					onError(
+						offset,
+						"BLOCK_AS_IMPLICIT_KEY",
+						"Nested mappings are not allowed in compact mappings",
+						false,
+					)
 				}
 				if composition.options.Strict && keyProperties.start < valueProperties.found.Offset-1024 {
-					onError(keyNode.Range, "KEY_OVER_1024_CHARS",
-						"The : indicator must be at most 1024 chars after the start of an implicit block mapping key", false)
+					onError(
+						keyNode.Range,
+						"KEY_OVER_1024_CHARS",
+						"The : indicator must be at most 1024 chars after the start of an implicit block mapping key",
+						false,
+					)
 				}
 			}
 			// value value
@@ -319,8 +333,10 @@ func resolveFlowCollection(composition *composeContext, fc *cst.Token, onError o
 					} else {
 						previous.Comment = unitsToString(previousItemComment)
 					}
-					properties.comment = unitsToString(substring(stringToUnits(properties.comment), len(previousItemComment)+1,
-						UnitLength(properties.comment)))
+					properties.comment = unitsToString(
+						substring(stringToUnits(properties.comment), len(previousItemComment)+1,
+							UnitLength(properties.comment)),
+					)
 				}
 			}
 		}
@@ -370,13 +386,22 @@ func resolveFlowCollection(composition *composeContext, fc *cst.Token, onError o
 							break
 						}
 						if st.Type == "newline" {
-							onError(st, "MULTILINE_IMPLICIT_KEY", "Implicit keys of flow sequence pairs need to be on a single line", false)
+							onError(
+								st,
+								"MULTILINE_IMPLICIT_KEY",
+								"Implicit keys of flow sequence pairs need to be on a single line",
+								false,
+							)
 							break
 						}
 					}
 					if properties.start < valueProperties.found.Offset-1024 {
-						onError(valueProperties.found, "KEY_OVER_1024_CHARS",
-							"The : indicator must be at most 1024 chars after the start of an implicit flow sequence key", false)
+						onError(
+							valueProperties.found,
+							"KEY_OVER_1024_CHARS",
+							"The : indicator must be at most 1024 chars after the start of an implicit flow sequence key",
+							false,
+						)
 					}
 				}
 			} else if value != nil {

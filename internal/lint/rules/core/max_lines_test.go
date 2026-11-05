@@ -81,7 +81,11 @@ func TestMaxLinesOptions(test *testing.T) {
 	test.Run("the default is 300", func(test *testing.T) {
 		test.Parallel()
 		rule_testing.ExpectClean(test, rule_testing.Run(test, MaxLines, maxLinesFile, maxLinesSource(300, "\n", true)))
-		rule_testing.ExpectFindings(test, rule_testing.Run(test, MaxLines, maxLinesFile, maxLinesSource(301, "\n", true)), "exceed")
+		rule_testing.ExpectFindings(
+			test,
+			rule_testing.Run(test, MaxLines, maxLinesFile, maxLinesSource(301, "\n", true)),
+			"exceed",
+		)
 	})
 
 	blankLines := "first;\n\n   \nsecond;\n"

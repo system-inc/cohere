@@ -26,7 +26,12 @@ func disjointFor(test *testing.T, source string) (*Function, *DisjointSet) {
 }
 
 // classOfName returns the sorted class containing the LAST value a named binding takes.
-func classOfName(test *testing.T, function *Function, set *DisjointSet, name string) []static_single_assignment.IdentifierId {
+func classOfName(
+	test *testing.T,
+	function *Function,
+	set *DisjointSet,
+	name string,
+) []static_single_assignment.IdentifierId {
 	test.Helper()
 	var target static_single_assignment.IdentifierId
 	found := false
@@ -89,13 +94,23 @@ func TestDisjointSetMatchesReact(test *testing.T) {
 			name:     "chain",
 			unions:   [][]static_single_assignment.IdentifierId{{a, b}, {b, c}, {c, d}},
 			wantSets: [][]static_single_assignment.IdentifierId{{a, b, c, d}},
-			wantRoot: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{a: a, b: a, c: a, d: a},
+			wantRoot: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{
+				a: a,
+				b: a,
+				c: a,
+				d: a,
+			},
 		},
 		{
 			name:     "two established classes merge",
 			unions:   [][]static_single_assignment.IdentifierId{{a, b}, {c, d}, {a, c}},
 			wantSets: [][]static_single_assignment.IdentifierId{{a, b, c, d}},
-			wantRoot: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{a: a, b: a, c: a, d: a},
+			wantRoot: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{
+				a: a,
+				b: a,
+				c: a,
+				d: a,
+			},
 		},
 		{
 			name:     "singleton",
@@ -115,13 +130,25 @@ func TestDisjointSetMatchesReact(test *testing.T) {
 			name:     "first element is not a root",
 			unions:   [][]static_single_assignment.IdentifierId{{a, b}, {c, d}, {b, d}},
 			wantSets: [][]static_single_assignment.IdentifierId{{a, b, c, d}},
-			wantRoot: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{a: a, b: a, c: a, d: a},
+			wantRoot: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{
+				a: a,
+				b: a,
+				c: a,
+				d: a,
+			},
 		},
 		{
 			name:     "three way merge",
 			unions:   [][]static_single_assignment.IdentifierId{{a, b, c}, {d, e, f}, {c, d}},
 			wantSets: [][]static_single_assignment.IdentifierId{{a, b, c, d, e, f}},
-			wantRoot: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{a: a, b: a, c: a, d: a, e: a, f: a},
+			wantRoot: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{
+				a: a,
+				b: a,
+				c: a,
+				d: a,
+				e: a,
+				f: a,
+			},
 		},
 		{
 			name:     "self union",
@@ -133,13 +160,25 @@ func TestDisjointSetMatchesReact(test *testing.T) {
 			name:     "two chains merged at their tails",
 			unions:   [][]static_single_assignment.IdentifierId{{a, b}, {b, c}, {d, e}, {e, f}, {a, f}},
 			wantSets: [][]static_single_assignment.IdentifierId{{a, b, c, d, e, f}},
-			wantRoot: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{a: a, b: a, c: a, d: a, e: a, f: a},
+			wantRoot: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{
+				a: a,
+				b: a,
+				c: a,
+				d: a,
+				e: a,
+				f: a,
+			},
 		},
 		{
 			name:     "star",
 			unions:   [][]static_single_assignment.IdentifierId{{a, b}, {a, c}, {a, d}},
 			wantSets: [][]static_single_assignment.IdentifierId{{a, b, c, d}},
-			wantRoot: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{a: a, b: a, c: a, d: a},
+			wantRoot: map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{
+				a: a,
+				b: a,
+				c: a,
+				d: a,
+			},
 		},
 	}
 
@@ -502,7 +541,11 @@ func TestDisjointMayAllocateMatchesReact(test *testing.T) {
 	for _, testCase := range tests {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			if got := mayAllocate(nil, newCalleeProducers(nil), &Instruction{Value: testCase.value}); got != testCase.want {
+			if got := mayAllocate(
+				nil,
+				newCalleeProducers(nil),
+				&Instruction{Value: testCase.value},
+			); got != testCase.want {
 				test.Errorf("mayAllocate(%s) = %v, want %v", testCase.name, got, testCase.want)
 			}
 		})
@@ -657,7 +700,12 @@ func TestDisjointPhiUsesReactsTwoTermTest(test *testing.T) {
 		{"unset range is rejected by the second term", mutation_aliasing.MutableRange{Start: 0, End: 0}, 5, false},
 		{"exactly one wide is rejected by the first term", mutation_aliasing.MutableRange{Start: 3, End: 4}, 1, false},
 		{"wider than one and ending after the block fires", mutation_aliasing.MutableRange{Start: 3, End: 9}, 5, true},
-		{"wider than one but ending before the block does not", mutation_aliasing.MutableRange{Start: 1, End: 3}, 5, false},
+		{
+			"wider than one but ending before the block does not",
+			mutation_aliasing.MutableRange{Start: 1, End: 3},
+			5,
+			false,
+		},
 		{"ending exactly at the first order does not fire", mutation_aliasing.MutableRange{Start: 1, End: 5}, 5, false},
 	}
 

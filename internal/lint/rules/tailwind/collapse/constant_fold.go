@@ -190,7 +190,12 @@ func constantFoldDeclarationAst(nodes []ValueNode, rem *float64, normalizeUnit b
 // lhs and rhs are the outer operands read as dimensions, and the nil one is the nested expression.
 // The second result is false when the expression does not have this shape or its units do not allow
 // the fold, and then upstream's hook goes on to its plain two-operand fold.
-func reassociateNestedExpression(valueNode *ValueNode, operator string, lhs *dimension, rhs *dimension) (ValueNode, bool) {
+func reassociateNestedExpression(
+	valueNode *ValueNode,
+	operator string,
+	lhs *dimension,
+	rhs *dimension,
+) (ValueNode, bool) {
 	constant := lhs
 	if constant == nil {
 		constant = rhs

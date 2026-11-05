@@ -8,8 +8,8 @@
 // The claim was measured before any of this was written, against the shipped engine on two
 // repositories: 37,625 of 37,643 registry classes, every sampled modifier class, and 132,199 of
 // 132,203 arbitrary probes over 327 roots and 527 value shapes. See
-// `internal/lint/rules/tailwind/tools/generate_descriptors/README.md`, which is the specification this file implements. The
-// numbers there are reproduced by running the extractor, not quoted from memory.
+// `internal/lint/rules/tailwind/tools/generate_descriptors/README.md`, which is the specification this file implements.
+// The numbers there are reproduced by running the extractor, not quoted from memory.
 //
 // # The descriptor is four things, and each correction cost a population of mispredictions
 //
@@ -360,7 +360,12 @@ func (table *Table) Lookup(candidate *ParsedCandidate) (Reading, bool) {
 // Each step exists because the one before it left a measurable population mispredicted, and the
 // riskiest single assumption available here is that "bare" means "theme lookup only": bare values
 // are inferred too, which is what makes `via-25%` a percentage.
-func (table *Table) bareReading(descriptor *Descriptor, axis AxisReadings, value string, modifierAxis ModifierAxis) Reading {
+func (table *Table) bareReading(
+	descriptor *Descriptor,
+	axis AxisReadings,
+	value string,
+	modifierAxis ModifierAxis,
+) Reading {
 	// 1. Root-defined literals, measured only on the unmodified axis.
 	if modifierAxis == ModifierAbsent {
 		if reading, found := descriptor.ByLiteral[value]; found {

@@ -54,7 +54,14 @@ func newContext(text []uint16, lineCounter *cst.LineCounter, nodes *arena.Arena[
 		// parses reuse it cleared, with the room it grew to.
 		memory.positionsByNode = make(map[*Node]*position, len(text)/8)
 	}
-	return &context{text: text, comments: []*Node{}, lineCounter: lineCounter, positions: memory.positionsByNode, nodes: nodes, memory: memory}
+	return &context{
+		text:        text,
+		comments:    []*Node{},
+		lineCounter: lineCounter,
+		positions:   memory.positionsByNode,
+		nodes:       nodes,
+		memory:      memory,
+	}
 }
 
 // parseMemory is what one Parse uses only while it runs, kept for the next (#vbjv3d6): its point and
@@ -186,7 +193,10 @@ func throwError(format string, arguments ...any) {
 // throwTypeError is the TypeError V8 raises reading property of undefined or null (missing names
 // which).
 func throwTypeError(missing string, property string) {
-	panic(&ThrownError{Name: "TypeError", Message: fmt.Sprintf("Cannot read properties of %s (reading '%s')", missing, property)})
+	panic(&ThrownError{
+		Name:    "TypeError",
+		Message: fmt.Sprintf("Cannot read properties of %s (reading '%s')", missing, property),
+	})
 }
 
 // SyntaxError is upstream's YAMLSyntaxError: the first error of the first document that has one, with

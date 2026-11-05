@@ -26,18 +26,34 @@ var formatCases = []formatCase{
 		source: "query   Named($id:ID!,$first:Int=10 @deprecated){user(id:$id){id}}\n" +
 			"query ($a:Int){a}\nquery{b}\n{c}\nmutation   M{d}\nsubscription S @live{e}\n" +
 			"mutation($b:[String!]!=[\"x\"]){f}\n",
-		contains: []string{"query Named($id: ID!, $first: Int = 10 @deprecated) {", "query ($a: Int) {", "query {", "\n{\n", "subscription S @live {"},
+		contains: []string{
+			"query Named($id: ID!, $first: Int = 10 @deprecated) {",
+			"query ($a: Int) {",
+			"query {",
+			"\n{\n",
+			"subscription S @live {",
+		},
 	},
 	{
 		name: "descriptions on executable definitions and variables, block and plain",
 		source: "\"Plain operation description\" query Q(\"variable description\" $a:Int){a}\n" +
 			"\"\"\"\n  Block fragment description\n  second line\n\"\"\" fragment F on T{a}\n",
-		contains: []string{"\"Plain operation description\"\nquery Q(", "\"\"\"\nBlock fragment description\nsecond line\n\"\"\"\nfragment F on T {"},
+		contains: []string{
+			"\"Plain operation description\"\nquery Q(",
+			"\"\"\"\nBlock fragment description\nsecond line\n\"\"\"\nfragment F on T {",
+		},
 	},
 	{
-		name:     "fields: aliases, arguments, directives, nested selections, fragments",
-		source:   "query{alias:field(a:1,b:\"two\",c:THREE,d:null,e:true,f:false,g:1.5e3,h:$v,i:[1,2],j:{k:1,l:{m:2}})@include(if:$x)@skip(if:false){...Spread @defer ...on Type{x} ... @include(if:true){y} ...{z}}}\n",
-		contains: []string{"alias: field(", "@include(if: $x) @skip(if: false) {", "...Spread @defer", "... on Type {", "... @include(if: true) {", "... {"},
+		name:   "fields: aliases, arguments, directives, nested selections, fragments",
+		source: "query{alias:field(a:1,b:\"two\",c:THREE,d:null,e:true,f:false,g:1.5e3,h:$v,i:[1,2],j:{k:1,l:{m:2}})@include(if:$x)@skip(if:false){...Spread @defer ...on Type{x} ... @include(if:true){y} ...{z}}}\n",
+		contains: []string{
+			"alias: field(",
+			"@include(if: $x) @skip(if: false) {",
+			"...Spread @defer",
+			"... on Type {",
+			"... @include(if: true) {",
+			"... {",
+		},
 	},
 	{
 		name:     "strings: escapes, unicode, and every block string shape",
@@ -60,8 +76,13 @@ var formatCases = []formatCase{
 			"\"\"\"directive description\"\"\" directive @dir(a:Int=1,b:String) repeatable on FIELD|FRAGMENT_SPREAD|INLINE_FRAGMENT\n" +
 			"directive @plain on QUERY\nextend directive @dir @i\n",
 		contains: []string{
-			"schema @a {", "extend schema @b\n", "type Query implements A & B @key(", "\"argument description\" a: Int = 1 @d",
-			"type Empty\n", "union U = A | B", "repeatable on FIELD | FRAGMENT_SPREAD | INLINE_FRAGMENT",
+			"schema @a {",
+			"extend schema @b\n",
+			"type Query implements A & B @key(",
+			"\"argument description\" a: Int = 1 @d",
+			"type Empty\n",
+			"union U = A | B",
+			"repeatable on FIELD | FRAGMENT_SPREAD | INLINE_FRAGMENT",
 			"extend directive @dir @i",
 		},
 	},
@@ -71,9 +92,12 @@ var formatCases = []formatCase{
 		contains: []string{"f(\n"},
 	},
 	{
-		name:     "fragment arguments on definitions and spreads",
-		source:   "fragment F($a:Int=1,$b:String @deprecated) on T @dir{f(a:$a)}\nquery{...F(a:2,b:\"x\") @skip(if:false)}\n",
-		contains: []string{"fragment F($a: Int = 1, $b: String @deprecated) on T @dir {", "...F(a: 2, b: \"x\") @skip(if: false)"},
+		name:   "fragment arguments on definitions and spreads",
+		source: "fragment F($a:Int=1,$b:String @deprecated) on T @dir{f(a:$a)}\nquery{...F(a:2,b:\"x\") @skip(if:false)}\n",
+		contains: []string{
+			"fragment F($a: Int = 1, $b: String @deprecated) on T @dir {",
+			"...F(a: 2, b: \"x\") @skip(if: false)",
+		},
 	},
 	{
 		name:     "blank lines between definitions and members are kept, runs collapse to one",
@@ -84,13 +108,23 @@ var formatCases = []formatCase{
 		name: "comments: own line, end of line, between arguments, trailing spaces, end of file",
 		source: "# leading the file   \n# ends in JavaScript-only whitespace\u00a0\f\ufeff\n\n# before a definition\ntype T { # after the brace\n  # own line before a field\n  a: Int # end of line\n" +
 			"  b(\n  # before an argument\n  x: Int # after an argument\n  ): Int\n}\nquery { a # after a selection\n  # between selections\n  b }\n# end of file\n",
-		contains: []string{"# leading the file\n", "# ends in JavaScript-only whitespace\n", "# end of line", "# end of file"},
+		contains: []string{
+			"# leading the file\n",
+			"# ends in JavaScript-only whitespace\n",
+			"# end of line",
+			"# end of file",
+		},
 	},
 	{
 		name: "comments: in variable definitions, object fields, list values, before a closing brace",
 		source: "query Q(\n# before a variable\n$a:Int # after a variable\n$b:Int) @dir # after a directive\n{a(o:{\n# before a field\nx:1 # after a field\ny:[1, # in a list\n2]})\n" +
 			"# before the closing brace\n}\nenum E { A # after a value\n# own line before the end\n}\nunion U = # after the equals\nA | B\n",
-		contains: []string{"# before a variable", "# after a field", "# before the closing brace", "# after the equals"},
+		contains: []string{
+			"# before a variable",
+			"# after a field",
+			"# before the closing brace",
+			"# after the equals",
+		},
 	},
 	{
 		name:     "comments dangling in an empty list and an empty object",
@@ -153,11 +187,21 @@ func TestFormatMatchesTheFork(test *testing.T) {
 				test.Fatalf("%s (%s): the oracle failed: %v", testCase.name, optionsName, err)
 			}
 			if expected == testCase.source {
-				test.Fatalf("%s (%s): the oracle left the snippet unchanged, so an identity printer would pass", testCase.name, optionsName)
+				test.Fatalf(
+					"%s (%s): the oracle left the snippet unchanged, so an identity printer would pass",
+					testCase.name,
+					optionsName,
+				)
 			}
 			for _, substring := range testCase.contains {
 				if !strings.Contains(expected, substring) {
-					test.Errorf("%s (%s): the fork's output lacks %q:\n%s", testCase.name, optionsName, substring, expected)
+					test.Errorf(
+						"%s (%s): the fork's output lacks %q:\n%s",
+						testCase.name,
+						optionsName,
+						substring,
+						expected,
+					)
 				}
 			}
 			actual, err := Format(testCase.source, options)
@@ -232,7 +276,10 @@ func TestPrintToDocIsFormatWithoutTheTrailingHardline(test *testing.T) {
 		if err != nil {
 			test.Fatalf("%s: %v", testCase.name, err)
 		}
-		printed := doc.Print(document, doc.Options{PrintWidth: options.PrintWidth, TabWidth: options.TabWidth, UseTabs: options.UseTabs})
+		printed := doc.Print(
+			document,
+			doc.Options{PrintWidth: options.PrintWidth, TabWidth: options.TabWidth, UseTabs: options.UseTabs},
+		)
 		if printed != strings.TrimSuffix(formatted, "\n") {
 			test.Errorf("%s:\n--- Format\n%s--- PrintToDoc\n%s", testCase.name, formatted, printed)
 		}

@@ -30,15 +30,30 @@ func TestPreferAsConstFires(test *testing.T) {
 		{"upstream fail 6", "const example: 'hello' = 'hello';"},
 		{"upstream fail 7", "let foo: 'bar' = \"bar\";"},
 		{"upstream fail 8", "const foo: 2 = 2;"},
-		{"upstream fail 9", "\n            class foo {\n              readonly bar: 'baz' = 'baz';\n            }\n                  "},
-		{"upstream fail 10", "\n            class foo {\n              static bar: 2 = 2;\n            }\n                  "},
+		{
+			"upstream fail 9",
+			"\n            class foo {\n              readonly bar: 'baz' = 'baz';\n            }\n                  ",
+		},
+		{
+			"upstream fail 10",
+			"\n            class foo {\n              static bar: 2 = 2;\n            }\n                  ",
+		},
 		{"upstream fail 11", "let foo: 'bar' = 'bar' as 'bar';"},
 		{"upstream fail 12", "let foo = 'bar' as 'bar';"},
 		{"upstream fail 13", "let foo = 5 as 5;"},
-		{"upstream fail 14", "\n            class foo {\n              bar: 'baz' = 'baz';\n            }\n                  "},
+		{
+			"upstream fail 14",
+			"\n            class foo {\n              bar: 'baz' = 'baz';\n            }\n                  ",
+		},
 		{"upstream fail 15", "\n            class foo {\n              bar: 2 = 2;\n            }\n                  "},
-		{"upstream fail 16", "\n            class foo {\n              foo = 'bar' as 'bar';\n            }\n                  "},
-		{"upstream fail 17", "\n            class foo {\n              foo = 5 as 5;\n            }\n                  "},
+		{
+			"upstream fail 16",
+			"\n            class foo {\n              foo = 'bar' as 'bar';\n            }\n                  ",
+		},
+		{
+			"upstream fail 17",
+			"\n            class foo {\n              foo = 5 as 5;\n            }\n                  ",
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -74,19 +89,47 @@ func TestPreferAsConstFixesWriteWhatTheyClaim(test *testing.T) {
 		{"upstream fix vector 8", "const foo: 2 = 2;", "const foo = 2 as const;"},
 		{"upstream fix vector 9", "let foo = 'bar' as 'bar';", "let foo = 'bar' as const;"},
 		{"upstream fix vector 10", "let foo = 5 as 5;", "let foo = 5 as const;"},
-		{"upstream fix vector 11", "\n            class foo {\n              readonly bar: 'baz' = 'baz';\n            }\n                  ", "\n            class foo {\n              readonly bar = 'baz' as const;\n            }\n                  "},
-		{"upstream fix vector 12", "\n            class foo {\n              static bar: 2 = 2;\n            }\n                  ", "\n            class foo {\n              static bar = 2 as const;\n            }\n                  "},
-		{"upstream fix vector 13", "\n            class foo {\n              foo = 'bar' as 'bar';\n            }\n                  ", "\n            class foo {\n              foo = 'bar' as const;\n            }\n                  "},
-		{"upstream fix vector 14", "\n            class foo {\n              foo = 5 as 5;\n            }\n                  ", "\n            class foo {\n              foo = 5 as const;\n            }\n                  "},
+		{
+			"upstream fix vector 11",
+			"\n            class foo {\n              readonly bar: 'baz' = 'baz';\n            }\n                  ",
+			"\n            class foo {\n              readonly bar = 'baz' as const;\n            }\n                  ",
+		},
+		{
+			"upstream fix vector 12",
+			"\n            class foo {\n              static bar: 2 = 2;\n            }\n                  ",
+			"\n            class foo {\n              static bar = 2 as const;\n            }\n                  ",
+		},
+		{
+			"upstream fix vector 13",
+			"\n            class foo {\n              foo = 'bar' as 'bar';\n            }\n                  ",
+			"\n            class foo {\n              foo = 'bar' as const;\n            }\n                  ",
+		},
+		{
+			"upstream fix vector 14",
+			"\n            class foo {\n              foo = 5 as 5;\n            }\n                  ",
+			"\n            class foo {\n              foo = 5 as const;\n            }\n                  ",
+		},
 		// Upstream omits the unmodified class property from its fix vectors, covering only the
 		// `readonly` and `static` spellings. Measured against the release binary, the plain form is
 		// fixed identically, so the omission is an incomplete vector list rather than a behavior.
-		{"a plain class property is fixed too", "class foo {\n  bar: 'baz' = 'baz';\n}\n", "class foo {\n  bar = 'baz' as const;\n}\n"},
+		{
+			"a plain class property is fixed too",
+			"class foo {\n  bar: 'baz' = 'baz';\n}\n",
+			"class foo {\n  bar = 'baz' as const;\n}\n",
+		},
 		// The annotation delete trims to the colon and leaves the whitespace before it, and the
 		// insert lands at the initializer's end rather than after its trailing trivia. Both are
 		// measured byte behaviors of upstream, not guesses about what looks tidy.
-		{"whitespace before the colon survives the delete", "let a  :  'bar' = 'bar';\n", "let a   = 'bar' as const;\n"},
-		{"a comment after the type survives the delete", "let a: 'bar' /*c*/ = 'bar';\n", "let a /*c*/ = 'bar' as const;\n"},
+		{
+			"whitespace before the colon survives the delete",
+			"let a  :  'bar' = 'bar';\n",
+			"let a   = 'bar' as const;\n",
+		},
+		{
+			"a comment after the type survives the delete",
+			"let a: 'bar' /*c*/ = 'bar';\n",
+			"let a /*c*/ = 'bar' as const;\n",
+		},
 		{"the insert precedes trailing trivia", "let a: 'bar' = 'bar' /*t*/;\n", "let a = 'bar' as const /*t*/;\n"},
 	}
 	for _, testCase := range cases {
@@ -130,7 +173,10 @@ func TestPreferAsConstReportsTheDestructuringCaseWithoutARepair(test *testing.T)
 				test.Fatalf("expected no fix on a binding pattern, got %d", len(result.Diagnostics[0].Fixes))
 			}
 			if len(result.Diagnostics[0].Suggestions) != 0 {
-				test.Fatalf("expected no suggestion on a binding pattern, got %d", len(result.Diagnostics[0].Suggestions))
+				test.Fatalf(
+					"expected no suggestion on a binding pattern, got %d",
+					len(result.Diagnostics[0].Suggestions),
+				)
 			}
 		})
 	}
@@ -204,17 +250,50 @@ func TestPreferAsConstStaysSilent(test *testing.T) {
 		{"upstream pass 17", "let foo: 'bar';"},
 		{"upstream pass 18", "let foo = { bar };"},
 		{"upstream pass 19", "let foo: 'baz' = 'baz' as const;"},
-		{"upstream pass 20", "\n                  class foo {\n                    bar = 'baz';\n                  }\n                "},
-		{"upstream pass 21", "\n                  class foo {\n                    bar: 'baz';\n                  }\n                "},
-		{"upstream pass 22", "\n                  class foo {\n                    bar;\n                  }\n                "},
-		{"upstream pass 23", "\n                  class foo {\n                    bar: string = 'baz';\n                  }\n                "},
-		{"upstream pass 24", "\n                  class foo {\n                    bar: number = 1;\n                  }\n                "},
-		{"upstream pass 25", "\n                  class foo {\n                    bar = 'baz' as const;\n                  }\n                "},
-		{"upstream pass 26", "\n                  class foo {\n                    bar = 2 as const;\n                  }\n                "},
-		{"upstream pass 27", "\n                  class foo {\n                    get bar(): 'bar' {}\n                    set bar(bar: 'bar') {}\n                  }\n                "},
-		{"upstream pass 28", "\n                  class foo {\n                    bar = () => 'bar' as const;\n                  }\n                "},
-		{"upstream pass 29", "\n                  type BazFunction = () => 'baz';\n                  class foo {\n                    bar: BazFunction = () => 'bar';\n                  }\n                "},
-		{"upstream pass 30", "\n                  class foo {\n                    bar(): void {}\n                  }\n                "},
+		{
+			"upstream pass 20",
+			"\n                  class foo {\n                    bar = 'baz';\n                  }\n                ",
+		},
+		{
+			"upstream pass 21",
+			"\n                  class foo {\n                    bar: 'baz';\n                  }\n                ",
+		},
+		{
+			"upstream pass 22",
+			"\n                  class foo {\n                    bar;\n                  }\n                ",
+		},
+		{
+			"upstream pass 23",
+			"\n                  class foo {\n                    bar: string = 'baz';\n                  }\n                ",
+		},
+		{
+			"upstream pass 24",
+			"\n                  class foo {\n                    bar: number = 1;\n                  }\n                ",
+		},
+		{
+			"upstream pass 25",
+			"\n                  class foo {\n                    bar = 'baz' as const;\n                  }\n                ",
+		},
+		{
+			"upstream pass 26",
+			"\n                  class foo {\n                    bar = 2 as const;\n                  }\n                ",
+		},
+		{
+			"upstream pass 27",
+			"\n                  class foo {\n                    get bar(): 'bar' {}\n                    set bar(bar: 'bar') {}\n                  }\n                ",
+		},
+		{
+			"upstream pass 28",
+			"\n                  class foo {\n                    bar = () => 'bar' as const;\n                  }\n                ",
+		},
+		{
+			"upstream pass 29",
+			"\n                  type BazFunction = () => 'baz';\n                  class foo {\n                    bar: BazFunction = () => 'bar';\n                  }\n                ",
+		},
+		{
+			"upstream pass 30",
+			"\n                  class foo {\n                    bar(): void {}\n                  }\n                ",
+		},
 
 		// The three angle-bracket assertions upstream lists as failures. They are failures in its
 		// tester only because it parses .tsx, where the snapshot records `Unexpected token` rather
@@ -223,7 +302,10 @@ func TestPreferAsConstStaysSilent(test *testing.T) {
 		// at all. This is a real gap against typescript-eslint, which does register one and would
 		// report. Upstream knows: its own fix vectors for these three are commented out. Reproduced
 		// as silence because oxc is what the differential harness compares against.
-		{"an angle bracket type assertion", "\n            class foo {\n              foo = <'bar'>'bar';\n            }\n                  "},
+		{
+			"an angle bracket type assertion",
+			"\n            class foo {\n              foo = <'bar'>'bar';\n            }\n                  ",
+		},
 		{"an angle bracket type assertion", "let foo = <'bar'>'bar';"},
 		{"an angle bracket type assertion", "let foo = <4>4;"},
 
@@ -255,7 +337,10 @@ func TestPreferAsConstStaysSilent(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.Run(test, PreferAsConst, preferAsConstFile, testCase.sourceText))
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.Run(test, PreferAsConst, preferAsConstFile, testCase.sourceText),
+			)
 		})
 	}
 }

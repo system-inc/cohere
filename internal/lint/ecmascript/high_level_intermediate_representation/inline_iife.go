@@ -465,7 +465,10 @@ func nestedFunctionOf(function *Function, expression *FunctionExpression) *Funct
 // of one -- passed as an argument, stored into an object, returned -- means the value escapes, and
 // a splice would then leave the escaped reference pointing at a function whose body also runs
 // inline. Upstream deletes on every operand of every non-call instruction for this reason.
-func forgetFunctionOperands(value InstructionValue, functions map[static_single_assignment.IdentifierId]*FunctionExpression) {
+func forgetFunctionOperands(
+	value InstructionValue,
+	functions map[static_single_assignment.IdentifierId]*FunctionExpression,
+) {
 	if len(functions) == 0 {
 		return
 	}

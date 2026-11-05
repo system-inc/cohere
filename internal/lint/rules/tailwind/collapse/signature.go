@@ -311,7 +311,9 @@ func resolveVariablesInValue(value string, theme *Theme) string {
 	walk = func(nodes []ValueNode) []ValueNode {
 		for index := 0; index < len(nodes); {
 			node := &nodes[index]
-			if node.Kind == ValueNodeKindFunction && node.Value == "var" && (len(node.Nodes) == 1 || len(node.Nodes) >= 3) {
+			if node.Kind == ValueNodeKindFunction &&
+				node.Value == "var" &&
+				(len(node.Nodes) == 1 || len(node.Nodes) >= 3) {
 				if replacement, replaced := resolveVariableNode(node, theme, seen, &changed); replaced {
 					nodes = append(nodes[:index:index], append(replacement, nodes[index+1:]...)...)
 					continue
@@ -373,14 +375,39 @@ func resolveThemeValue(path string, theme *Theme) (string, bool) {
 // value to each physical longhand.
 var (
 	signatureVariadicExpansions = map[string]map[int][]signatureLonghand{
-		"inset":               signatureQuad("top", "right", "bottom", "left"),
-		"margin":              signatureQuad("margin-top", "margin-right", "margin-bottom", "margin-left"),
-		"padding":             signatureQuad("padding-top", "padding-right", "padding-bottom", "padding-left"),
-		"scroll-margin":       signatureQuad("scroll-margin-top", "scroll-margin-right", "scroll-margin-bottom", "scroll-margin-left"),
-		"scroll-padding":      signatureQuad("scroll-padding-top", "scroll-padding-right", "scroll-padding-bottom", "scroll-padding-left"),
-		"border-width":        signatureQuad("border-top-width", "border-right-width", "border-bottom-width", "border-left-width"),
-		"border-style":        signatureQuad("border-top-style", "border-right-style", "border-bottom-style", "border-left-style"),
-		"border-color":        signatureQuad("border-top-color", "border-right-color", "border-bottom-color", "border-left-color"),
+		"inset":   signatureQuad("top", "right", "bottom", "left"),
+		"margin":  signatureQuad("margin-top", "margin-right", "margin-bottom", "margin-left"),
+		"padding": signatureQuad("padding-top", "padding-right", "padding-bottom", "padding-left"),
+		"scroll-margin": signatureQuad(
+			"scroll-margin-top",
+			"scroll-margin-right",
+			"scroll-margin-bottom",
+			"scroll-margin-left",
+		),
+		"scroll-padding": signatureQuad(
+			"scroll-padding-top",
+			"scroll-padding-right",
+			"scroll-padding-bottom",
+			"scroll-padding-left",
+		),
+		"border-width": signatureQuad(
+			"border-top-width",
+			"border-right-width",
+			"border-bottom-width",
+			"border-left-width",
+		),
+		"border-style": signatureQuad(
+			"border-top-style",
+			"border-right-style",
+			"border-bottom-style",
+			"border-left-style",
+		),
+		"border-color": signatureQuad(
+			"border-top-color",
+			"border-right-color",
+			"border-bottom-color",
+			"border-left-color",
+		),
 		"gap":                 signaturePair("row-gap", "column-gap"),
 		"overflow":            signaturePair("overflow-x", "overflow-y"),
 		"overscroll-behavior": signaturePair("overscroll-behavior-x", "overscroll-behavior-y"),
@@ -444,7 +471,13 @@ func expandSignatureDeclaration(node *Node, features SignatureFeatures) []*Node 
 		if longhands, isLogical := signatureLogicalExpansions[node.Property]; isLogical {
 			expanded := make([]*Node, 0, len(longhands))
 			for _, property := range longhands {
-				expanded = append(expanded, &Node{Kind: KindDeclaration, Property: property, Value: node.Value, ValuePresent: true, Important: node.Important})
+				expanded = append(expanded, &Node{
+					Kind:         KindDeclaration,
+					Property:     property,
+					Value:        node.Value,
+					ValuePresent: true,
+					Important:    node.Important,
+				})
 			}
 			return expanded
 		}

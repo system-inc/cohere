@@ -348,7 +348,10 @@ func TestForwardRefUsesRefWithholdsRemovalOnlyForAnonymousStatements(test *testi
 		test.Fatalf("named statement offered %d suggestions, want 2",
 			len(namedStatement.Diagnostics[0].Suggestions))
 	}
-	if got := applySuggestion("forwardRef(function Named(a) {});", namedStatement.Diagnostics[0].Suggestions[0]); got != "function Named(a) {};" {
+	if got := applySuggestion(
+		"forwardRef(function Named(a) {});",
+		namedStatement.Diagnostics[0].Suggestions[0],
+	); got != "function Named(a) {};" {
 		test.Errorf("named removal produced %q", got)
 	}
 

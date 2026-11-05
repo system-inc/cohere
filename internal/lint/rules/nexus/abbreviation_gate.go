@@ -59,7 +59,10 @@ func buildAbbreviationGate(vocabulary *abbreviation.Vocabulary) abbreviationGate
 	for name := range vocabulary.WholeByName {
 		built.wholeWords[name] = true
 	}
-	for _, entry := range append(append([]*abbreviation.Entry{}, vocabulary.EarlyPrefixes...), vocabulary.LatePrefixes...) {
+	for _, entry := range append(
+		append([]*abbreviation.Entry{}, vocabulary.EarlyPrefixes...),
+		vocabulary.LatePrefixes...,
+	) {
 		built.prefixes[entry.Abbreviation] = true
 		built.longestPrefix = max(built.longestPrefix, len(entry.Abbreviation))
 	}

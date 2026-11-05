@@ -60,14 +60,38 @@ func TestConsistentGenericConstructorsStaysSilent(test *testing.T) {
 		{sourceText: "\nfunction foo([a]: Foo = new Foo<string>()) {}\n    ", wire: "\"constructor\""},
 		{sourceText: "\nclass A {\n  constructor(a: Foo = new Foo<string>()) {}\n}\n    ", wire: "\"constructor\""},
 		{sourceText: "\nconst a = function (a: Foo = new Foo<string>()) {};\n    ", wire: "\"constructor\""},
-		{sourceText: "\nconst a: Float32Array<ArrayBufferLike> = new Float32Array();\nexport {};\n    ", wire: "\"constructor\""},
-		{sourceText: "\nconst a: Float64Array<ArrayBufferLike> = new Float64Array();\nexport {};\n    ", wire: "\"constructor\""},
-		{sourceText: "\nconst a: Int16Array<ArrayBufferLike> = new Int16Array();\nexport {};\n    ", wire: "\"constructor\""},
-		{sourceText: "\nconst a: Int8Array<ArrayBufferLike> = new Int8Array();\nexport {};\n    ", wire: "\"constructor\""},
-		{sourceText: "\nconst a: Uint16Array<ArrayBufferLike> = new Uint16Array();\nexport {};\n    ", wire: "\"constructor\""},
-		{sourceText: "\nconst a: Uint32Array<ArrayBufferLike> = new Uint32Array();\nexport {};\n    ", wire: "\"constructor\""},
-		{sourceText: "\nconst a: Uint8Array<ArrayBufferLike> = new Uint8Array();\nexport {};\n    ", wire: "\"constructor\""},
-		{sourceText: "\nconst a: Uint8ClampedArray<ArrayBufferLike> = new Uint8ClampedArray();\nexport {};\n    ", wire: "\"constructor\""},
+		{
+			sourceText: "\nconst a: Float32Array<ArrayBufferLike> = new Float32Array();\nexport {};\n    ",
+			wire:       "\"constructor\"",
+		},
+		{
+			sourceText: "\nconst a: Float64Array<ArrayBufferLike> = new Float64Array();\nexport {};\n    ",
+			wire:       "\"constructor\"",
+		},
+		{
+			sourceText: "\nconst a: Int16Array<ArrayBufferLike> = new Int16Array();\nexport {};\n    ",
+			wire:       "\"constructor\"",
+		},
+		{
+			sourceText: "\nconst a: Int8Array<ArrayBufferLike> = new Int8Array();\nexport {};\n    ",
+			wire:       "\"constructor\"",
+		},
+		{
+			sourceText: "\nconst a: Uint16Array<ArrayBufferLike> = new Uint16Array();\nexport {};\n    ",
+			wire:       "\"constructor\"",
+		},
+		{
+			sourceText: "\nconst a: Uint32Array<ArrayBufferLike> = new Uint32Array();\nexport {};\n    ",
+			wire:       "\"constructor\"",
+		},
+		{
+			sourceText: "\nconst a: Uint8Array<ArrayBufferLike> = new Uint8Array();\nexport {};\n    ",
+			wire:       "\"constructor\"",
+		},
+		{
+			sourceText: "\nconst a: Uint8ClampedArray<ArrayBufferLike> = new Uint8ClampedArray();\nexport {};\n    ",
+			wire:       "\"constructor\"",
+		},
 		// The isolatedDeclarations case lives in its own test: see the note above.
 		{sourceText: "const a = new Foo();", wire: "\"type-annotation\""},
 		{sourceText: "const a: Foo<string> = new Foo();", wire: "\"type-annotation\""},
@@ -84,7 +108,10 @@ func TestConsistentGenericConstructorsStaysSilent(test *testing.T) {
 		{sourceText: "\nfunction foo(a: Foo<string> = new Foo()) {}\n      ", wire: "\"type-annotation\""},
 		{sourceText: "\nfunction foo({ a }: Foo<string> = new Foo()) {}\n      ", wire: "\"type-annotation\""},
 		{sourceText: "\nfunction foo([a]: Foo<string> = new Foo()) {}\n      ", wire: "\"type-annotation\""},
-		{sourceText: "\nclass A {\n  constructor(a: Foo<string> = new Foo()) {}\n}\n      ", wire: "\"type-annotation\""},
+		{
+			sourceText: "\nclass A {\n  constructor(a: Foo<string> = new Foo()) {}\n}\n      ",
+			wire:       "\"type-annotation\"",
+		},
 		{sourceText: "\nconst a = function (a: Foo<string> = new Foo()) {};\n      ", wire: "\"type-annotation\""},
 		{sourceText: "\nconst [a = new Foo<string>()] = [];\n      ", wire: "\"type-annotation\""},
 		{sourceText: "\nfunction a([a = new Foo<string>()]) {}\n      ", wire: "\"type-annotation\""},
@@ -505,7 +532,9 @@ func TestConsistentGenericConstructorsDecoderReadsEveryWireShape(test *testing.T
 	for _, testCase := range cases {
 		test.Run(testCase.wire, func(test *testing.T) {
 			test.Parallel()
-			decoded, decodeConsistentGenericConstructorsOptionsError := DecodeConsistentGenericConstructorsOptions([]byte(testCase.wire))
+			decoded, decodeConsistentGenericConstructorsOptionsError := DecodeConsistentGenericConstructorsOptions(
+				[]byte(testCase.wire),
+			)
 			if decodeConsistentGenericConstructorsOptionsError != nil {
 				test.Fatalf("decoding %q: %v", testCase.wire, decodeConsistentGenericConstructorsOptionsError)
 			}
@@ -550,12 +579,19 @@ func TestConsistentGenericConstructorsDecoderRefusesAValueUpstreamRefuses(test *
 	} {
 		test.Run(testCase.wire, func(test *testing.T) {
 			test.Parallel()
-			_, decodeConsistentGenericConstructorsOptionsError := DecodeConsistentGenericConstructorsOptions([]byte(testCase.wire))
+			_, decodeConsistentGenericConstructorsOptionsError := DecodeConsistentGenericConstructorsOptions(
+				[]byte(testCase.wire),
+			)
 			if decodeConsistentGenericConstructorsOptionsError == nil {
 				test.Fatalf("%s decoded, so the configured mode is silently not the one written", testCase.wire)
 			}
 			if !strings.Contains(decodeConsistentGenericConstructorsOptionsError.Error(), testCase.named) {
-				test.Fatalf("%s was refused without naming %q: %v", testCase.wire, testCase.named, decodeConsistentGenericConstructorsOptionsError)
+				test.Fatalf(
+					"%s was refused without naming %q: %v",
+					testCase.wire,
+					testCase.named,
+					decodeConsistentGenericConstructorsOptionsError,
+				)
 			}
 		})
 	}

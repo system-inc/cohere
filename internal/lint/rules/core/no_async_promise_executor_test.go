@@ -53,7 +53,10 @@ func TestNoAsyncPromiseExecutorStaysSilent(test *testing.T) {
 		sourceText string
 	}{
 		{"a plain executor", "new Promise((resolve, reject) => {})"},
-		{"an async function in the second argument", "new Promise((resolve, reject) => {}, async function unrelated() {})"},
+		{
+			"an async function in the second argument",
+			"new Promise((resolve, reject) => {}, async function unrelated() {})",
+		},
 		{"a different constructor", "new Foo(async (resolve, reject) => {})"},
 	}
 
@@ -139,11 +142,17 @@ func TestNoAsyncPromiseExecutorStaysSilentOnCasesUpstreamDoesNotCover(test *test
 		// A non-async function in position zero with an async one after it, tightening upstream's
 		// second pass case: here the executor is a plain *function expression* rather than an
 		// arrow, so a rule that gated on kind before position would take a different path.
-		{"a plain function executor with an async second argument", "new Promise(function (resolve, reject) {}, async () => {})"},
+		{
+			"a plain function executor with an async second argument",
+			"new Promise(function (resolve, reject) {}, async () => {})",
+		},
 		// An async function nested inside the executor rather than being the executor. This is
 		// legal and common, and a rule walking the executor's subtree for an async modifier
 		// reports it.
-		{"an async function nested inside a plain executor", "new Promise((resolve, reject) => { void (async () => { await x; })(); })"},
+		{
+			"an async function nested inside a plain executor",
+			"new Promise((resolve, reject) => { void (async () => { await x; })(); })",
+		},
 		// An async method on an object literal passed as the executor. Not a function expression or
 		// an arrow, so the kind gate declines it, which matches oxc's two-arm match.
 		{"an object literal carrying an async method", "new Promise({ async run() {} })"},

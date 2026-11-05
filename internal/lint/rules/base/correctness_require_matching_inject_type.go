@@ -11,7 +11,10 @@ import (
 
 // correctnessRequireMatchingInjectTypeText is the rule's message, whose wording lives in
 // `policy/messages/correctness-require-matching-inject-type.json`.
-var correctnessRequireMatchingInjectTypeText = policy.MessageOf("base/correctness-require-matching-inject-type", "mismatch")
+var correctnessRequireMatchingInjectTypeText = policy.MessageOf(
+	"base/correctness-require-matching-inject-type",
+	"mismatch",
+)
 
 // CorrectnessRequireMatchingInjectType checks that a typed injection decorator resolves to a type the
 // decorated parameter accepts.

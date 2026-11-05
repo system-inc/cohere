@@ -128,7 +128,14 @@ func tidyWhitespace(segment ClassSegment, allowMultiline bool) (string, bool) {
 			builder.WriteString(run.text)
 			continue
 		}
-		replacement, _ := separatorRepair(run.text, index == 0, index == len(runs)-1, classCount, segment, allowMultiline)
+		replacement, _ := separatorRepair(
+			run.text,
+			index == 0,
+			index == len(runs)-1,
+			classCount,
+			segment,
+			allowMultiline,
+		)
 		builder.WriteString(replacement)
 	}
 
@@ -156,7 +163,14 @@ func tidyWhitespace(segment ClassSegment, allowMultiline bool) (string, bool) {
 //
 // Lengths count characters as upstream's JavaScript does, and every character isSpace accepts is one
 // byte, so a byte length is that count.
-func separatorRepair(run string, first bool, last bool, classCount int, segment ClassSegment, allowMultiline bool) (string, bool) {
+func separatorRepair(
+	run string,
+	first bool,
+	last bool,
+	classCount int,
+	segment ClassSegment,
+	allowMultiline bool,
+) (string, bool) {
 	if classCount == 0 && !segment.LeadingHole && !segment.TrailingHole {
 		return "", true
 	}
@@ -228,7 +242,14 @@ func whitespaceFixes(sourceText string, segment ClassSegment, allowMultiline boo
 		if !token.Separator {
 			continue
 		}
-		replacement, changes := separatorRepair(token.Text, index == 0, index == len(tokens)-1, classCount, segment, allowMultiline)
+		replacement, changes := separatorRepair(
+			token.Text,
+			index == 0,
+			index == len(tokens)-1,
+			classCount,
+			segment,
+			allowMultiline,
+		)
 		if !changes {
 			continue
 		}

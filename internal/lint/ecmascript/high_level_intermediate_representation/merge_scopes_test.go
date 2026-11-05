@@ -169,7 +169,11 @@ func TestMergeMatchesReact(test *testing.T) {
 			instructions: [][3]int{{1, 1, 0}, {2, 2, 0}, {3, 3, 0}},
 			terminal:     8,
 			wantGroups:   map[ScopeId]ScopeId{1: 1, 2: 2, 3: 3},
-			wantRanges:   map[ScopeId]mutation_aliasing.MutableRange{1: {Start: 1, End: 7}, 2: {Start: 2, End: 7}, 3: {Start: 3, End: 5}},
+			wantRanges: map[ScopeId]mutation_aliasing.MutableRange{
+				1: {Start: 1, End: 7},
+				2: {Start: 2, End: 7},
+				3: {Start: 3, End: 5},
+			},
 		},
 		{
 			// The case that makes the CLOSING ORDER load-bearing, minimised from the one function on
@@ -425,7 +429,11 @@ func mergeCorpusStats(test *testing.T, limit int) (functions, before, after, uni
 	nestingBefore, nestingAfter int) {
 	test.Helper()
 
-	forEachCorpusFunction(test, limit, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(test, limit, func(
+		function *Function,
+		ranges *mutation_aliasing.MutableRanges,
+		scopes *ReactiveScopes,
+	) {
 		functions++
 		before += scopes.Len()
 
@@ -564,7 +572,11 @@ func TestMergePreservesScopeWidthAndMembership(test *testing.T) {
 	var oneNarrowBefore, oneWideBefore, manyNarrowBefore, manyWideBefore int
 	var oneNarrowAfter, oneWideAfter, manyNarrowAfter, manyWideAfter int
 
-	forEachCorpusFunction(test, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(test, 400, func(
+		function *Function,
+		ranges *mutation_aliasing.MutableRanges,
+		scopes *ReactiveScopes,
+	) {
 		for _, scope := range scopes.Ids() {
 			scopeRange := scopes.RangeOf(scope)
 			classify(int(scopeRange.End-scopeRange.Start), len(scopes.MembersOf(scope)),
@@ -653,7 +665,11 @@ func TestMergeLeavesBlockScopeAlignmentUnclosed(test *testing.T) {
 	_, _, _, _, _, _, _, _, _, nestingBefore, nestingAfter := mergeCorpusStats(test, 400)
 
 	blocksAlone := 0
-	forEachCorpusFunction(test, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(test, 400, func(
+		function *Function,
+		ranges *mutation_aliasing.MutableRanges,
+		scopes *ReactiveScopes,
+	) {
 		blocksAlone += blockNestingViolations(nil, programBlockSubtrees(function))
 	})
 
@@ -687,7 +703,11 @@ func TestMergeFunctionOperandSkipUpperBound(test *testing.T) {
 	skipWithoutCorpus(test)
 	withoutGate, withGate, candidates := 0, 0, 0
 
-	forEachCorpusFunction(test, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(test, 400, func(
+		function *Function,
+		ranges *mutation_aliasing.MutableRanges,
+		scopes *ReactiveScopes,
+	) {
 		withoutGate += MergeOverlappingReactiveScopes(function, scopes).Unions()
 		withGate += unionsSkippingFunctionOperands(function, scopes)
 		for _, block := range function.Blocks {
@@ -793,7 +813,11 @@ func TestMergeAssumesMonotoneEvaluationOrder(test *testing.T) {
 
 	skipWithoutCorpus(test)
 	functions, violations := 0, 0
-	forEachCorpusFunction(test, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(test, 400, func(
+		function *Function,
+		ranges *mutation_aliasing.MutableRanges,
+		scopes *ReactiveScopes,
+	) {
 		functions++
 		var last static_single_assignment.EvaluationOrder
 		for _, block := range function.Blocks {
@@ -840,7 +864,11 @@ func TestMergeIsDeterministic(test *testing.T) {
 
 	skipWithoutCorpus(test)
 	functions, mismatches, merges := 0, 0, 0
-	forEachCorpusFunction(test, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(test, 400, func(
+		function *Function,
+		ranges *mutation_aliasing.MutableRanges,
+		scopes *ReactiveScopes,
+	) {
 		functions++
 		first := MergeOverlappingReactiveScopes(function, scopes)
 		second := MergeOverlappingReactiveScopes(function, scopes)
@@ -882,7 +910,11 @@ func TestMergeSortComparatorReachability(test *testing.T) {
 	skipWithoutCorpus(test)
 	startPositions, sharedStarts, endPositions, sharedEnds, widestEndGroup := 0, 0, 0, 0, 0
 
-	forEachCorpusFunction(test, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(test, 400, func(
+		function *Function,
+		ranges *mutation_aliasing.MutableRanges,
+		scopes *ReactiveScopes,
+	) {
 		starts, ends := collectScopeInfo(function, scopes)
 		for _, group := range starts {
 			startPositions++
@@ -962,7 +994,11 @@ func TestMergeRegistersScopesFromTerminals(test *testing.T) {
 	// The corpus half: the measurement that explains the survivor.
 	skipWithoutCorpus(test)
 	onlyTerminal, total := 0, 0
-	forEachCorpusFunction(test, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(test, 400, func(
+		function *Function,
+		ranges *mutation_aliasing.MutableRanges,
+		scopes *ReactiveScopes,
+	) {
 		fromInstruction, fromTerminal := map[ScopeId]bool{}, map[ScopeId]bool{}
 		for _, block := range function.Blocks {
 			if block == nil {

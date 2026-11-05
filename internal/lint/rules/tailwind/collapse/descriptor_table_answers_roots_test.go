@@ -83,31 +83,52 @@ func expectWave3RootsAnswered(test *testing.T, fixture wave3Fixture, system *Loa
 			// buries the second under 418 of the first.
 			if testCase.FromRegistry {
 				inventedOnRegistry++
-				disagreements = append(disagreements, testCase.ClassName+": registry class the engine declines, table read "+formatReading(reading))
+				disagreements = append(
+					disagreements,
+					testCase.ClassName+": registry class the engine declines, table read "+formatReading(reading),
+				)
 			} else {
 				inventedOnProbe++
 			}
 		case testCase.Reading != nil && !answered:
 			tableSilent++
-			disagreements = append(disagreements, testCase.ClassName+": engine reads "+formatReading(Reading{Order: testCase.Reading.Order, Count: testCase.Reading.Count})+", table declined")
+			disagreements = append(disagreements, testCase.ClassName+
+				": engine reads "+
+				formatReading(Reading{Order: testCase.Reading.Order, Count: testCase.Reading.Count})+
+				", table declined")
 		default:
 			expected := Reading{Order: testCase.Reading.Order, Count: testCase.Reading.Count}
 			if readingsEqual(expected, reading) {
 				agreed++
 				continue
 			}
-			disagreements = append(disagreements, testCase.ClassName+": engine "+formatReading(expected)+", table "+formatReading(reading))
+			disagreements = append(
+				disagreements,
+				testCase.ClassName+": engine "+formatReading(expected)+", table "+formatReading(reading),
+			)
 		}
 	}
 
 	sort.Strings(disagreements)
-	test.Logf("wave 3: %d roots, %d cases, agreed %d, both-declined %d, table-silent %d, invented on registry %d, invented on probe %d",
-		fixture.RootCount, fixture.CaseCount, agreed, bothDeclined, tableSilent, inventedOnRegistry, inventedOnProbe)
+	test.Logf(
+		"wave 3: %d roots, %d cases, agreed %d, both-declined %d, table-silent %d, invented on registry %d, invented on probe %d",
+		fixture.RootCount,
+		fixture.CaseCount,
+		agreed,
+		bothDeclined,
+		tableSilent,
+		inventedOnRegistry,
+		inventedOnProbe,
+	)
 
 	// A share of what the engine answered rather than a count, so the floor holds each copy to the same
 	// standard: it was 7,000 of ahra's 7,621, and 92% is that, rounded up.
 	if agreed*100 < fixture.Answered*92 {
-		test.Errorf("only %d of %d cases agreed; a lookup that stopped answering scores perfectly on any comparison counting disagreements alone", agreed, fixture.Answered)
+		test.Errorf(
+			"only %d of %d cases agreed; a lookup that stopped answering scores perfectly on any comparison counting disagreements alone",
+			agreed,
+			fixture.Answered,
+		)
 	}
 	if inventedOnRegistry > 0 {
 		test.Errorf("%d registry classes are answered by the table and declined by the engine", inventedOnRegistry)
@@ -150,8 +171,14 @@ func TestWave3ValueDependentRootsReadByType(test *testing.T) {
 				continue
 			}
 			if readingsEqual(colorReading, otherReading) {
-				test.Errorf("%s: %s and %s read identically as %v#%d; the type partition is what lets one root answer both",
-					testCase.description, testCase.colorClass, testCase.otherClass, colorReading.Order, colorReading.Count)
+				test.Errorf(
+					"%s: %s and %s read identically as %v#%d; the type partition is what lets one root answer both",
+					testCase.description,
+					testCase.colorClass,
+					testCase.otherClass,
+					colorReading.Order,
+					colorReading.Count,
+				)
 			}
 		}
 	})
@@ -177,7 +204,12 @@ func loadWave3Fixture(test *testing.T, name string) wave3Fixture {
 		test.Fatalf("parse %s: %v", name, decodeError)
 	}
 	if fixture.CaseCount == 0 || fixture.Answered == 0 {
-		test.Fatalf("%s carries %d cases and %d answered; a comparison over it would pass by comparing nothing", name, fixture.CaseCount, fixture.Answered)
+		test.Fatalf(
+			"%s carries %d cases and %d answered; a comparison over it would pass by comparing nothing",
+			name,
+			fixture.CaseCount,
+			fixture.Answered,
+		)
 	}
 	return fixture
 }
@@ -231,8 +263,11 @@ func TestNamespacePrecedenceIsUnobservableInThisCorpus(test *testing.T) {
 	}
 
 	if len(ambiguous) > 0 {
-		test.Errorf("%d keys are now claimed by two namespaces a single root consumes, so namespace precedence is observable and the longest-first order needs a mutation covering it: %v",
-			len(ambiguous), ambiguous)
+		test.Errorf(
+			"%d keys are now claimed by two namespaces a single root consumes, so namespace precedence is observable and the longest-first order needs a mutation covering it: %v",
+			len(ambiguous),
+			ambiguous,
+		)
 	}
 	test.Logf("no key is claimed by two namespaces of one root, so namespace order is unobservable in this corpus")
 }

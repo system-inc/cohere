@@ -294,8 +294,13 @@ func describeParsedVariant(variant ParsedVariant) string {
 		if variant.Variant != nil {
 			nested = describeParsedVariant(*variant.Variant)
 		}
-		return "{compound root=" + quoteForDiff(variant.Root) + " modifier=" + describeParsedModifier(variant.Modifier) +
-			" variant=" + nested + "}"
+		return "{compound root=" +
+			quoteForDiff(variant.Root) +
+			" modifier=" +
+			describeParsedModifier(variant.Modifier) +
+			" variant=" +
+			nested +
+			"}"
 	default:
 		return "{" + string(variant.Kind) + "}"
 	}
@@ -417,7 +422,11 @@ func TestParseCandidateMatchesEngine(test *testing.T) {
 		if testCase.Threw != nil {
 			// No case in the corpus does this, and if a future capture produces one it is a finding
 			// about the corpus rather than about the port.
-			test.Errorf("%s: the engine threw %q; this port has no error path to compare against", testCase.Name, *testCase.Threw)
+			test.Errorf(
+				"%s: the engine threw %q; this port has no error path to compare against",
+				testCase.Name,
+				*testCase.Threw,
+			)
 			continue
 		}
 
@@ -508,7 +517,11 @@ func TestParseCandidateOrderIsCompared(test *testing.T) {
 
 		actual := ParseCandidate(testCase.Input, designSystem)
 		if len(actual) < 2 {
-			test.Errorf("%s: the fixture calls this ambiguous but the port produced %d readings", testCase.Name, len(actual))
+			test.Errorf(
+				"%s: the fixture calls this ambiguous but the port produced %d readings",
+				testCase.Name,
+				len(actual),
+			)
 			continue
 		}
 
@@ -518,7 +531,10 @@ func TestParseCandidateOrderIsCompared(test *testing.T) {
 		}
 
 		if describeParsedCandidates(actual) == describeParsedCandidates(reversed) {
-			test.Errorf("%s: reversing the readings did not change the rendering, so order is not being compared", testCase.Name)
+			test.Errorf(
+				"%s: reversing the readings did not change the rendering, so order is not being compared",
+				testCase.Name,
+			)
 		}
 
 		checked++
@@ -548,10 +564,16 @@ func TestBorderBReadsBothWaysInOrder(test *testing.T) {
 	}
 
 	if readings[0].Root != "border-b" || readings[0].Value != nil {
-		test.Errorf("the first reading of border-b must be the root `border-b` with no value, got %s", describeParsedCandidate(readings[0]))
+		test.Errorf(
+			"the first reading of border-b must be the root `border-b` with no value, got %s",
+			describeParsedCandidate(readings[0]),
+		)
 	}
 	if readings[1].Root != "border" || readings[1].Value == nil || readings[1].Value.Value != "b" {
-		test.Errorf("the second reading of border-b must be the root `border` with the named value `b`, got %s", describeParsedCandidate(readings[1]))
+		test.Errorf(
+			"the second reading of border-b must be the root `border` with the named value `b`, got %s",
+			describeParsedCandidate(readings[1]),
+		)
 	}
 }
 
@@ -574,7 +596,8 @@ func TestCompoundsForSelectorsMatchesEngine(test *testing.T) {
 		child := ParsedVariant{
 			Kind:     ParsedVariantKindArbitrary,
 			Selector: probe.Selector,
-			Relative: len(probe.Selector) > 0 && (probe.Selector[0] == '>' || probe.Selector[0] == '+' || probe.Selector[0] == '~'),
+			Relative: len(probe.Selector) > 0 &&
+				(probe.Selector[0] == '>' || probe.Selector[0] == '+' || probe.Selector[0] == '~'),
 		}
 		actual := designSystem.VariantCompoundsWith(probe.Parent, child)
 		if actual != probe.CompoundsWith {
@@ -673,7 +696,11 @@ func TestGateCandidatesSeparatesWhatMustNotMerge(test *testing.T) {
 
 	for _, pair := range mustDiffer {
 		if keyOf(pair[0]) == keyOf(pair[1]) {
-			test.Errorf("%s and %s produced the same gate key; the conversion lost what separates them", pair[0], pair[1])
+			test.Errorf(
+				"%s and %s produced the same gate key; the conversion lost what separates them",
+				pair[0],
+				pair[1],
+			)
 		}
 	}
 

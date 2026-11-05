@@ -103,7 +103,12 @@ func TestPerformanceNoIndependentAwaitInLoopAhraShapes(test *testing.T) {
 			if readError != nil {
 				test.Fatal(readError)
 			}
-			result := rule_testing.RunTyped(test, PerformanceNoIndependentAwaitInLoop, "/repository/source/"+filepath.Base(name), string(source))
+			result := rule_testing.RunTyped(
+				test,
+				PerformanceNoIndependentAwaitInLoop,
+				"/repository/source/"+filepath.Base(name),
+				string(source),
+			)
 			if wantCount == 0 {
 				rule_testing.ExpectClean(test, result)
 				return
@@ -242,8 +247,12 @@ func TestPerformanceNoIndependentAwaitInLoopFires(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTyped(test, PerformanceNoIndependentAwaitInLoop, performanceNoIndependentAwaitInLoopFile,
-				performanceNoIndependentAwaitInLoopSource(testCase.lines...))
+			result := rule_testing.RunTyped(
+				test,
+				PerformanceNoIndependentAwaitInLoop,
+				performanceNoIndependentAwaitInLoopFile,
+				performanceNoIndependentAwaitInLoopSource(testCase.lines...),
+			)
 			rule_testing.ExpectFindings(test, result, "independentAwaitInLoop")
 		})
 	}
@@ -484,8 +493,12 @@ func TestPerformanceNoIndependentAwaitInLoopStaysSilent(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTyped(test, PerformanceNoIndependentAwaitInLoop, performanceNoIndependentAwaitInLoopFile,
-				performanceNoIndependentAwaitInLoopSource(testCase.lines...))
+			result := rule_testing.RunTyped(
+				test,
+				PerformanceNoIndependentAwaitInLoop,
+				performanceNoIndependentAwaitInLoopFile,
+				performanceNoIndependentAwaitInLoopSource(testCase.lines...),
+			)
 			rule_testing.ExpectClean(test, result)
 		})
 	}
@@ -499,7 +512,12 @@ func TestPerformanceNoIndependentAwaitInLoopStaysSilentOnYield(test *testing.T) 
 		"export async function* subject(): AsyncGenerator<number> {\n" +
 		"    for (const item of items) { yield await fetchItem(item); }\n" +
 		"}\n"
-	rule_testing.ExpectClean(test, rule_testing.RunTyped(test, PerformanceNoIndependentAwaitInLoop, performanceNoIndependentAwaitInLoopFile, source))
+	rule_testing.ExpectClean(test, rule_testing.RunTyped(
+		test,
+		PerformanceNoIndependentAwaitInLoop,
+		performanceNoIndependentAwaitInLoopFile,
+		source,
+	))
 
 	// Control: the same loop collecting rather than yielding reports, so the silence above is the yield.
 	control := performanceNoIndependentAwaitInLoopPrelude +
@@ -508,7 +526,12 @@ func TestPerformanceNoIndependentAwaitInLoopStaysSilentOnYield(test *testing.T) 
 		"    for (const item of items) { results.push(await fetchItem(item)); }\n" +
 		"    yield* results;\n" +
 		"}\n"
-	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, PerformanceNoIndependentAwaitInLoop, performanceNoIndependentAwaitInLoopFile, control),
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(
+		test,
+		PerformanceNoIndependentAwaitInLoop,
+		performanceNoIndependentAwaitInLoopFile,
+		control,
+	),
 		"independentAwaitInLoop")
 }
 
@@ -557,7 +580,12 @@ func TestPerformanceNoIndependentAwaitInLoopReportsTheInnermostLoopOnce(test *te
 		"    const results: number[] = [];",
 		"    for (const item of items) { results.push(await fetchItem(item)); results.push(await fetchItem(item + item)); }",
 	)
-	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, PerformanceNoIndependentAwaitInLoop, performanceNoIndependentAwaitInLoopFile, twoAwaits),
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(
+		test,
+		PerformanceNoIndependentAwaitInLoop,
+		performanceNoIndependentAwaitInLoopFile,
+		twoAwaits,
+	),
 		"independentAwaitInLoop")
 
 	nested := performanceNoIndependentAwaitInLoopSource(
@@ -566,7 +594,12 @@ func TestPerformanceNoIndependentAwaitInLoopReportsTheInnermostLoopOnce(test *te
 		"        for (const item of group) { results.push(await fetchItem(item)); }",
 		"    }",
 	)
-	result := rule_testing.RunTyped(test, PerformanceNoIndependentAwaitInLoop, performanceNoIndependentAwaitInLoopFile, nested)
+	result := rule_testing.RunTyped(
+		test,
+		PerformanceNoIndependentAwaitInLoop,
+		performanceNoIndependentAwaitInLoopFile,
+		nested,
+	)
 	rule_testing.ExpectFindings(test, result, "independentAwaitInLoop")
 	reported := result.SourceFile.Text()[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
 	if reported != "for (const item of group)" {
@@ -584,7 +617,12 @@ func TestPerformanceNoIndependentAwaitInLoopSpanAndMessage(test *testing.T) {
 		"        await fetchItem(items[index]);",
 		"    }",
 	)
-	result := rule_testing.RunTyped(test, PerformanceNoIndependentAwaitInLoop, performanceNoIndependentAwaitInLoopFile, source)
+	result := rule_testing.RunTyped(
+		test,
+		PerformanceNoIndependentAwaitInLoop,
+		performanceNoIndependentAwaitInLoopFile,
+		source,
+	)
 	rule_testing.ExpectFindings(test, result, "independentAwaitInLoop")
 	diagnostic := result.Diagnostics[0]
 	reported := result.SourceFile.Text()[diagnostic.Range.Pos():diagnostic.Range.End()]
@@ -594,7 +632,11 @@ func TestPerformanceNoIndependentAwaitInLoopSpanAndMessage(test *testing.T) {
 	if diagnostic.Message.Description != messagePerformanceNoIndependentAwaitInLoop().Description {
 		test.Fatalf("message: got %q", diagnostic.Message.Description)
 	}
-	for _, phrase := range []string{"Promise.all", "bounded", "cohere-disable-next-line nexus/performance-no-independent-await-in-loop -- "} {
+	for _, phrase := range []string{
+		"Promise.all",
+		"bounded",
+		"cohere-disable-next-line nexus/performance-no-independent-await-in-loop -- ",
+	} {
 		if !strings.Contains(diagnostic.Message.Description, phrase) {
 			test.Errorf("message should mention %q", phrase)
 		}
@@ -616,7 +658,15 @@ func TestPerformanceNoIndependentAwaitInLoopDeclinesWithoutAChecker(test *testin
 	source := performanceNoIndependentAwaitInLoopSource(
 		"    for (const item of items) { await fetchItem(item); }",
 	)
-	rule_testing.ExpectClean(test, rule_testing.Run(test, PerformanceNoIndependentAwaitInLoop, performanceNoIndependentAwaitInLoopFile, source))
-	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, PerformanceNoIndependentAwaitInLoop, performanceNoIndependentAwaitInLoopFile, source),
+	rule_testing.ExpectClean(
+		test,
+		rule_testing.Run(test, PerformanceNoIndependentAwaitInLoop, performanceNoIndependentAwaitInLoopFile, source),
+	)
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(
+		test,
+		PerformanceNoIndependentAwaitInLoop,
+		performanceNoIndependentAwaitInLoopFile,
+		source,
+	),
 		"independentAwaitInLoop")
 }

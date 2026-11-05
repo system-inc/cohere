@@ -48,7 +48,13 @@ func (oracle *optionsOracle) load() {
 	oracle.runtime = runtime
 }
 
-func (oracle *optionsOracle) format(text string, filePath string, parser string, options formatoptions.Options, proseWrap string) (string, error) {
+func (oracle *optionsOracle) format(
+	text string,
+	filePath string,
+	parser string,
+	options formatoptions.Options,
+	proseWrap string,
+) (string, error) {
 	key := oracletest.Key("options", text, filePath, parser, fmt.Sprintf("%+v", options), proseWrap)
 	return oracle.golden.Answer(key, func() (string, error) {
 		oracle.once.Do(oracle.load)
@@ -59,7 +65,13 @@ func (oracle *optionsOracle) format(text string, filePath string, parser string,
 	})
 }
 
-func (oracle *optionsOracle) formatLive(text string, filePath string, parser string, options formatoptions.Options, proseWrap string) (string, error) {
+func (oracle *optionsOracle) formatLive(
+	text string,
+	filePath string,
+	parser string,
+	options formatoptions.Options,
+	proseWrap string,
+) (string, error) {
 	oracle.runtime.Set("__source", text)
 	oracle.runtime.Set("__filePath", filePath)
 	oracle.runtime.Set("__parser", parser)
@@ -98,19 +110,35 @@ func (oracle *optionsOracle) formatLive(text string, filePath string, parser str
 // proseWrapFixtures are the inputs whose words the always and never branches join and split: multi-line
 // plain and quoted scalars, folded blocks, trailing backslashes, and long lines at a narrow width.
 var proseWrapFixtures = []string{
-	"a: b\n  c\n\n  d", "a: \"b\n  c\"", "a: 'b\n\n  c'", "a: \"b \\\n  c\"", "a: \"b\\\n  c\"", "a: \"b c \\\n  d\\\n  e\"",
-	"a: >\n  x\n  y\n\n  z\n", "a: >\n  x\n    y\n  z\n", "a: >\n  x  \n  y\n", "a: >\n   x\n  y\n", "a: >-\n  x y  z\n",
+	"a: b\n  c\n\n  d",
+	"a: \"b\n  c\"",
+	"a: 'b\n\n  c'",
+	"a: \"b \\\n  c\"",
+	"a: \"b\\\n  c\"",
+	"a: \"b c \\\n  d\\\n  e\"",
+	"a: >\n  x\n  y\n\n  z\n",
+	"a: >\n  x\n    y\n  z\n",
+	"a: >\n  x  \n  y\n",
+	"a: >\n   x\n  y\n",
+	"a: >-\n  x y  z\n",
 	"a: >\n  word word word word word word word word word word word word word word word word word word\n",
 	"a: word word word word word word word word word word word word word word word word word word word",
 	"a: 'word word word word word word word word word word word word word word word word word word word'",
 	"? word word word word word word word word word word word word word word word word\n: b",
 	"word word word word word word word: word word word word word word word word word word",
-	"a: b c\nd: \"e\n  f\"", "- a b\n  c d\n- \"e\n  f\"", "a: |\n  x y\n  z\n", "a: b  c\n  d", "a: \"b\\\n\n  c\"",
-	"a: >\n  x\n\n\n  y\n\nb: c", "key: 'it''s a long line of single quoted text that wraps'",
+	"a: b c\nd: \"e\n  f\"",
+	"- a b\n  c d\n- \"e\n  f\"",
+	"a: |\n  x y\n  z\n",
+	"a: b  c\n  d",
+	"a: \"b\\\n\n  c\"",
+	"a: >\n  x\n\n\n  y\n\nb: c",
+	"key: 'it''s a long line of single quoted text that wraps'",
 	"a: word  word  word  word  word  word  word  word  word  word  word  word  word  word  word",
 	"a: 'word  word  word  word  word  word  word  word  word  word  word  word  word  word  word'",
 	"a: >\n  word  word  word  word  word  word  word  word  word  word  word  word  word  word\n",
-	"a: >\n  \u00a0x\n  y\n", "a: >\n  x\u00a0\n  y\n", "a: plain\u00a0 b\n  c",
+	"a: >\n  \u00a0x\n  y\n",
+	"a: >\n  x\u00a0\n  y\n",
+	"a: plain\u00a0 b\n  c",
 }
 
 func TestProseWrapMatchesOracle(test *testing.T) {
@@ -128,15 +156,41 @@ func TestProseWrapMatchesOracle(test *testing.T) {
 				}
 				compared++
 				// The full stack: the Go parser and the printer, from the text.
-				if fullStack, formatFullStackError := formatFullStack("fixture.yaml", input, options, proseWrap, nil); formatFullStackError != nil || fullStack != expected {
+				if fullStack, formatFullStackError := formatFullStack(
+					"fixture.yaml",
+					input,
+					options,
+					proseWrap,
+					nil,
+				); formatFullStackError != nil || fullStack != expected {
 					fullStackFailures++
 					if formatFullStackError != nil {
-						test.Errorf("%s, variant %d, %q: Format: %v", proseWrap, variantIndex, input, formatFullStackError)
+						test.Errorf(
+							"%s, variant %d, %q: Format: %v",
+							proseWrap,
+							variantIndex,
+							input,
+							formatFullStackError,
+						)
 					} else {
-						test.Errorf("%s, variant %d, %q: Format: %s", proseWrap, variantIndex, input, differential.FirstDifference(expected, fullStack))
+						test.Errorf(
+							"%s, variant %d, %q: Format: %s",
+							proseWrap,
+							variantIndex,
+							input,
+							differential.FirstDifference(expected, fullStack),
+						)
 					}
 				}
-				actual, err := formatParsed("fixture.yaml", trees[index], texts[index], byteOrderMarks[index], options, proseWrap, nil)
+				actual, err := formatParsed(
+					"fixture.yaml",
+					trees[index],
+					texts[index],
+					byteOrderMarks[index],
+					options,
+					proseWrap,
+					nil,
+				)
 				if err != nil {
 					failures++
 					test.Errorf("%s, variant %d, %q: %v", proseWrap, variantIndex, input, err)
@@ -144,12 +198,23 @@ func TestProseWrapMatchesOracle(test *testing.T) {
 				}
 				if actual != expected {
 					failures++
-					test.Errorf("%s, variant %d, %q: %s", proseWrap, variantIndex, input, differential.FirstDifference(expected, actual))
+					test.Errorf(
+						"%s, variant %d, %q: %s",
+						proseWrap,
+						variantIndex,
+						input,
+						differential.FirstDifference(expected, actual),
+					)
 				}
 			}
 		}
 	}
-	test.Logf("%d proseWrap comparisons: full stack %d differ, tree loader %d differ", compared, fullStackFailures, failures)
+	test.Logf(
+		"%d proseWrap comparisons: full stack %d differ, tree loader %d differ",
+		compared,
+		fullStackFailures,
+		failures,
+	)
 }
 
 // jsonTextToDoc stands in for the native JSON printer: the oracle formats the JSON, and the text comes
@@ -176,7 +241,14 @@ func TestPrettierRcEmbedsJSON(test *testing.T) {
 		`{"semi":false,"singleQuote":true}`, "{\n  \"a\": [1,2,3]\n}\n", "semi: false\nsingleQuote:   true\n",
 		"# c\nsemi: false", "[1,  2]", "{a: 1}", "", "\"a\"",
 	}
-	fileNames := []string{".prettierrc", "a/.stylelintrc", "a\\.lintstagedrc", "prettierrc", ".prettierrc.yaml", "x.yaml"}
+	fileNames := []string{
+		".prettierrc",
+		"a/.stylelintrc",
+		"a\\.lintstagedrc",
+		"prettierrc",
+		".prettierrc.yaml",
+		"x.yaml",
+	}
 	texts, byteOrderMarks, trees := parseInputs(test, inputs)
 	for _, options := range formatVariants[:2] {
 		textToDoc := jsonTextToDoc(test, oracle, options)
@@ -187,17 +259,48 @@ func TestPrettierRcEmbedsJSON(test *testing.T) {
 					if trees[index].err == "" {
 						test.Errorf("%s, %q: the oracle failed (%v) but the parser did not", fileName, input, err)
 					}
-					if _, fullStackErr := formatFullStack(fileName, input, options, "preserve", textToDoc); !printing.IsSyntax(fullStackErr) {
-						test.Errorf("%s, %q: the oracle failed (%v) but Format gave %v", fileName, input, err, fullStackErr)
+					if _, fullStackErr := formatFullStack(
+						fileName,
+						input,
+						options,
+						"preserve",
+						textToDoc,
+					); !printing.IsSyntax(fullStackErr) {
+						test.Errorf(
+							"%s, %q: the oracle failed (%v) but Format gave %v",
+							fileName,
+							input,
+							err,
+							fullStackErr,
+						)
 					}
 					continue
 				}
-				if fullStack, formatFullStackError := formatFullStack(fileName, input, options, "preserve", textToDoc); formatFullStackError != nil {
+				if fullStack, formatFullStackError := formatFullStack(
+					fileName,
+					input,
+					options,
+					"preserve",
+					textToDoc,
+				); formatFullStackError != nil {
 					test.Errorf("%s, %q: Format: %v", fileName, input, formatFullStackError)
 				} else if fullStack != expected {
-					test.Errorf("%s, %q: Format: %s", fileName, input, differential.FirstDifference(expected, fullStack))
+					test.Errorf(
+						"%s, %q: Format: %s",
+						fileName,
+						input,
+						differential.FirstDifference(expected, fullStack),
+					)
 				}
-				actual, err := formatParsed(fileName, trees[index], texts[index], byteOrderMarks[index], options, "preserve", textToDoc)
+				actual, err := formatParsed(
+					fileName,
+					trees[index],
+					texts[index],
+					byteOrderMarks[index],
+					options,
+					"preserve",
+					textToDoc,
+				)
 				if err != nil {
 					test.Errorf("%s, %q: %v", fileName, input, err)
 					continue

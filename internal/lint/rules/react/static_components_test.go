@@ -359,7 +359,9 @@ func TestStaticComponentsRequiresTypeChecker(test *testing.T) {
 	test.Parallel()
 
 	if !StaticComponents.NeedsTypeChecker {
-		test.Fatal("rule must declare NeedsTypeChecker; lowering without one names no values and the rule silently reports nothing")
+		test.Fatal(
+			"rule must declare NeedsTypeChecker; lowering without one names no values and the rule silently reports nothing",
+		)
 	}
 	untyped := rule_testing.Run(test, StaticComponents, "component.tsx", scTesterFail)
 	if len(untyped.Diagnostics) != 0 {

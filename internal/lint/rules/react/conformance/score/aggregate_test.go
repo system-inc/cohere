@@ -15,21 +15,29 @@ import (
 // wrong answer rather than an absent one.
 type engineImplementation struct{ t *testing.T }
 
-func (implementation engineImplementation) Analyze(fixture react_conformance.Fixture) (react_conformance.Result, error) {
+func (implementation engineImplementation) Analyze(
+	fixture react_conformance.Fixture,
+) (react_conformance.Result, error) {
 	rules, complete := fixture.Rules()
 	if !complete {
-		return react_conformance.Result{}, &react_conformance.ErrUnsupported{Reason: "not every diagnostic could be attributed to an upstream rule"}
+		return react_conformance.Result{}, &react_conformance.ErrUnsupported{
+			Reason: "not every diagnostic could be attributed to an upstream rule",
+		}
 	}
 
 	// Only a fixture whose diagnostics belong to exactly one wired rule can be scored against that
 	// rule. A mixed fixture would be judged against one rule while expecting another's findings,
 	// which manufactures a failure neither rule earned.
 	if len(rules) != 1 {
-		return react_conformance.Result{}, &react_conformance.ErrUnsupported{Reason: "fixture spans more than one upstream rule, so no single rule can be scored against it"}
+		return react_conformance.Result{}, &react_conformance.ErrUnsupported{
+			Reason: "fixture spans more than one upstream rule, so no single rule can be scored against it",
+		}
 	}
 	subject, wired := Rules[rules[0]]
 	if !wired {
-		return react_conformance.Result{}, &react_conformance.ErrUnsupported{Reason: "no rule engine wired for upstream rule " + rules[0]}
+		return react_conformance.Result{}, &react_conformance.ErrUnsupported{
+			Reason: "no rule engine wired for upstream rule " + rules[0],
+		}
 	}
 	return Analyze(subject, fixture, implementation.t.TempDir())
 }
@@ -105,7 +113,12 @@ func TestAggregateWithTheRuleEngineWired(test *testing.T) {
 				continue
 			}
 			if verdict.Verdict == react_conformance.VerdictNotScored {
-				test.Errorf("%s is owned by wired rule %s and was not scored: %s", verdict.Name, upstream, verdict.Reason)
+				test.Errorf(
+					"%s is owned by wired rule %s and was not scored: %s",
+					verdict.Name,
+					upstream,
+					verdict.Reason,
+				)
 			}
 		}
 	}

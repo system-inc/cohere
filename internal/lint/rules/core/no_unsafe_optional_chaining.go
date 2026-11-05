@@ -126,8 +126,8 @@ var relationalOperators = map[ast.Kind]bool{
 // the middle of a chain, and such a link's operand is by construction the previous link of that same
 // chain and therefore never the outermost one. The anchor conjunction below already declines it. So
 // the two predicates are interchangeable *here* while the guard itself is not removable, and the
-// faithful one is kept because the equivalence rests on the anchor rather than on anything local. This distinction is the documented
-// trap in this tree, recorded at `internal/rules/typescript/no_extra_non_null_assertion.go`:
+// faithful one is kept because the equivalence rests on the anchor rather than on anything local. This distinction is
+// the documented trap in this tree, recorded at `internal/rules/typescript/no_extra_non_null_assertion.go`:
 // reading IsOptionalChain where the original reads `optional` over-reports, because it is true for
 // links with no `?.` of their own. Here it would make `obj?.foo.bar` look like a chain consumed by
 // an optional access, which is the right answer by accident, and `(obj?.foo).bar` look the same

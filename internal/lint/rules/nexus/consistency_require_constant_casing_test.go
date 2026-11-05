@@ -177,7 +177,11 @@ func TestConsistencyRequireConstantCasingStaysSilent(test *testing.T) {
 		{"exported URL keeps PascalCase", constantCasingFile, "export const Endpoint = new URL('https://x');\n"},
 
 		// React shapes, each of which needs its capital for a different reason.
-		{"createContext", constantCasingFile, "import { createContext } from 'react';\nconst ThemeContext = createContext(null);\n"},
+		{
+			"createContext",
+			constantCasingFile,
+			"import { createContext } from 'react';\nconst ThemeContext = createContext(null);\n",
+		},
 		{
 			"React.createContext", constantCasingFile,
 			"import * as React from 'react';\nconst ThemeContext = React.createContext(null);\n",
@@ -223,7 +227,11 @@ func TestConsistencyRequireConstantCasingStaysSilent(test *testing.T) {
 				"const ResizeObserverConstructor = polyfill ?? (typeof window !== 'undefined' ? window.ResizeObserver : undefined);\n",
 		},
 		// A lowercase property read is not a constructor re-binding.
-		{"lowercase property read is unaffected", constantCasingFile, "declare const counts: any;\nconst total = counts.sum;\n"},
+		{
+			"lowercase property read is unaffected",
+			constantCasingFile,
+			"declare const counts: any;\nconst total = counts.sum;\n",
+		},
 
 		// An import wearing a const; import-require-node-namespace owns this spelling.
 		{
@@ -406,7 +414,10 @@ func TestConsistencyRequireConstantCasingSuggestionText(test *testing.T) {
 			if len(result.Diagnostics) != 1 {
 				test.Fatalf("want exactly one finding, got %d", len(result.Diagnostics))
 			}
-			if suggestion := suggestionFrom(test, result.Diagnostics[0].Message.Description); suggestion != testCase.want {
+			if suggestion := suggestionFrom(
+				test,
+				result.Diagnostics[0].Message.Description,
+			); suggestion != testCase.want {
 				test.Fatalf("suggestion = %q, want %q", suggestion, testCase.want)
 			}
 		})
@@ -504,7 +515,12 @@ func TestConsistencyRequireConstantCasingReadsTheRealSitesThroughTheirType(test 
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedFiles(test, ConsistencyRequireConstantCasing, testCase.files, testCase.subject)
+			result := rule_testing.RunTypedFiles(
+				test,
+				ConsistencyRequireConstantCasing,
+				testCase.files,
+				testCase.subject,
+			)
 			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 		})
 	}
@@ -548,29 +564,77 @@ func TestConsistencyRequireConstantCasingReadsWhatACallHandsBackThroughItsType(t
 		wantIds    []string
 	}{
 		// An object with methods holds them; it is not called, so it is a constant.
-		{"an object with methods, camelCase", "import { createStore } from './Factories';\nexport const settingsStore = createStore();\n", []string{"requirePascalCaseExported"}},
-		{"an object with methods, PascalCase", "import { createStore } from './Factories';\nexport const SettingsStore = createStore();\n", nil},
+		{
+			"an object with methods, camelCase",
+			"import { createStore } from './Factories';\nexport const settingsStore = createStore();\n",
+			[]string{"requirePascalCaseExported"},
+		},
+		{
+			"an object with methods, PascalCase",
+			"import { createStore } from './Factories';\nexport const SettingsStore = createStore();\n",
+			nil,
+		},
 
 		// A constructor keeps the capital `new` expects, even when it can also be called.
-		{"a class", "import { createDecimalClass } from './Factories';\nexport const Decimal = createDecimalClass();\n", nil},
-		{"a class, camelCase", "import { createDecimalClass } from './Factories';\nexport const decimal = createDecimalClass();\n", []string{"requirePascalCaseExported"}},
-		{"callable and constructible", "import { createCallableConstructor } from './Factories';\nexport const Coerce = createCallableConstructor();\n", nil},
+		{
+			"a class",
+			"import { createDecimalClass } from './Factories';\nexport const Decimal = createDecimalClass();\n",
+			nil,
+		},
+		{
+			"a class, camelCase",
+			"import { createDecimalClass } from './Factories';\nexport const decimal = createDecimalClass();\n",
+			[]string{"requirePascalCaseExported"},
+		},
+		{
+			"callable and constructible",
+			"import { createCallableConstructor } from './Factories';\nexport const Coerce = createCallableConstructor();\n",
+			nil,
+		},
 
 		// A plain value is data, wherever it was made.
-		{"a number, camelCase", "import { createLimit } from './Factories';\nexport const retryLimit = createLimit();\n", []string{"requirePascalCaseExported"}},
-		{"a number, PascalCase", "import { createLimit } from './Factories';\nexport const RetryLimit = createLimit();\n", nil},
+		{
+			"a number, camelCase",
+			"import { createLimit } from './Factories';\nexport const retryLimit = createLimit();\n",
+			[]string{"requirePascalCaseExported"},
+		},
+		{
+			"a number, PascalCase",
+			"import { createLimit } from './Factories';\nexport const RetryLimit = createLimit();\n",
+			nil,
+		},
 
 		// `any` has no signatures and proves nothing, so it is judged on the other evidence, which
 		// here is none.
-		{"any", "import { createAnything } from './Factories';\nexport const anything = createAnything();\n", []string{"requirePascalCaseExported"}},
+		{
+			"any",
+			"import { createAnything } from './Factories';\nexport const anything = createAnything();\n",
+			[]string{"requirePascalCaseExported"},
+		},
 
 		// Null and undefined are set aside; a part that is not callable is not.
-		{"a function or undefined", "import { createMaybeHandler } from './Factories';\nexport const handler = createMaybeHandler();\n", nil},
-		{"a function or a string", "import { createHandlerOrLabel } from './Factories';\nexport const handlerOrLabel = createHandlerOrLabel();\n", []string{"requirePascalCaseExported"}},
+		{
+			"a function or undefined",
+			"import { createMaybeHandler } from './Factories';\nexport const handler = createMaybeHandler();\n",
+			nil,
+		},
+		{
+			"a function or a string",
+			"import { createHandlerOrLabel } from './Factories';\nexport const handlerOrLabel = createHandlerOrLabel();\n",
+			[]string{"requirePascalCaseExported"},
+		},
 
 		// The factory's name no longer matters: a Creator is read like any other call.
-		{"a Creator-named factory, PascalCase", "import { RuleCreator } from './Factories';\nexport const CreateEsLintRule = RuleCreator('a');\n", []string{"requireCamelCaseFunction"}},
-		{"a Creator-named factory, camelCase", "import { RuleCreator } from './Factories';\nexport const createEsLintRule = RuleCreator('a');\n", nil},
+		{
+			"a Creator-named factory, PascalCase",
+			"import { RuleCreator } from './Factories';\nexport const CreateEsLintRule = RuleCreator('a');\n",
+			[]string{"requireCamelCaseFunction"},
+		},
+		{
+			"a Creator-named factory, camelCase",
+			"import { RuleCreator } from './Factories';\nexport const createEsLintRule = RuleCreator('a');\n",
+			nil,
+		},
 
 		// A local factory, annotated or not.
 		{
@@ -588,12 +652,24 @@ func TestConsistencyRequireConstantCasingReadsWhatACallHandsBackThroughItsType(t
 		},
 
 		// The annotation is the type, whatever its name ends in.
-		{"a function type annotation named Type", "import { pick, type HandlerType } from './Factories';\nexport const handler: HandlerType = pick();\n", nil},
+		{
+			"a function type annotation named Type",
+			"import { pick, type HandlerType } from './Factories';\nexport const handler: HandlerType = pick();\n",
+			nil,
+		},
 
 		// An import is followed to what it is, not read from its casing.
-		{"an alias for an imported function", "import { numberCompact } from './Factories';\nexport const formatNumber = numberCompact;\n", nil},
+		{
+			"an alias for an imported function",
+			"import { numberCompact } from './Factories';\nexport const formatNumber = numberCompact;\n",
+			nil,
+		},
 		// The rule as it stood reads a camelCase imported name as a function, and that reading is kept.
-		{"an alias for an imported object", "import { defaultSettings } from './Factories';\nexport const settings = defaultSettings;\n", nil},
+		{
+			"an alias for an imported object",
+			"import { defaultSettings } from './Factories';\nexport const settings = defaultSettings;\n",
+			nil,
+		},
 
 		// A component is a function JSX needs capitalized: the compound and memo shapes from
 		// Structure's Dialog.tsx and TableVirtualizedRow.tsx.
@@ -630,8 +706,16 @@ func TestConsistencyRequireConstantCasingReadsWhatACallHandsBackThroughItsType(t
 				"export const Dialog = Object.assign(DialogRoot, { Trigger: DialogRoot });\n",
 			nil,
 		},
-		{"a function returning any, PascalCase", "import { createLooseHandler } from './Factories';\nexport const LooseHandler = createLooseHandler();\n", nil},
-		{"a function returning any, camelCase", "import { createLooseHandler } from './Factories';\nexport const looseHandler = createLooseHandler();\n", []string{"requirePascalCaseExported"}},
+		{
+			"a function returning any, PascalCase",
+			"import { createLooseHandler } from './Factories';\nexport const LooseHandler = createLooseHandler();\n",
+			nil,
+		},
+		{
+			"a function returning any, camelCase",
+			"import { createLooseHandler } from './Factories';\nexport const looseHandler = createLooseHandler();\n",
+			[]string{"requirePascalCaseExported"},
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -729,7 +813,12 @@ func TestConsistencyRequireConstantCasingRenamesAFileLocalConstant(test *testing
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTyped(test, ConsistencyRequireConstantCasing, constantCasingFile, testCase.sourceText)
+			result := rule_testing.RunTyped(
+				test,
+				ConsistencyRequireConstantCasing,
+				constantCasingFile,
+				testCase.sourceText,
+			)
 			rule_testing.ExpectFindings(test, result, testCase.wantId)
 			rule_testing.ExpectFixedSource(test, result, testCase.wantSource)
 		})
@@ -783,7 +872,12 @@ func TestConsistencyRequireConstantCasingWithholdsAnUnsafeRename(test *testing.T
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTyped(test, ConsistencyRequireConstantCasing, constantCasingFile, testCase.sourceText)
+			result := rule_testing.RunTyped(
+				test,
+				ConsistencyRequireConstantCasing,
+				constantCasingFile,
+				testCase.sourceText,
+			)
 			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 			for _, diagnostic := range result.Diagnostics {
 				if len(diagnostic.Fixes) != 0 {
@@ -823,14 +917,38 @@ func TestConsistencyRequireConstantCasingTellsAnUnimportedExportToDropTheExport(
 		wantId   string
 	}{
 		{"no importer at all", "", "dropUnimportedExport"},
-		{"an importer that takes a different name", "import { ArchivePath } from './MediumConversationSource';\nexport const Path = ArchivePath;\n", "dropUnimportedExport"},
+		{
+			"an importer that takes a different name",
+			"import { ArchivePath } from './MediumConversationSource';\nexport const Path = ArchivePath;\n",
+			"dropUnimportedExport",
+		},
 		{"an import run only for its effects", "import './MediumConversationSource';\n", "dropUnimportedExport"},
-		{"a named import", "import { defaultMediumArchiveDirectory } from './MediumConversationSource';\nexport const Path = defaultMediumArchiveDirectory;\n", "requirePascalCaseExported"},
-		{"an aliased import", "import { defaultMediumArchiveDirectory as directory } from './MediumConversationSource';\nexport const Path = directory;\n", "requirePascalCaseExported"},
-		{"a namespace import", "import * as Medium from './MediumConversationSource';\nexport const Path = Medium.ArchivePath;\n", "requirePascalCaseExported"},
-		{"a named re-export", "export { defaultMediumArchiveDirectory } from './MediumConversationSource';\n", "requirePascalCaseExported"},
+		{
+			"a named import",
+			"import { defaultMediumArchiveDirectory } from './MediumConversationSource';\nexport const Path = defaultMediumArchiveDirectory;\n",
+			"requirePascalCaseExported",
+		},
+		{
+			"an aliased import",
+			"import { defaultMediumArchiveDirectory as directory } from './MediumConversationSource';\nexport const Path = directory;\n",
+			"requirePascalCaseExported",
+		},
+		{
+			"a namespace import",
+			"import * as Medium from './MediumConversationSource';\nexport const Path = Medium.ArchivePath;\n",
+			"requirePascalCaseExported",
+		},
+		{
+			"a named re-export",
+			"export { defaultMediumArchiveDirectory } from './MediumConversationSource';\n",
+			"requirePascalCaseExported",
+		},
 		{"a star re-export", "export * from './MediumConversationSource';\n", "requirePascalCaseExported"},
-		{"a dynamic import", "export async function load(): Promise<string> {\n    const medium = await import('./MediumConversationSource');\n    return medium.ArchivePath;\n}\n", "requirePascalCaseExported"},
+		{
+			"a dynamic import",
+			"export async function load(): Promise<string> {\n    const medium = await import('./MediumConversationSource');\n    return medium.ArchivePath;\n}\n",
+			"requirePascalCaseExported",
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -954,15 +1072,40 @@ func TestConsistencyRequireConstantCasingLeavesNextRouteContractsAlone(test *tes
 		wantIds    []string
 	}{
 		{"revalidate in a page", pageFile, "export const revalidate = 60;", nil},
-		{"revalidate outside a route", constantCasingFile, "export const revalidate = 60;", []string{"requirePascalCaseExported"}},
+		{
+			"revalidate outside a route",
+			constantCasingFile,
+			"export const revalidate = 60;",
+			[]string{"requirePascalCaseExported"},
+		},
 		{"an arrow POST in a route", routeFile, "export const POST = async () => new Response('');", nil},
-		{"an arrow POST outside a route", constantCasingFile, "export const POST = async () => new Response('');", []string{"requireCamelCaseFunction"}},
+		{
+			"an arrow POST outside a route",
+			constantCasingFile,
+			"export const POST = async () => new Response('');",
+			[]string{"requireCamelCaseFunction"},
+		},
 		{"unstable_instant in a page", pageFile, "export const unstable_instant = false;", nil},
 		// Contracts differ by file: a route reads no metadata, so the export there is ours to judge.
-		{"metadata in a route is not a contract", routeFile, "export const metadata = { title: 'Title' };", []string{"requirePascalCaseExported"}},
+		{
+			"metadata in a route is not a contract",
+			routeFile,
+			"export const metadata = { title: 'Title' };",
+			[]string{"requirePascalCaseExported"},
+		},
 		// Only the export is the contract; a file-local constant with the spelling is judged as one.
-		{"an unexported POST is not read by Next", routeFile, "const POST = async () => new Response('');\nconsole.log(POST);", []string{"requireCamelCaseFunction"}},
-		{"a local PascalCase is still judged", pageFile, "const Revalidate = 60;\nconsole.log(Revalidate);", []string{"requireCamelCaseLocal"}},
+		{
+			"an unexported POST is not read by Next",
+			routeFile,
+			"const POST = async () => new Response('');\nconsole.log(POST);",
+			[]string{"requireCamelCaseFunction"},
+		},
+		{
+			"a local PascalCase is still judged",
+			pageFile,
+			"const Revalidate = 60;\nconsole.log(Revalidate);",
+			[]string{"requireCamelCaseLocal"},
+		},
 	}
 
 	for _, testCase := range cases {
@@ -993,19 +1136,47 @@ func TestConsistencyRequireConstantCasingExemptsAClassExtendingAContainer(test *
 		sourceText string
 		wantIds    []string
 	}{
-		{"a same-file class extending String", document + "export const AccountDocument = new TypedDocumentString<1, 2>('query { a }');\n", nil},
-		{"a same-file class extending Map", "class Registry extends Map<string, number> {}\nexport const Registries = new Registry();\n", nil},
-		{"a container reached through two classes", "class Base extends Set<string> {}\nclass Tags extends Base {}\nexport const AllTags = new Tags();\n", nil},
-		{"a class extending a class of ours", "class Service {}\nclass NetworkService extends Service {}\nexport const NetworkServiceSingleton = new NetworkService();\n", []string{"requireCamelCaseInstance"}},
-		{"a class extending nothing", "class NetworkService {}\nexport const NetworkServiceSingleton = new NetworkService();\n", []string{"requireCamelCaseInstance"}},
+		{
+			"a same-file class extending String",
+			document + "export const AccountDocument = new TypedDocumentString<1, 2>('query { a }');\n",
+			nil,
+		},
+		{
+			"a same-file class extending Map",
+			"class Registry extends Map<string, number> {}\nexport const Registries = new Registry();\n",
+			nil,
+		},
+		{
+			"a container reached through two classes",
+			"class Base extends Set<string> {}\nclass Tags extends Base {}\nexport const AllTags = new Tags();\n",
+			nil,
+		},
+		{
+			"a class extending a class of ours",
+			"class Service {}\nclass NetworkService extends Service {}\nexport const NetworkServiceSingleton = new NetworkService();\n",
+			[]string{"requireCamelCaseInstance"},
+		},
+		{
+			"a class extending nothing",
+			"class NetworkService {}\nexport const NetworkServiceSingleton = new NetworkService();\n",
+			[]string{"requireCamelCaseInstance"},
+		},
 	} {
 		test.Run("untyped, "+testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectFindings(test, rule_testing.Run(test, ConsistencyRequireConstantCasing, constantCasingFile, testCase.sourceText), testCase.wantIds...)
+			rule_testing.ExpectFindings(
+				test,
+				rule_testing.Run(test, ConsistencyRequireConstantCasing, constantCasingFile, testCase.sourceText),
+				testCase.wantIds...,
+			)
 		})
 		test.Run("typed, "+testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, ConsistencyRequireConstantCasing, constantCasingFile, testCase.sourceText), testCase.wantIds...)
+			rule_testing.ExpectFindings(
+				test,
+				rule_testing.RunTyped(test, ConsistencyRequireConstantCasing, constantCasingFile, testCase.sourceText),
+				testCase.wantIds...,
+			)
 		})
 	}
 
@@ -1016,7 +1187,11 @@ func TestConsistencyRequireConstantCasingExemptsAClassExtendingAContainer(test *
 		wantIds []string
 	}{
 		{"an imported class extending String", document, nil},
-		{"an imported class extending a class of ours", "export class Service {}\nexport class TypedDocumentString<TResult, TVariables> extends Service {}\n", []string{"requireCamelCaseInstance"}},
+		{
+			"an imported class extending a class of ours",
+			"export class Service {}\nexport class TypedDocumentString<TResult, TVariables> extends Service {}\n",
+			[]string{"requireCamelCaseInstance"},
+		},
 	} {
 		test.Run("imported, "+testCase.name, func(test *testing.T) {
 			test.Parallel()

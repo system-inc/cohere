@@ -178,7 +178,10 @@ func (ssaGraph) SetPhis(block *BasicBlock, phis []*Phi) { block.Phis = phis }
 // EachEdge reports the structural fallthrough first, then EachSuccessor's real edges in its order,
 // with MaybeThrow's handler marked exceptional. Try's handler is a real edge: it leaves the block
 // holding the Try, before the try body runs, so nothing in that block can throw on the way.
-func (ssaGraph) EachEdge(block *BasicBlock, visit func(successor static_single_assignment.BlockId, edge static_single_assignment.Edge)) {
+func (ssaGraph) EachEdge(
+	block *BasicBlock,
+	visit func(successor static_single_assignment.BlockId, edge static_single_assignment.Edge),
+) {
 	if fallthroughBlock, ok := Fallthrough(block.Terminal); ok {
 		visit(fallthroughBlock, static_single_assignment.Fallthrough)
 	}
@@ -220,7 +223,12 @@ func (ssaGraph) ContextStoreDefines(function *Function, block *BasicBlock, index
 	return place.Identifier == function.Instructions[block.Instructions[index]].LValue.Identifier
 }
 
-func (ssaGraph) SetInstructionOrder(function *Function, block *BasicBlock, index int, order static_single_assignment.EvaluationOrder) {
+func (ssaGraph) SetInstructionOrder(
+	function *Function,
+	block *BasicBlock,
+	index int,
+	order static_single_assignment.EvaluationOrder,
+) {
 	function.Instructions[block.Instructions[index]].Order = order
 }
 
@@ -238,7 +246,10 @@ func (ssaGraph) Params(function *Function) []Place { return function.Params }
 
 func (ssaGraph) Returns(function *Function) *Place { return &function.Returns }
 
-func (ssaGraph) Declaration(function *Function, identifier static_single_assignment.IdentifierId) static_single_assignment.DeclarationId {
+func (ssaGraph) Declaration(
+	function *Function,
+	identifier static_single_assignment.IdentifierId,
+) static_single_assignment.DeclarationId {
 	return function.Identifiers[identifier].Declaration
 }
 
@@ -251,7 +262,10 @@ func (ssaGraph) Contextual(function *Function, declaration static_single_assignm
 // The DeclarationId is preserved, which is the whole point: after renaming, "which variable is
 // this" is answered by the declaration and "which value is this" by the identifier, and a pass can
 // ask either.
-func (ssaGraph) Mint(function *Function, original static_single_assignment.IdentifierId) static_single_assignment.IdentifierId {
+func (ssaGraph) Mint(
+	function *Function,
+	original static_single_assignment.IdentifierId,
+) static_single_assignment.IdentifierId {
 	source := function.Identifiers[original]
 	return function.NewIdentifier(source.Name, source.Node, source.Declaration).Id
 }

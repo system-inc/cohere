@@ -32,7 +32,10 @@ func TestAQuietWindowHoldsUntilItEnds(test *testing.T) {
 		!strings.Contains(line, "holds until 04:30:00") || !strings.Contains(line, "a cold measurement") {
 		test.Errorf("29 minutes into a 30 minute window it does not hold, or does not say why: %q", line)
 	}
-	if holds, line := quietHolds(directory, opened.Add(31*time.Minute)); holds || !strings.Contains(line, "expired at 04:30:00") {
+	if holds, line := quietHolds(
+		directory,
+		opened.Add(31*time.Minute),
+	); holds || !strings.Contains(line, "expired at 04:30:00") {
 		test.Errorf("a minute after a 30 minute window ended it holds, or does not say it expired: %q", line)
 	}
 	if code := quietOn(directory, []string{"--for"}, opened); code != 2 {
@@ -44,7 +47,10 @@ func TestAQuietWindowHoldsUntilItEnds(test *testing.T) {
 	if writeError := os.WriteFile(quietPath(directory), []byte("tomorrow\n"), 0o644); writeError != nil {
 		test.Fatal(writeError)
 	}
-	if holds, line := quietHolds(directory, opened); !holds || !strings.Contains(line, "does not start with when it ends") {
+	if holds, line := quietHolds(
+		directory,
+		opened,
+	); !holds || !strings.Contains(line, "does not start with when it ends") {
 		test.Errorf("an unreadable marker does not hold, or does not say what is wrong: %q", line)
 	}
 }
@@ -96,7 +102,11 @@ func newQuietTrimCase(test *testing.T) quietTrimCase {
 	if createDirectoryError := os.MkdirAll(cache, 0o755); createDirectoryError != nil {
 		test.Fatal(createDirectoryError)
 	}
-	if writeError := os.WriteFile(filepath.Join(cache, "README"), []byte("This directory holds cached build artifacts from the Go build system.\n"), 0o644); writeError != nil {
+	if writeError := os.WriteFile(
+		filepath.Join(cache, "README"),
+		[]byte("This directory holds cached build artifacts from the Go build system.\n"),
+		0o644,
+	); writeError != nil {
 		test.Fatal(writeError)
 	}
 	for index := 0; index < 10; index++ {
@@ -148,10 +158,20 @@ func TestAQuietWindowSwitchesTheTrimOff(test *testing.T) {
 	}
 	c := newQuietTrimCase(test)
 
-	if output := c.run(test, "quiet", "on", "--for", "10m", "cache's cold runs"); !strings.Contains(output, "quiet window open until") {
+	if output := c.run(
+		test,
+		"quiet",
+		"on",
+		"--for",
+		"10m",
+		"cache's cold runs",
+	); !strings.Contains(output, "quiet window open until") {
 		test.Errorf("quiet on does not say the window is open:\n%s", output)
 	}
-	if output := c.run(test, "status"); !strings.Contains(output, "quiet window: open") || !strings.Contains(output, "cache's cold runs") {
+	if output := c.run(
+		test,
+		"status",
+	); !strings.Contains(output, "quiet window: open") || !strings.Contains(output, "cache's cold runs") {
 		test.Errorf("cohere-dev status does not show the open window:\n%s", output)
 	}
 	c.run(test, trimCacheVerb)
@@ -206,9 +226,13 @@ func TestAQuietWindowOpenedWhileTheTrimWaitsHoldsToo(test *testing.T) {
 	}
 	log := c.log(test)
 	if strings.Contains(log, "not looked at") {
-		test.Fatalf("the trim had not reached its wait for the pool in two seconds, so this run tells nothing:\n%s", log)
+		test.Fatalf(
+			"the trim had not reached its wait for the pool in two seconds, so this run tells nothing:\n%s",
+			log,
+		)
 	}
-	if !strings.Contains(log, "cap, not trimmed: a quiet window holds until") || !strings.Contains(log, "lint_rules' pairs") {
+	if !strings.Contains(log, "cap, not trimmed: a quiet window holds until") ||
+		!strings.Contains(log, "lint_rules' pairs") {
 		test.Errorf("the trim's log does not say the window stopped it after it held the pool:\n%s", log)
 	}
 }

@@ -305,7 +305,11 @@ var PreferFind = rule.Rule{
 
 		// buildSuggestion assembles the whole repair: every filter becomes find, and the trailing
 		// index access is deleted.
-		buildSuggestion := func(filters []filterCall, arrayExpression *ast.Node, wholeExpression *ast.Node) (rule.Suggestion, bool) {
+		buildSuggestion := func(
+			filters []filterCall,
+			arrayExpression *ast.Node,
+			wholeExpression *ast.Node,
+		) (rule.Suggestion, bool) {
 			fixes := make([]rule.Fix, 0, len(filters)+1)
 			for _, filter := range filters {
 				replacement := "find"

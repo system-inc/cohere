@@ -12,8 +12,14 @@ import (
 // The rule's messages, one handle per id, whose wording lives in
 // `policy/messages/network-require-hook-variables-type.json`.
 var (
-	networkRequireHookVariablesTypeInlineVariablesTypeText               = policy.MessageOf("structure/network-require-hook-variables-type", "inlineVariablesType")
-	networkRequireHookVariablesTypeUnnecessaryVariablesDestructuringText = policy.MessageOf("structure/network-require-hook-variables-type", "unnecessaryVariablesDestructuring")
+	networkRequireHookVariablesTypeInlineVariablesTypeText = policy.MessageOf(
+		"structure/network-require-hook-variables-type",
+		"inlineVariablesType",
+	)
+	networkRequireHookVariablesTypeUnnecessaryVariablesDestructuringText = policy.MessageOf(
+		"structure/network-require-hook-variables-type",
+		"unnecessaryVariablesDestructuring",
+	)
 )
 
 // messageInlineVariablesType is the finding, rendered when it is reported so the text comes from the current catalog.
@@ -24,7 +30,8 @@ func messageInlineVariablesType() rule.Message {
 	}
 }
 
-// messageUnnecessaryVariablesDestructuring is the finding, rendered when it is reported so the text comes from the current catalog.
+// messageUnnecessaryVariablesDestructuring is the finding, rendered when it is reported so the text comes from the
+// current catalog.
 func messageUnnecessaryVariablesDestructuring() rule.Message {
 	return rule.Message{
 		Id:          networkRequireHookVariablesTypeUnnecessaryVariablesDestructuringText.Id,

@@ -127,7 +127,12 @@ func TestATimedWalkBillsCPUNotWaiting(test *testing.T) {
 
 	// Both rules ran in every file, or a zero below would be a rule that never ran.
 	if slept.NodesOffered != fileCount || spun.NodesOffered != fileCount {
-		test.Fatalf("the planted rules ran on %d and %d files, want %d each", slept.NodesOffered, spun.NodesOffered, fileCount)
+		test.Fatalf(
+			"the planted rules ran on %d and %d files, want %d each",
+			slept.NodesOffered,
+			spun.NodesOffered,
+			fileCount,
+		)
 	}
 	sleptWall := time.Duration(sleptTotal.Load())
 	if sleptWall < fileCount*sleepPerFile {

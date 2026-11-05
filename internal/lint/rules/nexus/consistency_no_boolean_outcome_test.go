@@ -16,14 +16,26 @@ func TestConsistencyNoBooleanOutcomeFires(test *testing.T) {
 		name       string
 		sourceText string
 	}{
-		{"interface with success and error", "export interface LookupResult {\n    success: boolean;\n    error: string;\n}\n"},
-		{"type literal with ok and value", "export type LookupResultType = {\n    ok: boolean;\n    value: string;\n};\n"},
+		{
+			"interface with success and error",
+			"export interface LookupResult {\n    success: boolean;\n    error: string;\n}\n",
+		},
+		{
+			"type literal with ok and value",
+			"export type LookupResultType = {\n    ok: boolean;\n    value: string;\n};\n",
+		},
 		{"failed with a reason", "export interface CallResult {\n    failed: boolean;\n    reason: string;\n}\n"},
 		{"succeeded with data", "export interface CallResult {\n    succeeded: boolean;\n    data: string;\n}\n"},
-		{"isError alone with a message", "export interface CallResult {\n    isError: boolean;\n    message: string;\n}\n"},
+		{
+			"isError alone with a message",
+			"export interface CallResult {\n    isError: boolean;\n    message: string;\n}\n",
+		},
 		// A third-party envelope exempts only on its whole documented field set, so a shape of our own
 		// that shares three of Cloudflare v4's four fields is still ours.
-		{"three of cloudflare's four fields", "export interface SyncResult {\n    success: boolean;\n    errors: string[];\n    result: string;\n}\n"},
+		{
+			"three of cloudflare's four fields",
+			"export interface SyncResult {\n    success: boolean;\n    errors: string[];\n    result: string;\n}\n",
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -44,16 +56,48 @@ func TestConsistencyNoBooleanOutcomeStaysSilent(test *testing.T) {
 		fileName   string
 		sourceText string
 	}{
-		{"a flag with no companion is state", outcomeFile, "export interface ToggleState {\n    isVisible: boolean;\n    succeeded: boolean;\n}\n"},
-		{"a lone flag on a database row", outcomeFile, "export interface JobRow {\n    id: string;\n    succeeded: boolean;\n}\n"},
-		{"react properties are display state", outcomeFile, "export interface BannerProperties {\n    isError: boolean;\n    message: string;\n}\n"},
-		{"tanstack field set is not ours", outcomeFile, "export interface QueryResult {\n    isError: boolean;\n    isLoading: boolean;\n    error: string;\n}\n"},
-		{"cloudflare's v4 envelope is not ours", outcomeFile, "export interface R2CloudflareApiResponseInterface {\n    success: boolean;\n    errors: unknown;\n    messages: unknown;\n    result: unknown;\n}\n"},
-		{"isSuccess and isError are one settled state", outcomeFile, "export interface QueryResult {\n    isSuccess: boolean;\n    isError: boolean;\n    error: string;\n}\n"},
+		{
+			"a flag with no companion is state",
+			outcomeFile,
+			"export interface ToggleState {\n    isVisible: boolean;\n    succeeded: boolean;\n}\n",
+		},
+		{
+			"a lone flag on a database row",
+			outcomeFile,
+			"export interface JobRow {\n    id: string;\n    succeeded: boolean;\n}\n",
+		},
+		{
+			"react properties are display state",
+			outcomeFile,
+			"export interface BannerProperties {\n    isError: boolean;\n    message: string;\n}\n",
+		},
+		{
+			"tanstack field set is not ours",
+			outcomeFile,
+			"export interface QueryResult {\n    isError: boolean;\n    isLoading: boolean;\n    error: string;\n}\n",
+		},
+		{
+			"cloudflare's v4 envelope is not ours",
+			outcomeFile,
+			"export interface R2CloudflareApiResponseInterface {\n    success: boolean;\n    errors: unknown;\n    messages: unknown;\n    result: unknown;\n}\n",
+		},
+		{
+			"isSuccess and isError are one settled state",
+			outcomeFile,
+			"export interface QueryResult {\n    isSuccess: boolean;\n    isError: boolean;\n    error: string;\n}\n",
+		},
 		// A discriminated union is the shape this rule steers toward, so it must never fire on one.
-		{"a union alias is already the answer", outcomeFile, "export type PostOutcomeType =\n    | { outcome: 'Found'; value: string }\n    | { outcome: 'NotFound'; message: string };\n"},
+		{
+			"a union alias is already the answer",
+			outcomeFile,
+			"export type PostOutcomeType =\n    | { outcome: 'Found'; value: string }\n    | { outcome: 'NotFound'; message: string };\n",
+		},
 		// A literal arm inside a discriminated union is fine, since only a bare boolean counts.
-		{"a literal true is not a bare boolean", outcomeFile, "export interface FoundArm {\n    success: true;\n    value: string;\n}\n"},
+		{
+			"a literal true is not a bare boolean",
+			outcomeFile,
+			"export interface FoundArm {\n    success: true;\n    value: string;\n}\n",
+		},
 		{"an unrelated interface", outcomeFile, "export interface Point {\n    x: number;\n    y: number;\n}\n"},
 	}
 	for _, testCase := range cases {
@@ -70,7 +114,12 @@ func TestConsistencyNoBooleanOutcomeStaysSilent(test *testing.T) {
 func TestConsistencyNoBooleanOutcomeHoldsGeneratedFilesToTheRule(test *testing.T) {
 	test.Parallel()
 	for _, fileName := range []string{"/repository/source/generated/Api.ts", "/repository/source/Api.generated.ts"} {
-		result := rule_testing.Run(test, ConsistencyNoBooleanOutcome, fileName, "export interface LookupResult {\n    success: boolean;\n    error: string;\n}\n")
+		result := rule_testing.Run(
+			test,
+			ConsistencyNoBooleanOutcome,
+			fileName,
+			"export interface LookupResult {\n    success: boolean;\n    error: string;\n}\n",
+		)
 		rule_testing.ExpectFindings(test, result, "booleanOutcome")
 	}
 }

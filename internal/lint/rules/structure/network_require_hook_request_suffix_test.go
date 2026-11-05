@@ -227,13 +227,20 @@ func TestNetworkRequireHookRequestSuffixNeedsTheImport(test *testing.T) {
 		"declare const gqlDocument: unknown;\n" +
 		"export function useUser() {\n    return networkService.useGraphQlQuery(gqlDocument);\n}\n"
 
-	rule_testing.ExpectClean(test, rule_testing.Run(test, NetworkRequireHookRequestSuffix, plainNamedFile, withoutImport))
+	rule_testing.ExpectClean(
+		test,
+		rule_testing.Run(test, NetworkRequireHookRequestSuffix, plainNamedFile, withoutImport),
+	)
 
 	// The control: the same source with the import restored must fire both findings. Without this
 	// half the test above would pass on a rule that reports nothing at all.
 	withImport := requestSuffixDeclarations +
 		"export function useUser() {\n    return networkService.useGraphQlQuery(gqlDocument);\n}\n"
 
-	rule_testing.ExpectFindings(test, rule_testing.Run(test, NetworkRequireHookRequestSuffix, plainNamedFile, withImport),
-		"hookShouldEndWithRequest", "fileShouldEndWithRequest")
+	rule_testing.ExpectFindings(
+		test,
+		rule_testing.Run(test, NetworkRequireHookRequestSuffix, plainNamedFile, withImport),
+		"hookShouldEndWithRequest",
+		"fileShouldEndWithRequest",
+	)
 }

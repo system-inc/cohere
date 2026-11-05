@@ -55,7 +55,11 @@ func TestNoEvalFires(test *testing.T) {
 		{"the comma-sequence indirection", "(0, eval)('foo')", []string{"noEval"}},
 		{"an alias assignment", "var EVAL = eval; EVAL('foo')", []string{"noEval"}},
 		{"eval passed as an argument", "(function(exe){ exe('foo') })(eval);", []string{"noEval"}},
-		{"eval passed to a callback taker", "callbacks.findLastIndex(function (cb) { return cb(eval); }, this);", []string{"noEval"}},
+		{
+			"eval passed to a callback taker",
+			"callbacks.findLastIndex(function (cb) { return cb(eval); }, this);",
+			[]string{"noEval"},
+		},
 
 		// The global-object arm. Upstream gates these behind `env: { browser: true }` or
 		// `env: { node: true }`, which our configuration surface does not have; see the divergence
@@ -116,7 +120,10 @@ func TestNoEvalStaysSilent(test *testing.T) {
 		// property, whatever that variable happens to hold.
 		{"a window subscript through a shadowing variable", "function foo() { var eval = 'foo'; window[eval]('foo') }"},
 		{"a global subscript through a shadowing variable", "function foo() { var eval = 'foo'; global[eval]('foo') }"},
-		{"a globalThis subscript through a shadowing variable", "function foo() { var eval = 'foo'; globalThis[eval]('foo') }"},
+		{
+			"a globalThis subscript through a shadowing variable",
+			"function foo() { var eval = 'foo'; globalThis[eval]('foo') }",
+		},
 
 		// `this` inside a method, an object literal function, or a class body is not the global
 		// object, so `this.eval` there is a call on the receiver rather than global eval.
@@ -140,12 +147,24 @@ func TestNoEvalStaysSilent(test *testing.T) {
 
 		// A function passed a `thisArg` is invoked with that receiver, so `this.eval` inside it is
 		// not global eval. Upstream enumerates the standard-library methods that take one.
-		{"findLast with a thisArg", "array.findLast(function (x) { return this.eval.includes(x); }, { eval: ['foo', 'bar'] });"},
-		{"findLastIndex with this as thisArg", "callbacks.findLastIndex(function (cb) { return cb(this.eval); }, this);"},
+		{
+			"findLast with a thisArg",
+			"array.findLast(function (x) { return this.eval.includes(x); }, { eval: ['foo', 'bar'] });",
+		},
+		{
+			"findLastIndex with this as thisArg",
+			"callbacks.findLastIndex(function (cb) { return cb(this.eval); }, this);",
+		},
 		{"flatMap with a thisArg", "['1+1'].flatMap(function (str) { return this.eval(str); }, new Evaluator);"},
 		{"Array.from with a thisArg", "Array.from(values, function (value) { return this.eval(value); }, context);"},
-		{"Array.fromAsync with a thisArg", "Array.fromAsync(values, async function (value) { return this.eval(await value); }, context);"},
-		{"Uint8Array.from with a thisArg", "Uint8Array.from(values, function (value) { return this.eval(value); }, context);"},
+		{
+			"Array.fromAsync with a thisArg",
+			"Array.fromAsync(values, async function (value) { return this.eval(await value); }, context);",
+		},
+		{
+			"Uint8Array.from with a thisArg",
+			"Uint8Array.from(values, function (value) { return this.eval(value); }, context);",
+		},
 
 		// A top-level `this` in a module is undefined rather than the global object. Our tree is
 		// modules, so this is the shape a real file has and it must not fire.

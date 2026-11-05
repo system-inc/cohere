@@ -105,12 +105,22 @@ func CompiledModules(moduleDirectory string) ([]Module, error) {
 		command := exec.Command("go", "list", "-deps", "-f",
 			"{{with .Module}}{{.Path}}\t{{.Version}}\t{{.Dir}}{{end}}", "./command/cohere")
 		command.Dir = moduleDirectory
-		command.Env = append(os.Environ(), "GOOS="+target.GoOperatingSystem, "GOARCH="+target.GoArchitecture, "CGO_ENABLED=0")
+		command.Env = append(
+			os.Environ(),
+			"GOOS="+target.GoOperatingSystem,
+			"GOARCH="+target.GoArchitecture,
+			"CGO_ENABLED=0",
+		)
 		var standardError bytes.Buffer
 		command.Stderr = &standardError
 		output, outputError := command.Output()
 		if outputError != nil {
-			return nil, fmt.Errorf("listing cohere's build graph for %s: %w\n%s", target, outputError, standardError.String())
+			return nil, fmt.Errorf(
+				"listing cohere's build graph for %s: %w\n%s",
+				target,
+				outputError,
+				standardError.String(),
+			)
 		}
 		for line := range strings.SplitSeq(strings.TrimSpace(string(output)), "\n") {
 			fields := strings.Split(line, "\t")
@@ -161,13 +171,22 @@ func repositoryOnlyModules(moduleDirectory string, compiled []Module) ([]Module,
 		download.Dir = moduleDirectory
 		output, outputError := download.Output()
 		if outputError != nil {
-			return nil, fmt.Errorf("finding %s@%s to read its license: %w", requirement.Path, requirement.Version, outputError)
+			return nil, fmt.Errorf(
+				"finding %s@%s to read its license: %w",
+				requirement.Path,
+				requirement.Version,
+				outputError,
+			)
 		}
 		var downloaded struct{ Dir string }
 		if decodeError := json.Unmarshal(output, &downloaded); decodeError != nil {
 			return nil, decodeError
 		}
-		byPath[requirement.Path] = Module{Path: requirement.Path, Version: requirement.Version, Directory: downloaded.Dir}
+		byPath[requirement.Path] = Module{
+			Path:      requirement.Path,
+			Version:   requirement.Version,
+			Directory: downloaded.Dir,
+		}
 	}
 	return sortedModules(byPath), nil
 }
@@ -193,7 +212,13 @@ func readModuleLicense(module Module) (string, error) {
 			return string(contents), nil
 		}
 	}
-	return "", fmt.Errorf("%s@%s has no license file in %s (looked for %s)", module.Path, module.Version, module.Directory, strings.Join(moduleLicenseFileNames, ", "))
+	return "", fmt.Errorf(
+		"%s@%s has no license file in %s (looked for %s)",
+		module.Path,
+		module.Version,
+		module.Directory,
+		strings.Join(moduleLicenseFileNames, ", "),
+	)
 }
 
 // moduleThirdPartyFileNames are the names a Go module ships its own credit for code it includes under,
@@ -245,8 +270,14 @@ func readSwiftPins(moduleDirectory string) ([]swiftPin, error) {
 		if version == "" {
 			version = pin.State.Revision
 		}
-		pins = append(pins, swiftPin{Identity: pin.Identity, Location: strings.TrimSuffix(pin.Location, ".git"), Version: version})
+		pins = append(
+			pins,
+			swiftPin{Identity: pin.Identity, Location: strings.TrimSuffix(pin.Location, ".git"), Version: version},
+		)
 	}
-	slices.SortFunc(pins, func(left swiftPin, right swiftPin) int { return strings.Compare(left.Identity, right.Identity) })
+	slices.SortFunc(
+		pins,
+		func(left swiftPin, right swiftPin) int { return strings.Compare(left.Identity, right.Identity) },
+	)
 	return pins, nil
 }

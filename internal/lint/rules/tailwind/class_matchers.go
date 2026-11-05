@@ -41,7 +41,11 @@ func compileMatchers(matchers []SelectorMatcher) []compiledMatcher {
 	}
 	compiled := make([]compiledMatcher, 0, len(matchers))
 	for _, matcher := range matchers {
-		entry := compiledMatcher{matcherType: matcher.Type, hasPath: matcher.Path != "", inner: compileMatchers(matcher.Match)}
+		entry := compiledMatcher{
+			matcherType: matcher.Type,
+			hasPath:     matcher.Path != "",
+			inner:       compileMatchers(matcher.Match),
+		}
 		if entry.hasPath {
 			// Ignored: a pattern that does not compile leaves path nil, which matches no path rather than
 			// refusing the run, as compiledMatcher's path says.
@@ -423,7 +427,8 @@ func (matcher liveMatcher) evaluate(node esNode) (matcherResult, []liveMatcher) 
 	selector := matcher.matcher
 	if selector.matcherType == MatcherTypeAnonymousFunctionReturn {
 		if !node.asFunction && !node.asQuasi &&
-			(node.node.Kind == ast.KindVariableDeclaration || node.node.Kind == ast.KindCallExpression && isUncrossable(node.node)) {
+			(node.node.Kind == ast.KindVariableDeclaration ||
+				node.node.Kind == ast.KindCallExpression && isUncrossable(node.node)) {
 			return matcherUncrossable, nil
 		}
 		switch {
@@ -588,7 +593,9 @@ func isESBinaryExpression(node *ast.Node) (ast.Kind, bool) {
 		return 0, false
 	}
 	operator := node.AsBinaryExpression().OperatorToken.Kind
-	if ast.IsLogicalOrCoalescingBinaryOperator(operator) || ast.IsAssignmentOperator(operator) || operator == ast.KindCommaToken {
+	if ast.IsLogicalOrCoalescingBinaryOperator(operator) ||
+		ast.IsAssignmentOperator(operator) ||
+		operator == ast.KindCommaToken {
 		return operator, false
 	}
 	return operator, true
@@ -607,7 +614,8 @@ func isInsideDisallowedBinaryExpression(node *ast.Node) bool {
 // isInsideConditionalExpressionTest is upstream's: any ancestor the test of a conditional.
 func isInsideConditionalExpressionTest(node *ast.Node) bool {
 	for child, parent := node, esParent(node); parent != nil; child, parent = parent, esParent(parent) {
-		if parent.Kind == ast.KindConditionalExpression && skipOuter(parent.AsConditionalExpression().Condition) == child {
+		if parent.Kind == ast.KindConditionalExpression &&
+			skipOuter(parent.AsConditionalExpression().Condition) == child {
 			return true
 		}
 	}

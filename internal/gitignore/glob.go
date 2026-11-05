@@ -87,7 +87,9 @@ func compileGlob(pattern string, path bool) glob {
 			if path && runEnd > index {
 				segmentStart := index == 0 || pattern[index-1] == '/'
 				followedBySlash := runEnd+1 < len(pattern) && pattern[runEnd+1] == '/'
-				followedByEscapedSlash := runEnd+2 < len(pattern) && pattern[runEnd+1] == '\\' && pattern[runEnd+2] == '/'
+				followedByEscapedSlash := runEnd+2 < len(pattern) &&
+					pattern[runEnd+1] == '\\' &&
+					pattern[runEnd+2] == '/'
 				switch {
 				case segmentStart && runEnd+1 == len(pattern):
 					kind = everythingToken

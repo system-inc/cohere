@@ -14,7 +14,10 @@ var outsideNexusAliases = []string{"@project", "@structure", "@base"}
 
 // boundaryNoNexusOutsideImportText is the rule's message, whose wording lives in
 // `policy/messages/boundary-no-nexus-outside-import.json`.
-var boundaryNoNexusOutsideImportText = policy.MessageOf("nexus/boundary-no-nexus-outside-import", "forbiddenOutsideImport")
+var boundaryNoNexusOutsideImportText = policy.MessageOf(
+	"nexus/boundary-no-nexus-outside-import",
+	"forbiddenOutsideImport",
+)
 
 func messageForbiddenOutsideImport() rule.Message {
 	return rule.Message{

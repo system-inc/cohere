@@ -16,13 +16,24 @@ func TestNestedScopeMergeMatchesEnclosingDependencies(test *testing.T) {
 		removed                   int
 	}{
 		{name: "empty", removed: 1},
-		{name: "same input", outer: []ReactiveScopeDependency{{Identifier: input}}, inner: []ReactiveScopeDependency{{Identifier: input}}, removed: 1},
+		{
+			name:    "same input",
+			outer:   []ReactiveScopeDependency{{Identifier: input}},
+			inner:   []ReactiveScopeDependency{{Identifier: input}},
+			removed: 1,
+		},
 		{name: "different input", outer: []ReactiveScopeDependency{{Identifier: input}}},
 		{name: "pruned outer", prunedOuter: true},
 		{name: "pruned inner", prunedInner: true},
 		{name: "conditional", conditional: true, removed: 1},
 		{name: "pruned bridge", prunedBridge: true, removed: 1},
-		{name: "different optionality", outer: []ReactiveScopeDependency{{Identifier: input, Path: []DependencyPathEntry{{Property: "value"}}}}, inner: []ReactiveScopeDependency{{Identifier: input, Path: []DependencyPathEntry{{Property: "value", Optional: true}}}}},
+		{
+			name:  "different optionality",
+			outer: []ReactiveScopeDependency{{Identifier: input, Path: []DependencyPathEntry{{Property: "value"}}}},
+			inner: []ReactiveScopeDependency{
+				{Identifier: input, Path: []DependencyPathEntry{{Property: "value", Optional: true}}},
+			},
+		},
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
@@ -30,7 +41,11 @@ func TestNestedScopeMergeMatchesEnclosingDependencies(test *testing.T) {
 			function.NewIdentifier("condition", nil, 0)
 			function.NewIdentifier("input", nil, 1)
 			leaf := &ReactiveInstruction{Order: 7, Value: &ReactiveInstructionValue{Value: &Primitive{Value: 1}}}
-			inner := &ReactiveScopeBlock{Scope: 2, Pruned: testCase.prunedInner, Instructions: ReactiveBlock{&ReactiveInstructionStatement{Instruction: leaf}}}
+			inner := &ReactiveScopeBlock{
+				Scope:        2,
+				Pruned:       testCase.prunedInner,
+				Instructions: ReactiveBlock{&ReactiveInstructionStatement{Instruction: leaf}},
+			}
 			body := ReactiveBlock{inner}
 			if testCase.conditional {
 				body = ReactiveBlock{&ReactiveTerminalStatement{Terminal: &ReactiveIf{Consequent: body}}}
@@ -45,7 +60,11 @@ func TestNestedScopeMergeMatchesEnclosingDependencies(test *testing.T) {
 			}}
 			result := MergeReactiveScopesThatInvalidateTogether(tree, function, dependencies, nil)
 			if result.NestedScopesRemoved != testCase.removed || result.Merges != 0 {
-				test.Fatalf("merge result=%+v, want %d nested removals and no adjacent merges", result, testCase.removed)
+				test.Fatalf(
+					"merge result=%+v, want %d nested removals and no adjacent merges",
+					result,
+					testCase.removed,
+				)
 			}
 			instructions, innerScopes := 0, 0
 			VisitReactiveFunction(tree, ReactiveVisitor{

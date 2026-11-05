@@ -13,5 +13,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // of a real tree. `rule.DecodeOptionsInto` binds the *bool fields, which is what keeps an absent key
 // distinguishable from an explicit false, and the settings resolver applies the defaults on nil.
 func init() {
-	rule.Register(rule.Registration{Rule: RestrictPlusOperands, Decode: rule.DecodeOptionsInto[RestrictPlusOperandsOptions]()})
+	rule.Register(
+		rule.Registration{Rule: RestrictPlusOperands, Decode: rule.DecodeOptionsInto[RestrictPlusOperandsOptions]()},
+	)
 }

@@ -112,7 +112,11 @@ func TestIncrementalProgramSkipsUnchangedFiles(test *testing.T) {
 	// the harness can produce a finding at all, which is what makes leg three's result mean
 	// something. Without it, a silent leg three is indistinguishable from a broken detector.
 	plantedPath := filepath.Join(directory, "planted.ts")
-	if writeError := os.WriteFile(plantedPath, []byte("export const broken: number = \"a string\";\n"), 0o644); writeError != nil {
+	if writeError := os.WriteFile(
+		plantedPath,
+		[]byte("export const broken: number = \"a string\";\n"),
+		0o644,
+	); writeError != nil {
 		test.Fatalf("planting: %v", writeError)
 	}
 
@@ -233,7 +237,11 @@ func TestIncrementalDiagnosticsSurvivesAChange(test *testing.T) {
 	// the case a stale cache fails. The file is new, so the cache has never seen it, and a
 	// cache that trusts its snapshot over the filesystem reports nothing here.
 	plantedPath := filepath.Join(directory, "planted.ts")
-	if writeError := os.WriteFile(plantedPath, []byte("export const broken: number = \"a string\";\n"), 0o644); writeError != nil {
+	if writeError := os.WriteFile(
+		plantedPath,
+		[]byte("export const broken: number = \"a string\";\n"),
+		0o644,
+	); writeError != nil {
 		test.Fatalf("planting: %v", writeError)
 	}
 

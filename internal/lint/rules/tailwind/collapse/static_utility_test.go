@@ -30,8 +30,12 @@ func TestFrameworkStaticsReproduceTheBaseTable(test *testing.T) {
 	sort.Strings(disagreeing)
 
 	if len(missing) > 0 {
-		test.Errorf("%d of %d base statics have no framework registration, so deleting their rows would delete an answer: %v",
-			len(missing), len(baseStatics), truncate(missing, 12))
+		test.Errorf(
+			"%d of %d base statics have no framework registration, so deleting their rows would delete an answer: %v",
+			len(missing),
+			len(baseStatics),
+			truncate(missing, 12),
+		)
 	}
 	for _, name := range disagreeing {
 		expected := baseStatics[name]
@@ -44,7 +48,10 @@ func TestFrameworkStaticsReproduceTheBaseTable(test *testing.T) {
 	// check above by comparing nothing, which is the vacuous-sweep shape this slice has been bitten
 	// by before.
 	if len(baseStatics) < 800 {
-		test.Fatalf("baseStatics holds %d entries; expected around 869, so this comparison measured far less than it appears to", len(baseStatics))
+		test.Fatalf(
+			"baseStatics holds %d entries; expected around 869, so this comparison measured far less than it appears to",
+			len(baseStatics),
+		)
 	}
 	test.Logf("reproduced %d of %d base statics by walking declarations; the framework table holds %d",
 		len(baseStatics)-len(missing)-len(disagreeing), len(baseStatics), len(FrameworkStaticDeclarations))
@@ -71,7 +78,10 @@ func TestFrameworkStaticsCoverTheDeprecatedRegistrations(test *testing.T) {
 
 	for name, expected := range deprecated {
 		if _, inBase := baseStatics[name]; inBase {
-			test.Errorf("%s is now in baseStatics; this test asserts the gap the framework table closes, so the gap may have been closed elsewhere and this should be re-measured rather than loosened", name)
+			test.Errorf(
+				"%s is now in baseStatics; this test asserts the gap the framework table closes, so the gap may have been closed elsewhere and this should be re-measured rather than loosened",
+				name,
+			)
 		}
 		actual, found := FrameworkStaticReading(name)
 		if !found {
@@ -79,7 +89,14 @@ func TestFrameworkStaticsCoverTheDeprecatedRegistrations(test *testing.T) {
 			continue
 		}
 		if !readingsEqual(expected, actual) {
-			test.Errorf("%s reads %v#%d, expected %v#%d from the engine", name, actual.Order, actual.Count, expected.Order, expected.Count)
+			test.Errorf(
+				"%s reads %v#%d, expected %v#%d from the engine",
+				name,
+				actual.Order,
+				actual.Count,
+				expected.Order,
+				expected.Count,
+			)
 		}
 	}
 }

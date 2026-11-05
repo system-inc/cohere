@@ -115,9 +115,11 @@ var optionElementCases = []optionElementCase{
 		treatment: `["error", "self", "vm"]`,
 	},
 	{
-		rule: "func-name-matching", source: "declare const module: { exports: unknown };\nmodule.exports = function foo() {};\n",
-		control:   `["error", "always"]`,
-		treatment: `["error", "always", {"includeCommonJSModuleExports": true}]`, treatmentCount: 1,
+		rule:           "func-name-matching",
+		source:         "declare const module: { exports: unknown };\nmodule.exports = function foo() {};\n",
+		control:        `["error", "always"]`,
+		treatment:      `["error", "always", {"includeCommonJSModuleExports": true}]`,
+		treatmentCount: 1,
 	},
 	{
 		rule: "id-denylist", source: "export const data = 1;\nexport const err = 2;\n",
@@ -130,14 +132,18 @@ var optionElementCases = []optionElementCase{
 		treatment: `["error", "^[^_]+$", {"properties": true}]`, treatmentCount: 1,
 	},
 	{
-		rule: "logical-assignment-operators", source: "declare let a: unknown;\ndeclare const b: unknown;\nif (!a) a = b;\n",
-		control:   `["error", "always"]`,
-		treatment: `["error", "always", {"enforceForIfStatements": true}]`, treatmentCount: 1,
+		rule:           "logical-assignment-operators",
+		source:         "declare let a: unknown;\ndeclare const b: unknown;\nif (!a) a = b;\n",
+		control:        `["error", "always"]`,
+		treatment:      `["error", "always", {"enforceForIfStatements": true}]`,
+		treatmentCount: 1,
 	},
 	{
-		rule: "no-inner-declarations", source: "'use strict';\ndeclare const test: boolean;\nif (test) { function doSomething() {} }\n",
-		control:   `["error", "functions"]`,
-		treatment: `["error", "functions", {"blockScopedFunctions": "disallow"}]`, treatmentCount: 1,
+		rule:           "no-inner-declarations",
+		source:         "'use strict';\ndeclare const test: boolean;\nif (test) { function doSomething() {} }\n",
+		control:        `["error", "functions"]`,
+		treatment:      `["error", "functions", {"blockScopedFunctions": "disallow"}]`,
+		treatmentCount: 1,
 	},
 	{
 		rule: "no-restricted-globals", source: "export const a = event;\nexport const b = fdescribe;\n",
@@ -150,9 +156,12 @@ var optionElementCases = []optionElementCase{
 		treatment: `["error", "fs", "os"]`, treatmentCount: 2,
 	},
 	{
-		rule: "no-restricted-properties", source: "declare const foo: any;\ndeclare const baz: any;\nfoo.bar;\nbaz.qux;\n",
-		control: `["error", {"object": "foo", "property": "bar"}]`, controlCount: 1,
-		treatment: `["error", {"object": "foo", "property": "bar"}, {"object": "baz", "property": "qux"}]`, treatmentCount: 2,
+		rule:           "no-restricted-properties",
+		source:         "declare const foo: any;\ndeclare const baz: any;\nfoo.bar;\nbaz.qux;\n",
+		control:        `["error", {"object": "foo", "property": "bar"}]`,
+		controlCount:   1,
+		treatment:      `["error", {"object": "foo", "property": "bar"}, {"object": "baz", "property": "qux"}]`,
+		treatmentCount: 2,
 	},
 	{
 		rule: "object-shorthand", source: "export const x = { ConstructorFunction: function () {} };\n",
@@ -217,7 +226,11 @@ func TestTheSecondOptionElementReachesTheRule(test *testing.T) {
 				{"control", testCase.control, testCase.controlCount},
 				{"treatment", testCase.treatment, testCase.treatmentCount},
 			} {
-				options, optionsThroughTheConfigurationLayerError := optionsThroughTheConfigLayer(test, testCase.rule, arm.config)
+				options, optionsThroughTheConfigurationLayerError := optionsThroughTheConfigLayer(
+					test,
+					testCase.rule,
+					arm.config,
+				)
 				if optionsThroughTheConfigurationLayerError != nil {
 					test.Fatalf("%s %s was refused: %v", arm.name, arm.config, optionsThroughTheConfigurationLayerError)
 				}
@@ -253,12 +266,30 @@ func TestASecondElementTheRuleCannotHonourIsRefused(test *testing.T) {
 			key:      "includeFromSettings",
 		},
 	} {
-		if _, optionsThroughTheConfigurationLayerError := optionsThroughTheConfigLayer(test, testCase.rule, testCase.accepted); optionsThroughTheConfigurationLayerError != nil {
-			test.Errorf("%s refused its second element at the default: %v", testCase.rule, optionsThroughTheConfigurationLayerError)
+		if _, optionsThroughTheConfigurationLayerError := optionsThroughTheConfigLayer(
+			test,
+			testCase.rule,
+			testCase.accepted,
+		); optionsThroughTheConfigurationLayerError != nil {
+			test.Errorf(
+				"%s refused its second element at the default: %v",
+				testCase.rule,
+				optionsThroughTheConfigurationLayerError,
+			)
 		}
-		_, optionsThroughTheConfigurationLayerError := optionsThroughTheConfigLayer(test, testCase.rule, testCase.refused)
-		if optionsThroughTheConfigurationLayerError == nil || !strings.Contains(optionsThroughTheConfigurationLayerError.Error(), testCase.key) {
-			test.Errorf("%s: want a refusal naming %s, got %v", testCase.rule, testCase.key, optionsThroughTheConfigurationLayerError)
+		_, optionsThroughTheConfigurationLayerError := optionsThroughTheConfigLayer(
+			test,
+			testCase.rule,
+			testCase.refused,
+		)
+		if optionsThroughTheConfigurationLayerError == nil ||
+			!strings.Contains(optionsThroughTheConfigurationLayerError.Error(), testCase.key) {
+			test.Errorf(
+				"%s: want a refusal naming %s, got %v",
+				testCase.rule,
+				testCase.key,
+				optionsThroughTheConfigurationLayerError,
+			)
 		}
 	}
 }
@@ -296,21 +327,34 @@ func TestAnElementTheRuleDoesNotTakeIsALoudError(test *testing.T) {
 			mustName: []string{"prefer-destructuring", `element 3 {"array":true}`},
 		},
 	} {
-		_, optionsThroughTheConfigurationLayerError := optionsThroughTheConfigLayer(test, testCase.rule, testCase.config)
+		_, optionsThroughTheConfigurationLayerError := optionsThroughTheConfigLayer(
+			test,
+			testCase.rule,
+			testCase.config,
+		)
 		if optionsThroughTheConfigurationLayerError == nil {
 			test.Errorf("%s %s loaded, and the extra element would never be read", testCase.rule, testCase.config)
 			continue
 		}
 		for _, want := range testCase.mustName {
 			if !strings.Contains(optionsThroughTheConfigurationLayerError.Error(), want) {
-				test.Errorf("%s: the refusal does not name %q: %v", testCase.rule, want, optionsThroughTheConfigurationLayerError)
+				test.Errorf(
+					"%s: the refusal does not name %q: %v",
+					testCase.rule,
+					want,
+					optionsThroughTheConfigurationLayerError,
+				)
 			}
 		}
 	}
 
 	// The control: the same single-element rule with one element loads, so the refusals above are
 	// about the count rather than about the rule refusing everything.
-	if _, optionsThroughTheConfigurationLayerError := optionsThroughTheConfigLayer(test, "array-callback-return", `["error", {"allowImplicit": true}]`); optionsThroughTheConfigurationLayerError != nil {
+	if _, optionsThroughTheConfigurationLayerError := optionsThroughTheConfigLayer(
+		test,
+		"array-callback-return",
+		`["error", {"allowImplicit": true}]`,
+	); optionsThroughTheConfigurationLayerError != nil {
 		test.Errorf("array-callback-return refused its one element: %v", optionsThroughTheConfigurationLayerError)
 	}
 }
@@ -355,17 +399,35 @@ func TestANullInARulesOptionsIsRefused(test *testing.T) {
 			mustName: "element 1 is null",
 		},
 	} {
-		if _, optionsThroughTheConfigurationLayerError := optionsThroughTheConfigLayer(test, testCase.rule, testCase.accepted); optionsThroughTheConfigurationLayerError != nil {
-			test.Errorf("%s refused %s, so the refusal below would not be about the null: %v", testCase.rule, testCase.accepted, optionsThroughTheConfigurationLayerError)
+		if _, optionsThroughTheConfigurationLayerError := optionsThroughTheConfigLayer(
+			test,
+			testCase.rule,
+			testCase.accepted,
+		); optionsThroughTheConfigurationLayerError != nil {
+			test.Errorf(
+				"%s refused %s, so the refusal below would not be about the null: %v",
+				testCase.rule,
+				testCase.accepted,
+				optionsThroughTheConfigurationLayerError,
+			)
 		}
-		_, optionsThroughTheConfigurationLayerError := optionsThroughTheConfigLayer(test, testCase.rule, testCase.refused)
+		_, optionsThroughTheConfigurationLayerError := optionsThroughTheConfigLayer(
+			test,
+			testCase.rule,
+			testCase.refused,
+		)
 		if optionsThroughTheConfigurationLayerError == nil {
 			test.Errorf("%s %s loaded, and the null would have read as the default", testCase.rule, testCase.refused)
 			continue
 		}
 		for _, want := range []string{testCase.rule, testCase.mustName} {
 			if !strings.Contains(optionsThroughTheConfigurationLayerError.Error(), want) {
-				test.Errorf("%s: the refusal does not name %q: %v", testCase.rule, want, optionsThroughTheConfigurationLayerError)
+				test.Errorf(
+					"%s: the refusal does not name %q: %v",
+					testCase.rule,
+					want,
+					optionsThroughTheConfigurationLayerError,
+				)
 			}
 		}
 	}

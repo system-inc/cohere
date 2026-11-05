@@ -47,7 +47,10 @@ func DecodeNoInvalidRegexpOptions(raw []byte) (any, error) {
 	seen := make(map[string]bool, len(options.AllowConstructorFlags))
 	for _, flags := range options.AllowConstructorFlags {
 		if seen[flags] {
-			return NoInvalidRegexpOptions{}, fmt.Errorf("allowConstructorFlags lists %q more than once, and its items must be unique", flags)
+			return NoInvalidRegexpOptions{}, fmt.Errorf(
+				"allowConstructorFlags lists %q more than once, and its items must be unique",
+				flags,
+			)
 		}
 		seen[flags] = true
 	}
@@ -267,7 +270,8 @@ func invalidPatternMessage(pattern string, flags string) string {
 		// already says. Trimming to the first ": " drops it. Our parser's own refusals put the
 		// refused construct after that same separator, so trimming there would keep the construct
 		// and throw away the explanation, which is why they are excluded.
-		if !errors.Is(compileError, esregexp.ErrUnsupportedSyntax) && !errors.Is(compileError, esregexp.ErrUnsupportedFlag) {
+		if !errors.Is(compileError, esregexp.ErrUnsupportedSyntax) &&
+			!errors.Is(compileError, esregexp.ErrUnsupportedFlag) {
 			if separator := strings.Index(text, ": "); separator != -1 {
 				text = text[separator+2:]
 			}

@@ -32,10 +32,19 @@ func listEverything(test *testing.T, root string) *program.DirectoryListings {
 
 // listingsReport is what a build makes of its tree: the files the tsconfig named, and every input the run
 // cache would record.
-func listingsReport(test *testing.T, directory string, listings *program.DirectoryListings) (ours []string, present []string, absent []string) {
+func listingsReport(
+	test *testing.T,
+	directory string,
+	listings *program.DirectoryListings,
+) (ours []string, present []string, absent []string) {
 	test.Helper()
 	recorder := program.NewInputRecorder()
-	graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory, Inputs: recorder, Listings: listings})
+	graph, buildError := program.Build(program.Options{
+		ConfigFileName:   "tsconfig.json",
+		CurrentDirectory: directory,
+		Inputs:           recorder,
+		Listings:         listings,
+	})
 	if buildError != nil {
 		test.Fatalf("building: %v", buildError)
 	}
@@ -89,7 +98,13 @@ func TestABuildListsFromDiscoverysListingsAsFromDisk(test *testing.T) {
 		test.Fatalf("the fixture's five included files (two through links) came back as %v", diskOurs)
 	}
 	if !slices.Equal(diskPresent, listedPresent) || !slices.Equal(diskAbsent, listedAbsent) {
-		test.Fatalf("the recorded inputs differ:\ndisk   %v %v\nlisted %v %v", diskPresent, diskAbsent, listedPresent, listedAbsent)
+		test.Fatalf(
+			"the recorded inputs differ:\ndisk   %v %v\nlisted %v %v",
+			diskPresent,
+			diskAbsent,
+			listedPresent,
+			listedAbsent,
+		)
 	}
 
 	stale := program.NewDirectoryListings()
@@ -103,7 +118,10 @@ func TestABuildListsFromDiscoverysListingsAsFromDisk(test *testing.T) {
 // so a caller reads that one from disk rather than taking it for empty.
 func TestListingAnswersForWhatWasListedAndOnlyThat(test *testing.T) {
 	test.Parallel()
-	directory := writeProject(test, map[string]string{"a.ts": "export const a = 1;\n", "sub/b.ts": "export const b = 1;\n"})
+	directory := writeProject(
+		test,
+		map[string]string{"a.ts": "export const a = 1;\n", "sub/b.ts": "export const b = 1;\n"},
+	)
 	entries, readDirectoryError := os.ReadDir(directory)
 	if readDirectoryError != nil {
 		test.Fatal(readDirectoryError)

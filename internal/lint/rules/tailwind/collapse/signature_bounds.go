@@ -116,7 +116,12 @@ func (compiler *SignatureCompiler) boundNodes(candidate *ParsedCandidate) ([]*No
 				return nil, false, false
 			}
 			for _, declaration := range declarations {
-				nodes = append(nodes, &Node{Kind: KindDeclaration, Property: declaration.Property, Value: declaration.Value, ValuePresent: declaration.ValuePresent})
+				nodes = append(nodes, &Node{
+					Kind:         KindDeclaration,
+					Property:     declaration.Property,
+					Value:        declaration.Value,
+					ValuePresent: declaration.ValuePresent,
+				})
 			}
 			bodies++
 		}
@@ -168,7 +173,12 @@ func (universe RootProperties) armFor(candidate *ParsedCandidate, theme *Theme) 
 	if isColourKeyword(candidate.Value.Value) {
 		return universe.Colour
 	}
-	if _, isColour := theme.Resolve(candidate.Value.Value, true, colourNamespacesOf(strings.TrimPrefix(candidate.Root, "-")), 0); isColour {
+	if _, isColour := theme.Resolve(
+		candidate.Value.Value,
+		true,
+		colourNamespacesOf(strings.TrimPrefix(candidate.Root, "-")),
+		0,
+	); isColour {
 		return universe.Colour
 	}
 	return universe.Other

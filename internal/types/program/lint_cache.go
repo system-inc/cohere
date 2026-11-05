@@ -222,7 +222,10 @@ func mergeAdamic(first *AdamicRecord, second *AdamicRecord) *AdamicRecord {
 		Counts:  append(append([]AdamicCount{}, first.Counts...), second.Counts...),
 		Skipped: append(append([]string{}, first.Skipped...), second.Skipped...),
 	}
-	sort.Slice(merged.Counts, func(left, right int) bool { return merged.Counts[left].Rule < merged.Counts[right].Rule })
+	sort.Slice(
+		merged.Counts,
+		func(left, right int) bool { return merged.Counts[left].Rule < merged.Counts[right].Rule },
+	)
 	sort.Strings(merged.Skipped)
 	if len(merged.Counts) == 0 {
 		merged.Counts = nil
@@ -354,7 +357,12 @@ const lintCacheVersion = 10
 //
 // A hit needs the key, the path, the bytes and the applied rule list all to match. The index is built
 // on first use, so a caller that loads a cache and discards it on a key mismatch never pays for it.
-func (cache *LintCache) Lookup(path string, contentHash [sha256.Size]byte, key [sha256.Size]byte, rules []string) (LintCacheEntry, bool) {
+func (cache *LintCache) Lookup(
+	path string,
+	contentHash [sha256.Size]byte,
+	key [sha256.Size]byte,
+	rules []string,
+) (LintCacheEntry, bool) {
 	if cache == nil || cache.Key != key {
 		return LintCacheEntry{}, false
 	}

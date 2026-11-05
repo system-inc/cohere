@@ -545,7 +545,9 @@ func TestConsistentReturnFires(test *testing.T) {
 						index, wantPosition, wantEnd,
 						expected.line, expected.column, expected.endLine, expected.endColumn,
 						diagnostic.Range.Pos(), diagnostic.Range.End(),
-						asTheTypedConsistentReturnHarnessWroteIt(testCase.source)[diagnostic.Range.Pos():diagnostic.Range.End()])
+						asTheTypedConsistentReturnHarnessWroteIt(
+							testCase.source,
+						)[diagnostic.Range.Pos():diagnostic.Range.End()])
 				}
 			}
 		})

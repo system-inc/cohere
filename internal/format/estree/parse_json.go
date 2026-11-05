@@ -151,7 +151,8 @@ func (reader *jsonReader) parseValue() (*Node, error) {
 		}
 		// assertJsonNode: a sign only before a number, Infinity or NaN.
 		if !argument.Is("NumericLiteral") &&
-			!(argument.Is("Identifier") && (argument.String("name") == "Infinity" || argument.String("name") == "NaN")) {
+			!(argument.Is("Identifier") &&
+				(argument.String("name") == "Infinity" || argument.String("name") == "NaN")) {
 			return nil, reader.errorf("Operator '%c' before '%s' is not allowed in JSON", character, argument.Type())
 		}
 		return New("UnaryExpression", start, argument.End(), "operator", string(character), "prefix", true,
@@ -324,7 +325,15 @@ func (reader *jsonReader) parseTemplate() (*Node, error) {
 	if decodeJavaScriptStringError != nil {
 		return nil, reader.errorf("%v", decodeJavaScriptStringError)
 	}
-	element := New("TemplateElement", start+1, position, "value", &TemplateValue{Cooked: &cooked, Raw: raw}, "tail", true)
+	element := New(
+		"TemplateElement",
+		start+1,
+		position,
+		"value",
+		&TemplateValue{Cooked: &cooked, Raw: raw},
+		"tail",
+		true,
+	)
 	return New("TemplateLiteral", start, reader.position, "expressions", []*Node{}, "quasis", []*Node{element}), nil
 }
 
@@ -408,7 +417,9 @@ func separatorsBetweenDigits(text string, start int, end int, radix int) bool {
 		if text[index] != '_' {
 			continue
 		}
-		if index+1 >= len(text) || digitValue(text[index+1]) >= radix || strings.IndexByte(forbidden, text[index+1]) >= 0 {
+		if index+1 >= len(text) ||
+			digitValue(text[index+1]) >= radix ||
+			strings.IndexByte(forbidden, text[index+1]) >= 0 {
 			return false
 		}
 		if index > 0 && strings.IndexByte(forbidden, text[index-1]) >= 0 {
@@ -440,7 +451,10 @@ func (reader *jsonReader) readIdentifierName() string {
 	start := reader.position
 	for reader.position < len(reader.text) {
 		character, size := utf8.DecodeRuneInString(reader.text[reader.position:])
-		isStart := character == '$' || character == '_' || unicode.IsLetter(character) || unicode.Is(unicode.Nl, character)
+		isStart := character == '$' ||
+			character == '_' ||
+			unicode.IsLetter(character) ||
+			unicode.Is(unicode.Nl, character)
 		if reader.position == start && !isStart {
 			break
 		}
@@ -517,7 +531,9 @@ func decodeJavaScriptString(content string) (string, error) {
 			index += length
 			// A surrogate pair spelled as two escapes is one character.
 			if code >= 0xD800 && code <= 0xDBFF && strings.HasPrefix(content[index+1:], "\\u") {
-				if low, lowLength, readUnicodeEscapeError := readUnicodeEscape(content[index+3:]); readUnicodeEscapeError == nil && low >= 0xDC00 && low <= 0xDFFF {
+				if low, lowLength, readUnicodeEscapeError := readUnicodeEscape(
+					content[index+3:],
+				); readUnicodeEscapeError == nil && low >= 0xDC00 && low <= 0xDFFF {
 					code = (code-0xD800)<<10 + (low - 0xDC00) + 0x10000
 					index += 2 + lowLength
 				}

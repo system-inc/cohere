@@ -208,7 +208,8 @@ var StrictVoidReturn = rule.Rule{
 				// The attribute's expected type resolves the element's props, for every attribute,
 				// and a value that is not a non-void function is silent whatever was expected, so
 				// the value is asked first (#hekjpw3).
-				if inner := initializer.AsJsxExpression().Expression; inner != nil && state.isNonVoidFunctionValue(inner) {
+				if inner := initializer.AsJsxExpression().Expression; inner != nil &&
+					state.isNonVoidFunctionValue(inner) {
 					state.checkExpression(inner)
 				}
 			},
@@ -241,7 +242,11 @@ func (state *strictVoidReturnState) isVoidReturningFunctionType(subject *checker
 	// exposes the raw checker method, which does not.
 	found := 0
 	for part := range type_checking.UnionTypePartsSeq(subject) {
-		for _, signature := range checker.Checker_getSignaturesOfType(state.ctx.TypeChecker, part, checker.SignatureKindCall) {
+		for _, signature := range checker.Checker_getSignaturesOfType(
+			state.ctx.TypeChecker,
+			part,
+			checker.SignatureKindCall,
+		) {
 			returnType := checker.Checker_getReturnTypeOfSignature(state.ctx.TypeChecker, signature)
 			for constituent := range type_checking.UnionTypePartsSeq(returnType) {
 				found++
@@ -433,7 +438,11 @@ func (state *strictVoidReturnState) isNonVoidFunctionValue(node *ast.Node) bool 
 	acceptable := true
 	sawOne := false
 	for part := range type_checking.UnionTypePartsSeq(actual) {
-		for _, signature := range checker.Checker_getSignaturesOfType(state.ctx.TypeChecker, part, checker.SignatureKindCall) {
+		for _, signature := range checker.Checker_getSignaturesOfType(
+			state.ctx.TypeChecker,
+			part,
+			checker.SignatureKindCall,
+		) {
 			returnType := checker.Checker_getReturnTypeOfSignature(state.ctx.TypeChecker, signature)
 			for constituent := range type_checking.UnionTypePartsSeq(returnType) {
 				sawOne = true

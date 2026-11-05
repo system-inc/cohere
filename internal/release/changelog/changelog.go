@@ -6,8 +6,8 @@
 // can fail after it, which is a change a person opts into by taking a minor, and a major version is for
 // breaking the configuration format or the command line. Below 1.0.0, semver moves both of those into the
 // minor, so a patch only relaxes or fixes and anything that can fail a project or break a configuration
-// takes the next minor. The sets are the part of a release a diff can read exactly, so their entries are generated; what
-// changed in cohere itself is written by a person under the same heading.
+// takes the next minor. The sets are the part of a release a diff can read exactly, so their entries are generated;
+// what changed in cohere itself is written by a person under the same heading.
 package changelog
 
 import (
@@ -133,7 +133,10 @@ func DiffSet(before []byte, after []byte) (SetChanges, error) {
 		case was > 0 && now == 0:
 			changes.TurnedOff = append(changes.TurnedOff, name)
 		case was != now:
-			changes.Severity = append(changes.Severity, fmt.Sprintf("%s: %s -> %s", name, severityNames[was], severityNames[now]))
+			changes.Severity = append(
+				changes.Severity,
+				fmt.Sprintf("%s: %s -> %s", name, severityNames[was], severityNames[now]),
+			)
 			if now > was {
 				changes.Bump = Minor
 			}
@@ -272,7 +275,12 @@ func git(directory string, arguments ...string) ([]byte, error) {
 	command.Stderr = &standardError
 	output, outputError := command.Output()
 	if outputError != nil {
-		return nil, fmt.Errorf("git %s: %w: %s", strings.Join(arguments, " "), outputError, strings.TrimSpace(standardError.String()))
+		return nil, fmt.Errorf(
+			"git %s: %w: %s",
+			strings.Join(arguments, " "),
+			outputError,
+			strings.TrimSpace(standardError.String()),
+		)
 	}
 	return output, nil
 }
@@ -353,9 +361,17 @@ func RequireBump(previous string, next string, bump Bump) error {
 		}
 		return nil
 	case to[0] == 0 && bump != Patch:
-		return fmt.Errorf("%s is a patch after %s, and a rule set changed in a way that can fail a project that passed or break a configuration, which below 1.0.0 needs the next minor version", next, previous)
+		return fmt.Errorf(
+			"%s is a patch after %s, and a rule set changed in a way that can fail a project that passed or break a configuration, which below 1.0.0 needs the next minor version",
+			next,
+			previous,
+		)
 	case bump == Major:
-		return fmt.Errorf("%s keeps the major version of %s, and a rule set was removed, so a configuration that extends it no longer loads, which needs a major version", next, previous)
+		return fmt.Errorf(
+			"%s keeps the major version of %s, and a rule set was removed, so a configuration that extends it no longer loads, which needs a major version",
+			next,
+			previous,
+		)
 	case to[1] != from[1]:
 		if to[1] < from[1] {
 			return fmt.Errorf("%s comes before %s", next, previous)
@@ -364,7 +380,11 @@ func RequireBump(previous string, next string, bump Bump) error {
 	case to[2] <= from[2]:
 		return fmt.Errorf("%s does not come after %s", next, previous)
 	case bump == Minor:
-		return fmt.Errorf("%s is a patch after %s, and a rule set changed in a way that can fail a project that passed, which needs at least a minor version", next, previous)
+		return fmt.Errorf(
+			"%s is a patch after %s, and a rule set changed in a way that can fail a project that passed, which needs at least a minor version",
+			next,
+			previous,
+		)
 	}
 	return nil
 }

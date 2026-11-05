@@ -34,7 +34,10 @@ func TestOverrideReachesTheLoader(test *testing.T) {
 	test.Setenv(ForkPathVariable, "/nonexistent/elsewhere")
 
 	if _, newPrettierError := New(formatoptions.Default()); newPrettierError == nil {
-		test.Fatalf("New succeeded with %s pointed at a nonexistent path, so the loader is not reading it", ForkPathVariable)
+		test.Fatalf(
+			"New succeeded with %s pointed at a nonexistent path, so the loader is not reading it",
+			ForkPathVariable,
+		)
 	} else if !strings.Contains(newPrettierError.Error(), "/nonexistent/elsewhere") {
 		test.Fatalf("the failure does not name the overridden path, so something else failed: %v", newPrettierError)
 	}
@@ -127,6 +130,9 @@ func TestReleaseResolvesThroughTheEngine(test *testing.T) {
 	test.Parallel()
 
 	if ForkPathVariable != "COHERE_PRETTIER_FORK" {
-		test.Fatalf("the variable is %q; release's exported alias and any CI that sets it both assume the old spelling", ForkPathVariable)
+		test.Fatalf(
+			"the variable is %q; release's exported alias and any CI that sets it both assume the old spelling",
+			ForkPathVariable,
+		)
 	}
 }

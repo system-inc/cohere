@@ -188,7 +188,13 @@ func (catalog *MessageCatalog) add(idea string, data []byte) error {
 	}
 	for language, ruleName := range file.Rules {
 		if !messageLanguages[language] {
-			return fmt.Errorf("rules: %q is not %q, %q or %q", language, MessageLanguageTypeScript, MessageLanguageSwift, MessageLanguageGo)
+			return fmt.Errorf(
+				"rules: %q is not %q, %q or %q",
+				language,
+				MessageLanguageTypeScript,
+				MessageLanguageSwift,
+				MessageLanguageGo,
+			)
 		}
 		if _, leaf, found := strings.Cut(ruleName, "/"); !found || leaf == "" {
 			return fmt.Errorf("rules: %q is not a namespaced rule name", ruleName)
@@ -265,14 +271,23 @@ func (catalog *MessageCatalog) add(idea string, data []byte) error {
 			}
 			for language := range byLanguage {
 				if !slices.Contains(languages, language) {
-					return fmt.Errorf("message %q: the term %q gives %s, which the message is not rendered in", id, term, language)
+					return fmt.Errorf(
+						"message %q: the term %q gives %s, which the message is not rendered in",
+						id,
+						term,
+						language,
+					)
 				}
 			}
 		}
 	}
 	for name := range stringPhrases {
 		if len(phraseUsers[name]) < 2 {
-			return fmt.Errorf("the string phrase %q is in %d message, and one shared by fewer than two stays inline", name, len(phraseUsers[name]))
+			return fmt.Errorf(
+				"the string phrase %q is in %d message, and one shared by fewer than two stays inline",
+				name,
+				len(phraseUsers[name]),
+			)
 		}
 	}
 	for name := range objectPhrases {
@@ -321,7 +336,10 @@ type objectPhrase map[string]map[string]string
 // is not camelCase, an object with no option or an option name that is not, an option giving its text
 // by language for no language or for one the file names no rule for, and a phrase holding a phrase or
 // a term.
-func readPhrases(raw map[string]json.RawMessage, rules map[string]string) (map[string]string, map[string]objectPhrase, error) {
+func readPhrases(
+	raw map[string]json.RawMessage,
+	rules map[string]string,
+) (map[string]string, map[string]objectPhrase, error) {
 	stringPhrases := map[string]string{}
 	objectPhrases := map[string]objectPhrase{}
 	for name, value := range raw {
@@ -358,7 +376,10 @@ func readPhrases(raw map[string]json.RawMessage, rules map[string]string) (map[s
 			objectPhrases[name] = phrase
 		}
 		for _, text := range texts {
-			if strings.Contains(text, "<<") || strings.Contains(text, ">>") || strings.Contains(text, "[[") || strings.Contains(text, "]]") {
+			if strings.Contains(text, "<<") ||
+				strings.Contains(text, ">>") ||
+				strings.Contains(text, "[[") ||
+				strings.Contains(text, "]]") {
 				return nil, nil, fmt.Errorf("phrase %q holds a phrase or a term, and nothing nests", name)
 			}
 			if _, placeholderNamesError := placeholderNames(text, "{{", "}}"); placeholderNamesError != nil {
@@ -401,7 +422,12 @@ func strictUnmarshal[Target any](data []byte, target *Target) error {
 // resolvePhrases puts each string phrase into text, and keeps each object phrase as a slot with the
 // options that have text for language, refusing a `<<name>>` the file does not define and an object
 // phrase with no option for the language the text is rendered in.
-func resolvePhrases(text string, stringPhrases map[string]string, objectPhrases map[string]objectPhrase, language string) (messageTemplate, error) {
+func resolvePhrases(
+	text string,
+	stringPhrases map[string]string,
+	objectPhrases map[string]objectPhrase,
+	language string,
+) (messageTemplate, error) {
 	names, placeholderNamesError := placeholderNames(text, "<<", ">>")
 	if placeholderNamesError != nil {
 		return messageTemplate{}, placeholderNamesError
@@ -439,7 +465,12 @@ func resolvePhrases(text string, stringPhrases map[string]string, objectPhrases 
 //
 // Mutates: used is the caller's record of the terms any language's text used, so a term in no text is refused
 // once every language is read
-func resolveTerms(text string, terms map[string]map[string]string, language string, used map[string]bool) (string, error) {
+func resolveTerms(
+	text string,
+	terms map[string]map[string]string,
+	language string,
+	used map[string]bool,
+) (string, error) {
 	names, placeholderNamesError := placeholderNames(text, "[[", "]]")
 	if placeholderNamesError != nil {
 		return "", placeholderNamesError
@@ -449,7 +480,10 @@ func resolveTerms(text string, terms map[string]map[string]string, language stri
 		if !defined {
 			return "", fmt.Errorf("the term %q has no words for %s", name, language)
 		}
-		if strings.Contains(words, "[[") || strings.Contains(words, "]]") || strings.Contains(words, "<<") || strings.Contains(words, ">>") {
+		if strings.Contains(words, "[[") ||
+			strings.Contains(words, "]]") ||
+			strings.Contains(words, "<<") ||
+			strings.Contains(words, ">>") {
 			return "", fmt.Errorf("the term %q holds a term or a phrase, and nothing nests", name)
 		}
 		text = strings.ReplaceAll(text, "[["+name+"]]", words)
@@ -500,7 +534,9 @@ func isCamelCaseName(text string) bool {
 		return false
 	}
 	for _, character := range text {
-		if (character < 'a' || character > 'z') && (character < 'A' || character > 'Z') && (character < '0' || character > '9') {
+		if (character < 'a' || character > 'z') &&
+			(character < 'A' || character > 'Z') &&
+			(character < '0' || character > '9') {
 			return false
 		}
 	}
@@ -535,7 +571,13 @@ func (catalog *MessageCatalog) Option(handle MessageHandle, phrase string, name 
 	if _, held := template.options[phrase][name]; !found || !held {
 		// Invariant: options are claimed in package-level vars like handles, so a missing option fails every
 		// test binary that links the rule when it initializes, and no build that passed its tests reaches here.
-		panic(fmt.Sprintf("policy/messages: %s %q has no option %q of the phrase %q", handle.Rule, handle.Id, name, phrase))
+		panic(fmt.Sprintf(
+			"policy/messages: %s %q has no option %q of the phrase %q",
+			handle.Rule,
+			handle.Id,
+			name,
+			phrase,
+		))
 	}
 	option := MessageOption{Rule: handle.Rule, Id: handle.Id, Phrase: phrase, Name: name}
 	requestedMessages.Lock()
@@ -570,27 +612,50 @@ func (catalog *MessageCatalog) Render(handle MessageHandle, values map[string]st
 		if option.Rule != handle.Rule || option.Id != handle.Id || !held || chosen[option.Phrase] {
 			// Invariant: a rule passes the options it claimed for this message, so the rule's own tests, which
 			// render every message it reports, fail here before a wrong option can ship.
-			panic(fmt.Sprintf("policy/messages: %s %q was given the option %q of %q, which it does not take", handle.Rule, handle.Id, option.Name, option.Phrase))
+			panic(fmt.Sprintf(
+				"policy/messages: %s %q was given the option %q of %q, which it does not take",
+				handle.Rule,
+				handle.Id,
+				option.Name,
+				option.Phrase,
+			))
 		}
 		chosen[option.Phrase] = true
 		text = strings.ReplaceAll(text, "<<"+option.Phrase+">>", optionText)
 	}
 	if len(chosen) != len(template.options) {
 		// Invariant: a rule picks one option per phrase its message uses, which its own tests render.
-		panic(fmt.Sprintf("policy/messages: %s %q picks from %d phrases, and was given %d options", handle.Rule, handle.Id, len(template.options), len(chosen)))
+		panic(fmt.Sprintf(
+			"policy/messages: %s %q picks from %d phrases, and was given %d options",
+			handle.Rule,
+			handle.Id,
+			len(template.options),
+			len(chosen),
+		))
 	}
 	// Ignored: the template's text and every option's were read as well-formed when the catalog loaded, and
 	// putting a whole option into a whole slot makes no new placeholder.
 	needed, _ := placeholderNames(text, "{{", "}}")
 	if len(values) != len(needed) {
 		// Invariant: a rule gives the values its message's text uses, which its own tests render.
-		panic(fmt.Sprintf("policy/messages: %s %q uses the values %v, and was given %d", handle.Rule, handle.Id, needed, len(values)))
+		panic(fmt.Sprintf(
+			"policy/messages: %s %q uses the values %v, and was given %d",
+			handle.Rule,
+			handle.Id,
+			needed,
+			len(values),
+		))
 	}
 	for _, name := range needed {
 		value, given := values[name]
 		if !given {
 			// Invariant: a rule gives the values its message's text uses, which its own tests render.
-			panic(fmt.Sprintf("policy/messages: %s %q uses the value %q, and was not given it", handle.Rule, handle.Id, name))
+			panic(fmt.Sprintf(
+				"policy/messages: %s %q uses the value %q, and was not given it",
+				handle.Rule,
+				handle.Id,
+				name,
+			))
 		}
 		text = strings.ReplaceAll(text, "{{"+name+"}}", value)
 	}

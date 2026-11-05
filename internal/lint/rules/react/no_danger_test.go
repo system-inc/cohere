@@ -65,12 +65,36 @@ func TestNoDangerFires(test *testing.T) {
 		findings   []string
 	}{
 		{"<div dangerouslySetInnerHTML={{ __html: \"\" }}></div>;", "", []string{"dangerousProp"}},
-		{"<App dangerouslySetInnerHTML={{ __html: \"<span>hello</span>\" }} />;", "{\"customComponentNames\":[\"*\"]}", []string{"dangerousProp"}},
-		{"\n        function App() {\n          return <Title dangerouslySetInnerHTML={{ __html: \"<span>hello</span>\" }} />;\n        }\n      ", "{\"customComponentNames\":[\"Title\"]}", []string{"dangerousProp"}},
-		{"\n        function App() {\n          return <TextFoo dangerouslySetInnerHTML={{ __html: \"<span>hello</span>\" }} />;\n        }\n      ", "{\"customComponentNames\":[\"*Foo\"]}", []string{"dangerousProp"}},
-		{"\n        function App() {\n          return <FooText dangerouslySetInnerHTML={{ __html: \"<span>hello</span>\" }} />;\n        }\n      ", "{\"customComponentNames\":[\"Foo*\"]}", []string{"dangerousProp"}},
-		{"\n        function App() {\n          return <TextMUI dangerouslySetInnerHTML={{ __html: \"<span>hello</span>\" }} />;\n        }\n      ", "{\"customComponentNames\":[\"*MUI\"]}", []string{"dangerousProp"}},
-		{"\n        import type { ComponentProps } from \"react\";\n\n        const Comp = \"div\";\n        const Component = () => <></>;\n\n        const NestedComponent = (_props: ComponentProps<\"div\">) => <></>;\n\n        Component.NestedComponent = NestedComponent;\n\n        function App() {\n          return (\n            <>\n              <div dangerouslySetInnerHTML={{ __html: \"<div>aaa</div>\" }} />\n              <Comp dangerouslySetInnerHTML={{ __html: \"<div>aaa</div>\" }} />\n\n              <Component.NestedComponent\n                dangerouslySetInnerHTML={{ __html: '<div>aaa</div>' }}\n              />\n            </>\n          );\n        }\n      ", "{\"customComponentNames\":[\"*\"]}", []string{"dangerousProp", "dangerousProp", "dangerousProp"}},
+		{
+			"<App dangerouslySetInnerHTML={{ __html: \"<span>hello</span>\" }} />;",
+			"{\"customComponentNames\":[\"*\"]}",
+			[]string{"dangerousProp"},
+		},
+		{
+			"\n        function App() {\n          return <Title dangerouslySetInnerHTML={{ __html: \"<span>hello</span>\" }} />;\n        }\n      ",
+			"{\"customComponentNames\":[\"Title\"]}",
+			[]string{"dangerousProp"},
+		},
+		{
+			"\n        function App() {\n          return <TextFoo dangerouslySetInnerHTML={{ __html: \"<span>hello</span>\" }} />;\n        }\n      ",
+			"{\"customComponentNames\":[\"*Foo\"]}",
+			[]string{"dangerousProp"},
+		},
+		{
+			"\n        function App() {\n          return <FooText dangerouslySetInnerHTML={{ __html: \"<span>hello</span>\" }} />;\n        }\n      ",
+			"{\"customComponentNames\":[\"Foo*\"]}",
+			[]string{"dangerousProp"},
+		},
+		{
+			"\n        function App() {\n          return <TextMUI dangerouslySetInnerHTML={{ __html: \"<span>hello</span>\" }} />;\n        }\n      ",
+			"{\"customComponentNames\":[\"*MUI\"]}",
+			[]string{"dangerousProp"},
+		},
+		{
+			"\n        import type { ComponentProps } from \"react\";\n\n        const Comp = \"div\";\n        const Component = () => <></>;\n\n        const NestedComponent = (_props: ComponentProps<\"div\">) => <></>;\n\n        Component.NestedComponent = NestedComponent;\n\n        function App() {\n          return (\n            <>\n              <div dangerouslySetInnerHTML={{ __html: \"<div>aaa</div>\" }} />\n              <Comp dangerouslySetInnerHTML={{ __html: \"<div>aaa</div>\" }} />\n\n              <Component.NestedComponent\n                dangerouslySetInnerHTML={{ __html: '<div>aaa</div>' }}\n              />\n            </>\n          );\n        }\n      ",
+			"{\"customComponentNames\":[\"*\"]}",
+			[]string{"dangerousProp", "dangerousProp", "dangerousProp"},
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.sourceText, func(test *testing.T) {
@@ -92,8 +116,14 @@ func TestNoDangerStaysSilent(test *testing.T) {
 		{"<App dangerouslySetInnerHTML={{ __html: \"\" }} />;", ""},
 		{"<div className=\"bar\"></div>;", ""},
 		{"<div className=\"bar\"></div>;", "{\"customComponentNames\":[\"*\"]}"},
-		{"\n        function App() {\n          return <Title dangerouslySetInnerHTML={{ __html: \"<span>hello</span>\" }} />;\n        }\n      ", "{\"customComponentNames\":[\"Home\"]}"},
-		{"\n        function App() {\n          return <TextMUI dangerouslySetInnerHTML={{ __html: \"<span>hello</span>\" }} />;\n        }\n      ", "{\"customComponentNames\":[\"MUI*\"]}"},
+		{
+			"\n        function App() {\n          return <Title dangerouslySetInnerHTML={{ __html: \"<span>hello</span>\" }} />;\n        }\n      ",
+			"{\"customComponentNames\":[\"Home\"]}",
+		},
+		{
+			"\n        function App() {\n          return <TextMUI dangerouslySetInnerHTML={{ __html: \"<span>hello</span>\" }} />;\n        }\n      ",
+			"{\"customComponentNames\":[\"MUI*\"]}",
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.sourceText, func(test *testing.T) {
@@ -123,12 +153,28 @@ func TestNoDangerElementNameBoundary(test *testing.T) {
 		findings   []string
 	}{
 		{"a plain DOM element", "<div dangerouslySetInnerHTML={{__html:''}} />;", []string{"dangerousProp"}},
-		{"a custom element, still lowercase", "<x-custom dangerouslySetInnerHTML={{__html:''}} />;", []string{"dangerousProp"}},
-		{"a dotted tag whose first character is lowercase", "<a.b dangerouslySetInnerHTML={{__html:''}} />;", []string{"dangerousProp"}},
-		{"a namespaced tag whose first character is lowercase", "<div:ns dangerouslySetInnerHTML={{__html:''}} />;", []string{"dangerousProp"}},
+		{
+			"a custom element, still lowercase",
+			"<x-custom dangerouslySetInnerHTML={{__html:''}} />;",
+			[]string{"dangerousProp"},
+		},
+		{
+			"a dotted tag whose first character is lowercase",
+			"<a.b dangerouslySetInnerHTML={{__html:''}} />;",
+			[]string{"dangerousProp"},
+		},
+		{
+			"a namespaced tag whose first character is lowercase",
+			"<div:ns dangerouslySetInnerHTML={{__html:''}} />;",
+			[]string{"dangerousProp"},
+		},
 		{"a component is silent by the capital", "<App dangerouslySetInnerHTML={{__html:''}} />;", nil},
 		{"and so is a dotted one", "<A.B dangerouslySetInnerHTML={{__html:''}} />;", nil},
-		{"a paired tag reports on the attribute of the opening element", "<div dangerouslySetInnerHTML={{__html:''}}></div>;", []string{"dangerousProp"}},
+		{
+			"a paired tag reports on the attribute of the opening element",
+			"<div dangerouslySetInnerHTML={{__html:''}}></div>;",
+			[]string{"dangerousProp"},
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -160,8 +206,16 @@ func TestNoDangerAttributeNameBoundary(test *testing.T) {
 		{"an unrelated attribute", "<div className=\"bar\" />;", nil},
 		{"a spread carries no name and is skipped, even though it may supply the property", "<div {...props} />;", nil},
 		{"a bare attribute with no value still reports", "<div dangerouslySetInnerHTML />;", []string{"dangerousProp"}},
-		{"and a string-valued one does too, which is where a value-reading port would panic", "<div dangerouslySetInnerHTML=\"x\" />;", []string{"dangerousProp"}},
-		{"written twice reports twice, because the loop does not stop at the first", "<div dangerouslySetInnerHTML={{__html:''}} dangerouslySetInnerHTML={{__html:''}} />;", []string{"dangerousProp", "dangerousProp"}},
+		{
+			"and a string-valued one does too, which is where a value-reading port would panic",
+			"<div dangerouslySetInnerHTML=\"x\" />;",
+			[]string{"dangerousProp"},
+		},
+		{
+			"written twice reports twice, because the loop does not stop at the first",
+			"<div dangerouslySetInnerHTML={{__html:''}} dangerouslySetInnerHTML={{__html:''}} />;",
+			[]string{"dangerousProp", "dangerousProp"},
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -190,21 +244,66 @@ func TestNoDangerCustomComponentNames(test *testing.T) {
 		options    string
 		findings   []string
 	}{
-		{"a star matches any component", "<App dangerouslySetInnerHTML={{__html:''}} />;", `{"customComponentNames":["*"]}`, []string{"dangerousProp"}},
-		{"an exact name matches itself", "<Title dangerouslySetInnerHTML={{__html:''}} />;", `{"customComponentNames":["Title"]}`, []string{"dangerousProp"}},
-		{"a different exact name does not", "<Title dangerouslySetInnerHTML={{__html:''}} />;", `{"customComponentNames":["Home"]}`, nil},
-		{"a trailing star anchors the prefix, so MUI* does not match TextMUI", "<TextMUI dangerouslySetInnerHTML={{__html:''}} />;", `{"customComponentNames":["MUI*"]}`, nil},
-		{"a leading star does match it", "<TextMUI dangerouslySetInnerHTML={{__html:''}} />;", `{"customComponentNames":["*MUI"]}`, []string{"dangerousProp"}},
-		{"an empty list checks nothing extra", "<App dangerouslySetInnerHTML={{__html:''}} />;", `{"customComponentNames":[]}`, nil},
+		{
+			"a star matches any component",
+			"<App dangerouslySetInnerHTML={{__html:''}} />;",
+			`{"customComponentNames":["*"]}`,
+			[]string{"dangerousProp"},
+		},
+		{
+			"an exact name matches itself",
+			"<Title dangerouslySetInnerHTML={{__html:''}} />;",
+			`{"customComponentNames":["Title"]}`,
+			[]string{"dangerousProp"},
+		},
+		{
+			"a different exact name does not",
+			"<Title dangerouslySetInnerHTML={{__html:''}} />;",
+			`{"customComponentNames":["Home"]}`,
+			nil,
+		},
+		{
+			"a trailing star anchors the prefix, so MUI* does not match TextMUI",
+			"<TextMUI dangerouslySetInnerHTML={{__html:''}} />;",
+			`{"customComponentNames":["MUI*"]}`,
+			nil,
+		},
+		{
+			"a leading star does match it",
+			"<TextMUI dangerouslySetInnerHTML={{__html:''}} />;",
+			`{"customComponentNames":["*MUI"]}`,
+			[]string{"dangerousProp"},
+		},
+		{
+			"an empty list checks nothing extra",
+			"<App dangerouslySetInnerHTML={{__html:''}} />;",
+			`{"customComponentNames":[]}`,
+			nil,
+		},
 		{"an absent key behaves as an empty list", "<App dangerouslySetInnerHTML={{__html:''}} />;", `{}`, nil},
-		{"a DOM element still reports whatever the option says", "<div dangerouslySetInnerHTML={{__html:''}} />;", `{"customComponentNames":["Nothing"]}`, []string{"dangerousProp"}},
+		{
+			"a DOM element still reports whatever the option says",
+			"<div dangerouslySetInnerHTML={{__html:''}} />;",
+			`{"customComponentNames":["Nothing"]}`,
+			[]string{"dangerousProp"},
+		},
 
 		// Divergence. Upstream builds the compared name with an expression that does not recurse
 		// through a nested member, so <A.B.C /> renders as "undefined.C" there. Measured
 		// behaviorally: with ["A.B.C"] upstream is silent and with ["undefined.C"] it reports.
 		// Declined, because carrying it means matching a pattern nobody would write.
-		{"a nested member renders fully here, which upstream does not", "<A.B.C dangerouslySetInnerHTML={{__html:''}} />;", `{"customComponentNames":["A.B.C"]}`, []string{"dangerousProp"}},
-		{"a two-part member matches under both", "<A.B dangerouslySetInnerHTML={{__html:''}} />;", `{"customComponentNames":["A.B"]}`, []string{"dangerousProp"}},
+		{
+			"a nested member renders fully here, which upstream does not",
+			"<A.B.C dangerouslySetInnerHTML={{__html:''}} />;",
+			`{"customComponentNames":["A.B.C"]}`,
+			[]string{"dangerousProp"},
+		},
+		{
+			"a two-part member matches under both",
+			"<A.B dangerouslySetInnerHTML={{__html:''}} />;",
+			`{"customComponentNames":["A.B"]}`,
+			[]string{"dangerousProp"},
+		},
 
 		// Divergence, and this one is a crash upstream rather than a wrong answer. The same
 		// expression yields the name node for a namespaced tag, minimatch calls split on an object
@@ -217,10 +316,30 @@ func TestNoDangerCustomComponentNames(test *testing.T) {
 		// "ns:App", whose first character is lowercase, so it is a DOM element by the regex above
 		// and reports with no options set. Both lines measured on the installed build: <ns:App>
 		// with no options reports, and <Ns:App> with any customComponentNames crashes.
-		{"a lowercase namespace is a DOM element and needs no option", "<ns:App dangerouslySetInnerHTML={{__html:''}} />;", "", []string{"dangerousProp"}},
-		{"a capital namespace is not, and is silent unconfigured", "<Ns:App dangerouslySetInnerHTML={{__html:''}} />;", "", nil},
-		{"and matches its rendered name rather than crashing, which is where upstream throws", "<Ns:App dangerouslySetInnerHTML={{__html:''}} />;", `{"customComponentNames":["Ns:App"]}`, []string{"dangerousProp"}},
-		{"declining cleanly on a pattern that does not match, where upstream also throws", "<Ns:App dangerouslySetInnerHTML={{__html:''}} />;", `{"customComponentNames":["Other"]}`, nil},
+		{
+			"a lowercase namespace is a DOM element and needs no option",
+			"<ns:App dangerouslySetInnerHTML={{__html:''}} />;",
+			"",
+			[]string{"dangerousProp"},
+		},
+		{
+			"a capital namespace is not, and is silent unconfigured",
+			"<Ns:App dangerouslySetInnerHTML={{__html:''}} />;",
+			"",
+			nil,
+		},
+		{
+			"and matches its rendered name rather than crashing, which is where upstream throws",
+			"<Ns:App dangerouslySetInnerHTML={{__html:''}} />;",
+			`{"customComponentNames":["Ns:App"]}`,
+			[]string{"dangerousProp"},
+		},
+		{
+			"declining cleanly on a pattern that does not match, where upstream also throws",
+			"<Ns:App dangerouslySetInnerHTML={{__html:''}} />;",
+			`{"customComponentNames":["Other"]}`,
+			nil,
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -257,7 +376,9 @@ func TestNoDangerDecodesOptions(test *testing.T) {
 
 	test.Run("the wire name is customComponentNames", func(test *testing.T) {
 		test.Parallel()
-		decoded, decodeNoDangerOptionsError := DecodeNoDangerOptions(json.RawMessage(`{"customComponentNames":["A","B*"]}`))
+		decoded, decodeNoDangerOptionsError := DecodeNoDangerOptions(
+			json.RawMessage(`{"customComponentNames":["A","B*"]}`),
+		)
 		if decodeNoDangerOptionsError != nil {
 			test.Fatalf("decoding: %v", decodeNoDangerOptionsError)
 		}
@@ -265,12 +386,16 @@ func TestNoDangerDecodesOptions(test *testing.T) {
 		if !ok {
 			test.Fatalf("decoded to %T, want NoDangerOptions", decoded)
 		}
-		if len(settings.CustomComponentNames) != 2 || settings.CustomComponentNames[0] != "A" || settings.CustomComponentNames[1] != "B*" {
+		if len(settings.CustomComponentNames) != 2 ||
+			settings.CustomComponentNames[0] != "A" ||
+			settings.CustomComponentNames[1] != "B*" {
 			test.Fatalf("decoded to %v", settings.CustomComponentNames)
 		}
 	})
 
-	test.Run("an unknown key is accepted and ignored, matching a schema without additionalProperties false", func(test *testing.T) {
+	test.Run("an unknown key is accepted and ignored, matching a schema without additionalProperties false", func(
+		test *testing.T,
+	) {
 		test.Parallel()
 		decoded, decodeNoDangerOptionsError := DecodeNoDangerOptions(json.RawMessage(`{"somethingElse":1}`))
 		if decodeNoDangerOptionsError != nil {
@@ -297,10 +422,22 @@ func TestNoDangerDecodesOptions(test *testing.T) {
 		//
 		// This is the port brief's point that a survivor needs an input on which the two versions
 		// produce different output rather than merely take different internal paths.
-		component := rule_testing.RunWithOptions(test, NoDanger, noDangerFile, "<App dangerouslySetInnerHTML={{__html:''}} />;", nil)
+		component := rule_testing.RunWithOptions(
+			test,
+			NoDanger,
+			noDangerFile,
+			"<App dangerouslySetInnerHTML={{__html:''}} />;",
+			nil,
+		)
 		rule_testing.ExpectClean(test, component)
 
-		element := rule_testing.RunWithOptions(test, NoDanger, noDangerFile, "<div dangerouslySetInnerHTML={{__html:''}} />;", nil)
+		element := rule_testing.RunWithOptions(
+			test,
+			NoDanger,
+			noDangerFile,
+			"<div dangerouslySetInnerHTML={{__html:''}} />;",
+			nil,
+		)
 		rule_testing.ExpectFindings(test, element, "dangerousProp")
 	})
 }

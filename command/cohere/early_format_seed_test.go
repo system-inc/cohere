@@ -56,15 +56,23 @@ func TestTheEarlyPassFormatsFromTheProgramsBoundTreeAndNeverDuringBinding(test *
 		}
 	}
 	configuration := `{"compilerOptions":{"strict":true,"module":"esnext","target":"esnext","moduleResolution":"bundler","jsx":"preserve","lib":["esnext","esnext.disposable"]},"include":["**/*.ts","**/*.tsx"]}`
-	if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration), 0o644); writeError != nil {
+	if writeError := os.WriteFile(
+		filepath.Join(directory, "tsconfig.json"),
+		[]byte(configuration),
+		0o644,
+	); writeError != nil {
 		test.Fatal(writeError)
 	}
 
 	formatter := native.Formatter{Options: formatoptions.Default()}
-	transformCounting := func(programs *programOffer, fromProgram *atomic.Int32) func(string, string, *ast.SourceFile) (string, error) {
+	transformCounting := func(
+		programs *programOffer,
+		fromProgram *atomic.Int32,
+	) func(string, string, *ast.SourceFile) (string, error) {
 		return func(fileName string, text string, parsed *ast.SourceFile) (string, error) {
 			if programs != nil && parsed != nil {
-				if program := programs.program.Load(); program != nil && parsed == program.GetSourceFile(tspath.RootedFilePath(fileName)) {
+				if program := programs.program.Load(); program != nil &&
+					parsed == program.GetSourceFile(tspath.RootedFilePath(fileName)) {
 					fromProgram.Add(1)
 				}
 			}
@@ -77,7 +85,9 @@ func TestTheEarlyPassFormatsFromTheProgramsBoundTreeAndNeverDuringBinding(test *
 	reference.wait()
 
 	for round := range 6 {
-		graph, buildError := program.Build(program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory})
+		graph, buildError := program.Build(
+			program.Options{ConfigFileName: "tsconfig.json", CurrentDirectory: directory},
+		)
 		if buildError != nil {
 			test.Fatal(buildError)
 		}
@@ -107,7 +117,12 @@ func TestTheEarlyPassFormatsFromTheProgramsBoundTreeAndNeverDuringBinding(test *
 		after.wait()
 		sameResults(test, fmt.Sprintf("round %d, after binding", round), reference, after)
 		if formatted := int(fromProgram.Load()); formatted != len(candidates) {
-			test.Fatalf("round %d: %d of %d files were formatted from the program's tree", round, formatted, len(candidates))
+			test.Fatalf(
+				"round %d: %d of %d files were formatted from the program's tree",
+				round,
+				formatted,
+				len(candidates),
+			)
 		}
 	}
 }
@@ -116,7 +131,12 @@ func TestTheEarlyPassFormatsFromTheProgramsBoundTreeAndNeverDuringBinding(test *
 func sameResults(test *testing.T, label string, expected *formatSpeculation, actual *formatSpeculation) {
 	test.Helper()
 	if len(actual.attempts) != len(expected.attempts) {
-		test.Errorf("%s: %d files kept, against %d with no program", label, len(actual.attempts), len(expected.attempts))
+		test.Errorf(
+			"%s: %d files kept, against %d with no program",
+			label,
+			len(actual.attempts),
+			len(expected.attempts),
+		)
 	}
 	for fileName, want := range expected.attempts {
 		got, kept := actual.attempts[fileName]

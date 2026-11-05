@@ -259,7 +259,11 @@ func (state *noUnusedClassComponentMethodsState) collect(node *ast.Node) {
 }
 
 // report emits one finding per definition whose name nothing used.
-func (state *noUnusedClassComponentMethodsState) report(ruleContext rule.Context, className string, lifecycle map[string]bool) {
+func (state *noUnusedClassComponentMethodsState) report(
+	ruleContext rule.Context,
+	className string,
+	lifecycle map[string]bool,
+) {
 	for _, key := range state.definitions {
 		name, ok := noUnusedClassComponentMethodsLiteralName(key)
 		if !ok {

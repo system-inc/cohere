@@ -57,7 +57,11 @@ func TestNoPhysicalDirectionFires(test *testing.T) {
 		{"a template tail after a hole", "export const c = `flex ${other} ml-4`;\n", 1},
 		// The exact strings the tree carries, so the fixtures and the answer key agree.
 		{"the dialog theme string", "export const c = 'fixed top-[50%] left-[50%] z-50 outline-none';\n", 1},
-		{"the scroll area string", "export const c = 'before:absolute before:top-1/2 before:left-1/2 before:size-full';\n", 1},
+		{
+			"the scroll area string",
+			"export const c = 'before:absolute before:top-1/2 before:left-1/2 before:size-full';\n",
+			1,
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -96,7 +100,11 @@ func TestNoPhysicalDirectionStaysSilent(test *testing.T) {
 		{"a bare prefix with no value", physicalDirectionFile, "export const c = 'flex ml-';\n"},
 		// Unrelated classes that contain the words.
 		{"a class containing left elsewhere", physicalDirectionFile, "export const c = 'flex overflow-hidden';\n"},
-		{"the word left in prose", physicalDirectionFile, "export const message = 'You have items left in your cart';\n"},
+		{
+			"the word left in prose",
+			physicalDirectionFile,
+			"export const message = 'You have items left in your cart';\n",
+		},
 		{"a sentence", physicalDirectionFile, "export const message = 'Align the text to the left side';\n"},
 		// Strings that are not classes at all, which is what the shape test exists for. The rule
 		// visits every literal in the file, so these are the population it has to stay quiet on.
@@ -105,7 +113,11 @@ func TestNoPhysicalDirectionStaysSilent(test *testing.T) {
 		// because no token in the string passes the class-shape test. Without them, deleting the
 		// shape test kills no fixture, and the one guard between this rule and 139,000 string
 		// literals is unpinned. Mutation found exactly that.
-		{"a documentation path naming a class", physicalDirectionFile, "export const link = 'See docs/text-left.md';\n"},
+		{
+			"a documentation path naming a class",
+			physicalDirectionFile,
+			"export const link = 'See docs/text-left.md';\n",
+		},
 		{"a class name inside braces", physicalDirectionFile, "export const token = '{{ml-4}}';\n"},
 		{"a class name with trailing punctuation", physicalDirectionFile, "export const note = 'ml-4;';\n"},
 		{"a url", physicalDirectionFile, "export const url = 'https://example.com/left/right';\n"},

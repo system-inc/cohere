@@ -16,15 +16,33 @@ func TestNoDupeElseIfFires(test *testing.T) {
 		sourceText string
 	}{
 		{"the same identifier twice", "declare const a: boolean;\nexport function run() { if(a) {} else if(a) {} }\n"},
-		{"a duplicate later in the chain", "declare const a: boolean, b: boolean;\nexport function run() { if(a) {} else if(b) {} else if(a) {} }\n"},
-		{"the same call expression", "declare function f(): boolean;\nexport function run() { if(f()) {} else if(f()) {} }\n"},
-		{"the same member access", "declare const o: { a: boolean };\nexport function run() { if(o.a) {} else if(o.a) {} }\n"},
+		{
+			"a duplicate later in the chain",
+			"declare const a: boolean, b: boolean;\nexport function run() { if(a) {} else if(b) {} else if(a) {} }\n",
+		},
+		{
+			"the same call expression",
+			"declare function f(): boolean;\nexport function run() { if(f()) {} else if(f()) {} }\n",
+		},
+		{
+			"the same member access",
+			"declare const o: { a: boolean };\nexport function run() { if(o.a) {} else if(o.a) {} }\n",
+		},
 
 		// Subsumption rather than equality, which is most of the rule: everything the second
 		// condition matches, the first already matched.
-		{"an or covering a later single", "declare const a: boolean, b: boolean;\nexport function run() { if(a || b) {} else if(a) {} }\n"},
-		{"an or covering a later or", "declare const a: boolean, b: boolean, c: boolean;\nexport function run() { if(a || b || c) {} else if(b || c) {} }\n"},
-		{"a single covering a later and", "declare const a: boolean, b: boolean;\nexport function run() { if(a) {} else if(a && b) {} }\n"},
+		{
+			"an or covering a later single",
+			"declare const a: boolean, b: boolean;\nexport function run() { if(a || b) {} else if(a) {} }\n",
+		},
+		{
+			"an or covering a later or",
+			"declare const a: boolean, b: boolean, c: boolean;\nexport function run() { if(a || b || c) {} else if(b || c) {} }\n",
+		},
+		{
+			"a single covering a later and",
+			"declare const a: boolean, b: boolean;\nexport function run() { if(a) {} else if(a && b) {} }\n",
+		},
 
 		// Commutativity, which is sound only because these are read for truthiness.
 		//
@@ -37,8 +55,14 @@ func TestNoDupeElseIfFires(test *testing.T) {
 		// The branch is reached only when a logical expression is compared as a whole, which
 		// happens when it is nested inside another operator so the split does not take it apart.
 		// The parenthesized cases are the ones that measure it.
-		{"and operands reordered", "declare const a: boolean, b: boolean;\nexport function run() { if(a && b) {} else if(b && a) {} }\n"},
-		{"or operands reordered", "declare const a: boolean, b: boolean;\nexport function run() { if(a || b) {} else if(b || a) {} }\n"},
+		{
+			"and operands reordered",
+			"declare const a: boolean, b: boolean;\nexport function run() { if(a && b) {} else if(b && a) {} }\n",
+		},
+		{
+			"or operands reordered",
+			"declare const a: boolean, b: boolean;\nexport function run() { if(a || b) {} else if(b || a) {} }\n",
+		},
 		{
 			"a nested or with its operands reordered",
 			"declare const a: boolean, b: boolean, c: boolean;\n" +
@@ -52,11 +76,17 @@ func TestNoDupeElseIfFires(test *testing.T) {
 
 		// Flattening. `a || b || c` is a left-nested tree, so a rule reading only the top node
 		// sees two operands rather than three.
-		{"a middle operand of a flattened or", "declare const a: boolean, b: boolean, c: boolean;\nexport function run() { if(a || b || c) {} else if(b) {} }\n"},
+		{
+			"a middle operand of a flattened or",
+			"declare const a: boolean, b: boolean, c: boolean;\nexport function run() { if(a || b || c) {} else if(b) {} }\n",
+		},
 
 		// Two earlier branches together covering a later one, which is why the walk accumulates
 		// rather than comparing against the immediately preceding branch only.
-		{"two earlier branches covering one later", "declare const a: boolean, b: boolean;\nexport function run() { if(a) {} else if(b) {} else if(a || b) {} }\n"},
+		{
+			"two earlier branches covering one later",
+			"declare const a: boolean, b: boolean;\nexport function run() { if(a) {} else if(b) {} else if(a || b) {} }\n",
+		},
 
 		// A later `&&` extending an earlier one. Fires, but it does not measure the conjunct
 		// expansion: `a && b && c` splits into the single operand set {a,b,c}, which the earlier
@@ -85,9 +115,15 @@ func TestNoDupeElseIfFires(test *testing.T) {
 			"declare const a: boolean, b: boolean, c: boolean;\n" +
 				"export function run() { if(a || b) {} else if((a || b) && c) {} }\n",
 		},
-		{"whitespace differences are ignored", "declare const a: boolean, b: boolean;\nexport function run() { if(a &&  b) {} else if(a&&b) {} }\n"},
+		{
+			"whitespace differences are ignored",
+			"declare const a: boolean, b: boolean;\nexport function run() { if(a &&  b) {} else if(a&&b) {} }\n",
+		},
 		{"parentheses are ignored", "declare const a: boolean;\nexport function run() { if(a) {} else if((a)) {} }\n"},
-		{"a comment between does not matter", "declare const a: boolean;\nexport function run() { if(a) {} else if(/* same */ a) {} }\n"},
+		{
+			"a comment between does not matter",
+			"declare const a: boolean;\nexport function run() { if(a) {} else if(/* same */ a) {} }\n",
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -105,19 +141,43 @@ func TestNoDupeElseIfStaysSilent(test *testing.T) {
 		name       string
 		sourceText string
 	}{
-		{"different conditions", "declare const a: boolean, b: boolean;\nexport function run() { if(a) {} else if(b) {} }\n"},
-		{"a longer chain of distinct conditions", "declare const a: boolean, b: boolean, c: boolean;\nexport function run() { if(a) {} else if(b) {} else if(c) {} }\n"},
+		{
+			"different conditions",
+			"declare const a: boolean, b: boolean;\nexport function run() { if(a) {} else if(b) {} }\n",
+		},
+		{
+			"a longer chain of distinct conditions",
+			"declare const a: boolean, b: boolean, c: boolean;\nexport function run() { if(a) {} else if(b) {} else if(c) {} }\n",
+		},
 
 		// The direction that must not be reversed. An earlier `a && b` does not cover a later `a`:
 		// the later branch is reachable whenever a holds and b does not.
-		{"an and followed by one of its operands", "declare const a: boolean, b: boolean;\nexport function run() { if(a && b) {} else if(a) {} }\n"},
-		{"a single followed by an unrelated or", "declare const a: boolean, b: boolean;\nexport function run() { if(a) {} else if(a || b) {} }\n"},
+		{
+			"an and followed by one of its operands",
+			"declare const a: boolean, b: boolean;\nexport function run() { if(a && b) {} else if(a) {} }\n",
+		},
+		{
+			"a single followed by an unrelated or",
+			"declare const a: boolean, b: boolean;\nexport function run() { if(a) {} else if(a || b) {} }\n",
+		},
 
 		// Not the same expression despite looking close. These are what the token oracle is for.
-		{"optional chaining is a different expression", "declare const o: { a?: boolean } | undefined;\nexport function run() { if(o!.a) {} else if(o?.a) {} }\n"},
-		{"different literals", "declare const a: number;\nexport function run() { if(a === 1) {} else if(a === 2) {} }\n"},
-		{"different negations", "declare const a: number;\nexport function run() { if(a === -1) {} else if(a === +1) {} }\n"},
-		{"different members of the same object", "declare const o: { a: boolean; b: boolean };\nexport function run() { if(o.a) {} else if(o.b) {} }\n"},
+		{
+			"optional chaining is a different expression",
+			"declare const o: { a?: boolean } | undefined;\nexport function run() { if(o!.a) {} else if(o?.a) {} }\n",
+		},
+		{
+			"different literals",
+			"declare const a: number;\nexport function run() { if(a === 1) {} else if(a === 2) {} }\n",
+		},
+		{
+			"different negations",
+			"declare const a: number;\nexport function run() { if(a === -1) {} else if(a === +1) {} }\n",
+		},
+		{
+			"different members of the same object",
+			"declare const o: { a: boolean; b: boolean };\nexport function run() { if(o.a) {} else if(o.b) {} }\n",
+		},
 
 		// A nested if inside a consequent is not part of this chain, which is what the alternate
 		// check enforces. Without it the inner condition would be compared to the outer one.
@@ -130,8 +190,14 @@ func TestNoDupeElseIfStaysSilent(test *testing.T) {
 		// The brace-less case is the one that measures it: there the inner if's parent really is
 		// the outer IfStatement, and only the alternate test distinguishes "this is the else branch"
 		// from "this is the then branch".
-		{"a repeated condition inside the consequent", "declare const a: boolean;\nexport function run() { if(a) { if(a) {} } }\n"},
-		{"a repeated condition in a nested else", "declare const a: boolean, b: boolean;\nexport function run() { if(a) { if(b) {} else if(a) {} } }\n"},
+		{
+			"a repeated condition inside the consequent",
+			"declare const a: boolean;\nexport function run() { if(a) { if(a) {} } }\n",
+		},
+		{
+			"a repeated condition in a nested else",
+			"declare const a: boolean, b: boolean;\nexport function run() { if(a) { if(b) {} else if(a) {} } }\n",
+		},
 		{
 			"a repeated condition in a brace-less consequent",
 			"declare const a: boolean;\nexport function run() { if(a) if(a) {} }\n",

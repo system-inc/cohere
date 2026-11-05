@@ -198,7 +198,14 @@ func TestCoverageStatesEveryPartOfTheWalksCPU(test *testing.T) {
 	flushStream(test, stream)
 	rendered := out.String()
 
-	for _, want := range []string{"1000ms", "rules 30%", "shared derivations 10%", "measuring 10%", "50% the walk itself", "250ms of process CPU"} {
+	for _, want := range []string{
+		"1000ms",
+		"rules 30%",
+		"shared derivations 10%",
+		"measuring 10%",
+		"50% the walk itself",
+		"250ms of process CPU",
+	} {
 		if !strings.Contains(rendered, want) {
 			test.Fatalf("coverage did not state %q: %q", want, rendered)
 		}

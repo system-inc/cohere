@@ -10,7 +10,10 @@ import (
 
 // consistencyNoHandBuiltDeclaredErrorText is the rule's message, whose wording lives in
 // `policy/messages/consistency-no-hand-built-declared-error.json`.
-var consistencyNoHandBuiltDeclaredErrorText = policy.MessageOf("base/consistency-no-hand-built-declared-error", "consistencyNoHandBuiltDeclaredError")
+var consistencyNoHandBuiltDeclaredErrorText = policy.MessageOf(
+	"base/consistency-no-hand-built-declared-error",
+	"consistencyNoHandBuiltDeclaredError",
+)
 
 // messageNoHandBuiltDeclaredError is the rule's single finding.
 //

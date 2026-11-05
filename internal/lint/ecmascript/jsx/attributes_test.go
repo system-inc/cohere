@@ -102,8 +102,22 @@ func TestStringAttributeValueHonoursBothMatchers(test *testing.T) {
 		wantFound  bool
 	}{
 		{"an exact match", "export const A = <link rel='stylesheet' />;\n", "rel", MatchExactly, "stylesheet", true},
-		{"exact matching rejects a case difference", "export const A = <link REL='stylesheet' />;\n", "rel", MatchExactly, "", false},
-		{"insensitive matching accepts it", "export const A = <link REL='stylesheet' />;\n", "rel", MatchIgnoringCase, "stylesheet", true},
+		{
+			"exact matching rejects a case difference",
+			"export const A = <link REL='stylesheet' />;\n",
+			"rel",
+			MatchExactly,
+			"",
+			false,
+		},
+		{
+			"insensitive matching accepts it",
+			"export const A = <link REL='stylesheet' />;\n",
+			"rel",
+			MatchIgnoringCase,
+			"stylesheet",
+			true,
+		},
 		{"an absent attribute", "export const A = <link href='x' />;\n", "rel", MatchExactly, "", false},
 	}
 	for _, testCase := range cases {
@@ -176,7 +190,13 @@ func TestHasAttributeNamedAsksAboutPresence(test *testing.T) {
 	}{
 		{"a bare attribute", "export const A = <script async />;\n", "async", MatchExactly, true},
 		{"an attribute with a value", "export const A = <script async='true' />;\n", "async", MatchExactly, true},
-		{"an expression value still counts as present", "export const A = <script async={flag} />;\n", "async", MatchExactly, true},
+		{
+			"an expression value still counts as present",
+			"export const A = <script async={flag} />;\n",
+			"async",
+			MatchExactly,
+			true,
+		},
 		{"an absent attribute", "export const A = <script src='x' />;\n", "async", MatchExactly, false},
 		{"case matters to the exact matcher", "export const A = <script ASYNC />;\n", "async", MatchExactly, false},
 		{"and not to the insensitive one", "export const A = <script ASYNC />;\n", "async", MatchIgnoringCase, true},

@@ -27,7 +27,10 @@ const consistencyNoLongLineCommentId = "longLineComment"
 
 // consistencyNoLongLineCommentText is the rule's message, whose wording lives in
 // `policy/messages/consistency-no-long-line-comment.json`.
-var consistencyNoLongLineCommentText = policy.MessageOf("nexus/consistency-no-long-line-comment", consistencyNoLongLineCommentId)
+var consistencyNoLongLineCommentText = policy.MessageOf(
+	"nexus/consistency-no-long-line-comment",
+	consistencyNoLongLineCommentId,
+)
 
 // ConsistencyNoLongLineComment requires a block comment for a long run of line comments.
 //
@@ -45,7 +48,9 @@ var ConsistencyNoLongLineComment = rule.Rule{
 		}
 
 		maximumLineCount := defaultMaximumLineCount
-		if settings, hasSettings := rule.OptionsAs[ConsistencyNoLongLineCommentOptions](options); hasSettings && settings.MaximumLineCount > 0 {
+		if settings, hasSettings := rule.OptionsAs[ConsistencyNoLongLineCommentOptions](
+			options,
+		); hasSettings && settings.MaximumLineCount > 0 {
 			maximumLineCount = settings.MaximumLineCount
 		}
 

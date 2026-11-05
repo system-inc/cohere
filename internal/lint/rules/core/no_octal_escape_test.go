@@ -356,7 +356,10 @@ func TestNoOctalEscapeMessage(test *testing.T) {
 	if got := result.Diagnostics[0].Message.Id; got != "octalEscapeSequence" {
 		test.Errorf("message id = %q, want %q", got, "octalEscapeSequence")
 	}
-	if got := result.Diagnostics[0].Message.Description; !strings.HasPrefix(got, "Do not use the octal escape `\\01`.") {
+	if got := result.Diagnostics[0].Message.Description; !strings.HasPrefix(
+		got,
+		"Do not use the octal escape `\\01`.",
+	) {
 		test.Errorf("message %q does not name the sequence", got)
 	}
 }

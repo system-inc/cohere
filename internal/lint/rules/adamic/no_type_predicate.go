@@ -42,7 +42,10 @@ var NoTypePredicate = rule.Rule{
 	Run: func(ruleContext rule.Context, options any) rule.Listeners {
 		return rule.Listeners{
 			ast.KindTypePredicate: func(node *ast.Node) {
-				ruleContext.ReportNode(node, rule.Message{Id: "typePredicate", Description: noTypePredicateText.Render(nil)})
+				ruleContext.ReportNode(
+					node,
+					rule.Message{Id: "typePredicate", Description: noTypePredicateText.Render(nil)},
+				)
 			},
 		}
 	},

@@ -18,7 +18,10 @@ import (
 
 // boundaryNoProjectThemeValueText is the rule's message, whose wording lives in
 // `policy/messages/boundary-no-project-theme-value.json`.
-var boundaryNoProjectThemeValueText = policy.MessageOf("structure/boundary-no-project-theme-value", "forbiddenThemeValue")
+var boundaryNoProjectThemeValueText = policy.MessageOf(
+	"structure/boundary-no-project-theme-value",
+	"forbiddenThemeValue",
+)
 
 // messageForbiddenThemeValue names the value, the component, and what is allowed instead.
 //
@@ -109,7 +112,8 @@ var BoundaryNoProjectThemeValue = rule.Rule{
 	// fingerprint (#kdee854). See themeFingerprint.
 	ProgramFingerprint: themeFingerprint,
 	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		if ruleContext.SourceFile == nil || !FileContextFor(ruleContext.SourceFile.FileName().AsString()).IsInLibrariesStructure {
+		if ruleContext.SourceFile == nil ||
+			!FileContextFor(ruleContext.SourceFile.FileName().AsString()).IsInLibrariesStructure {
 			return nil
 		}
 		if ruleContext.Program == nil {

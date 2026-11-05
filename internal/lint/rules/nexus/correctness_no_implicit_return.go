@@ -55,7 +55,10 @@ var CorrectnessNoImplicitReturn = rule.Rule{
 		}
 		compilerOptions := ruleContext.Program.Options()
 		if compilerOptions.NoImplicitReturns.IsTrue() {
-			ruleContext.SkipCovered(rule.CoverTypeCheck, "noImplicitReturns is on, so the type check reports these itself")
+			ruleContext.SkipCovered(
+				rule.CoverTypeCheck,
+				"noImplicitReturns is on, so the type check reports these itself",
+			)
 			return nil
 		}
 		strictNullChecks := compilerOptions.GetStrictOptionValue(compilerOptions.StrictNullChecks)
@@ -63,8 +66,9 @@ var CorrectnessNoImplicitReturn = rule.Rule{
 		// isUndefinedVoidOrAny is the checker's own test of a return type that needs no return value
 		isUndefinedVoidOrAny := func(returnType *checker.Type, functionFlags ast.FunctionFlags) bool {
 			unwrapped := checker.Checker_unwrapReturnType(ruleContext.TypeChecker, returnType, functionFlags)
-			return unwrapped != nil && (checker.Checker_maybeTypeOfKind(ruleContext.TypeChecker, unwrapped, checker.TypeFlagsVoid) ||
-				checker.Type_flags(unwrapped)&(checker.TypeFlagsAny|checker.TypeFlagsUndefined) != 0)
+			return unwrapped != nil &&
+				(checker.Checker_maybeTypeOfKind(ruleContext.TypeChecker, unwrapped, checker.TypeFlagsVoid) ||
+					checker.Type_flags(unwrapped)&(checker.TypeFlagsAny|checker.TypeFlagsUndefined) != 0)
 		}
 
 		report := func(node *ast.Node) {
@@ -75,7 +79,10 @@ var CorrectnessNoImplicitReturn = rule.Rule{
 		// The end of the function: checkAllCodePathsInNonVoidFunctionReturnOrThrow's noImplicitReturns branch
 		checkEnd := func(function *ast.Node) {
 			body := function.Body()
-			if ast.IsMethodSignatureDeclaration(function) || body == nil || ast.NodeIsMissing(body) || !ast.IsBlock(body) {
+			if ast.IsMethodSignatureDeclaration(function) ||
+				body == nil ||
+				ast.NodeIsMissing(body) ||
+				!ast.IsBlock(body) {
 				return
 			}
 			functionFlags := ast.GetFunctionFlags(function)
@@ -89,8 +96,9 @@ var CorrectnessNoImplicitReturn = rule.Rule{
 			if declared != nil {
 				unwrapped = checker.Checker_unwrapReturnType(ruleContext.TypeChecker, declared, functionFlags)
 			}
-			if unwrapped != nil && (checker.Checker_maybeTypeOfKind(ruleContext.TypeChecker, unwrapped, checker.TypeFlagsVoid) ||
-				checker.Type_flags(unwrapped)&(checker.TypeFlagsAny|checker.TypeFlagsUndefined) != 0) {
+			if unwrapped != nil &&
+				(checker.Checker_maybeTypeOfKind(ruleContext.TypeChecker, unwrapped, checker.TypeFlagsVoid) ||
+					checker.Type_flags(unwrapped)&(checker.TypeFlagsAny|checker.TypeFlagsUndefined) != 0) {
 				return
 			}
 			if !checker.Checker_functionHasImplicitReturn(ruleContext.TypeChecker, function) {
@@ -104,7 +112,11 @@ var CorrectnessNoImplicitReturn = rule.Rule{
 			case unwrapped != nil && !hasExplicitReturn:
 				return
 			case unwrapped != nil && strictNullChecks &&
-				!checker.Checker_isTypeAssignableTo(ruleContext.TypeChecker, checker.Checker_undefinedType(ruleContext.TypeChecker), unwrapped):
+				!checker.Checker_isTypeAssignableTo(
+					ruleContext.TypeChecker,
+					checker.Checker_undefinedType(ruleContext.TypeChecker),
+					unwrapped,
+				):
 				return
 			case unwrapped == nil:
 				// No annotation: with no return value anywhere the inferred type is void, and nothing is owed
@@ -112,7 +124,10 @@ var CorrectnessNoImplicitReturn = rule.Rule{
 					return
 				}
 				signature := checker.Checker_getSignatureFromDeclaration(ruleContext.TypeChecker, function)
-				if isUndefinedVoidOrAny(checker.Checker_getReturnTypeOfSignature(ruleContext.TypeChecker, signature), functionFlags) {
+				if isUndefinedVoidOrAny(
+					checker.Checker_getReturnTypeOfSignature(ruleContext.TypeChecker, signature),
+					functionFlags,
+				) {
 					return
 				}
 			}
@@ -142,7 +157,9 @@ var CorrectnessNoImplicitReturn = rule.Rule{
 					return
 				}
 				container := ast.FindAncestor(node.Parent, ast.IsFunctionLikeOrClassStaticBlockDeclaration)
-				if container == nil || ast.IsClassStaticBlockDeclaration(container) || ast.IsConstructorDeclaration(container) {
+				if container == nil ||
+					ast.IsClassStaticBlockDeclaration(container) ||
+					ast.IsConstructorDeclaration(container) {
 					return
 				}
 				signature := checker.Checker_getSignatureFromDeclaration(ruleContext.TypeChecker, container)

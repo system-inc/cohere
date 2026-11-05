@@ -137,8 +137,12 @@ func TestPaginationDecoratorPointsAtTheName(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.Run(test, ConsistencyRequirePaginationArgumentName, consistencyRequirePaginationArgumentNameFile,
-				testCase.sourceText)
+			result := rule_testing.Run(
+				test,
+				ConsistencyRequirePaginationArgumentName,
+				consistencyRequirePaginationArgumentNameFile,
+				testCase.sourceText,
+			)
 			rule_testing.ExpectFindings(test, result, "invalidName")
 			source := result.SourceFile.Text()
 			reported := source[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]

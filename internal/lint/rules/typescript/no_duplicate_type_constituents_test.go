@@ -32,7 +32,9 @@ func noDuplicateTypeConstituentsOptionsFor(test *testing.T, optionsJson string) 
 	if optionsJson == "" {
 		return DefaultNoDuplicateTypeConstituentsSettings()
 	}
-	decoded, decodeNoDuplicateTypeConstituentsOptionsError := DecodeNoDuplicateTypeConstituentsOptions(json.RawMessage(optionsJson))
+	decoded, decodeNoDuplicateTypeConstituentsOptionsError := DecodeNoDuplicateTypeConstituentsOptions(
+		json.RawMessage(optionsJson),
+	)
 	if decodeNoDuplicateTypeConstituentsOptionsError != nil {
 		test.Fatalf("decoding %s: %v", optionsJson, decodeNoDuplicateTypeConstituentsOptionsError)
 	}
@@ -80,7 +82,10 @@ func TestNoDuplicateTypeConstituentsStaysSilentOnUpstreamPassCases(test *testing
 		{sourceText: "\ntype A = 'A';\ntype B = 'B';\ntype T = 'A' | 'B';\n      ", optionsJson: ""},
 		{sourceText: "\ntype A = 'A';\ntype B = 'B';\ntype C = 'C';\ntype T = A | B | C;\n      ", optionsJson: ""},
 		{sourceText: "type T = readonly string[] | string[];", optionsJson: ""},
-		{sourceText: "\ntype A = 'A';\ntype B = 'B';\ntype C = 'C';\ntype D = 'D';\ntype T = (A | B) | (C | D);\n      ", optionsJson: ""},
+		{
+			sourceText:  "\ntype A = 'A';\ntype B = 'B';\ntype C = 'C';\ntype D = 'D';\ntype T = (A | B) | (C | D);\n      ",
+			optionsJson: "",
+		},
 		{sourceText: "\ntype A = 'A';\ntype B = 'B';\ntype T = (A | B) | (A & B);\n      ", optionsJson: ""},
 		{sourceText: "\ntype A = 'A';\ntype B = 'B';\ntype T = Record<string, A | B>;\n      ", optionsJson: ""},
 		{sourceText: "type T = A | A;", optionsJson: "{\"ignoreUnions\": true}"},
@@ -136,7 +141,11 @@ func TestNoDuplicateTypeConstituentsFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type T = true  ;\n",
 			wantFindings: []noDuplicateTypeConstituentsFinding{
-				{wantId: "duplicate", wantSpan: "true", wantMessage: "Intersection type constituent is duplicated with true."},
+				{
+					wantId:      "duplicate",
+					wantSpan:    "true",
+					wantMessage: "Intersection type constituent is duplicated with true.",
+				},
 			},
 		},
 		{
@@ -160,7 +169,11 @@ func TestNoDuplicateTypeConstituentsFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type T = { a: string   };\n",
 			wantFindings: []noDuplicateTypeConstituentsFinding{
-				{wantId: "duplicate", wantSpan: "string", wantMessage: "Union type constituent is duplicated with string."},
+				{
+					wantId:      "duplicate",
+					wantSpan:    "string",
+					wantMessage: "Union type constituent is duplicated with string.",
+				},
 			},
 		},
 		{
@@ -168,7 +181,11 @@ func TestNoDuplicateTypeConstituentsFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type T = { a: string }  ;\n",
 			wantFindings: []noDuplicateTypeConstituentsFinding{
-				{wantId: "duplicate", wantSpan: "{ a: string }", wantMessage: "Union type constituent is duplicated with { a: string }."},
+				{
+					wantId:      "duplicate",
+					wantSpan:    "{ a: string }",
+					wantMessage: "Union type constituent is duplicated with { a: string }.",
+				},
 			},
 		},
 		{
@@ -176,7 +193,11 @@ func TestNoDuplicateTypeConstituentsFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type T = { a: string; b: number }  ;\n",
 			wantFindings: []noDuplicateTypeConstituentsFinding{
-				{wantId: "duplicate", wantSpan: "{ a: string; b: number }", wantMessage: "Union type constituent is duplicated with { a: string; b: number }."},
+				{
+					wantId:      "duplicate",
+					wantSpan:    "{ a: string; b: number }",
+					wantMessage: "Union type constituent is duplicated with { a: string; b: number }.",
+				},
 			},
 		},
 		{
@@ -184,7 +205,11 @@ func TestNoDuplicateTypeConstituentsFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type T = Set<string>  ;\n",
 			wantFindings: []noDuplicateTypeConstituentsFinding{
-				{wantId: "duplicate", wantSpan: "Set<string>", wantMessage: "Union type constituent is duplicated with Set<string>."},
+				{
+					wantId:      "duplicate",
+					wantSpan:    "Set<string>",
+					wantMessage: "Union type constituent is duplicated with Set<string>.",
+				},
 			},
 		},
 		{
@@ -192,7 +217,11 @@ func TestNoDuplicateTypeConstituentsFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type IsArray<T> = T extends any[] ? true : false;\ntype ActuallyDuplicated = IsArray<number>  ;\n",
 			wantFindings: []noDuplicateTypeConstituentsFinding{
-				{wantId: "duplicate", wantSpan: "IsArray<string>", wantMessage: "Union type constituent is duplicated with IsArray<number>."},
+				{
+					wantId:      "duplicate",
+					wantSpan:    "IsArray<string>",
+					wantMessage: "Union type constituent is duplicated with IsArray<number>.",
+				},
 			},
 		},
 		{
@@ -200,7 +229,11 @@ func TestNoDuplicateTypeConstituentsFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type T = string[]  ;\n",
 			wantFindings: []noDuplicateTypeConstituentsFinding{
-				{wantId: "duplicate", wantSpan: "string[]", wantMessage: "Union type constituent is duplicated with string[]."},
+				{
+					wantId:      "duplicate",
+					wantSpan:    "string[]",
+					wantMessage: "Union type constituent is duplicated with string[].",
+				},
 			},
 		},
 		{
@@ -208,7 +241,11 @@ func TestNoDuplicateTypeConstituentsFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type T = string[][]  ;\n",
 			wantFindings: []noDuplicateTypeConstituentsFinding{
-				{wantId: "duplicate", wantSpan: "string[][]", wantMessage: "Union type constituent is duplicated with string[][]."},
+				{
+					wantId:      "duplicate",
+					wantSpan:    "string[][]",
+					wantMessage: "Union type constituent is duplicated with string[][].",
+				},
 			},
 		},
 		{
@@ -216,7 +253,11 @@ func TestNoDuplicateTypeConstituentsFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type T = [1, 2, 3]  ;\n",
 			wantFindings: []noDuplicateTypeConstituentsFinding{
-				{wantId: "duplicate", wantSpan: "[1, 2, 3]", wantMessage: "Union type constituent is duplicated with [1, 2, 3]."},
+				{
+					wantId:      "duplicate",
+					wantSpan:    "[1, 2, 3]",
+					wantMessage: "Union type constituent is duplicated with [1, 2, 3].",
+				},
 			},
 		},
 		{
@@ -224,7 +265,11 @@ func TestNoDuplicateTypeConstituentsFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type T = () => string  ;\n",
 			wantFindings: []noDuplicateTypeConstituentsFinding{
-				{wantId: "duplicate", wantSpan: "string", wantMessage: "Union type constituent is duplicated with string."},
+				{
+					wantId:      "duplicate",
+					wantSpan:    "string",
+					wantMessage: "Union type constituent is duplicated with string.",
+				},
 			},
 		},
 		{
@@ -240,7 +285,11 @@ func TestNoDuplicateTypeConstituentsFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type T = (arg: string  ) => void;\n",
 			wantFindings: []noDuplicateTypeConstituentsFinding{
-				{wantId: "duplicate", wantSpan: "string", wantMessage: "Union type constituent is duplicated with string."},
+				{
+					wantId:      "duplicate",
+					wantSpan:    "string",
+					wantMessage: "Union type constituent is duplicated with string.",
+				},
 			},
 		},
 		{
@@ -323,7 +372,11 @@ func TestNoDuplicateTypeConstituentsFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type A = 'A';\ntype B = 'B';\ntype T = (A | B)  ;\n",
 			wantFindings: []noDuplicateTypeConstituentsFinding{
-				{wantId: "duplicate", wantSpan: "A | B)", wantMessage: "Union type constituent is duplicated with A | B."},
+				{
+					wantId:      "duplicate",
+					wantSpan:    "A | B)",
+					wantMessage: "Union type constituent is duplicated with A | B.",
+				},
 			},
 		},
 		{
@@ -339,8 +392,16 @@ func TestNoDuplicateTypeConstituentsFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type A = 'A';\ntype B = 'B';\ntype C = 'C';\ntype D = 'D';\ntype F = (A | B)   | ((C | D) & (A | B))  ;\n",
 			wantFindings: []noDuplicateTypeConstituentsFinding{
-				{wantId: "duplicate", wantSpan: "A | B)", wantMessage: "Union type constituent is duplicated with A | B."},
-				{wantId: "duplicate", wantSpan: "A | B)", wantMessage: "Union type constituent is duplicated with A | B."},
+				{
+					wantId:      "duplicate",
+					wantSpan:    "A | B)",
+					wantMessage: "Union type constituent is duplicated with A | B.",
+				},
+				{
+					wantId:      "duplicate",
+					wantSpan:    "A | B)",
+					wantMessage: "Union type constituent is duplicated with A | B.",
+				},
 			},
 		},
 		{
@@ -350,7 +411,11 @@ func TestNoDuplicateTypeConstituentsFiresOnUpstreamFailCases(test *testing.T) {
 			wantFindings: []noDuplicateTypeConstituentsFinding{
 				{wantId: "duplicate", wantSpan: "A", wantMessage: "Union type constituent is duplicated with A."},
 				{wantId: "duplicate", wantSpan: "B", wantMessage: "Union type constituent is duplicated with B."},
-				{wantId: "duplicate", wantSpan: "A | B)", wantMessage: "Union type constituent is duplicated with A | B."},
+				{
+					wantId:      "duplicate",
+					wantSpan:    "A | B)",
+					wantMessage: "Union type constituent is duplicated with A | B.",
+				},
 			},
 		},
 		{
@@ -358,8 +423,16 @@ func TestNoDuplicateTypeConstituentsFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type A = (number | string)    ;\n",
 			wantFindings: []noDuplicateTypeConstituentsFinding{
-				{wantId: "duplicate", wantSpan: "number", wantMessage: "Union type constituent is duplicated with number."},
-				{wantId: "duplicate", wantSpan: "string", wantMessage: "Union type constituent is duplicated with string."},
+				{
+					wantId:      "duplicate",
+					wantSpan:    "number",
+					wantMessage: "Union type constituent is duplicated with number.",
+				},
+				{
+					wantId:      "duplicate",
+					wantSpan:    "string",
+					wantMessage: "Union type constituent is duplicated with string.",
+				},
 			},
 		},
 		{
@@ -367,7 +440,11 @@ func TestNoDuplicateTypeConstituentsFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type A = (number | (string | null))  ;\n",
 			wantFindings: []noDuplicateTypeConstituentsFinding{
-				{wantId: "duplicate", wantSpan: "string | (null | number))", wantMessage: "Union type constituent is duplicated with number | (string | null)."},
+				{
+					wantId:      "duplicate",
+					wantSpan:    "string | (null | number))",
+					wantMessage: "Union type constituent is duplicated with number | (string | null).",
+				},
 			},
 		},
 		{
@@ -375,8 +452,16 @@ func TestNoDuplicateTypeConstituentsFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type A = (number & string)    ;\n",
 			wantFindings: []noDuplicateTypeConstituentsFinding{
-				{wantId: "duplicate", wantSpan: "number", wantMessage: "Intersection type constituent is duplicated with number."},
-				{wantId: "duplicate", wantSpan: "string", wantMessage: "Intersection type constituent is duplicated with string."},
+				{
+					wantId:      "duplicate",
+					wantSpan:    "number",
+					wantMessage: "Intersection type constituent is duplicated with number.",
+				},
+				{
+					wantId:      "duplicate",
+					wantSpan:    "string",
+					wantMessage: "Intersection type constituent is duplicated with string.",
+				},
 			},
 		},
 		{
@@ -384,8 +469,16 @@ func TestNoDuplicateTypeConstituentsFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "", // repairs overlap; see the note at the assertion below
 			wantFindings: []noDuplicateTypeConstituentsFinding{
-				{wantId: "duplicate", wantSpan: "number", wantMessage: "Intersection type constituent is duplicated with number."},
-				{wantId: "duplicate", wantSpan: "string", wantMessage: "Intersection type constituent is duplicated with string."},
+				{
+					wantId:      "duplicate",
+					wantSpan:    "number",
+					wantMessage: "Intersection type constituent is duplicated with number.",
+				},
+				{
+					wantId:      "duplicate",
+					wantSpan:    "string",
+					wantMessage: "Intersection type constituent is duplicated with string.",
+				},
 			},
 		},
 		{
@@ -401,7 +494,11 @@ func TestNoDuplicateTypeConstituentsFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type T = A | A | string  ;\n",
 			wantFindings: []noDuplicateTypeConstituentsFinding{
-				{wantId: "duplicate", wantSpan: "string", wantMessage: "Union type constituent is duplicated with string."},
+				{
+					wantId:      "duplicate",
+					wantSpan:    "string",
+					wantMessage: "Union type constituent is duplicated with string.",
+				},
 			},
 		},
 		{
@@ -409,7 +506,11 @@ func TestNoDuplicateTypeConstituentsFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "(a?: string  ) => {};\n",
 			wantFindings: []noDuplicateTypeConstituentsFinding{
-				{wantId: "unnecessary", wantSpan: "undefined", wantMessage: "Explicit undefined is unnecessary on an optional parameter."},
+				{
+					wantId:      "unnecessary",
+					wantSpan:    "undefined",
+					wantMessage: "Explicit undefined is unnecessary on an optional parameter.",
+				},
 			},
 		},
 		{
@@ -417,7 +518,11 @@ func TestNoDuplicateTypeConstituentsFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type T = undefined;\n(arg?:   string) => {};\n",
 			wantFindings: []noDuplicateTypeConstituentsFinding{
-				{wantId: "unnecessary", wantSpan: "T", wantMessage: "Explicit undefined is unnecessary on an optional parameter."},
+				{
+					wantId:      "unnecessary",
+					wantSpan:    "T",
+					wantMessage: "Explicit undefined is unnecessary on an optional parameter.",
+				},
 			},
 		},
 		{
@@ -425,7 +530,11 @@ func TestNoDuplicateTypeConstituentsFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "interface F {\n  (a?: string  ): void;\n}\n",
 			wantFindings: []noDuplicateTypeConstituentsFinding{
-				{wantId: "unnecessary", wantSpan: "undefined", wantMessage: "Explicit undefined is unnecessary on an optional parameter."},
+				{
+					wantId:      "unnecessary",
+					wantSpan:    "undefined",
+					wantMessage: "Explicit undefined is unnecessary on an optional parameter.",
+				},
 			},
 		},
 		{
@@ -433,7 +542,11 @@ func TestNoDuplicateTypeConstituentsFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type fn = new (a?: string  ) => void;\n",
 			wantFindings: []noDuplicateTypeConstituentsFinding{
-				{wantId: "unnecessary", wantSpan: "undefined", wantMessage: "Explicit undefined is unnecessary on an optional parameter."},
+				{
+					wantId:      "unnecessary",
+					wantSpan:    "undefined",
+					wantMessage: "Explicit undefined is unnecessary on an optional parameter.",
+				},
 			},
 		},
 		{
@@ -441,7 +554,11 @@ func TestNoDuplicateTypeConstituentsFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "function f(a?: string  ) {}\n",
 			wantFindings: []noDuplicateTypeConstituentsFinding{
-				{wantId: "unnecessary", wantSpan: "undefined", wantMessage: "Explicit undefined is unnecessary on an optional parameter."},
+				{
+					wantId:      "unnecessary",
+					wantSpan:    "undefined",
+					wantMessage: "Explicit undefined is unnecessary on an optional parameter.",
+				},
 			},
 		},
 		{
@@ -449,7 +566,11 @@ func TestNoDuplicateTypeConstituentsFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "f = function (a?: string  ) {};\n",
 			wantFindings: []noDuplicateTypeConstituentsFinding{
-				{wantId: "unnecessary", wantSpan: "undefined", wantMessage: "Explicit undefined is unnecessary on an optional parameter."},
+				{
+					wantId:      "unnecessary",
+					wantSpan:    "undefined",
+					wantMessage: "Explicit undefined is unnecessary on an optional parameter.",
+				},
 			},
 		},
 		{
@@ -457,7 +578,11 @@ func TestNoDuplicateTypeConstituentsFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "declare function f(a?: string  ): void;\n",
 			wantFindings: []noDuplicateTypeConstituentsFinding{
-				{wantId: "unnecessary", wantSpan: "undefined", wantMessage: "Explicit undefined is unnecessary on an optional parameter."},
+				{
+					wantId:      "unnecessary",
+					wantSpan:    "undefined",
+					wantMessage: "Explicit undefined is unnecessary on an optional parameter.",
+				},
 			},
 		},
 		{
@@ -465,7 +590,11 @@ func TestNoDuplicateTypeConstituentsFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "declare class bb {\n  f(a?: string  ): void;\n}\n",
 			wantFindings: []noDuplicateTypeConstituentsFinding{
-				{wantId: "unnecessary", wantSpan: "undefined", wantMessage: "Explicit undefined is unnecessary on an optional parameter."},
+				{
+					wantId:      "unnecessary",
+					wantSpan:    "undefined",
+					wantMessage: "Explicit undefined is unnecessary on an optional parameter.",
+				},
 			},
 		},
 		{
@@ -473,7 +602,11 @@ func TestNoDuplicateTypeConstituentsFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "interface ee {\n  f(a?: string  ): void;\n}\n",
 			wantFindings: []noDuplicateTypeConstituentsFinding{
-				{wantId: "unnecessary", wantSpan: "undefined", wantMessage: "Explicit undefined is unnecessary on an optional parameter."},
+				{
+					wantId:      "unnecessary",
+					wantSpan:    "undefined",
+					wantMessage: "Explicit undefined is unnecessary on an optional parameter.",
+				},
 			},
 		},
 		{
@@ -481,7 +614,11 @@ func TestNoDuplicateTypeConstituentsFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "interface ee {\n  new (a?: string  ): void;\n}\n",
 			wantFindings: []noDuplicateTypeConstituentsFinding{
-				{wantId: "unnecessary", wantSpan: "undefined", wantMessage: "Explicit undefined is unnecessary on an optional parameter."},
+				{
+					wantId:      "unnecessary",
+					wantSpan:    "undefined",
+					wantMessage: "Explicit undefined is unnecessary on an optional parameter.",
+				},
 			},
 		},
 		{
@@ -489,7 +626,11 @@ func TestNoDuplicateTypeConstituentsFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type fn = (a?: string  ) => void;\n",
 			wantFindings: []noDuplicateTypeConstituentsFinding{
-				{wantId: "unnecessary", wantSpan: "undefined", wantMessage: "Explicit undefined is unnecessary on an optional parameter."},
+				{
+					wantId:      "unnecessary",
+					wantSpan:    "undefined",
+					wantMessage: "Explicit undefined is unnecessary on an optional parameter.",
+				},
 			},
 		},
 		{
@@ -497,7 +638,11 @@ func TestNoDuplicateTypeConstituentsFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type fn = (a?: string | (  number)) => void;\n",
 			wantFindings: []noDuplicateTypeConstituentsFinding{
-				{wantId: "unnecessary", wantSpan: "undefined", wantMessage: "Explicit undefined is unnecessary on an optional parameter."},
+				{
+					wantId:      "unnecessary",
+					wantSpan:    "undefined",
+					wantMessage: "Explicit undefined is unnecessary on an optional parameter.",
+				},
 			},
 		},
 		{
@@ -505,7 +650,11 @@ func TestNoDuplicateTypeConstituentsFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "type fn = (a?: (  number) | string) => void;\n",
 			wantFindings: []noDuplicateTypeConstituentsFinding{
-				{wantId: "unnecessary", wantSpan: "undefined", wantMessage: "Explicit undefined is unnecessary on an optional parameter."},
+				{
+					wantId:      "unnecessary",
+					wantSpan:    "undefined",
+					wantMessage: "Explicit undefined is unnecessary on an optional parameter.",
+				},
 			},
 		},
 		{
@@ -513,7 +662,11 @@ func TestNoDuplicateTypeConstituentsFiresOnUpstreamFailCases(test *testing.T) {
 			optionsJson: "",
 			wantFixed:   "abstract class cc {\n  abstract f(a?: string  ): void;\n}\n",
 			wantFindings: []noDuplicateTypeConstituentsFinding{
-				{wantId: "unnecessary", wantSpan: "undefined", wantMessage: "Explicit undefined is unnecessary on an optional parameter."},
+				{
+					wantId:      "unnecessary",
+					wantSpan:    "undefined",
+					wantMessage: "Explicit undefined is unnecessary on an optional parameter.",
+				},
 			},
 		},
 	}
@@ -539,7 +692,12 @@ func TestNoDuplicateTypeConstituentsFiresOnUpstreamFailCases(test *testing.T) {
 					test.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
 				}
 				if diagnostic.Message.Description != want.wantMessage {
-					test.Fatalf("finding %d message: expected %q, got %q", position, want.wantMessage, diagnostic.Message.Description)
+					test.Fatalf(
+						"finding %d message: expected %q, got %q",
+						position,
+						want.wantMessage,
+						diagnostic.Message.Description,
+					)
 				}
 
 				// The repair is a fix rather than a suggestion, matching upstream's fixable meta.
@@ -587,7 +745,8 @@ func TestNoDuplicateTypeConstituentsStaysSilentOnTypeScriptShapes(test *testing.
 		sourceText string
 	}{
 		{
-			// An unresolvable import type resolves to the error type, which upstream skips so that a file with a broken import does not report every constituent against the first.
+			// An unresolvable import type resolves to the error type, which upstream skips so that a file with a broken
+			// import does not report every constituent against the first.
 			sourceText: "type T = import('x').A | import('x').A;",
 		},
 	}
@@ -614,15 +773,24 @@ func TestNoDuplicateTypeConstituentsFiresOnTypeScriptShapes(test *testing.T) {
 			sourceText: "type T = readonly string[] | readonly string[];",
 			wantFixed:  "type T = readonly string[]  ;\n",
 			wantFindings: []noDuplicateTypeConstituentsFinding{
-				{wantId: "duplicate", wantSpan: "readonly string[]", wantMessage: "Union type constituent is duplicated with readonly string[]."},
+				{
+					wantId:      "duplicate",
+					wantSpan:    "readonly string[]",
+					wantMessage: "Union type constituent is duplicated with readonly string[].",
+				},
 			},
 		},
 		{
-			// Two structurally identical object literals. The checker gives these distinct type objects, so only the syntactic comparison can see them, which is why upstream runs it first.
+			// Two structurally identical object literals. The checker gives these distinct type objects, so only the
+			// syntactic comparison can see them, which is why upstream runs it first.
 			sourceText: "type T = { readonly a: 1 } | { readonly a: 1 };",
 			wantFixed:  "type T = { readonly a: 1 }  ;\n",
 			wantFindings: []noDuplicateTypeConstituentsFinding{
-				{wantId: "duplicate", wantSpan: "{ readonly a: 1 }", wantMessage: "Union type constituent is duplicated with { readonly a: 1 }."},
+				{
+					wantId:      "duplicate",
+					wantSpan:    "{ readonly a: 1 }",
+					wantMessage: "Union type constituent is duplicated with { readonly a: 1 }.",
+				},
 			},
 		},
 		{
@@ -630,7 +798,11 @@ func TestNoDuplicateTypeConstituentsFiresOnTypeScriptShapes(test *testing.T) {
 			sourceText: "function f(a?: string | undefined, b?: number) {}",
 			wantFixed:  "function f(a?: string  , b?: number) {}\n",
 			wantFindings: []noDuplicateTypeConstituentsFinding{
-				{wantId: "unnecessary", wantSpan: "undefined", wantMessage: "Explicit undefined is unnecessary on an optional parameter."},
+				{
+					wantId:      "unnecessary",
+					wantSpan:    "undefined",
+					wantMessage: "Explicit undefined is unnecessary on an optional parameter.",
+				},
 			},
 		},
 		{
@@ -638,7 +810,11 @@ func TestNoDuplicateTypeConstituentsFiresOnTypeScriptShapes(test *testing.T) {
 			sourceText: "class K { m(a?: string | undefined): void {} }",
 			wantFixed:  "class K { m(a?: string  ): void {} }\n",
 			wantFindings: []noDuplicateTypeConstituentsFinding{
-				{wantId: "unnecessary", wantSpan: "undefined", wantMessage: "Explicit undefined is unnecessary on an optional parameter."},
+				{
+					wantId:      "unnecessary",
+					wantSpan:    "undefined",
+					wantMessage: "Explicit undefined is unnecessary on an optional parameter.",
+				},
 			},
 		},
 		{
@@ -646,7 +822,11 @@ func TestNoDuplicateTypeConstituentsFiresOnTypeScriptShapes(test *testing.T) {
 			sourceText: "type T = (() => void) | (() => void);",
 			wantFixed:  "type T = (() => void)  ;\n",
 			wantFindings: []noDuplicateTypeConstituentsFinding{
-				{wantId: "duplicate", wantSpan: "() => void)", wantMessage: "Union type constituent is duplicated with () => void."},
+				{
+					wantId:      "duplicate",
+					wantSpan:    "() => void)",
+					wantMessage: "Union type constituent is duplicated with () => void.",
+				},
 			},
 		},
 		{
@@ -654,8 +834,16 @@ func TestNoDuplicateTypeConstituentsFiresOnTypeScriptShapes(test *testing.T) {
 			sourceText: "type T = string | string | string;",
 			wantFixed:  "type T = string    ;\n",
 			wantFindings: []noDuplicateTypeConstituentsFinding{
-				{wantId: "duplicate", wantSpan: "string", wantMessage: "Union type constituent is duplicated with string."},
-				{wantId: "duplicate", wantSpan: "string", wantMessage: "Union type constituent is duplicated with string."},
+				{
+					wantId:      "duplicate",
+					wantSpan:    "string",
+					wantMessage: "Union type constituent is duplicated with string.",
+				},
+				{
+					wantId:      "duplicate",
+					wantSpan:    "string",
+					wantMessage: "Union type constituent is duplicated with string.",
+				},
 			},
 		},
 		{
@@ -671,7 +859,11 @@ func TestNoDuplicateTypeConstituentsFiresOnTypeScriptShapes(test *testing.T) {
 			sourceText: "type T = `a${string}` | `a${string}`;",
 			wantFixed:  "type T = `a${string}`  ;\n",
 			wantFindings: []noDuplicateTypeConstituentsFinding{
-				{wantId: "duplicate", wantSpan: "`a${string}`", wantMessage: "Union type constituent is duplicated with `a${string}`."},
+				{
+					wantId:      "duplicate",
+					wantSpan:    "`a${string}`",
+					wantMessage: "Union type constituent is duplicated with `a${string}`.",
+				},
 			},
 		},
 		{
@@ -679,7 +871,11 @@ func TestNoDuplicateTypeConstituentsFiresOnTypeScriptShapes(test *testing.T) {
 			sourceText: "interface I { a: string | string; }",
 			wantFixed:  "interface I { a: string  ; }\n",
 			wantFindings: []noDuplicateTypeConstituentsFinding{
-				{wantId: "duplicate", wantSpan: "string", wantMessage: "Union type constituent is duplicated with string."},
+				{
+					wantId:      "duplicate",
+					wantSpan:    "string",
+					wantMessage: "Union type constituent is duplicated with string.",
+				},
 			},
 		},
 		{
@@ -687,7 +883,11 @@ func TestNoDuplicateTypeConstituentsFiresOnTypeScriptShapes(test *testing.T) {
 			sourceText: "let x: string | string = 'a';",
 			wantFixed:  "let x: string   = 'a';\n",
 			wantFindings: []noDuplicateTypeConstituentsFinding{
-				{wantId: "duplicate", wantSpan: "string", wantMessage: "Union type constituent is duplicated with string."},
+				{
+					wantId:      "duplicate",
+					wantSpan:    "string",
+					wantMessage: "Union type constituent is duplicated with string.",
+				},
 			},
 		},
 		{
@@ -695,7 +895,11 @@ func TestNoDuplicateTypeConstituentsFiresOnTypeScriptShapes(test *testing.T) {
 			sourceText: "declare function f(a?: A | undefined): void;",
 			wantFixed:  "declare function f(a?: A  ): void;\n",
 			wantFindings: []noDuplicateTypeConstituentsFinding{
-				{wantId: "unnecessary", wantSpan: "undefined", wantMessage: "Explicit undefined is unnecessary on an optional parameter."},
+				{
+					wantId:      "unnecessary",
+					wantSpan:    "undefined",
+					wantMessage: "Explicit undefined is unnecessary on an optional parameter.",
+				},
 			},
 		},
 		{
@@ -711,7 +915,11 @@ func TestNoDuplicateTypeConstituentsFiresOnTypeScriptShapes(test *testing.T) {
 			sourceText: "type T = keyof A | keyof A;\ntype A = {a:1};",
 			wantFixed:  "type T = keyof A  ;\ntype A = {a:1};\n",
 			wantFindings: []noDuplicateTypeConstituentsFinding{
-				{wantId: "duplicate", wantSpan: "keyof A", wantMessage: "Union type constituent is duplicated with keyof A."},
+				{
+					wantId:      "duplicate",
+					wantSpan:    "keyof A",
+					wantMessage: "Union type constituent is duplicated with keyof A.",
+				},
 			},
 		},
 		{
@@ -744,7 +952,12 @@ func TestNoDuplicateTypeConstituentsFiresOnTypeScriptShapes(test *testing.T) {
 					test.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
 				}
 				if diagnostic.Message.Description != want.wantMessage {
-					test.Fatalf("finding %d message: expected %q, got %q", position, want.wantMessage, diagnostic.Message.Description)
+					test.Fatalf(
+						"finding %d message: expected %q, got %q",
+						position,
+						want.wantMessage,
+						diagnostic.Message.Description,
+					)
 				}
 			}
 
@@ -771,13 +984,20 @@ func TestDecodeNoDuplicateTypeConstituentsOptions(test *testing.T) {
 		{name: "emptyObject", raw: `{}`, wantIntersections: false, wantUnions: false},
 		{name: "ignoreUnions", raw: `{"ignoreUnions": true}`, wantIntersections: false, wantUnions: true},
 		{name: "ignoreIntersections", raw: `{"ignoreIntersections": true}`, wantIntersections: true, wantUnions: false},
-		{name: "both", raw: `{"ignoreUnions": true, "ignoreIntersections": true}`, wantIntersections: true, wantUnions: true},
+		{
+			name:              "both",
+			raw:               `{"ignoreUnions": true, "ignoreIntersections": true}`,
+			wantIntersections: true,
+			wantUnions:        true,
+		},
 		{name: "explicitFalse", raw: `{"ignoreUnions": false}`, wantIntersections: false, wantUnions: false},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, decodeNoDuplicateTypeConstituentsOptionsError := DecodeNoDuplicateTypeConstituentsOptions(json.RawMessage(testCase.raw))
+			decoded, decodeNoDuplicateTypeConstituentsOptionsError := DecodeNoDuplicateTypeConstituentsOptions(
+				json.RawMessage(testCase.raw),
+			)
 			if decodeNoDuplicateTypeConstituentsOptionsError != nil {
 				test.Fatalf("decoding %s: %v", testCase.raw, decodeNoDuplicateTypeConstituentsOptionsError)
 			}
@@ -786,7 +1006,11 @@ func TestDecodeNoDuplicateTypeConstituentsOptions(test *testing.T) {
 				test.Fatalf("the decoder returned %T rather than the options struct", decoded)
 			}
 			if options.IgnoreIntersections != testCase.wantIntersections {
-				test.Fatalf("ignoreIntersections: expected %v, got %v", testCase.wantIntersections, options.IgnoreIntersections)
+				test.Fatalf(
+					"ignoreIntersections: expected %v, got %v",
+					testCase.wantIntersections,
+					options.IgnoreIntersections,
+				)
 			}
 			if options.IgnoreUnions != testCase.wantUnions {
 				test.Fatalf("ignoreUnions: expected %v, got %v", testCase.wantUnions, options.IgnoreUnions)

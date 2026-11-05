@@ -78,7 +78,11 @@ func ruleImplicitReturns(test *testing.T, source string, strict bool, noImplicit
 		map[string]string{"Case.ts": source}, "Case.ts",
 		func(directory string) {
 			configuration := implicitReturnConfiguration(noImplicitReturns, strict)
-			if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration), 0o644); writeError != nil {
+			if writeError := os.WriteFile(
+				filepath.Join(directory, "tsconfig.json"),
+				[]byte(configuration),
+				0o644,
+			); writeError != nil {
 				test.Fatal(writeError)
 			}
 		})
@@ -248,7 +252,12 @@ func TestCorrectnessNoImplicitReturnReportsWhatTypeScriptDoes(test *testing.T) {
 			test.Parallel()
 			typeScript := typeScriptImplicitReturns(test, fixture.source, fixture.strict)
 			if len(typeScript) != fixture.want {
-				test.Fatalf("TypeScript reports %d TS7030 (%q), and the fixture says %d", len(typeScript), typeScript, fixture.want)
+				test.Fatalf(
+					"TypeScript reports %d TS7030 (%q), and the fixture says %d",
+					len(typeScript),
+					typeScript,
+					fixture.want,
+				)
 			}
 			reported := ruleImplicitReturns(test, fixture.source, fixture.strict, false)
 			if strings.Join(reported, "\x00") != strings.Join(typeScript, "\x00") {
@@ -280,7 +289,10 @@ func TestCorrectnessNoImplicitReturnFixturePair(test *testing.T) {
 		"implicitReturn")
 	for _, fixture := range implicitReturnFixtures {
 		if fixture.want == 0 && fixture.strict {
-			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, CorrectnessNoImplicitReturn, "Case.ts", fixture.source))
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.RunTyped(test, CorrectnessNoImplicitReturn, "Case.ts", fixture.source),
+			)
 		}
 	}
 }

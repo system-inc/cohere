@@ -239,7 +239,10 @@ func reportTemplateDuplicates(ruleContext rule.Context, segments []ClassSegment)
 			}
 			separator := tokens[tokenIndex-1].Range
 			if separator.End() == separator.Pos()+1 {
-				found.fixes = append(found.fixes, rule.ReplaceRange(core.NewTextRange(separator.Pos(), token.Range.End()), ""))
+				found.fixes = append(
+					found.fixes,
+					rule.ReplaceRange(core.NewTextRange(separator.Pos(), token.Range.End()), ""),
+				)
 			} else {
 				found.fixes = append(found.fixes,
 					rule.ReplaceRange(core.NewTextRange(separator.Pos(), separator.Pos()+1), ""),

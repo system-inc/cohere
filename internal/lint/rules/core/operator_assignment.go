@@ -103,18 +103,22 @@ var operatorAssignmentShorthand = map[ast.Kind]struct {
 	// concatenation does not commute, so `x = y + x` is a different program.
 	commutative bool
 }{
-	ast.KindAsteriskToken:                          {ast.KindAsteriskEqualsToken, "*=", true},
-	ast.KindAmpersandToken:                         {ast.KindAmpersandEqualsToken, "&=", true},
-	ast.KindCaretToken:                             {ast.KindCaretEqualsToken, "^=", true},
-	ast.KindBarToken:                               {ast.KindBarEqualsToken, "|=", true},
-	ast.KindPlusToken:                              {ast.KindPlusEqualsToken, "+=", false},
-	ast.KindMinusToken:                             {ast.KindMinusEqualsToken, "-=", false},
-	ast.KindSlashToken:                             {ast.KindSlashEqualsToken, "/=", false},
-	ast.KindPercentToken:                           {ast.KindPercentEqualsToken, "%=", false},
-	ast.KindLessThanLessThanToken:                  {ast.KindLessThanLessThanEqualsToken, "<<=", false},
-	ast.KindGreaterThanGreaterThanToken:            {ast.KindGreaterThanGreaterThanEqualsToken, ">>=", false},
-	ast.KindGreaterThanGreaterThanGreaterThanToken: {ast.KindGreaterThanGreaterThanGreaterThanEqualsToken, ">>>=", false},
-	ast.KindAsteriskAsteriskToken:                  {ast.KindAsteriskAsteriskEqualsToken, "**=", false},
+	ast.KindAsteriskToken:               {ast.KindAsteriskEqualsToken, "*=", true},
+	ast.KindAmpersandToken:              {ast.KindAmpersandEqualsToken, "&=", true},
+	ast.KindCaretToken:                  {ast.KindCaretEqualsToken, "^=", true},
+	ast.KindBarToken:                    {ast.KindBarEqualsToken, "|=", true},
+	ast.KindPlusToken:                   {ast.KindPlusEqualsToken, "+=", false},
+	ast.KindMinusToken:                  {ast.KindMinusEqualsToken, "-=", false},
+	ast.KindSlashToken:                  {ast.KindSlashEqualsToken, "/=", false},
+	ast.KindPercentToken:                {ast.KindPercentEqualsToken, "%=", false},
+	ast.KindLessThanLessThanToken:       {ast.KindLessThanLessThanEqualsToken, "<<=", false},
+	ast.KindGreaterThanGreaterThanToken: {ast.KindGreaterThanGreaterThanEqualsToken, ">>=", false},
+	ast.KindGreaterThanGreaterThanGreaterThanToken: {
+		ast.KindGreaterThanGreaterThanGreaterThanEqualsToken,
+		">>>=",
+		false,
+	},
+	ast.KindAsteriskAsteriskToken: {ast.KindAsteriskAsteriskEqualsToken, "**=", false},
 }
 
 // operatorAssignmentLongForm is the reverse table, used by the `never` arm.
@@ -279,7 +283,13 @@ func operatorAssignmentProhibit(ruleContext rule.Context, node *ast.Node) {
 		return
 	}
 
-	if fix, canFix := operatorAssignmentExpandFix(ruleContext, node, assignment, longForm.binary, longForm.text); canFix {
+	if fix, canFix := operatorAssignmentExpandFix(
+		ruleContext,
+		node,
+		assignment,
+		longForm.binary,
+		longForm.text,
+	); canFix {
 		ruleContext.ReportNodeWithFixes(node, operatorAssignmentUnexpectedMessage(longForm.text+"="), fix)
 		return
 	}

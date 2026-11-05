@@ -89,7 +89,13 @@ func RunTypedWithOptions(test *testing.T, subject rule.Rule, fileName string, so
 // in the row's own bytes, and FixtureText's trim moved a finding at the start or end of the file, in
 // both directions (#jjfa7qb). Hand-written fixtures keep the trim, which is what lets them be indented
 // backquoted literals.
-func RunTypedVerbatimWithOptions(test *testing.T, subject rule.Rule, fileName string, sourceText string, options any) Result {
+func RunTypedVerbatimWithOptions(
+	test *testing.T,
+	subject rule.Rule,
+	fileName string,
+	sourceText string,
+	options any,
+) Result {
 	test.Helper()
 	files := map[string]string{fileName: sourceText}
 	return runTypedFiles(test, subject, files, fileName, fixedOptions(options), nil, true)

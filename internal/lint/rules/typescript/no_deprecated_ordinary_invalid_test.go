@@ -987,7 +987,11 @@ var noDeprecatedOrdinaryInvalidCases = []noDeprecatedCase{
 			"assert.fail({}, {});\n" +
 			"      ",
 		expected: []noDeprecatedFinding{
-			{messageId: "deprecatedWithReason", name: "fail", reason: "since v10.0.0 - use fail([message]) or other assert functions instead."},
+			{
+				messageId: "deprecatedWithReason",
+				name:      "fail",
+				reason:    "since v10.0.0 - use fail([message]) or other assert functions instead.",
+			},
 		},
 	},
 	{
@@ -1135,7 +1139,11 @@ var noDeprecatedOrdinaryInvalidCases = []noDeprecatedCase{
 			"}\n" +
 			"      ",
 		expected: []noDeprecatedFinding{
-			{messageId: "deprecatedWithReason", name: "isReceiver", reason: "This param is not used and will be removed in the future."},
+			{
+				messageId: "deprecatedWithReason",
+				name:      "isReceiver",
+				reason:    "This param is not used and will be removed in the future.",
+			},
 		},
 	},
 	{

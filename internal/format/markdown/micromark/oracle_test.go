@@ -76,7 +76,11 @@ func upstreamEvents(test *testing.T, inputs []string) [][]string {
 
 	directory := test.TempDir()
 	script := filepath.Join(directory, "oracle.mjs")
-	if writeError := os.WriteFile(script, []byte(strings.ReplaceAll(oracleScript, "FORK", root)), 0o644); writeError != nil {
+	if writeError := os.WriteFile(
+		script,
+		[]byte(strings.ReplaceAll(oracleScript, "FORK", root)),
+		0o644,
+	); writeError != nil {
 		test.Fatal(writeError)
 	}
 	encoded, err := json.Marshal(inputs)

@@ -65,7 +65,10 @@ func expectFrameworkFunctionalUtilitiesMatch(test *testing.T, fixture wave1Fixtu
 	for _, testCase := range fixture.Cases {
 		utility, known := FrameworkFunctionalUtilities[testCase.Root]
 		if !known {
-			test.Fatalf("%s is in the fixture and not in the table; the fixture and the table disagree about which roots wave 1 covers", testCase.Root)
+			test.Fatalf(
+				"%s is in the fixture and not in the table; the fixture and the table disagree about which roots wave 1 covers",
+				testCase.Root,
+			)
 		}
 
 		// A negative candidate parses to its own root: `-col-1` is root `-col`, not `col` negated,
@@ -92,7 +95,10 @@ func expectFrameworkFunctionalUtilitiesMatch(test *testing.T, fixture wave1Fixtu
 			bothDeclined++
 		case testCase.Reading == nil && produced:
 			engineSilent++
-			disagreements = append(disagreements, testCase.ClassName+": engine declined, table read "+formatReading(reading))
+			disagreements = append(
+				disagreements,
+				testCase.ClassName+": engine declined, table read "+formatReading(reading),
+			)
 		case testCase.Reading != nil && !produced:
 			goSilent++
 			silentNames = append(silentNames, testCase.ClassName)
@@ -102,7 +108,10 @@ func expectFrameworkFunctionalUtilitiesMatch(test *testing.T, fixture wave1Fixtu
 				agreed++
 				continue
 			}
-			disagreements = append(disagreements, testCase.ClassName+": engine "+formatReading(expected)+", table "+formatReading(reading))
+			disagreements = append(
+				disagreements,
+				testCase.ClassName+": engine "+formatReading(expected)+", table "+formatReading(reading),
+			)
 		}
 	}
 
@@ -116,22 +125,40 @@ func expectFrameworkFunctionalUtilitiesMatch(test *testing.T, fixture wave1Fixtu
 	// gap in this table wearing the same shape.
 	for _, className := range silentNames {
 		if _, found := FrameworkStaticDeclarations[className]; !found {
-			test.Errorf("%s: the engine reads it, this table declines, and no static registration covers it, so it is an unexplained gap", className)
+			test.Errorf(
+				"%s: the engine reads it, this table declines, and no static registration covers it, so it is an unexplained gap",
+				className,
+			)
 		}
 	}
 	if len(silentNames) > 0 {
 		test.Logf("table-silent classes, all covered by the static table: %v", silentNames)
 	}
-	test.Logf("wave 1: %d roots, %d cases, agreed %d, both-declined %d, table-silent %d, engine-silent %d, disagreed %d",
-		fixture.RootCount, fixture.CaseCount, agreed, bothDeclined, goSilent, engineSilent, len(disagreements))
+	test.Logf(
+		"wave 1: %d roots, %d cases, agreed %d, both-declined %d, table-silent %d, engine-silent %d, disagreed %d",
+		fixture.RootCount,
+		fixture.CaseCount,
+		agreed,
+		bothDeclined,
+		goSilent,
+		engineSilent,
+		len(disagreements),
+	)
 
 	// The population assertions, stated before the disagreements so a run that measured almost
 	// nothing fails on the denominator rather than passing on the rate.
 	if agreed < 150 {
-		test.Errorf("only %d cases agreed of %d answered by the engine; a table that stopped answering scores perfectly on any comparison that counts only disagreements", agreed, fixture.Answered)
+		test.Errorf(
+			"only %d cases agreed of %d answered by the engine; a table that stopped answering scores perfectly on any comparison that counts only disagreements",
+			agreed,
+			fixture.Answered,
+		)
 	}
 	if bothDeclined < 50 {
-		test.Errorf("only %d cases were declined by both sides; the rejection branches are under-exercised", bothDeclined)
+		test.Errorf(
+			"only %d cases were declined by both sides; the rejection branches are under-exercised",
+			bothDeclined,
+		)
 	}
 
 	for _, disagreement := range disagreements {
@@ -183,7 +210,10 @@ func TestFrameworkFunctionalUtilitiesShareOneBarePredicate(test *testing.T) {
 		}
 	}
 	if shared < 10 {
-		test.Errorf("%d roots reference the shared positive-integer predicate; upstream has twelve in this wave, so the table may have inlined some", shared)
+		test.Errorf(
+			"%d roots reference the shared positive-integer predicate; upstream has twelve in this wave, so the table may have inlined some",
+			shared,
+		)
 	}
 }
 
@@ -211,7 +241,12 @@ func loadWave1Fixture(test *testing.T, name string) wave1Fixture {
 		test.Fatalf("parse %s: %v", name, decodeError)
 	}
 	if fixture.CaseCount == 0 || fixture.Answered == 0 {
-		test.Fatalf("%s carries %d cases and %d answered; a comparison over it would pass by comparing nothing", name, fixture.CaseCount, fixture.Answered)
+		test.Fatalf(
+			"%s carries %d cases and %d answered; a comparison over it would pass by comparing nothing",
+			name,
+			fixture.CaseCount,
+			fixture.Answered,
+		)
 	}
 	return fixture
 }
@@ -256,7 +291,13 @@ func TestFrameworkStaticValuesDeclareTheirRootsProperty(test *testing.T) {
 		for _, static := range utility.StaticValues {
 			if static.Property != utility.Property {
 				diverging++
-				test.Logf("%s: static %q declares %q where the root declares %q", root, static.Name, static.Property, utility.Property)
+				test.Logf(
+					"%s: static %q declares %q where the root declares %q",
+					root,
+					static.Name,
+					static.Property,
+					utility.Property,
+				)
 			}
 		}
 	}
@@ -265,7 +306,10 @@ func TestFrameworkStaticValuesDeclareTheirRootsProperty(test *testing.T) {
 		test.Fatal("no wave-1 root declares staticValues, so this assertion measured nothing")
 	}
 	if diverging > 0 {
-		test.Errorf("%d static values now declare a property their root does not; the property lookup in Reading is load-bearing in this wave and needs a mutation covering it", diverging)
+		test.Errorf(
+			"%d static values now declare a property their root does not; the property lookup in Reading is load-bearing in this wave and needs a mutation covering it",
+			diverging,
+		)
 	}
 	test.Logf("%d roots declare staticValues, %d diverging properties", withStatics, diverging)
 }
@@ -313,19 +357,38 @@ func TestFrameworkBareValueSuffixIsUnobservableInAReading(test *testing.T) {
 			continue
 		}
 		if resolved.Value != testCase.expected {
-			test.Errorf("%s-%s resolved to %q, the engine resolves it to %q", testCase.root, testCase.bare, resolved.Value, testCase.expected)
+			test.Errorf(
+				"%s-%s resolved to %q, the engine resolves it to %q",
+				testCase.root,
+				testCase.bare,
+				resolved.Value,
+				testCase.expected,
+			)
 		}
 	}
 
 	// The reading is deliberately shown to be blind to all of it, so the next reader does not add a
 	// reading-based assertion here and believe it covers the suffix.
 	utility := FrameworkFunctionalUtilities["delay"]
-	long := ParsedCandidate{Kind: ParsedCandidateKindFunctional, Root: "delay", Value: &ParsedValue{Kind: ParsedValueKindNamed, Value: "150"}}
-	short := ParsedCandidate{Kind: ParsedCandidateKindFunctional, Root: "delay", Value: &ParsedValue{Kind: ParsedValueKindNamed, Value: "1"}}
+	long := ParsedCandidate{
+		Kind:  ParsedCandidateKindFunctional,
+		Root:  "delay",
+		Value: &ParsedValue{Kind: ParsedValueKindNamed, Value: "150"},
+	}
+	short := ParsedCandidate{
+		Kind:  ParsedCandidateKindFunctional,
+		Root:  "delay",
+		Value: &ParsedValue{Kind: ParsedValueKindNamed, Value: "1"},
+	}
 	longReading, _ := utility.Reading("delay", &long, theme, false)
 	shortReading, _ := utility.Reading("delay", &short, theme, false)
 	if !readingsEqual(longReading, shortReading) {
-		test.Errorf("delay-150 and delay-1 read differently (%v#%d and %v#%d); if that is now true, a reading-based test can cover the suffix",
-			longReading.Order, longReading.Count, shortReading.Order, shortReading.Count)
+		test.Errorf(
+			"delay-150 and delay-1 read differently (%v#%d and %v#%d); if that is now true, a reading-based test can cover the suffix",
+			longReading.Order,
+			longReading.Count,
+			shortReading.Order,
+			shortReading.Count,
+		)
 	}
 }

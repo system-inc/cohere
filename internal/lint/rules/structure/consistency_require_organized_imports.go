@@ -10,7 +10,10 @@ import (
 
 // consistencyRequireOrganizedImportsText is the rule's message, whose wording lives in
 // `policy/messages/consistency-require-organized-imports.json`.
-var consistencyRequireOrganizedImportsText = policy.MessageOf("structure/consistency-require-organized-imports", "importsNotOrganized")
+var consistencyRequireOrganizedImportsText = policy.MessageOf(
+	"structure/consistency-require-organized-imports",
+	"importsNotOrganized",
+)
 
 // messageImportsNotOrganized is the finding, rendered when it is reported so the text comes from the current catalog.
 func messageImportsNotOrganized() rule.Message {
@@ -128,9 +131,23 @@ func checkImportOrganization(ruleContext rule.Context, sourceFile *ast.Node) {
 
 	descriptionBlock := fileDescriptionBlock(sourceFileNode, fileComments, importDeclarations[0], directiveNode)
 
-	classified := classifyDeclarations(sourceFileNode, sourceText, fileComments, importDeclarations, sectionStart, descriptionBlock)
+	classified := classifyDeclarations(
+		sourceFileNode,
+		sourceText,
+		fileComments,
+		importDeclarations,
+		sectionStart,
+		descriptionBlock,
+	)
 
-	interleaved, sectionEnd := interleavedStatements(sourceFileNode, sourceText, fileComments, statements, importDeclarations, sectionStart)
+	interleaved, sectionEnd := interleavedStatements(
+		sourceFileNode,
+		sourceText,
+		fileComments,
+		statements,
+		importDeclarations,
+		sectionStart,
+	)
 
 	expected := renderSection(directive, descriptionBlock, classified, interleaved)
 

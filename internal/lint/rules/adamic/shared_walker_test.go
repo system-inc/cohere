@@ -50,7 +50,11 @@ func TestTheRulesSharingAWalkerReportWhatEachReportsAlone(test *testing.T) {
 	test.Parallel()
 	directory := test.TempDir()
 	writeAdamicSupport(test)(directory)
-	if writeError := os.WriteFile(filepath.Join(directory, "Case.ts"), []byte(sharedWalkerFixture), 0o644); writeError != nil {
+	if writeError := os.WriteFile(
+		filepath.Join(directory, "Case.ts"),
+		[]byte(sharedWalkerFixture),
+		0o644,
+	); writeError != nil {
 		test.Fatal(writeError)
 	}
 	walk := func(rules ...rule.Rule) []string {
@@ -68,8 +72,17 @@ func TestTheRulesSharingAWalkerReportWhatEachReportsAlone(test *testing.T) {
 		}
 		findings := []string{}
 		for _, diagnostic := range result.Diagnostics {
-			findings = append(findings, fmt.Sprintf("%s %d-%d %s: %s", filepath.Base(diagnostic.SourceFile.FileName().AsString()),
-				diagnostic.Range.Pos(), diagnostic.Range.End(), diagnostic.RuleName, diagnostic.Message.Description))
+			findings = append(
+				findings,
+				fmt.Sprintf(
+					"%s %d-%d %s: %s",
+					filepath.Base(diagnostic.SourceFile.FileName().AsString()),
+					diagnostic.Range.Pos(),
+					diagnostic.Range.End(),
+					diagnostic.RuleName,
+					diagnostic.Message.Description,
+				),
+			)
 		}
 		sort.Strings(findings)
 		return findings

@@ -108,7 +108,8 @@ func (parser *parser) comment() {
 func commentDelimiters(value string) string {
 	var builder strings.Builder
 	for index := 0; index < len(value); index++ {
-		if index+1 < len(value) && ((value[index] == '/' && value[index+1] == '*') || (value[index] == '*' && value[index+1] == '/')) {
+		if index+1 < len(value) &&
+			((value[index] == '/' && value[index+1] == '*') || (value[index] == '*' && value[index+1] == '/')) {
 			index++
 			continue
 		}
@@ -118,7 +119,10 @@ func commentDelimiters(value string) string {
 }
 
 func (parser *parser) error(message string, token *token) {
-	panic(&Error{Name: "ParserError", Message: message + " at line: " + itoa(token.startLine) + ", column " + itoa(token.startColumn)})
+	panic(&Error{
+		Name:    "ParserError",
+		Message: message + " at line: " + itoa(token.startLine) + ", column " + itoa(token.startColumn),
+	})
 }
 
 func (parser *parser) loop() *estree.Node {
@@ -155,7 +159,8 @@ func (parser *parser) operator() {
 						// valid: calc(1 - +2)
 						// invalid: calc(1 -+2)
 						parser.error("Syntax Error", parser.currToken())
-					} else if kind(parser.nextToken()) == "word" && property(last(parser.current), "type") != "operator" &&
+					} else if kind(parser.nextToken()) == "word" &&
+						property(last(parser.current), "type") != "operator" &&
 						property(last(parser.current), "value") != "(" {
 						// valid: calc(1 - +2)
 						// valid: calc(-0.5 + 2)
@@ -180,7 +185,8 @@ func (parser *parser) operator() {
 			}
 		} else {
 			currentLast := last(parser.current)
-			if (len(parser.current.List("nodes")) == 0 || (currentLast != nil && currentLast.Is("operator"))) && kind(parser.nextToken()) == "word" {
+			if (len(parser.current.List("nodes")) == 0 || (currentLast != nil && currentLast.Is("operator"))) &&
+				kind(parser.nextToken()) == "word" {
 				parser.word()
 				return
 			}
@@ -190,7 +196,12 @@ func (parser *parser) operator() {
 	token := parser.currToken()
 	// Upstream ends the operator where it starts, and takes its sourceIndex from token[4], which is
 	// the end line rather than the index. Prettier reads it as an index, so it converts like one.
-	node := leaf("operator", decode(token.value), source(position(token.startLine, token.startColumn), position(token.startLine, token.startColumn)), parser.sourceIndex(token.endLine))
+	node := leaf(
+		"operator",
+		decode(token.value),
+		source(position(token.startLine, token.startColumn), position(token.startLine, token.startColumn)),
+		parser.sourceIndex(token.endLine),
+	)
 
 	parser.position++
 
@@ -281,7 +292,12 @@ func (parser *parser) parenOpen() {
 			parser.position++
 
 			// Constructed directly, so unlike splitWord's words it carries no isHex or isColor.
-			parser.newNode(leaf("word", value, source(start, position(parser.currToken().endLine, parser.currToken().endColumnValue())), parser.sourceIndex(parser.currToken().index)))
+			parser.newNode(leaf(
+				"word",
+				value,
+				source(start, position(parser.currToken().endLine, parser.currToken().endColumnValue())),
+				parser.sourceIndex(parser.currToken().index),
+			))
 		}
 	}
 }
@@ -382,7 +398,12 @@ func rNoFollow(word []uint16) bool {
 
 // isHex is /^#(.+)/: '#' and at least one character that is not a line terminator.
 func isHex(value []uint16) bool {
-	return len(value) > 1 && value[0] == '#' && value[1] != '\n' && value[1] != '\r' && value[1] != 0x2028 && value[1] != 0x2029
+	return len(value) > 1 &&
+		value[0] == '#' &&
+		value[1] != '\n' &&
+		value[1] != '\r' &&
+		value[1] != 0x2028 &&
+		value[1] != 0x2029
 }
 
 // isColor is /^#([0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i, ASCII only as above.
@@ -445,7 +466,10 @@ func (parser *parser) splitWord() {
 		value := word[ind:index]
 		var node *estree.Node
 
-		nodeSource := source(position(currToken.startLine, currToken.startColumn+ind), position(currToken.endLine, currToken.startColumn+(index-1)))
+		nodeSource := source(
+			position(currToken.startLine, currToken.startColumn+ind),
+			position(currToken.endLine, currToken.startColumn+(index-1)),
+		)
 		nodeSourceIndex := parser.sourceIndex(currToken.index + indices[i])
 
 		if containsIndex(hasAt, ind) {

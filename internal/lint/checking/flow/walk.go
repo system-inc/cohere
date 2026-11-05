@@ -313,7 +313,14 @@ func (walker *Walker) relate(pair Pair, depth int) (Pair, bool) {
 	// own mutability.
 	if pair.Source.Flags()&checker.TypeFlagsUnion != 0 {
 		for _, member := range pair.Source.Types() {
-			if found, isWrong := walker.relate(Pair{Source: member, Target: pair.Target, Path: pair.Path, Method: pair.Method, Built: pair.Built, Literals: pair.Literals}, depth+1); isWrong {
+			if found, isWrong := walker.relate(Pair{
+				Source:   member,
+				Target:   pair.Target,
+				Path:     pair.Path,
+				Method:   pair.Method,
+				Built:    pair.Built,
+				Literals: pair.Literals,
+			}, depth+1); isWrong {
 				return found, true
 			}
 		}
@@ -326,7 +333,14 @@ func (walker *Walker) relate(pair Pair, depth int) (Pair, bool) {
 			if !walker.IsAssignable(pair.Source, member) {
 				continue
 			}
-			found, isWrong := walker.relate(Pair{Source: pair.Source, Target: member, Path: pair.Path, Method: pair.Method, Built: pair.Built, Literals: pair.Literals}, depth+1)
+			found, isWrong := walker.relate(Pair{
+				Source:   pair.Source,
+				Target:   member,
+				Path:     pair.Path,
+				Method:   pair.Method,
+				Built:    pair.Built,
+				Literals: pair.Literals,
+			}, depth+1)
 			if !isWrong {
 				return Pair{}, false
 			}
@@ -355,7 +369,10 @@ func (walker *Walker) relate(pair Pair, depth int) (Pair, bool) {
 			if !walker.isSlotContainer(member) && (!objectMembers || member.Flags()&checker.TypeFlagsObject == 0) {
 				continue
 			}
-			if found, isWrong := walker.relate(Pair{Source: pair.Source, Target: member, Path: pair.Path, Built: pair.Built, Literals: pair.Literals}, depth+1); isWrong {
+			if found, isWrong := walker.relate(
+				Pair{Source: pair.Source, Target: member, Path: pair.Path, Built: pair.Built, Literals: pair.Literals},
+				depth+1,
+			); isWrong {
 				return found, true
 			}
 		}
@@ -366,7 +383,10 @@ func (walker *Walker) relate(pair Pair, depth int) (Pair, bool) {
 			if !walker.isSlotContainer(member) || !walker.IsAssignable(member, pair.Target) {
 				continue
 			}
-			if found, isWrong := walker.relate(Pair{Source: member, Target: pair.Target, Path: pair.Path, Built: pair.Built, Literals: pair.Literals}, depth+1); isWrong {
+			if found, isWrong := walker.relate(
+				Pair{Source: member, Target: pair.Target, Path: pair.Path, Built: pair.Built, Literals: pair.Literals},
+				depth+1,
+			); isWrong {
 				return found, true
 			}
 		}
@@ -433,7 +453,8 @@ func (walker *Walker) isSlotContainer(t *checker.Type) bool {
  * An `any` or `never` source is no value the slot could be shared with either.
  */
 func (walker *Walker) typeParameterSlot(pair Pair) (Pair, bool) {
-	if pair.Source.Flags()&(checker.TypeFlagsAny|checker.TypeFlagsNever) != 0 || !walker.IsAssignable(pair.Source, pair.Target) {
+	if pair.Source.Flags()&(checker.TypeFlagsAny|checker.TypeFlagsNever) != 0 ||
+		!walker.IsAssignable(pair.Source, pair.Target) {
 		return Pair{}, false
 	}
 	if pair.Source.Flags()&checker.TypeFlagsIntersection != 0 && slices.Contains(pair.Source.Types(), pair.Target) {
@@ -564,12 +585,18 @@ func (walker *Walker) hasWritableSlot(t *checker.Type, depth int) bool {
 		if !t.TargetTupleType().IsReadonly() {
 			return true
 		}
-		return slices.ContainsFunc(checker.Checker_getTypeArguments(walker.typeChecker, t), func(element *checker.Type) bool {
+		return slices.ContainsFunc(checker.Checker_getTypeArguments(
+			walker.typeChecker,
+			t,
+		), func(element *checker.Type) bool {
 			return walker.hasWritableSlot(element, depth+1)
 		})
 	}
 	if _, readonly, isContainer := containerOf(t); isContainer {
-		return !readonly || slices.ContainsFunc(checker.Checker_getTypeArguments(walker.typeChecker, t), func(argument *checker.Type) bool {
+		return !readonly || slices.ContainsFunc(checker.Checker_getTypeArguments(
+			walker.typeChecker,
+			t,
+		), func(argument *checker.Type) bool {
 			return walker.hasWritableSlot(argument, depth+1)
 		})
 	}
@@ -614,14 +641,24 @@ func (walker *Walker) parts(pair Pair, depth int) (Pair, bool) {
 		case checker.Checker_isArrayType(walker.typeChecker, source):
 			step := Step{Kind: StepElement, Index: -1}
 			built, literals := walker.partOf(pair.Literals, step)
-			return walker.into(pair, Pair{Source: walker.typeArgument(source, 0), Target: targetElement, Mutable: mutable, Built: built, Literals: literals},
+			return walker.into(pair, Pair{
+				Source:   walker.typeArgument(source, 0),
+				Target:   targetElement,
+				Mutable:  mutable,
+				Built:    built,
+				Literals: literals,
+			},
 				step, depth)
 		case checker.IsTupleType(source):
 			step := Step{Kind: StepElement, Index: -1}
 			built, literals := walker.partOf(pair.Literals, step)
 			for _, element := range checker.Checker_getTypeArguments(walker.typeChecker, source) {
-				if found, wrong := walker.into(pair, Pair{Source: element, Target: targetElement, Mutable: mutable, Built: built, Literals: literals},
-					step, depth); wrong {
+				if found, wrong := walker.into(
+					pair,
+					Pair{Source: element, Target: targetElement, Mutable: mutable, Built: built, Literals: literals},
+					step,
+					depth,
+				); wrong {
 					return found, true
 				}
 			}
@@ -638,7 +675,13 @@ func (walker *Walker) parts(pair Pair, depth int) (Pair, bool) {
 		for index := 0; index < len(sourceElements) && index < len(targetElements); index++ {
 			step := Step{Kind: StepElement, Index: index}
 			built, literals := walker.partOf(pair.Literals, step)
-			if found, wrong := walker.into(pair, Pair{Source: sourceElements[index], Target: targetElements[index], Mutable: mutable, Built: built, Literals: literals},
+			if found, wrong := walker.into(pair, Pair{
+				Source:   sourceElements[index],
+				Target:   targetElements[index],
+				Mutable:  mutable,
+				Built:    built,
+				Literals: literals,
+			},
 				step, depth); wrong {
 				return found, true
 			}
@@ -647,13 +690,18 @@ func (walker *Walker) parts(pair Pair, depth int) (Pair, bool) {
 	}
 	if container, readonly, isContainer := containerOf(target); isContainer {
 		sourceContainer, _, sourceIsContainer := containerOf(source)
-		if !sourceIsContainer || strings.TrimPrefix(sourceContainer, "Readonly") != strings.TrimPrefix(container, "Readonly") {
+		if !sourceIsContainer ||
+			strings.TrimPrefix(sourceContainer, "Readonly") != strings.TrimPrefix(container, "Readonly") {
 			return Pair{}, false
 		}
 		sourceArguments := checker.Checker_getTypeArguments(walker.typeChecker, source)
 		targetArguments := checker.Checker_getTypeArguments(walker.typeChecker, target)
 		for index := 0; index < len(sourceArguments) && index < len(targetArguments); index++ {
-			if found, wrong := walker.into(pair, Pair{Source: sourceArguments[index], Target: targetArguments[index], Mutable: ownSlotsShared && !readonly},
+			if found, wrong := walker.into(pair, Pair{
+				Source:  sourceArguments[index],
+				Target:  targetArguments[index],
+				Mutable: ownSlotsShared && !readonly,
+			},
 				Step{Kind: StepTypeArgument, Name: container, Index: index}, depth); wrong {
 				return found, true
 			}
@@ -703,10 +751,12 @@ func (walker *Walker) parts(pair Pair, depth int) (Pair, bool) {
 	}
 	// A class's `prototype` is not writable: assigning it throws in strict code before anything is stored,
 	// so a constructor's `prototype` is a read-only slot (Node probe on #b9a0wgy). Read-only, not skipped:
-	// nominal-class still judges what it holds, and skipping it dropped 24 of its api findings. The value decides it, the source:
-	// through an intersection target the walk meets `{ prototype: object }` alone, with no construct
+	// nominal-class still judges what it holds, and skipping it dropped 24 of its api findings. The value decides it,
+	// the source: through an intersection target the walk meets `{ prototype: object }` alone, with no construct
 	// signature of its own. Every `() => typeof Entity` resolver was about 84 findings this way.
-	isConstructor := len(checker.Checker_getSignaturesOfType(walker.typeChecker, source, checker.SignatureKindConstruct)) > 0 ||
+	isConstructor := len(
+		checker.Checker_getSignaturesOfType(walker.typeChecker, source, checker.SignatureKindConstruct),
+	) > 0 ||
 		len(checker.Checker_getSignaturesOfType(walker.typeChecker, target, checker.SignatureKindConstruct)) > 0
 	for _, property := range checker.Checker_getPropertiesOfType(walker.typeChecker, target) {
 		if len(pair.Path) == 0 && slices.Contains(walker.overridden, property.Name) {
@@ -717,7 +767,11 @@ func (walker *Walker) parts(pair Pair, depth int) (Pair, bool) {
 				continue
 			}
 			// A method is a function the caller passes into, never a slot the walk writes: see WalkOptions.
-			if sourceProperty := checker.Checker_getPropertyOfType(walker.typeChecker, source, property.Name); sourceProperty != nil {
+			if sourceProperty := checker.Checker_getPropertyOfType(
+				walker.typeChecker,
+				source,
+				property.Name,
+			); sourceProperty != nil {
 				sourceMethod := checker.Checker_getTypeOfSymbol(walker.typeChecker, sourceProperty)
 				targetMethod := checker.Checker_getTypeOfSymbol(walker.typeChecker, property)
 				if found, wrong := walker.into(pair, Pair{Source: sourceMethod, Target: targetMethod, Method: true},
@@ -727,7 +781,8 @@ func (walker *Walker) parts(pair Pair, depth int) (Pair, bool) {
 			}
 			continue
 		}
-		readonly := checker.Checker_isReadonlySymbol(walker.typeChecker, property) || (isConstructor && property.Name == "prototype")
+		readonly := checker.Checker_isReadonlySymbol(walker.typeChecker, property) ||
+			(isConstructor && property.Name == "prototype")
 		sourceProperty := checker.Checker_getPropertyOfType(walker.typeChecker, source, property.Name)
 		if sourceProperty == nil {
 			continue
@@ -758,7 +813,10 @@ func (walker *Walker) parts(pair Pair, depth int) (Pair, bool) {
  * for `clone<T>`, and a generic function's `Promise<RowType[]>` reached `then` with two unrelated `RowType`s. A
  * target alone with type parameters is compared as it stands, as tsc compares it.
  */
-func (walker *Walker) inContextOf(source *checker.Signature, target *checker.Signature) (*checker.Signature, *checker.Signature) {
+func (walker *Walker) inContextOf(
+	source *checker.Signature,
+	target *checker.Signature,
+) (*checker.Signature, *checker.Signature) {
 	if len(source.TypeParameters()) == 0 || slices.Equal(source.TypeParameters(), target.TypeParameters()) {
 		return source, target
 	}
@@ -903,7 +961,8 @@ func (walker *Walker) partOf(literals []*ast.Node, step Step) (bool, []*ast.Node
 				case name.Text() != step.Name:
 				case property.Kind == ast.KindPropertyAssignment:
 					written, readable = property.AsPropertyAssignment().Initializer, true
-				case property.Kind == ast.KindShorthandPropertyAssignment && property.AsShorthandPropertyAssignment().ObjectAssignmentInitializer == nil:
+				case property.Kind == ast.KindShorthandPropertyAssignment &&
+					property.AsShorthandPropertyAssignment().ObjectAssignmentInitializer == nil:
 					// `{ filters }` holds what the binding does, which isBuilt traces (#qq4haam).
 					written, readable = name, true
 				default:
@@ -948,7 +1007,8 @@ func (walker *Walker) literalsOf(expressions []*ast.Node, depth int) []*ast.Node
 				return nil
 			}
 			literals = append(literals, branches...)
-		case expression.Kind == ast.KindNullKeyword || expression.Kind == ast.KindIdentifier && expression.Text() == "undefined":
+		case expression.Kind == ast.KindNullKeyword ||
+			expression.Kind == ast.KindIdentifier && expression.Text() == "undefined":
 		case mapsToFresh(expression):
 			// A new array whose elements the callback builds, read by partOf as the literals it returns.
 			literals = append(literals, ast.SkipParentheses(expression))
@@ -1001,7 +1061,10 @@ func (walker *Walker) traced(expression *ast.Node, depth int) *ast.Node {
 	declaration := symbol.ValueDeclaration
 	list := declaration.Parent
 	initializer := declaration.AsVariableDeclaration().Initializer
-	if initializer == nil || list == nil || list.Kind != ast.KindVariableDeclarationList || list.Flags&ast.NodeFlagsConst == 0 {
+	if initializer == nil ||
+		list == nil ||
+		list.Kind != ast.KindVariableDeclarationList ||
+		list.Flags&ast.NodeFlagsConst == 0 {
 		return nil
 	}
 	function := ast.GetContainingFunction(expression)
@@ -1012,7 +1075,10 @@ func (walker *Walker) traced(expression *ast.Node, depth int) *ast.Node {
 	only := true
 	var visit func(node *ast.Node) bool
 	visit = func(node *ast.Node) bool {
-		if node.Kind == ast.KindIdentifier && node.Text() == expression.Text() && node != declaration.Name() && walker.valueSymbol(node) == symbol {
+		if node.Kind == ast.KindIdentifier &&
+			node.Text() == expression.Text() &&
+			node != declaration.Name() &&
+			walker.valueSymbol(node) == symbol {
 			references++
 			if node != expression {
 				only = false
@@ -1030,7 +1096,9 @@ func (walker *Walker) traced(expression *ast.Node, depth int) *ast.Node {
 
 // valueSymbol is the symbol an identifier reads: a shorthand property's name reads the binding of that name.
 func (walker *Walker) valueSymbol(identifier *ast.Node) *ast.Symbol {
-	if parent := identifier.Parent; parent != nil && parent.Kind == ast.KindShorthandPropertyAssignment && parent.Name() == identifier {
+	if parent := identifier.Parent; parent != nil &&
+		parent.Kind == ast.KindShorthandPropertyAssignment &&
+		parent.Name() == identifier {
 		return walker.typeChecker.GetShorthandAssignmentValueSymbol(parent)
 	}
 	return walker.typeChecker.GetSymbolAtLocation(identifier)

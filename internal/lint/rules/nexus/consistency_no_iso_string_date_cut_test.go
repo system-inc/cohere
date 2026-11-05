@@ -87,7 +87,11 @@ func consistencyNoIsoStringDateCutExpect(test *testing.T, result rule_testing.Re
 	for _, diagnostic := range diagnostics {
 		got = append(got, text[diagnostic.Range.Pos():diagnostic.Range.End()])
 		if len(diagnostic.Fixes) != 0 || len(diagnostic.Suggestions) != 0 {
-			test.Fatalf("expected no fix and no suggestion, got %d and %d", len(diagnostic.Fixes), len(diagnostic.Suggestions))
+			test.Fatalf(
+				"expected no fix and no suggestion, got %d and %d",
+				len(diagnostic.Fixes),
+				len(diagnostic.Suggestions),
+			)
 		}
 	}
 	if len(got) != len(want) {
@@ -220,7 +224,11 @@ func TestConsistencyNoIsoStringDateCutFiresOnRealSites(test *testing.T) {
 		test.Run(site.name, func(test *testing.T) {
 			test.Parallel()
 
-			consistencyNoIsoStringDateCutExpect(test, consistencyNoIsoStringDateCutRun(test, consistencyNoIsoStringDateCutSource(site.broken...)), site.want)
+			consistencyNoIsoStringDateCutExpect(
+				test,
+				consistencyNoIsoStringDateCutRun(test, consistencyNoIsoStringDateCutSource(site.broken...)),
+				site.want,
+			)
 		})
 	}
 }
@@ -232,7 +240,10 @@ func TestConsistencyNoIsoStringDateCutStaysSilentOnFixedRealSites(test *testing.
 		test.Run(site.name, func(test *testing.T) {
 			test.Parallel()
 
-			rule_testing.ExpectClean(test, consistencyNoIsoStringDateCutRun(test, consistencyNoIsoStringDateCutSource(site.fixed...)))
+			rule_testing.ExpectClean(
+				test,
+				consistencyNoIsoStringDateCutRun(test, consistencyNoIsoStringDateCutSource(site.fixed...)),
+			)
 		})
 	}
 }
@@ -293,7 +304,11 @@ func TestConsistencyNoIsoStringDateCutFires(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 
-			consistencyNoIsoStringDateCutExpect(test, consistencyNoIsoStringDateCutRun(test, consistencyNoIsoStringDateCutSource(testCase.lines...)), testCase.want)
+			consistencyNoIsoStringDateCutExpect(
+				test,
+				consistencyNoIsoStringDateCutRun(test, consistencyNoIsoStringDateCutSource(testCase.lines...)),
+				testCase.want,
+			)
 		})
 	}
 }
@@ -390,7 +405,10 @@ func TestConsistencyNoIsoStringDateCutStaysSilent(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 
-			rule_testing.ExpectClean(test, consistencyNoIsoStringDateCutRun(test, consistencyNoIsoStringDateCutSource(testCase.lines...)))
+			rule_testing.ExpectClean(
+				test,
+				consistencyNoIsoStringDateCutRun(test, consistencyNoIsoStringDateCutSource(testCase.lines...)),
+			)
 		})
 	}
 }
@@ -404,7 +422,11 @@ func TestConsistencyNoIsoStringDateCutFollowsOnlyThisFile(test *testing.T) {
 	// The harness forces every file to be a module; these two must be scripts to share a scope.
 	scripts := func(directory string) {
 		configuration := `{"compilerOptions": {"strict": true, "target": "ES2022", "lib": ["ES2022"], "types": []}, "include": ["**/*.ts"]}`
-		if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration), 0o644); writeError != nil {
+		if writeError := os.WriteFile(
+			filepath.Join(directory, "tsconfig.json"),
+			[]byte(configuration),
+			0o644,
+		); writeError != nil {
 			test.Fatalf("writing the tsconfig: %v", writeError)
 		}
 	}
@@ -412,9 +434,21 @@ func TestConsistencyNoIsoStringDateCutFollowsOnlyThisFile(test *testing.T) {
 		"/repository/source/Declaring.ts": "const startedIso = new Date().toISOString();",
 		"/repository/source/Reading.ts":   "const startedOn = startedIso.slice(0, 10);",
 	}
-	rule_testing.ExpectClean(test, rule_testing.RunTypedFilesWithSetup(test, ConsistencyNoIsoStringDateCut, files, "/repository/source/Reading.ts", scripts))
+	rule_testing.ExpectClean(test, rule_testing.RunTypedFilesWithSetup(
+		test,
+		ConsistencyNoIsoStringDateCut,
+		files,
+		"/repository/source/Reading.ts",
+		scripts,
+	))
 
 	files["/repository/source/Reading.ts"] = "const startedIsoHere = new Date().toISOString();\nconst startedOnHere = startedIsoHere.slice(0, 10);"
-	consistencyNoIsoStringDateCutExpect(test, rule_testing.RunTypedFilesWithSetup(test, ConsistencyNoIsoStringDateCut, files, "/repository/source/Reading.ts", scripts),
+	consistencyNoIsoStringDateCutExpect(test, rule_testing.RunTypedFilesWithSetup(
+		test,
+		ConsistencyNoIsoStringDateCut,
+		files,
+		"/repository/source/Reading.ts",
+		scripts,
+	),
 		[]string{"startedIsoHere.slice(0, 10)"})
 }

@@ -212,7 +212,13 @@ func (tracker *Tracker) bindingReferences(name string, symbol *ast.Symbol) []*as
 // eslint-utils skips a reference that only writes. Nothing here needs to: a write target is never the
 // object of a member, the callee of a call, or the value side of an assignment or a declaration, so
 // following one finds nothing, and a global with a write among its references is not followed at all.
-func (tracker *Tracker) followReads(key bindingKey, references []*ast.Node, path []string, traceMap *TraceMap, reportReads bool) {
+func (tracker *Tracker) followReads(
+	key bindingKey,
+	references []*ast.Node,
+	path []string,
+	traceMap *TraceMap,
+	reportReads bool,
+) {
 	for _, following := range tracker.following {
 		if following == key {
 			return
@@ -319,7 +325,13 @@ func (tracker *Tracker) followTarget(target *ast.Node, path []string, traceMap *
 			// eslint-utils' findVariable does not find either.
 			return
 		}
-		tracker.followReads(bindingKey{symbol: symbol}, tracker.bindingReferences(target.Text(), symbol), path, traceMap, false)
+		tracker.followReads(
+			bindingKey{symbol: symbol},
+			tracker.bindingReferences(target.Text(), symbol),
+			path,
+			traceMap,
+			false,
+		)
 
 	case ast.KindObjectBindingPattern:
 		for _, element := range target.AsBindingPattern().Elements.Nodes {
@@ -355,7 +367,13 @@ func (tracker *Tracker) followTarget(target *ast.Node, path []string, traceMap *
 }
 
 // followPatternProperty follows one property of an object pattern when the map names its key.
-func (tracker *Tracker) followPatternProperty(property *ast.Node, keyName *ast.Node, value *ast.Node, path []string, traceMap *TraceMap) {
+func (tracker *Tracker) followPatternProperty(
+	property *ast.Node,
+	keyName *ast.Node,
+	value *ast.Node,
+	path []string,
+	traceMap *TraceMap,
+) {
 	key, isStatic := patternKey(keyName)
 	if !isStatic {
 		return
@@ -432,12 +450,16 @@ func ConstantString(expression *ast.Node) (string, bool) {
 // constantValue folds an expression, saying also whether the value is a string, which decides what
 // `+` does. A nil resolve is the scope-less reading; ConstantStringIn passes one that reads a name's
 // binding and a regex literal's text.
-func constantValue(expression *ast.Node, resolve func(*ast.Node) (string, bool, bool)) (text string, isString bool, isConstant bool) {
+func constantValue(
+	expression *ast.Node,
+	resolve func(*ast.Node) (string, bool, bool),
+) (text string, isString bool, isConstant bool) {
 	if expression == nil {
 		return "", false, false
 	}
 	expression = ast.SkipParentheses(expression)
-	if resolve != nil && (expression.Kind == ast.KindIdentifier || expression.Kind == ast.KindRegularExpressionLiteral) {
+	if resolve != nil &&
+		(expression.Kind == ast.KindIdentifier || expression.Kind == ast.KindRegularExpressionLiteral) {
 		return resolve(expression)
 	}
 	switch expression.Kind {

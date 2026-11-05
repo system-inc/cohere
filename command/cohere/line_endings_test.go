@@ -40,7 +40,10 @@ func TestCRLFFilesAreNamedOnceWithTheFix(test *testing.T) {
 	checkedStream := bufio.NewWriter(&checked)
 	lineEndings.report(checkedStream, false)
 	flushStream(test, checkedStream)
-	if got := checked.String(); !strings.HasPrefix(got, "note: 2 files have CRLF line endings, and the house format is LF, so --no-fix reports them as unformatted.") ||
+	if got := checked.String(); !strings.HasPrefix(
+		got,
+		"note: 2 files have CRLF line endings, and the house format is LF, so --no-fix reports them as unformatted.",
+	) ||
 		!strings.Contains(got, "add `* text=auto eol=lf` to the repository's .gitattributes") {
 		test.Fatalf("the note reads %q", got)
 	}

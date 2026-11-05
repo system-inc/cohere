@@ -48,29 +48,127 @@ func preferRegexpExecCases() []preferRegexpExecCase {
 		{"'Infinity contains -Infinity and +Infinity in JavaScript.'.match(+Infinity);", []string{}, nil},
 		{"'Infinity contains -Infinity and +Infinity in JavaScript.'.match(-Infinity);", []string{}, nil},
 		{"'void and null'.match(null);", []string{}, nil},
-		{"\nconst matchers = ['package-lock.json', /regexp/];\nconst file = '';\nmatchers.some(matcher => !!file.match(matcher));\n    ", []string{}, nil},
-		{"\nconst matchers = [/regexp/, 'package-lock.json'];\nconst file = '';\nmatchers.some(matcher => !!file.match(matcher));\n    ", []string{}, nil},
-		{"\nconst matchers = [{ match: (s: RegExp) => false }];\nconst file = '';\nmatchers.some(matcher => !!file.match(matcher));\n    ", []string{}, nil},
-		{"\nfunction test(pattern: string) {\n  'hello hello'.match(RegExp(pattern, 'g'))?.reduce(() => []);\n}\n    ", []string{}, nil},
-		{"\nfunction test(pattern: string) {\n  'hello hello'.match(new RegExp(pattern, 'gi'))?.reduce(() => []);\n}\n    ", []string{}, nil},
-		{"\nfunction findMatches(text: string, pattern: string, flags: string) {\n  return text.match(new RegExp(pattern, flags));\n}\n    ", []string{}, nil},
-		{"\nconst matchCount = (str: string, re: RegExp) => {\n  return (str.match(re) || []).length;\n};\n    ", []string{}, nil},
+		{
+			"\nconst matchers = ['package-lock.json', /regexp/];\nconst file = '';\nmatchers.some(matcher => !!file.match(matcher));\n    ",
+			[]string{},
+			nil,
+		},
+		{
+			"\nconst matchers = [/regexp/, 'package-lock.json'];\nconst file = '';\nmatchers.some(matcher => !!file.match(matcher));\n    ",
+			[]string{},
+			nil,
+		},
+		{
+			"\nconst matchers = [{ match: (s: RegExp) => false }];\nconst file = '';\nmatchers.some(matcher => !!file.match(matcher));\n    ",
+			[]string{},
+			nil,
+		},
+		{
+			"\nfunction test(pattern: string) {\n  'hello hello'.match(RegExp(pattern, 'g'))?.reduce(() => []);\n}\n    ",
+			[]string{},
+			nil,
+		},
+		{
+			"\nfunction test(pattern: string) {\n  'hello hello'.match(new RegExp(pattern, 'gi'))?.reduce(() => []);\n}\n    ",
+			[]string{},
+			nil,
+		},
+		{
+			"\nfunction findMatches(text: string, pattern: string, flags: string) {\n  return text.match(new RegExp(pattern, flags));\n}\n    ",
+			[]string{},
+			nil,
+		},
+		{
+			"\nconst matchCount = (str: string, re: RegExp) => {\n  return (str.match(re) || []).length;\n};\n    ",
+			[]string{},
+			nil,
+		},
 		{"\nfunction test(str: string) {\n  str.match('[a-z');\n}\n    ", []string{}, nil},
 		{"\nconst text = 'something';\ndeclare const search: RegExp;\ntext.match(search);\n      ", []string{}, nil},
-		{"\nconst text = 'something';\ndeclare const obj: { search: RegExp };\ntext.match(obj.search);\n      ", []string{}, nil},
-		{"\nconst text = 'something';\ndeclare function returnsRegexp(): RegExp;\ntext.match(returnsRegexp());\n      ", []string{}, nil},
-		{"'something'.match(/thing/);", []string{"regExpExecOverStringMatch"}, preferRegexpExecPointer("/thing/.exec('something');")},
-		{"'something'.match('^[a-z]+thing/?$');", []string{"regExpExecOverStringMatch"}, preferRegexpExecPointer("/^[a-z]+thing\\/?$/.exec('something');")},
-		{"\nconst text = 'something';\nconst search = /thing/;\ntext.match(search);\n      ", []string{"regExpExecOverStringMatch"}, preferRegexpExecPointer("\nconst text = 'something';\nconst search = /thing/;\nsearch.exec(text);\n      ")},
-		{"\nconst text = 'something';\nconst search = 'thing';\ntext.match(search);\n      ", []string{"regExpExecOverStringMatch"}, preferRegexpExecPointer("\nconst text = 'something';\nconst search = 'thing';\nRegExp(search).exec(text);\n      ")},
-		{"\nfunction f(s: 'a' | 'b') {\n  s.match('a');\n}\n      ", []string{"regExpExecOverStringMatch"}, preferRegexpExecPointer("\nfunction f(s: 'a' | 'b') {\n  /a/.exec(s);\n}\n      ")},
-		{"\ntype SafeString = string & { __HTML_ESCAPED__: void };\nfunction f(s: SafeString) {\n  s.match(/thing/);\n}\n      ", []string{"regExpExecOverStringMatch"}, preferRegexpExecPointer("\ntype SafeString = string & { __HTML_ESCAPED__: void };\nfunction f(s: SafeString) {\n  /thing/.exec(s);\n}\n      ")},
-		{"\nfunction f<T extends 'a' | 'b'>(s: T) {\n  s.match(/thing/);\n}\n      ", []string{"regExpExecOverStringMatch"}, preferRegexpExecPointer("\nfunction f<T extends 'a' | 'b'>(s: T) {\n  /thing/.exec(s);\n}\n      ")},
-		{"\nconst text = 'something';\nconst search = new RegExp('test', '');\ntext.match(search);\n      ", []string{"regExpExecOverStringMatch"}, preferRegexpExecPointer("\nconst text = 'something';\nconst search = new RegExp('test', '');\nsearch.exec(text);\n      ")},
-		{"\nfunction test(pattern: string) {\n  'check'.match(new RegExp(pattern, undefined));\n}\n      ", []string{"regExpExecOverStringMatch"}, preferRegexpExecPointer("\nfunction test(pattern: string) {\n  new RegExp(pattern, undefined).exec('check');\n}\n      ")},
-		{"\nfunction test(pattern: string) {\n  'check'.match(new RegExp(pattern));\n}\n      ", []string{"regExpExecOverStringMatch"}, preferRegexpExecPointer("\nfunction test(pattern: string) {\n  new RegExp(pattern).exec('check');\n}\n      ")},
-		{"\nfunction test(pattern: string) {\n  'check'.match(new RegExp(pattern, 'i'));\n}\n      ", []string{"regExpExecOverStringMatch"}, preferRegexpExecPointer("\nfunction test(pattern: string) {\n  new RegExp(pattern, 'i').exec('check');\n}\n      ")},
-		{"\nfunction temp(text: string): void {\n  text.match(new RegExp(`${'hello'}`));\n  text.match(new RegExp(`${'hello'.toString()}`));\n}\n      ", []string{"regExpExecOverStringMatch", "regExpExecOverStringMatch"}, preferRegexpExecPointer("\nfunction temp(text: string): void {\n  new RegExp(`${'hello'}`).exec(text);\n  new RegExp(`${'hello'.toString()}`).exec(text);\n}\n      ")},
+		{
+			"\nconst text = 'something';\ndeclare const obj: { search: RegExp };\ntext.match(obj.search);\n      ",
+			[]string{},
+			nil,
+		},
+		{
+			"\nconst text = 'something';\ndeclare function returnsRegexp(): RegExp;\ntext.match(returnsRegexp());\n      ",
+			[]string{},
+			nil,
+		},
+		{
+			"'something'.match(/thing/);",
+			[]string{"regExpExecOverStringMatch"},
+			preferRegexpExecPointer("/thing/.exec('something');"),
+		},
+		{
+			"'something'.match('^[a-z]+thing/?$');",
+			[]string{"regExpExecOverStringMatch"},
+			preferRegexpExecPointer("/^[a-z]+thing\\/?$/.exec('something');"),
+		},
+		{
+			"\nconst text = 'something';\nconst search = /thing/;\ntext.match(search);\n      ",
+			[]string{"regExpExecOverStringMatch"},
+			preferRegexpExecPointer("\nconst text = 'something';\nconst search = /thing/;\nsearch.exec(text);\n      "),
+		},
+		{
+			"\nconst text = 'something';\nconst search = 'thing';\ntext.match(search);\n      ",
+			[]string{"regExpExecOverStringMatch"},
+			preferRegexpExecPointer(
+				"\nconst text = 'something';\nconst search = 'thing';\nRegExp(search).exec(text);\n      ",
+			),
+		},
+		{
+			"\nfunction f(s: 'a' | 'b') {\n  s.match('a');\n}\n      ",
+			[]string{"regExpExecOverStringMatch"},
+			preferRegexpExecPointer("\nfunction f(s: 'a' | 'b') {\n  /a/.exec(s);\n}\n      "),
+		},
+		{
+			"\ntype SafeString = string & { __HTML_ESCAPED__: void };\nfunction f(s: SafeString) {\n  s.match(/thing/);\n}\n      ",
+			[]string{"regExpExecOverStringMatch"},
+			preferRegexpExecPointer(
+				"\ntype SafeString = string & { __HTML_ESCAPED__: void };\nfunction f(s: SafeString) {\n  /thing/.exec(s);\n}\n      ",
+			),
+		},
+		{
+			"\nfunction f<T extends 'a' | 'b'>(s: T) {\n  s.match(/thing/);\n}\n      ",
+			[]string{"regExpExecOverStringMatch"},
+			preferRegexpExecPointer("\nfunction f<T extends 'a' | 'b'>(s: T) {\n  /thing/.exec(s);\n}\n      "),
+		},
+		{
+			"\nconst text = 'something';\nconst search = new RegExp('test', '');\ntext.match(search);\n      ",
+			[]string{"regExpExecOverStringMatch"},
+			preferRegexpExecPointer(
+				"\nconst text = 'something';\nconst search = new RegExp('test', '');\nsearch.exec(text);\n      ",
+			),
+		},
+		{
+			"\nfunction test(pattern: string) {\n  'check'.match(new RegExp(pattern, undefined));\n}\n      ",
+			[]string{"regExpExecOverStringMatch"},
+			preferRegexpExecPointer(
+				"\nfunction test(pattern: string) {\n  new RegExp(pattern, undefined).exec('check');\n}\n      ",
+			),
+		},
+		{
+			"\nfunction test(pattern: string) {\n  'check'.match(new RegExp(pattern));\n}\n      ",
+			[]string{"regExpExecOverStringMatch"},
+			preferRegexpExecPointer(
+				"\nfunction test(pattern: string) {\n  new RegExp(pattern).exec('check');\n}\n      ",
+			),
+		},
+		{
+			"\nfunction test(pattern: string) {\n  'check'.match(new RegExp(pattern, 'i'));\n}\n      ",
+			[]string{"regExpExecOverStringMatch"},
+			preferRegexpExecPointer(
+				"\nfunction test(pattern: string) {\n  new RegExp(pattern, 'i').exec('check');\n}\n      ",
+			),
+		},
+		{
+			"\nfunction temp(text: string): void {\n  text.match(new RegExp(`${'hello'}`));\n  text.match(new RegExp(`${'hello'.toString()}`));\n}\n      ",
+			[]string{"regExpExecOverStringMatch", "regExpExecOverStringMatch"},
+			preferRegexpExecPointer(
+				"\nfunction temp(text: string): void {\n  new RegExp(`${'hello'}`).exec(text);\n  new RegExp(`${'hello'.toString()}`).exec(text);\n}\n      ",
+			),
+		},
 	}
 }
 
@@ -189,22 +287,46 @@ func TestPreferRegexpExecEvaluatesAReferenceRatherThanRecursingIntoIt(test *test
 		{"a bound regex literal", "declare const a: string;\nconst r = /x/;\na.match(r);", true},
 		{"a bound string literal", "declare const a: string;\nconst s = 'thing';\na.match(s);", true},
 		{"a bound concatenation", "declare const a: string;\nconst s = 'a' + 'b';\na.match(s);", true},
-		{"a bound construction from literals", "declare const a: string;\nconst r = new RegExp('test', '');\na.match(r);", true},
+		{
+			"a bound construction from literals",
+			"declare const a: string;\nconst r = new RegExp('test', '');\na.match(r);",
+			true,
+		},
 
 		// Not computable, so not reportable -- the class that over-reported.
-		{"a bound construction from a template", "declare const a: string;\ndeclare const t: string;\nconst r = new RegExp(`^${t}$`);\na.match(r);", false},
-		{"a bound construction from a variable", "declare const a: string;\ndeclare const p: string;\nconst r = new RegExp(p);\na.match(r);", false},
+		{
+			"a bound construction from a template",
+			"declare const a: string;\ndeclare const t: string;\nconst r = new RegExp(`^${t}$`);\na.match(r);",
+			false,
+		},
+		{
+			"a bound construction from a variable",
+			"declare const a: string;\ndeclare const p: string;\nconst r = new RegExp(p);\na.match(r);",
+			false,
+		},
 		{"a declared const with no value", "declare const a: string;\ndeclare const s: string;\na.match(s);", false},
 
 		// Computable and global, so not reportable for the original reason.
 		{"a bound global regex", "declare const a: string;\nconst r = /x/g;\na.match(r);", false},
-		{"a bound global construction", "declare const a: string;\nconst r = new RegExp('x', 'g');\na.match(r);", false},
+		{
+			"a bound global construction",
+			"declare const a: string;\nconst r = new RegExp('x', 'g');\na.match(r);",
+			false,
+		},
 
 		// An inline construction is judged syntactically instead, so the template that is clean when
 		// bound reports when written in place. This asymmetry is upstream's and is the sharpest
 		// evidence that a reference and a construction take different paths.
-		{"an inline construction from a template", "declare const a: string;\ndeclare const t: string;\na.match(new RegExp(`^${t}$`));", true},
-		{"an inline construction from a variable", "declare const a: string;\ndeclare const p: string;\na.match(new RegExp(p));", true},
+		{
+			"an inline construction from a template",
+			"declare const a: string;\ndeclare const t: string;\na.match(new RegExp(`^${t}$`));",
+			true,
+		},
+		{
+			"an inline construction from a variable",
+			"declare const a: string;\ndeclare const p: string;\na.match(new RegExp(p));",
+			true,
+		},
 	}
 	for _, testCase := range cases {
 		result := rule_testing.RunTyped(test, PreferRegexpExec, preferRegexpExecFile, testCase.source)
@@ -267,7 +389,11 @@ func TestPreferRegexpExecFoldsAWrittenOnceBindingRegardlessOfKeyword(test *testi
 		{"var, written once", "declare const a: string;\nvar r = /x/;\na.match(r);", true},
 		{"let, reassigned before use", "declare const a: string;\nlet r = /x/;\nr = /y/g;\na.match(r);", false},
 		{"let, reassigned after use", "declare const a: string;\nlet r = /x/;\na.match(r);\nr = /y/g;", false},
-		{"let, reassigned inside a function", "declare const a: string;\nlet r = /x/;\nfunction f() {\n  r = /y/g;\n}\na.match(r);", false},
+		{
+			"let, reassigned inside a function",
+			"declare const a: string;\nlet r = /x/;\nfunction f() {\n  r = /y/g;\n}\na.match(r);",
+			false,
+		},
 	}
 	for _, testCase := range cases {
 		result := rule_testing.RunTyped(test, PreferRegexpExec, preferRegexpExecFile, testCase.source)

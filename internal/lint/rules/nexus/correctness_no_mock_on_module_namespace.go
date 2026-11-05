@@ -13,7 +13,10 @@ const correctnessNoMockOnModuleNamespaceId = "mockOnModuleNamespace"
 
 // correctnessNoMockOnModuleNamespaceText is the rule's message, whose wording lives in
 // `policy/messages/correctness-no-mock-on-module-namespace.json`.
-var correctnessNoMockOnModuleNamespaceText = policy.MessageOf("nexus/correctness-no-mock-on-module-namespace", correctnessNoMockOnModuleNamespaceId)
+var correctnessNoMockOnModuleNamespaceText = policy.MessageOf(
+	"nexus/correctness-no-mock-on-module-namespace",
+	correctnessNoMockOnModuleNamespaceId,
+)
 
 func correctnessNoMockOnModuleNamespaceMessage() rule.Message {
 	return rule.Message{
@@ -113,7 +116,10 @@ var CorrectnessNoMockOnModuleNamespace = rule.Rule{
 			// value of the same type, are questions for the checker.
 			return nil
 		}
-		if !correctnessNoMockOnModuleNamespaceRunsAsModule(ruleContext.SourceFile.FileName().AsString(), ruleContext.Program.Options()) {
+		if !correctnessNoMockOnModuleNamespaceRunsAsModule(
+			ruleContext.SourceFile.FileName().AsString(),
+			ruleContext.Program.Options(),
+		) {
 			return nil
 		}
 		return rule.Listeners{
@@ -131,7 +137,8 @@ var CorrectnessNoMockOnModuleNamespace = rule.Rule{
 					return
 				}
 				target := correctnessNoMockOnModuleNamespaceUnwrap(call.Arguments.Nodes[0])
-				if target.Kind != ast.KindIdentifier || !correctnessNoMockOnModuleNamespaceIsNamespace(ruleContext, target) {
+				if target.Kind != ast.KindIdentifier ||
+					!correctnessNoMockOnModuleNamespaceIsNamespace(ruleContext, target) {
 					return
 				}
 				if !correctnessNoMockOnModuleNamespaceIsMockTracker(ruleContext, node) {
@@ -197,7 +204,8 @@ func correctnessNoMockOnModuleNamespaceIsMockTracker(ruleContext rule.Context, c
 		return false
 	}
 	declaration := signature.Declaration()
-	if declaration == nil || (declaration.Kind != ast.KindMethodSignature && declaration.Kind != ast.KindMethodDeclaration) {
+	if declaration == nil ||
+		(declaration.Kind != ast.KindMethodSignature && declaration.Kind != ast.KindMethodDeclaration) {
 		return false
 	}
 	owner := declaration.Parent

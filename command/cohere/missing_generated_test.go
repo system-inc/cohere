@@ -66,7 +66,10 @@ func TestAMissingGeneratedFileLeadsAsOneCause(test *testing.T) {
 		if exitCode == 0 {
 			test.Fatalf("a run missing a generated file passed:\n%s", output)
 		}
-		if !strings.Contains(output, "next-env.d.ts:1:8 error missing-generated-file ./.next/types/routes.d.ts does not exist") ||
+		if !strings.Contains(
+			output,
+			"next-env.d.ts:1:8 error missing-generated-file ./.next/types/routes.d.ts does not exist",
+		) ||
 			!strings.Contains(output, "`next typegen` writes it") {
 			test.Errorf("the cause and its remedy do not lead:\n%s", output)
 		}
@@ -84,18 +87,22 @@ func TestAMissingGeneratedFileLeadsAsOneCause(test *testing.T) {
 		}
 
 		verbose, _ := run(test, root, "--verbose")
-		if !strings.Contains(verbose, "missing-generated-file") || !strings.Contains(verbose, "error TS2304: Cannot find name 'PageProps'.") {
+		if !strings.Contains(verbose, "missing-generated-file") ||
+			!strings.Contains(verbose, "error TS2304: Cannot find name 'PageProps'.") {
 			test.Errorf("--verbose does not print the cause and every type error:\n%s", verbose)
 		}
 		jsonOutput, _ := run(test, root, "--json")
-		if !strings.Contains(jsonOutput, `"rule":"missing-generated-file"`) || !strings.Contains(jsonOutput, `"rule":"TS2304"`) ||
+		if !strings.Contains(jsonOutput, `"rule":"missing-generated-file"`) ||
+			!strings.Contains(jsonOutput, `"rule":"TS2304"`) ||
 			!strings.Contains(jsonOutput, `"missingGenerated":[".next/types/routes.d.ts"]`) {
 			test.Errorf("--json does not carry the cause, every type error and the gap:\n%s", jsonOutput)
 		}
 
 		writeTree(test, root, map[string]string{".next/types/routes.d.ts": routes})
 		output, exitCode = run(test, root)
-		if exitCode != 0 || strings.Contains(output, "missing-generated-file") || strings.Contains(output, "generated file missing") {
+		if exitCode != 0 ||
+			strings.Contains(output, "missing-generated-file") ||
+			strings.Contains(output, "generated file missing") {
 			test.Errorf("with the generated file present, exit %d:\n%s", exitCode, output)
 		}
 	})
@@ -104,7 +111,9 @@ func TestAMissingGeneratedFileLeadsAsOneCause(test *testing.T) {
 		test.Parallel()
 		root := project(test, "import \"./.next/types/routes.d.ts\";\n", "export const title = 'home';\n")
 		output, exitCode := run(test, root)
-		if exitCode == 0 || !strings.Contains(output, "missing-generated-file") || !strings.Contains(output, "⚠ 1 generated file missing") {
+		if exitCode == 0 ||
+			!strings.Contains(output, "missing-generated-file") ||
+			!strings.Contains(output, "⚠ 1 generated file missing") {
 			test.Errorf("a missing generated file with nothing failing after it, exit %d:\n%s", exitCode, output)
 		}
 		if strings.Contains(output, "folded under it") {
@@ -150,7 +159,10 @@ func TestAMissingGeneratedFileLeadsAsOneCause(test *testing.T) {
 		test.Parallel()
 		root := project(test, "/// <reference path=\"./.next/types/routes.d.ts\" />\n", usesPageProperties)
 		output, exitCode := run(test, root)
-		if exitCode == 0 || !strings.Contains(output, "next-env.d.ts:1:22 error missing-generated-file ./.next/types/routes.d.ts does not exist") {
+		if exitCode == 0 || !strings.Contains(
+			output,
+			"next-env.d.ts:1:22 error missing-generated-file ./.next/types/routes.d.ts does not exist",
+		) {
 			test.Errorf("a missing reference path, exit %d:\n%s", exitCode, output)
 		}
 	})
@@ -159,9 +171,15 @@ func TestAMissingGeneratedFileLeadsAsOneCause(test *testing.T) {
 		test.Parallel()
 		root := project(test, "import \"./types/routes.d.ts\";\n", usesPageProperties)
 		output, exitCode := run(test, root)
-		if exitCode == 0 || strings.Contains(output, "missing-generated-file") || strings.Contains(output, "folded under it") ||
+		if exitCode == 0 ||
+			strings.Contains(output, "missing-generated-file") ||
+			strings.Contains(output, "folded under it") ||
 			!strings.Contains(output, "Cannot find name 'PageProps'") {
-			test.Errorf("a missing file git does not ignore is the source's own mistake, exit %d:\n%s", exitCode, output)
+			test.Errorf(
+				"a missing file git does not ignore is the source's own mistake, exit %d:\n%s",
+				exitCode,
+				output,
+			)
 		}
 		if _, statError := os.Stat(filepath.Join(root, "types")); statError == nil {
 			test.Fatalf("the fixture's missing file exists")

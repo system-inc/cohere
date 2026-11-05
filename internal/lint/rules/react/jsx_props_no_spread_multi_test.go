@@ -32,11 +32,31 @@ func TestJsxPropsNoSpreadMultiFires(test *testing.T) {
 		sourceText string
 		findings   []string
 	}{
-		{"the same identifier spread twice", "\n          const props = {};\n          <App {...props} {...props} />\n        ", []string{"jsxPropsNoSpreadMultiIdentifier"}},
-		{"the same property spread twice", "\n          const props = {};\n          <App {...props.foo} {...props.foo} />\n        ", []string{"jsxPropsNoSpreadMultiMemberExpression"}},
-		{"one property spread twice, written with different parentheses", "\n          const props = {};\n          <App {...(props.foo).baz} {...(props.foo.baz)} />\n        ", []string{"jsxPropsNoSpreadMultiMemberExpression"}},
-		{"the same identifier spread across an intervening attribute", "\n          const props = {};\n          <div {...props} a=\"a\" {...props} />\n        ", []string{"jsxPropsNoSpreadMultiIdentifier"}},
-		{"the same identifier spread three times", "\n          const props = {};\n          <div {...props} {...props} {...props} />\n        ", []string{"jsxPropsNoSpreadMultiIdentifier"}},
+		{
+			"the same identifier spread twice",
+			"\n          const props = {};\n          <App {...props} {...props} />\n        ",
+			[]string{"jsxPropsNoSpreadMultiIdentifier"},
+		},
+		{
+			"the same property spread twice",
+			"\n          const props = {};\n          <App {...props.foo} {...props.foo} />\n        ",
+			[]string{"jsxPropsNoSpreadMultiMemberExpression"},
+		},
+		{
+			"one property spread twice, written with different parentheses",
+			"\n          const props = {};\n          <App {...(props.foo).baz} {...(props.foo.baz)} />\n        ",
+			[]string{"jsxPropsNoSpreadMultiMemberExpression"},
+		},
+		{
+			"the same identifier spread across an intervening attribute",
+			"\n          const props = {};\n          <div {...props} a=\"a\" {...props} />\n        ",
+			[]string{"jsxPropsNoSpreadMultiIdentifier"},
+		},
+		{
+			"the same identifier spread three times",
+			"\n          const props = {};\n          <div {...props} {...props} {...props} />\n        ",
+			[]string{"jsxPropsNoSpreadMultiIdentifier"},
+		},
 		// Beyond upstream. Each exists because the imported corpus cannot see the distinction, and
 		// each was measured on the release oxlint binary before being written down.
 
@@ -204,9 +224,18 @@ func TestJsxPropsNoSpreadMultiStaysSilent(test *testing.T) {
 		sourceText string
 	}{
 		{"a single spread", "\n          const a = {};\n          <App {...a} />\n        "},
-		{"two spreads of different identifiers", "\n          const a = {};\n          const b = {};\n          <App {...a} {...b} />\n        "},
-		{"two spreads of different properties of one receiver", "\n        const props = {};\n        <App {...props.x} {...props.foo} />\n      "},
-		{"parenthesized member spreads whose receivers differ", "\n        const props = {};\n        <App {...(props.foo).baz} {...(props.y.baz)} />\n      "},
+		{
+			"two spreads of different identifiers",
+			"\n          const a = {};\n          const b = {};\n          <App {...a} {...b} />\n        ",
+		},
+		{
+			"two spreads of different properties of one receiver",
+			"\n        const props = {};\n        <App {...props.x} {...props.foo} />\n      ",
+		},
+		{
+			"parenthesized member spreads whose receivers differ",
+			"\n        const props = {};\n        <App {...(props.foo).baz} {...(props.y.baz)} />\n      ",
+		},
 		// Beyond upstream, each measured silent on the release binary.
 
 		// Optional chaining, and the only case here where reproducing upstream costs an extra
@@ -260,7 +289,10 @@ func TestJsxPropsNoSpreadMultiStaysSilent(test *testing.T) {
 		// guard these compare equal on text alone and this reports, which is the second blind spot
 		// mutation found. oxc keys its literal arms on matched pairs of variants, so a number and a
 		// string never meet. Measured: silent.
-		{"a numeric subscript against a string one with the same text", "const a = <App {...props[o[1]]} {...props[o[\"1\"]]} />;\n"},
+		{
+			"a numeric subscript against a string one with the same text",
+			"const a = <App {...props[o[1]]} {...props[o[\"1\"]]} />;\n",
+		},
 
 		// Two different string-literal receivers. Without comparing literal text every pair of
 		// same-kind literals reads as equal and this reports. Measured: silent.
@@ -273,7 +305,10 @@ func TestJsxPropsNoSpreadMultiStaysSilent(test *testing.T) {
 		// A numeric-literal receiver against a string-literal one whose text agrees. Without the
 		// kind-equality guard in the structural comparison these compare equal on text alone.
 		// Measured: silent.
-		{"a numeric-literal receiver against a string-literal one", "const a = <App {...(1).toFixed} {...\"1\".toFixed} />;\n"},
+		{
+			"a numeric-literal receiver against a string-literal one",
+			"const a = <App {...(1).toFixed} {...\"1\".toFixed} />;\n",
+		},
 
 		// Different receivers with the same property name, which is what the recursion into the
 		// receiver is for. Without it this would compare equal on the key alone.
@@ -281,7 +316,10 @@ func TestJsxPropsNoSpreadMultiStaysSilent(test *testing.T) {
 
 		// Spreads on two different elements never see each other, since the collections are rebuilt
 		// per element.
-		{"the same identifier spread once on each of two elements", "const a = <div><App {...props} /><App {...props} /></div>;\n"},
+		{
+			"the same identifier spread once on each of two elements",
+			"const a = <div><App {...props} /><App {...props} /></div>;\n",
+		},
 
 		// An element with no attributes at all, and one with only ordinary attributes, which is
 		// most of the real tree.

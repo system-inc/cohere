@@ -42,7 +42,9 @@ var verbs = []string{"rename"}
 
 // notRecaptured is what a run that read the examples back says, every time, so nothing it prints reads as
 // a verdict on the examples themselves.
-const notRecaptured = "the examples were read back from " + docsdata.ExamplesDirectory + ", not recaptured from the lint tests; -check recaptures them"
+const notRecaptured = "the examples were read back from " +
+	docsdata.ExamplesDirectory +
+	", not recaptured from the lint tests; -check recaptures them"
 
 // sources is where a run reads what Build takes beyond the module's files: the binary's help and the lint
 // tests' captured cases. A test swaps both, so it can run a check without building the binary or the suite.
@@ -60,9 +62,21 @@ var moduleSources = sources{root: ".", help: binaryHelp, capture: captureLintTes
 var errStale = errors.New("stale")
 
 func main() {
-	check := flag.Bool("check", false, "recapture the examples from the lint tests, then report every stale file and exit 1, writing nothing (minutes)")
-	checkRendering := flag.Bool("check-rendering", false, "report every stale file rendered from the committed examples and exit 1, writing nothing; the examples are not recaptured")
-	recapture := flag.Bool("capture", false, "rerun the lint tests with "+capture.Variable+" set and pick the examples afresh")
+	check := flag.Bool(
+		"check",
+		false,
+		"recapture the examples from the lint tests, then report every stale file and exit 1, writing nothing (minutes)",
+	)
+	checkRendering := flag.Bool(
+		"check-rendering",
+		false,
+		"report every stale file rendered from the committed examples and exit 1, writing nothing; the examples are not recaptured",
+	)
+	recapture := flag.Bool(
+		"capture",
+		false,
+		"rerun the lint tests with "+capture.Variable+" set and pick the examples afresh",
+	)
 	flag.Parse()
 
 	if runError := run(*check, *checkRendering, *recapture); runError != nil {
@@ -209,8 +223,11 @@ func gather(source sources, scratch string, recapture bool) (docsdata.Inputs, er
 	}
 	var withOptions int
 	inputs.Examples, withOptions = docsdata.PickExamples(records)
-	_, printError := fmt.Printf("captured %d records; %d distinct cases ran with options, counted for message ids and never shown\n",
-		len(records), withOptions)
+	_, printError := fmt.Printf(
+		"captured %d records; %d distinct cases ran with options, counted for message ids and never shown\n",
+		len(records),
+		withOptions,
+	)
 	if printError != nil {
 		return inputs, fmt.Errorf("saying what was captured: %w", printError)
 	}

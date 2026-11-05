@@ -43,10 +43,16 @@ func TestDesignSystemReadsAreRunCacheInputs(test *testing.T) {
 			test.Fatal(writeError)
 		}
 	}
-	if createDirectoryError := os.MkdirAll(filepath.Join(directory, "node_modules"), 0o755); createDirectoryError != nil {
+	if createDirectoryError := os.MkdirAll(
+		filepath.Join(directory, "node_modules"),
+		0o755,
+	); createDirectoryError != nil {
 		test.Fatal(createDirectoryError)
 	}
-	if symlinkError := os.Symlink(packageRoot, filepath.Join(directory, "node_modules", "tailwindcss")); symlinkError != nil {
+	if symlinkError := os.Symlink(
+		packageRoot,
+		filepath.Join(directory, "node_modules", "tailwindcss"),
+	); symlinkError != nil {
 		test.Fatal(symlinkError)
 	}
 

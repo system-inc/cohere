@@ -194,7 +194,10 @@ func TestASetMayExtendOnlySets(test *testing.T) {
 func TestExtendsTakesOneSourceOrAListOfThem(test *testing.T) {
 	test.Parallel()
 	for _, extends := range []string{`""`, `[]`} {
-		directory := writeConfigs(test, map[string]string{"CohereSettings.json": `{"extends": ` + extends + `, "rules": {"no-var": "error"}}`})
+		directory := writeConfigs(
+			test,
+			map[string]string{"CohereSettings.json": `{"extends": ` + extends + `, "rules": {"no-var": "error"}}`},
+		)
 		loaded := loadOrFail(test, filepath.Join(directory, "CohereSettings.json"))
 		if len(loaded.Sources) != 1 {
 			test.Errorf("extends %s read %v; it names nothing", extends, loaded.Sources)

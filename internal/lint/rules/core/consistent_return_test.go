@@ -57,12 +57,30 @@ var consistentReturnCleanCases = []consistentReturnCase{
 	{source: "function Foo() { if (!(this instanceof Foo)) return new Foo(); }", optionsJson: ""},
 	{source: "function foo() { if (true) return 5; else return undefined; }", optionsJson: ""},
 	{source: "function foo() { if (true) return 5; else return void 0; }", optionsJson: ""},
-	{source: "function foo() { if (true) return; else return undefined; }", optionsJson: "{\"treatUndefinedAsUnspecified\":true}"},
-	{source: "function foo() { if (true) return; else return void 0; }", optionsJson: "{\"treatUndefinedAsUnspecified\":true}"},
-	{source: "function foo() { if (true) return undefined; else return; }", optionsJson: "{\"treatUndefinedAsUnspecified\":true}"},
-	{source: "function foo() { if (true) return undefined; else return void 0; }", optionsJson: "{\"treatUndefinedAsUnspecified\":true}"},
-	{source: "function foo() { if (true) return void 0; else return; }", optionsJson: "{\"treatUndefinedAsUnspecified\":true}"},
-	{source: "function foo() { if (true) return void 0; else return undefined; }", optionsJson: "{\"treatUndefinedAsUnspecified\":true}"},
+	{
+		source:      "function foo() { if (true) return; else return undefined; }",
+		optionsJson: "{\"treatUndefinedAsUnspecified\":true}",
+	},
+	{
+		source:      "function foo() { if (true) return; else return void 0; }",
+		optionsJson: "{\"treatUndefinedAsUnspecified\":true}",
+	},
+	{
+		source:      "function foo() { if (true) return undefined; else return; }",
+		optionsJson: "{\"treatUndefinedAsUnspecified\":true}",
+	},
+	{
+		source:      "function foo() { if (true) return undefined; else return void 0; }",
+		optionsJson: "{\"treatUndefinedAsUnspecified\":true}",
+	},
+	{
+		source:      "function foo() { if (true) return void 0; else return; }",
+		optionsJson: "{\"treatUndefinedAsUnspecified\":true}",
+	},
+	{
+		source:      "function foo() { if (true) return void 0; else return undefined; }",
+		optionsJson: "{\"treatUndefinedAsUnspecified\":true}",
+	},
 	{source: "var x = () => {  return {}; };", optionsJson: ""},
 	{source: "if (true) { return 1; } return 0;", optionsJson: ""},
 	{source: "class Foo { constructor() { if (true) return foo; } }", optionsJson: ""},
@@ -70,27 +88,129 @@ var consistentReturnCleanCases = []consistentReturnCase{
 }
 
 var consistentReturnFiringCases = []consistentReturnCase{
-	{source: "function foo() { if (true) return true; else return; }", optionsJson: "", findings: []consistentReturnExpectation{{id: "missingReturnValue", name: "Function 'foo'", line: 1, column: 46}}},
-	{source: "var foo = () => { if (true) return true; else return; }", optionsJson: "", findings: []consistentReturnExpectation{{id: "missingReturnValue", name: "Arrow function", line: 1, column: 47}}},
-	{source: "function foo() { if (true) return; else return false; }", optionsJson: "", findings: []consistentReturnExpectation{{id: "unexpectedReturnValue", name: "Function 'foo'", line: 1, column: 41}}},
-	{source: "f(function() { if (true) return true; else return; })", optionsJson: "", findings: []consistentReturnExpectation{{id: "missingReturnValue", name: "Function", line: 1, column: 44}}},
-	{source: "f(function() { if (true) return; else return false; })", optionsJson: "", findings: []consistentReturnExpectation{{id: "unexpectedReturnValue", name: "Function", line: 1, column: 39}}},
-	{source: "f(a => { if (true) return; else return false; })", optionsJson: "", findings: []consistentReturnExpectation{{id: "unexpectedReturnValue", name: "Arrow function", line: 1, column: 33}}},
-	{source: "function foo() { if (true) return true; return undefined; }", optionsJson: "{\"treatUndefinedAsUnspecified\":true}", findings: []consistentReturnExpectation{{id: "missingReturnValue", name: "Function 'foo'", line: 1, column: 41}}},
-	{source: "function foo() { if (true) return true; return void 0; }", optionsJson: "{\"treatUndefinedAsUnspecified\":true}", findings: []consistentReturnExpectation{{id: "missingReturnValue", name: "Function 'foo'", line: 1, column: 41}}},
-	{source: "function foo() { if (true) return undefined; return true; }", optionsJson: "{\"treatUndefinedAsUnspecified\":true}", findings: []consistentReturnExpectation{{id: "unexpectedReturnValue", name: "Function 'foo'", line: 1, column: 46}}},
-	{source: "function foo() { if (true) return void 0; return true; }", optionsJson: "{\"treatUndefinedAsUnspecified\":true}", findings: []consistentReturnExpectation{{id: "unexpectedReturnValue", name: "Function 'foo'", line: 1, column: 43}}},
-	{source: "if (true) { return 1; } return;", optionsJson: "", findings: []consistentReturnExpectation{{id: "missingReturnValue", name: "Program", line: 1, column: 25}}},
-	{source: "function foo() { if (a) return true; }", optionsJson: "", findings: []consistentReturnExpectation{{id: "missingReturn", name: "function 'foo'", line: 1, column: 10}}},
-	{source: "function _foo() { if (a) return true; }", optionsJson: "", findings: []consistentReturnExpectation{{id: "missingReturn", name: "function '_foo'", line: 1, column: 10}}},
-	{source: "f(function foo() { if (a) return true; });", optionsJson: "", findings: []consistentReturnExpectation{{id: "missingReturn", name: "function 'foo'", line: 1, column: 12}}},
-	{source: "f(function() { if (a) return true; });", optionsJson: "", findings: []consistentReturnExpectation{{id: "missingReturn", name: "function", line: 1, column: 3}}},
-	{source: "f(() => { if (a) return true; });", optionsJson: "", findings: []consistentReturnExpectation{{id: "missingReturn", name: "arrow function", line: 1, column: 6}}},
-	{source: "var obj = {foo() { if (a) return true; }};", optionsJson: "", findings: []consistentReturnExpectation{{id: "missingReturn", name: "method 'foo'", line: 1, column: 12}}},
-	{source: "class A {foo() { if (a) return true; }};", optionsJson: "", findings: []consistentReturnExpectation{{id: "missingReturn", name: "method 'foo'", line: 1, column: 10}}},
-	{source: "if (a) return true;", optionsJson: "", findings: []consistentReturnExpectation{{id: "missingReturn", name: "program", line: 1, column: 1}}},
-	{source: "class A { CapitalizedFunction() { if (a) return true; } }", optionsJson: "", findings: []consistentReturnExpectation{{id: "missingReturn", name: "method 'CapitalizedFunction'", line: 1, column: 11}}},
-	{source: "({ constructor() { if (a) return true; } });", optionsJson: "", findings: []consistentReturnExpectation{{id: "missingReturn", name: "method 'constructor'", line: 1, column: 4}}},
+	{
+		source:      "function foo() { if (true) return true; else return; }",
+		optionsJson: "",
+		findings: []consistentReturnExpectation{
+			{id: "missingReturnValue", name: "Function 'foo'", line: 1, column: 46},
+		},
+	},
+	{
+		source:      "var foo = () => { if (true) return true; else return; }",
+		optionsJson: "",
+		findings: []consistentReturnExpectation{
+			{id: "missingReturnValue", name: "Arrow function", line: 1, column: 47},
+		},
+	},
+	{
+		source:      "function foo() { if (true) return; else return false; }",
+		optionsJson: "",
+		findings: []consistentReturnExpectation{
+			{id: "unexpectedReturnValue", name: "Function 'foo'", line: 1, column: 41},
+		},
+	},
+	{
+		source:      "f(function() { if (true) return true; else return; })",
+		optionsJson: "",
+		findings:    []consistentReturnExpectation{{id: "missingReturnValue", name: "Function", line: 1, column: 44}},
+	},
+	{
+		source:      "f(function() { if (true) return; else return false; })",
+		optionsJson: "",
+		findings: []consistentReturnExpectation{
+			{id: "unexpectedReturnValue", name: "Function", line: 1, column: 39},
+		},
+	},
+	{
+		source:      "f(a => { if (true) return; else return false; })",
+		optionsJson: "",
+		findings: []consistentReturnExpectation{
+			{id: "unexpectedReturnValue", name: "Arrow function", line: 1, column: 33},
+		},
+	},
+	{
+		source:      "function foo() { if (true) return true; return undefined; }",
+		optionsJson: "{\"treatUndefinedAsUnspecified\":true}",
+		findings: []consistentReturnExpectation{
+			{id: "missingReturnValue", name: "Function 'foo'", line: 1, column: 41},
+		},
+	},
+	{
+		source:      "function foo() { if (true) return true; return void 0; }",
+		optionsJson: "{\"treatUndefinedAsUnspecified\":true}",
+		findings: []consistentReturnExpectation{
+			{id: "missingReturnValue", name: "Function 'foo'", line: 1, column: 41},
+		},
+	},
+	{
+		source:      "function foo() { if (true) return undefined; return true; }",
+		optionsJson: "{\"treatUndefinedAsUnspecified\":true}",
+		findings: []consistentReturnExpectation{
+			{id: "unexpectedReturnValue", name: "Function 'foo'", line: 1, column: 46},
+		},
+	},
+	{
+		source:      "function foo() { if (true) return void 0; return true; }",
+		optionsJson: "{\"treatUndefinedAsUnspecified\":true}",
+		findings: []consistentReturnExpectation{
+			{id: "unexpectedReturnValue", name: "Function 'foo'", line: 1, column: 43},
+		},
+	},
+	{
+		source:      "if (true) { return 1; } return;",
+		optionsJson: "",
+		findings:    []consistentReturnExpectation{{id: "missingReturnValue", name: "Program", line: 1, column: 25}},
+	},
+	{
+		source:      "function foo() { if (a) return true; }",
+		optionsJson: "",
+		findings:    []consistentReturnExpectation{{id: "missingReturn", name: "function 'foo'", line: 1, column: 10}},
+	},
+	{
+		source:      "function _foo() { if (a) return true; }",
+		optionsJson: "",
+		findings:    []consistentReturnExpectation{{id: "missingReturn", name: "function '_foo'", line: 1, column: 10}},
+	},
+	{
+		source:      "f(function foo() { if (a) return true; });",
+		optionsJson: "",
+		findings:    []consistentReturnExpectation{{id: "missingReturn", name: "function 'foo'", line: 1, column: 12}},
+	},
+	{
+		source:      "f(function() { if (a) return true; });",
+		optionsJson: "",
+		findings:    []consistentReturnExpectation{{id: "missingReturn", name: "function", line: 1, column: 3}},
+	},
+	{
+		source:      "f(() => { if (a) return true; });",
+		optionsJson: "",
+		findings:    []consistentReturnExpectation{{id: "missingReturn", name: "arrow function", line: 1, column: 6}},
+	},
+	{
+		source:      "var obj = {foo() { if (a) return true; }};",
+		optionsJson: "",
+		findings:    []consistentReturnExpectation{{id: "missingReturn", name: "method 'foo'", line: 1, column: 12}},
+	},
+	{
+		source:      "class A {foo() { if (a) return true; }};",
+		optionsJson: "",
+		findings:    []consistentReturnExpectation{{id: "missingReturn", name: "method 'foo'", line: 1, column: 10}},
+	},
+	{
+		source:      "if (a) return true;",
+		optionsJson: "",
+		findings:    []consistentReturnExpectation{{id: "missingReturn", name: "program", line: 1, column: 1}},
+	},
+	{
+		source:      "class A { CapitalizedFunction() { if (a) return true; } }",
+		optionsJson: "",
+		findings: []consistentReturnExpectation{
+			{id: "missingReturn", name: "method 'CapitalizedFunction'", line: 1, column: 11},
+		},
+	},
+	{source: "({ constructor() { if (a) return true; } });", optionsJson: "", findings: []consistentReturnExpectation{
+		{id: "missingReturn", name: "method 'constructor'", line: 1, column: 4},
+	}},
 }
 
 // TestConsistentReturnFires runs upstream's 21 invalid cases.
@@ -425,7 +545,9 @@ func TestConsistentReturnDecoderRoundTrip(test *testing.T) {
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, decodeConsistentReturnOptionsError := DecodeConsistentReturnOptions(json.RawMessage(testCase.optionsJson))
+			decoded, decodeConsistentReturnOptionsError := DecodeConsistentReturnOptions(
+				json.RawMessage(testCase.optionsJson),
+			)
 			if decodeConsistentReturnOptionsError != nil {
 				test.Fatalf("decoding %q: %v", testCase.optionsJson, decodeConsistentReturnOptionsError)
 			}

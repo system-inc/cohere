@@ -122,7 +122,10 @@ func GetTypeName(
 			if ast.IsTypeParameterDeclaration(decls[0]) {
 				typeParamDecl := decls[0].AsTypeParameterDeclaration()
 				if typeParamDecl.Constraint != nil {
-					return GetTypeName(typeChecker, checker.Checker_getTypeFromTypeNode(typeChecker, typeParamDecl.Constraint))
+					return GetTypeName(
+						typeChecker,
+						checker.Checker_getTypeFromTypeNode(typeChecker, typeParamDecl.Constraint),
+					)
 				}
 			}
 		}
@@ -345,7 +348,12 @@ func isUnsafeAssignmentWorker(
 			return nil, nil, false
 		}
 
-		if senderNode != nil && ast.IsNewExpression(senderNode) && ast.IsIdentifier(senderNode.Expression()) && senderNode.Expression().Text() == "Map" && len(senderNode.Arguments()) == 0 && senderNode.TypeArguments() == nil {
+		if senderNode != nil &&
+			ast.IsNewExpression(senderNode) &&
+			ast.IsIdentifier(senderNode.Expression()) &&
+			senderNode.Expression().Text() == "Map" &&
+			len(senderNode.Arguments()) == 0 &&
+			senderNode.TypeArguments() == nil {
 			// special case to handle `new Map()`
 			// unfortunately Map's default empty constructor is typed to return `Map<any, any>` :(
 			// https://github.com/typescript-eslint/typescript-eslint/issues/2109#issuecomment-634144396
@@ -392,16 +400,21 @@ func GetContextualType(
 			// is the callee, so has no contextual type
 			return nil
 		}
-	} else if ast.IsVariableDeclaration(parent) || ast.IsPropertyDeclaration(parent) || ast.IsParameterDeclaration(parent) {
+	} else if ast.IsVariableDeclaration(parent) ||
+		ast.IsPropertyDeclaration(parent) ||
+		ast.IsParameterDeclaration(parent) {
 		if t := parent.Type(); t != nil {
 			return checker.Checker_getTypeFromTypeNode(typeChecker, t)
 		}
 		return nil
 	} else if parent.Kind == ast.KindJsxExpression {
 		return checker.Checker_getContextualType(typeChecker, parent, checker.ContextFlagsNone)
-	} else if ast.IsIdentifier(node) && (ast.IsPropertyAssignment(parent) || ast.IsShorthandPropertyAssignment(parent)) {
+	} else if ast.IsIdentifier(node) &&
+		(ast.IsPropertyAssignment(parent) || ast.IsShorthandPropertyAssignment(parent)) {
 		return checker.Checker_getContextualType(typeChecker, node, checker.ContextFlagsNone)
-	} else if ast.IsBinaryExpression(parent) && parent.AsBinaryExpression().OperatorToken.Kind == ast.KindEqualsToken && parent.AsBinaryExpression().Right == node {
+	} else if ast.IsBinaryExpression(parent) &&
+		parent.AsBinaryExpression().OperatorToken.Kind == ast.KindEqualsToken &&
+		parent.AsBinaryExpression().Right == node {
 		// is RHS of assignment
 		return typeChecker.GetTypeAtLocation(parent.AsBinaryExpression().Left)
 	} else if parent.Kind != ast.KindJsxExpression && !ast.IsTemplateSpan(parent) {
@@ -563,7 +576,11 @@ func GetParentFunctionNode(
 
 func IsHigherPrecedenceThanAwait(node *ast.Node) bool {
 	nodePrecedence := ast.GetExpressionPrecedence(node)
-	awaitPrecedence := ast.GetOperatorPrecedence(ast.KindAwaitExpression, ast.KindUnknown, ast.OperatorPrecedenceFlagsNone)
+	awaitPrecedence := ast.GetOperatorPrecedence(
+		ast.KindAwaitExpression,
+		ast.KindUnknown,
+		ast.OperatorPrecedenceFlagsNone,
+	)
 	return nodePrecedence > awaitPrecedence
 }
 

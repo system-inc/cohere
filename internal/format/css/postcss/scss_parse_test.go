@@ -24,7 +24,12 @@ func TestParseSCSSTree(test *testing.T) {
 
 	comment := nodes[0]
 	commentRaws := objectOf(test, comment.Get("raws"), "comment raws")
-	if comment.Type() != "comment" || comment.String("text") != "a *//* b" || commentRaws["inline"] != true || commentRaws["text"] != "a /* b" || commentRaws["left"] != " " || commentRaws["right"] != "" {
+	if comment.Type() != "comment" ||
+		comment.String("text") != "a *//* b" ||
+		commentRaws["inline"] != true ||
+		commentRaws["text"] != "a /* b" ||
+		commentRaws["left"] != " " ||
+		commentRaws["right"] != "" {
 		test.Errorf("comment %q %v", comment.String("text"), commentRaws)
 	}
 	if comment.Range != [2]int{0, 9} {
@@ -32,14 +37,24 @@ func TestParseSCSSTree(test *testing.T) {
 	}
 
 	nested := nodes[1].List("nodes")[0]
-	if nested.Type() != "decl" || !nested.Bool("isNested") || nested.String("prop") != "margin" || len(nested.List("nodes")) != 1 {
+	if nested.Type() != "decl" ||
+		!nested.Bool("isNested") ||
+		nested.String("prop") != "margin" ||
+		len(nested.List("nodes")) != 1 {
 		test.Errorf("nested declaration %s %v %q", nested.Type(), nested.Get("isNested"), nested.String("prop"))
 	}
-	if keys := nested.Keys(); !reflect.DeepEqual(keys, []string{"raws", "isNested", "nodes", "source", "prop", "value"}) {
+	if keys := nested.Keys(); !reflect.DeepEqual(
+		keys,
+		[]string{"raws", "isNested", "nodes", "source", "prop", "value"},
+	) {
 		test.Errorf("nested declaration keys %v", keys)
 	}
 	value := objectOf(test, nested.Get("raws"), "nested declaration raws")["value"]
-	if want := map[string]any{"value": "0 ", "raw": "0 /* c*/\n ", "scss": "0 // c\n "}; !reflect.DeepEqual(value, want) {
+	if want := map[string]any{
+		"value": "0 ",
+		"raw":   "0 /* c*/\n ",
+		"scss":  "0 // c\n ",
+	}; !reflect.DeepEqual(value, want) {
 		test.Errorf("raws.value %#v", value)
 	}
 

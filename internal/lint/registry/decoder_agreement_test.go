@@ -92,10 +92,22 @@ func TestEveryDecoderHandsItsRuleTheTypeTheRuleReads(test *testing.T) {
 				// Any other panic is the crash corpus's business, not this test's.
 			}()
 			if subject.NeedsTypeChecker {
-				rule_testing.RunTypedWithOptions(test, subject, "/repository/source/Probe.tsx", "export const value = 1;\n", decoded)
+				rule_testing.RunTypedWithOptions(
+					test,
+					subject,
+					"/repository/source/Probe.tsx",
+					"export const value = 1;\n",
+					decoded,
+				)
 				return
 			}
-			rule_testing.RunWithOptions(test, subject, "/repository/source/Probe.tsx", "export const value = 1;\n", decoded)
+			rule_testing.RunWithOptions(
+				test,
+				subject,
+				"/repository/source/Probe.tsx",
+				"export const value = 1;\n",
+				decoded,
+			)
 		})
 		if rule.OptionsAsReads.Load() == readsBefore && !optionsReadUnreachableOnProbe[subject.Name] {
 			unreached = append(unreached, subject.Name)
@@ -163,11 +175,25 @@ var optionsReachControl = rule.Rule{
 // a parallel test calling OptionsAs would break.
 func TestTheOptionsReachCounterSeesARuleThatNeverReadsItsOptions(test *testing.T) {
 	before := rule.OptionsAsReads.Load()
-	rule_testing.RunWithOptions(test, optionsReachControl, "/repository/source/Probe.tsx", "export const value = 1;\n", optionsReachControlOptions{})
+	rule_testing.RunWithOptions(
+		test,
+		optionsReachControl,
+		"/repository/source/Probe.tsx",
+		"export const value = 1;\n",
+		optionsReachControlOptions{},
+	)
 	if rule.OptionsAsReads.Load() != before {
-		test.Fatal("the control moved the counter on a source with no class, so the counter cannot tell reached from run")
+		test.Fatal(
+			"the control moved the counter on a source with no class, so the counter cannot tell reached from run",
+		)
 	}
-	rule_testing.RunWithOptions(test, optionsReachControl, "/repository/source/Probe.tsx", "export class Probe {}\n", optionsReachControlOptions{})
+	rule_testing.RunWithOptions(
+		test,
+		optionsReachControl,
+		"/repository/source/Probe.tsx",
+		"export class Probe {}\n",
+		optionsReachControlOptions{},
+	)
 	if rule.OptionsAsReads.Load() == before {
 		test.Fatal("the control did not move the counter on a class, so the counter is not counting")
 	}

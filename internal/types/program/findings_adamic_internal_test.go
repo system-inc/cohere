@@ -15,7 +15,12 @@ import (
 func adamicFixtureReuse(test *testing.T, entry LintCacheEntry) (*FindingsReuse, cacheKeys) {
 	test.Helper()
 	key := HashRuleSet([]string{"fixture"})
-	keys := cacheKeys{contentHash: entry.ContentHash, pure: entry.Rules, typed: entry.TypedRules, typeFingerprint: entry.TypeFingerprint}
+	keys := cacheKeys{
+		contentHash:     entry.ContentHash,
+		pure:            entry.Rules,
+		typed:           entry.TypedRules,
+		typeFingerprint: entry.TypeFingerprint,
+	}
 	previous := &LintCache{Version: lintCacheVersion, Key: key, Entries: []LintCacheEntry{entry}}
 	return NewFindingsReuse(key, previous, PathAnchor{}), keys
 }
@@ -36,7 +41,9 @@ func TestAReadinessRunMissesAnEntryThatWasNeverMeasured(test *testing.T) {
 	reuse, keys := adamicFixtureReuse(test, adamicFixtureEntry(nil))
 	reuse.MeasureReadiness()
 	if _, hits := reuse.lookup("/project/a.ts", keys, ""); hits.pure {
-		test.Fatal("a readiness run replayed an entry recorded without readiness, so an unmeasured file would read as ready")
+		test.Fatal(
+			"a readiness run replayed an entry recorded without readiness, so an unmeasured file would read as ready",
+		)
 	}
 	if reuse.Replayed() != 0 {
 		test.Fatalf("a miss counted as %d replayed files", reuse.Replayed())
@@ -45,7 +52,9 @@ func TestAReadinessRunMissesAnEntryThatWasNeverMeasured(test *testing.T) {
 
 func TestAReadinessRunReplaysAMeasuredEntry(test *testing.T) {
 	test.Parallel()
-	record := &AdamicRecord{Counts: []AdamicCount{{Rule: "adamic/invariant-mutable", Findings: 2}, {Rule: "adamic/single-spread"}}}
+	record := &AdamicRecord{
+		Counts: []AdamicCount{{Rule: "adamic/invariant-mutable", Findings: 2}, {Rule: "adamic/single-spread"}},
+	}
 	reuse, keys := adamicFixtureReuse(test, adamicFixtureEntry(record))
 	reuse.MeasureReadiness()
 	entry, hits := reuse.lookup("/project/a.ts", keys, "")
@@ -73,24 +82,48 @@ func TestARunThatDoesNotMeasureReplaysEitherEntry(test *testing.T) {
 func TestARefreshMergesTheReadinessRecordRuleByRule(test *testing.T) {
 	test.Parallel()
 	old := adamicFixtureEntry(&AdamicRecord{
-		Counts:  []AdamicCount{{Rule: "adamic/invariant-mutable", Findings: 3}, {Rule: "adamic/single-spread", Findings: 1}},
+		Counts: []AdamicCount{
+			{Rule: "adamic/invariant-mutable", Findings: 3},
+			{Rule: "adamic/single-spread", Findings: 1},
+		},
 		Skipped: []string{"adamic/invariant-mutable"},
 	})
-	keys := cacheKeys{contentHash: old.ContentHash, pure: old.Rules, typed: old.TypedRules, typeFingerprint: sha256.Sum256([]byte("moved"))}
+	keys := cacheKeys{
+		contentHash:     old.ContentHash,
+		pure:            old.Rules,
+		typed:           old.TypedRules,
+		typeFingerprint: sha256.Sum256([]byte("moved")),
+	}
 	hits := classHits{pure: true, shaped: true, design: true}
-	walked := &AdamicRecord{Counts: []AdamicCount{{Rule: "adamic/invariant-mutable"}, {Rule: "adamic/uncacheable", Findings: 4}}}
+	walked := &AdamicRecord{
+		Counts: []AdamicCount{{Rule: "adamic/invariant-mutable"}, {Rule: "adamic/uncacheable", Findings: 4}},
+	}
 
 	refreshed, eligible := refreshClasses(old, keys, hits, nil, nil, nil, walked, suppressionTally{})
 	if !eligible {
 		test.Fatal("a refresh with no fixes was refused")
 	}
-	want := &AdamicRecord{Counts: []AdamicCount{{Rule: "adamic/invariant-mutable"}, {Rule: "adamic/single-spread", Findings: 1}}}
+	want := &AdamicRecord{
+		Counts: []AdamicCount{{Rule: "adamic/invariant-mutable"}, {Rule: "adamic/single-spread", Findings: 1}},
+	}
 	if !reflect.DeepEqual(refreshed.Adamic, want) {
-		test.Fatalf("refreshed record %+v, want %+v: the stale type-aware count or skip survived, or the uncacheable rule was stored",
-			refreshed.Adamic, want)
+		test.Fatalf(
+			"refreshed record %+v, want %+v: the stale type-aware count or skip survived, or the uncacheable rule was stored",
+			refreshed.Adamic,
+			want,
+		)
 	}
 
-	if unmeasured, _ := refreshClasses(old, keys, hits, nil, nil, nil, nil, suppressionTally{}); unmeasured.Adamic != nil {
+	if unmeasured, _ := refreshClasses(
+		old,
+		keys,
+		hits,
+		nil,
+		nil,
+		nil,
+		nil,
+		suppressionTally{},
+	); unmeasured.Adamic != nil {
 		test.Fatalf("a refresh whose walk measured nothing kept a record, %+v, half of it stale", unmeasured.Adamic)
 	}
 }
@@ -100,10 +133,18 @@ func TestARefreshMergesTheReadinessRecordRuleByRule(test *testing.T) {
 func TestARecordedEntryKeepsOnlyTheCacheableRulesReadiness(test *testing.T) {
 	test.Parallel()
 	root := test.TempDir()
-	if writeError := os.WriteFile(filepath.Join(root, "tsconfig.json"), []byte(`{"compilerOptions": {"noEmit": true}}`), 0o644); writeError != nil {
+	if writeError := os.WriteFile(
+		filepath.Join(root, "tsconfig.json"),
+		[]byte(`{"compilerOptions": {"noEmit": true}}`),
+		0o644,
+	); writeError != nil {
 		test.Fatal(writeError)
 	}
-	if writeError := os.WriteFile(filepath.Join(root, "a.ts"), []byte("export const a = 1;\n"), 0o644); writeError != nil {
+	if writeError := os.WriteFile(
+		filepath.Join(root, "a.ts"),
+		[]byte("export const a = 1;\n"),
+		0o644,
+	); writeError != nil {
 		test.Fatal(writeError)
 	}
 	graph, buildError := Build(Options{ConfigFileName: filepath.Join(root, "tsconfig.json")})
@@ -126,7 +167,16 @@ func TestARecordedEntryKeepsOnlyTheCacheableRulesReadiness(test *testing.T) {
 		test.Fatalf("recorded %+v, want %+v", entry.Adamic, want)
 	}
 
-	if unmeasured, _ := recordableEntry(sourceFile, keys, nil, nil, nil, nil, 0, suppressionTally{}); unmeasured.Adamic != nil {
+	if unmeasured, _ := recordableEntry(
+		sourceFile,
+		keys,
+		nil,
+		nil,
+		nil,
+		nil,
+		0,
+		suppressionTally{},
+	); unmeasured.Adamic != nil {
 		test.Fatalf("a walk that measured nothing recorded %+v", unmeasured.Adamic)
 	}
 }

@@ -124,16 +124,28 @@ func TestPreferEnumInitializersFiresOnUpstreamFailCases(test *testing.T) {
 					wantSuggestions: []preferEnumInitializersSuggestion{
 						{desc: "Can be fixed to Up = 0", applied: "\nenum Direction {\n  Up = 0,\n  Down,\n}\n      "},
 						{desc: "Can be fixed to Up = 1", applied: "\nenum Direction {\n  Up = 1,\n  Down,\n}\n      "},
-						{desc: "Can be fixed to Up = 'Up'", applied: "\nenum Direction {\n  Up = 'Up',\n  Down,\n}\n      "},
+						{
+							desc:    "Can be fixed to Up = 'Up'",
+							applied: "\nenum Direction {\n  Up = 'Up',\n  Down,\n}\n      ",
+						},
 					},
 				},
 				{
 					wantSpan:    "Down",
 					wantMessage: "The value of the member 'Down' should be explicitly defined.",
 					wantSuggestions: []preferEnumInitializersSuggestion{
-						{desc: "Can be fixed to Down = 1", applied: "\nenum Direction {\n  Up,\n  Down = 1,\n}\n      "},
-						{desc: "Can be fixed to Down = 2", applied: "\nenum Direction {\n  Up,\n  Down = 2,\n}\n      "},
-						{desc: "Can be fixed to Down = 'Down'", applied: "\nenum Direction {\n  Up,\n  Down = 'Down',\n}\n      "},
+						{
+							desc:    "Can be fixed to Down = 1",
+							applied: "\nenum Direction {\n  Up,\n  Down = 1,\n}\n      ",
+						},
+						{
+							desc:    "Can be fixed to Down = 2",
+							applied: "\nenum Direction {\n  Up,\n  Down = 2,\n}\n      ",
+						},
+						{
+							desc:    "Can be fixed to Down = 'Down'",
+							applied: "\nenum Direction {\n  Up,\n  Down = 'Down',\n}\n      ",
+						},
 					},
 				},
 			},
@@ -145,9 +157,18 @@ func TestPreferEnumInitializersFiresOnUpstreamFailCases(test *testing.T) {
 					wantSpan:    "Down",
 					wantMessage: "The value of the member 'Down' should be explicitly defined.",
 					wantSuggestions: []preferEnumInitializersSuggestion{
-						{desc: "Can be fixed to Down = 1", applied: "\nenum Direction {\n  Up = 'Up',\n  Down = 1,\n}\n      "},
-						{desc: "Can be fixed to Down = 2", applied: "\nenum Direction {\n  Up = 'Up',\n  Down = 2,\n}\n      "},
-						{desc: "Can be fixed to Down = 'Down'", applied: "\nenum Direction {\n  Up = 'Up',\n  Down = 'Down',\n}\n      "},
+						{
+							desc:    "Can be fixed to Down = 1",
+							applied: "\nenum Direction {\n  Up = 'Up',\n  Down = 1,\n}\n      ",
+						},
+						{
+							desc:    "Can be fixed to Down = 2",
+							applied: "\nenum Direction {\n  Up = 'Up',\n  Down = 2,\n}\n      ",
+						},
+						{
+							desc:    "Can be fixed to Down = 'Down'",
+							applied: "\nenum Direction {\n  Up = 'Up',\n  Down = 'Down',\n}\n      ",
+						},
 					},
 				},
 			},
@@ -159,9 +180,18 @@ func TestPreferEnumInitializersFiresOnUpstreamFailCases(test *testing.T) {
 					wantSpan:    "Up",
 					wantMessage: "The value of the member 'Up' should be explicitly defined.",
 					wantSuggestions: []preferEnumInitializersSuggestion{
-						{desc: "Can be fixed to Up = 0", applied: "\nenum Direction {\n  Up = 0,\n  Down = 'Down',\n}\n      "},
-						{desc: "Can be fixed to Up = 1", applied: "\nenum Direction {\n  Up = 1,\n  Down = 'Down',\n}\n      "},
-						{desc: "Can be fixed to Up = 'Up'", applied: "\nenum Direction {\n  Up = 'Up',\n  Down = 'Down',\n}\n      "},
+						{
+							desc:    "Can be fixed to Up = 0",
+							applied: "\nenum Direction {\n  Up = 0,\n  Down = 'Down',\n}\n      ",
+						},
+						{
+							desc:    "Can be fixed to Up = 1",
+							applied: "\nenum Direction {\n  Up = 1,\n  Down = 'Down',\n}\n      ",
+						},
+						{
+							desc:    "Can be fixed to Up = 'Up'",
+							applied: "\nenum Direction {\n  Up = 'Up',\n  Down = 'Down',\n}\n      ",
+						},
 					},
 				},
 			},
@@ -186,7 +216,12 @@ func TestPreferEnumInitializersFiresOnUpstreamFailCases(test *testing.T) {
 					test.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
 				}
 				if diagnostic.Message.Description != want.wantMessage {
-					test.Fatalf("finding %d message: expected %q, got %q", position, want.wantMessage, diagnostic.Message.Description)
+					test.Fatalf(
+						"finding %d message: expected %q, got %q",
+						position,
+						want.wantMessage,
+						diagnostic.Message.Description,
+					)
 				}
 				if diagnostic.Message.Id != "defineInitializer" {
 					test.Fatalf("finding %d message id: got %q", position, diagnostic.Message.Id)
@@ -276,7 +311,9 @@ func TestPreferEnumInitializersFiresOnShapesTheCorpusDoesNotWrite(test *testing.
 		wantFindings []preferEnumInitializersFinding
 	}{
 		{
-			// A quoted key: `getText(member)` includes the quotes, so upstream renders the name doubled in the message and emits a syntactically broken third suggestion. Reproduced rather than corrected; the differential compares the message text.
+			// A quoted key: `getText(member)` includes the quotes, so upstream renders the name doubled in the message
+			// and emits a syntactically broken third suggestion. Reproduced rather than corrected; the differential
+			// compares the message text.
 			sourceText: "enum D {\n  'quoted',\n}",
 			wantFindings: []preferEnumInitializersFinding{
 				{
@@ -285,7 +322,10 @@ func TestPreferEnumInitializersFiresOnShapesTheCorpusDoesNotWrite(test *testing.
 					wantSuggestions: []preferEnumInitializersSuggestion{
 						{desc: "Can be fixed to 'quoted' = 0", applied: "enum D {\n  'quoted' = 0,\n}"},
 						{desc: "Can be fixed to 'quoted' = 1", applied: "enum D {\n  'quoted' = 1,\n}"},
-						{desc: "Can be fixed to 'quoted' = ''quoted''", applied: "enum D {\n  'quoted' = ''quoted'',\n}"},
+						{
+							desc:    "Can be fixed to 'quoted' = ''quoted''",
+							applied: "enum D {\n  'quoted' = ''quoted'',\n}",
+						},
 					},
 				},
 			},
@@ -330,7 +370,10 @@ func TestPreferEnumInitializersFiresOnShapesTheCorpusDoesNotWrite(test *testing.
 					wantSuggestions: []preferEnumInitializersSuggestion{
 						{desc: "Can be fixed to Up = 0", applied: "namespace N {\n  enum D {\n    Up = 0,\n  }\n}"},
 						{desc: "Can be fixed to Up = 1", applied: "namespace N {\n  enum D {\n    Up = 1,\n  }\n}"},
-						{desc: "Can be fixed to Up = 'Up'", applied: "namespace N {\n  enum D {\n    Up = 'Up',\n  }\n}"},
+						{
+							desc:    "Can be fixed to Up = 'Up'",
+							applied: "namespace N {\n  enum D {\n    Up = 'Up',\n  }\n}",
+						},
 					},
 				},
 			},
@@ -360,7 +403,8 @@ func TestPreferEnumInitializersFiresOnShapesTheCorpusDoesNotWrite(test *testing.
 			},
 		},
 		{
-			// The case that separates position from value: B's computed value is 2 and upstream offers 1, because index is the member's place in the list.
+			// The case that separates position from value: B's computed value is 2 and upstream offers 1, because index
+			// is the member's place in the list.
 			sourceText: "enum D {\n  A = 1,\n  B,\n  C,\n}",
 			wantFindings: []preferEnumInitializersFinding{
 				{
@@ -474,19 +518,41 @@ func TestPreferEnumInitializersFiresOnShapesTheCorpusDoesNotWrite(test *testing.
 					test.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
 				}
 				if diagnostic.Message.Description != want.wantMessage {
-					test.Fatalf("finding %d message: expected %q, got %q", position, want.wantMessage, diagnostic.Message.Description)
+					test.Fatalf(
+						"finding %d message: expected %q, got %q",
+						position,
+						want.wantMessage,
+						diagnostic.Message.Description,
+					)
 				}
 				if len(diagnostic.Suggestions) != len(want.wantSuggestions) {
-					test.Fatalf("finding %d: expected %d suggestions, got %d", position, len(want.wantSuggestions), len(diagnostic.Suggestions))
+					test.Fatalf(
+						"finding %d: expected %d suggestions, got %d",
+						position,
+						len(want.wantSuggestions),
+						len(diagnostic.Suggestions),
+					)
 				}
 				for order, wantSuggestion := range want.wantSuggestions {
 					got := diagnostic.Suggestions[order]
 					if got.Message.Description != wantSuggestion.desc {
-						test.Fatalf("finding %d suggestion %d: expected %q, got %q", position, order, wantSuggestion.desc, got.Message.Description)
+						test.Fatalf(
+							"finding %d suggestion %d: expected %q, got %q",
+							position,
+							order,
+							wantSuggestion.desc,
+							got.Message.Description,
+						)
 					}
 					applied := applyPreferEnumInitializersSuggestion(test, testCase.sourceText, got)
 					if applied != wantSuggestion.applied {
-						test.Fatalf("finding %d suggestion %d applied: expected %q, got %q", position, order, wantSuggestion.applied, applied)
+						test.Fatalf(
+							"finding %d suggestion %d applied: expected %q, got %q",
+							position,
+							order,
+							wantSuggestion.applied,
+							applied,
+						)
 					}
 				}
 			}

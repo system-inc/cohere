@@ -135,7 +135,8 @@ func (printer *stableTypePrinter) named(name string, arguments []*checker.Type, 
 // parenthesized, as TypeScript prints it.
 func (printer *stableTypePrinter) operand(t *checker.Type, depth int) string {
 	text := printer.print(t, depth)
-	if t.Alias() == nil && (t.Flags()&(checker.TypeFlagsUnion|checker.TypeFlagsIntersection) != 0 || strings.Contains(text, "=>")) {
+	if t.Alias() == nil &&
+		(t.Flags()&(checker.TypeFlagsUnion|checker.TypeFlagsIntersection) != 0 || strings.Contains(text, "=>")) {
 		return "(" + text + ")"
 	}
 	return text
@@ -305,7 +306,9 @@ func (printer *stableTypePrinter) members(t *checker.Type) []*ast.Symbol {
 // statements the namespace or file around their block and variable statement.
 func memberHome(declaration *ast.Node) *ast.Node {
 	home := declaration.Parent
-	for home != nil && (home.Kind == ast.KindModuleBlock || home.Kind == ast.KindVariableStatement || home.Kind == ast.KindVariableDeclarationList) {
+	for home != nil && (home.Kind == ast.KindModuleBlock ||
+		home.Kind == ast.KindVariableStatement ||
+		home.Kind == ast.KindVariableDeclarationList) {
 		home = home.Parent
 	}
 	return home
@@ -325,7 +328,10 @@ func (printer *stableTypePrinter) member(property *ast.Symbol, depth int) string
 	}
 	propertyType := checker.Checker_getNonMissingTypeOfSymbol(printer.typeChecker, property)
 	if property.Flags&ast.SymbolFlagsMethod != 0 {
-		if signatures := printer.typeChecker.GetSignaturesOfType(propertyType, checker.SignatureKindCall); len(signatures) == 1 {
+		if signatures := printer.typeChecker.GetSignaturesOfType(
+			propertyType,
+			checker.SignatureKindCall,
+		); len(signatures) == 1 {
 			return name + printer.signature(signatures[0], ": ", depth)
 		}
 	}
@@ -356,7 +362,11 @@ func (printer *stableTypePrinter) signature(signature *checker.Signature, arrow 
 		case index >= signature.MinArgumentCount():
 			suffix = "?"
 		}
-		printed[index] = prefix + parameter.Name + suffix + ": " + printer.print(printer.typeChecker.GetTypeOfSymbol(parameter), depth+1)
+		printed[index] = prefix +
+			parameter.Name +
+			suffix +
+			": " +
+			printer.print(printer.typeChecker.GetTypeOfSymbol(parameter), depth+1)
 	}
 	text.WriteString("(" + strings.Join(printed, ", ") + ")")
 	text.WriteString(arrow + printer.print(printer.typeChecker.GetReturnTypeOfSignature(signature), depth+1))

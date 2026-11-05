@@ -50,10 +50,14 @@ func TestBoundaryNoProjectThemeValueFires(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectFindings(test, rule_testing.RunTypedFiles(test, BoundaryNoProjectThemeValue, map[string]string{
-				themeFilePath:   buttonThemeSource,
-				libraryFilePath: testCase.sourceText,
-			}, libraryFilePath), "forbiddenThemeValue")
+			rule_testing.ExpectFindings(
+				test,
+				rule_testing.RunTypedFiles(test, BoundaryNoProjectThemeValue, map[string]string{
+					themeFilePath:   buttonThemeSource,
+					libraryFilePath: testCase.sourceText,
+				}, libraryFilePath),
+				"forbiddenThemeValue",
+			)
 		})
 	}
 }
@@ -74,16 +78,28 @@ func TestBoundaryNoProjectThemeValueStaysSilent(test *testing.T) {
 		{"a defined value on an alias", libraryFilePath, "export const a = <AnimatedButton variant=\"Ghost\" />;\n"},
 		// A defined value spelled with a character reference. ESLint's parser decodes a JSX attribute
 		// string, and the twin reads that decoded value, so this is Ghost to both (#5f61r5b).
-		{"a defined value spelled with a character reference", libraryFilePath, "export const a = <Button variant=\"Gh&#111;st\" />;\n"},
+		{
+			"a defined value spelled with a character reference",
+			libraryFilePath,
+			"export const a = <Button variant=\"Gh&#111;st\" />;\n",
+		},
 		// The boundary itself. The same undefined value outside the library is a project extending
 		// the library, which is the system working. This fixture is the one that pins the gate, and
 		// it has to carry a value that would otherwise report.
-		{"an undefined value outside the library", projectFilePath, "export const a = <Button variant=\"Emphasized\" />;\n"},
+		{
+			"an undefined value outside the library",
+			projectFilePath,
+			"export const a = <Button variant=\"Emphasized\" />;\n",
+		},
 		// A component with no theme. Nothing defines its values, so the rule has no standing.
 		{"a component with no theme", libraryFilePath, "export const a = <Unthemed variant=\"Emphasized\" />;\n"},
 		// A property that is not a theme property, carrying a value no theme defines.
 		{"a non-theme property", libraryFilePath, "export const a = <Button title=\"Emphasized\" />;\n"},
-		{"a property merely containing a theme word", libraryFilePath, "export const a = <Button variantName=\"Emphasized\" />;\n"},
+		{
+			"a property merely containing a theme word",
+			libraryFilePath,
+			"export const a = <Button variantName=\"Emphasized\" />;\n",
+		},
 		// An expression rather than a literal. The value cannot be read without evaluating it, and
 		// guessing is how a boundary rule starts reporting on correct code.
 		{"an expression value", libraryFilePath, "export const a = <Button variant={chosen} />;\n"},
@@ -97,10 +113,13 @@ func TestBoundaryNoProjectThemeValueStaysSilent(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.RunTypedFiles(test, BoundaryNoProjectThemeValue, map[string]string{
-				themeFilePath:     buttonThemeSource,
-				testCase.fileName: testCase.sourceText,
-			}, testCase.fileName))
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.RunTypedFiles(test, BoundaryNoProjectThemeValue, map[string]string{
+					themeFilePath:     buttonThemeSource,
+					testCase.fileName: testCase.sourceText,
+				}, testCase.fileName),
+			)
 		})
 	}
 }
@@ -131,10 +150,14 @@ func TestBoundaryNoProjectThemeValueReadsTheProgramRatherThanTheFilesystem(test 
 
 	test.Run("a value it does not define", func(test *testing.T) {
 		test.Parallel()
-		rule_testing.ExpectFindings(test, rule_testing.RunTypedFiles(test, BoundaryNoProjectThemeValue, map[string]string{
-			inMemoryThemePath: inMemoryTheme,
-			libraryFilePath:   "export const a = <Card variant=\"Raised\" />;\n",
-		}, libraryFilePath), "forbiddenThemeValue")
+		rule_testing.ExpectFindings(
+			test,
+			rule_testing.RunTypedFiles(test, BoundaryNoProjectThemeValue, map[string]string{
+				inMemoryThemePath: inMemoryTheme,
+				libraryFilePath:   "export const a = <Card variant=\"Raised\" />;\n",
+			}, libraryFilePath),
+			"forbiddenThemeValue",
+		)
 	})
 
 	// The exported-only check. A theme interface the file keeps to itself is not the library's
@@ -165,7 +188,10 @@ func TestBoundaryNoProjectThemeValueReadsTheProgramRatherThanTheFilesystem(test 
 			"/repository/libraries/structure/source/components/time/calendar/CalendarTheme.ts": "export interface CalendarSizesInterface {\n    Base: string;\n}\n",
 			libraryFilePath: "export const a = <Calendar variant=\"A\" size=\"Base\" />;\n",
 		}
-		rule_testing.ExpectClean(test, rule_testing.RunTypedFiles(test, BoundaryNoProjectThemeValue, files, libraryFilePath))
+		rule_testing.ExpectClean(
+			test,
+			rule_testing.RunTypedFiles(test, BoundaryNoProjectThemeValue, files, libraryFilePath),
+		)
 	})
 
 	// The same pair, asking about values neither file defines. Without this the case above passes
@@ -179,8 +205,11 @@ func TestBoundaryNoProjectThemeValueReadsTheProgramRatherThanTheFilesystem(test 
 				"/repository/libraries/structure/source/components/time/calendar/CalendarTheme.ts": "export interface CalendarSizesInterface {\n    Base: string;\n}\n",
 				libraryFilePath: "export const a = <Calendar " + attribute + " />;\n",
 			}
-			rule_testing.ExpectFindings(test, rule_testing.RunTypedFiles(test, BoundaryNoProjectThemeValue, files, libraryFilePath),
-				"forbiddenThemeValue")
+			rule_testing.ExpectFindings(
+				test,
+				rule_testing.RunTypedFiles(test, BoundaryNoProjectThemeValue, files, libraryFilePath),
+				"forbiddenThemeValue",
+			)
 		}
 	})
 
@@ -286,10 +315,16 @@ func TestBoundaryNoProjectThemeValueFingerprintsExactlyTheThemeMap(test *testing
 	original := themeFingerprintOf(test, base)
 
 	moves := map[string]map[string]string{
-		"a value added":   with(themeFilePath, strings.Replace(buttonThemeSource, "Outline: string;", "Outline: string;\n    Emphasized: string;", 1)),
+		"a value added": with(
+			themeFilePath,
+			strings.Replace(buttonThemeSource, "Outline: string;", "Outline: string;\n    Emphasized: string;", 1),
+		),
 		"a value renamed": with(themeFilePath, strings.Replace(buttonThemeSource, "Ghost", "Spectral", 1)),
-		"two values swapped": with(themeFilePath, strings.Replace(buttonThemeSource, "Ghost: string;\n    Outline: string;",
-			"Outline: string;\n    Ghost: string;", 1)),
+		"two values swapped": with(
+			themeFilePath,
+			strings.Replace(buttonThemeSource, "Ghost: string;\n    Outline: string;",
+				"Outline: string;\n    Ghost: string;", 1),
+		),
 		"a theme file added": with("/repository/libraries/structure/source/components/cards/CardTheme.ts",
 			"export interface CardVariantsInterface {\n    Flat: string;\n}\n"),
 	}

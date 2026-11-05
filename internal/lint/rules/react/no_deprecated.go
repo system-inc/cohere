@@ -312,10 +312,26 @@ func deprecationsForPragma(pragma string) map[string]deprecation {
 		},
 
 		// 18.0.0
-		"ReactDOM.render":                   {since: "18.0.0", replacement: "createRoot", reference: createRootReference},
-		"ReactDOM.hydrate":                  {since: "18.0.0", replacement: "hydrateRoot", reference: createRootReference},
-		"ReactDOM.unmountComponentAtNode":   {since: "18.0.0", replacement: "root.unmount", reference: createRootReference},
-		"ReactDOMServer.renderToNodeStream": {since: "18.0.0", replacement: "renderToPipeableStream", reference: "https://reactjs.org/docs/react-dom-server.html#rendertonodestream"},
+		"ReactDOM.render": {
+			since:       "18.0.0",
+			replacement: "createRoot",
+			reference:   createRootReference,
+		},
+		"ReactDOM.hydrate": {
+			since:       "18.0.0",
+			replacement: "hydrateRoot",
+			reference:   createRootReference,
+		},
+		"ReactDOM.unmountComponentAtNode": {
+			since:       "18.0.0",
+			replacement: "root.unmount",
+			reference:   createRootReference,
+		},
+		"ReactDOMServer.renderToNodeStream": {
+			since:       "18.0.0",
+			replacement: "renderToPipeableStream",
+			reference:   "https://reactjs.org/docs/react-dom-server.html#rendertonodestream",
+		},
 	}
 }
 

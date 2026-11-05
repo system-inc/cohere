@@ -157,7 +157,12 @@ func buildCommitted(paths Paths, packagePath string, build committedBuild, binar
 		return fmt.Errorf("resolving the snapshot directory: %w", err)
 	}
 
-	if extractGitArchiveError := extractGitArchive(paths.ModuleDirectory, build.Commit, "", snapshot); extractGitArchiveError != nil {
+	if extractGitArchiveError := extractGitArchive(
+		paths.ModuleDirectory,
+		build.Commit,
+		"",
+		snapshot,
+	); extractGitArchiveError != nil {
 		return fmt.Errorf("extracting commit %s: %w", release.ShortCommit(build.Commit), extractGitArchiveError)
 	}
 
@@ -180,10 +185,18 @@ func buildCommitted(paths Paths, packagePath string, build committedBuild, binar
 	// Built to a temporary name and renamed only once proven, so a concurrent run never finds, and
 	// execs, a binary that is half-written or that failed its proof.
 	// The suffix stays last, so Windows runs the proof against the temporary name as it runs the binary.
-	temporary := strings.TrimSuffix(binaryPath, executableSuffix) + fmt.Sprintf(".partial-%d", os.Getpid()) + executableSuffix
+	temporary := strings.TrimSuffix(binaryPath, executableSuffix) +
+		fmt.Sprintf(".partial-%d", os.Getpid()) +
+		executableSuffix
 	defer os.Remove(temporary)
 
-	if goBuildSnapshotError := goBuildSnapshot(paths, snapshot, packagePath, build, temporary); goBuildSnapshotError != nil {
+	if goBuildSnapshotError := goBuildSnapshot(
+		paths,
+		snapshot,
+		packagePath,
+		build,
+		temporary,
+	); goBuildSnapshotError != nil {
 		return goBuildSnapshotError
 	}
 	if proveCommittedBinaryError := proveCommittedBinary(temporary, snapshot, build); proveCommittedBinaryError != nil {
@@ -239,12 +252,19 @@ func ensureCompiler(paths Paths, compilerCommit string) (string, error) {
 		// extraction's own time is when it was made. A build against a pin extracted yesterday would
 		// otherwise compile against a directory the next prune is free to take.
 		if changeTimesError := os.Chtimes(compiler, time.Now(), time.Now()); changeTimesError != nil {
-			return "", fmt.Errorf("marking the compiler at %s in use: %w", release.ShortCommit(compilerCommit), changeTimesError)
+			return "", fmt.Errorf(
+				"marking the compiler at %s in use: %w",
+				release.ShortCommit(compilerCommit),
+				changeTimesError,
+			)
 		}
 		return compiler, nil
 	}
 
-	Report.Step("cohere: extracting the compiler at %s, once per pin (about seven seconds)", release.ShortCommit(compilerCommit))
+	Report.Step(
+		"cohere: extracting the compiler at %s, once per pin (about seven seconds)",
+		release.ShortCommit(compilerCommit),
+	)
 
 	partial, temporaryDirectoryError := os.MkdirTemp(paths.CompilerDirectory(), key+".partial-*")
 	if temporaryDirectoryError != nil {
@@ -254,9 +274,19 @@ func ensureCompiler(paths Paths, compilerCommit string) (string, error) {
 	defer os.RemoveAll(partial)
 
 	submodule := filepath.Join(paths.ModuleDirectory, "TypeScript")
-	if extractGitArchiveError := extractGitArchive(submodule, compilerCommit, compilerSubdirectory, partial); extractGitArchiveError != nil {
-		return "", fmt.Errorf("extracting the compiler at %s (if the commit is missing, the submodule has not fetched it: "+
-			"run `git submodule sync && git submodule update --init` in %s): %w", release.ShortCommit(compilerCommit), paths.ModuleDirectory, extractGitArchiveError)
+	if extractGitArchiveError := extractGitArchive(
+		submodule,
+		compilerCommit,
+		compilerSubdirectory,
+		partial,
+	); extractGitArchiveError != nil {
+		return "", fmt.Errorf(
+			"extracting the compiler at %s (if the commit is missing, the submodule has not fetched it: "+
+				"run `git submodule sync && git submodule update --init` in %s): %w",
+			release.ShortCommit(compilerCommit),
+			paths.ModuleDirectory,
+			extractGitArchiveError,
+		)
 	}
 
 	if renameError := os.Rename(partial, compiler); renameError != nil {
@@ -352,12 +382,20 @@ func checkCommittedVersion(version string, commit string) error {
 	}
 
 	if !commitNamed {
-		return fmt.Errorf("the binary built from %s does not name that commit in --version, so it cannot be traced back to it "+
-			"and was not cached:\n%s", release.ShortCommit(commit), version)
+		return fmt.Errorf(
+			"the binary built from %s does not name that commit in --version, so it cannot be traced back to it "+
+				"and was not cached:\n%s",
+			release.ShortCommit(commit),
+			version,
+		)
 	}
 	if strings.Contains(version, "uncommitted changes") {
-		return fmt.Errorf("the binary built from %s reports uncommitted changes, which a committed-tree build cannot have, "+
-			"so it was not cached:\n%s", release.ShortCommit(commit), version)
+		return fmt.Errorf(
+			"the binary built from %s reports uncommitted changes, which a committed-tree build cannot have, "+
+				"so it was not cached:\n%s",
+			release.ShortCommit(commit),
+			version,
+		)
 	}
 	return nil
 }
@@ -452,7 +490,11 @@ func extractTar(stream io.Reader, destination string) (int, error) {
 			// git archive opens with a pax header carrying the commit id. It describes the archive and
 			// is not a file.
 		default:
-			return written, fmt.Errorf("archive entry %q has type %q, which the extraction does not handle", header.Name, header.Typeflag)
+			return written, fmt.Errorf(
+				"archive entry %q has type %q, which the extraction does not handle",
+				header.Name,
+				header.Typeflag,
+			)
 		}
 	}
 }
@@ -464,7 +506,12 @@ func gitOutput(directory string, arguments ...string) (string, error) {
 	command.Stderr = &standardError
 	output, outputError := command.Output()
 	if outputError != nil {
-		return "", fmt.Errorf("git %s: %w: %s", strings.Join(arguments, " "), outputError, strings.TrimSpace(standardError.String()))
+		return "", fmt.Errorf(
+			"git %s: %w: %s",
+			strings.Join(arguments, " "),
+			outputError,
+			strings.TrimSpace(standardError.String()),
+		)
 	}
 	return string(output), nil
 }

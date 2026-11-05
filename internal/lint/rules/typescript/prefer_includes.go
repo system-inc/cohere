@@ -177,7 +177,10 @@ func reportPreferIncludesComparison(ruleContext rule.Context, node *ast.Node) {
 //
 // Returning both answers from one function because the caller needs the direction and upstream's
 // two predicates partition the same switch.
-func preferIncludesCheckDirection(ruleContext rule.Context, comparison *ast.BinaryExpression) (negative bool, positive bool) {
+func preferIncludesCheckDirection(
+	ruleContext rule.Context,
+	comparison *ast.BinaryExpression,
+) (negative bool, positive bool) {
 	right := comparison.Right
 	if right == nil {
 		return false, false

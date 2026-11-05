@@ -157,7 +157,8 @@ var siteFinders = map[ast.Kind]func(w *Walker, node *ast.Node){
 		w.contextual(node.AsPropertyAssignment().Initializer)
 	},
 	ast.KindShorthandPropertyAssignment: func(w *Walker, node *ast.Node) {
-		if IsDestructuringTarget(node.Parent) || node.AsShorthandPropertyAssignment().ObjectAssignmentInitializer != nil {
+		if IsDestructuringTarget(node.Parent) ||
+			node.AsShorthandPropertyAssignment().ObjectAssignmentInitializer != nil {
 			return
 		}
 		name := node.Name()
@@ -187,8 +188,8 @@ var siteFinders = map[ast.Kind]func(w *Walker, node *ast.Node){
 }
 
 // offer adds the site of expression flowing into target, unless the two are one type or the target has no
-// object part or generic indexed access, where no judge can rule (see Judge). The target is read first so such a site never asks the
-// checker for its source.
+// object part or generic indexed access, where no judge can rule (see Judge). The target is read first so such a site
+// never asks the checker for its source.
 func (walker *Walker) offer(expression *ast.Node, target *checker.Type) {
 	if expression == nil || target == nil || !walker.hasObjectPart(target) {
 		return
@@ -197,8 +198,11 @@ func (walker *Walker) offer(expression *ast.Node, target *checker.Type) {
 	if source == nil || source == target {
 		return
 	}
-	walker.sites = append(walker.sites, Site{Node: expression, Source: source, Target: target, Fresh: isFresh(expression),
-		NewContainer: isNewContainer(expression)})
+	walker.sites = append(
+		walker.sites,
+		Site{Node: expression, Source: source, Target: target, Fresh: isFresh(expression),
+			NewContainer: isNewContainer(expression)},
+	)
 }
 
 // offerPart adds the site of a part of node's value flowing into target, when the part has no expression of its
@@ -223,7 +227,9 @@ func (walker *Walker) offerPart(node *ast.Node, source *checker.Type, target *ch
  * own, which the BinaryExpression finder offers.
  */
 func (walker *Walker) destructured(pattern *ast.Node, value *ast.Node, valueType *checker.Type) {
-	if kind := ast.SkipParentheses(value).Kind; kind == ast.KindArrayLiteralExpression || kind == ast.KindObjectLiteralExpression {
+	if kind := ast.SkipParentheses(
+		value,
+	).Kind; kind == ast.KindArrayLiteralExpression || kind == ast.KindObjectLiteralExpression {
 		return
 	}
 	walker.destructuredParts(pattern, value, valueType)
@@ -266,7 +272,8 @@ func (walker *Walker) destructuredParts(pattern *ast.Node, value *ast.Node, valu
 // type, and anything else is a slot the part is put into.
 func (walker *Walker) destructuredTarget(target *ast.Node, value *ast.Node, partType *checker.Type) {
 	target = ast.SkipParentheses(target)
-	if target.Kind == ast.KindBinaryExpression && target.AsBinaryExpression().OperatorToken.Kind == ast.KindEqualsToken {
+	if target.Kind == ast.KindBinaryExpression &&
+		target.AsBinaryExpression().OperatorToken.Kind == ast.KindEqualsToken {
 		target = ast.SkipParentheses(target.AsBinaryExpression().Left)
 	}
 	if target.Kind == ast.KindArrayLiteralExpression || target.Kind == ast.KindObjectLiteralExpression {
@@ -309,7 +316,10 @@ func (walker *Walker) annotated(typeNode *ast.Node, expression *ast.Node) {
 }
 
 func (walker *Walker) contextual(expression *ast.Node) {
-	walker.offer(expression, checker.Checker_getContextualType(walker.typeChecker, expression, checker.ContextFlagsNone))
+	walker.offer(
+		expression,
+		checker.Checker_getContextualType(walker.typeChecker, expression, checker.ContextFlagsNone),
+	)
 }
 
 func (walker *Walker) returned(function *ast.Node, expression *ast.Node) {
@@ -339,7 +349,10 @@ func (walker *Walker) arguments(call *ast.Node) {
  */
 func (walker *Walker) offerMethod(node *ast.Node) {
 	literal, name := node.Parent, node.Name()
-	if literal == nil || literal.Kind != ast.KindObjectLiteralExpression || name == nil || IsDestructuringTarget(literal) {
+	if literal == nil ||
+		literal.Kind != ast.KindObjectLiteralExpression ||
+		name == nil ||
+		IsDestructuringTarget(literal) {
 		return
 	}
 	if name.Kind != ast.KindIdentifier && name.Kind != ast.KindStringLiteral {
@@ -372,7 +385,9 @@ func (walker *Walker) offerMethod(node *ast.Node) {
  */
 func (walker *Walker) offerSpread(node *ast.Node) {
 	literal := node.Parent
-	if literal == nil || literal.Kind != ast.KindObjectLiteralExpression && literal.Kind != ast.KindArrayLiteralExpression || IsDestructuringTarget(literal) {
+	if literal == nil ||
+		literal.Kind != ast.KindObjectLiteralExpression && literal.Kind != ast.KindArrayLiteralExpression ||
+		IsDestructuringTarget(literal) {
 		return
 	}
 	expression := node.Expression()
@@ -460,7 +475,9 @@ func (walker *Walker) writtenAfter(literal *ast.Node, spread *ast.Node) []string
 	var names []string
 	for _, property := range properties[slices.Index(properties, spread)+1:] {
 		if property.Kind == ast.KindSpreadAssignment {
-			if later := walker.typeChecker.GetTypeAtLocation(property.Expression()); later != nil && later.Flags()&checker.TypeFlagsObject != 0 {
+			if later := walker.typeChecker.GetTypeAtLocation(
+				property.Expression(),
+			); later != nil && later.Flags()&checker.TypeFlagsObject != 0 {
 				for _, symbol := range checker.Checker_getPropertiesOfType(walker.typeChecker, later) {
 					if symbol.Flags&ast.SymbolFlagsOptional == 0 {
 						names = append(names, symbol.Name)
@@ -469,7 +486,8 @@ func (walker *Walker) writtenAfter(literal *ast.Node, spread *ast.Node) []string
 			}
 			continue
 		}
-		if name := property.Name(); name != nil && (name.Kind == ast.KindIdentifier || name.Kind == ast.KindStringLiteral) {
+		if name := property.Name(); name != nil &&
+			(name.Kind == ast.KindIdentifier || name.Kind == ast.KindStringLiteral) {
 			names = append(names, name.Text())
 		}
 	}
@@ -496,8 +514,8 @@ func (walker *Walker) offerUpcast(node *ast.Node) {
 }
 
 // hasObjectPart is a type the walk can relate parts of: an object type, a union with one among its
-// members, a generic indexed access, an intersection with an array, tuple or container member, or a type parameter whose constraint
-// has one (#53w68gt). A union's members are never
+// members, a generic indexed access, an intersection with an array, tuple or container member, or a type parameter
+// whose constraint has one (#53w68gt). A union's members are never
 // unions, and a type parameter's base constraint is never a type parameter, so this goes at most two deep.
 func (walker *Walker) hasObjectPart(t *checker.Type) bool {
 	switch {

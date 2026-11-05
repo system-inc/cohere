@@ -33,9 +33,11 @@ func TestAReasonThatExplainsNothingIsRefused(test *testing.T) {
 		want  string
 	}{
 		{
-			name:  "a reason for a rule the file turns on",
-			files: map[string]string{"CohereSettings.json": `{"rules": {"no-continue": "error"}, "reasons": {"no-continue": "left over from when it was off"}}`},
-			want:  `names "no-continue" under "reasons", but it does not turn that rule off`,
+			name: "a reason for a rule the file turns on",
+			files: map[string]string{
+				"CohereSettings.json": `{"rules": {"no-continue": "error"}, "reasons": {"no-continue": "left over from when it was off"}}`,
+			},
+			want: `names "no-continue" under "reasons", but it does not turn that rule off`,
 		},
 		{
 			name:  "a reason for a rule the file never writes",
@@ -52,9 +54,11 @@ func TestAReasonThatExplainsNothingIsRefused(test *testing.T) {
 			want: `names "no-continue" under "reasons", but it does not turn that rule off`,
 		},
 		{
-			name:  "a reason with no sentence",
-			files: map[string]string{"CohereSettings.json": `{"rules": {"no-continue": "off"}, "reasons": {"no-continue": "   "}}`},
-			want:  `names "no-continue" under "reasons" and gives no reason`,
+			name: "a reason with no sentence",
+			files: map[string]string{
+				"CohereSettings.json": `{"rules": {"no-continue": "off"}, "reasons": {"no-continue": "   "}}`,
+			},
+			want: `names "no-continue" under "reasons" and gives no reason`,
 		},
 		{
 			name: "a reason beside the departure that already says why",
@@ -90,7 +94,8 @@ func TestAReasonFollowsTheRuleUpTheChain(test *testing.T) {
 	})
 	loaded := loadOrFail(test, filepath.Join(directory, "CohereSettings.json"))
 
-	if offReason := loaded.OffReasons["no-continue"]; offReason.Reason != "style" || offReason.File != filepath.Join(directory, "base.json") {
+	if offReason := loaded.OffReasons["no-continue"]; offReason.Reason != "style" ||
+		offReason.File != filepath.Join(directory, "base.json") {
 		test.Errorf("a restated off recorded %+v, want the base's reason and file", offReason)
 	}
 	if offReason := loaded.OffReasons["no-var"]; offReason.Reason != "a legacy script keeps var" {
@@ -111,7 +116,9 @@ func TestAnOffWithNoReasonIsRefusedAndAReasonedOneLoads(test *testing.T) {
 	withOurTierForTest(test)
 	test.Run("an unreasoned off in the project's own file is refused", func(test *testing.T) {
 		test.Parallel()
-		directory := writeConfigs(test, map[string]string{"CohereSettings.json": `{"extends": "cohere:system-inc/test", "rules": {"no-continue": "off"}}`})
+		directory := writeConfigs(test, map[string]string{
+			"CohereSettings.json": `{"extends": "cohere:system-inc/test", "rules": {"no-continue": "off"}}`,
+		})
 		refusedWith(test, filepath.Join(directory, "CohereSettings.json"),
 			`turns off "no-continue" in `+filepath.Join(directory, "CohereSettings.json")+` with no reason`)
 	})
@@ -188,7 +195,9 @@ func TestOutsideOurTiersAProjectsOwnOffsAndDeparturesNeedNoReason(test *testing.
 	// The unreasoned off is not given a reason it never had: coverage counts it as an off with no reason.
 	directory := writeConfigs(test, cases["an undeclared departure"])
 	loaded := loadOrFail(test, filepath.Join(directory, "CohereSettings.json"))
-	if _, reasoned := loaded.OffReasonFor("no-implied-eval"); reasoned || !loaded.TurnsOffAtTopLevel("no-implied-eval") {
+	if _, reasoned := loaded.OffReasonFor(
+		"no-implied-eval",
+	); reasoned || !loaded.TurnsOffAtTopLevel("no-implied-eval") {
 		test.Error("an outsider's unreasoned off must load as an off with no reason")
 	}
 }
@@ -200,7 +209,11 @@ func TestOutsideOurTiersAProjectsOwnOffsAndDeparturesNeedNoReason(test *testing.
 func TestASetsOwnUnreasonedOffIsRefusedInAnyChain(test *testing.T) {
 	withSetFiles(test, map[string]string{"typescript": `{"rules": {"no-continue": "off"}}`})
 	directory := writeConfigs(test, map[string]string{"CohereSettings.json": `{"extends": "cohere:typescript"}`})
-	refusedWith(test, filepath.Join(directory, "CohereSettings.json"), `turns off "no-continue" in cohere:typescript with no reason`)
+	refusedWith(
+		test,
+		filepath.Join(directory, "CohereSettings.json"),
+		`turns off "no-continue" in cohere:typescript with no reason`,
+	)
 }
 
 // The loader decides tier membership by InOurTiers over the whole chain, the predicate the format
@@ -218,7 +231,11 @@ func TestTierMembershipIsTheWholeChainsAndThePredicateFormatAsks(test *testing.T
 	path := filepath.Join(inTier, "CohereSettings.json")
 	sources, sourcesOfError := SourcesOf(path)
 	if sourcesOfError != nil || !InOurTiers(sources) {
-		test.Fatalf("a nested tier set must make the chain ours by the shared predicate: %v %v", sources, sourcesOfError)
+		test.Fatalf(
+			"a nested tier set must make the chain ours by the shared predicate: %v %v",
+			sources,
+			sourcesOfError,
+		)
 	}
 	refusedWith(test, path, `turns off "no-continue" in `+path+` with no reason`)
 

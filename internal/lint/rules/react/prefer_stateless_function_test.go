@@ -53,26 +53,106 @@ func TestPreferStatelessFunctionFires(test *testing.T) {
 		options    string
 		findings   []string
 	}{
-		{"\n        class Foo extends React.Component {\n          render() {\n            return <div>{this.props.foo}</div>;\n          }\n        }\n      ", "", []string{"componentShouldBePure"}},
-		{"\n        class Foo extends React.Component {\n          render() {\n            return <div>{this['props'].foo}</div>;\n          }\n        }\n      ", "", []string{"componentShouldBePure"}},
-		{"\n        class Foo extends React.PureComponent {\n          render() {\n            return <div>foo</div>;\n          }\n        }\n      ", "", []string{"componentShouldBePure"}},
-		{"\n        class Foo extends React.PureComponent {\n          render() {\n            return <div>{this.props.foo}</div>;\n          }\n        }\n      ", "", []string{"componentShouldBePure"}},
-		{"\n        class Foo extends React.Component {\n          static get displayName() {\n            return 'Foo';\n          }\n          render() {\n            return <div>{this.props.foo}</div>;\n          }\n        }\n      ", "", []string{"componentShouldBePure"}},
-		{"\n        class Foo extends React.Component {\n          static displayName = 'Foo';\n          render() {\n            return <div>{this.props.foo}</div>;\n          }\n        }\n      ", "", []string{"componentShouldBePure"}},
-		{"\n        class Foo extends React.Component {\n          static get propTypes() {\n            return {\n              name: PropTypes.string\n            };\n          }\n          render() {\n            return <div>{this.props.foo}</div>;\n          }\n        }\n      ", "", []string{"componentShouldBePure"}},
-		{"\n        class Foo extends React.Component {\n          static propTypes = {\n            name: PropTypes.string\n          };\n          render() {\n            return <div>{this.props.foo}</div>;\n          }\n        }\n      ", "", []string{"componentShouldBePure"}},
-		{"\n        class Foo extends React.Component {\n          props: {\n            name: string;\n          };\n          render() {\n            return <div>{this.props.foo}</div>;\n          }\n        }\n      ", "", []string{"componentShouldBePure"}},
-		{"\n        class Foo extends React.Component {\n          constructor() {\n            super();\n          }\n          render() {\n            return <div>{this.props.foo}</div>;\n          }\n        }\n      ", "", []string{"componentShouldBePure"}},
-		{"\n        class Foo extends React.Component {\n          render() {\n            let {props:{foo}, context:{bar}} = this;\n            return <div>{this.props.foo}</div>;\n          }\n        }\n      ", "", []string{"componentShouldBePure"}},
-		{"\n        class Foo extends React.Component {\n          render() {\n            if (!this.props.foo) {\n              return null;\n            }\n            return <div>{this.props.foo}</div>;\n          }\n        }\n      ", "", []string{"componentShouldBePure"}},
-		{"\n        var Foo = createReactClass({\n          render: function() {\n            if (!this.props.foo) {\n              return null;\n            }\n            return <div>{this.props.foo}</div>;\n          }\n        });\n      ", "", []string{"componentShouldBePure"}},
-		{"\n        class Foo extends React.Component {\n          render() {\n            return true ? <div /> : null;\n          }\n        }\n      ", "", []string{"componentShouldBePure"}},
-		{"\n        class Foo extends React.Component {\n          static defaultProps = {\n            foo: true\n          }\n          render() {\n            const { foo } = this.props;\n            return foo ? <div /> : null;\n          }\n        }\n      ", "", []string{"componentShouldBePure"}},
-		{"\n        class Foo extends React.Component {\n          static get defaultProps() {\n            return {\n              foo: true\n            };\n          }\n          render() {\n            const { foo } = this.props;\n            return foo ? <div /> : null;\n          }\n        }\n      ", "", []string{"componentShouldBePure"}},
-		{"\n        class Foo extends React.Component {\n          render() {\n            const { foo } = this.props;\n            return foo ? <div /> : null;\n          }\n        }\n        Foo.defaultProps = {\n          foo: true\n        };\n      ", "", []string{"componentShouldBePure"}},
-		{"\n        class Foo extends React.Component {\n          static contextTypes = {\n            foo: PropTypes.boolean\n          }\n          render() {\n            const { foo } = this.context;\n            return foo ? <div /> : null;\n          }\n        }\n      ", "", []string{"componentShouldBePure"}},
-		{"\n        class Foo extends React.Component {\n          static get contextTypes() {\n            return {\n              foo: PropTypes.boolean\n            };\n          }\n          render() {\n            const { foo } = this.context;\n            return foo ? <div /> : null;\n          }\n        }\n      ", "", []string{"componentShouldBePure"}},
-		{"\n        class Foo extends React.Component {\n          render() {\n            const { foo } = this.context;\n            return foo ? <div /> : null;\n          }\n        }\n        Foo.contextTypes = {\n          foo: PropTypes.boolean\n        };\n      ", "", []string{"componentShouldBePure"}},
+		{
+			"\n        class Foo extends React.Component {\n          render() {\n            return <div>{this.props.foo}</div>;\n          }\n        }\n      ",
+			"",
+			[]string{"componentShouldBePure"},
+		},
+		{
+			"\n        class Foo extends React.Component {\n          render() {\n            return <div>{this['props'].foo}</div>;\n          }\n        }\n      ",
+			"",
+			[]string{"componentShouldBePure"},
+		},
+		{
+			"\n        class Foo extends React.PureComponent {\n          render() {\n            return <div>foo</div>;\n          }\n        }\n      ",
+			"",
+			[]string{"componentShouldBePure"},
+		},
+		{
+			"\n        class Foo extends React.PureComponent {\n          render() {\n            return <div>{this.props.foo}</div>;\n          }\n        }\n      ",
+			"",
+			[]string{"componentShouldBePure"},
+		},
+		{
+			"\n        class Foo extends React.Component {\n          static get displayName() {\n            return 'Foo';\n          }\n          render() {\n            return <div>{this.props.foo}</div>;\n          }\n        }\n      ",
+			"",
+			[]string{"componentShouldBePure"},
+		},
+		{
+			"\n        class Foo extends React.Component {\n          static displayName = 'Foo';\n          render() {\n            return <div>{this.props.foo}</div>;\n          }\n        }\n      ",
+			"",
+			[]string{"componentShouldBePure"},
+		},
+		{
+			"\n        class Foo extends React.Component {\n          static get propTypes() {\n            return {\n              name: PropTypes.string\n            };\n          }\n          render() {\n            return <div>{this.props.foo}</div>;\n          }\n        }\n      ",
+			"",
+			[]string{"componentShouldBePure"},
+		},
+		{
+			"\n        class Foo extends React.Component {\n          static propTypes = {\n            name: PropTypes.string\n          };\n          render() {\n            return <div>{this.props.foo}</div>;\n          }\n        }\n      ",
+			"",
+			[]string{"componentShouldBePure"},
+		},
+		{
+			"\n        class Foo extends React.Component {\n          props: {\n            name: string;\n          };\n          render() {\n            return <div>{this.props.foo}</div>;\n          }\n        }\n      ",
+			"",
+			[]string{"componentShouldBePure"},
+		},
+		{
+			"\n        class Foo extends React.Component {\n          constructor() {\n            super();\n          }\n          render() {\n            return <div>{this.props.foo}</div>;\n          }\n        }\n      ",
+			"",
+			[]string{"componentShouldBePure"},
+		},
+		{
+			"\n        class Foo extends React.Component {\n          render() {\n            let {props:{foo}, context:{bar}} = this;\n            return <div>{this.props.foo}</div>;\n          }\n        }\n      ",
+			"",
+			[]string{"componentShouldBePure"},
+		},
+		{
+			"\n        class Foo extends React.Component {\n          render() {\n            if (!this.props.foo) {\n              return null;\n            }\n            return <div>{this.props.foo}</div>;\n          }\n        }\n      ",
+			"",
+			[]string{"componentShouldBePure"},
+		},
+		{
+			"\n        var Foo = createReactClass({\n          render: function() {\n            if (!this.props.foo) {\n              return null;\n            }\n            return <div>{this.props.foo}</div>;\n          }\n        });\n      ",
+			"",
+			[]string{"componentShouldBePure"},
+		},
+		{
+			"\n        class Foo extends React.Component {\n          render() {\n            return true ? <div /> : null;\n          }\n        }\n      ",
+			"",
+			[]string{"componentShouldBePure"},
+		},
+		{
+			"\n        class Foo extends React.Component {\n          static defaultProps = {\n            foo: true\n          }\n          render() {\n            const { foo } = this.props;\n            return foo ? <div /> : null;\n          }\n        }\n      ",
+			"",
+			[]string{"componentShouldBePure"},
+		},
+		{
+			"\n        class Foo extends React.Component {\n          static get defaultProps() {\n            return {\n              foo: true\n            };\n          }\n          render() {\n            const { foo } = this.props;\n            return foo ? <div /> : null;\n          }\n        }\n      ",
+			"",
+			[]string{"componentShouldBePure"},
+		},
+		{
+			"\n        class Foo extends React.Component {\n          render() {\n            const { foo } = this.props;\n            return foo ? <div /> : null;\n          }\n        }\n        Foo.defaultProps = {\n          foo: true\n        };\n      ",
+			"",
+			[]string{"componentShouldBePure"},
+		},
+		{
+			"\n        class Foo extends React.Component {\n          static contextTypes = {\n            foo: PropTypes.boolean\n          }\n          render() {\n            const { foo } = this.context;\n            return foo ? <div /> : null;\n          }\n        }\n      ",
+			"",
+			[]string{"componentShouldBePure"},
+		},
+		{
+			"\n        class Foo extends React.Component {\n          static get contextTypes() {\n            return {\n              foo: PropTypes.boolean\n            };\n          }\n          render() {\n            const { foo } = this.context;\n            return foo ? <div /> : null;\n          }\n        }\n      ",
+			"",
+			[]string{"componentShouldBePure"},
+		},
+		{
+			"\n        class Foo extends React.Component {\n          render() {\n            const { foo } = this.context;\n            return foo ? <div /> : null;\n          }\n        }\n        Foo.contextTypes = {\n          foo: PropTypes.boolean\n        };\n      ",
+			"",
+			[]string{"componentShouldBePure"},
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.sourceText, func(test *testing.T) {
@@ -112,31 +192,106 @@ func TestPreferStatelessFunctionStaysSilent(test *testing.T) {
 	}{
 		{"\n        const Foo = function(props) {\n          return <div>{props.foo}</div>;\n        };\n      ", ""},
 		{"const Foo = ({foo}) => <div>{foo}</div>;", ""},
-		{"\n        class Foo extends React.PureComponent {\n          render() {\n            return <div>{this.props.foo}</div>;\n          }\n        }\n      ", "{\"ignorePureComponents\":true}"},
-		{"\n        class Foo extends React.PureComponent {\n          render() {\n            return <div>{this.context.foo}</div>;\n          }\n        }\n      ", "{\"ignorePureComponents\":true}"},
-		{"\n        const Foo = class extends React.PureComponent {\n          render() {\n            return <div>{this.props.foo}</div>;\n          }\n        };\n      ", "{\"ignorePureComponents\":true}"},
-		{"\n        class Foo extends React.Component {\n          shouldComponentUpdate() {\n            return false;\n          }\n          render() {\n            return <div>{this.props.foo}</div>;\n          }\n        }\n      ", ""},
-		{"\n        class Foo extends React.Component {\n          changeState() {\n            this.setState({foo: \"clicked\"});\n          }\n          render() {\n            return <div onClick={this.changeState.bind(this)}>{this.state.foo || \"bar\"}</div>;\n          }\n        }\n      ", ""},
-		{"\n        class Foo extends React.Component {\n          doStuff() {\n            this.refs.foo.style.backgroundColor = \"red\";\n          }\n          render() {\n            return <div ref=\"foo\" onClick={this.doStuff}>{this.props.foo}</div>;\n          }\n        }\n      ", ""},
-		{"\n        class Foo extends React.Component {\n          doStuff() {}\n          render() {\n            return <div>{this.props.foo}</div>;\n          }\n        }\n      ", ""},
-		{"\n        class Foo extends React.Component {\n          constructor() {}\n          render() {\n            return <div>{this.props.foo}</div>;\n          }\n        }\n      ", ""},
-		{"\n        class Foo extends React.Component {\n          constructor() {\n            doSpecialStuffs();\n          }\n          render() {\n            return <div>{this.props.foo}</div>;\n          }\n        }\n      ", ""},
-		{"\n        class Foo extends React.Component {\n          constructor() {\n            foo;\n          }\n          render() {\n            return <div>{this.props.foo}</div>;\n          }\n        }\n      ", ""},
-		{"\n        class Foo extends React.Component {\n          constructor(props)\n\n          render() {\n            return <div>{this.props.foo}</div>;\n          }\n        }\n      ", ""},
-		{"\n        class Foo extends React.Component {\n          render() {\n            return <div>{this.bar}</div>;\n          }\n        }\n      ", ""},
-		{"\n        class Foo extends React.Component {\n          render() {\n            let {props:{foo}, bar} = this;\n            return <div>{foo}</div>;\n          }\n        }\n      ", ""},
-		{"\n        class Foo extends React.Component {\n          render() {\n            return <div>{this[bar]}</div>;\n          }\n        }\n      ", ""},
-		{"\n        class Foo extends React.Component {\n          render() {\n            return <div>{this['bar']}</div>;\n          }\n        }\n      ", ""},
-		{"\n        export default (Component) => (\n          class Test extends React.Component {\n            componentDidMount() {}\n            render() {\n              return <Component />;\n            }\n          }\n        );\n      ", ""},
-		{"\n        class Foo extends React.Component {\n          render() {\n            return <div>{this.props.children}</div>;\n          }\n        }\n        Foo.childContextTypes = {\n          color: PropTypes.string\n        };\n      ", ""},
-		{"\n        @foo\n        class Foo extends React.Component {\n          render() {\n            return <div>{this.props.foo}</div>;\n          }\n        }\n      ", ""},
-		{"\n        @foo(\"bar\")\n        class Foo extends React.Component {\n          render() {\n            return <div>{this.props.foo}</div>;\n          }\n        }\n      ", ""},
-		{"\n        @foo\n        @bar()\n        class Foo extends React.Component {\n          render() {\n            return <div>{this.props.foo}</div>;\n          }\n        }\n      ", ""},
-		{"\n        class Child extends PureComponent {\n          render() {\n            return <h1>I don't</h1>;\n          }\n        }\n      ", "{\"ignorePureComponents\":true}"},
-		{"\n        import React, {PureComponent, PropTypes} from 'react'\n\n        export default function errorDecorator (options) {\n          return WrappedComponent => {\n            class Wrapper extends PureComponent {\n              static propTypes = {\n                error: PropTypes.string\n              }\n              render () {\n                const {error, ...props} = this.props\n                if (error) {\n                  return <div>Error! {error}</div>\n                } else {\n                  return <WrappedComponent {...props} />\n                }\n              }\n            }\n            return Wrapper\n          }\n        }\n      ", "{\"ignorePureComponents\":true}"},
-		{"\n        import React, {PureComponent, PropTypes} from 'react'\n\n        export default function errorDecorator (options) {\n          return WrappedComponent =>\n            class Wrapper extends PureComponent {\n              static propTypes = {\n                error: PropTypes.string\n              }\n              render () {\n                const {error, ...props} = this.props\n                if (error) {\n                  return <div>Error! {error}</div>\n                } else {\n                  return <WrappedComponent {...props} />\n                }\n              }\n            }\n        }\n      ", "{\"ignorePureComponents\":true}"},
-		{"\n        export default function errorDecorator (options) {\n          return WrappedComponent =>\n            class Wrapper extends React.PureComponent {\n              static propTypes = {\n                error: PropTypes.string\n              }\n              render () {\n                const {error, ...props} = this.props\n                if (error) {\n                  return <div>Error! {error}</div>\n                } else {\n                  return <WrappedComponent {...props} />\n                }\n              }\n            }\n        }\n      ", "{\"ignorePureComponents\":true}"},
-		{"\n        /**\n         * @param a.\n         */\n        function Comp() {\n          return <a></a>\n        }\n      ", ""},
+		{
+			"\n        class Foo extends React.PureComponent {\n          render() {\n            return <div>{this.props.foo}</div>;\n          }\n        }\n      ",
+			"{\"ignorePureComponents\":true}",
+		},
+		{
+			"\n        class Foo extends React.PureComponent {\n          render() {\n            return <div>{this.context.foo}</div>;\n          }\n        }\n      ",
+			"{\"ignorePureComponents\":true}",
+		},
+		{
+			"\n        const Foo = class extends React.PureComponent {\n          render() {\n            return <div>{this.props.foo}</div>;\n          }\n        };\n      ",
+			"{\"ignorePureComponents\":true}",
+		},
+		{
+			"\n        class Foo extends React.Component {\n          shouldComponentUpdate() {\n            return false;\n          }\n          render() {\n            return <div>{this.props.foo}</div>;\n          }\n        }\n      ",
+			"",
+		},
+		{
+			"\n        class Foo extends React.Component {\n          changeState() {\n            this.setState({foo: \"clicked\"});\n          }\n          render() {\n            return <div onClick={this.changeState.bind(this)}>{this.state.foo || \"bar\"}</div>;\n          }\n        }\n      ",
+			"",
+		},
+		{
+			"\n        class Foo extends React.Component {\n          doStuff() {\n            this.refs.foo.style.backgroundColor = \"red\";\n          }\n          render() {\n            return <div ref=\"foo\" onClick={this.doStuff}>{this.props.foo}</div>;\n          }\n        }\n      ",
+			"",
+		},
+		{
+			"\n        class Foo extends React.Component {\n          doStuff() {}\n          render() {\n            return <div>{this.props.foo}</div>;\n          }\n        }\n      ",
+			"",
+		},
+		{
+			"\n        class Foo extends React.Component {\n          constructor() {}\n          render() {\n            return <div>{this.props.foo}</div>;\n          }\n        }\n      ",
+			"",
+		},
+		{
+			"\n        class Foo extends React.Component {\n          constructor() {\n            doSpecialStuffs();\n          }\n          render() {\n            return <div>{this.props.foo}</div>;\n          }\n        }\n      ",
+			"",
+		},
+		{
+			"\n        class Foo extends React.Component {\n          constructor() {\n            foo;\n          }\n          render() {\n            return <div>{this.props.foo}</div>;\n          }\n        }\n      ",
+			"",
+		},
+		{
+			"\n        class Foo extends React.Component {\n          constructor(props)\n\n          render() {\n            return <div>{this.props.foo}</div>;\n          }\n        }\n      ",
+			"",
+		},
+		{
+			"\n        class Foo extends React.Component {\n          render() {\n            return <div>{this.bar}</div>;\n          }\n        }\n      ",
+			"",
+		},
+		{
+			"\n        class Foo extends React.Component {\n          render() {\n            let {props:{foo}, bar} = this;\n            return <div>{foo}</div>;\n          }\n        }\n      ",
+			"",
+		},
+		{
+			"\n        class Foo extends React.Component {\n          render() {\n            return <div>{this[bar]}</div>;\n          }\n        }\n      ",
+			"",
+		},
+		{
+			"\n        class Foo extends React.Component {\n          render() {\n            return <div>{this['bar']}</div>;\n          }\n        }\n      ",
+			"",
+		},
+		{
+			"\n        export default (Component) => (\n          class Test extends React.Component {\n            componentDidMount() {}\n            render() {\n              return <Component />;\n            }\n          }\n        );\n      ",
+			"",
+		},
+		{
+			"\n        class Foo extends React.Component {\n          render() {\n            return <div>{this.props.children}</div>;\n          }\n        }\n        Foo.childContextTypes = {\n          color: PropTypes.string\n        };\n      ",
+			"",
+		},
+		{
+			"\n        @foo\n        class Foo extends React.Component {\n          render() {\n            return <div>{this.props.foo}</div>;\n          }\n        }\n      ",
+			"",
+		},
+		{
+			"\n        @foo(\"bar\")\n        class Foo extends React.Component {\n          render() {\n            return <div>{this.props.foo}</div>;\n          }\n        }\n      ",
+			"",
+		},
+		{
+			"\n        @foo\n        @bar()\n        class Foo extends React.Component {\n          render() {\n            return <div>{this.props.foo}</div>;\n          }\n        }\n      ",
+			"",
+		},
+		{
+			"\n        class Child extends PureComponent {\n          render() {\n            return <h1>I don't</h1>;\n          }\n        }\n      ",
+			"{\"ignorePureComponents\":true}",
+		},
+		{
+			"\n        import React, {PureComponent, PropTypes} from 'react'\n\n        export default function errorDecorator (options) {\n          return WrappedComponent => {\n            class Wrapper extends PureComponent {\n              static propTypes = {\n                error: PropTypes.string\n              }\n              render () {\n                const {error, ...props} = this.props\n                if (error) {\n                  return <div>Error! {error}</div>\n                } else {\n                  return <WrappedComponent {...props} />\n                }\n              }\n            }\n            return Wrapper\n          }\n        }\n      ",
+			"{\"ignorePureComponents\":true}",
+		},
+		{
+			"\n        import React, {PureComponent, PropTypes} from 'react'\n\n        export default function errorDecorator (options) {\n          return WrappedComponent =>\n            class Wrapper extends PureComponent {\n              static propTypes = {\n                error: PropTypes.string\n              }\n              render () {\n                const {error, ...props} = this.props\n                if (error) {\n                  return <div>Error! {error}</div>\n                } else {\n                  return <WrappedComponent {...props} />\n                }\n              }\n            }\n        }\n      ",
+			"{\"ignorePureComponents\":true}",
+		},
+		{
+			"\n        export default function errorDecorator (options) {\n          return WrappedComponent =>\n            class Wrapper extends React.PureComponent {\n              static propTypes = {\n                error: PropTypes.string\n              }\n              render () {\n                const {error, ...props} = this.props\n                if (error) {\n                  return <div>Error! {error}</div>\n                } else {\n                  return <WrappedComponent {...props} />\n                }\n              }\n            }\n        }\n      ",
+			"{\"ignorePureComponents\":true}",
+		},
+		{
+			"\n        /**\n         * @param a.\n         */\n        function Comp() {\n          return <a></a>\n        }\n      ",
+			"",
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.sourceText, func(test *testing.T) {
@@ -165,10 +320,26 @@ func TestPreferStatelessFunctionOnlyClassesAndFactoriesReport(test *testing.T) {
 		sourceText string
 		findings   []string
 	}{
-		{"an es6 class component", "class Foo extends React.Component { render() { return <div/>; } }", []string{"componentShouldBePure"}},
-		{"the bare heritage spelling", "class Foo extends Component { render() { return <div/>; } }", []string{"componentShouldBePure"}},
-		{"a class expression", "const Foo = class extends React.Component { render() { return <div/>; } };", []string{"componentShouldBePure"}},
-		{"an es5 factory call", "var Foo = createReactClass({ render: function() { return <div/>; } });", []string{"componentShouldBePure"}},
+		{
+			"an es6 class component",
+			"class Foo extends React.Component { render() { return <div/>; } }",
+			[]string{"componentShouldBePure"},
+		},
+		{
+			"the bare heritage spelling",
+			"class Foo extends Component { render() { return <div/>; } }",
+			[]string{"componentShouldBePure"},
+		},
+		{
+			"a class expression",
+			"const Foo = class extends React.Component { render() { return <div/>; } };",
+			[]string{"componentShouldBePure"},
+		},
+		{
+			"an es5 factory call",
+			"var Foo = createReactClass({ render: function() { return <div/>; } });",
+			[]string{"componentShouldBePure"},
+		},
 		{"a function declaration is never a candidate", "function Foo() { return <div/>; }", nil},
 		{"nor an arrow", "const Foo = () => <div/>;", nil},
 		{"nor a function expression", "const Foo = function() { return <div/>; };", nil},
@@ -197,15 +368,51 @@ func TestPreferStatelessFunctionMemberBoundary(test *testing.T) {
 		sourceText string
 		findings   []string
 	}{
-		{"displayName as a static field", "class Foo extends React.Component { static displayName = 'F'; render() { return <div/>; } }", []string{"componentShouldBePure"}},
-		{"displayName as a getter, the same name through a different kind", "class Foo extends React.Component { static get displayName() { return 'F'; } render() { return <div/>; } }", []string{"componentShouldBePure"}},
-		{"propTypes", "class Foo extends React.Component { static propTypes = {}; render() { return <div/>; } }", []string{"componentShouldBePure"}},
-		{"defaultProps", "class Foo extends React.Component { static defaultProps = {}; render() { return <div/>; } }", []string{"componentShouldBePure"}},
-		{"contextTypes", "class Foo extends React.Component { static contextTypes = {}; render() { return <div/>; } }", []string{"componentShouldBePure"}},
-		{"any other method exempts", "class Foo extends React.Component { other() {} render() { return <div/>; } }", nil},
-		{"any other field exempts", "class Foo extends React.Component { other = 1; render() { return <div/>; } }", nil},
-		{"a childContextTypes member exempts, since it is not in the allowed set", "class Foo extends React.Component { childContextTypes = {}; render() { return <div/>; } }", nil},
-		{"a bare props member exempts, having no type annotation", "class Foo extends React.Component { props; render() { return <div/>; } }", nil},
+		{
+			"displayName as a static field",
+			"class Foo extends React.Component { static displayName = 'F'; render() { return <div/>; } }",
+			[]string{"componentShouldBePure"},
+		},
+		{
+			"displayName as a getter, the same name through a different kind",
+			"class Foo extends React.Component { static get displayName() { return 'F'; } render() { return <div/>; } }",
+			[]string{"componentShouldBePure"},
+		},
+		{
+			"propTypes",
+			"class Foo extends React.Component { static propTypes = {}; render() { return <div/>; } }",
+			[]string{"componentShouldBePure"},
+		},
+		{
+			"defaultProps",
+			"class Foo extends React.Component { static defaultProps = {}; render() { return <div/>; } }",
+			[]string{"componentShouldBePure"},
+		},
+		{
+			"contextTypes",
+			"class Foo extends React.Component { static contextTypes = {}; render() { return <div/>; } }",
+			[]string{"componentShouldBePure"},
+		},
+		{
+			"any other method exempts",
+			"class Foo extends React.Component { other() {} render() { return <div/>; } }",
+			nil,
+		},
+		{
+			"any other field exempts",
+			"class Foo extends React.Component { other = 1; render() { return <div/>; } }",
+			nil,
+		},
+		{
+			"a childContextTypes member exempts, since it is not in the allowed set",
+			"class Foo extends React.Component { childContextTypes = {}; render() { return <div/>; } }",
+			nil,
+		},
+		{
+			"a bare props member exempts, having no type annotation",
+			"class Foo extends React.Component { props; render() { return <div/>; } }",
+			nil,
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -229,14 +436,46 @@ func TestPreferStatelessFunctionThisBoundary(test *testing.T) {
 		sourceText string
 		findings   []string
 	}{
-		{"this.props is exempt", "class Foo extends React.Component { render() { return <div>{this.props.foo}</div>; } }", []string{"componentShouldBePure"}},
-		{"a string subscript reads as the same name", "class Foo extends React.Component { render() { return <div>{this['props'].foo}</div>; } }", []string{"componentShouldBePure"}},
-		{"this.context is exempt too", "class Foo extends React.Component { render() { return <div>{this.context.foo}</div>; } }", []string{"componentShouldBePure"}},
-		{"any other member is a real use of this", "class Foo extends React.Component { render() { return <div>{this.bar}</div>; } }", nil},
-		{"including through a string subscript", "class Foo extends React.Component { render() { return <div>{this['bar']}</div>; } }", nil},
-		{"and a computed key, whose name cannot be read", "declare const bar: string; class Foo extends React.Component { render() { return <div>{this[bar]}</div>; } }", nil},
-		{"destructuring only props and context is exempt", "class Foo extends React.Component { render() { let {props:{foo}, context:{bar}} = this; return <div/>; } }", []string{"componentShouldBePure"}},
-		{"one stray name disqualifies the whole pattern", "class Foo extends React.Component { render() { let {props:{foo}, bar} = this; return <div/>; } }", nil},
+		{
+			"this.props is exempt",
+			"class Foo extends React.Component { render() { return <div>{this.props.foo}</div>; } }",
+			[]string{"componentShouldBePure"},
+		},
+		{
+			"a string subscript reads as the same name",
+			"class Foo extends React.Component { render() { return <div>{this['props'].foo}</div>; } }",
+			[]string{"componentShouldBePure"},
+		},
+		{
+			"this.context is exempt too",
+			"class Foo extends React.Component { render() { return <div>{this.context.foo}</div>; } }",
+			[]string{"componentShouldBePure"},
+		},
+		{
+			"any other member is a real use of this",
+			"class Foo extends React.Component { render() { return <div>{this.bar}</div>; } }",
+			nil,
+		},
+		{
+			"including through a string subscript",
+			"class Foo extends React.Component { render() { return <div>{this['bar']}</div>; } }",
+			nil,
+		},
+		{
+			"and a computed key, whose name cannot be read",
+			"declare const bar: string; class Foo extends React.Component { render() { return <div>{this[bar]}</div>; } }",
+			nil,
+		},
+		{
+			"destructuring only props and context is exempt",
+			"class Foo extends React.Component { render() { let {props:{foo}, context:{bar}} = this; return <div/>; } }",
+			[]string{"componentShouldBePure"},
+		},
+		{
+			"one stray name disqualifies the whole pattern",
+			"class Foo extends React.Component { render() { let {props:{foo}, bar} = this; return <div/>; } }",
+			nil,
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -260,10 +499,26 @@ func TestPreferStatelessFunctionChildContextTypes(test *testing.T) {
 		sourceText string
 		findings   []string
 	}{
-		{"an out-of-band declaration naming this component exempts", "class Foo extends React.Component { render() { return <div/>; } }\nFoo.childContextTypes = {};", nil},
-		{"naming a different identifier does not", "declare const Bar: any;\nclass Foo extends React.Component { render() { return <div/>; } }\nBar.childContextTypes = {};", []string{"componentShouldBePure"}},
-		{"a different property does not", "class Foo extends React.Component { render() { return <div/>; } }\nFoo.somethingElse = {};", []string{"componentShouldBePure"}},
-		{"a read rather than a declaration on another object does not", "declare const y: any;\nclass Foo extends React.Component { render() { return <div/>; } }\nconst x = y.childContextTypes;", []string{"componentShouldBePure"}},
+		{
+			"an out-of-band declaration naming this component exempts",
+			"class Foo extends React.Component { render() { return <div/>; } }\nFoo.childContextTypes = {};",
+			nil,
+		},
+		{
+			"naming a different identifier does not",
+			"declare const Bar: any;\nclass Foo extends React.Component { render() { return <div/>; } }\nBar.childContextTypes = {};",
+			[]string{"componentShouldBePure"},
+		},
+		{
+			"a different property does not",
+			"class Foo extends React.Component { render() { return <div/>; } }\nFoo.somethingElse = {};",
+			[]string{"componentShouldBePure"},
+		},
+		{
+			"a read rather than a declaration on another object does not",
+			"declare const y: any;\nclass Foo extends React.Component { render() { return <div/>; } }\nconst x = y.childContextTypes;",
+			[]string{"componentShouldBePure"},
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -288,10 +543,26 @@ func TestPreferStatelessFunctionReturnBoundary(test *testing.T) {
 		findings   []string
 	}{
 		{"jsx", "class Foo extends React.Component { render() { return <div/>; } }", []string{"componentShouldBePure"}},
-		{"a fragment", "class Foo extends React.Component { render() { return <></>; } }", []string{"componentShouldBePure"}},
-		{"null, allowed since React 15", "class Foo extends React.Component { render() { return null; } }", []string{"componentShouldBePure"}},
-		{"false", "class Foo extends React.Component { render() { return false; } }", []string{"componentShouldBePure"}},
-		{"a conditional with one qualifying branch", "class Foo extends React.Component { render() { return true ? <div/> : null; } }", []string{"componentShouldBePure"}},
+		{
+			"a fragment",
+			"class Foo extends React.Component { render() { return <></>; } }",
+			[]string{"componentShouldBePure"},
+		},
+		{
+			"null, allowed since React 15",
+			"class Foo extends React.Component { render() { return null; } }",
+			[]string{"componentShouldBePure"},
+		},
+		{
+			"false",
+			"class Foo extends React.Component { render() { return false; } }",
+			[]string{"componentShouldBePure"},
+		},
+		{
+			"a conditional with one qualifying branch",
+			"class Foo extends React.Component { render() { return true ? <div/> : null; } }",
+			[]string{"componentShouldBePure"},
+		},
 		{"a number is neither jsx nor null", "class Foo extends React.Component { render() { return 42; } }", nil},
 		{"a string likewise", "class Foo extends React.Component { render() { return 'x'; } }", nil},
 		{"a bare return has no argument at all", "class Foo extends React.Component { render() { return; } }", nil},
@@ -332,7 +603,9 @@ func TestPreferStatelessFunctionDecodesOptions(test *testing.T) {
 
 	test.Run("the wire name is ignorePureComponents", func(test *testing.T) {
 		test.Parallel()
-		decoded, decodePreferStatelessFunctionOptionsError := DecodePreferStatelessFunctionOptions(json.RawMessage(`{"ignorePureComponents":true}`))
+		decoded, decodePreferStatelessFunctionOptionsError := DecodePreferStatelessFunctionOptions(
+			json.RawMessage(`{"ignorePureComponents":true}`),
+		)
 		if decodePreferStatelessFunctionOptionsError != nil {
 			test.Fatalf("decoding: %v", decodePreferStatelessFunctionOptionsError)
 		}
@@ -358,7 +631,11 @@ func TestPreferStatelessFunctionDecodesOptions(test *testing.T) {
 		// Component and PureComponent alike and is the right predicate for the outer gate and the
 		// wrong one here; routing the option through it would exempt every class component.
 		const sourceText = "class Foo extends React.Component { render() { return <div>{this.props.foo}</div>; } }"
-		rule_testing.ExpectFindings(test, runPreferStatelessFunction(test, sourceText, `{"ignorePureComponents":true}`), "componentShouldBePure")
+		rule_testing.ExpectFindings(
+			test,
+			runPreferStatelessFunction(test, sourceText, `{"ignorePureComponents":true}`),
+			"componentShouldBePure",
+		)
 	})
 
 	test.Run("the rule falls back to the default when handed nil rather than the struct", func(test *testing.T) {
@@ -405,7 +682,11 @@ func TestPreferStatelessFunctionSpan(test *testing.T) {
 
 	test.Run("the message identifies the rule and explains the defect", func(test *testing.T) {
 		test.Parallel()
-		result := runPreferStatelessFunction(test, "class Foo extends React.Component { render() { return <div/>; } }", "")
+		result := runPreferStatelessFunction(
+			test,
+			"class Foo extends React.Component { render() { return <div/>; } }",
+			"",
+		)
 		rule_testing.ExpectFindings(test, result, "componentShouldBePure")
 		if result.Diagnostics[0].Message.Id != "componentShouldBePure" {
 			test.Fatalf("id was %q", result.Diagnostics[0].Message.Id)

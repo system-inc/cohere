@@ -61,7 +61,12 @@ func Format(text string, prettierOptions formatoptions.Options, textToDoc printi
 
 // formatWithProseWrap is Format with proseWrap given, so the tests can reach the always and never
 // branches the corpora never take.
-func formatWithProseWrap(text string, prettierOptions formatoptions.Options, proseWrap string, textToDoc printing.TextToDoc) (formatted string, err error) {
+func formatWithProseWrap(
+	text string,
+	prettierOptions formatoptions.Options,
+	proseWrap string,
+	textToDoc printing.TextToDoc,
+) (formatted string, err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			formatted, err = "", fmt.Errorf("markdown: %v", recovered)
@@ -101,5 +106,9 @@ func formatWithProseWrap(text string, prettierOptions formatoptions.Options, pro
 		return "", err
 	}
 
-	return doc.Print(document, doc.Options{PrintWidth: prettierOptions.PrintWidth, TabWidth: prettierOptions.TabWidth, UseTabs: prettierOptions.UseTabs}), nil
+	return doc.Print(document, doc.Options{
+		PrintWidth: prettierOptions.PrintWidth,
+		TabWidth:   prettierOptions.TabWidth,
+		UseTabs:    prettierOptions.UseTabs,
+	}), nil
 }

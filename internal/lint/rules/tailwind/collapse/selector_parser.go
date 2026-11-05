@@ -453,7 +453,11 @@ func parseSelectorTree(input string) []*selectorTreeNode {
 		// A `(` opens a function whose name is whatever the buffer held, which is empty for a bare
 		// `(`.
 		case selectorOpenParen:
-			node := &selectorTreeNode{kind: SelectorNodeKindFunction, value: buffer.String(), nodes: []*selectorTreeNode{}}
+			node := &selectorTreeNode{
+				kind:  SelectorNodeKindFunction,
+				value: buffer.String(),
+				nodes: []*selectorTreeNode{},
+			}
 			buffer.Reset()
 
 			// Only these four take a selector argument. Every other function's arguments are taken
@@ -495,7 +499,10 @@ func parseSelectorTree(input string) []*selectorTreeNode {
 				// space specifically, so `of` followed by a tab or newline is not a clause.
 				if node.value == ":nth-child" || node.value == ":nth-last-child" {
 					if clause := strings.Index(contents, "of "); clause != -1 {
-						node.nodes = append(node.nodes, &selectorTreeNode{kind: SelectorNodeKindValue, value: contents[:clause+3]})
+						node.nodes = append(
+							node.nodes,
+							&selectorTreeNode{kind: SelectorNodeKindValue, value: contents[:clause+3]},
+						)
 						node.nodes = append(node.nodes, parseSelectorTree(contents[clause+3:])...)
 						index = end
 						appendNode(node)

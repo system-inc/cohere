@@ -47,7 +47,10 @@ func blockScopedVarFiresCases() []blockScopedVarCase {
 		{"class C { static { if (bar) { var foo; } foo; } }", []string{"outOfScope"}},
 		{"{ var foo,\n  bar; } bar;", []string{"outOfScope"}},
 		{"{ var { foo,\n  bar } = baz; } bar;", []string{"outOfScope"}},
-		{"if (foo) { var a = 1; } else if (bar) { var a = 2; } else { var a = 3; }", []string{"outOfScope", "outOfScope", "outOfScope", "outOfScope", "outOfScope", "outOfScope"}},
+		{
+			"if (foo) { var a = 1; } else if (bar) { var a = 2; } else { var a = 3; }",
+			[]string{"outOfScope", "outOfScope", "outOfScope", "outOfScope", "outOfScope", "outOfScope"},
+		},
 	}
 }
 
@@ -125,10 +128,16 @@ func blockScopedVarSilentCases() []blockScopedVarCase {
 		{"function z(){var b;}; var a = b;", []string{}},
 		{"function f(){ try{}catch(e){} e }", []string{}},
 		{"a:b;", []string{}},
-		{"/*global React*/ let {PropTypes, addons: {PureRenderMixin}} = React; let Test = React.createClass({mixins: [PureRenderMixin]});", []string{}},
+		{
+			"/*global React*/ let {PropTypes, addons: {PureRenderMixin}} = React; let Test = React.createClass({mixins: [PureRenderMixin]});",
+			[]string{},
+		},
 		{"/*global prevState*/ const { virtualSize: prevVirtualSize = 0 } = prevState;", []string{}},
 		{"const { dummy: { data, isLoading }, auth: { isLoggedIn } } = this.props;", []string{}},
-		{"function a(n) { return n > 0 ? b(n - 1) : \"a\"; } function b(n) { return n > 0 ? a(n - 1) : \"b\"; }", []string{}},
+		{
+			"function a(n) { return n > 0 ? b(n - 1) : \"a\"; } function b(n) { return n > 0 ? a(n - 1) : \"b\"; }",
+			[]string{},
+		},
 		{"(function () { foo(); })(); function foo() {}", []string{}},
 		{"class C { static { var foo; foo; } }", []string{}},
 		{"class C { static { foo; var foo; } }", []string{}},

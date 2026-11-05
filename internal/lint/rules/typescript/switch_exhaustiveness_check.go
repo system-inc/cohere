@@ -268,7 +268,10 @@ var SwitchExhaustivenessCheck = rule.Rule{
 					continue
 				}
 
-				caseTypes = append(caseTypes, type_checking.GetConstrainedTypeAtLocation(ruleContext.TypeChecker, c.AsCaseOrDefaultClause().Expression))
+				caseTypes = append(caseTypes, type_checking.GetConstrainedTypeAtLocation(
+					ruleContext.TypeChecker,
+					c.AsCaseOrDefaultClause().Expression,
+				))
 			}
 
 			containsNonLiteralType := doesTypeContainNonLiteralType(discriminantType)
@@ -298,7 +301,11 @@ var SwitchExhaustivenessCheck = rule.Rule{
 				MissingLiteralBranchTypes: missingLiteralBranchTypes,
 			}
 			if defaultCase == nil {
-				metadata.DefaultCaseComment, metadata.DefaultCaseCommentOverran = defaultCaseComment(ruleContext, node, commentPattern)
+				metadata.DefaultCaseComment, metadata.DefaultCaseCommentOverran = defaultCaseComment(
+					ruleContext,
+					node,
+					commentPattern,
+				)
 			}
 			return metadata
 		}
@@ -404,7 +411,11 @@ func (metadata *switchMetadata) hasDefaultCase() bool {
 //	// no default here                        not          the default pattern is anchored at both ends
 //
 // An empty pattern matches every comment, as `new RegExp(”)` does upstream.
-func defaultCaseComment(ruleContext rule.Context, statement *ast.SwitchStatement, pattern *esregexp.RegExp) (*comments.Comment, bool) {
+func defaultCaseComment(
+	ruleContext rule.Context,
+	statement *ast.SwitchStatement,
+	pattern *esregexp.RegExp,
+) (*comments.Comment, bool) {
 	if pattern == nil {
 		return nil, false
 	}

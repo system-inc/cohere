@@ -60,12 +60,21 @@ func printJSON(path *Path, options *Options, print PrintFunc, _ any) Doc {
 			}
 			return print(nil, nil)
 		}, "elements")
-		return concatIn(path, "[", indentIn(path, concatIn(path, hardline, join(concatIn(path, ",", hardline), printed))), hardline, "]")
+		return concatIn(
+			path,
+			"[",
+			indentIn(path, concatIn(path, hardline, join(concatIn(path, ",", hardline), printed))),
+			hardline,
+			"]",
+		)
 	case "ObjectExpression":
 		if len(current.List("properties")) == 0 {
 			return doc.Text("{}")
 		}
-		return concatIn(path, "{", indentIn(path, concatIn(path, hardline, join(concatIn(path, ",", hardline), printAll(path, print, "properties")))), hardline, "}")
+		return concatIn(path, "{", indentIn(
+			path,
+			concatIn(path, hardline, join(concatIn(path, ",", hardline), printAll(path, print, "properties"))),
+		), hardline, "}")
 	case "ObjectProperty":
 		return concatIn(path, print("key", nil), ": ", print("value", nil))
 	case "UnaryExpression":
@@ -112,7 +121,10 @@ func printJSON(path *Path, options *Options, print PrintFunc, _ any) Doc {
 		value, isTemplateValue := current.Get("value").(*estree.TemplateValue)
 		if !isTemplateValue || value == nil || value.Cooked == nil {
 			// Invariant: estree.ParseJSON builds every TemplateElement with a TemplateValue whose cooked text is set.
-			panic(fmt.Sprintf("javascript: a JSON TemplateElement's value is a %T with no cooked text", current.Get("value")))
+			panic(fmt.Sprintf(
+				"javascript: a JSON TemplateElement's value is a %T with no cooked text",
+				current.Get("value"),
+			))
 		}
 		return doc.Text(jsonStringify(*value.Cooked))
 	}

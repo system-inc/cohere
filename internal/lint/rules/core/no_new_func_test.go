@@ -35,9 +35,15 @@ func TestNoNewFuncFires(test *testing.T) {
 		{"bind on the global, then invoked", "var a = Function.bind(null, \"b\", \"c\", \"return b+c\")();"},
 		{"bind on the global, uncalled", "var a = Function.bind(null, \"b\", \"c\", \"return b+c\");"},
 		{"a subscripted call on the global", "var a = Function[\"call\"](null, \"b\", \"c\", \"return b+c\");"},
-		{"a parenthesized optional call on the global", "var a = (Function?.call)(null, \"b\", \"c\", \"return b+c\");"},
+		{
+			"a parenthesized optional call on the global",
+			"var a = (Function?.call)(null, \"b\", \"c\", \"return b+c\");",
+		},
 		{"a class shadowing only an inner scope", "const fn = () => { class Function {} }; new Function('', '')"},
-		{"a function declaration shadowing only an inner scope", "var fn = function () { function Function() {} }; Function('', '')"},
+		{
+			"a function declaration shadowing only an inner scope",
+			"var fn = function () { function Function() {} }; Function('', '')",
+		},
 	}
 
 	for _, testCase := range cases {
@@ -68,7 +74,10 @@ func TestNoNewFuncStaysSilent(test *testing.T) {
 		{"a class shadowing the global", "class Function {}; new Function()"},
 		{"a class shadowing inside an arrow body", "const fn = () => { class Function {}; new Function() }"},
 		{"a function declaration shadowing the global", "function Function() {}; Function()"},
-		{"a function declaration shadowing inside a function body", "var fn = function () { function Function() {}; Function() }"},
+		{
+			"a function declaration shadowing inside a function body",
+			"var fn = function () { function Function() {}; Function() }",
+		},
 		{"a named function expression shadowing its own body", "var x = function Function() { Function(); }"},
 		{"the global passed as an argument", "call(Function)"},
 		{"the global passed to another constructor", "new Class(Function)"},

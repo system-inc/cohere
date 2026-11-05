@@ -265,7 +265,11 @@ func (path *AstPath[N]) Each(callback func(path *AstPath[N], index int, value an
 }
 
 // Map is upstream's path.map(callback, ...names): Each, collecting results by index.
-func Map[N Node[N], R any](path *AstPath[N], callback func(path *AstPath[N], index int, value any) R, names ...any) []R {
+func Map[N Node[N], R any](
+	path *AstPath[N],
+	callback func(path *AstPath[N], index int, value any) R,
+	names ...any,
+) []R {
 	var results []R
 	path.Each(func(path *AstPath[N], index int, value any) {
 		for len(results) <= index {

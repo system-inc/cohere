@@ -4,8 +4,8 @@ import "testing"
 
 // TestCheckedInTablesMatchTheInstalledEngine is the standing half of the upstream diff.
 //
-// `internal/lint/rules/tailwind/tools/generate_upstream_diff` compares two installed engines and reports which of the port's
-// tables need regenerating. That is the tool a person runs on a version bump. This is the part that
+// `internal/lint/rules/tailwind/tools/generate_upstream_diff` compares two installed engines and reports which of the
+// port's tables need regenerating. That is the tool a person runs on a version bump. This is the part that
 // runs on every build: it compares the checked-in tables against the engine actually installed here,
 // so a bump that lands without anyone running the tool fails the suite rather than shipping.
 //
@@ -88,8 +88,14 @@ func TestCheckedInTablesMatchTheInstalledEngine(test *testing.T) {
 				"vouches for classes that do not compile: %v", len(missingFromEngine), truncate(missingFromEngine, 12))
 		}
 
-		test.Logf("Tailwind %s: %d statics registered, %d in the table, %d property positions, %d variant registrations",
-			system.TailwindVersion, len(registered), len(FrameworkStaticDeclarations), len(PropertyOrder), len(FrameworkVariantRegistrations))
+		test.Logf(
+			"Tailwind %s: %d statics registered, %d in the table, %d property positions, %d variant registrations",
+			system.TailwindVersion,
+			len(registered),
+			len(FrameworkStaticDeclarations),
+			len(PropertyOrder),
+			len(FrameworkVariantRegistrations),
+		)
 	})
 }
 
@@ -103,8 +109,8 @@ func TestCheckedInTablesMatchTheInstalledEngine(test *testing.T) {
 //
 // The circularity is not a defect to fix in Go, because Go has no engine to ask: the registry lives
 // behind `designSystem.utilities.keys('static')` and that is JavaScript. The non-circular comparison
-// is `internal/lint/rules/tailwind/tools/generate_upstream_diff`, which loads two real engines and diffs their registries.
-// That tool was proven against a planted control: renaming `sr-only` to `sr-only-planted` in one
+// is `internal/lint/rules/tailwind/tools/generate_upstream_diff`, which loads two real engines and diffs their
+// registries. That tool was proven against a planted control: renaming `sr-only` to `sr-only-planted` in one
 // bundle produced exactly two changes, the addition and the removal, where three genuine patch
 // releases produced zero.
 //

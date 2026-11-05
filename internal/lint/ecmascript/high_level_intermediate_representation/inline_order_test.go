@@ -28,7 +28,10 @@ func TestInlineMemoCallbacksRepeatIdentically(test *testing.T) {
 		if !strings.Contains(fixture.source, "useMemo") && !strings.Contains(fixture.source, "useCallback") {
 			continue
 		}
-		prepasses := lowerReactCompilerFixture(test, fixture.source, func(ruleContext rule.Context, node *ast.Node) *Function {
+		prepasses := lowerReactCompilerFixture(test, fixture.source, func(
+			ruleContext rule.Context,
+			node *ast.Node,
+		) *Function {
 			f := Lower(node, ruleContext.TypeChecker)
 			if f != nil {
 				Construct(f)
@@ -83,7 +86,13 @@ func TestInlineMemoCallbacksRepeatIdentically(test *testing.T) {
 			test.Errorf("missing regression case %s", name)
 		}
 	}
-	test.Logf("%d fixtures, %d functions, %d splices, %d repetitions per function", fixtures, functions, splices, repetitions)
+	test.Logf(
+		"%d fixtures, %d functions, %d splices, %d repetitions per function",
+		fixtures,
+		functions,
+		splices,
+		repetitions,
+	)
 	if fixtures == 0 || functions == 0 || splices == 0 {
 		test.Fatal("no memo callback inlined: repetition would be vacuous")
 	}

@@ -59,7 +59,10 @@ func TestSymbolDescriptionStaysSilent(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, SymbolDescription, symbolDescriptionFile, testCase.sourceText))
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.RunTyped(test, SymbolDescription, symbolDescriptionFile, testCase.sourceText),
+			)
 		})
 	}
 }
@@ -127,7 +130,10 @@ func TestSymbolDescriptionStaysSilentOnCasesBeyondTheCorpus(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, SymbolDescription, symbolDescriptionFile, testCase.sourceText))
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.RunTyped(test, SymbolDescription, symbolDescriptionFile, testCase.sourceText),
+			)
 		})
 	}
 }
@@ -193,7 +199,10 @@ func TestSymbolDescriptionMessage(test *testing.T) {
 	if got := result.Diagnostics[0].Message.Id; got != "expected" {
 		test.Errorf("message id is %q, want %q", got, "expected")
 	}
-	if got := result.Diagnostics[0].Message.Description; !strings.HasPrefix(got, "This creates a symbol with no description") {
+	if got := result.Diagnostics[0].Message.Description; !strings.HasPrefix(
+		got,
+		"This creates a symbol with no description",
+	) {
 		test.Errorf("message description starts %q, which is not the sentence this rule reports", got)
 	}
 }
@@ -224,7 +233,10 @@ func TestSymbolDescriptionStaysSilentOnOtherGlobals(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, SymbolDescription, symbolDescriptionFile, testCase.sourceText))
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.RunTyped(test, SymbolDescription, symbolDescriptionFile, testCase.sourceText),
+			)
 		})
 	}
 }

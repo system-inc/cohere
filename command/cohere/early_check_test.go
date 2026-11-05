@@ -34,16 +34,31 @@ func TestAFixThatRewritesAFileDuringTheEarlyCheckDoesNotCrashTheRun(test *testin
 			test.Fatal(writeError)
 		}
 	}
-	write("tsconfig.json", `{"compilerOptions":{"strict":true,"noEmit":true,"target":"es2022","module":"esnext","moduleResolution":"bundler"},"include":["source"]}`)
+	write(
+		"tsconfig.json",
+		`{"compilerOptions":{"strict":true,"noEmit":true,"target":"es2022","module":"esnext","moduleResolution":"bundler"},"include":["source"]}`,
+	)
 	write("CohereSettings.json", `{"rules":{"prefer-const":"error"}}`)
 	write("package.json", `{"name":"fixture","private":true,"type":"module"}`)
 	write(".gitignore", ".cache/\nnode_modules/\n")
-	write("source/fixable.ts", "export function fixable(): number {\n    let unchanged = 1;\n    return unchanged;\n}\n")
+	write(
+		"source/fixable.ts",
+		"export function fixable(): number {\n    let unchanged = 1;\n    return unchanged;\n}\n",
+	)
 	for index := range 4 {
-		write(fmt.Sprintf("source/other%d.ts", index), fmt.Sprintf("export const other%d: number = %d;\n", index, index))
+		write(
+			fmt.Sprintf("source/other%d.ts", index),
+			fmt.Sprintf("export const other%d: number = %d;\n", index, index),
+		)
 	}
 
-	output, exitCode := runCohereWithEnvironment(test, binary, root, []string{"COHERE_TEST_HOLD_EARLY_CHECK=1"}, "--single-threaded")
+	output, exitCode := runCohereWithEnvironment(
+		test,
+		binary,
+		root,
+		[]string{"COHERE_TEST_HOLD_EARLY_CHECK=1"},
+		"--single-threaded",
+	)
 
 	if strings.Contains(output, "panic") {
 		test.Fatalf("the run panicked after its fix phase rebuilt the graph:\n%s", output)
@@ -87,7 +102,10 @@ func TestExplainWritesNothing(test *testing.T) {
 			test.Fatal(writeError)
 		}
 	}
-	write("tsconfig.json", `{"compilerOptions":{"strict":true,"noEmit":true,"target":"es2022","module":"esnext","moduleResolution":"bundler"},"include":["source"]}`)
+	write(
+		"tsconfig.json",
+		`{"compilerOptions":{"strict":true,"noEmit":true,"target":"es2022","module":"esnext","moduleResolution":"bundler"},"include":["source"]}`,
+	)
 	write("CohereSettings.json", `{"rules":{"prefer-const":"error"}}`)
 	write("package.json", `{"name":"fixture","private":true,"type":"module"}`)
 	write(".gitignore", ".cache/\nnode_modules/\n")

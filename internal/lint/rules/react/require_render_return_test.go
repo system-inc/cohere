@@ -35,15 +35,35 @@ func TestRequireRenderReturnFires(test *testing.T) {
 		sourceText string
 		findings   []string
 	}{
-		{"upstream invalid 0", "\n        var Hello = createReactClass({\n          displayName: 'Hello',\n          render: function() {}\n        });\n      ", []string{"noRenderReturn"}},
-		{"upstream invalid 1", "\n        class Hello extends React.Component {\n          render() {}\n        }\n      ", []string{"noRenderReturn"}},
-		{"upstream invalid 2", "\n        class Hello extends React.Component {\n          render() {\n            const names = this.props.names.map(function(name) {\n              return <div>{name}</div>\n            });\n          }\n        }\n      ", []string{"noRenderReturn"}},
-		{"upstream invalid 3", "\n        class Hello extends React.Component {\n          render = () => {\n            <div>Hello {this.props.name}</div>\n          }\n        }\n      ", []string{"noRenderReturn"}},
+		{
+			"upstream invalid 0",
+			"\n        var Hello = createReactClass({\n          displayName: 'Hello',\n          render: function() {}\n        });\n      ",
+			[]string{"noRenderReturn"},
+		},
+		{
+			"upstream invalid 1",
+			"\n        class Hello extends React.Component {\n          render() {}\n        }\n      ",
+			[]string{"noRenderReturn"},
+		},
+		{
+			"upstream invalid 2",
+			"\n        class Hello extends React.Component {\n          render() {\n            const names = this.props.names.map(function(name) {\n              return <div>{name}</div>\n            });\n          }\n        }\n      ",
+			[]string{"noRenderReturn"},
+		},
+		{
+			"upstream invalid 3",
+			"\n        class Hello extends React.Component {\n          render = () => {\n            <div>Hello {this.props.name}</div>\n          }\n        }\n      ",
+			[]string{"noRenderReturn"},
+		},
 		// --- cases upstream does not cover, each measured against the installed build ---
 
 		// The ES5 factory name is `createReactClass` alone. `createClass` and `React.createClass`
 		// are both clean, which the two silent fixtures pin; this is the spelling that reports.
-		{"es5 namespaced createReactClass", "var Hello = React.createReactClass({\n  render: function() {}\n});\n", []string{"noRenderReturn"}},
+		{
+			"es5 namespaced createReactClass",
+			"var Hello = React.createReactClass({\n  render: function() {}\n});\n",
+			[]string{"noRenderReturn"},
+		},
 
 		// Parentheses in the heritage clause, all four spellings, all reporting.
 		//
@@ -54,38 +74,86 @@ func TestRequireRenderReturnFires(test *testing.T) {
 		// The first and third of these fail against the shelf helper and pass against the local
 		// one, which is the entire reason `isRenderReturnEs6ComponentClass` exists. Measured on
 		// the installed build; nothing in the corpus writes a parenthesis.
-		{"parens around the whole heritage expression", "class Hello extends (React.Component) {\n  render() {}\n}\n", []string{"noRenderReturn"}},
-		{"parens around the heritage receiver", "class Hello extends (React).Component {\n  render() {}\n}\n", []string{"noRenderReturn"}},
-		{"nested parens around the heritage expression", "class Hello extends ((React.Component)) {\n  render() {}\n}\n", []string{"noRenderReturn"}},
-		{"parens around a bare base name", "class Hello extends (Component) {\n  render() {}\n}\n", []string{"noRenderReturn"}},
+		{
+			"parens around the whole heritage expression",
+			"class Hello extends (React.Component) {\n  render() {}\n}\n",
+			[]string{"noRenderReturn"},
+		},
+		{
+			"parens around the heritage receiver",
+			"class Hello extends (React).Component {\n  render() {}\n}\n",
+			[]string{"noRenderReturn"},
+		},
+		{
+			"nested parens around the heritage expression",
+			"class Hello extends ((React.Component)) {\n  render() {}\n}\n",
+			[]string{"noRenderReturn"},
+		},
+		{
+			"parens around a bare base name",
+			"class Hello extends (Component) {\n  render() {}\n}\n",
+			[]string{"noRenderReturn"},
+		},
 
 		// The ES5 factory callee in parentheses. `isEs5ComponentCallStrict` skips them and upstream
 		// agrees, so this is the one paren position where the shelf and the authority already
 		// match.
-		{"parens around the es5 factory callee", "var Hello = (createReactClass)({\n  render: function() {}\n});\n", []string{"noRenderReturn"}},
+		{
+			"parens around the es5 factory callee",
+			"var Hello = (createReactClass)({\n  render: function() {}\n});\n",
+			[]string{"noRenderReturn"},
+		},
 
 		// The bare base names, and the pure variant. All four report.
 		{"bare Component base", "class Hello extends Component {\n  render() {}\n}\n", []string{"noRenderReturn"}},
-		{"bare PureComponent base", "class Hello extends PureComponent {\n  render() {}\n}\n", []string{"noRenderReturn"}},
-		{"namespaced PureComponent base", "class Hello extends React.PureComponent {\n  render() {}\n}\n", []string{"noRenderReturn"}},
+		{
+			"bare PureComponent base",
+			"class Hello extends PureComponent {\n  render() {}\n}\n",
+			[]string{"noRenderReturn"},
+		},
+		{
+			"namespaced PureComponent base",
+			"class Hello extends React.PureComponent {\n  render() {}\n}\n",
+			[]string{"noRenderReturn"},
+		},
 
 		// A class expression is a component too, which `Components.detect` registers alongside the
 		// declaration and the rule's own filter keeps.
-		{"class expression component", "var Hello = class extends React.Component {\n  render() {}\n};\n", []string{"noRenderReturn"}},
+		{
+			"class expression component",
+			"var Hello = class extends React.Component {\n  render() {}\n};\n",
+			[]string{"noRenderReturn"},
+		},
 
 		// An arrow with a block body has no implicit return, so it falls through to the walk and
 		// reports. Its expression-bodied twin is a silent fixture below, and the pair is what
 		// separates the two listeners.
-		{"arrow render with empty block body", "class Hello extends React.Component {\n  render = () => {}\n}\n", []string{"noRenderReturn"}},
-		{"es5 arrow render with empty block body", "var Hello = createReactClass({\n  render: () => {}\n});\n", []string{"noRenderReturn"}},
+		{
+			"arrow render with empty block body",
+			"class Hello extends React.Component {\n  render = () => {}\n}\n",
+			[]string{"noRenderReturn"},
+		},
+		{
+			"es5 arrow render with empty block body",
+			"var Hello = createReactClass({\n  render: () => {}\n});\n",
+			[]string{"noRenderReturn"},
+		},
 
 		// A `render` property whose value is a function expression rather than an arrow.
-		{"render property holding a function expression", "class Hello extends React.Component {\n  render = function() {}\n}\n", []string{"noRenderReturn"}},
+		{
+			"render property holding a function expression",
+			"class Hello extends React.Component {\n  render = function() {}\n}\n",
+			[]string{"noRenderReturn"},
+		},
 
 		// Accessors and modifiers. Upstream sees each of these as a `MethodDefinition` whose
 		// `value` is a `FunctionExpression`, so all five report; our tree splits the accessors into
 		// their own kinds, which is why they are matched explicitly in the rule.
-		{"static render", "class Hello extends React.Component {\n  static render() {}\n}\n", []string{"noRenderReturn"}},
+		{
+			"static render",
+			"class Hello extends React.Component {\n  static render() {}\n}\n",
+			[]string{"noRenderReturn"},
+		},
 		{"getter render", "class Hello extends React.Component {\n  get render() {}\n}\n", []string{"noRenderReturn"}},
 		{"setter render", "class Hello extends React.Component {\n  set render(v) {}\n}\n", []string{"noRenderReturn"}},
 		{"async render", "class Hello extends React.Component {\n  async render() {}\n}\n", []string{"noRenderReturn"}},
@@ -95,38 +163,82 @@ func TestRequireRenderReturnFires(test *testing.T) {
 		// upstream's `/Function(Expression|Declaration)$/` is unanchored at the front and
 		// `ArrowFunctionExpression` matches it. Reading arrows as transparent is the natural wrong
 		// answer and these three are what catch it.
-		{"return only inside a nested arrow", "class Hello extends React.Component {\n  render() {\n    var f = () => { return 1; };\n  }\n}\n", []string{"noRenderReturn"}},
-		{"return only inside a nested function declaration", "class Hello extends React.Component {\n  render() {\n    function f() { return 1; }\n  }\n}\n", []string{"noRenderReturn"}},
-		{"es5 return only inside a nested arrow", "var Hello = createReactClass({\n  render: function() { var f = () => { return 1; }; }\n});\n", []string{"noRenderReturn"}},
+		{
+			"return only inside a nested arrow",
+			"class Hello extends React.Component {\n  render() {\n    var f = () => { return 1; };\n  }\n}\n",
+			[]string{"noRenderReturn"},
+		},
+		{
+			"return only inside a nested function declaration",
+			"class Hello extends React.Component {\n  render() {\n    function f() { return 1; }\n  }\n}\n",
+			[]string{"noRenderReturn"},
+		},
+		{
+			"es5 return only inside a nested arrow",
+			"var Hello = createReactClass({\n  render: function() { var f = () => { return 1; }; }\n});\n",
+			[]string{"noRenderReturn"},
+		},
 
 		// The per-component flag, in the direction that reports. Both renders empty reports once,
 		// on the first, which is `findRenderMethod` taking the first match.
-		{"two empty render methods report once on the first", "class Hello extends React.Component {\n  render() {}\n  render() {}\n}\n", []string{"noRenderReturn"}},
+		{
+			"two empty render methods report once on the first",
+			"class Hello extends React.Component {\n  render() {}\n  render() {}\n}\n",
+			[]string{"noRenderReturn"},
+		},
 
 		// A return in a sibling method does not satisfy `render`: the ancestor named `render` is
 		// never reached on the climb.
-		{"return only in a sibling method", "class Hello extends React.Component {\n  foo() { return 1; }\n  render() {}\n}\n", []string{"noRenderReturn"}},
+		{
+			"return only in a sibling method",
+			"class Hello extends React.Component {\n  foo() { return 1; }\n  render() {}\n}\n",
+			[]string{"noRenderReturn"},
+		},
 
 		// Two broken components in one file report twice, in source order.
-		{"two broken components", "class A extends React.Component { render() {} }\nclass B extends React.Component { render() {} }\n", []string{"noRenderReturn", "noRenderReturn"}},
+		{
+			"two broken components",
+			"class A extends React.Component { render() {} }\nclass B extends React.Component { render() {} }\n",
+			[]string{"noRenderReturn", "noRenderReturn"},
+		},
 
 		// Nested components are each judged on their own. The inner one is registered, so the
 		// return inside it marks the inner and leaves the outer unmarked.
-		{"inner component returns, outer does not", "class Outer extends React.Component {\n  render() {\n    class Inner extends React.Component { render() { return <div/>; } }\n  }\n}\n", []string{"noRenderReturn"}},
+		{
+			"inner component returns, outer does not",
+			"class Outer extends React.Component {\n  render() {\n    class Inner extends React.Component { render() { return <div/>; } }\n  }\n}\n",
+			[]string{"noRenderReturn"},
+		},
 
 		// An implicit-return arrow whose parent property is not named `render` must not satisfy
 		// anything. Upstream's second listener returns early on exactly this test, and a mutation
 		// removing it survived every other fixture: the arm then marks the enclosing component for
 		// any expression-bodied arrow anywhere inside it, which is three of the commonest shapes
 		// in real code. All three measured as reporting on the installed build.
-		{"implicit arrow bound to a plain variable", "class Hello extends React.Component {\n  render() {\n    var f = () => <div/>;\n  }\n}\n", []string{"noRenderReturn"}},
-		{"implicit arrow on a property named something else", "class Hello extends React.Component {\n  render() {\n    var o = { other: () => <div/> };\n  }\n}\n", []string{"noRenderReturn"}},
-		{"implicit arrow passed as a callback argument", "class Hello extends React.Component {\n  render() {\n    [].map(x => x + 1);\n  }\n}\n", []string{"noRenderReturn"}},
+		{
+			"implicit arrow bound to a plain variable",
+			"class Hello extends React.Component {\n  render() {\n    var f = () => <div/>;\n  }\n}\n",
+			[]string{"noRenderReturn"},
+		},
+		{
+			"implicit arrow on a property named something else",
+			"class Hello extends React.Component {\n  render() {\n    var o = { other: () => <div/> };\n  }\n}\n",
+			[]string{"noRenderReturn"},
+		},
+		{
+			"implicit arrow passed as a callback argument",
+			"class Hello extends React.Component {\n  render() {\n    [].map(x => x + 1);\n  }\n}\n",
+			[]string{"noRenderReturn"},
+		},
 
 		// A `render` arrow on a plain object elsewhere in the file does not reach this component,
 		// because the climb from that arrow stops at the nearest enclosing component and there is
 		// none. Its nested twin, which does reach, is a silent fixture below.
-		{"stray render arrow outside the component", "class Hello extends React.Component {\n  render() {}\n}\nvar o = { render: () => <div/> };\n", []string{"noRenderReturn"}},
+		{
+			"stray render arrow outside the component",
+			"class Hello extends React.Component {\n  render() {}\n}\nvar o = { render: () => <div/> };\n",
+			[]string{"noRenderReturn"},
+		},
 	}
 
 	for _, testCase := range cases {
@@ -146,18 +258,39 @@ func TestRequireRenderReturnStaysSilent(test *testing.T) {
 		name       string
 		sourceText string
 	}{
-		{"upstream valid 0", "\n        class Hello extends React.Component {\n          render() {\n            return <div>Hello {this.props.name}</div>;\n          }\n        }\n      "},
-		{"upstream valid 1", "\n        class Hello extends React.Component {\n          render = () => {\n            return <div>Hello {this.props.name}</div>;\n          }\n        }\n      "},
-		{"upstream valid 2", "\n        class Hello extends React.Component {\n          render = () => (\n            <div>Hello {this.props.name}</div>\n          )\n        }\n      "},
-		{"upstream valid 3", "\n        var Hello = createReactClass({\n          displayName: 'Hello',\n          render: function() {\n            return <div></div>\n          }\n        });\n      "},
+		{
+			"upstream valid 0",
+			"\n        class Hello extends React.Component {\n          render() {\n            return <div>Hello {this.props.name}</div>;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid 1",
+			"\n        class Hello extends React.Component {\n          render = () => {\n            return <div>Hello {this.props.name}</div>;\n          }\n        }\n      ",
+		},
+		{
+			"upstream valid 2",
+			"\n        class Hello extends React.Component {\n          render = () => (\n            <div>Hello {this.props.name}</div>\n          )\n        }\n      ",
+		},
+		{
+			"upstream valid 3",
+			"\n        var Hello = createReactClass({\n          displayName: 'Hello',\n          render: function() {\n            return <div></div>\n          }\n        });\n      ",
+		},
 		{"upstream valid 4", "\n        function Hello() {\n          return <div></div>;\n        }\n      "},
 		{"upstream valid 5", "\n        var Hello = () => (\n          <div></div>\n        );\n      "},
-		{"upstream valid 6", "\n        var Hello = createReactClass({\n          render: function() {\n            switch (this.props.name) {\n              case 'Foo':\n                return <div>Hello Foo</div>;\n              default:\n                return <div>Hello {this.props.name}</div>;\n            }\n          }\n        });\n      "},
-		{"upstream valid 7", "\n        var Hello = createReactClass({\n          render: function() {\n            if (this.props.name === 'Foo') {\n              return <div>Hello Foo</div>;\n            } else {\n              return <div>Hello {this.props.name}</div>;\n            }\n          }\n        });\n      "},
+		{
+			"upstream valid 6",
+			"\n        var Hello = createReactClass({\n          render: function() {\n            switch (this.props.name) {\n              case 'Foo':\n                return <div>Hello Foo</div>;\n              default:\n                return <div>Hello {this.props.name}</div>;\n            }\n          }\n        });\n      ",
+		},
+		{
+			"upstream valid 7",
+			"\n        var Hello = createReactClass({\n          render: function() {\n            if (this.props.name === 'Foo') {\n              return <div>Hello Foo</div>;\n            } else {\n              return <div>Hello {this.props.name}</div>;\n            }\n          }\n        });\n      ",
+		},
 		{"upstream valid 8", "\n        class Hello {\n          render() {}\n        }\n      "},
 		{"upstream valid 9", "class Hello extends React.Component {}"},
 		{"upstream valid 10", "var Hello = createReactClass({});"},
-		{"upstream valid 11", "\n        var render = require('./render');\n        var Hello = createReactClass({\n          render\n        });\n      "},
+		{
+			"upstream valid 11",
+			"\n        var render = require('./render');\n        var Hello = createReactClass({\n          render\n        });\n      ",
+		},
 		{"upstream valid 12", "\n        class Foo extends Component {\n          render\n        }\n      "},
 		// --- cases upstream does not cover, each measured against the installed build ---
 
@@ -165,11 +298,17 @@ func TestRequireRenderReturnStaysSilent(test *testing.T) {
 		// clean, which is narrower than the shelf's `IsEs5ComponentCall` and is why the rule calls
 		// `isEs5ComponentCallStrict`.
 		{"bare createClass is not a component", "var Hello = createClass({\n  render: function() {}\n});\n"},
-		{"namespaced React.createClass is not a component", "var Hello = React.createClass({\n  render: function() {}\n});\n"},
+		{
+			"namespaced React.createClass is not a component",
+			"var Hello = React.createClass({\n  render: function() {}\n});\n",
+		},
 
 		// The parenthesized factory callee with a render that does return. Paired with the
 		// reporting fixture above, this separates the parenthesis handling from the verdict.
-		{"parenthesized factory callee with a returning render", "var Hello = (createReactClass)({\n  render: function() { return <div/>; }\n});\n"},
+		{
+			"parenthesized factory callee with a returning render",
+			"var Hello = (createReactClass)({\n  render: function() { return <div/>; }\n});\n",
+		},
 
 		// A base class that is not React's.
 		{"unrelated namespace base", "class Hello extends Foo.Component {\n  render() {}\n}\n"},
@@ -192,7 +331,10 @@ func TestRequireRenderReturnStaysSilent(test *testing.T) {
 
 		// The implicit-return arrow, which has no return statement anywhere and is caught by the
 		// second listener alone. Three spellings of it.
-		{"arrow render returning jsx implicitly", "class Hello extends React.Component {\n  render = () => <div/>\n}\n"},
+		{
+			"arrow render returning jsx implicitly",
+			"class Hello extends React.Component {\n  render = () => <div/>\n}\n",
+		},
 		{"arrow render returning null implicitly", "class Hello extends React.Component {\n  render = () => null\n}\n"},
 		{"es5 arrow render returning implicitly", "var Hello = createReactClass({\n  render: () => <div/>\n});\n"},
 
@@ -202,26 +344,44 @@ func TestRequireRenderReturnStaysSilent(test *testing.T) {
 
 		// Blocks, conditionals and switches are transparent to the scope count, which is two of
 		// upstream's clean cases and this third shape beside them.
-		{"return inside an if block", "class Hello extends React.Component {\n  render() { if (a) { return <div/>; } }\n}\n"},
+		{
+			"return inside an if block",
+			"class Hello extends React.Component {\n  render() { if (a) { return <div/>; } }\n}\n",
+		},
 
 		// The per-component flag, in the direction that goes quiet. A return in either render marks
 		// the whole component, so both orderings are clean while the both-empty pair reports. This
 		// is upstream being loose and it is reproduced.
-		{"second render returns, first is empty", "class Hello extends React.Component {\n  render() {}\n  render() { return <div/>; }\n}\n"},
-		{"first render returns, second is empty", "class Hello extends React.Component {\n  render() { return <div/>; }\n  render() {}\n}\n"},
+		{
+			"second render returns, first is empty",
+			"class Hello extends React.Component {\n  render() {}\n  render() { return <div/>; }\n}\n",
+		},
+		{
+			"first render returns, second is empty",
+			"class Hello extends React.Component {\n  render() { return <div/>; }\n  render() {}\n}\n",
+		},
 
 		// The measured false negative, and the reason the flag climbs to the nearest registered
 		// component rather than to the nearest class. `Inner` is not a component, so the return
 		// inside it climbs past and marks `Outer`. Its twin where `Inner` is a component is a
 		// reporting fixture above, and the pair is the only thing that can see this decision.
-		{"return inside a nested plain class marks the outer component", "class Outer extends React.Component {\n  render() {\n    class Inner { render() { return <div/>; } }\n  }\n}\n"},
+		{
+			"return inside a nested plain class marks the outer component",
+			"class Outer extends React.Component {\n  render() {\n    class Inner { render() { return <div/>; } }\n  }\n}\n",
+		},
 
 		// The same looseness through the arrow listener: an implicit-return `render` arrow on a
 		// plain object nested in the broken render marks the enclosing component.
-		{"nested implicit render arrow marks the outer component", "class Hello extends React.Component {\n  render() {\n    var o = { render: () => <div/> };\n  }\n}\n"},
+		{
+			"nested implicit render arrow marks the outer component",
+			"class Hello extends React.Component {\n  render() {\n    var o = { render: () => <div/> };\n  }\n}\n",
+		},
 
 		// A `render` nested one object deeper is not the component's `render`.
-		{"render on a nested object is not the component's", "var Hello = createReactClass({\n  foo: { render: function() {} }\n});\n"},
+		{
+			"render on a nested object is not the component's",
+			"var Hello = createReactClass({\n  foo: { render: function() {} }\n});\n",
+		},
 
 		// A component with no `render` at all, and a component whose only empty method is not
 		// `render`. Both are `renderProperty == nil`.

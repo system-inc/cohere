@@ -117,14 +117,22 @@ func (set *stringSet) UnmarshalJSON(raw []byte) error {
 type entitySelectors []entitySelector
 
 func (selectors *entitySelectors) UnmarshalJSON(raw []byte) error {
-	return decodeOneOrMany(raw, (*[]entitySelector)(selectors), "an element selector such as {\"element\": {\"type\": \"api\"}}")
+	return decodeOneOrMany(
+		raw,
+		(*[]entitySelector)(selectors),
+		"an element selector such as {\"element\": {\"type\": \"api\"}}",
+	)
 }
 
 // dependencySelectors is upstream's selector-or-array-of-selectors for `allow` and `disallow`.
 type dependencySelectors []dependencySelector
 
 func (selectors *dependencySelectors) UnmarshalJSON(raw []byte) error {
-	return decodeOneOrMany(raw, (*[]dependencySelector)(selectors), "a dependency selector such as {\"to\": {\"element\": {\"type\": \"api\"}}}")
+	return decodeOneOrMany(
+		raw,
+		(*[]dependencySelector)(selectors),
+		"a dependency selector such as {\"to\": {\"element\": {\"type\": \"api\"}}}",
+	)
 }
 
 // decodeOneOrMany reads one selector or an array of them, each through rule.UnmarshalOptions.
@@ -146,7 +154,11 @@ func decodeOneOrMany[Item any](raw []byte, into *[]Item, shape string) error {
 		for _, element := range many {
 			var item Item
 			if unmarshalOptionsError := rule.UnmarshalOptions(element, &item); unmarshalOptionsError != nil {
-				return fmt.Errorf("%w; this port reads %s, and upstream's legacy string selectors are not ported", unmarshalOptionsError, shape)
+				return fmt.Errorf(
+					"%w; this port reads %s, and upstream's legacy string selectors are not ported",
+					unmarshalOptionsError,
+					shape,
+				)
 			}
 			*into = append(*into, item)
 		}
@@ -154,7 +166,11 @@ func decodeOneOrMany[Item any](raw []byte, into *[]Item, shape string) error {
 	}
 	var item Item
 	if unmarshalOptionsError := rule.UnmarshalOptions(trimmed, &item); unmarshalOptionsError != nil {
-		return fmt.Errorf("%w; this port reads %s, and upstream's legacy string selectors are not ported", unmarshalOptionsError, shape)
+		return fmt.Errorf(
+			"%w; this port reads %s, and upstream's legacy string selectors are not ported",
+			unmarshalOptionsError,
+			shape,
+		)
 	}
 	*into = append(*into, item)
 	return nil
@@ -177,7 +193,10 @@ func decodeDependenciesOptions(raw []byte, base rule.OptionsBase) (any, error) {
 	}
 
 	if settings.Default != "" && settings.Default != "allow" && settings.Default != "disallow" {
-		return nil, fmt.Errorf("boundaries/dependencies: default is %q, and upstream accepts only \"allow\" or \"disallow\"", settings.Default)
+		return nil, fmt.Errorf(
+			"boundaries/dependencies: default is %q, and upstream accepts only \"allow\" or \"disallow\"",
+			settings.Default,
+		)
 	}
 	for name, flag := range map[string]*bool{
 		"checkAllOrigins":    settings.CheckAllOrigins,
@@ -231,7 +250,11 @@ func decodeDependenciesOptions(raw []byte, base rule.OptionsBase) (any, error) {
 			for _, entry := range entries {
 				for _, selectors := range []entitySelectors{entry.From, entry.To} {
 					if checkEntitySelectorsError := checkEntitySelectors(selectors); checkEntitySelectorsError != nil {
-						return nil, fmt.Errorf("boundaries/dependencies: policy %d: %w", index, checkEntitySelectorsError)
+						return nil, fmt.Errorf(
+							"boundaries/dependencies: policy %d: %w",
+							index,
+							checkEntitySelectorsError,
+						)
 					}
 				}
 			}
@@ -560,7 +583,9 @@ var Dependencies = rule.Rule{
 		// Measuring only against the root as written would put every package outside the project,
 		// where it is skipped for the wrong reason and the external check is never asked.
 		roots := []string{root}
-		if realRoot, resolveSymlinksError := filepath.EvalSymlinks(root); resolveSymlinksError == nil && realRoot != root {
+		if realRoot, resolveSymlinksError := filepath.EvalSymlinks(
+			root,
+		); resolveSymlinksError == nil && realRoot != root {
 			roots = append(roots, realRoot)
 		}
 		relative := func(fileName string) (string, bool) {

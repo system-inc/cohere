@@ -106,7 +106,11 @@ func printClassWithoutDecorators(path *Path, options *Options, print PrintFunc) 
 	if groupMode {
 		heritageGroupId = getHeritageGroupId(options, current)
 		parts = append(parts,
-			groupWithIn(path, concatIn(path, append(partsGroup, indentIn(path, concatIn(path, extendsParts...)))...), doc.GroupOptions{ID: heritageGroupId}),
+			groupWithIn(
+				path,
+				concatIn(path, append(partsGroup, indentIn(path, concatIn(path, extendsParts...)))...),
+				doc.GroupOptions{ID: heritageGroupId},
+			),
 		)
 	} else {
 		parts = append(parts, partsGroup...)
@@ -240,7 +244,10 @@ func printSuperClass(path *Path, options *Options, print PrintFunc) Doc {
 	printed := print("superClass", nil)
 	parent := parentOf(path)
 	if parent.Is("AssignmentExpression") {
-		return groupIn(path, ifBreak(concatIn(path, "(", indentIn(path, concatIn(path, softline, printed)), softline, ")"), printed))
+		return groupIn(
+			path,
+			ifBreak(concatIn(path, "(", indentIn(path, concatIn(path, softline, printed)), softline, ")"), printed),
+		)
 	}
 	return printed
 }

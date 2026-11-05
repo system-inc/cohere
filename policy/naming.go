@@ -135,7 +135,11 @@ func (naming RuleNaming) ParseHouseRuleName(leaf string) (HouseRuleName, error) 
 				return HouseRuleName{Category: category, Verb: verb.Name, Object: object}, nil
 			}
 		}
-		return HouseRuleName{}, fmt.Errorf("%q has the category %q, and what follows is not a verb from the closed list and an object", leaf, category)
+		return HouseRuleName{}, fmt.Errorf(
+			"%q has the category %q, and what follows is not a verb from the closed list and an object",
+			leaf,
+			category,
+		)
 	}
 	return HouseRuleName{}, fmt.Errorf("%q does not begin with a category from the closed list", leaf)
 }
@@ -153,7 +157,11 @@ func (naming RuleNaming) ParseRuleName(namespace string, leaf string) (HouseRule
 				return HouseRuleName{Category: closed.Name, Object: leaf}, nil
 			}
 		}
-		return HouseRuleName{}, fmt.Errorf("%q is not in the %s namespace's closed list in RuleNaming.json", leaf, closed.Name)
+		return HouseRuleName{}, fmt.Errorf(
+			"%q is not in the %s namespace's closed list in RuleNaming.json",
+			leaf,
+			closed.Name,
+		)
 	}
 	return naming.ParseHouseRuleName(leaf)
 }

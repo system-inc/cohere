@@ -11,9 +11,13 @@ import (
 
 // networkNoInvalidateCacheInOnSuccessText is the rule's message, whose wording lives in
 // `policy/messages/network-no-invalidate-cache-in-on-success.json`.
-var networkNoInvalidateCacheInOnSuccessText = policy.MessageOf("structure/network-no-invalidate-cache-in-on-success", "noInvalidateCacheInOnSuccess")
+var networkNoInvalidateCacheInOnSuccessText = policy.MessageOf(
+	"structure/network-no-invalidate-cache-in-on-success",
+	"noInvalidateCacheInOnSuccess",
+)
 
-// messageNoInvalidateCacheInOnSuccess is the finding, rendered when it is reported so the text comes from the current catalog.
+// messageNoInvalidateCacheInOnSuccess is the finding, rendered when it is reported so the text comes from the current
+// catalog.
 func messageNoInvalidateCacheInOnSuccess() rule.Message {
 	return rule.Message{
 		Id:          networkNoInvalidateCacheInOnSuccessText.Id,

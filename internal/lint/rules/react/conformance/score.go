@@ -95,7 +95,11 @@ func (score Score) Check() error {
 		)
 	}
 	if score.Considered != len(score.Fixtures) {
-		return fmt.Errorf("score considered %d fixtures but recorded %d verdicts", score.Considered, len(score.Fixtures))
+		return fmt.Errorf(
+			"score considered %d fixtures but recorded %d verdicts",
+			score.Considered,
+			len(score.Fixtures),
+		)
 	}
 	return nil
 }
@@ -235,12 +239,18 @@ func Compare(expected Expectation, result Result) FixtureScore {
 	var unexpected []string
 	for key, count := range want {
 		if got[key] < count {
-			missing = append(missing, fmt.Sprintf("%s: %s (line %d) x%d", key.Heading, key.Message, key.Line, count-got[key]))
+			missing = append(
+				missing,
+				fmt.Sprintf("%s: %s (line %d) x%d", key.Heading, key.Message, key.Line, count-got[key]),
+			)
 		}
 	}
 	for key, count := range got {
 		if want[key] < count {
-			unexpected = append(unexpected, fmt.Sprintf("%s: %s (line %d) x%d", key.Heading, key.Message, key.Line, count-want[key]))
+			unexpected = append(
+				unexpected,
+				fmt.Sprintf("%s: %s (line %d) x%d", key.Heading, key.Message, key.Line, count-want[key]),
+			)
 		}
 	}
 	sort.Strings(missing)

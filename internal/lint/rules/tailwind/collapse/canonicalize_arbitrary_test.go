@@ -42,7 +42,10 @@ func TestListedUniversesHoldUpstreamsProperties(test *testing.T) {
 				}
 				for _, property := range strings.Fields(entry.properties) {
 					if !group.maybe[property] {
-						outside = append(outside, entry.className+": declares "+property+", outside its group's universe")
+						outside = append(
+							outside,
+							entry.className+": declares "+property+", outside its group's universe",
+						)
 						break
 					}
 				}
@@ -52,7 +55,11 @@ func TestListedUniversesHoldUpstreamsProperties(test *testing.T) {
 				if len(shown) > 40 {
 					shown = shown[:40]
 				}
-				test.Errorf("%d listed classes fall outside the index, starting with:\n  %s", len(outside), strings.Join(shown, "\n  "))
+				test.Errorf(
+					"%d listed classes fall outside the index, starting with:\n  %s",
+					len(outside),
+					strings.Join(shown, "\n  "),
+				)
 			}
 			test.Logf("%d listed classes checked in %d groups", checked, len(index.groups))
 		})

@@ -54,7 +54,11 @@ func warmSummary(summary *runSummary) {
 // Mutates: summary a case's summary func turns the clean summary it is handed into the run it names
 func replaySummary(summary *runSummary) {
 	*summary = runSummary{
-		Total: 50 * time.Millisecond, Cache: cacheUse{Replayed: true}, Rules: 480, FilesInScope: 3926, FilesCached: 3926,
+		Total:        50 * time.Millisecond,
+		Cache:        cacheUse{Replayed: true},
+		Rules:        480,
+		FilesInScope: 3926,
+		FilesCached:  3926,
 	}
 }
 
@@ -173,7 +177,11 @@ func TestFooterGolden(test *testing.T) {
 			name: "types bailed, so lint did not run",
 			summary: func(summary *runSummary) {
 				summary.TypeErrors = 2
-				summary.Phases[2] = phaseRecord{Name: phaseLint, Outcome: outcomeNotReached, Detail: "types bailed: 2 type errors"}
+				summary.Phases[2] = phaseRecord{
+					Name:    phaseLint,
+					Outcome: outcomeNotReached,
+					Detail:  "types bailed: 2 type errors",
+				}
 			},
 			want: "✗ ☠️ 2.4s • 2 type errors (480 rules • 3,926 checked) • ⚠ 👑 lint did not run",
 		},
@@ -243,7 +251,10 @@ func TestCoheredIsTheListAboveTheFooter(test *testing.T) {
 	for _, count := range []int{0, 1, 3, changedFilesShown, changedFilesShown + 7} {
 		summary := cleanSummary()
 		for index := range count {
-			summary.Changed = append(summary.Changed, changedFile{Path: fmt.Sprintf("file%03d.ts", index), Formatted: true})
+			summary.Changed = append(
+				summary.Changed,
+				changedFile{Path: fmt.Sprintf("file%03d.ts", index), Formatted: true},
+			)
 		}
 		listed := 0
 		for _, line := range changedFileLines(summary.Changed, plain) {
@@ -263,7 +274,13 @@ func TestCoheredIsTheListAboveTheFooter(test *testing.T) {
 			}
 		}
 		if said != listed || said != count {
-			test.Errorf("%d files rewritten: the list accounts for %d and the footer says %d cohered (%s)", count, listed, said, got)
+			test.Errorf(
+				"%d files rewritten: the list accounts for %d and the footer says %d cohered (%s)",
+				count,
+				listed,
+				said,
+				got,
+			)
 		}
 	}
 }
@@ -415,8 +432,11 @@ func TestFooterGroupsCounts(test *testing.T) {
 		}
 	}
 	for duration, want := range map[time.Duration]string{
-		4 * time.Millisecond: "0.004s", 50 * time.Millisecond: "0.05s", 400 * time.Millisecond: "0.4s", 2400 * time.Millisecond: "2.4s",
-		12 * time.Second: "12s",
+		4 * time.Millisecond:    "0.004s",
+		50 * time.Millisecond:   "0.05s",
+		400 * time.Millisecond:  "0.4s",
+		2400 * time.Millisecond: "2.4s",
+		12 * time.Second:        "12s",
 	} {
 		if got := footerSeconds(duration); got != want {
 			test.Errorf("footerSeconds(%s) = %s, want %s", duration, got, want)
@@ -443,9 +463,13 @@ func TestOverallFooterGolden(test *testing.T) {
 			want:  "✓ 💎 8.1s • 2 projects",
 		},
 		{
-			name:  "a project failed",
-			facts: overallFacts{Total: 8100 * time.Millisecond, ProjectsByEngine: engines, Failed: []string{"www (exit 1)"}},
-			want:  "✗ ☠️ 8.1s • 3 projects: 1 Swift, 2 TypeScript → ☠️ www (exit 1)",
+			name: "a project failed",
+			facts: overallFacts{
+				Total:            8100 * time.Millisecond,
+				ProjectsByEngine: engines,
+				Failed:           []string{"www (exit 1)"},
+			},
+			want: "✗ ☠️ 8.1s • 3 projects: 1 Swift, 2 TypeScript → ☠️ www (exit 1)",
 		},
 		{
 			// A project that did not finish checked nothing, so the run cannot be green.

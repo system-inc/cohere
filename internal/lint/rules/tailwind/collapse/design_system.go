@@ -230,7 +230,10 @@ func (system *LoadedDesignSystem) HasUtility(root string, kind UtilityKind) bool
 // is lost by dropping them here: a repository that declares `prose` still gets it, and one that does
 // not no longer inherits ahra's.
 var frameworkFunctionalRoots = func() map[string]bool {
-	roots := make(map[string]bool, len(baseDescriptors)+len(FrameworkFunctionalUtilities)+len(FrameworkMultiDeclarationUtilities))
+	roots := make(
+		map[string]bool,
+		len(baseDescriptors)+len(FrameworkFunctionalUtilities)+len(FrameworkMultiDeclarationUtilities),
+	)
 	for root := range baseDescriptors {
 		roots[root] = true
 	}
@@ -438,7 +441,9 @@ type LoadOptions struct {
 // failing-safe note in the file comment.
 func LoadDesignSystem(options LoadOptions) (*LoadedDesignSystem, error) {
 	if options.EntryPoint == "" {
-		return nil, fmt.Errorf("no entry point given: a design system cannot be built without a stylesheet to build it from")
+		return nil, fmt.Errorf(
+			"no entry point given: a design system cannot be built without a stylesheet to build it from",
+		)
 	}
 
 	resolve := options.Resolve
@@ -742,7 +747,11 @@ func (collector *stylesheetCollector) ingestThemeBlock(node *Node, path string) 
 			return WalkContinue
 		}
 		if child.Kind == KindDeclaration && strings.HasPrefix(child.Property, "--") {
-			if addError := collector.theme.Add(unescapeCSSIdentifier(child.Property), child.Value, options); addError != nil {
+			if addError := collector.theme.Add(
+				unescapeCSSIdentifier(child.Property),
+				child.Value,
+				options,
+			); addError != nil {
 				walkErr = fmt.Errorf("%s: %w", path, addError)
 				return WalkStop
 			}

@@ -79,7 +79,10 @@ var DotNotation = rule.Rule{
 		if !isDotNotationOptions {
 			resolved = DefaultDotNotationOptions()
 		}
-		settings := dotnotation.Settings{AllowKeywords: true, AllowPattern: dotnotation.CompileAllowPattern(resolved.AllowPattern)}
+		settings := dotnotation.Settings{
+			AllowKeywords: true,
+			AllowPattern:  dotnotation.CompileAllowPattern(resolved.AllowPattern),
+		}
 		if resolved.AllowKeywords != nil {
 			settings.AllowKeywords = *resolved.AllowKeywords
 		}
@@ -87,12 +90,16 @@ var DotNotation = rule.Rule{
 		allowIndexSignature := resolved.AllowIndexSignaturePropertyAccess ||
 			(ruleContext.Program != nil && ruleContext.Program.Options().NoPropertyAccessFromIndexSignature.IsTrue())
 		if ruleContext.TypeChecker != nil &&
-			(resolved.AllowPrivateClassPropertyAccess || resolved.AllowProtectedClassPropertyAccess || allowIndexSignature) {
+			(resolved.AllowPrivateClassPropertyAccess ||
+				resolved.AllowProtectedClassPropertyAccess ||
+				allowIndexSignature) {
 			settings.DeclinesComputed = func(access *ast.Node, key *ast.Node) bool {
 				object := access.AsElementAccessExpression().Expression
 				property := ruleContext.TypeChecker.GetSymbolAtLocation(key)
 				if property == nil && key.Kind == ast.KindStringLiteral {
-					objectType := ruleContext.TypeChecker.GetNonNullableType(ruleContext.TypeChecker.GetTypeAtLocation(object))
+					objectType := ruleContext.TypeChecker.GetNonNullableType(
+						ruleContext.TypeChecker.GetTypeAtLocation(object),
+					)
 					for _, candidate := range ruleContext.TypeChecker.GetPropertiesOfType(objectType) {
 						if candidate.Name == key.Text() {
 							property = candidate
@@ -113,7 +120,9 @@ var DotNotation = rule.Rule{
 				}
 
 				if property == nil && allowIndexSignature {
-					objectType := ruleContext.TypeChecker.GetNonNullableType(ruleContext.TypeChecker.GetTypeAtLocation(object))
+					objectType := ruleContext.TypeChecker.GetNonNullableType(
+						ruleContext.TypeChecker.GetTypeAtLocation(object),
+					)
 					for _, indexInfo := range ruleContext.TypeChecker.GetIndexInfosOfType(objectType) {
 						if type_checking.IsTypeFlagSet(indexInfo.KeyType(), checker.TypeFlagsStringLike) {
 							return true

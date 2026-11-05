@@ -198,8 +198,10 @@ func TestParametersDefinedOnEntryBothWays(test *testing.T) {
 		p, q, r := ssa.IdentifierId(1), ssa.IdentifierId(2), ssa.IdentifierId(3)
 		f.params = []testPlace{place(p), place(q), place(r)}
 		entry := f.block()
-		entry.add(&testInstruction{uses: []testPlace{place(q)},
-			effects: []AliasingEffect[testPlace]{MutationEffect(AliasingEffectMutateTransitiveConditionally, place(p))}})
+		entry.add(&testInstruction{
+			uses:    []testPlace{place(q)},
+			effects: []AliasingEffect[testPlace]{MutationEffect(AliasingEffectMutateTransitiveConditionally, place(p))},
+		})
 		entry.add(&testInstruction{uses: []testPlace{place(p)}})
 		entry.add(&testInstruction{uses: []testPlace{place(p)},
 			effects: []AliasingEffect[testPlace]{MutationEffect(AliasingEffectMutate, place(p))}})
@@ -214,7 +216,9 @@ func TestParametersDefinedOnEntryBothWays(test *testing.T) {
 	expectRange(test, without, p, MutableRange{Start: 2, End: 4},
 		"React's rule opens a parameter's range at its first read, after the mutation at order 1")
 	if without.Contains(p, 1) {
-		test.Error("without the option, the mutation at order 1 must fall outside p's range: that is the hole the option closes")
+		test.Error(
+			"without the option, the mutation at order 1 must fall outside p's range: that is the hole the option closes",
+		)
 	}
 	expectRange(test, without, q, MutableRange{}, "q is read and never mutated")
 	expectRange(test, without, r, MutableRange{}, "r is never touched")
@@ -225,8 +229,20 @@ func TestParametersDefinedOnEntryBothWays(test *testing.T) {
 	if !with.Contains(p, 1) {
 		test.Error("with the option, the mutation at order 1 must be inside p's range")
 	}
-	expectRange(test, with, q, MutableRange{Start: 1, End: 2}, "a parameter nothing widened is the first instruction alone")
-	expectRange(test, with, r, MutableRange{Start: 1, End: 2}, "a parameter nothing widened is the first instruction alone")
+	expectRange(
+		test,
+		with,
+		q,
+		MutableRange{Start: 1, End: 2},
+		"a parameter nothing widened is the first instruction alone",
+	)
+	expectRange(
+		test,
+		with,
+		r,
+		MutableRange{Start: 1, End: 2},
+		"a parameter nothing widened is the first instruction alone",
+	)
 }
 
 // TestAMutationReachesWhatItIsAnAliasOf: Alias is "mutating Into implies mutating From", so mutating
@@ -268,7 +284,13 @@ func TestAnAliasMadeAfterAMutationDoesNotWiden(test *testing.T) {
 		effects: []AliasingEffect[testPlace]{FlowEffect(AliasingEffectAlias, place(source), place(alias))}})
 
 	table := ranges(f, Options{})
-	expectRange(test, table, source, MutableRange{Start: 1, End: 2}, "the alias came after the mutation, so the source is untouched")
+	expectRange(
+		test,
+		table,
+		source,
+		MutableRange{Start: 1, End: 2},
+		"the alias came after the mutation, so the source is untouched",
+	)
 	expectRange(test, table, alias, MutableRange{Start: 2, End: 4}, "mutated at 3")
 }
 
@@ -292,7 +314,13 @@ func TestFrozenParametersDropAConditionalMutation(test *testing.T) {
 		if frozen {
 			want = MutableRange{}
 		}
-		expectRange(test, table, p, want, map[bool]string{true: "frozen parameters drop it", false: "mutable parameters widen"}[frozen])
+		expectRange(
+			test,
+			table,
+			p,
+			want,
+			map[bool]string{true: "frozen parameters drop it", false: "mutable parameters widen"}[frozen],
+		)
 	}
 }
 
@@ -327,7 +355,9 @@ func TestMutatingAReturnedValueReachesTheReturnsPlace(test *testing.T) {
 
 	finalize(f)
 	graph := BuildAliasingGraph(testGraph{}, f, Options{})
-	if node := graph.state.nodes[returned]; node == nil || len(node.aliasesOrder) != 1 || node.aliasesOrder[0] != value {
+	if node := graph.state.nodes[returned]; node == nil ||
+		len(node.aliasesOrder) != 1 ||
+		node.aliasesOrder[0] != value {
 		test.Fatalf("the Returns place should alias the returned value, got %+v", node)
 	}
 

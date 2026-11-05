@@ -311,8 +311,17 @@ func analyzeUnusedBindings(ruleContext rule.Context, sourceFile *ast.Node, setti
 		arrayElement := destructuredArrayIgnore != nil && isDestructuredFromAnArray(candidate, candidateWrites)
 		// A match that overruns the time bound ignores too: no answer here is a report.
 		if arrayElement && destructuredArrayIgnore.TestOrTimeout(name) {
-			reportUsedIgnoredName(ruleContext, candidate, symbol, candidateWrites, settings, reads,
-				"destructuredArrayIgnorePattern", settings.DestructuredArrayIgnorePattern, "an element of array destructuring")
+			reportUsedIgnoredName(
+				ruleContext,
+				candidate,
+				symbol,
+				candidateWrites,
+				settings,
+				reads,
+				"destructuredArrayIgnorePattern",
+				settings.DestructuredArrayIgnorePattern,
+				"an element of array destructuring",
+			)
 			continue
 		}
 		if settings.IgnoreClassWithStaticInitBlock && candidate.declaration.Kind == ast.KindClassDeclaration &&
@@ -329,7 +338,17 @@ func analyzeUnusedBindings(ruleContext rule.Context, sourceFile *ast.Node, setti
 		}
 		if matchesIgnorePattern(candidate, settings) {
 			option, pattern, noun := ignorePatternFor(candidate.kind, settings)
-			reportUsedIgnoredName(ruleContext, candidate, symbol, candidateWrites, settings, reads, option, pattern, noun)
+			reportUsedIgnoredName(
+				ruleContext,
+				candidate,
+				symbol,
+				candidateWrites,
+				settings,
+				reads,
+				option,
+				pattern,
+				noun,
+			)
 			continue
 		}
 		if settings.IgnoreUsingDeclarations && isUsingDeclaration(candidate) {
@@ -351,7 +370,10 @@ func analyzeUnusedBindings(ruleContext rule.Context, sourceFile *ast.Node, setti
 			}
 			ruleContext.ReportNode(
 				unusedBindingReportNode(candidate, candidateWrites),
-				noUnusedVarsUsedOnlyAsTypeMessage(name, len(candidateWrites) != 0 || declaringNameIsInitialized(candidate.name)),
+				noUnusedVarsUsedOnlyAsTypeMessage(
+					name,
+					len(candidateWrites) != 0 || declaringNameIsInitialized(candidate.name),
+				),
 			)
 			continue
 		}
@@ -368,7 +390,12 @@ func analyzeUnusedBindings(ruleContext rule.Context, sourceFile *ast.Node, setti
 		// every binding of the declaration has been reported yet, this one included.
 		reportedUnused[candidate.name] = true
 		if candidate.kind == bindingImport {
-			if removal, removalId, removable := importRemoval(ruleContext, candidate, symbol, reportedUnused); removable {
+			if removal, removalId, removable := importRemoval(
+				ruleContext,
+				candidate,
+				symbol,
+				reportedUnused,
+			); removable {
 				if settings.EnableAutofixRemoval.Imports {
 					ruleContext.ReportNodeWithFixes(reportNode, message, removal)
 				} else {
@@ -466,7 +493,11 @@ func declaringNameIsInitialized(name *ast.Node) bool {
 // `ReturnType<typeof f>`. A symbol here that is also read is exempt before this map is asked, and an
 // import is never reported from it at all, so neither needs excluding here: upstream's exception for
 // a type-only import reaches the same silence.
-func collectReadSymbols(ruleContext rule.Context, sourceFile *ast.Node, interesting map[string]bool) (map[*ast.Symbol]bool, map[*ast.Symbol][]*ast.Node, map[*ast.Symbol]bool) {
+func collectReadSymbols(
+	ruleContext rule.Context,
+	sourceFile *ast.Node,
+	interesting map[string]bool,
+) (map[*ast.Symbol]bool, map[*ast.Symbol][]*ast.Node, map[*ast.Symbol]bool) {
 	reads := map[*ast.Symbol]bool{}
 	writes := map[*ast.Symbol][]*ast.Node{}
 	typeOnlyReads := map[*ast.Symbol]bool{}
@@ -914,7 +945,9 @@ func collectCandidateBindings(sourceFile *ast.Node) []candidateBinding {
 				kind := bindingVariable
 				if owner := patternOwner(current); owner.Kind == ast.KindParameter {
 					kind = bindingParameter
-				} else if owner.Kind == ast.KindVariableDeclaration && owner.Parent != nil && owner.Parent.Kind == ast.KindCatchClause {
+				} else if owner.Kind == ast.KindVariableDeclaration &&
+					owner.Parent != nil &&
+					owner.Parent.Kind == ast.KindCatchClause {
 					kind = bindingCaughtError
 				}
 				candidates = append(candidates, candidateBinding{name, current, kind})
@@ -1235,7 +1268,12 @@ func isExemptFromUnusedReport(
 // symbol or the one an import aliases, the for-in leading-return idiom, or an export. It is the half
 // of upstream's usedVariables this rule computes, asked both by isExemptFromUnusedReport and, for a
 // name an ignore pattern set aside, by reportUsedIgnorePattern.
-func isUsedBinding(ruleContext rule.Context, candidate candidateBinding, symbol *ast.Symbol, reads map[*ast.Symbol]bool) bool {
+func isUsedBinding(
+	ruleContext rule.Context,
+	candidate candidateBinding,
+	symbol *ast.Symbol,
+	reads map[*ast.Symbol]bool,
+) bool {
 	if reads[symbol] {
 		return true
 	}
@@ -2207,7 +2245,10 @@ func reportUsedIgnoredName(
 	if !settings.ReportUsedIgnorePattern || symbol == nil || !isUsedBinding(ruleContext, candidate, symbol, reads) {
 		return
 	}
-	ruleContext.ReportNode(unusedBindingReportNode(candidate, writes), noUnusedVarsUsedIgnoredMessage(candidate.name.Text(), option, pattern, noun))
+	ruleContext.ReportNode(
+		unusedBindingReportNode(candidate, writes),
+		noUnusedVarsUsedIgnoredMessage(candidate.name.Text(), option, pattern, noun),
+	)
 }
 
 // ignorePatternFor names the ignore pattern a kind of binding answers to, as nameMatchesIgnorePattern
@@ -2363,7 +2404,11 @@ var noUnusedVarsModes = []struct {
 }{
 	{"vars", []string{"all", "local"}, func(options *NoUnusedVarsOptions) string { return options.Vars }},
 	{"args", []string{"all", "after-used", "none"}, func(options *NoUnusedVarsOptions) string { return options.Args }},
-	{"caughtErrors", []string{"all", "none"}, func(options *NoUnusedVarsOptions) string { return options.CaughtErrors }},
+	{
+		"caughtErrors",
+		[]string{"all", "none"},
+		func(options *NoUnusedVarsOptions) string { return options.CaughtErrors },
+	},
 }
 
 // UnmarshalJSON reads upstream's two forms: the object, decoded strictly, and the bare string

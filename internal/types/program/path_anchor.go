@@ -44,7 +44,11 @@ func NewPathAnchor(root string) PathAnchor {
 		if candidate == "" {
 			continue
 		}
-		for _, form := range []string{candidate, filepath.ToSlash(candidate), strings.ToLower(filepath.ToSlash(candidate))} {
+		for _, form := range []string{
+			candidate,
+			filepath.ToSlash(candidate),
+			strings.ToLower(filepath.ToSlash(candidate)),
+		} {
 			for _, separator := range []string{string(filepath.Separator), "/"} {
 				prefix := strings.TrimSuffix(form, separator) + separator
 				if !seen[prefix] {

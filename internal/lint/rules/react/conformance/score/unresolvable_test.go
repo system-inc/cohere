@@ -62,9 +62,15 @@ func TestUnresolvableTypesIsEarnedNotAssumed(test *testing.T) {
 		}
 	}
 
-	test.Logf("of the unresolvable-types fixtures: %d start reporting once types resolve, %d stay silent", moved, stayedSilent)
+	test.Logf(
+		"of the unresolvable-types fixtures: %d start reporting once types resolve, %d stay silent",
+		moved,
+		stayedSilent,
+	)
 	if moved == 0 {
-		test.Error("no fixture changed answer when types were supplied, so `unresolvable types` is not the mechanism it claims")
+		test.Error(
+			"no fixture changed answer when types were supplied, so `unresolvable types` is not the mechanism it claims",
+		)
 	}
 }
 

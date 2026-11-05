@@ -38,7 +38,16 @@ func TestAPackTrustsTheCheckStatsAndTheRunClockRefusesAChangeAfterThem(test *tes
 	if saveError := recording.Save(); saveError != nil {
 		test.Fatal(saveError)
 	}
-	recorded, recordRunCacheError := RecordRunCache("key", []string{file}, nil, nil, nil, []byte("verdict"), 0, time.Time{})
+	recorded, recordRunCacheError := RecordRunCache(
+		"key",
+		[]string{file},
+		nil,
+		nil,
+		nil,
+		[]byte("verdict"),
+		0,
+		time.Time{},
+	)
 	if recordRunCacheError != nil {
 		test.Fatal(recordRunCacheError)
 	}
@@ -75,8 +84,20 @@ func TestAPackTrustsTheCheckStatsAndTheRunClockRefusesAChangeAfterThem(test *tes
 		test.Errorf("a pack statting afresh served %q, so the snapshot was not what decided above", served)
 	}
 
-	if _, recordRunCacheError := RecordRunCache("key", []string{file}, nil, nil, nil, []byte("verdict"), 0, readSince); recordRunCacheError == nil ||
+	if _, recordRunCacheError := RecordRunCache(
+		"key",
+		[]string{file},
+		nil,
+		nil,
+		nil,
+		[]byte("verdict"),
+		0,
+		readSince,
+	); recordRunCacheError == nil ||
 		!strings.Contains(recordRunCacheError.Error(), "changed after the run began reading") {
-		test.Errorf("a run that read the file before its change was recorded anyway (%v), so the next run could replay it", recordRunCacheError)
+		test.Errorf(
+			"a run that read the file before its change was recorded anyway (%v), so the next run could replay it",
+			recordRunCacheError,
+		)
 	}
 }

@@ -58,7 +58,8 @@ func SerialTests(fileName string, source []byte) ([]Violation, error) {
 			continue
 		}
 		// A doc comment is the comment above the func line, and it may carry other prose above the marker.
-		if !callsParallel(function.Body, parameter) && !(function.Doc != nil && reasonAfterMarker.MatchString(function.Doc.Text())) {
+		if !callsParallel(function.Body, parameter) &&
+			!(function.Doc != nil && reasonAfterMarker.MatchString(function.Doc.Text())) {
 			report(function, function.Name.Name)
 		}
 		ast.Inspect(function.Body, func(node ast.Node) bool {

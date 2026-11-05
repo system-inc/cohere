@@ -51,7 +51,13 @@ func runConsistentTypeImportsFix(test *testing.T, options string, code string) (
 	if err != nil {
 		test.Fatalf("decoding %s: %v", options, err)
 	}
-	result := rule_testing.RunTypedWithOptions(test, ConsistentTypeImports, "consistent_type_imports.ts", code, settings)
+	result := rule_testing.RunTypedWithOptions(
+		test,
+		ConsistentTypeImports,
+		"consistent_type_imports.ts",
+		code,
+		settings,
+	)
 	fixed, count := applyConsistentTypeImportsFixes(test, result)
 	return strings.TrimSpace(code) + "\n", fixed, count
 }
@@ -85,7 +91,11 @@ func TestConsistentTypeImportsFixMatchesUpstream(test *testing.T) {
 	ran := 0
 	for _, testCase := range consistentTypeImportsUpstreamFixes {
 		ran++
-		test.Run(strings.ReplaceAll(strings.TrimSpace(strings.SplitN(strings.TrimSpace(testCase.code), "\n", 2)[0]), "/", "_"), func(test *testing.T) {
+		test.Run(strings.ReplaceAll(
+			strings.TrimSpace(strings.SplitN(strings.TrimSpace(testCase.code), "\n", 2)[0]),
+			"/",
+			"_",
+		), func(test *testing.T) {
 			test.Parallel()
 			_, fixed, count := runConsistentTypeImportsFix(test, testCase.options, testCase.code)
 			want := strings.TrimSpace(testCase.upstream) + "\n"
@@ -128,7 +138,10 @@ func consistentTypeImportsTypeErrors(test *testing.T, sources map[string]string)
 						// The checker this rule already holds, never Program.GetSemanticDiagnostics: the harness
 						// holds the file's checker exclusively while a rule runs, and the program-level call waits
 						// for that same lock, so it deadlocked and read as a suite too slow to finish.
-						for _, diagnostic := range ruleContext.TypeChecker.GetDiagnostics(context.Background(), sourceFile) {
+						for _, diagnostic := range ruleContext.TypeChecker.GetDiagnostics(
+							context.Background(),
+							sourceFile,
+						) {
 							ruleContext.ReportNode(node, rule.Message{
 								Id:          key,
 								Description: fmt.Sprintf("TS%d %s", diagnostic.Code(), diagnostic.MessageText()),
@@ -159,7 +172,11 @@ func consistentTypeImportsTypeErrors(test *testing.T, sources map[string]string)
 // did not. Fixture modules do not exist, so "no errors" is the wrong bar; "no new errors" is the one a
 // repair must meet, and the error a wrong repair causes is new: TS1361, a name imported with
 // `import type` used as a value.
-func consistentTypeImportsNewTypeErrors(test *testing.T, originals map[string]string, repaired map[string]string) map[string][]string {
+func consistentTypeImportsNewTypeErrors(
+	test *testing.T,
+	originals map[string]string,
+	repaired map[string]string,
+) map[string][]string {
 	test.Helper()
 	before := consistentTypeImportsTypeErrors(test, originals)
 	after := consistentTypeImportsTypeErrors(test, repaired)
@@ -253,7 +270,9 @@ func TestConsistentTypeImportsFixCases(test *testing.T) {
 			original, fixed, _ := runConsistentTypeImportsFix(test, testCase.options, testCase.code)
 			settings := DefaultConsistentTypeImportsOptions()
 			if testCase.options != "" {
-				decoded, decodeConsistentTypeImportsOptionsError := DecodeConsistentTypeImportsOptions([]byte(testCase.options))
+				decoded, decodeConsistentTypeImportsOptionsError := DecodeConsistentTypeImportsOptions(
+					[]byte(testCase.options),
+				)
 				if decodeConsistentTypeImportsOptionsError != nil {
 					test.Fatalf("decoding %s: %v", testCase.options, decodeConsistentTypeImportsOptionsError)
 				}
@@ -263,10 +282,20 @@ func TestConsistentTypeImportsFixCases(test *testing.T) {
 				}
 				settings = typed
 			}
-			result := rule_testing.RunTypedWithOptions(test, ConsistentTypeImports, "consistent_type_imports.ts", testCase.code, settings)
+			result := rule_testing.RunTypedWithOptions(
+				test,
+				ConsistentTypeImports,
+				"consistent_type_imports.ts",
+				testCase.code,
+				settings,
+			)
 			rule_testing.ExpectFixedSource(test, result, testCase.want)
 			name := "/repository/source/fixcase.ts"
-			if added := consistentTypeImportsNewTypeErrors(test, map[string]string{name: original}, map[string]string{name: fixed}); len(added) > 0 {
+			if added := consistentTypeImportsNewTypeErrors(
+				test,
+				map[string]string{name: original},
+				map[string]string{name: fixed},
+			); len(added) > 0 {
 				test.Errorf("the repair added diagnostics %v", added)
 			}
 		})
@@ -274,7 +303,11 @@ func TestConsistentTypeImportsFixCases(test *testing.T) {
 
 	// Import attributes cannot sit on a type-only import, so a mixed declaration carrying them reports
 	// and proposes nothing rather than writing `import type { A } from 'foo' with { ... }`.
-	_, _, count := runConsistentTypeImportsFix(test, "", "import { A, B } from 'foo' with { type: 'json' };\ntype T = A;\nconst b = B;\n")
+	_, _, count := runConsistentTypeImportsFix(
+		test,
+		"",
+		"import { A, B } from 'foo' with { type: 'json' };\ntype T = A;\nconst b = B;\n",
+	)
 	if count != 0 {
 		test.Errorf("a declaration with attributes proposed %d fixes, want none", count)
 	}

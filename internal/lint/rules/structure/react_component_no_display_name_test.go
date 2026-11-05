@@ -159,7 +159,10 @@ func TestReactComponentNoDisplayNameStaysSilent(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.Run(test, ReactComponentNoDisplayName, displayNameFile, testCase.sourceText))
+			rule_testing.ExpectClean(
+				test,
+				rule_testing.Run(test, ReactComponentNoDisplayName, displayNameFile, testCase.sourceText),
+			)
 		})
 	}
 }
@@ -183,6 +186,9 @@ func TestReactComponentNoDisplayNameDependsOnDeclarationOrder(test *testing.T) {
 
 	assignedFirst := "declare function memo(component: unknown): unknown;\n" +
 		"Field.displayName = 'Field';\nexport const Field = memo(function () { return null; });\n"
-	rule_testing.ExpectFindings(test, rule_testing.Run(test, ReactComponentNoDisplayName, displayNameFile, assignedFirst),
-		"noDisplayNameAssignment")
+	rule_testing.ExpectFindings(
+		test,
+		rule_testing.Run(test, ReactComponentNoDisplayName, displayNameFile, assignedFirst),
+		"noDisplayNameAssignment",
+	)
 }

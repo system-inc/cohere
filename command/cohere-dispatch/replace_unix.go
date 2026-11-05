@@ -18,7 +18,11 @@ func replaceProcess(binaryPath string, arguments []string) error {
 	if exitCode := streams.Finish(0); exitCode != 0 {
 		os.Exit(exitCode)
 	}
-	if execError := syscall.Exec(binaryPath, append([]string{binaryPath}, arguments...), os.Environ()); execError != nil {
+	if execError := syscall.Exec(
+		binaryPath,
+		append([]string{binaryPath}, arguments...),
+		os.Environ(),
+	); execError != nil {
 		return fmt.Errorf("running %s: %w", binaryPath, execError)
 	}
 	return nil

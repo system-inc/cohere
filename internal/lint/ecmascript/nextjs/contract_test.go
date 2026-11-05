@@ -12,9 +12,24 @@ func TestIsRouteContractExport(test *testing.T) {
 		export   string
 		want     bool
 	}{
-		{"a dynamic blog page", "/www-phi-health/app/(main-layout)/blog/[slugWithId]/page.tsx", "generateStaticParams", true},
-		{"a catch-all inside route groups", "/www-phi-health/app/(main-layout)/(shop)/shop/(products)/axis/[[...variant]]/page.tsx", "generateStaticParams", true},
-		{"the near miss is not the contract", "/www-phi-health/app/(main-layout)/blog/[slugWithId]/page.tsx", "generateStaticParameters", false},
+		{
+			"a dynamic blog page",
+			"/www-phi-health/app/(main-layout)/blog/[slugWithId]/page.tsx",
+			"generateStaticParams",
+			true,
+		},
+		{
+			"a catch-all inside route groups",
+			"/www-phi-health/app/(main-layout)/(shop)/shop/(products)/axis/[[...variant]]/page.tsx",
+			"generateStaticParams",
+			true,
+		},
+		{
+			"the near miss is not the contract",
+			"/www-phi-health/app/(main-layout)/blog/[slugWithId]/page.tsx",
+			"generateStaticParameters",
+			false,
+		},
 
 		{"segment configuration on a layout", "/repository/app/layout.tsx", "revalidate", true},
 		{"the abbreviation gate's trap", "/repository/app/api/report/route.ts", "maxDuration", true},
@@ -45,7 +60,13 @@ func TestIsRouteContractExport(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			if got := IsRouteContractExport(testCase.filePath, testCase.export); got != testCase.want {
-				test.Errorf("IsRouteContractExport(%q, %q) = %v, want %v", testCase.filePath, testCase.export, got, testCase.want)
+				test.Errorf(
+					"IsRouteContractExport(%q, %q) = %v, want %v",
+					testCase.filePath,
+					testCase.export,
+					got,
+					testCase.want,
+				)
 			}
 		})
 	}

@@ -37,6 +37,10 @@ func TestBracketSameLineReachesTheEngine(test *testing.T) {
 		test.Fatalf("bracketSameLine changed nothing:\n%s", apart)
 	}
 	if !strings.Contains(together, "\"x\">") || strings.Contains(apart, "\"x\">") {
-		test.Fatalf("expected `>` on the attribute line only with bracketSameLine:\nfalse:\n%s\ntrue:\n%s", apart, together)
+		test.Fatalf(
+			"expected `>` on the attribute line only with bracketSameLine:\nfalse:\n%s\ntrue:\n%s",
+			apart,
+			together,
+		)
 	}
 }

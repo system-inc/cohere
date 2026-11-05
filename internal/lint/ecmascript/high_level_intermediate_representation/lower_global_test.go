@@ -20,7 +20,15 @@ func TestGlobalLoadsRetainBindingProvenance(test *testing.T) {
 		loads      int
 	}{
 		{"named", `import {value} from './library';`, "", GlobalBindingKindImportSpecifier, "./library", "value", 1},
-		{"renamed", `import {exported as value} from './library';`, "", GlobalBindingKindImportSpecifier, "./library", "exported", 1},
+		{
+			"renamed",
+			`import {exported as value} from './library';`,
+			"",
+			GlobalBindingKindImportSpecifier,
+			"./library",
+			"exported",
+			1,
+		},
 		{"default", `import value from './library';`, "", GlobalBindingKindImportDefault, "./library", "", 1},
 		{"namespace", `import * as value from './library';`, "", GlobalBindingKindImportNamespace, "./library", "", 1},
 		{"module local", `const value = 1;`, "", GlobalBindingKindModuleLocal, "", "", 1},
@@ -30,30 +38,42 @@ func TestGlobalLoadsRetainBindingProvenance(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			visited, loads := 0, 0
-			probe := rule.Rule{Name: "global-load-provenance", NeedsTypeChecker: true, Run: func(ruleContext rule.Context, options any) rule.Listeners {
-				return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
-					forEachFunctionLike(node, func(node *ast.Node) {
-						if node.Name() == nil || node.Name().Text() != "Component" {
-							return
-						}
-						function := Lower(node, ruleContext.TypeChecker)
-						if function == nil {
-							test.Fatal("function did not lower")
-						}
-						visited++
-						for _, instruction := range function.Instructions {
-							load, ok := instruction.Value.(*LoadGlobal)
-							if !ok || load.Name != "value" {
-								continue
+			probe := rule.Rule{
+				Name:             "global-load-provenance",
+				NeedsTypeChecker: true,
+				Run: func(ruleContext rule.Context, options any) rule.Listeners {
+					return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
+						forEachFunctionLike(node, func(node *ast.Node) {
+							if node.Name() == nil || node.Name().Text() != "Component" {
+								return
 							}
-							loads++
-							if load.BindingKind != testCase.kind || load.Source != testCase.module || load.Imported != testCase.imported {
-								test.Errorf("load=%+v, want kind=%v source=%q imported=%q", load, testCase.kind, testCase.module, testCase.imported)
+							function := Lower(node, ruleContext.TypeChecker)
+							if function == nil {
+								test.Fatal("function did not lower")
 							}
-						}
-					})
-				}}
-			}}
+							visited++
+							for _, instruction := range function.Instructions {
+								load, ok := instruction.Value.(*LoadGlobal)
+								if !ok || load.Name != "value" {
+									continue
+								}
+								loads++
+								if load.BindingKind != testCase.kind ||
+									load.Source != testCase.module ||
+									load.Imported != testCase.imported {
+									test.Errorf(
+										"load=%+v, want kind=%v source=%q imported=%q",
+										load,
+										testCase.kind,
+										testCase.module,
+										testCase.imported,
+									)
+								}
+							}
+						})
+					}}
+				},
+			}
 			rule_testing.RunTypedFiles(test, probe, map[string]string{
 				"/library.ts": `export const value = 1; export const exported = 2; export default value;`,
 				"/fixture.ts": testCase.prefix + " function Component(" + testCase.parameters + ") {return value;}",

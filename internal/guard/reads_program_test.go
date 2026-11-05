@@ -122,14 +122,24 @@ var Probe = rule.Rule{Run: func(ctx rule.Context, options any) rule.Listeners { 
 			name: "a context under another name, through a chain",
 			source: `package probe
 var Probe = rule.Rule{ProgramReads: rule.ReadsModuleResolution, Run: func(c rule.Context, options any) rule.Listeners { _ = state{c}.c.Program.ResolveModule(nil, nil); return nil }}`,
-			want: programFacts{readsProgram: true, definesRule: true, reads: readsModuleResolution, declared: readsModuleResolution},
+			want: programFacts{
+				readsProgram: true,
+				definesRule:  true,
+				reads:        readsModuleResolution,
+				declared:     readsModuleResolution,
+			},
 		},
 		{
 			// A read through a helper counts as the helper's reads.
 			name: "a read through a helper",
 			source: `package probe
 var Probe = rule.Rule{ProgramReads: rule.ReadsCompilerOptions, Run: func(ctx rule.Context, options any) rule.Listeners { _ = type_checking.IsPromiseLike(ctx.Program, nil, nil); return nil }}`,
-			want: programFacts{readsProgram: true, definesRule: true, reads: readsCompilerOptions | readsDefaultLibrary, declared: readsCompilerOptions},
+			want: programFacts{
+				readsProgram: true,
+				definesRule:  true,
+				reads:        readsCompilerOptions | readsDefaultLibrary,
+				declared:     readsCompilerOptions,
+			},
 		},
 		{
 			// The walk calls a rule's ProgramFingerprint with the rule's own view of the program, so its
@@ -137,7 +147,12 @@ var Probe = rule.Rule{ProgramReads: rule.ReadsCompilerOptions, Run: func(ctx rul
 			name: "a read through the program fingerprint",
 			source: `package probe
 var Probe = rule.Rule{ProgramReads: rule.ReadsCompilerOptions, ProgramFingerprint: fingerprint, Run: func(ctx rule.Context, options any) rule.Listeners { return nil }}`,
-			want: programFacts{readsProgram: true, definesRule: true, reads: readsCompilerOptions, declared: readsCompilerOptions},
+			want: programFacts{
+				readsProgram: true,
+				definesRule:  true,
+				reads:        readsCompilerOptions,
+				declared:     readsCompilerOptions,
+			},
 		},
 		{
 			name: "a program fingerprint this cannot see",
@@ -302,7 +317,8 @@ func programHelperReads(test *testing.T, paths []string) map[string]programRead 
 			for _, field := range function.Type.Params.List {
 				// Inside the rule package itself the type is spelled bare (rule.FingerprintPath).
 				bare, isBare := field.Type.(*ast.Ident)
-				if isRuleSelector(field.Type, "Program") || (file.Name.Name == "rule" && isBare && bare.Name == "Program") {
+				if isRuleSelector(field.Type, "Program") ||
+					(file.Name.Name == "rule" && isBare && bare.Name == "Program") {
 					for _, name := range field.Names {
 						names[name.Name] = true
 					}
@@ -401,7 +417,10 @@ func readProgramFacts(test *testing.T, path string, helpers map[string]programRe
 				if function, isNamed := typed.Value.(*ast.Ident); isNamed {
 					fingerprint = function.Name
 				} else {
-					facts.unseenCallees = append(facts.unseenCallees, "a ProgramFingerprint that is not a named function")
+					facts.unseenCallees = append(
+						facts.unseenCallees,
+						"a ProgramFingerprint that is not a named function",
+					)
 				}
 				facts.readsProgram = true
 			}

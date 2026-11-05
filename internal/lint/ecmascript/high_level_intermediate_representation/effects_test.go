@@ -411,14 +411,23 @@ func TestFreezeFollowsOnlySharedAssignIdentity(test *testing.T) {
 			relationEffects := []AliasingEffect{}
 			if testCase.relation == mutation_aliasing.AliasingEffectCapture ||
 				testCase.relation == mutation_aliasing.AliasingEffectMaybeAlias {
-				relationEffects = append(relationEffects, mutation_aliasing.CreateEffect(alias, mutation_aliasing.EffectValueMutable))
+				relationEffects = append(
+					relationEffects,
+					mutation_aliasing.CreateEffect(alias, mutation_aliasing.EffectValueMutable),
+				)
 			}
 			relationEffects = append(relationEffects, mutation_aliasing.FlowEffect(testCase.relation, source, alias))
 			effects := &AliasingEffects{byInstruction: map[InstructionId][]AliasingEffect{
 				sourceInstruction.Id: {mutation_aliasing.CreateEffect(source, mutation_aliasing.EffectValueMutable)},
 				aliasInstruction.Id:  relationEffects,
 				freezeInstruction.Id: effectsForInstruction(function, newCalleeProducers(function), freezeInstruction),
-				callInstruction.Id:   {mutation_aliasing.CreateEffect(callResult, mutation_aliasing.EffectValueMutable), mutation_aliasing.MutationEffect(mutation_aliasing.AliasingEffectMutateTransitiveConditionally, alias)},
+				callInstruction.Id: {
+					mutation_aliasing.CreateEffect(callResult, mutation_aliasing.EffectValueMutable),
+					mutation_aliasing.MutationEffect(
+						mutation_aliasing.AliasingEffectMutateTransitiveConditionally,
+						alias,
+					),
+				},
 			}}
 
 			ranges := InferMutableRangesWithEffects(function, effects)
@@ -475,7 +484,11 @@ func TestFreezeTraversesPhiValuesAndFunctionCaptures(test *testing.T) {
 		join.Terminal = &Return{Value: selected}
 		Finalize(function)
 
-		aliasingGraph := mutation_aliasing.BuildAliasingGraph(newRangeGraph(function, InferAliasingEffects(function)), function, mutation_aliasing.Options{})
+		aliasingGraph := mutation_aliasing.BuildAliasingGraph(
+			newRangeGraph(function, InferAliasingEffects(function)),
+			function,
+			mutation_aliasing.Options{},
+		)
 		for name, place := range map[string]Place{"left": left, "right": right, "phi": selected} {
 			if aliasingGraph.Kind(place.Identifier) == mutation_aliasing.EffectValueMutable {
 				test.Errorf("Freeze(phi) left %s mutable", name)
@@ -509,7 +522,11 @@ func TestFreezeTraversesPhiValuesAndFunctionCaptures(test *testing.T) {
 		block.Terminal = &Return{Value: alias}
 		Finalize(function)
 
-		aliasingGraph := mutation_aliasing.BuildAliasingGraph(newRangeGraph(function, InferAliasingEffects(function)), function, mutation_aliasing.Options{})
+		aliasingGraph := mutation_aliasing.BuildAliasingGraph(
+			newRangeGraph(function, InferAliasingEffects(function)),
+			function,
+			mutation_aliasing.Options{},
+		)
 		if aliasingGraph.Kind(captured.Identifier) == mutation_aliasing.EffectValueMutable {
 			test.Error("freezing a function alias did not recursively freeze its capture")
 		}
@@ -848,7 +865,10 @@ func TestProjectEffectsNeedsRangesToDistinguishCaptureFromRead(test *testing.T) 
 	}
 
 	ranges := &mutation_aliasing.MutableRanges{}
-	ranges.Set(into.Identifier, mutation_aliasing.MutableRange{Start: static_single_assignment.EvaluationOrder(1), End: static_single_assignment.EvaluationOrder(9)})
+	ranges.Set(into.Identifier, mutation_aliasing.MutableRange{
+		Start: static_single_assignment.EvaluationOrder(1),
+		End:   static_single_assignment.EvaluationOrder(9),
+	})
 	withRanges := ProjectEffects(effects, ranges, static_single_assignment.EvaluationOrder(5))
 	if withRanges[from.Identifier] != EffectCapture {
 		test.Fatalf("a source flowing into a still-mutable target must be Capture, got %v",

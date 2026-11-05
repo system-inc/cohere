@@ -89,6 +89,10 @@ func TestAnEngineNamedByTheOverrideVouchesForNoCommit(test *testing.T) {
 		test.Fatalf("resolved %s, the override named %s", binaryPath, engine)
 	}
 	if sourceCommit != "" {
-		test.Fatalf("an engine named by %s vouched for commit %s, which nothing guarantees", dispatch.SwiftEngineOverrideVariable, sourceCommit)
+		test.Fatalf(
+			"an engine named by %s vouched for commit %s, which nothing guarantees",
+			dispatch.SwiftEngineOverrideVariable,
+			sourceCommit,
+		)
 	}
 }

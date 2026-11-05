@@ -207,7 +207,11 @@ func TestNoUnusedPrivateClassMembersFires(test *testing.T) {
 		// member is never brand-checked and never read, so the finding stands. This is the control
 		// for the brand-check clean case, which without it could pass by the rule being blind to
 		// `in` entirely rather than by reading it correctly.
-		{"a member never brand checked and never read", `class A { #brand; static has(o) { return #other in o; } #other; }`, 1},
+		{
+			"a member never brand checked and never read",
+			`class A { #brand; static has(o) { return #other in o; } #other; }`,
+			1,
+		},
 
 		// Static private members are the same question with a different modifier, and no upstream
 		// fail case carries `static`. A rule keying on instance shape alone goes silent here.
@@ -222,7 +226,11 @@ func TestNoUnusedPrivateClassMembersFires(test *testing.T) {
 		// A member used only inside a nested class that redeclares the name. The inner `#x`
 		// satisfies the inner class; the outer one is still dead. Upstream carries this shape, but
 		// only in classes large enough that a rule could pass it by accident.
-		{"a name shadowed by a nested class", `class A { #x; m() { return class { #x; n() { return this.#x; } }; } }`, 1},
+		{
+			"a name shadowed by a nested class",
+			`class A { #x; m() { return class { #x; n() { return this.#x; } }; } }`,
+			1,
+		},
 
 		// A TypeScript-only declaration form. `declare #x` and `accessor #x` both parse as ordinary
 		// property declarations, which the probe measured rather than the port assumed; if either
@@ -234,7 +242,11 @@ func TestNoUnusedPrivateClassMembersFires(test *testing.T) {
 		// the top of a method. The statement test has to look at the immediate parent, and a rule
 		// that instead asked whether the method body's last statement was an expression would pass
 		// the simple upstream case and fail this.
-		{"a compound assignment discarded inside a block", `class A { #x = 0; m() { if (cond) { this.#x += 1; } } }`, 1},
+		{
+			"a compound assignment discarded inside a block",
+			`class A { #x = 0; m() { if (cond) { this.#x += 1; } } }`,
+			1,
+		},
 
 		// Both update fixities as discarded statements. Upstream carries only the postfix form, so
 		// a rule handling `x++` and forgetting `++x` passes the whole corpus. This is the shape
@@ -439,26 +451,71 @@ func TestNoUnusedPrivateClassMembersStaysSilent(test *testing.T) {
                 callback;
             }
          }`},
-		{"upstream pass 25", `class ChildProcess extends EventEmitter { #stdioObject; #createStdioObject() {} get stdio() { return (this.#stdioObject ??= this.#createStdioObject()); } }`},
-		{"upstream pass 26", "export class Foo { readonly #select = 123; override render() { return html`foo=${this.#select}`; } }"},
-		{"upstream pass 27", `export class Foo { #listened = false; bar() { if (!this.#listened) return; this.#listened = false; } } `},
-		{"upstream pass 28", `export class RichText { #verticalScrollContainer; init() { const verticalScrollContainer = this.#verticalScrollContainer || (this.#verticalScrollContainer = this.verticalScrollContainerGetter?.() || null); } }`},
-		{"upstream pass 29", `class Foo { #a = false; on(data) { return this.#a ? [data] : data; } set setA(value) { this.#a = value; } }`},
+		{
+			"upstream pass 25",
+			`class ChildProcess extends EventEmitter { #stdioObject; #createStdioObject() {} get stdio() { return (this.#stdioObject ??= this.#createStdioObject()); } }`,
+		},
+		{
+			"upstream pass 26",
+			"export class Foo { readonly #select = 123; override render() { return html`foo=${this.#select}`; } }",
+		},
+		{
+			"upstream pass 27",
+			`export class Foo { #listened = false; bar() { if (!this.#listened) return; this.#listened = false; } } `,
+		},
+		{
+			"upstream pass 28",
+			`export class RichText { #verticalScrollContainer; init() { const verticalScrollContainer = this.#verticalScrollContainer || (this.#verticalScrollContainer = this.verticalScrollContainerGetter?.() || null); } }`,
+		},
+		{
+			"upstream pass 29",
+			`class Foo { #a = false; on(data) { return this.#a ? [data] : data; } set setA(value) { this.#a = value; } }`,
+		},
 		{"upstream pass 30", `class Foo { #a = false; on(data) { return this.#a ? [data] : data; } }`},
-		{"upstream pass 31", `class WeakReference { #i = 0; inc() { return ++this.#i; }; dec() { return --this.#i; } }`},
-		{"upstream pass 32", `class Foo { #d; constructor(d) { this.#d = d || kDefaultD; } get getD(): string { return this.#d!; } }`},
-		{"upstream pass 33", `class F { #o; initialize(output) { this.#o = output; } text(e) { return this.#o!.text(e); } }`},
-		{"upstream pass 34", `class Foo { #a; constructor(a) { this.#a = a; }; b(b?: string): this { this.#a!.setB(b); return this; } resetA() { this.#a = undefined; } }`},
-		{"upstream pass 35", `let getPrivate; class C { #private; constructor(v) { this.#private = v; } static { getPrivate = klass => klass.#private; } }`},
-		{"upstream pass 36", `let getPrivate; class C { #private; constructor(v) { this.#private = v; } static { getPrivate = klass => { return klass.#private; } } }`},
+		{
+			"upstream pass 31",
+			`class WeakReference { #i = 0; inc() { return ++this.#i; }; dec() { return --this.#i; } }`,
+		},
+		{
+			"upstream pass 32",
+			`class Foo { #d; constructor(d) { this.#d = d || kDefaultD; } get getD(): string { return this.#d!; } }`,
+		},
+		{
+			"upstream pass 33",
+			`class F { #o; initialize(output) { this.#o = output; } text(e) { return this.#o!.text(e); } }`,
+		},
+		{
+			"upstream pass 34",
+			`class Foo { #a; constructor(a) { this.#a = a; }; b(b?: string): this { this.#a!.setB(b); return this; } resetA() { this.#a = undefined; } }`,
+		},
+		{
+			"upstream pass 35",
+			`let getPrivate; class C { #private; constructor(v) { this.#private = v; } static { getPrivate = klass => klass.#private; } }`,
+		},
+		{
+			"upstream pass 36",
+			`let getPrivate; class C { #private; constructor(v) { this.#private = v; } static { getPrivate = klass => { return klass.#private; } } }`,
+		},
 		{"upstream pass 37", `class C { #field = 1; static { const obj = new C(); console.log(obj.#field); } }`},
 		{"upstream pass 38", `class C { #method() { return 42; } static { const obj = new C(); obj.#method(); } }`},
 		{"upstream pass 39", `class C { #field = 1; static { const getField = obj => { return obj.#field; }; } }`},
-		{"upstream pass 40", `export class Database<const S extends idb.DBSchema> { readonly #db: Promise<idb.IDBPDatabase<S>>; constructor(name: string, version: number, hooks: idb.OpenDBCallbacks<S>) { this.#db = idb.openDB<S>(name, version, hooks); }  async read() { let db = await this.#db; } }`},
-		{"upstream pass 41", `export class A { #x; constructor(x: number) { this.#x = x; } get(y = this.#x) { return y; } }`},
+		{
+			"upstream pass 40",
+			`export class Database<const S extends idb.DBSchema> { readonly #db: Promise<idb.IDBPDatabase<S>>; constructor(name: string, version: number, hooks: idb.OpenDBCallbacks<S>) { this.#db = idb.openDB<S>(name, version, hooks); }  async read() { let db = await this.#db; } }`,
+		},
+		{
+			"upstream pass 41",
+			`export class A { #x; constructor(x: number) { this.#x = x; } get(y = this.#x) { return y; } }`,
+		},
 		{"upstream pass 42", `class B { #value = 42; method(param = this.#value) { return param * 2; } }`},
-		{"upstream pass 43", `class C { #arr = [1, 2, 3]; process(items = this.#arr) { return items.map(x => x * 2); } }`},
-		{"upstream pass 44", `export class BugClass { readonly #BUG: readonly [] = []; method() { return Math.random() > 0.5 ? this.#BUG : []; } }`},
+		{
+			"upstream pass 43",
+			`class C { #arr = [1, 2, 3]; process(items = this.#arr) { return items.map(x => x * 2); } }`,
+		},
+		{
+			"upstream pass 44",
+			`export class BugClass { readonly #BUG: readonly [] = []; method() { return Math.random() > 0.5 ? this.#BUG : []; } }`,
+		},
 		{"upstream pass 45", `class Foo { #x; #y; method(a, b, c) { return a ? (b ? this.#x : c) : this.#y; } }`},
 		{"upstream pass 46", `class Foo { #x; method() { return () => a ? this.#x : b; } }`},
 		{"upstream pass 47", `class Foo { #x; method() { return a && (b ? this.#x : c); } }`},
@@ -474,10 +531,22 @@ func TestNoUnusedPrivateClassMembersStaysSilent(test *testing.T) {
 		{"upstream pass 57", `class ExampleFoo { #foo = 0; foo(foo) { foo = foo ?? this.#foo; return foo; } }`},
 		{"upstream pass 58", `class ExampleBar { #bar = 0; bar(bar) { bar = ++this.#bar; return bar; } }`},
 		{"upstream pass 59", `class Foo { #awaitedMember; async method() { await this.#awaitedMember; } }`},
-		{"upstream pass 60", `class Test { #url: string; constructor(url: string) { this.#url = url; } open() { return new WebSocket(this.#url); } }`},
-		{"upstream pass 61", `export class Foo { #fetch: typeof fetch; constructor() { this.#fetch = fetch; } async bar() { return (0, this.#fetch)('https://example.com'); } }`},
-		{"upstream pass 62", `export class StateMachine { #state = 'idle'; step() { switch (this.#state) { case 'idle': { this.#state = 'running'; break; } case 'running': { this.#state = 'done'; break; } } } }`},
-		{"upstream pass 63", `class Stopper { #promise; async stop() { this.#promise ??= this.makePromise(); await this.#promise; } makePromise() { return Promise.resolve(); } }`},
+		{
+			"upstream pass 60",
+			`class Test { #url: string; constructor(url: string) { this.#url = url; } open() { return new WebSocket(this.#url); } }`,
+		},
+		{
+			"upstream pass 61",
+			`export class Foo { #fetch: typeof fetch; constructor() { this.#fetch = fetch; } async bar() { return (0, this.#fetch)('https://example.com'); } }`,
+		},
+		{
+			"upstream pass 62",
+			`export class StateMachine { #state = 'idle'; step() { switch (this.#state) { case 'idle': { this.#state = 'running'; break; } case 'running': { this.#state = 'done'; break; } } } }`,
+		},
+		{
+			"upstream pass 63",
+			`class Stopper { #promise; async stop() { this.#promise ??= this.makePromise(); await this.#promise; } makePromise() { return Promise.resolve(); } }`,
+		},
 		// Added from reading our code. The use forms upstream never spells out, each one a way for
 		// the rule to under-report and accuse working code of being dead.
 
@@ -499,7 +568,10 @@ func TestNoUnusedPrivateClassMembersStaysSilent(test *testing.T) {
 		// A use inside a nested arrow capturing `this`. The reference is lexically inside the class
 		// but syntactically inside a function, and it is still the same member.
 		{"a read inside a nested arrow", `class A { #f = 1; m() { return () => this.#f; } }`},
-		{"a read inside a nested function expression", `class A { #f = 1; m(o: A) { return function () { return o.#f; }; } }`},
+		{
+			"a read inside a nested function expression",
+			`class A { #f = 1; m(o: A) { return function () { return o.#f; }; } }`,
+		},
 
 		// Both update fixities in value position. The mirror of the discarded pair in the Fires
 		// suite: `return ++this.#x` reads the member, and a rule keying on the operator rather than
@@ -512,8 +584,14 @@ func TestNoUnusedPrivateClassMembersStaysSilent(test *testing.T) {
 		// getting it backwards reports the ordinary way to write a private setter. The rest-pattern
 		// and for-in forms are here because they are the write shapes most likely to be handled by
 		// a separate arm that forgets to ask whether the member is an accessor first.
-		{"a setter written through a rest pattern", `class A { set #a(v: unknown[]) {} m(b: unknown[]) { [...this.#a] = b; } }`},
-		{"a setter written as a for-in target", `class A { set #a(v: string) {} m(b: object) { for (this.#a in b) {} } }`},
+		{
+			"a setter written through a rest pattern",
+			`class A { set #a(v: unknown[]) {} m(b: unknown[]) { [...this.#a] = b; } }`,
+		},
+		{
+			"a setter written as a for-in target",
+			`class A { set #a(v: string) {} m(b: object) { for (this.#a in b) {} } }`,
+		},
 		{"a getter written to", `class A { get #a() { return 1; } m() { this.#a = 1; } }`},
 
 		// A private name declared twice with mixed kinds. This is a syntax error in JavaScript, and
@@ -524,7 +602,10 @@ func TestNoUnusedPrivateClassMembersStaysSilent(test *testing.T) {
 		// write-only finding on code the language already refuses. Staying silent is the
 		// conservative answer, since a finding here would be a second complaint about a file that
 		// cannot run at all.
-		{"a private name declared as both a getter and a field", `class A { get #a() { return 1; } #a = 1; m() { this.#a = 1; } }`},
+		{
+			"a private name declared as both a getter and a field",
+			`class A { get #a() { return 1; } #a = 1; m() { this.#a = 1; } }`,
+		},
 
 		// A read through another instance rather than through `this`.
 		{"a read through another instance", `class A { #foo = 1; m(o: A) { return o.#foo; } }`},
@@ -545,16 +626,31 @@ func TestNoUnusedPrivateClassMembersStaysSilent(test *testing.T) {
 		// as a write, because the climb reaches an assignment operator either way and only the side
 		// tells the two apart. Nothing upstream builds a value this way from a private member.
 		{"an array literal on the right of an assignment", `class A { #x = 1; m(foo: unknown) { foo = [this.#x]; } }`},
-		{"an object literal on the right of an assignment", `class A { #x = 1; m(foo: unknown) { foo = { k: this.#x }; } }`},
-		{"a spread on the right of an assignment", `class A { #x: unknown[] = []; m(foo: unknown) { foo = [...this.#x]; } }`},
-		{"a nested literal on the right of an assignment", `class A { #x = 1; m(foo: unknown) { foo = [{ k: this.#x }]; } }`},
+		{
+			"an object literal on the right of an assignment",
+			`class A { #x = 1; m(foo: unknown) { foo = { k: this.#x }; } }`,
+		},
+		{
+			"a spread on the right of an assignment",
+			`class A { #x: unknown[] = []; m(foo: unknown) { foo = [...this.#x]; } }`,
+		},
+		{
+			"a nested literal on the right of an assignment",
+			`class A { #x = 1; m(foo: unknown) { foo = [{ k: this.#x }]; } }`,
+		},
 
 		// A destructuring-shaped literal under a *non-assignment* binary operator. Written for a
 		// second surviving mutant: dropping the operator test from the climb made `[this.#x] === bar`
 		// read as a write, since the literal genuinely is the left operand and only the operator
 		// says it is a comparison rather than a store.
-		{"an array literal compared with a non-assignment operator", `class A { #x = 1; m(bar: unknown) { return [this.#x] === bar; } }`},
-		{"an object literal compared with a non-assignment operator", `class A { #x = 1; m(bar: unknown) { return { k: this.#x } !== bar; } }`},
+		{
+			"an array literal compared with a non-assignment operator",
+			`class A { #x = 1; m(bar: unknown) { return [this.#x] === bar; } }`,
+		},
+		{
+			"an object literal compared with a non-assignment operator",
+			`class A { #x = 1; m(bar: unknown) { return { k: this.#x } !== bar; } }`,
+		},
 
 		// The right side of an assignment whose left side is the same member. A rule that saw the
 		// member on the left and stopped would call this write-only.
@@ -563,12 +659,18 @@ func TestNoUnusedPrivateClassMembersStaysSilent(test *testing.T) {
 		// A nested destructuring target that reaches its assignment operator through several
 		// levels. The climb has to pass through both literal kinds and the property assignment
 		// between them, and this is a read on the *key* side, which the climb must not reach.
-		{"a computed key inside a nested destructuring target", `class A { #k = "a"; m(o: never) { ({ x: { [this.#k]: y } } = o); } }`},
+		{
+			"a computed key inside a nested destructuring target",
+			`class A { #k = "a"; m(o: never) { ({ x: { [this.#k]: y } } = o); } }`,
+		},
 
 		// A member declared in an outer class and read from inside a nested class that does *not*
 		// redeclare it. The shadowing narrowing must remove only the names the inner class
 		// redeclares, not stop the walk outright.
-		{"a read from a nested class that shadows a different name", `class A { #outer = 1; m() { return class { #inner = 2; n() { return this.#inner; } }; } o() { return this.#outer; } }`},
+		{
+			"a read from a nested class that shadows a different name",
+			`class A { #outer = 1; m() { return class { #inner = 2; n() { return this.#inner; } }; } o() { return this.#outer; } }`,
+		},
 	}
 
 	for _, testCase := range cases {
@@ -644,10 +746,18 @@ func TestNoUnusedPrivateClassMembersPointsAtThePrivateName(test *testing.T) {
 		// count assertion and fails this one.
 		{"two members in one class", `class A { #first = 1; #second = 2; }`, []string{"#first", "#second"}},
 		// The finding must land on the dead member, not on the live one beside it.
-		{"the dead member beside a live one", `class A { #live = 1; #dead = 2; m() { return this.#live; } }`, []string{"#dead"}},
+		{
+			"the dead member beside a live one",
+			`class A { #live = 1; #dead = 2; m() { return this.#live; } }`,
+			[]string{"#dead"},
+		},
 		// A member whose name is a prefix of another. A span computed from a name search rather
 		// than from the node lands on the wrong one.
-		{"a name that is a prefix of a live name", `class A { #x = 1; #xy = 2; m() { return this.#xy; } }`, []string{"#x"}},
+		{
+			"a name that is a prefix of a live name",
+			`class A { #x = 1; #xy = 2; m() { return this.#xy; } }`,
+			[]string{"#x"},
+		},
 	}
 
 	for _, testCase := range cases {

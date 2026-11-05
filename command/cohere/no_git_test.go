@@ -171,13 +171,22 @@ func runNoGitSequence(test *testing.T, binary string, path string) []string {
 	expectWouldChange("the first format check", output,
 		"CohereSettings.json", "NexusCohereSettings.json", "Producer.ts", "Ugly.ts", "tsconfig.json")
 
-	if !strings.Contains(output, "library/Inner.ts:1:1 - the formatter would rewrite this file in nested repository library, which a run here never writes: run cohere there [format/nested-drift]") ||
-		!strings.Contains(output, "nested repositories: 1 read, 1 files: 1 checked by the formatter, 1 would change under their own run") {
+	if !strings.Contains(
+		output,
+		"library/Inner.ts:1:1 - the formatter would rewrite this file in nested repository library, which a run here never writes: run cohere there [format/nested-drift]",
+	) ||
+		!strings.Contains(
+			output,
+			"nested repositories: 1 read, 1 files: 1 checked by the formatter, 1 would change under their own run",
+		) {
 		test.Fatalf("the submodule's drift was not reported as its own:\n%s", output)
 	}
 
 	step("--fix", "--format")
-	if inner := readForTest(test, filepath.Join(root, "library/Inner.ts")); inner != "export function inner(): number {\n    debugger;\n    return 1;\n}\n" {
+	if inner := readForTest(
+		test,
+		filepath.Join(root, "library/Inner.ts"),
+	); inner != "export function inner(): number {\n    debugger;\n    return 1;\n}\n" {
 		test.Fatalf("a run in the project wrote into the submodule:\n%s", inner)
 	}
 	for name, want := range map[string]string{

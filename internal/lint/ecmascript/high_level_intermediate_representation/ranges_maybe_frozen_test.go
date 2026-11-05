@@ -42,8 +42,18 @@ function Component(props) {
 		{"mutable", strings.Replace(source, "props.items ?? []", "getItems() ?? []", 1), true, true},
 		{"global", strings.Replace(source, "props.items ?? []", "props.flag ? externalItems : []", 1), true, true},
 		{"primitive mutable", strings.Replace(source, "props.items ?? []", "props.flag ? [] : null", 1), true, true},
-		{"missing dependency", strings.Replace(source, "() => setState(1)", "() => [props.value, setState(1)]", 1), true, false},
-		{"direct method", strings.Replace(source, "function findItem(id) { return items.find(item => item.id === id); }\n const item = findItem(props.id);", "const item = items.find(item => item.id === props.id);", 1), false, false},
+		{
+			"missing dependency",
+			strings.Replace(source, "() => setState(1)", "() => [props.value, setState(1)]", 1),
+			true,
+			false,
+		},
+		{"direct method", strings.Replace(
+			source,
+			"function findItem(id) { return items.find(item => item.id === id); }\n const item = findItem(props.id);",
+			"const item = items.find(item => item.id === props.id);",
+			1,
+		), false, false},
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()

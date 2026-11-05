@@ -44,7 +44,10 @@ func moduleCopy(test *testing.T) string {
 	for _, record := range records {
 		copyFile(filepath.Join("bench", "results", filepath.Base(record)))
 	}
-	err = filepath.WalkDir(filepath.Join(moduleRoot, docsdata.Directory), func(path string, entry os.DirEntry, err error) error {
+	err = filepath.WalkDir(filepath.Join(
+		moduleRoot,
+		docsdata.Directory,
+	), func(path string, entry os.DirEntry, err error) error {
 		if err != nil || entry.IsDir() {
 			return err
 		}
@@ -75,18 +78,35 @@ func recordsReproducing(examples docsdata.Examples) []capture.Record {
 			Outcome: outcome, Findings: firing.Findings, FixedSource: firing.FixedSource})
 	}
 	if clean := examples.Clean; clean != nil {
-		records = append(records, capture.Record{Rule: examples.Rule, File: clean.File, Source: clean.Source, Outcome: capture.OutcomeClean})
+		records = append(
+			records,
+			capture.Record{Rule: examples.Rule, File: clean.File, Source: clean.Source, Outcome: capture.OutcomeClean},
+		)
 	}
 	suggestions := 0
 	if examples.AssertsSuggestion {
 		suggestions = 1
 	}
 	for _, id := range examples.AssertedMessageIds {
-		records = append(records, capture.Record{Rule: examples.Rule, File: "options.ts", Source: id, Options: json.RawMessage(`{}`),
-			Outcome: capture.OutcomeFindings, Findings: []capture.Finding{{MessageId: id, Fix: examples.AssertsFix, Suggestions: suggestions}}})
+		records = append(
+			records,
+			capture.Record{
+				Rule:     examples.Rule,
+				File:     "options.ts",
+				Source:   id,
+				Options:  json.RawMessage(`{}`),
+				Outcome:  capture.OutcomeFindings,
+				Findings: []capture.Finding{{MessageId: id, Fix: examples.AssertsFix, Suggestions: suggestions}},
+			},
+		)
 	}
 	if len(records) == 0 {
-		records = append(records, capture.Record{Rule: examples.Rule, File: "options.ts", Options: json.RawMessage(`{}`), Outcome: capture.OutcomeClean})
+		records = append(records, capture.Record{
+			Rule:    examples.Rule,
+			File:    "options.ts",
+			Options: json.RawMessage(`{}`),
+			Outcome: capture.OutcomeClean,
+		})
 	}
 	return records
 }
@@ -164,7 +184,11 @@ func TestCheckRecapturesTheExamples(test *testing.T) {
 	test.Run("a fresh tree passes -check", func(test *testing.T) {
 		test.Parallel()
 		root := moduleCopy(test)
-		stale, staleFilesError := staleFiles(sources{root: root, help: noHelp, capture: capturing}, test.TempDir(), true)
+		stale, staleFilesError := staleFiles(
+			sources{root: root, help: noHelp, capture: capturing},
+			test.TempDir(),
+			true,
+		)
 		if staleFilesError != nil {
 			test.Fatal(staleFilesError)
 		}
@@ -177,7 +201,11 @@ func TestCheckRecapturesTheExamples(test *testing.T) {
 		test.Parallel()
 		root := moduleCopy(test)
 		planted := plantStaleExample(test, root)
-		stale, staleFilesError := staleFiles(sources{root: root, help: noHelp, capture: capturing}, test.TempDir(), true)
+		stale, staleFilesError := staleFiles(
+			sources{root: root, help: noHelp, capture: capturing},
+			test.TempDir(),
+			true,
+		)
 		if staleFilesError != nil {
 			test.Fatal(staleFilesError)
 		}
@@ -194,7 +222,11 @@ func TestCheckRecapturesTheExamples(test *testing.T) {
 			test.Error("the rendering depth ran the lint tests")
 			return nil
 		}
-		stale, staleFilesError := staleFiles(sources{root: root, help: noHelp, capture: noCapture}, test.TempDir(), false)
+		stale, staleFilesError := staleFiles(
+			sources{root: root, help: noHelp, capture: noCapture},
+			test.TempDir(),
+			false,
+		)
 		if staleFilesError != nil {
 			test.Fatal(staleFilesError)
 		}
@@ -206,7 +238,11 @@ func TestCheckRecapturesTheExamples(test *testing.T) {
 	test.Run("a capture that recorded nothing is refused", func(test *testing.T) {
 		test.Parallel()
 		recordsNothing := func(directory string) error { return os.MkdirAll(directory, 0o755) }
-		_, staleFilesError := staleFiles(sources{root: moduleCopy(test), help: noHelp, capture: recordsNothing}, test.TempDir(), true)
+		_, staleFilesError := staleFiles(
+			sources{root: moduleCopy(test), help: noHelp, capture: recordsNothing},
+			test.TempDir(),
+			true,
+		)
 		if staleFilesError == nil || !strings.Contains(staleFilesError.Error(), "recorded no case") {
 			test.Errorf("an empty capture passed as a check: %v", staleFilesError)
 		}

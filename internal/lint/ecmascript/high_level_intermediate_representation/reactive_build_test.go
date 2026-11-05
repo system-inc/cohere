@@ -30,7 +30,10 @@ func TestBuildReactiveFunctionShapes(test *testing.T) {
 		source        string
 	}{
 		{name: "branch with join", source: `function f(a) { if (a) { return 1; } return 2; }`},
-		{name: "loop with back edge", source: `function f(xs) { let t = 0; for (const x of xs) { t = t + x; } return t; }`},
+		{
+			name:   "loop with back edge",
+			source: `function f(xs) { let t = 0; for (const x of xs) { t = t + x; } return t; }`,
+		},
 		{name: "ternary", valueTerminals: 1, reactiveExtra: 1,
 			source: `function f(a) { const x = a ? 1 : 2; return x; }`},
 		{name: "logical", valueTerminals: 1, reactiveExtra: 1,
@@ -355,7 +358,11 @@ func TestBuildReactiveFunctionCorpusConservation(test *testing.T) {
 	doubleEmitted, unmatchedGotos := 0, 0
 	elidedScopeBreaks, nonImplicitScopeBreaks := 0, 0
 
-	forEachCorpusFunction(test, 400, func(function *Function, ranges *mutation_aliasing.MutableRanges, scopes *ReactiveScopes) {
+	forEachCorpusFunction(test, 400, func(
+		function *Function,
+		ranges *mutation_aliasing.MutableRanges,
+		scopes *ReactiveScopes,
+	) {
 		// Bring the graph to the state the pipeline actually delivers before converting it.
 		aligned, merged := AlignThenMergeReactiveScopes(function, scopes)
 		BuildReactiveScopeTerminals(function, scopes, MergedScopeIdentity{Aligned: aligned, Merged: merged})

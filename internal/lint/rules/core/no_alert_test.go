@@ -307,8 +307,14 @@ func TestNoAlertSurvivesACalleeThatIsNotAMemberAccess(test *testing.T) {
 		name   string
 		source string
 	}{
-		{name: "super call", source: "class Base { constructor(a: number) {} }\nclass Derived extends Base { constructor() { super(1); } }"},
-		{name: "super method call", source: "class Base { go() {} }\nclass Derived extends Base { go() { super.go(); } }"},
+		{
+			name:   "super call",
+			source: "class Base { constructor(a: number) {} }\nclass Derived extends Base { constructor() { super(1); } }",
+		},
+		{
+			name:   "super method call",
+			source: "class Base { go() {} }\nclass Derived extends Base { go() { super.go(); } }",
+		},
 		{name: "dynamic import", source: "async function load() { await import('./Other'); }"},
 		{name: "immediately invoked function", source: "(function() { return 1; })();"},
 		{name: "call returning a function", source: "function outer() { return function() {}; }\nouter()();"},

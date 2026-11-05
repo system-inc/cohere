@@ -45,8 +45,12 @@ func TestPathAliasRootIsAnchoredToTheConfig(test *testing.T) {
 			test.Parallel()
 			root := pathAliasProject(test, options)
 			output, _ := runCohere(test, binary, filepath.Join(root, "source", "features"), "--no-fix", "--lint")
-			if !strings.Contains(output, "import-require-path-alias") || !strings.Contains(output, "@project/foundation/Thing") {
-				test.Errorf("the rule reported nothing on an import that climbs two levels, so it ran inert:\n%s", output)
+			if !strings.Contains(output, "import-require-path-alias") ||
+				!strings.Contains(output, "@project/foundation/Thing") {
+				test.Errorf(
+					"the rule reported nothing on an import that climbs two levels, so it ran inert:\n%s",
+					output,
+				)
 			}
 		})
 	}

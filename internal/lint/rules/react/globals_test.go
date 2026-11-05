@@ -97,112 +97,353 @@ func TestGlobalsStaysSilent(test *testing.T) {
 
 func globalsFiresCases() []globalsCase {
 	return []globalsCase{
-		{name: "moduleLetWrittenInComponent", source: "let g = 0;\nfunction Component() {\n  g = 1;\n  return <div />;\n}\n", count: 1},
-		{name: "undeclaredNameWrittenInComponent", source: "function Component() {\n  someGlobal = true;\n  return <div />;\n}\n", count: 1},
-		{name: "moduleConstWritten", source: "const b = 1;\nfunction Component() {\n  b = 2;\n  return <div />;\n}\n", count: 1},
-		{name: "moduleVarWritten", source: "var b = 1;\nfunction Component() {\n  b = 2;\n  return <div />;\n}\n", count: 1},
-		{name: "importedBindingWritten", source: "import {thing} from 'mod';\nfunction Component() {\n  thing = 2;\n  return <div />;\n}\n", count: 1},
-		{name: "functionDeclarationWritten", source: "function other() {}\nfunction Component() {\n  other = 2;\n  return <div />;\n}\n", count: 1},
-		{name: "classDeclarationWritten", source: "class Thing {}\nfunction Component() {\n  Thing = 1;\n  return <div />;\n}\n", count: 1},
-		{name: "standardLibraryBindingWritten", source: "function Component() {\n  Object = 1;\n  return <div />;\n}\n", count: 1},
-		{name: "hookRootWrites", source: "import {useState} from 'react';\nlet g = 0;\nfunction useThing() {\n  useState(0);\n  g = 1;\n  return g;\n}\n", count: 1},
-		{name: "arrowComponentRootWrites", source: "let g = 0;\nconst Component = () => {\n  g = 1;\n  return <div />;\n};\n", count: 1},
-		{name: "twoWritesReportTwice", source: "let g = 0;\nlet h = 0;\nfunction Component() {\n  g = 1;\n  h = 2;\n  return <div />;\n}\n", count: 2},
-		{name: "chainedAssignmentReportsBoth", source: "function Component() {\n  a = b = 1;\n  return <div />;\n}\n", count: 2},
-		{name: "componentWithRefSecondParameter", source: "let g = 0;\nfunction Component(props, ref) {\n  g = 1;\n  return <div />;\n}\n", count: 1},
-		{name: "compoundPlus", source: "let g = 0;\nfunction Component() {\n  g += 1;\n  return <div />;\n}\n", count: 1},
-		{name: "compoundMinus", source: "let g = 0;\nfunction Component() {\n  g -= 1;\n  return <div />;\n}\n", count: 1},
-		{name: "compoundTimes", source: "let g = 0;\nfunction Component() {\n  g *= 1;\n  return <div />;\n}\n", count: 1},
-		{name: "compoundDivide", source: "let g = 0;\nfunction Component() {\n  g /= 1;\n  return <div />;\n}\n", count: 1},
-		{name: "compoundModulo", source: "let g = 0;\nfunction Component() {\n  g %= 1;\n  return <div />;\n}\n", count: 1},
-		{name: "compoundExponent", source: "let g = 0;\nfunction Component() {\n  g **= 1;\n  return <div />;\n}\n", count: 1},
-		{name: "compoundShiftLeft", source: "let g = 0;\nfunction Component() {\n  g <<= 1;\n  return <div />;\n}\n", count: 1},
-		{name: "compoundShiftRight", source: "let g = 0;\nfunction Component() {\n  g >>= 1;\n  return <div />;\n}\n", count: 1},
-		{name: "compoundUnsignedShiftRight", source: "let g = 0;\nfunction Component() {\n  g >>>= 1;\n  return <div />;\n}\n", count: 1},
-		{name: "compoundBitwiseAnd", source: "let g = 0;\nfunction Component() {\n  g &= 1;\n  return <div />;\n}\n", count: 1},
-		{name: "compoundBitwiseOr", source: "let g = 0;\nfunction Component() {\n  g |= 1;\n  return <div />;\n}\n", count: 1},
-		{name: "compoundBitwiseXor", source: "let g = 0;\nfunction Component() {\n  g ^= 1;\n  return <div />;\n}\n", count: 1},
-		{name: "destructureArrayElement", source: "let g = 0;\nfunction Component(props) {\n  [g] = props.value;\n  return <div />;\n}\n", count: 1},
-		{name: "destructureShorthandProperty", source: "function Component(props) {\n  ({a} = props);\n  return <div />;\n}\n", count: 1},
-		{name: "destructureRenamedProperty", source: "let g = 0;\nfunction Component(props) {\n  ({k: g} = props);\n  return <div />;\n}\n", count: 1},
-		{name: "destructureRestElementArray", source: "function Component(props) {\n  [...rest] = props;\n  return <div />;\n}\n", count: 1},
-		{name: "destructureRestElementObject", source: "function Component(props) {\n  ({...rest} = props);\n  return <div />;\n}\n", count: 1},
-		{name: "destructureNested", source: "function Component(props) {\n  [[q]] = props;\n  return <div />;\n}\n", count: 1},
-		{name: "destructureMixedLocalAndOuter", source: "function Component(props) {\n  let a;\n  [a, b] = props.value;\n  return <div />;\n}\n", count: 1},
-		{name: "writeInsideIf", source: "let g = 0;\nfunction Component(p) {\n  if (p) { g = 1; }\n  return <div />;\n}\n", count: 1},
-		{name: "writeInsideLoop", source: "let g = 0;\nfunction Component(p) {\n  while (p) { g = 1; }\n  return <div />;\n}\n", count: 1},
-		{name: "writeInsideTryBlock", source: "let g = 0;\nfunction Component(p) {\n  try { g = 1; } catch (e) {}\n  return <div />;\n}\n", count: 1},
-		{name: "writeInsideSwitchCase", source: "let g = 0;\nfunction Component(p) {\n  switch (p) { case 1: g = 1; break; }\n  return <div />;\n}\n", count: 1},
-		{name: "writeInsideBareBlock", source: "let g = 0;\nfunction Component(p) {\n  { g = 1; }\n  return <div />;\n}\n", count: 1},
-		{name: "writeInsideJsxExpression", source: "let g = 0;\nfunction Component() {\n  return <div>{(g = 1)}</div>;\n}\n", count: 1},
-		{name: "writeAsCallArgument", source: "let g = 0;\nfunction Component() {\n  helper(g = 1);\n  return <div />;\n}\n", count: 1},
-		{name: "parenthesizedSimpleTarget", source: "let g = 0;\nfunction Component() {\n  (g) = 1;\n  return <div />;\n}\n", count: 1},
-		{name: "parenthesizedCompoundTarget", source: "let g = 0;\nfunction Component() {\n  (g) += 1;\n  return <div />;\n}\n", count: 1},
+		{
+			name:   "moduleLetWrittenInComponent",
+			source: "let g = 0;\nfunction Component() {\n  g = 1;\n  return <div />;\n}\n",
+			count:  1,
+		},
+		{
+			name:   "undeclaredNameWrittenInComponent",
+			source: "function Component() {\n  someGlobal = true;\n  return <div />;\n}\n",
+			count:  1,
+		},
+		{
+			name:   "moduleConstWritten",
+			source: "const b = 1;\nfunction Component() {\n  b = 2;\n  return <div />;\n}\n",
+			count:  1,
+		},
+		{
+			name:   "moduleVarWritten",
+			source: "var b = 1;\nfunction Component() {\n  b = 2;\n  return <div />;\n}\n",
+			count:  1,
+		},
+		{
+			name:   "importedBindingWritten",
+			source: "import {thing} from 'mod';\nfunction Component() {\n  thing = 2;\n  return <div />;\n}\n",
+			count:  1,
+		},
+		{
+			name:   "functionDeclarationWritten",
+			source: "function other() {}\nfunction Component() {\n  other = 2;\n  return <div />;\n}\n",
+			count:  1,
+		},
+		{
+			name:   "classDeclarationWritten",
+			source: "class Thing {}\nfunction Component() {\n  Thing = 1;\n  return <div />;\n}\n",
+			count:  1,
+		},
+		{
+			name:   "standardLibraryBindingWritten",
+			source: "function Component() {\n  Object = 1;\n  return <div />;\n}\n",
+			count:  1,
+		},
+		{
+			name:   "hookRootWrites",
+			source: "import {useState} from 'react';\nlet g = 0;\nfunction useThing() {\n  useState(0);\n  g = 1;\n  return g;\n}\n",
+			count:  1,
+		},
+		{
+			name:   "arrowComponentRootWrites",
+			source: "let g = 0;\nconst Component = () => {\n  g = 1;\n  return <div />;\n};\n",
+			count:  1,
+		},
+		{
+			name:   "twoWritesReportTwice",
+			source: "let g = 0;\nlet h = 0;\nfunction Component() {\n  g = 1;\n  h = 2;\n  return <div />;\n}\n",
+			count:  2,
+		},
+		{
+			name:   "chainedAssignmentReportsBoth",
+			source: "function Component() {\n  a = b = 1;\n  return <div />;\n}\n",
+			count:  2,
+		},
+		{
+			name:   "componentWithRefSecondParameter",
+			source: "let g = 0;\nfunction Component(props, ref) {\n  g = 1;\n  return <div />;\n}\n",
+			count:  1,
+		},
+		{
+			name:   "compoundPlus",
+			source: "let g = 0;\nfunction Component() {\n  g += 1;\n  return <div />;\n}\n",
+			count:  1,
+		},
+		{
+			name:   "compoundMinus",
+			source: "let g = 0;\nfunction Component() {\n  g -= 1;\n  return <div />;\n}\n",
+			count:  1,
+		},
+		{
+			name:   "compoundTimes",
+			source: "let g = 0;\nfunction Component() {\n  g *= 1;\n  return <div />;\n}\n",
+			count:  1,
+		},
+		{
+			name:   "compoundDivide",
+			source: "let g = 0;\nfunction Component() {\n  g /= 1;\n  return <div />;\n}\n",
+			count:  1,
+		},
+		{
+			name:   "compoundModulo",
+			source: "let g = 0;\nfunction Component() {\n  g %= 1;\n  return <div />;\n}\n",
+			count:  1,
+		},
+		{
+			name:   "compoundExponent",
+			source: "let g = 0;\nfunction Component() {\n  g **= 1;\n  return <div />;\n}\n",
+			count:  1,
+		},
+		{
+			name:   "compoundShiftLeft",
+			source: "let g = 0;\nfunction Component() {\n  g <<= 1;\n  return <div />;\n}\n",
+			count:  1,
+		},
+		{
+			name:   "compoundShiftRight",
+			source: "let g = 0;\nfunction Component() {\n  g >>= 1;\n  return <div />;\n}\n",
+			count:  1,
+		},
+		{
+			name:   "compoundUnsignedShiftRight",
+			source: "let g = 0;\nfunction Component() {\n  g >>>= 1;\n  return <div />;\n}\n",
+			count:  1,
+		},
+		{
+			name:   "compoundBitwiseAnd",
+			source: "let g = 0;\nfunction Component() {\n  g &= 1;\n  return <div />;\n}\n",
+			count:  1,
+		},
+		{
+			name:   "compoundBitwiseOr",
+			source: "let g = 0;\nfunction Component() {\n  g |= 1;\n  return <div />;\n}\n",
+			count:  1,
+		},
+		{
+			name:   "compoundBitwiseXor",
+			source: "let g = 0;\nfunction Component() {\n  g ^= 1;\n  return <div />;\n}\n",
+			count:  1,
+		},
+		{
+			name:   "destructureArrayElement",
+			source: "let g = 0;\nfunction Component(props) {\n  [g] = props.value;\n  return <div />;\n}\n",
+			count:  1,
+		},
+		{
+			name:   "destructureShorthandProperty",
+			source: "function Component(props) {\n  ({a} = props);\n  return <div />;\n}\n",
+			count:  1,
+		},
+		{
+			name:   "destructureRenamedProperty",
+			source: "let g = 0;\nfunction Component(props) {\n  ({k: g} = props);\n  return <div />;\n}\n",
+			count:  1,
+		},
+		{
+			name:   "destructureRestElementArray",
+			source: "function Component(props) {\n  [...rest] = props;\n  return <div />;\n}\n",
+			count:  1,
+		},
+		{
+			name:   "destructureRestElementObject",
+			source: "function Component(props) {\n  ({...rest} = props);\n  return <div />;\n}\n",
+			count:  1,
+		},
+		{
+			name:   "destructureNested",
+			source: "function Component(props) {\n  [[q]] = props;\n  return <div />;\n}\n",
+			count:  1,
+		},
+		{
+			name:   "destructureMixedLocalAndOuter",
+			source: "function Component(props) {\n  let a;\n  [a, b] = props.value;\n  return <div />;\n}\n",
+			count:  1,
+		},
+		{
+			name:   "writeInsideIf",
+			source: "let g = 0;\nfunction Component(p) {\n  if (p) { g = 1; }\n  return <div />;\n}\n",
+			count:  1,
+		},
+		{
+			name:   "writeInsideLoop",
+			source: "let g = 0;\nfunction Component(p) {\n  while (p) { g = 1; }\n  return <div />;\n}\n",
+			count:  1,
+		},
+		{
+			name:   "writeInsideTryBlock",
+			source: "let g = 0;\nfunction Component(p) {\n  try { g = 1; } catch (e) {}\n  return <div />;\n}\n",
+			count:  1,
+		},
+		{
+			name:   "writeInsideSwitchCase",
+			source: "let g = 0;\nfunction Component(p) {\n  switch (p) { case 1: g = 1; break; }\n  return <div />;\n}\n",
+			count:  1,
+		},
+		{
+			name:   "writeInsideBareBlock",
+			source: "let g = 0;\nfunction Component(p) {\n  { g = 1; }\n  return <div />;\n}\n",
+			count:  1,
+		},
+		{
+			name:   "writeInsideJsxExpression",
+			source: "let g = 0;\nfunction Component() {\n  return <div>{(g = 1)}</div>;\n}\n",
+			count:  1,
+		},
+		{
+			name:   "writeAsCallArgument",
+			source: "let g = 0;\nfunction Component() {\n  helper(g = 1);\n  return <div />;\n}\n",
+			count:  1,
+		},
+		{
+			name:   "parenthesizedSimpleTarget",
+			source: "let g = 0;\nfunction Component() {\n  (g) = 1;\n  return <div />;\n}\n",
+			count:  1,
+		},
+		{
+			name:   "parenthesizedCompoundTarget",
+			source: "let g = 0;\nfunction Component() {\n  (g) += 1;\n  return <div />;\n}\n",
+			count:  1,
+		},
 		// The shorthand accessor returns nil for an undeclared target, which is the reporting case
 		// rather than a decline. See the note in `declaredOutsideCompilationRoot`.
-		{name: "destructureShorthandOnModuleBinding", source: "let a = 0;\nfunction Component(props) {\n  ({a} = props);\n  return <div />;\n}\n", count: 1},
+		{
+			name:   "destructureShorthandOnModuleBinding",
+			source: "let a = 0;\nfunction Component(props) {\n  ({a} = props);\n  return <div />;\n}\n",
+			count:  1,
+		},
 		// A rest parameter declines one function rather than bailing out the file. A sibling rule
 		// found upstream silencing a whole function on a rest parameter with no diagnostic to
 		// explain it, so the same shape was measured here with a control: the second component in
 		// this file still reports, and a rest parameter in a nested function or in a destructuring
 		// does not silence the component at all. This rule's gate is per-function, and this is the
 		// case that says so.
-		{name: "restParameterDeclinesOneFunctionOnly", source: "let g = 0;\nlet h = 0;\nfunction Widget(...props) {\n  g = 1;\n  return <div />;\n}\nfunction Other() {\n  h = 1;\n  return <div />;\n}\n", count: 1},
+		{
+			name:   "restParameterDeclinesOneFunctionOnly",
+			source: "let g = 0;\nlet h = 0;\nfunction Widget(...props) {\n  g = 1;\n  return <div />;\n}\nfunction Other() {\n  h = 1;\n  return <div />;\n}\n",
+			count:  1,
+		},
 		// The for-of bailout is also per-function. `First` is silent, `Second` reports.
-		{name: "forOfBailoutDoesNotReachTheNextComponent", source: "let h = 0;\nfunction First(props) {\n  for (item of props.items) {}\n  return <div />;\n}\nfunction Second() {\n  h = 1;\n  return <div />;\n}\n", count: 1},
-		{name: "restParameterInANestedFunctionDoesNotDecline", source: "let g = 0;\nfunction Component() {\n  const f = (...args) => args;\n  g = 1;\n  return <div />;\n}\n", count: 1},
-		{name: "restElementInABodyDestructuringDoesNotDecline", source: "let g = 0;\nfunction Component(props) {\n  const [a, ...others] = props.list;\n  g = 1;\n  return <div />;\n}\n", count: 1},
+		{
+			name:   "forOfBailoutDoesNotReachTheNextComponent",
+			source: "let h = 0;\nfunction First(props) {\n  for (item of props.items) {}\n  return <div />;\n}\nfunction Second() {\n  h = 1;\n  return <div />;\n}\n",
+			count:  1,
+		},
+		{
+			name:   "restParameterInANestedFunctionDoesNotDecline",
+			source: "let g = 0;\nfunction Component() {\n  const f = (...args) => args;\n  g = 1;\n  return <div />;\n}\n",
+			count:  1,
+		},
+		{
+			name:   "restElementInABodyDestructuringDoesNotDecline",
+			source: "let g = 0;\nfunction Component(props) {\n  const [a, ...others] = props.list;\n  g = 1;\n  return <div />;\n}\n",
+			count:  1,
+		},
 	}
 }
 
 func globalsSilentCases() []globalsCase {
 	return []globalsCase{
 		// golden reports 2; React's lint rule is silent, no JSX and no hook call
-		{name: "upstreamReassignmentToGlobal", source: "function Component() {\n  // Cannot assign to globals\n  someUnknownGlobal = true;\n  moduleLocal = true;\n}\n"},
+		{
+			name:   "upstreamReassignmentToGlobal",
+			source: "function Component() {\n  // Cannot assign to globals\n  someUnknownGlobal = true;\n  moduleLocal = true;\n}\n",
+		},
 		// golden reports 2; lint rule silent, no JSX and no hook call
-		{name: "upstreamReassignmentToGlobalIndirect", source: "function Component() {\n  const foo = () => {\n    // Cannot assign to globals\n    someUnknownGlobal = true;\n    moduleLocal = true;\n  };\n  foo();\n}\n"},
+		{
+			name:   "upstreamReassignmentToGlobalIndirect",
+			source: "function Component() {\n  const foo = () => {\n    // Cannot assign to globals\n    someUnknownGlobal = true;\n    moduleLocal = true;\n  };\n  foo();\n}\n",
+		},
 		// golden reports 1; lint rule silent, hook makes no hook call and writes no JSX
-		{name: "upstreamInvalidDestructureAssignmentToGlobal", source: "function useFoo(props) {\n  [x] = props;\n  return {x};\n}\n"},
+		{
+			name:   "upstreamInvalidDestructureAssignmentToGlobal",
+			source: "function useFoo(props) {\n  [x] = props;\n  return {x};\n}\n",
+		},
 		// golden reports 1 on b; lint rule silent, no JSX and no hook call
-		{name: "upstreamInvalidDestructureToLocalGlobalVariables", source: "function Component(props) {\n  let a;\n  [a, b] = props.value;\n\n  return [a, b];\n}\n"},
+		{
+			name:   "upstreamInvalidDestructureToLocalGlobalVariables",
+			source: "function Component(props) {\n  let a;\n  [a, b] = props.value;\n\n  return [a, b];\n}\n",
+		},
 		// golden reports 1; lint rule silent, hook has no hook call and no JSX
-		{name: "upstreamUpdateGlobalShouldBailout", source: "let renderCount = 0;\nfunction useFoo() {\n  renderCount += 1;\n  return renderCount;\n}\n"},
+		{
+			name:   "upstreamUpdateGlobalShouldBailout",
+			source: "let renderCount = 0;\nfunction useFoo() {\n  renderCount += 1;\n  return renderCount;\n}\n",
+		},
 		// golden reports 1; write is in a nested function, the stated subset
-		{name: "upstreamReassignGlobalFnArg", source: "let b = 1;\n\nexport default function MyApp() {\n  const fn = () => {\n    b = 2;\n  };\n  return foo(fn);\n}\n\nfunction foo(fn) {}\n"},
+		{
+			name:   "upstreamReassignGlobalFnArg",
+			source: "let b = 1;\n\nexport default function MyApp() {\n  const fn = () => {\n    b = 2;\n  };\n  return foo(fn);\n}\n\nfunction foo(fn) {}\n",
+		},
 		// React lint reports 1; write is in a nested function, the stated subset
-		{name: "upstreamAssignGlobalInComponentTagFunction", source: "function Component() {\n  const Foo = () => {\n    someGlobal = true;\n  };\n  return <Foo />;\n}\n"},
+		{
+			name:   "upstreamAssignGlobalInComponentTagFunction",
+			source: "function Component() {\n  const Foo = () => {\n    someGlobal = true;\n  };\n  return <Foo />;\n}\n",
+		},
 		// React lint reports 1; write is in a nested function, the stated subset
-		{name: "upstreamAssignGlobalInJsxChildren", source: "function Component() {\n  const foo = () => {\n    someGlobal = true;\n  };\n  // Children are generally access/called during render, so\n  // modifying a global in a children function is almost\n  // certainly a mistake.\n  return <Foo>{foo}</Foo>;\n}\n"},
+		{
+			name:   "upstreamAssignGlobalInJsxChildren",
+			source: "function Component() {\n  const foo = () => {\n    someGlobal = true;\n  };\n  // Children are generally access/called during render, so\n  // modifying a global in a children function is almost\n  // certainly a mistake.\n  return <Foo>{foo}</Foo>;\n}\n",
+		},
 		// React lint reports 1; write is in a nested function, the stated subset
-		{name: "upstreamInvalidGlobalReassignmentIndirect", source: "import {useEffect, useState} from 'react';\n\nlet someGlobal = false;\n\nfunction Component() {\n  const [state, setState] = useState(someGlobal);\n\n  const setGlobal = () => {\n    someGlobal = true;\n  };\n  const indirectSetGlobal = () => {\n    setGlobal();\n  };\n  indirectSetGlobal();\n\n  useEffect(() => {\n    setState(someGlobal);\n  }, [someGlobal]);\n\n  return <div>{String(state)}</div>;\n}\n"},
+		{
+			name:   "upstreamInvalidGlobalReassignmentIndirect",
+			source: "import {useEffect, useState} from 'react';\n\nlet someGlobal = false;\n\nfunction Component() {\n  const [state, setState] = useState(someGlobal);\n\n  const setGlobal = () => {\n    someGlobal = true;\n  };\n  const indirectSetGlobal = () => {\n    setGlobal();\n  };\n  indirectSetGlobal();\n\n  useEffect(() => {\n    setState(someGlobal);\n  }, [someGlobal]);\n\n  return <div>{String(state)}</div>;\n}\n",
+		},
 		// oxc pass case; React agrees it is silent
-		{name: "upstreamOxcPassGlobalInEffect", source: "\nimport {useEffect} from 'react';\nlet someGlobal = false;\nfunction Component() {\n  useEffect(() => {\n    someGlobal = true;\n  }, []);\n  return <div />;\n}\n"},
+		{
+			name:   "upstreamOxcPassGlobalInEffect",
+			source: "\nimport {useEffect} from 'react';\nlet someGlobal = false;\nfunction Component() {\n  useEffect(() => {\n    someGlobal = true;\n  }, []);\n  return <div />;\n}\n",
+		},
 		// oxc fail case, 1 diagnostic; write is in a nested function, the stated subset
-		{name: "upstreamOxcFailSetGlobal", source: "\nlet someGlobal = false;\nfunction Component() {\n  const setGlobal = () => {\n    someGlobal = true;\n  };\n  setGlobal();\n  return <div>{String(someGlobal)}</div>;\n}\n"},
+		{
+			name:   "upstreamOxcFailSetGlobal",
+			source: "\nlet someGlobal = false;\nfunction Component() {\n  const setGlobal = () => {\n    someGlobal = true;\n  };\n  setGlobal();\n  return <div>{String(someGlobal)}</div>;\n}\n",
+		},
 		// own local
-		{name: "localDeclaredInComponent", source: "function Component() {\n  let x = 1;\n  x = 2;\n  return <div />;\n}\n"},
+		{
+			name:   "localDeclaredInComponent",
+			source: "function Component() {\n  let x = 1;\n  x = 2;\n  return <div />;\n}\n",
+		},
 		// own parameter
 		{name: "parameterWritten", source: "function Component(props) {\n  props = 1;\n  return <div />;\n}\n"},
 		// the `HIR` gets this one wrong; upstream classifies it StoreContext
-		{name: "captureFromEnclosingFunction", source: "function Component() {\n  let x = 1;\n  const f = () => { x = 2; };\n  f();\n  return <div />;\n}\n"},
+		{
+			name:   "captureFromEnclosingFunction",
+			source: "function Component() {\n  let x = 1;\n  const f = () => { x = 2; };\n  f();\n  return <div />;\n}\n",
+		},
 		// shadow
-		{name: "shadowedByLocal", source: "let g = 0;\nfunction Component() {\n  let g = 1;\n  g = 2;\n  return <div />;\n}\n"},
+		{
+			name:   "shadowedByLocal",
+			source: "let g = 0;\nfunction Component() {\n  let g = 1;\n  g = 2;\n  return <div />;\n}\n",
+		},
 		// shadow
 		{name: "shadowedByParameter", source: "let g = 0;\nfunction Component(g) {\n  g = 2;\n  return <div />;\n}\n"},
 		// gate: name
-		{name: "lowercaseFunctionIsNotAComponent", source: "function helper() {\n  someGlobal = true;\n  return <div />;\n}\n"},
+		{
+			name:   "lowercaseFunctionIsNotAComponent",
+			source: "function helper() {\n  someGlobal = true;\n  return <div />;\n}\n",
+		},
 		// gate: no enclosing function
 		{name: "moduleTopLevelWrite", source: "someGlobal = true;\n"},
 		// gate: no evidence
 		{name: "componentWithoutJsxOrHookCall", source: "function Component() {\n  someGlobal = true;\n}\n"},
 		// gate: rest parameter
-		{name: "componentWithRestParameter", source: "function Component(...props) {\n  someGlobal = true;\n  return <div />;\n}\n"},
+		{
+			name:   "componentWithRestParameter",
+			source: "function Component(...props) {\n  someGlobal = true;\n  return <div />;\n}\n",
+		},
 		// gate: second parameter must contain ref
-		{name: "componentWithSecondParameterNotRef", source: "function Component(props, other) {\n  someGlobal = true;\n  return <div />;\n}\n"},
+		{
+			name:   "componentWithSecondParameterNotRef",
+			source: "function Component(props, other) {\n  someGlobal = true;\n  return <div />;\n}\n",
+		},
 		// gate: at most two parameters
-		{name: "componentWithThreeParameters", source: "function Component(a, b, c) {\n  someGlobal = true;\n  return <div />;\n}\n"},
+		{
+			name:   "componentWithThreeParameters",
+			source: "function Component(a, b, c) {\n  someGlobal = true;\n  return <div />;\n}\n",
+		},
 		// gate: evidence walk skips nested functions
-		{name: "jsxOnlyInsideNestedFunction", source: "function Component() {\n  someGlobal = true;\n  const f = () => <div />;\n  return f;\n}\n"},
+		{
+			name:   "jsxOnlyInsideNestedFunction",
+			source: "function Component() {\n  someGlobal = true;\n  const f = () => <div />;\n  return f;\n}\n",
+		},
 		// measured silent upstream with a control
 		{name: "updatePostfixIncrement", source: "let g = 0;\nfunction Component() {\n  g++;\n  return <div />;\n}\n"},
 		// measured silent upstream with a control
@@ -218,47 +459,95 @@ func globalsSilentCases() []globalsCase {
 		// measured silent upstream with a control
 		{name: "updateNullish", source: "let g = 0;\nfunction Component() {\n  g ??= 1;\n  return <div />;\n}\n"},
 		// a property write is the immutability rule, not this one
-		{name: "propertyWriteOnOuterBinding", source: "let wat = {};\nfunction Component() {\n  wat.test = 1;\n  return <div />;\n}\n"},
+		{
+			name:   "propertyWriteOnOuterBinding",
+			source: "let wat = {};\nfunction Component() {\n  wat.test = 1;\n  return <div />;\n}\n",
+		},
 		// property write
-		{name: "elementWriteOnOuterBinding", source: "let g = {};\nfunction Component() {\n  g[0] = 1;\n  return <div />;\n}\n"},
+		{
+			name:   "elementWriteOnOuterBinding",
+			source: "let g = {};\nfunction Component() {\n  g[0] = 1;\n  return <div />;\n}\n",
+		},
 		// a read is not a write
 		{name: "readOnly", source: "function Component() {\n  return <div>{someGlobal}</div>;\n}\n"},
 		// a call is not a write
 		{name: "callOnly", source: "function Component() {\n  someGlobal();\n  return <div />;\n}\n"},
 		// upstream takes the whole function silent; stated divergence
-		{name: "forOfHeadWithoutDeclaration", source: "function Component(props) {\n  for (item of props.items) {}\n  return <div />;\n}\n"},
+		{
+			name:   "forOfHeadWithoutDeclaration",
+			source: "function Component(props) {\n  for (item of props.items) {}\n  return <div />;\n}\n",
+		},
 		// a declaration is not an assignment
-		{name: "forOfHeadWithDeclaration", source: "function Component(props) {\n  for (const q of props.items) {}\n  return <div />;\n}\n"},
+		{
+			name:   "forOfHeadWithDeclaration",
+			source: "function Component(props) {\n  for (const q of props.items) {}\n  return <div />;\n}\n",
+		},
 		// measured silent upstream with a control
-		{name: "writeInsideCatchClause", source: "let g = 0;\nfunction Component(p) {\n  try {} catch (e) { g = 1; }\n  return <div />;\n}\n"},
+		{
+			name:   "writeInsideCatchClause",
+			source: "let g = 0;\nfunction Component(p) {\n  try {} catch (e) { g = 1; }\n  return <div />;\n}\n",
+		},
 		// measured silent upstream with a control
-		{name: "writeInsideFinallyBlock", source: "let g = 0;\nfunction Component(p) {\n  try {} finally { g = 1; }\n  return <div />;\n}\n"},
+		{
+			name:   "writeInsideFinallyBlock",
+			source: "let g = 0;\nfunction Component(p) {\n  try {} finally { g = 1; }\n  return <div />;\n}\n",
+		},
 		// unreachable; measured silent upstream with a control
 		{name: "writeAfterReturn", source: "let g = 0;\nfunction Component() {\n  return <div />;\n  g = 1;\n}\n"},
 		// not during render
-		{name: "writeInsideEffectCallback", source: "import {useEffect} from 'react';\nlet g = 0;\nfunction Component() {\n  useEffect(() => { g = 1; }, []);\n  return <div />;\n}\n"},
+		{
+			name:   "writeInsideEffectCallback",
+			source: "import {useEffect} from 'react';\nlet g = 0;\nfunction Component() {\n  useEffect(() => { g = 1; }, []);\n  return <div />;\n}\n",
+		},
 		// not during render
-		{name: "writeInsideEventHandler", source: "let g = 0;\nfunction Component() {\n  return <div onClick={() => { g = 1; }} />;\n}\n"},
+		{
+			name:   "writeInsideEventHandler",
+			source: "let g = 0;\nfunction Component() {\n  return <div onClick={() => { g = 1; }} />;\n}\n",
+		},
 		// The three shapes that keep the unconditional shorthand substitution honest: a shadow must
 		// still decline, and a default value is a read rather than a write.
-		{name: "shorthandShadowedByLocal", source: "function Component(props) {\n  let a;\n  ({a} = props);\n  return <div />;\n}\n"},
-		{name: "shorthandShadowedByParameter", source: "function Component(props, a) {\n  ({a} = props);\n  return <div />;\n}\n"},
-		{name: "shorthandDefaultValueIsARead", source: "let a = 0;\nfunction Component(props) {\n  let files;\n  ({files = a} = props);\n  return <div />;\n}\n"},
+		{
+			name:   "shorthandShadowedByLocal",
+			source: "function Component(props) {\n  let a;\n  ({a} = props);\n  return <div />;\n}\n",
+		},
+		{
+			name:   "shorthandShadowedByParameter",
+			source: "function Component(props, a) {\n  ({a} = props);\n  return <div />;\n}\n",
+		},
+		{
+			name:   "shorthandDefaultValueIsARead",
+			source: "let a = 0;\nfunction Component(props) {\n  let files;\n  ({files = a} = props);\n  return <div />;\n}\n",
+		},
 		// A parenthesized target under a non-reporting operator. These are what make the upward
 		// parenthesis skip in `isGlobalStoreTarget` load-bearing: without it the switch never sees
 		// the update or logical-assign parent, falls through, and reports. A mutant removing that
 		// skip survived the whole suite before these existed, because every parenthesized fixture
 		// here used a reporting operator, where skipping and not skipping both reach "report".
 		// All four measured silent under React's own rule.
-		{name: "parenthesizedPostfixIncrement", source: "let g = 0;\nfunction Component() {\n  (g)++;\n  return <div />;\n}\n"},
-		{name: "parenthesizedPrefixIncrement", source: "let g = 0;\nfunction Component() {\n  ++(g);\n  return <div />;\n}\n"},
-		{name: "parenthesizedLogicalOrAssign", source: "let g = 0;\nfunction Component() {\n  (g) ||= 1;\n  return <div />;\n}\n"},
-		{name: "parenthesizedNullishAssign", source: "let g = 0;\nfunction Component() {\n  (g) ??= 1;\n  return <div />;\n}\n"},
+		{
+			name:   "parenthesizedPostfixIncrement",
+			source: "let g = 0;\nfunction Component() {\n  (g)++;\n  return <div />;\n}\n",
+		},
+		{
+			name:   "parenthesizedPrefixIncrement",
+			source: "let g = 0;\nfunction Component() {\n  ++(g);\n  return <div />;\n}\n",
+		},
+		{
+			name:   "parenthesizedLogicalOrAssign",
+			source: "let g = 0;\nfunction Component() {\n  (g) ||= 1;\n  return <div />;\n}\n",
+		},
+		{
+			name:   "parenthesizedNullishAssign",
+			source: "let g = 0;\nfunction Component() {\n  (g) ??= 1;\n  return <div />;\n}\n",
+		},
 		// A rest parameter in a nested function, and a rest element in a destructuring, are not the
 		// component's own parameter list and do not decline it. Both measured; both report their
 		// global write, which is why they are in the fires table rather than here. What is pinned
 		// here is the component whose own parameter list carries the rest.
-		{name: "restParameterOnTheComponentItself", source: "let g = 0;\nfunction Widget(...props) {\n  g = 1;\n  return <div />;\n}\n"},
+		{
+			name:   "restParameterOnTheComponentItself",
+			source: "let g = 0;\nfunction Widget(...props) {\n  g = 1;\n  return <div />;\n}\n",
+		},
 	}
 }
 

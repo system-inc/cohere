@@ -134,12 +134,18 @@ func (parser *parser) combinator() {
 		parser.namespace()
 		return
 	}
-	node := newSelectorNode(typeCombinator,
-		"value", "",
-		"source", source(parser.currToken().at(2), parser.currToken().at(3), parser.currToken().at(2), parser.currToken().at(3)),
-		"sourceIndex", parser.currToken().at(4),
+	node := newSelectorNode(
+		typeCombinator,
+		"value",
+		"",
+		"source",
+		source(parser.currToken().at(2), parser.currToken().at(3), parser.currToken().at(2), parser.currToken().at(3)),
+		"sourceIndex",
+		parser.currToken().at(4),
 	)
-	for parser.position < len(parser.tokens) && parser.currToken() != nil && (parser.currToken().kind == "space" || parser.currToken().kind == "combinator") {
+	for parser.position < len(parser.tokens) &&
+		parser.currToken() != nil &&
+		(parser.currToken().kind == "space" || parser.currToken().kind == "combinator") {
 		if parser.nextToken() != nil && parser.nextToken().kind == "combinator" {
 			spacesOf(node)["before"] = parser.parseSpace(parser.currToken().value, "")
 			sourceEdgeOf(node, "start")["line"] = parser.nextToken().at(2)
@@ -172,10 +178,14 @@ func (parser *parser) comma() {
 }
 
 func (parser *parser) comment() {
-	node := newSelectorNode(typeComment,
-		"value", parser.currToken().value,
-		"source", source(parser.currToken().at(2), parser.currToken().at(3), parser.currToken().at(4), parser.currToken().at(5)),
-		"sourceIndex", parser.currToken().at(6),
+	node := newSelectorNode(
+		typeComment,
+		"value",
+		parser.currToken().value,
+		"source",
+		source(parser.currToken().at(2), parser.currToken().at(3), parser.currToken().at(4), parser.currToken().at(5)),
+		"sourceIndex",
+		parser.currToken().at(6),
 	)
 	parser.newNode(node, nil)
 	parser.position++
@@ -220,10 +230,14 @@ func (parser *parser) namespace() {
 }
 
 func (parser *parser) nesting() {
-	parser.newNode(newSelectorNode(typeNesting,
-		"value", parser.currToken().value,
-		"source", source(parser.currToken().at(2), parser.currToken().at(3), parser.currToken().at(2), parser.currToken().at(3)),
-		"sourceIndex", parser.currToken().at(4),
+	parser.newNode(newSelectorNode(
+		typeNesting,
+		"value",
+		parser.currToken().value,
+		"source",
+		source(parser.currToken().at(2), parser.currToken().at(3), parser.currToken().at(2), parser.currToken().at(3)),
+		"sourceIndex",
+		parser.currToken().at(4),
 	), nil)
 	parser.position++
 }
@@ -296,7 +310,12 @@ func (parser *parser) pseudo() {
 			pseudoString += first
 			pseudo := newSelectorNode(typePseudo,
 				"value", pseudoString,
-				"source", source(startingToken.at(2), startingToken.at(3), parser.currToken().loose(4), parser.currToken().loose(5)),
+				"source", source(
+					startingToken.at(2),
+					startingToken.at(3),
+					parser.currToken().loose(4),
+					parser.currToken().loose(5),
+				),
 				"sourceIndex", startingToken.at(4),
 			)
 			parser.newNode(pseudo, nil)
@@ -315,7 +334,9 @@ func (parser *parser) space() {
 	if parser.position == 0 || parser.prevToken().kind == "," || parser.prevToken().kind == "(" {
 		parser.spaces = parser.parseSpace(token.value, "")
 		parser.position++
-	} else if parser.position == len(parser.tokens)-1 || parser.nextToken().kind == "," || parser.nextToken().kind == ")" {
+	} else if parser.position == len(parser.tokens)-1 ||
+		parser.nextToken().kind == "," ||
+		parser.nextToken().kind == ")" {
 		last := lastOf(parser.current)
 		if last == nil {
 			throwTypeError("spaces")
@@ -344,10 +365,14 @@ func (parser *parser) universal(namespace any) {
 		parser.namespace()
 		return
 	}
-	parser.newNode(newSelectorNode(typeUniversal,
-		"value", parser.currToken().value,
-		"source", source(parser.currToken().at(2), parser.currToken().at(3), parser.currToken().at(2), parser.currToken().at(3)),
-		"sourceIndex", parser.currToken().at(4),
+	parser.newNode(newSelectorNode(
+		typeUniversal,
+		"value",
+		parser.currToken().value,
+		"source",
+		source(parser.currToken().at(2), parser.currToken().at(3), parser.currToken().at(2), parser.currToken().at(3)),
+		"sourceIndex",
+		parser.currToken().at(4),
 	), namespace)
 	parser.position++
 }
@@ -395,7 +420,12 @@ func (parser *parser) splitWord(namespace any, firstCallback func(first string, 
 			continue
 		}
 		currToken := parser.currToken()
-		nodeSource := source(currToken.loose(2), jsAdd(currToken.loose(3), ind), currToken.loose(4), jsAdd(currToken.loose(3), index-1))
+		nodeSource := source(
+			currToken.loose(2),
+			jsAdd(currToken.loose(3), ind),
+			currToken.loose(4),
+			jsAdd(currToken.loose(3), index-1),
+		)
 		var node *estree.Node
 		if containsInt(hasClass, ind) {
 			node = newSelectorNode(typeClass,

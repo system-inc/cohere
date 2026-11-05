@@ -362,8 +362,10 @@ func TestSolveSeedsEveryTerminalBlockBackward(test *testing.T) {
 		if !hasSuccessor {
 			terminals++
 			if !inExitSet[block.Index()] {
-				test.Errorf("reachable terminal block %d is in neither FinalBlocks nor ThrownBlocks, so a backward analysis would not seed it",
-					block.Index())
+				test.Errorf(
+					"reachable terminal block %d is in neither FinalBlocks nor ThrownBlocks, so a backward analysis would not seed it",
+					block.Index(),
+				)
 			}
 		}
 	}
@@ -415,7 +417,10 @@ func TestSolveConvergesInFewRoundsOnAcyclicGraphs(test *testing.T) {
 		test.Errorf("an acyclic forward analysis in reverse postorder should settle in 2 rounds, got %d", rounds)
 	}
 	if rounds := Solve[map[string]bool, string](graph, Backward, liveNames{}).Rounds(); rounds != 2 {
-		test.Errorf("an acyclic backward analysis in reversed reverse postorder should settle in 2 rounds, got %d", rounds)
+		test.Errorf(
+			"an acyclic backward analysis in reversed reverse postorder should settle in 2 rounds, got %d",
+			rounds,
+		)
 	}
 }
 
@@ -441,8 +446,11 @@ func TestSolveBackwardOrderIsReversed(test *testing.T) {
 			graph, _ := buildPathTestGraph(test, testCase.code)
 			solution := Solve[map[string]bool, string](graph, Backward, liveNames{})
 			if rounds := solution.Rounds(); rounds != testCase.wantRounds {
-				test.Errorf("backward analysis settled in %d rounds, want %d; the iteration order is not reversed reverse postorder",
-					rounds, testCase.wantRounds)
+				test.Errorf(
+					"backward analysis settled in %d rounds, want %d; the iteration order is not reversed reverse postorder",
+					rounds,
+					testCase.wantRounds,
+				)
 			}
 			// Every reachable block still has a value, so a wrong count is not being read off a
 			// solver that quietly stopped early.

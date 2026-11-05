@@ -123,7 +123,12 @@ func TestVerifyArrayParityFires(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			source := verifyArrayDecoratorPreamble + testCase.source
-			result := rule_testing.RunTyped(test, CorrectnessRequireVerifyArrayParity, correctnessRequireVerifyArrayParityFile, source)
+			result := rule_testing.RunTyped(
+				test,
+				CorrectnessRequireVerifyArrayParity,
+				correctnessRequireVerifyArrayParityFile,
+				source,
+			)
 			rule_testing.ExpectFindings(test, result, "missingArrayRule")
 
 			// The span: the original reports the property's key, so a port pointing at the whole

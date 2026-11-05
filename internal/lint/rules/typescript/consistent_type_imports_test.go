@@ -331,7 +331,12 @@ var consistentTypeImportsReportingCases = []consistentTypeImportsCase{
 	{
 		source:  "\n              import { Value1, Type1 } from 'named_import';\n              import Type2, { Value2 } from 'default_import';\n              import Value3, { Type3 } from 'default_import2';\n              import Type4, { Type5, Value4 } from 'default_and_named_import';\n              type T = Type1 | Type2 | Type3 | Type4 | Type5;\n            ",
 		options: "",
-		ids:     []string{"someImportsAreOnlyTypes", "someImportsAreOnlyTypes", "someImportsAreOnlyTypes", "someImportsAreOnlyTypes"},
+		ids: []string{
+			"someImportsAreOnlyTypes",
+			"someImportsAreOnlyTypes",
+			"someImportsAreOnlyTypes",
+			"someImportsAreOnlyTypes",
+		},
 	},
 	{
 		source:  "\n              let foo: import('foo');\n              let bar: import('foo').Bar;\n            ",
@@ -1079,7 +1084,11 @@ func TestConsistentTypeImportsDecoderDefaults(test *testing.T) {
 func TestConsistentTypeImportsProposesOneEditPerFinding(test *testing.T) {
 	test.Parallel()
 
-	for _, source := range []string{"import Foo from 'foo';\nlet foo: Foo;\n", "import Foo, { Bar } from 'foo';\nlet foo: Foo;\nlet bar: Bar;\n", "import { A, B } from 'foo';\nconst foo: A = B();\n"} {
+	for _, source := range []string{
+		"import Foo from 'foo';\nlet foo: Foo;\n",
+		"import Foo, { Bar } from 'foo';\nlet foo: Foo;\nlet bar: Bar;\n",
+		"import { A, B } from 'foo';\nconst foo: A = B();\n",
+	} {
 		result := rule_testing.RunTypedWithOptions(test, ConsistentTypeImports,
 			"consistent_type_imports.tsx", source, DefaultConsistentTypeImportsOptions())
 		if len(result.Diagnostics) == 0 {
@@ -1097,12 +1106,19 @@ func TestConsistentTypeImportsProposesOneEditPerFinding(test *testing.T) {
 	// seventy, is in consistent_type_imports_fix_test.go.
 	mixed := rule_testing.RunTypedWithOptions(test, ConsistentTypeImports, "consistent_type_imports.tsx",
 		"import Foo, { Bar } from 'foo';\nlet foo: Foo;\nconst bar = Bar;\n", DefaultConsistentTypeImportsOptions())
-	rule_testing.ExpectFixedSource(test, mixed, "import type Foo from 'foo';\nimport { Bar } from 'foo';\nlet foo: Foo;\nconst bar = Bar;\n")
+	rule_testing.ExpectFixedSource(
+		test,
+		mixed,
+		"import type Foo from 'foo';\nimport { Bar } from 'foo';\nlet foo: Foo;\nconst bar = Bar;\n",
+	)
 
 	annotation := rule_testing.RunTypedWithOptions(test, ConsistentTypeImports,
 		"consistent_type_imports.tsx", "type T = import('foo');\n", DefaultConsistentTypeImportsOptions())
 	if len(annotation.Diagnostics) != 1 || len(annotation.Diagnostics[0].Fixes) != 0 {
-		test.Errorf("the import() annotation finding should report once with no repair, got %+v", annotation.Diagnostics)
+		test.Errorf(
+			"the import() annotation finding should report once with no repair, got %+v",
+			annotation.Diagnostics,
+		)
 	}
 }
 
@@ -1146,7 +1162,11 @@ func TestConsistentTypeImportsReadsTheJsxFactoryFromTheProgram(test *testing.T) 
 			`"moduleDetection": "force", "types": [], "jsx": "react", "jsxFactory": "h.createElement", ` +
 			`"jsxFragmentFactory": "Fragment"}, ` +
 			`"include": ["**/*.ts", "**/*.tsx"]}`
-		if writeError := os.WriteFile(filepath.Join(directory, "tsconfig.json"), []byte(configuration), 0o644); writeError != nil {
+		if writeError := os.WriteFile(
+			filepath.Join(directory, "tsconfig.json"),
+			[]byte(configuration),
+			0o644,
+		); writeError != nil {
 			test.Fatalf("writing the tsconfig: %v", writeError)
 		}
 	}
@@ -1155,12 +1175,28 @@ func TestConsistentTypeImportsReadsTheJsxFactoryFromTheProgram(test *testing.T) 
 		source string
 		ids    []string
 	}{
-		{"the factory's binding is a value use", "import { h } from 'preact';\ntype T = h.JSX.Element;\nconst x = <div />;\n", nil},
-		{"React is an ordinary name under another factory", "import React from 'react';\ntype T = React.FC;\nconst x = <div />;\n", []string{"typeOverValue"}},
+		{
+			"the factory's binding is a value use",
+			"import { h } from 'preact';\ntype T = h.JSX.Element;\nconst x = <div />;\n",
+			nil,
+		},
+		{
+			"React is an ordinary name under another factory",
+			"import React from 'react';\ntype T = React.FC;\nconst x = <div />;\n",
+			[]string{"typeOverValue"},
+		},
 		// The fragment factory is a value use only where a fragment is written. Both measured on the
 		// installed ESLint with `jsxPragma: 'h'` and `jsxFragmentName: 'Fragment'`.
-		{"a fragment makes the fragment factory a value use", "import { h, Fragment } from 'preact';\ntype T = Fragment;\nconst x = <></>;\n", nil},
-		{"without a fragment the fragment factory is a type use", "import { h, Fragment } from 'preact';\ntype T = Fragment;\nconst x = <div />;\n", []string{"someImportsAreOnlyTypes"}},
+		{
+			"a fragment makes the fragment factory a value use",
+			"import { h, Fragment } from 'preact';\ntype T = Fragment;\nconst x = <></>;\n",
+			nil,
+		},
+		{
+			"without a fragment the fragment factory is a type use",
+			"import { h, Fragment } from 'preact';\ntype T = Fragment;\nconst x = <div />;\n",
+			[]string{"someImportsAreOnlyTypes"},
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {

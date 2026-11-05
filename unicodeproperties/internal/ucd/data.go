@@ -197,7 +197,13 @@ func Build() (Tables, error) {
 		}
 	}
 	binaries := map[string][]Range{}
-	for _, f := range []string{"PropList.txt", "DerivedCoreProperties.txt", "extracted/DerivedBinaryProperties.txt", "emoji/emoji-data.txt", "DerivedNormalizationProps.txt"} {
+	for _, f := range []string{
+		"PropList.txt",
+		"DerivedCoreProperties.txt",
+		"extracted/DerivedBinaryProperties.txt",
+		"emoji/emoji-data.txt",
+		"DerivedNormalizationProps.txt",
+	} {
 		for _, row := range fields(files[f]) {
 			binaries[row[1]] = append(binaries[row[1]], span(row[0]))
 		}

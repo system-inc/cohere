@@ -96,21 +96,41 @@ var postDominatorShapes = []struct {
 	{name: "both arms return", code: `function f(p) { if (p) { return 1; } else { return 2; } }`, minimumPairs: 9},
 	{name: "nested if", code: `function f(p, q) { if (p) { if (q) { a(); } b(); } return c; }`, minimumPairs: 12},
 	{name: "while", code: `function f(p) { while (p) { a(); } return b; }`, minimumPairs: 12},
-	{name: "while with break", code: `function f(p) { while (p) { if (p) { break; } a(); } return b; }`, minimumPairs: 20},
+	{
+		name:         "while with break",
+		code:         `function f(p) { while (p) { if (p) { break; } a(); } return b; }`,
+		minimumPairs: 20,
+	},
 	{name: "for of", code: `function f(p) { for (const x of p) { a(x); } return b; }`, minimumPairs: 12},
 	{name: "for of empty body", code: `function f(p) { for (const x of p) {} return b; }`, minimumPairs: 12},
 	{name: "throw in one arm", code: `function f(p) { if (p) { throw new Error(); } a(); return b; }`, minimumPairs: 4},
-	{name: "loop with throw arm", code: `function f(p) { for (const x of p) { if (p) { break; } else { throw new Error(); } } return b; }`, minimumPairs: 12},
+	{
+		name:         "loop with throw arm",
+		code:         `function f(p) { for (const x of p) { if (p) { break; } else { throw new Error(); } } return b; }`,
+		minimumPairs: 12,
+	},
 	{name: "try catch", code: `function f() { try { a(); } catch (e) { b(); } return c; }`, minimumPairs: 6},
-	{name: "switch", code: `function f(p) { switch (p) { case 1: a(); break; default: b(); } return c; }`, minimumPairs: 12},
+	{
+		name:         "switch",
+		code:         `function f(p) { switch (p) { case 1: a(); break; default: b(); } return c; }`,
+		minimumPairs: 12,
+	},
 	{name: "ternary", code: `function f(p) { const x = p ? a() : b(); return x; }`, minimumPairs: 12},
 	{name: "logical and", code: `function f(p) { const x = p && a(); return x; }`, minimumPairs: 12},
 	{name: "do while", code: `function f(p) { do { a(); } while (p); return b; }`, minimumPairs: 12},
-	{name: "labelled break", code: `function f(p) { outer: for (const x of p) { break outer; } return b; }`, minimumPairs: 20},
+	{
+		name:         "labelled break",
+		code:         `function f(p) { outer: for (const x of p) { break outer; } return b; }`,
+		minimumPairs: 20,
+	},
 	{name: "two returns", code: `function f(p) { if (p) { return 1; } return 2; }`, minimumPairs: 6},
 	{name: "infinite loop", code: `function f() { while (true) { a(); } }`, minimumPairs: 12},
 	{name: "return inside loop", code: `function f(p) { while (p) { return 1; } return 2; }`, minimumPairs: 12},
-	{name: "nested loops", code: `function f(p, q) { for (const x of p) { for (const y of q) { a(); } } return b; }`, minimumPairs: 20},
+	{
+		name:         "nested loops",
+		code:         `function f(p, q) { for (const x of p) { for (const y of q) { a(); } } return b; }`,
+		minimumPairs: 20,
+	},
 }
 
 // TestPostDominatorsMatchTheDefinition checks every ordered pair of blocks in every shape against a
@@ -147,8 +167,11 @@ func TestPostDominatorsMatchTheDefinition(test *testing.T) {
 				}
 			}
 			if pairs < shape.minimumPairs {
-				test.Fatalf("only %d ordered pairs checked, want at least %d; this shape is smaller than the case assumes and would pass vacuously",
-					pairs, shape.minimumPairs)
+				test.Fatalf(
+					"only %d ordered pairs checked, want at least %d; this shape is smaller than the case assumes and would pass vacuously",
+					pairs,
+					shape.minimumPairs,
+				)
 			}
 		})
 	}
@@ -230,8 +253,12 @@ func TestPostDominatorDefinitionCheckCanFail(test *testing.T) {
 				return
 			}
 			if detected != withContent {
-				test.Errorf("only %d of %d corruptions with real content were detected; the definition check is partly blind\n%s",
-					detected, withContent, Print(function))
+				test.Errorf(
+					"only %d of %d corruptions with real content were detected; the definition check is partly blind\n%s",
+					detected,
+					withContent,
+					Print(function),
+				)
 			}
 			shapesWithContent++
 			test.Logf("%d of %d corruptions detected", detected, withContent)
@@ -262,17 +289,41 @@ func TestUnconditionalBlocksOnMeasuredShapes(test *testing.T) {
 		// React reports: the call is in the entry block.
 		{name: "straight", code: `function f() { const s = g(); s(1); return 0; }`, wantUnconditional: true},
 		// React is clean: a conditional call.
-		{name: "conditional", code: `function f(p) { const s = g(); if (p) { s(1); } return 0; }`, wantUnconditional: false},
+		{
+			name:              "conditional",
+			code:              `function f(p) { const s = g(); if (p) { s(1); } return 0; }`,
+			wantUnconditional: false,
+		},
 		// React is clean: an early return means the tail is not on every path.
-		{name: "early return", code: `function f(p) { const s = g(); if (p) { return 1; } s(1); return 0; }`, wantUnconditional: false},
+		{
+			name:              "early return",
+			code:              `function f(p) { const s = g(); if (p) { return 1; } s(1); return 0; }`,
+			wantUnconditional: false,
+		},
 		// React reports: the loop always terminates into the tail.
-		{name: "after empty loop", code: `function f(p) { const s = g(); for (const x of p) {} s(1); return 0; }`, wantUnconditional: true},
+		{
+			name:              "after empty loop",
+			code:              `function f(p) { const s = g(); for (const x of p) {} s(1); return 0; }`,
+			wantUnconditional: true,
+		},
 		// React reports: the throwing arm is not an exit, so the break is the only way out.
-		{name: "after loop with throw arm", code: `function f(p) { const s = g(); for (const x of p) { if (p) { break; } else { throw new Error(); } } s(1); return 0; }`, wantUnconditional: true},
+		{
+			name:              "after loop with throw arm",
+			code:              `function f(p) { const s = g(); for (const x of p) { if (p) { break; } else { throw new Error(); } } s(1); return 0; }`,
+			wantUnconditional: true,
+		},
 		// React is clean: a loop body is conditional.
-		{name: "inside loop", code: `function f(p) { const s = g(); for (const x of p) { s(1); } return 0; }`, wantUnconditional: false},
+		{
+			name:              "inside loop",
+			code:              `function f(p) { const s = g(); for (const x of p) { s(1); } return 0; }`,
+			wantUnconditional: false,
+		},
 		// React is clean: a try body may not complete.
-		{name: "inside try", code: `function f() { const s = g(); try { s(1); } catch (e) {} return 0; }`, wantUnconditional: false},
+		{
+			name:              "inside try",
+			code:              `function f() { const s = g(); try { s(1); } catch (e) {} return 0; }`,
+			wantUnconditional: false,
+		},
 	}
 
 	for _, testCase := range cases {

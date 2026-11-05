@@ -98,73 +98,109 @@ func TestPreferFindFiresOnUpstreamFailCases(test *testing.T) {
 		{
 			sourceText: "\ndeclare const arr: string[];\narr.filter(item => item === 'aha')[0];\n      ",
 			wantFindings: []preferFindFinding{
-				{wantSpan: "arr.filter(item => item === 'aha')[0]", wantSuggestion: "declare const arr: string[];\narr.find(item => item === 'aha');\n"},
+				{
+					wantSpan:       "arr.filter(item => item === 'aha')[0]",
+					wantSuggestion: "declare const arr: string[];\narr.find(item => item === 'aha');\n",
+				},
 			},
 		},
 		{
 			sourceText: "\ndeclare const arr: Array<string>;\nconst zero = 0;\narr.filter(item => item === 'aha')[zero];\n      ",
 			wantFindings: []preferFindFinding{
-				{wantSpan: "arr.filter(item => item === 'aha')[zero]", wantSuggestion: "declare const arr: Array<string>;\nconst zero = 0;\narr.find(item => item === 'aha');\n"},
+				{
+					wantSpan:       "arr.filter(item => item === 'aha')[zero]",
+					wantSuggestion: "declare const arr: Array<string>;\nconst zero = 0;\narr.find(item => item === 'aha');\n",
+				},
 			},
 		},
 		{
 			sourceText: "\ndeclare const arr: Array<string>;\nconst zero = 0n;\narr.filter(item => item === 'aha')[zero];\n      ",
 			wantFindings: []preferFindFinding{
-				{wantSpan: "arr.filter(item => item === 'aha')[zero]", wantSuggestion: "declare const arr: Array<string>;\nconst zero = 0n;\narr.find(item => item === 'aha');\n"},
+				{
+					wantSpan:       "arr.filter(item => item === 'aha')[zero]",
+					wantSuggestion: "declare const arr: Array<string>;\nconst zero = 0n;\narr.find(item => item === 'aha');\n",
+				},
 			},
 		},
 		{
 			sourceText: "\ndeclare const arr: Array<string>;\nconst zero = -0n;\narr.filter(item => item === 'aha')[zero];\n      ",
 			wantFindings: []preferFindFinding{
-				{wantSpan: "arr.filter(item => item === 'aha')[zero]", wantSuggestion: "declare const arr: Array<string>;\nconst zero = -0n;\narr.find(item => item === 'aha');\n"},
+				{
+					wantSpan:       "arr.filter(item => item === 'aha')[zero]",
+					wantSuggestion: "declare const arr: Array<string>;\nconst zero = -0n;\narr.find(item => item === 'aha');\n",
+				},
 			},
 		},
 		{
 			sourceText: "\ndeclare const arr: readonly string[];\narr.filter(item => item === 'aha').at(0);\n      ",
 			wantFindings: []preferFindFinding{
-				{wantSpan: "arr.filter(item => item === 'aha').at(0)", wantSuggestion: "declare const arr: readonly string[];\narr.find(item => item === 'aha');\n"},
+				{
+					wantSpan:       "arr.filter(item => item === 'aha').at(0)",
+					wantSuggestion: "declare const arr: readonly string[];\narr.find(item => item === 'aha');\n",
+				},
 			},
 		},
 		{
 			sourceText: "\ndeclare const arr: ReadonlyArray<string>;\n(undefined, arr.filter(item => item === 'aha')).at(0);\n      ",
 			wantFindings: []preferFindFinding{
-				{wantSpan: "(undefined, arr.filter(item => item === 'aha')).at(0)", wantSuggestion: "declare const arr: ReadonlyArray<string>;\n(undefined, arr.find(item => item === 'aha'));\n"},
+				{
+					wantSpan:       "(undefined, arr.filter(item => item === 'aha')).at(0)",
+					wantSuggestion: "declare const arr: ReadonlyArray<string>;\n(undefined, arr.find(item => item === 'aha'));\n",
+				},
 			},
 		},
 		{
 			sourceText: "\ndeclare const arr: string[];\nconst zero = 0;\narr.filter(item => item === 'aha').at(zero);\n      ",
 			wantFindings: []preferFindFinding{
-				{wantSpan: "arr.filter(item => item === 'aha').at(zero)", wantSuggestion: "declare const arr: string[];\nconst zero = 0;\narr.find(item => item === 'aha');\n"},
+				{
+					wantSpan:       "arr.filter(item => item === 'aha').at(zero)",
+					wantSuggestion: "declare const arr: string[];\nconst zero = 0;\narr.find(item => item === 'aha');\n",
+				},
 			},
 		},
 		{
 			sourceText: "\ndeclare const arr: string[];\narr.filter(item => item === 'aha')['0'];\n      ",
 			wantFindings: []preferFindFinding{
-				{wantSpan: "arr.filter(item => item === 'aha')['0']", wantSuggestion: "declare const arr: string[];\narr.find(item => item === 'aha');\n"},
+				{
+					wantSpan:       "arr.filter(item => item === 'aha')['0']",
+					wantSuggestion: "declare const arr: string[];\narr.find(item => item === 'aha');\n",
+				},
 			},
 		},
 		{
 			sourceText: "const two = [1, 2, 3].filter(item => item === 2)[0];",
 			wantFindings: []preferFindFinding{
-				{wantSpan: "[1, 2, 3].filter(item => item === 2)[0]", wantSuggestion: "const two = [1, 2, 3].find(item => item === 2);\n"},
+				{
+					wantSpan:       "[1, 2, 3].filter(item => item === 2)[0]",
+					wantSuggestion: "const two = [1, 2, 3].find(item => item === 2);\n",
+				},
 			},
 		},
 		{
 			sourceText: "const fltr = \"filter\"; (([] as unknown[]))[fltr] ((item) => { return item === 2 }  ) [ 0  ] ;",
 			wantFindings: []preferFindFinding{
-				{wantSpan: "(([] as unknown[]))[fltr] ((item) => { return item === 2 }  ) [ 0  ]", wantSuggestion: "const fltr = \"filter\"; (([] as unknown[]))[\"find\"] ((item) => { return item === 2 }  )  ;\n"},
+				{
+					wantSpan:       "(([] as unknown[]))[fltr] ((item) => { return item === 2 }  ) [ 0  ]",
+					wantSuggestion: "const fltr = \"filter\"; (([] as unknown[]))[\"find\"] ((item) => { return item === 2 }  )  ;\n",
+				},
 			},
 		},
 		{
 			sourceText: "(([] as unknown[]))?.[\"filter\"] ((item) => { return item === 2 }  ) [ 0  ] ;",
 			wantFindings: []preferFindFinding{
-				{wantSpan: "(([] as unknown[]))?.[\"filter\"] ((item) => { return item === 2 }  ) [ 0  ]", wantSuggestion: "(([] as unknown[]))?.[\"find\"] ((item) => { return item === 2 }  )  ;\n"},
+				{
+					wantSpan:       "(([] as unknown[]))?.[\"filter\"] ((item) => { return item === 2 }  ) [ 0  ]",
+					wantSuggestion: "(([] as unknown[]))?.[\"find\"] ((item) => { return item === 2 }  )  ;\n",
+				},
 			},
 		},
 		{
 			sourceText: "\ndeclare const nullableArray: unknown[] | undefined | null;\nnullableArray?.filter(item => true)[0];\n      ",
 			wantFindings: []preferFindFinding{
-				{wantSpan: "nullableArray?.filter(item => true)[0]", wantSuggestion: "declare const nullableArray: unknown[] | undefined | null;\nnullableArray?.find(item => true);\n"},
+				{
+					wantSpan:       "nullableArray?.filter(item => true)[0]",
+					wantSuggestion: "declare const nullableArray: unknown[] | undefined | null;\nnullableArray?.find(item => true);\n",
+				},
 			},
 		},
 		{
@@ -176,7 +212,10 @@ func TestPreferFindFiresOnUpstreamFailCases(test *testing.T) {
 		{
 			sourceText: "\ndeclare const objectWithArrayProperty: { arr: unknown[] };\ndeclare function cond(x: unknown): boolean;\nconsole.log((1, 2, objectWithArrayProperty?.arr['filter'](cond)).at(0));\n      ",
 			wantFindings: []preferFindFinding{
-				{wantSpan: "(1, 2, objectWithArrayProperty?.arr['filter'](cond)).at(0)", wantSuggestion: "declare const objectWithArrayProperty: { arr: unknown[] };\ndeclare function cond(x: unknown): boolean;\nconsole.log((1, 2, objectWithArrayProperty?.arr[\"find\"](cond)));\n"},
+				{
+					wantSpan:       "(1, 2, objectWithArrayProperty?.arr['filter'](cond)).at(0)",
+					wantSuggestion: "declare const objectWithArrayProperty: { arr: unknown[] };\ndeclare function cond(x: unknown): boolean;\nconsole.log((1, 2, objectWithArrayProperty?.arr[\"find\"](cond)));\n",
+				},
 			},
 		},
 		{
@@ -188,7 +227,10 @@ func TestPreferFindFiresOnUpstreamFailCases(test *testing.T) {
 		{
 			sourceText: "\nconst idxToLookUp = -0.12635678;\n[1, 2, 3].filter(x => x > 0).at(idxToLookUp);\n      ",
 			wantFindings: []preferFindFinding{
-				{wantSpan: "[1, 2, 3].filter(x => x > 0).at(idxToLookUp)", wantSuggestion: "const idxToLookUp = -0.12635678;\n[1, 2, 3].find(x => x > 0);\n"},
+				{
+					wantSpan:       "[1, 2, 3].filter(x => x > 0).at(idxToLookUp)",
+					wantSuggestion: "const idxToLookUp = -0.12635678;\n[1, 2, 3].find(x => x > 0);\n",
+				},
 			},
 		},
 		{
@@ -200,67 +242,100 @@ func TestPreferFindFiresOnUpstreamFailCases(test *testing.T) {
 		{
 			sourceText: "\ndeclare const arr: string[];\ndeclare const cond: Parameters<Array<string>['filter']>[0];\nconst a = { arr };\na?.arr\n  .filter(cond) /* what a bad spot for a comment. Let's make sure\n  there's some yucky symbols too. [ . ?. <>   ' ' \\'] */\n  .at('0');\n      ",
 			wantFindings: []preferFindFinding{
-				{wantSpan: "a?.arr\n  .filter(cond) /* what a bad spot for a comment. Let's make sure\n  there's some yucky symbols too. [ . ?. <>   ' ' \\'] */\n  .at('0')", wantSuggestion: "declare const arr: string[];\ndeclare const cond: Parameters<Array<string>['filter']>[0];\nconst a = { arr };\na?.arr\n  .find(cond) /* what a bad spot for a comment. Let's make sure\n  there's some yucky symbols too. [ . ?. <>   ' ' \\'] */\n  ;\n"},
+				{
+					wantSpan:       "a?.arr\n  .filter(cond) /* what a bad spot for a comment. Let's make sure\n  there's some yucky symbols too. [ . ?. <>   ' ' \\'] */\n  .at('0')",
+					wantSuggestion: "declare const arr: string[];\ndeclare const cond: Parameters<Array<string>['filter']>[0];\nconst a = { arr };\na?.arr\n  .find(cond) /* what a bad spot for a comment. Let's make sure\n  there's some yucky symbols too. [ . ?. <>   ' ' \\'] */\n  ;\n",
+				},
 			},
 		},
 		{
 			sourceText: "\nconst imNotActuallyAnArray = [\n  [1, 2, 3],\n  [2, 3, 4],\n] as const;\nconst butIAm = [4, 5, 6];\nbutIAm.push(\n  // line comment!\n  ...imNotActuallyAnArray[/* comment */ 'filter' /* another comment */](\n    x => x[1] > 0,\n  ) /**/[`0`]!,\n);\n      ",
 			wantFindings: []preferFindFinding{
-				{wantSpan: "imNotActuallyAnArray[/* comment */ 'filter' /* another comment */](\n    x => x[1] > 0,\n  ) /**/[`0`]", wantSuggestion: "const imNotActuallyAnArray = [\n  [1, 2, 3],\n  [2, 3, 4],\n] as const;\nconst butIAm = [4, 5, 6];\nbutIAm.push(\n  // line comment!\n  ...imNotActuallyAnArray[/* comment */ \"find\" /* another comment */](\n    x => x[1] > 0,\n  ) /**/!,\n);\n"},
+				{
+					wantSpan:       "imNotActuallyAnArray[/* comment */ 'filter' /* another comment */](\n    x => x[1] > 0,\n  ) /**/[`0`]",
+					wantSuggestion: "const imNotActuallyAnArray = [\n  [1, 2, 3],\n  [2, 3, 4],\n] as const;\nconst butIAm = [4, 5, 6];\nbutIAm.push(\n  // line comment!\n  ...imNotActuallyAnArray[/* comment */ \"find\" /* another comment */](\n    x => x[1] > 0,\n  ) /**/!,\n);\n",
+				},
 			},
 		},
 		{
 			sourceText: "\nfunction actingOnArray<T extends string[]>(values: T) {\n  return values.filter(filter => filter === 'filter')[\n    /* filter */ -0.0 /* filter */\n  ];\n}\n      ",
 			wantFindings: []preferFindFinding{
-				{wantSpan: "values.filter(filter => filter === 'filter')[\n    /* filter */ -0.0 /* filter */\n  ]", wantSuggestion: "function actingOnArray<T extends string[]>(values: T) {\n  return values.find(filter => filter === 'filter');\n}\n"},
+				{
+					wantSpan:       "values.filter(filter => filter === 'filter')[\n    /* filter */ -0.0 /* filter */\n  ]",
+					wantSuggestion: "function actingOnArray<T extends string[]>(values: T) {\n  return values.find(filter => filter === 'filter');\n}\n",
+				},
 			},
 		},
 		{
 			sourceText: "\nconst nestedSequenceAbomination =\n  (1,\n  2,\n  (1,\n  2,\n  3,\n  (1, 2, 3, 4),\n  (1, 2, 3, 4, 5, [1, 2, 3, 4, 5, 6].filter(x => x % 2 == 0)))['0']);\n      ",
 			wantFindings: []preferFindFinding{
-				{wantSpan: "(1,\n  2,\n  3,\n  (1, 2, 3, 4),\n  (1, 2, 3, 4, 5, [1, 2, 3, 4, 5, 6].filter(x => x % 2 == 0)))['0']", wantSuggestion: "const nestedSequenceAbomination =\n  (1,\n  2,\n  (1,\n  2,\n  3,\n  (1, 2, 3, 4),\n  (1, 2, 3, 4, 5, [1, 2, 3, 4, 5, 6].find(x => x % 2 == 0))));\n"},
+				{
+					wantSpan:       "(1,\n  2,\n  3,\n  (1, 2, 3, 4),\n  (1, 2, 3, 4, 5, [1, 2, 3, 4, 5, 6].filter(x => x % 2 == 0)))['0']",
+					wantSuggestion: "const nestedSequenceAbomination =\n  (1,\n  2,\n  (1,\n  2,\n  3,\n  (1, 2, 3, 4),\n  (1, 2, 3, 4, 5, [1, 2, 3, 4, 5, 6].find(x => x % 2 == 0))));\n",
+				},
 			},
 		},
 		{
 			sourceText: "\ndeclare const arr: { a: 1 }[] & { b: 2 }[];\narr.filter(f, thisArg)[0];\n      ",
 			wantFindings: []preferFindFinding{
-				{wantSpan: "arr.filter(f, thisArg)[0]", wantSuggestion: "declare const arr: { a: 1 }[] & { b: 2 }[];\narr.find(f, thisArg);\n"},
+				{
+					wantSpan:       "arr.filter(f, thisArg)[0]",
+					wantSuggestion: "declare const arr: { a: 1 }[] & { b: 2 }[];\narr.find(f, thisArg);\n",
+				},
 			},
 		},
 		{
 			sourceText: "\ndeclare const arr: { a: 1 }[] & ({ b: 2 }[] | { c: 3 }[]);\narr.filter(f, thisArg)[0];\n      ",
 			wantFindings: []preferFindFinding{
-				{wantSpan: "arr.filter(f, thisArg)[0]", wantSuggestion: "declare const arr: { a: 1 }[] & ({ b: 2 }[] | { c: 3 }[]);\narr.find(f, thisArg);\n"},
+				{
+					wantSpan:       "arr.filter(f, thisArg)[0]",
+					wantSuggestion: "declare const arr: { a: 1 }[] & ({ b: 2 }[] | { c: 3 }[]);\narr.find(f, thisArg);\n",
+				},
 			},
 		},
 		{
 			sourceText: "\n(Math.random() < 0.5\n  ? [1, 2, 3].filter(x => false)\n  : [1, 2, 3].filter(x => true))[0];\n      ",
 			wantFindings: []preferFindFinding{
-				{wantSpan: "(Math.random() < 0.5\n  ? [1, 2, 3].filter(x => false)\n  : [1, 2, 3].filter(x => true))[0]", wantSuggestion: "(Math.random() < 0.5\n  ? [1, 2, 3].find(x => false)\n  : [1, 2, 3].find(x => true));\n"},
+				{
+					wantSpan:       "(Math.random() < 0.5\n  ? [1, 2, 3].filter(x => false)\n  : [1, 2, 3].filter(x => true))[0]",
+					wantSuggestion: "(Math.random() < 0.5\n  ? [1, 2, 3].find(x => false)\n  : [1, 2, 3].find(x => true));\n",
+				},
 			},
 		},
 		{
 			sourceText: "\nMath.random() < 0.5\n  ? [1, 2, 3].find(x => true)\n  : [1, 2, 3].filter(x => true)[0];\n      ",
 			wantFindings: []preferFindFinding{
-				{wantSpan: "[1, 2, 3].filter(x => true)[0]", wantSuggestion: "Math.random() < 0.5\n  ? [1, 2, 3].find(x => true)\n  : [1, 2, 3].find(x => true);\n"},
+				{
+					wantSpan:       "[1, 2, 3].filter(x => true)[0]",
+					wantSuggestion: "Math.random() < 0.5\n  ? [1, 2, 3].find(x => true)\n  : [1, 2, 3].find(x => true);\n",
+				},
 			},
 		},
 		{
 			sourceText: "\ndeclare const f: (arg0: unknown, arg1: number, arg2: Array<unknown>) => boolean,\n  g: (arg0: unknown) => boolean;\nconst nestedTernaries = (\n  Math.random() < 0.5\n    ? Math.random() < 0.5\n      ? [1, 2, 3].filter(f)\n      : []?.filter(x => 'shrug')\n    : [2, 3, 4]['filter'](g)\n).at(0.2);\n      ",
 			wantFindings: []preferFindFinding{
-				{wantSpan: "(\n  Math.random() < 0.5\n    ? Math.random() < 0.5\n      ? [1, 2, 3].filter(f)\n      : []?.filter(x => 'shrug')\n    : [2, 3, 4]['filter'](g)\n).at(0.2)", wantSuggestion: "declare const f: (arg0: unknown, arg1: number, arg2: Array<unknown>) => boolean,\n  g: (arg0: unknown) => boolean;\nconst nestedTernaries = (\n  Math.random() < 0.5\n    ? Math.random() < 0.5\n      ? [1, 2, 3].find(f)\n      : []?.find(x => 'shrug')\n    : [2, 3, 4][\"find\"](g)\n);\n"},
+				{
+					wantSpan:       "(\n  Math.random() < 0.5\n    ? Math.random() < 0.5\n      ? [1, 2, 3].filter(f)\n      : []?.filter(x => 'shrug')\n    : [2, 3, 4]['filter'](g)\n).at(0.2)",
+					wantSuggestion: "declare const f: (arg0: unknown, arg1: number, arg2: Array<unknown>) => boolean,\n  g: (arg0: unknown) => boolean;\nconst nestedTernaries = (\n  Math.random() < 0.5\n    ? Math.random() < 0.5\n      ? [1, 2, 3].find(f)\n      : []?.find(x => 'shrug')\n    : [2, 3, 4][\"find\"](g)\n);\n",
+				},
 			},
 		},
 		{
 			sourceText: "\ndeclare const f: (arg0: unknown) => boolean, g: (arg0: unknown) => boolean;\nconst nestedTernariesWithSequenceExpression = (\n  Math.random() < 0.5\n    ? ('sequence',\n      'expression',\n      Math.random() < 0.5 ? [1, 2, 3].filter(f) : []?.filter(x => 'shrug'))\n    : [2, 3, 4]['filter'](g)\n).at(0.2);\n      ",
 			wantFindings: []preferFindFinding{
-				{wantSpan: "(\n  Math.random() < 0.5\n    ? ('sequence',\n      'expression',\n      Math.random() < 0.5 ? [1, 2, 3].filter(f) : []?.filter(x => 'shrug'))\n    : [2, 3, 4]['filter'](g)\n).at(0.2)", wantSuggestion: "declare const f: (arg0: unknown) => boolean, g: (arg0: unknown) => boolean;\nconst nestedTernariesWithSequenceExpression = (\n  Math.random() < 0.5\n    ? ('sequence',\n      'expression',\n      Math.random() < 0.5 ? [1, 2, 3].find(f) : []?.find(x => 'shrug'))\n    : [2, 3, 4][\"find\"](g)\n);\n"},
+				{
+					wantSpan:       "(\n  Math.random() < 0.5\n    ? ('sequence',\n      'expression',\n      Math.random() < 0.5 ? [1, 2, 3].filter(f) : []?.filter(x => 'shrug'))\n    : [2, 3, 4]['filter'](g)\n).at(0.2)",
+					wantSuggestion: "declare const f: (arg0: unknown) => boolean, g: (arg0: unknown) => boolean;\nconst nestedTernariesWithSequenceExpression = (\n  Math.random() < 0.5\n    ? ('sequence',\n      'expression',\n      Math.random() < 0.5 ? [1, 2, 3].find(f) : []?.find(x => 'shrug'))\n    : [2, 3, 4][\"find\"](g)\n);\n",
+				},
 			},
 		},
 		{
 			sourceText: "\ndeclare const spreadArgs: [(x: unknown) => boolean];\n[1, 2, 3].filter(...spreadArgs).at(0);\n      ",
 			wantFindings: []preferFindFinding{
-				{wantSpan: "[1, 2, 3].filter(...spreadArgs).at(0)", wantSuggestion: "declare const spreadArgs: [(x: unknown) => boolean];\n[1, 2, 3].find(...spreadArgs);\n"},
+				{
+					wantSpan:       "[1, 2, 3].filter(...spreadArgs).at(0)",
+					wantSuggestion: "declare const spreadArgs: [(x: unknown) => boolean];\n[1, 2, 3].find(...spreadArgs);\n",
+				},
 			},
 		},
 	}

@@ -14,9 +14,15 @@ func TestNoDefiniteAssignmentFiresOnBothForms(test *testing.T) {
 		span   string
 	}{
 		// h09
-		"a field":         {`class Account { balance!: number; describe(): string { return this.balance.toFixed(2); } }`, "balance"},
-		"a variable":      {`let total!: number; function read(): number { return total; }`, "total"},
-		"a private field": {`class Account { #balance!: number; read(): number { return this.#balance; } }`, "#balance"},
+		"a field": {
+			`class Account { balance!: number; describe(): string { return this.balance.toFixed(2); } }`,
+			"balance",
+		},
+		"a variable": {`let total!: number; function read(): number { return total; }`, "total"},
+		"a private field": {
+			`class Account { #balance!: number; read(): number { return this.#balance; } }`,
+			"#balance",
+		},
 	} {
 		test.Run(name, func(test *testing.T) {
 			test.Parallel()

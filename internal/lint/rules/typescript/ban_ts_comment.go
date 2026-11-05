@@ -301,7 +301,11 @@ func findBanTsCommentDirective(value string, isBlock bool) (string, string, bool
 		// slash, then whitespace. A line comment holds no line terminator, so `.*$` is the rest.
 		rest := strings.TrimPrefix(value, "/")
 		rest = strings.TrimLeftFunc(rest, type_checking.IsStrWhiteSpace)
-		if directive, description, found := banTsCommentDirectiveAt(rest, banTsCommentCheck, banTsCommentNoCheck); found {
+		if directive, description, found := banTsCommentDirectiveAt(
+			rest,
+			banTsCommentCheck,
+			banTsCommentNoCheck,
+		); found {
 			return directive, description, true
 		}
 		// `^\/*\s*@ts-(expect-error|ignore)(.*)` over the value: any number of slashes, then
@@ -502,7 +506,10 @@ func settingOrDefaultBanTsComment(raw json.RawMessage, fallback BanTsCommentSett
 		if asString == "allow-with-description" {
 			return BanTsCommentSetting{Kind: BanTsCommentRequireDescription}, nil
 		}
-		return fallback, fmt.Errorf("expected true, false, \"allow-with-description\" or {\"descriptionFormat\": ...}, got %s", raw)
+		return fallback, fmt.Errorf(
+			"expected true, false, \"allow-with-description\" or {\"descriptionFormat\": ...}, got %s",
+			raw,
+		)
 	}
 
 	var asObject struct {
@@ -520,7 +527,11 @@ func settingOrDefaultBanTsComment(raw json.RawMessage, fallback BanTsCommentSett
 		}
 		compiled, compileError := esregexp.Compile(*asObject.DescriptionFormat, "")
 		if compileError != nil {
-			return fallback, fmt.Errorf("descriptionFormat %q is not a pattern JavaScript can compile: %w", *asObject.DescriptionFormat, compileError)
+			return fallback, fmt.Errorf(
+				"descriptionFormat %q is not a pattern JavaScript can compile: %w",
+				*asObject.DescriptionFormat,
+				compileError,
+			)
 		}
 		return BanTsCommentSetting{
 			Kind:              BanTsCommentDescriptionFormat,
@@ -528,5 +539,8 @@ func settingOrDefaultBanTsComment(raw json.RawMessage, fallback BanTsCommentSett
 		}, nil
 	}
 
-	return fallback, fmt.Errorf("expected true, false, \"allow-with-description\" or {\"descriptionFormat\": ...}, got %s", raw)
+	return fallback, fmt.Errorf(
+		"expected true, false, \"allow-with-description\" or {\"descriptionFormat\": ...}, got %s",
+		raw,
+	)
 }

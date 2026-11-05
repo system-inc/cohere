@@ -184,12 +184,16 @@ func Run(ctx context.Context, options RunOptions) (Report, error) {
 	gateFilesWalked := cohereFilesWalked
 
 	report := Compare(Inputs{
-		CohereFindings:   cohereParsed.Findings,
-		GateFindings:     gateParsed.Findings,
-		CoherePopulation: Population{Findings: len(cohereParsed.Findings), FilesWalked: cohereFilesWalked, Rules: cohereRulesRun},
-		GatePopulation:   Population{Findings: len(gateParsed.Findings), FilesWalked: gateFilesWalked},
-		CohereRules:      options.CohereRules,
-		ConfiguredRules:  options.ConfiguredRules,
+		CohereFindings: cohereParsed.Findings,
+		GateFindings:   gateParsed.Findings,
+		CoherePopulation: Population{
+			Findings:    len(cohereParsed.Findings),
+			FilesWalked: cohereFilesWalked,
+			Rules:       cohereRulesRun,
+		},
+		GatePopulation:  Population{Findings: len(gateParsed.Findings), FilesWalked: gateFilesWalked},
+		CohereRules:     options.CohereRules,
+		ConfiguredRules: options.ConfiguredRules,
 		// The known gate defects are compiled in rather than passed at the command line: an
 		// acknowledgement that can be supplied per-run can be supplied by whoever wants a green
 		// result, and this list is reviewed like any other code.
@@ -249,7 +253,11 @@ func checkControls(planted []Control, report Report, cohereFindings []Finding, g
 				continue
 			}
 			if difference.OnlyOn != control.ExpectedSide {
-				result.Detail = fmt.Sprintf("found, but attributed to %s rather than %s", difference.OnlyOn, control.ExpectedSide)
+				result.Detail = fmt.Sprintf(
+					"found, but attributed to %s rather than %s",
+					difference.OnlyOn,
+					control.ExpectedSide,
+				)
 				break
 			}
 			result.Detected = true
@@ -271,7 +279,12 @@ func checkControls(planted []Control, report Report, cohereFindings []Finding, g
 // being tested is that the finding survived each side's parse and normalization and then matched.
 // Asking the difference list could only ever say the control was absent from it, which is true both
 // when both sides saw it and when neither did — the two outcomes this control exists to separate.
-func checkSharedControl(control Control, result ControlResult, cohereFindings []Finding, gateFindings []Finding) ControlResult {
+func checkSharedControl(
+	control Control,
+	result ControlResult,
+	cohereFindings []Finding,
+	gateFindings []Finding,
+) ControlResult {
 	seenByCohere := false
 	for _, finding := range cohereFindings {
 		if controlMatches(control, finding) {
@@ -291,11 +304,23 @@ func checkSharedControl(control Control, result ControlResult, cohereFindings []
 	case seenByCohere && seenByGate:
 		result.Detected = true
 	case !seenByCohere && !seenByGate:
-		result.Detail = fmt.Sprintf("neither gate reported %s in %s, so the plant never reached either one", control.Rule, control.RelativePath)
+		result.Detail = fmt.Sprintf(
+			"neither gate reported %s in %s, so the plant never reached either one",
+			control.Rule,
+			control.RelativePath,
+		)
 	case seenByCohere:
-		result.Detail = fmt.Sprintf("only cohere reported %s in %s, and both were expected to", control.Rule, control.RelativePath)
+		result.Detail = fmt.Sprintf(
+			"only cohere reported %s in %s, and both were expected to",
+			control.Rule,
+			control.RelativePath,
+		)
 	default:
-		result.Detail = fmt.Sprintf("only the gate reported %s in %s, and both were expected to", control.Rule, control.RelativePath)
+		result.Detail = fmt.Sprintf(
+			"only the gate reported %s in %s, and both were expected to",
+			control.Rule,
+			control.RelativePath,
+		)
 	}
 	return result
 }
@@ -352,7 +377,12 @@ func plantControls(options RunOptions) ([]Control, func(), error) {
 		// gates ran, it stays and so does the directory.
 		for index := len(createdDirectories) - 1; index >= 0; index-- {
 			if removeError := os.Remove(createdDirectories[index]); removeError != nil && !os.IsNotExist(removeError) {
-				fmt.Fprintf(os.Stderr, "differential: left the directory %s in place: %v\n", createdDirectories[index], removeError)
+				fmt.Fprintf(
+					os.Stderr,
+					"differential: left the directory %s in place: %v\n",
+					createdDirectories[index],
+					removeError,
+				)
 			}
 		}
 	}
@@ -367,10 +397,18 @@ func plantControls(options RunOptions) ([]Control, func(), error) {
 		}
 		missing, missingDirectoriesError := missingDirectories(filepath.Dir(absolutePath), options.Root)
 		if missingDirectoriesError != nil {
-			return planted, cleanup, fmt.Errorf("planning the directory for control %q: %w", control.Name, missingDirectoriesError)
+			return planted, cleanup, fmt.Errorf(
+				"planning the directory for control %q: %w",
+				control.Name,
+				missingDirectoriesError,
+			)
 		}
 		if createDirectoryError := os.MkdirAll(filepath.Dir(absolutePath), 0o755); createDirectoryError != nil {
-			return planted, cleanup, fmt.Errorf("creating the directory for control %q: %w", control.Name, createDirectoryError)
+			return planted, cleanup, fmt.Errorf(
+				"creating the directory for control %q: %w",
+				control.Name,
+				createDirectoryError,
+			)
 		}
 		createdDirectories = append(createdDirectories, missing...)
 		if writeError := os.WriteFile(absolutePath, []byte(control.Contents), 0o644); writeError != nil {
@@ -568,7 +606,8 @@ func cohereCommandWithExtraRules(options RunOptions) (GateCommand, func(), error
 	extendedPath := filepath.Join(options.Root, ".oxlintrc.differential.json")
 	if _, statError := os.Stat(extendedPath); statError == nil {
 		return options.Cohere, noCleanup, fmt.Errorf(
-			"%s already exists, so a differential run is in flight or one was interrupted; not overwriting it", extendedPath,
+			"%s already exists, so a differential run is in flight or one was interrupted; not overwriting it",
+			extendedPath,
 		)
 	}
 	if writeError := os.WriteFile(extendedPath, extended, 0o644); writeError != nil {

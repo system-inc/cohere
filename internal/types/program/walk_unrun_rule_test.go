@@ -61,11 +61,19 @@ func TestADirectiveNamingARuleCohereDoesNotRunIsANoteAndATypoStaysAnError(test *
 	for _, diagnostic := range result.Diagnostics {
 		reported = append(reported, diagnostic.RuleName+"/"+diagnostic.Message.Id)
 	}
-	if want := []string{"no-witth/ruleNotFound", "nexus/consistency-no-enumm/ruleNotFound"}; !slices.Equal(reported, want) {
+	if want := []string{
+		"no-witth/ruleNotFound",
+		"nexus/consistency-no-enumm/ruleNotFound",
+	}; !slices.Equal(reported, want) {
 		test.Errorf("the findings are %q, want only the two typos %q", reported, want)
 	}
 
-	want := map[string]int{"import/no-cycle": 2, "jsx-a11y/alt-text": 1, "@eslint-react/no-array-index-key": 1, "no-with": 1}
+	want := map[string]int{
+		"import/no-cycle":                  2,
+		"jsx-a11y/alt-text":                1,
+		"@eslint-react/no-array-index-key": 1,
+		"no-with":                          1,
+	}
 	if !maps.Equal(result.Coverage.UnrunRuleReferences, want) {
 		test.Errorf("the rules counted as not run are %v, want %v", result.Coverage.UnrunRuleReferences, want)
 	}

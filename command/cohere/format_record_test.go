@@ -119,7 +119,8 @@ func assertScope(test *testing.T, got []string, want ...string) {
 // repository's own boundary. Writes stay inside one repository (@system_cohere, 2026-10-03), so the
 // declared submodule is formatted by a run inside it and only read from here, by the check (see
 // checkNestedRepositories); it used to be walked into and written.
-// Not parallel: it sets `HOME` and XDG_CACHE_HOME with test.Setenv through newRecordFixture, which a parallel test may not
+// Not parallel: it sets `HOME` and XDG_CACHE_HOME with test.Setenv through newRecordFixture, which a parallel test may
+// not
 func TestWithNoRecordEveryFileOfTheRepositoryIsInScopeAndNoSubmoduleIs(test *testing.T) {
 	fixture := newRecordFixture(test)
 	files, universe, _, description := fixture.scope(test)
@@ -129,14 +130,18 @@ func TestWithNoRecordEveryFileOfTheRepositoryIsInScopeAndNoSubmoduleIs(test *tes
 	if len(universe) != 2 {
 		test.Fatalf("universe %v, expected the two files in scope", fixture.relative(test, universe))
 	}
-	for _, want := range []string{"all 2 files, because no earlier check is on record", "skipped nested repositories library, projects/clone"} {
+	for _, want := range []string{
+		"all 2 files, because no earlier check is on record",
+		"skipped nested repositories library, projects/clone",
+	} {
 		if !strings.Contains(description, want) {
 			test.Errorf("the scope line does not say %q:\n%s", want, description)
 		}
 	}
 }
 
-// Not parallel: it sets `HOME` and XDG_CACHE_HOME with test.Setenv through newRecordFixture, which a parallel test may not
+// Not parallel: it sets `HOME` and XDG_CACHE_HOME with test.Setenv through newRecordFixture, which a parallel test may
+// not
 func TestTheRecordScopesWhatChangedSinceCohereLastLooked(test *testing.T) {
 	fixture := newRecordFixture(test)
 	fixture.formatEverything(test)
@@ -166,7 +171,8 @@ func TestTheRecordScopesWhatChangedSinceCohereLastLooked(test *testing.T) {
 	assertScope(test, files, "New.ts")
 }
 
-// Not parallel: it sets `HOME` and XDG_CACHE_HOME with test.Setenv through newRecordFixture, which a parallel test may not
+// Not parallel: it sets `HOME` and XDG_CACHE_HOME with test.Setenv through newRecordFixture, which a parallel test may
+// not
 func TestADeletedFileLeavesTheScopeAndTheRecord(test *testing.T) {
 	fixture := newRecordFixture(test)
 	fixture.formatEverything(test)
@@ -193,7 +199,8 @@ func TestADeletedFileLeavesTheScopeAndTheRecord(test *testing.T) {
 
 // An unformatted file checked under --no-fix records the text the formatter would write, which is not
 // what is on disk, so the file stays in scope and keeps being reported until it is written.
-// Not parallel: it sets `HOME` and XDG_CACHE_HOME with test.Setenv through newRecordFixture, which a parallel test may not
+// Not parallel: it sets `HOME` and XDG_CACHE_HOME with test.Setenv through newRecordFixture, which a parallel test may
+// not
 func TestAnUnformattedFileStaysInScopeUntilItIsWritten(test *testing.T) {
 	fixture := newRecordFixture(test)
 	fixture.engine.format = func(fileName string, text string) (string, error) {
@@ -211,7 +218,8 @@ func TestAnUnformattedFileStaysInScopeUntilItIsWritten(test *testing.T) {
 	assertScope(test, files)
 }
 
-// Not parallel: it sets `HOME` and XDG_CACHE_HOME with test.Setenv through newRecordFixture, which a parallel test may not
+// Not parallel: it sets `HOME` and XDG_CACHE_HOME with test.Setenv through newRecordFixture, which a parallel test may
+// not
 func TestAnOptionsChangeSendsItsFilesBackThroughTheFormatter(test *testing.T) {
 	fixture := newRecordFixture(test)
 	fixture.formatEverything(test)
@@ -226,7 +234,8 @@ func TestAnOptionsChangeSendsItsFilesBackThroughTheFormatter(test *testing.T) {
 	assertScope(test, files, "B.ts")
 }
 
-// Not parallel: it sets `HOME` and XDG_CACHE_HOME with test.Setenv through newRecordFixture, which a parallel test may not
+// Not parallel: it sets `HOME` and XDG_CACHE_HOME with test.Setenv through newRecordFixture, which a parallel test may
+// not
 func TestARecordFromAnotherCohereSaysNothing(test *testing.T) {
 	fixture := newRecordFixture(test)
 	fixture.formatEverything(test)
@@ -244,7 +253,11 @@ func TestARecordFromAnotherCohereSaysNothing(test *testing.T) {
 	}
 
 	// An unreadable table is the same answer, never an error.
-	if writeError := os.WriteFile(filepath.Join(cacheDirectory(fixture.root), "format.gob"), []byte("not a cache table"), 0o644); writeError != nil {
+	if writeError := os.WriteFile(
+		filepath.Join(cacheDirectory(fixture.root), "format.gob"),
+		[]byte("not a cache table"),
+		0o644,
+	); writeError != nil {
 		test.Fatal(writeError)
 	}
 	files, _, _, _ = fixture.scope(test)
@@ -253,7 +266,8 @@ func TestARecordFromAnotherCohereSaysNothing(test *testing.T) {
 
 // The stat shortcut is only taken once the bytes were read and matched, and a file whose bytes change
 // is caught whether or not its size does.
-// Not parallel: it sets `HOME` and XDG_CACHE_HOME with test.Setenv through newRecordFixture, which a parallel test may not
+// Not parallel: it sets `HOME` and XDG_CACHE_HOME with test.Setenv through newRecordFixture, which a parallel test may
+// not
 func TestAVerifiedFileIsAnsweredByStatAndAnEditIsStillSeen(test *testing.T) {
 	fixture := newRecordFixture(test)
 	fixture.formatEverything(test)
@@ -298,7 +312,9 @@ func TestDeclaredSubmodulesReadsTheGitmodulesPaths(test *testing.T) {
 		test.Fatalf("declared %v, expected %v", declared, want)
 	}
 
-	if none, declaredSubmodulesError := declaredSubmodules(test.TempDir()); declaredSubmodulesError != nil || len(none) != 0 {
+	if none, declaredSubmodulesError := declaredSubmodules(
+		test.TempDir(),
+	); declaredSubmodulesError != nil || len(none) != 0 {
 		test.Fatalf("a repository with no .gitmodules declared %v (err %v)", none, declaredSubmodulesError)
 	}
 }
@@ -334,10 +350,23 @@ func TestTheRecordFollowsTheFormatterNotTheBinary(test *testing.T) {
 		stamp := stamps[index]
 		binaries[index] = filepath.Join(test.TempDir(), "cohere")
 		command := exec.Command("go", "build", "-buildvcs=false", "-trimpath", "-o", binaries[index],
-			"-ldflags=-X "+packaging+".selfCommit="+stamp.selfCommit+" -X "+packaging+".formatterIdentity="+stamp.formatter, "./command/cohere")
+			"-ldflags=-X "+
+				packaging+
+				".selfCommit="+
+				stamp.selfCommit+
+				" -X "+
+				packaging+
+				".formatterIdentity="+
+				stamp.formatter, "./command/cohere")
 		command.Dir = snapshot
 		if output, outputError := command.CombinedOutput(); outputError != nil {
-			failures[index] = fmt.Sprintf("cannot build cohere stamped %s, %s: %v\n%s", stamp.selfCommit, stamp.formatter, outputError, output)
+			failures[index] = fmt.Sprintf(
+				"cannot build cohere stamped %s, %s: %v\n%s",
+				stamp.selfCommit,
+				stamp.formatter,
+				outputError,
+				output,
+			)
 		}
 	}
 	build(0)
@@ -376,10 +405,18 @@ func TestTheRecordFollowsTheFormatterNotTheBinary(test *testing.T) {
 	}
 
 	run(first, "--fix", "--format")
-	if output := run(lintOnly, "--no-fix", "--format"); !strings.Contains(output, "0 of 5 files not on record as formatted") {
+	if output := run(
+		lintOnly,
+		"--no-fix",
+		"--format",
+	); !strings.Contains(output, "0 of 5 files not on record as formatted") {
 		test.Fatalf("a build from another commit with the same formatter did not read the record:\n%s", output)
 	}
-	if output := run(printerChanged, "--no-fix", "--format"); !strings.Contains(output, "all 5 files, because the formatter changed since the last check") {
+	if output := run(
+		printerChanged,
+		"--no-fix",
+		"--format",
+	); !strings.Contains(output, "all 5 files, because the formatter changed since the last check") {
 		test.Fatalf("a build with another formatter trusted the record:\n%s", output)
 	}
 }
@@ -405,7 +442,15 @@ func sourceSnapshot(test *testing.T) string {
 	}
 	// Every directory holding source go builds: the module's own, and the modules go.work names beside
 	// it. A module left out is one the snapshot's go.work names and cannot find.
-	for _, directory := range []string{"command", "internal", "policy", "TypeScript-shim", "static_single_assignment", "mutation_aliasing", "unicodeproperties"} {
+	for _, directory := range []string{
+		"command",
+		"internal",
+		"policy",
+		"TypeScript-shim",
+		"static_single_assignment",
+		"mutation_aliasing",
+		"unicodeproperties",
+	} {
 		source := filepath.Join(moduleRoot, directory)
 		walkError := filepath.WalkDir(source, func(path string, entry fs.DirEntry, walkError error) error {
 			if walkError != nil {
@@ -431,7 +476,10 @@ func sourceSnapshot(test *testing.T) string {
 			test.Fatalf("snapshotting %s: %v", directory, walkError)
 		}
 	}
-	if symlinkError := os.Symlink(filepath.Join(moduleRoot, "TypeScript"), filepath.Join(snapshot, "TypeScript")); symlinkError != nil {
+	if symlinkError := os.Symlink(
+		filepath.Join(moduleRoot, "TypeScript"),
+		filepath.Join(snapshot, "TypeScript"),
+	); symlinkError != nil {
 		test.Fatal(symlinkError)
 	}
 	return snapshot

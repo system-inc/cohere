@@ -256,7 +256,12 @@ func declineListeners(ruleContext rule.Context, ruleName string, designSystem De
 // engine's own ordering requires rather than a convenience. See class_order_key.go: a variant's
 // index is a rank among exactly the variants this list contains, so there is no per-class key to
 // compute and no pairwise comparator that could compute one.
-func reportClassOrder(ruleContext rule.Context, literal ClassLiteral, designSystem DesignSystemResult, ordering classOrderOptions) {
+func reportClassOrder(
+	ruleContext rule.Context,
+	literal ClassLiteral,
+	designSystem DesignSystemResult,
+	ordering classOrderOptions,
+) {
 	classes := SplitClasses(literal.Text)
 	if len(classes) < 2 {
 		return
@@ -360,7 +365,12 @@ func reorderFixes(sourceText string, literal ClassLiteral, classes []string, ord
 // removes it, the plugin's own order of operations: it dedupes a run, then sorts it. The repeat is
 // that rule's finding meanwhile, so the run is never left unordered in silence. A repeat split
 // across a hole is no repeat within either run and does not hold the ordering back.
-func reportTemplateClassOrder(ruleContext rule.Context, segments []ClassSegment, designSystem DesignSystemResult, ordering classOrderOptions) {
+func reportTemplateClassOrder(
+	ruleContext rule.Context,
+	segments []ClassSegment,
+	designSystem DesignSystemResult,
+	ordering classOrderOptions,
+) {
 	sourceText := ruleContext.SourceFile.Text()
 	for index, segment := range segments {
 		if strings.ContainsRune(segment.Text, '\v') {

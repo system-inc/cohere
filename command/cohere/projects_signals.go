@@ -58,7 +58,9 @@ func (children *projectChildren) forward(received os.Signal) {
 		}
 		// A platform that cannot deliver the signal, Windows for all but a kill, ends the child instead,
 		// since the point is that it does not outlive this run.
-		if signalError := child.Process.Signal(received); signalError != nil && !errors.Is(signalError, os.ErrProcessDone) {
+		if signalError := child.Process.Signal(
+			received,
+		); signalError != nil && !errors.Is(signalError, os.ErrProcessDone) {
 			// Ignored: as the kill above.
 			_ = child.Process.Kill()
 		}

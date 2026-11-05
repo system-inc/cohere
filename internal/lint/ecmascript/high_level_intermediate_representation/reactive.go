@@ -65,8 +65,8 @@
 // test below keys on the CALLEE rather than on the result. `useContext<T>(c): T` returns a bare
 // generic; there is no type on `ctx` that separates it from `plain`. What the checker does give is
 // the callee's own symbol name, `useState`, `useContext`, `useCustomThing`, which is precisely
-// React's own naming convention and is what `high_level_intermediate_representation.FunctionKind` already classifies functions by. So
-// a hook call is a call whose callee resolves to a name matching React's hook pattern. That is a
+// React's own naming convention and is what `high_level_intermediate_representation.FunctionKind` already classifies
+// functions by. So a hook call is a call whose callee resolves to a name matching React's hook pattern. That is a
 // weaker test than upstream's shape registry and it is weaker in a specific, stated direction; see
 // `isHookCallee`.
 //
@@ -98,9 +98,9 @@
 // that direction.
 //
 // Filling `Place.Effect` was deliberately NOT attempted as part of this. The `Effect` doc comment
-// in high_level_intermediate_representation.go explains why at length: `Effect` is an OUTPUT of an abstract interpretation over a
-// disjoint `ValueKind` lattice whose join is not a max over the declaration order, and a pass that
-// invented effects to feed this one would be self-consistent and wrong.
+// in high_level_intermediate_representation.go explains why at length: `Effect` is an OUTPUT of an abstract
+// interpretation over a disjoint `ValueKind` lattice whose join is not a max over the declaration order, and a pass
+// that invented effects to feed this one would be self-consistent and wrong.
 //
 // # Convergence equality is not identity equality, and getting it wrong hangs rather than fails
 //
@@ -830,7 +830,10 @@ func eachInstructionLValue(instruction *Instruction, visit func(Place)) {
 // grows, so the frontier is cached and the test is re-asked each round. Caching the whole answer
 // would freeze the first round's reactive set into the control decision and silently lose sources.
 // refreshControlled recomputes which blocks are reactive-controlled from the current reactive set.
-func (r *reactivity) refreshControlled(frontiers map[static_single_assignment.BlockId][]static_single_assignment.BlockId, controlled map[static_single_assignment.BlockId]bool) {
+func (r *reactivity) refreshControlled(
+	frontiers map[static_single_assignment.BlockId][]static_single_assignment.BlockId,
+	controlled map[static_single_assignment.BlockId]bool,
+) {
 	for blockId, frontier := range frontiers {
 		if controlled[blockId] {
 			continue

@@ -2523,11 +2523,19 @@ func TestNoUseBeforeDefineQualifiedNames(test *testing.T) {
 
 		// The namespaced ones are not, and this is the whole point of the immediate-parent test.
 		{"namespaced type reference reports", "let x: A.B; namespace A { export type B = 1 }", 1},
-		{"deeper namespaced type reference reports", "let x: A.B.C; namespace A { export namespace B { export type C = 1 } }", 1},
+		{
+			"deeper namespaced type reference reports",
+			"let x: A.B.C; namespace A { export namespace B { export type C = 1 } }",
+			1,
+		},
 
 		// A value-position namespace path reports for the ordinary reason, and only its leftmost
 		// segment names a binding: `B` and `C` are members of `A`, not bindings of their own.
-		{"namespaced value reference reports once", "A.B.C; namespace A { export namespace B { export const C = 1 } }", 1},
+		{
+			"namespaced value reference reports once",
+			"A.B.C; namespace A { export namespace B { export const C = 1 } }",
+			1,
+		},
 		{"member access on a namespace reports once", "const y = A.B; namespace A { export const B = 1 }", 1},
 
 		// A type query is exempt whatever its shape, which is the other half of the option and a
@@ -2574,8 +2582,16 @@ func TestNoUseBeforeDefineJsxAttributes(test *testing.T) {
 
 		// Component references are, and this is the pair the guard has to preserve. Losing these
 		// would make the guard look correct while switching the rule off for every JSX file.
-		{"component used above its declaration", "const a = <Section />; function Section() { return <div/>; } export {};", 1},
-		{"component used from a function above its declaration", "function App() { return <Section/>; } function Section() { return <div/>; } export {};", 1},
+		{
+			"component used above its declaration",
+			"const a = <Section />; function Section() { return <div/>; } export {};",
+			1,
+		},
+		{
+			"component used from a function above its declaration",
+			"function App() { return <Section/>; } function Section() { return <div/>; } export {};",
+			1,
+		},
 	}
 
 	for _, testCase := range cases {
@@ -2654,8 +2670,16 @@ func TestNoUseBeforeDefineDestructuringPropertyNames(test *testing.T) {
 		findings int
 	}{
 		// One finding each, on the binding or on the source value, never on the property name.
-		{"renamed binding from a later function", "const { sorted: sortedTypes } = f(); function f() { return { sorted: 1 }; }", 1},
-		{"shorthand binding from a later function", "const { sorted } = f(); function f() { return { sorted: 1 }; }", 1},
+		{
+			"renamed binding from a later function",
+			"const { sorted: sortedTypes } = f(); function f() { return { sorted: 1 }; }",
+			1,
+		},
+		{
+			"shorthand binding from a later function",
+			"const { sorted } = f(); function f() { return { sorted: 1 }; }",
+			1,
+		},
 		{"two renamed bindings from a later object", "const { a: b, c: d } = o; const o = { a: 1, c: 2 };", 1},
 
 		// The control: destructuring that reads nothing declared later is clean, so a guard that
@@ -2714,6 +2738,11 @@ func TestNoUseBeforeDefineObjectMethodParameters(test *testing.T) {
 	// The control: a parameter is clean, but a genuine forward reference from inside an object
 	// method still reports. Without this, dropping the whole initialization arm would pass the rows
 	// above.
-	control := rule_testing.RunTyped(test, NoUseBeforeDefine, "fixture.ts", "const o = { start() { return later; } }; const later = 1;")
+	control := rule_testing.RunTyped(
+		test,
+		NoUseBeforeDefine,
+		"fixture.ts",
+		"const o = { start() { return later; } }; const later = 1;",
+	)
 	rule_testing.ExpectFindings(test, control, "usedBeforeDefined")
 }

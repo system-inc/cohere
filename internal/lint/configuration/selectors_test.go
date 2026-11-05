@@ -54,7 +54,10 @@ func TestEveryMatchingSelectorPasses(test *testing.T) {
 		"/repo/modules/finance/Sync.ts",
 	})
 	if validateSelectorsError != nil {
-		test.Fatalf("the three live selector shapes did not validate against files each one reaches: %v", validateSelectorsError)
+		test.Fatalf(
+			"the three live selector shapes did not validate against files each one reaches: %v",
+			validateSelectorsError,
+		)
 	}
 }
 

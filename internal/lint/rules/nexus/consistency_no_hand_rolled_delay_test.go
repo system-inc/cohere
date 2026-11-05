@@ -172,7 +172,10 @@ func TestConsistencyNoHandRolledDelayReports(test *testing.T) {
 			result := rule_testing.Run(test, ConsistencyNoHandRolledDelay, consistencyNoHandRolledDelayFile, sourceText)
 			rule_testing.ExpectFindings(test, result, consistencyNoHandRolledDelayId)
 			if !strings.HasPrefix(sourceText[result.Diagnostics[0].Range.Pos():], "new Promise") {
-				test.Fatalf("finding starts at %q, not at the new expression", sourceText[result.Diagnostics[0].Range.Pos():][:12])
+				test.Fatalf(
+					"finding starts at %q, not at the new expression",
+					sourceText[result.Diagnostics[0].Range.Pos():][:12],
+				)
 			}
 			if len(result.Diagnostics[0].Fixes) != 0 {
 				test.Fatalf("expected no fix, got %d", len(result.Diagnostics[0].Fixes))
@@ -309,7 +312,12 @@ func TestConsistencyNoHandRolledDelayStaysSilent(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.Run(test, ConsistencyNoHandRolledDelay, consistencyNoHandRolledDelayFile, strings.Join(testCase.lines, "\n")+"\n")
+			result := rule_testing.Run(
+				test,
+				ConsistencyNoHandRolledDelay,
+				consistencyNoHandRolledDelayFile,
+				strings.Join(testCase.lines, "\n")+"\n",
+			)
 			rule_testing.ExpectClean(test, result)
 		})
 	}

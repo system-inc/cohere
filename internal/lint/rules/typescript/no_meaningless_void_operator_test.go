@@ -49,7 +49,9 @@ func noMeaninglessVoidOperatorOptionsFor(test *testing.T, optionsJson string) an
 	if optionsJson == "" {
 		return DefaultNoMeaninglessVoidOperatorSettings()
 	}
-	decoded, decodeNoMeaninglessVoidOperatorOptionsError := DecodeNoMeaninglessVoidOperatorOptions(json.RawMessage(optionsJson))
+	decoded, decodeNoMeaninglessVoidOperatorOptionsError := DecodeNoMeaninglessVoidOperatorOptions(
+		json.RawMessage(optionsJson),
+	)
 	if decodeNoMeaninglessVoidOperatorOptionsError != nil {
 		test.Fatalf("decoding %s: %v", optionsJson, decodeNoMeaninglessVoidOperatorOptionsError)
 	}
@@ -95,33 +97,109 @@ func applyNoMeaninglessVoidOperatorSuggestion(test *testing.T, source string, su
 // rewrites are against that trimmed text.
 func noMeaninglessVoidOperatorSilentRows() []noMeaninglessVoidOperatorRow {
 	return []noMeaninglessVoidOperatorRow{
-		{origin: "upstream-valid", sourceText: "\n(() => {})();\n\nfunction foo() {}\nfoo(); // nothing to discard\n\nfunction bar(): number {\n  return 2;\n}\nvoid bar();\n    ", optionsJson: ""},
-		{origin: "upstream-valid", sourceText: "\ndeclare function fail(): never;\nvoid fail();\n    ", optionsJson: ""},
-		{origin: "upstream-valid", sourceText: "\ndeclare function getValue(): string;\nvoid getValue();\n    ", optionsJson: ""},
-		{origin: "upstream-valid", sourceText: "\ndeclare const box: { getValue(): string };\nvoid box.getValue();\n    ", optionsJson: ""},
-		{origin: "upstream-valid", sourceText: "\ndeclare const box: { value: string };\nvoid box.value.toUpperCase();\n    ", optionsJson: ""},
-		{origin: "upstream-valid", sourceText: "\ndeclare const box: { method(): string } | undefined;\nvoid box?.method();\n    ", optionsJson: ""},
-		{origin: "upstream-valid", sourceText: "\ndeclare function getValue(): string | void;\nvoid getValue();\n    ", optionsJson: ""},
-		{origin: "upstream-valid", sourceText: "\ndeclare function getValue(): string | undefined;\nvoid getValue();\n    ", optionsJson: ""},
-		{origin: "upstream-valid", sourceText: "\ndeclare const box: { method?: () => string };\nvoid box.method?.();\n    ", optionsJson: ""},
-		{origin: "upstream-valid", sourceText: "\ndeclare function getValue(): string;\nvoid (getValue() as string);\n    ", optionsJson: ""},
+		{
+			origin:      "upstream-valid",
+			sourceText:  "\n(() => {})();\n\nfunction foo() {}\nfoo(); // nothing to discard\n\nfunction bar(): number {\n  return 2;\n}\nvoid bar();\n    ",
+			optionsJson: "",
+		},
+		{
+			origin:      "upstream-valid",
+			sourceText:  "\ndeclare function fail(): never;\nvoid fail();\n    ",
+			optionsJson: "",
+		},
+		{
+			origin:      "upstream-valid",
+			sourceText:  "\ndeclare function getValue(): string;\nvoid getValue();\n    ",
+			optionsJson: "",
+		},
+		{
+			origin:      "upstream-valid",
+			sourceText:  "\ndeclare const box: { getValue(): string };\nvoid box.getValue();\n    ",
+			optionsJson: "",
+		},
+		{
+			origin:      "upstream-valid",
+			sourceText:  "\ndeclare const box: { value: string };\nvoid box.value.toUpperCase();\n    ",
+			optionsJson: "",
+		},
+		{
+			origin:      "upstream-valid",
+			sourceText:  "\ndeclare const box: { method(): string } | undefined;\nvoid box?.method();\n    ",
+			optionsJson: "",
+		},
+		{
+			origin:      "upstream-valid",
+			sourceText:  "\ndeclare function getValue(): string | void;\nvoid getValue();\n    ",
+			optionsJson: "",
+		},
+		{
+			origin:      "upstream-valid",
+			sourceText:  "\ndeclare function getValue(): string | undefined;\nvoid getValue();\n    ",
+			optionsJson: "",
+		},
+		{
+			origin:      "upstream-valid",
+			sourceText:  "\ndeclare const box: { method?: () => string };\nvoid box.method?.();\n    ",
+			optionsJson: "",
+		},
+		{
+			origin:      "upstream-valid",
+			sourceText:  "\ndeclare function getValue(): string;\nvoid (getValue() as string);\n    ",
+			optionsJson: "",
+		},
 		{origin: "upstream-valid", sourceText: "void 0;", optionsJson: ""},
-		{origin: "upstream-valid", sourceText: "\ndeclare const promise: Promise<number>;\nvoid promise;\n    ", optionsJson: ""},
-		{origin: "upstream-valid", sourceText: "\ndeclare const thenable: { then(onFulfilled: () => void): void };\nvoid thenable;\n    ", optionsJson: ""},
-		{origin: "upstream-valid", sourceText: "\nvoid new Promise<void>(resolve => {\n  resolve();\n});\n    ", optionsJson: ""},
-		{origin: "upstream-valid", sourceText: "\ndeclare function fn(): void;\ndeclare function getValue(): string;\nvoid (fn(), getValue());\n    ", optionsJson: ""},
+		{
+			origin:      "upstream-valid",
+			sourceText:  "\ndeclare const promise: Promise<number>;\nvoid promise;\n    ",
+			optionsJson: "",
+		},
+		{
+			origin:      "upstream-valid",
+			sourceText:  "\ndeclare const thenable: { then(onFulfilled: () => void): void };\nvoid thenable;\n    ",
+			optionsJson: "",
+		},
+		{
+			origin:      "upstream-valid",
+			sourceText:  "\nvoid new Promise<void>(resolve => {\n  resolve();\n});\n    ",
+			optionsJson: "",
+		},
+		{
+			origin:      "upstream-valid",
+			sourceText:  "\ndeclare function fn(): void;\ndeclare function getValue(): string;\nvoid (fn(), getValue());\n    ",
+			optionsJson: "",
+		},
 		{origin: "upstream-valid", sourceText: "\ndeclare let x: number;\nvoid (x = 1);\n    ", optionsJson: ""},
 		{origin: "upstream-valid", sourceText: "\ndeclare let x: number;\n() => void (x = 1);\n    ", optionsJson: ""},
 		{origin: "upstream-valid", sourceText: "\ndeclare let x: number;\nvoid (x += 1);\n    ", optionsJson: ""},
-		{origin: "upstream-valid", sourceText: "\ndeclare let x: number;\ndeclare let y: number;\nvoid (x = y = 1);\n    ", optionsJson: ""},
-		{origin: "upstream-valid", sourceText: "\ndeclare let x: string;\ndeclare function getValue(): string;\nvoid (x = getValue());\n    ", optionsJson: ""},
-		{origin: "upstream-valid", sourceText: "\ndeclare const obj: { prop: number };\nvoid (obj.prop = 1);\n    ", optionsJson: ""},
-		{origin: "upstream-valid", sourceText: "\ndeclare let x: number;\ndeclare let y: number;\nvoid ((x = 1), (y = 2));\n    ", optionsJson: ""},
+		{
+			origin:      "upstream-valid",
+			sourceText:  "\ndeclare let x: number;\ndeclare let y: number;\nvoid (x = y = 1);\n    ",
+			optionsJson: "",
+		},
+		{
+			origin:      "upstream-valid",
+			sourceText:  "\ndeclare let x: string;\ndeclare function getValue(): string;\nvoid (x = getValue());\n    ",
+			optionsJson: "",
+		},
+		{
+			origin:      "upstream-valid",
+			sourceText:  "\ndeclare const obj: { prop: number };\nvoid (obj.prop = 1);\n    ",
+			optionsJson: "",
+		},
+		{
+			origin:      "upstream-valid",
+			sourceText:  "\ndeclare let x: number;\ndeclare let y: number;\nvoid ((x = 1), (y = 2));\n    ",
+			optionsJson: "",
+		},
 		{origin: "extra", sourceText: "void 0x0;", optionsJson: ""},
 		{origin: "extra", sourceText: "void 0.0;", optionsJson: ""},
 		{origin: "extra", sourceText: "void (0);", optionsJson: ""},
 		{origin: "extra", sourceText: "declare let x: number | undefined;\nvoid (x ??= 1);", optionsJson: ""},
-		{origin: "extra", sourceText: "declare let a: number;\ndeclare const b: number[];\nvoid ([a] = b);", optionsJson: ""},
+		{
+			origin:      "extra",
+			sourceText:  "declare let a: number;\ndeclare const b: number[];\nvoid ([a] = b);",
+			optionsJson: "",
+		},
 		{origin: "extra", sourceText: "void (async () => {})();", optionsJson: ""},
 		{origin: "extra", sourceText: "declare const p: Promise<void> | undefined;\nvoid p;", optionsJson: ""},
 		{origin: "extra", sourceText: "declare function fail(): never;\nvoid fail();", optionsJson: ""},
@@ -136,7 +214,12 @@ func noMeaninglessVoidOperatorFiringRows() []noMeaninglessVoidOperatorRow {
 			optionsJson:     "",
 			wantComposedFix: "(() => {})();\n",
 			wantFindings: []noMeaninglessVoidOperatorFinding{
-				{wantId: "meaninglessVoidOperator", wantSpan: "void (() => {})()", wantMessage: "void operator shouldn't be used on void; it should convey that a return value is being ignored", wantRepair: "Fix"},
+				{
+					wantId:      "meaninglessVoidOperator",
+					wantSpan:    "void (() => {})()",
+					wantMessage: "void operator shouldn't be used on void; it should convey that a return value is being ignored",
+					wantRepair:  "Fix",
+				},
 			},
 		},
 		{
@@ -145,7 +228,12 @@ func noMeaninglessVoidOperatorFiringRows() []noMeaninglessVoidOperatorRow {
 			optionsJson:     "",
 			wantComposedFix: "function foo() {}\nfoo();\n",
 			wantFindings: []noMeaninglessVoidOperatorFinding{
-				{wantId: "meaninglessVoidOperator", wantSpan: "void foo()", wantMessage: "void operator shouldn't be used on void; it should convey that a return value is being ignored", wantRepair: "Fix"},
+				{
+					wantId:      "meaninglessVoidOperator",
+					wantSpan:    "void foo()",
+					wantMessage: "void operator shouldn't be used on void; it should convey that a return value is being ignored",
+					wantRepair:  "Fix",
+				},
 			},
 		},
 		{
@@ -154,7 +242,12 @@ func noMeaninglessVoidOperatorFiringRows() []noMeaninglessVoidOperatorRow {
 			optionsJson:     "",
 			wantComposedFix: "declare const box: { value: string };\nbox;\n",
 			wantFindings: []noMeaninglessVoidOperatorFinding{
-				{wantId: "meaninglessVoidOnNonCall", wantSpan: "void box", wantMessage: "void operator is useless here; it should only discard a call's return value", wantRepair: "Fix"},
+				{
+					wantId:      "meaninglessVoidOnNonCall",
+					wantSpan:    "void box",
+					wantMessage: "void operator is useless here; it should only discard a call's return value",
+					wantRepair:  "Fix",
+				},
 			},
 		},
 		{
@@ -163,7 +256,12 @@ func noMeaninglessVoidOperatorFiringRows() []noMeaninglessVoidOperatorRow {
 			optionsJson:     "",
 			wantComposedFix: "declare const box: { value: string };\nbox.value;\n",
 			wantFindings: []noMeaninglessVoidOperatorFinding{
-				{wantId: "meaninglessVoidOnNonCall", wantSpan: "void box.value", wantMessage: "void operator is useless here; it should only discard a call's return value", wantRepair: "Fix"},
+				{
+					wantId:      "meaninglessVoidOnNonCall",
+					wantSpan:    "void box.value",
+					wantMessage: "void operator is useless here; it should only discard a call's return value",
+					wantRepair:  "Fix",
+				},
 			},
 		},
 		{
@@ -172,7 +270,12 @@ func noMeaninglessVoidOperatorFiringRows() []noMeaninglessVoidOperatorRow {
 			optionsJson:     "",
 			wantComposedFix: "declare const box: { value: string } | undefined;\nbox?.value;\n",
 			wantFindings: []noMeaninglessVoidOperatorFinding{
-				{wantId: "meaninglessVoidOnNonCall", wantSpan: "void box?.value", wantMessage: "void operator is useless here; it should only discard a call's return value", wantRepair: "Fix"},
+				{
+					wantId:      "meaninglessVoidOnNonCall",
+					wantSpan:    "void box?.value",
+					wantMessage: "void operator is useless here; it should only discard a call's return value",
+					wantRepair:  "Fix",
+				},
 			},
 		},
 		{
@@ -181,7 +284,12 @@ func noMeaninglessVoidOperatorFiringRows() []noMeaninglessVoidOperatorRow {
 			optionsJson:     "",
 			wantComposedFix: "declare const box: { value: string };\n(<string>box.value);\n",
 			wantFindings: []noMeaninglessVoidOperatorFinding{
-				{wantId: "meaninglessVoidOnNonCall", wantSpan: "void (<string>box.value)", wantMessage: "void operator is useless here; it should only discard a call's return value", wantRepair: "Fix"},
+				{
+					wantId:      "meaninglessVoidOnNonCall",
+					wantSpan:    "void (<string>box.value)",
+					wantMessage: "void operator is useless here; it should only discard a call's return value",
+					wantRepair:  "Fix",
+				},
 			},
 		},
 		{
@@ -190,7 +298,12 @@ func noMeaninglessVoidOperatorFiringRows() []noMeaninglessVoidOperatorRow {
 			optionsJson:     "",
 			wantComposedFix: "declare const box: { value: string };\n(box.value as string);\n",
 			wantFindings: []noMeaninglessVoidOperatorFinding{
-				{wantId: "meaninglessVoidOnNonCall", wantSpan: "void (box.value as string)", wantMessage: "void operator is useless here; it should only discard a call's return value", wantRepair: "Fix"},
+				{
+					wantId:      "meaninglessVoidOnNonCall",
+					wantSpan:    "void (box.value as string)",
+					wantMessage: "void operator is useless here; it should only discard a call's return value",
+					wantRepair:  "Fix",
+				},
 			},
 		},
 		{
@@ -199,7 +312,12 @@ func noMeaninglessVoidOperatorFiringRows() []noMeaninglessVoidOperatorRow {
 			optionsJson:     "",
 			wantComposedFix: "declare const box: { value: string };\n(box.value satisfies string);\n",
 			wantFindings: []noMeaninglessVoidOperatorFinding{
-				{wantId: "meaninglessVoidOnNonCall", wantSpan: "void (box.value satisfies string)", wantMessage: "void operator is useless here; it should only discard a call's return value", wantRepair: "Fix"},
+				{
+					wantId:      "meaninglessVoidOnNonCall",
+					wantSpan:    "void (box.value satisfies string)",
+					wantMessage: "void operator is useless here; it should only discard a call's return value",
+					wantRepair:  "Fix",
+				},
 			},
 		},
 		{
@@ -208,7 +326,12 @@ func noMeaninglessVoidOperatorFiringRows() []noMeaninglessVoidOperatorRow {
 			optionsJson:     "",
 			wantComposedFix: "declare const box: { value: string };\nbox.value!;\n",
 			wantFindings: []noMeaninglessVoidOperatorFinding{
-				{wantId: "meaninglessVoidOnNonCall", wantSpan: "void box.value!", wantMessage: "void operator is useless here; it should only discard a call's return value", wantRepair: "Fix"},
+				{
+					wantId:      "meaninglessVoidOnNonCall",
+					wantSpan:    "void box.value!",
+					wantMessage: "void operator is useless here; it should only discard a call's return value",
+					wantRepair:  "Fix",
+				},
 			},
 		},
 		{
@@ -217,7 +340,12 @@ func noMeaninglessVoidOperatorFiringRows() []noMeaninglessVoidOperatorRow {
 			optionsJson:     "",
 			wantComposedFix: "declare const wrapper: { box?: { value: string } };\nwrapper?.box?.value!;\n",
 			wantFindings: []noMeaninglessVoidOperatorFinding{
-				{wantId: "meaninglessVoidOnNonCall", wantSpan: "void wrapper?.box?.value!", wantMessage: "void operator is useless here; it should only discard a call's return value", wantRepair: "Fix"},
+				{
+					wantId:      "meaninglessVoidOnNonCall",
+					wantSpan:    "void wrapper?.box?.value!",
+					wantMessage: "void operator is useless here; it should only discard a call's return value",
+					wantRepair:  "Fix",
+				},
 			},
 		},
 		{
@@ -226,7 +354,12 @@ func noMeaninglessVoidOperatorFiringRows() []noMeaninglessVoidOperatorRow {
 			optionsJson:     "",
 			wantComposedFix: "declare function fn(): void;\ndeclare const box: { value: string };\n(fn(), box.value);\n",
 			wantFindings: []noMeaninglessVoidOperatorFinding{
-				{wantId: "meaninglessVoidOnNonCall", wantSpan: "void (fn(), box.value)", wantMessage: "void operator is useless here; it should only discard a call's return value", wantRepair: "Fix"},
+				{
+					wantId:      "meaninglessVoidOnNonCall",
+					wantSpan:    "void (fn(), box.value)",
+					wantMessage: "void operator is useless here; it should only discard a call's return value",
+					wantRepair:  "Fix",
+				},
 			},
 		},
 		{
@@ -235,7 +368,12 @@ func noMeaninglessVoidOperatorFiringRows() []noMeaninglessVoidOperatorRow {
 			optionsJson:     "",
 			wantComposedFix: "declare function fn(): void;\ndeclare const box: { value: string };\n(fn(), box.value)!;\n",
 			wantFindings: []noMeaninglessVoidOperatorFinding{
-				{wantId: "meaninglessVoidOnNonCall", wantSpan: "void (fn(), box.value)!", wantMessage: "void operator is useless here; it should only discard a call's return value", wantRepair: "Fix"},
+				{
+					wantId:      "meaninglessVoidOnNonCall",
+					wantSpan:    "void (fn(), box.value)!",
+					wantMessage: "void operator is useless here; it should only discard a call's return value",
+					wantRepair:  "Fix",
+				},
 			},
 		},
 		{
@@ -244,7 +382,12 @@ func noMeaninglessVoidOperatorFiringRows() []noMeaninglessVoidOperatorRow {
 			optionsJson:     "",
 			wantComposedFix: "function bar(x: never) {\n  x;\n}\n",
 			wantFindings: []noMeaninglessVoidOperatorFinding{
-				{wantId: "meaninglessVoidOnNonCall", wantSpan: "void x", wantMessage: "void operator is useless here; it should only discard a call's return value", wantRepair: "Fix"},
+				{
+					wantId:      "meaninglessVoidOnNonCall",
+					wantSpan:    "void x",
+					wantMessage: "void operator is useless here; it should only discard a call's return value",
+					wantRepair:  "Fix",
+				},
 			},
 		},
 		{
@@ -253,7 +396,12 @@ func noMeaninglessVoidOperatorFiringRows() []noMeaninglessVoidOperatorRow {
 			optionsJson:     "",
 			wantComposedFix: "declare const box: { value: never };\nbox.value;\n",
 			wantFindings: []noMeaninglessVoidOperatorFinding{
-				{wantId: "meaninglessVoidOnNonCall", wantSpan: "void box.value", wantMessage: "void operator is useless here; it should only discard a call's return value", wantRepair: "Fix"},
+				{
+					wantId:      "meaninglessVoidOnNonCall",
+					wantSpan:    "void box.value",
+					wantMessage: "void operator is useless here; it should only discard a call's return value",
+					wantRepair:  "Fix",
+				},
 			},
 		},
 		{
@@ -261,7 +409,14 @@ func noMeaninglessVoidOperatorFiringRows() []noMeaninglessVoidOperatorRow {
 			sourceText:  "\ndeclare function fail(): never;\nvoid fail();\n      ",
 			optionsJson: "{\"checkNever\": true}",
 			wantFindings: []noMeaninglessVoidOperatorFinding{
-				{wantId: "meaninglessVoidOperator", wantSpan: "void fail()", wantMessage: "void operator shouldn't be used on never; it should convey that a return value is being ignored", wantRepair: "Suggestion", wantSuggestion: "declare function fail(): never;\nfail();\n", wantSuggestionDescription: "Remove 'void'"},
+				{
+					wantId:                    "meaninglessVoidOperator",
+					wantSpan:                  "void fail()",
+					wantMessage:               "void operator shouldn't be used on never; it should convey that a return value is being ignored",
+					wantRepair:                "Suggestion",
+					wantSuggestion:            "declare function fail(): never;\nfail();\n",
+					wantSuggestionDescription: "Remove 'void'",
+				},
 			},
 		},
 		{
@@ -270,7 +425,12 @@ func noMeaninglessVoidOperatorFiringRows() []noMeaninglessVoidOperatorRow {
 			optionsJson:     "",
 			wantComposedFix: "1;\n",
 			wantFindings: []noMeaninglessVoidOperatorFinding{
-				{wantId: "meaninglessVoidOnNonCall", wantSpan: "void 1", wantMessage: "void operator is useless here; it should only discard a call's return value", wantRepair: "Fix"},
+				{
+					wantId:      "meaninglessVoidOnNonCall",
+					wantSpan:    "void 1",
+					wantMessage: "void operator is useless here; it should only discard a call's return value",
+					wantRepair:  "Fix",
+				},
 			},
 		},
 		{
@@ -279,7 +439,12 @@ func noMeaninglessVoidOperatorFiringRows() []noMeaninglessVoidOperatorRow {
 			optionsJson:     "",
 			wantComposedFix: "'0';\n",
 			wantFindings: []noMeaninglessVoidOperatorFinding{
-				{wantId: "meaninglessVoidOnNonCall", wantSpan: "void '0'", wantMessage: "void operator is useless here; it should only discard a call's return value", wantRepair: "Fix"},
+				{
+					wantId:      "meaninglessVoidOnNonCall",
+					wantSpan:    "void '0'",
+					wantMessage: "void operator is useless here; it should only discard a call's return value",
+					wantRepair:  "Fix",
+				},
 			},
 		},
 		{
@@ -287,7 +452,12 @@ func noMeaninglessVoidOperatorFiringRows() []noMeaninglessVoidOperatorRow {
 			sourceText:  "\ndeclare const value: string;\nconst result = void value;\n      ",
 			optionsJson: "",
 			wantFindings: []noMeaninglessVoidOperatorFinding{
-				{wantId: "meaninglessVoidOnNonCall", wantSpan: "void value", wantMessage: "void operator is useless here; it should only discard a call's return value", wantRepair: "None"},
+				{
+					wantId:      "meaninglessVoidOnNonCall",
+					wantSpan:    "void value",
+					wantMessage: "void operator is useless here; it should only discard a call's return value",
+					wantRepair:  "None",
+				},
 			},
 		},
 		{
@@ -296,7 +466,12 @@ func noMeaninglessVoidOperatorFiringRows() []noMeaninglessVoidOperatorRow {
 			optionsJson:     "",
 			wantComposedFix: "declare let x: number;\nx;\n",
 			wantFindings: []noMeaninglessVoidOperatorFinding{
-				{wantId: "meaninglessVoidOnNonCall", wantSpan: "void x", wantMessage: "void operator is useless here; it should only discard a call's return value", wantRepair: "Fix"},
+				{
+					wantId:      "meaninglessVoidOnNonCall",
+					wantSpan:    "void x",
+					wantMessage: "void operator is useless here; it should only discard a call's return value",
+					wantRepair:  "Fix",
+				},
 			},
 		},
 		{
@@ -305,7 +480,12 @@ func noMeaninglessVoidOperatorFiringRows() []noMeaninglessVoidOperatorRow {
 			optionsJson:     "",
 			wantComposedFix: "declare let x: number;\n++x;\n",
 			wantFindings: []noMeaninglessVoidOperatorFinding{
-				{wantId: "meaninglessVoidOnNonCall", wantSpan: "void ++x", wantMessage: "void operator is useless here; it should only discard a call's return value", wantRepair: "Fix"},
+				{
+					wantId:      "meaninglessVoidOnNonCall",
+					wantSpan:    "void ++x",
+					wantMessage: "void operator is useless here; it should only discard a call's return value",
+					wantRepair:  "Fix",
+				},
 			},
 		},
 		{
@@ -314,7 +494,12 @@ func noMeaninglessVoidOperatorFiringRows() []noMeaninglessVoidOperatorRow {
 			optionsJson:     "",
 			wantComposedFix: "declare let x: number;\nx++;\n",
 			wantFindings: []noMeaninglessVoidOperatorFinding{
-				{wantId: "meaninglessVoidOnNonCall", wantSpan: "void x++", wantMessage: "void operator is useless here; it should only discard a call's return value", wantRepair: "Fix"},
+				{
+					wantId:      "meaninglessVoidOnNonCall",
+					wantSpan:    "void x++",
+					wantMessage: "void operator is useless here; it should only discard a call's return value",
+					wantRepair:  "Fix",
+				},
 			},
 		},
 		{
@@ -323,7 +508,12 @@ func noMeaninglessVoidOperatorFiringRows() []noMeaninglessVoidOperatorRow {
 			optionsJson:     "",
 			wantComposedFix: "0n;\n",
 			wantFindings: []noMeaninglessVoidOperatorFinding{
-				{wantId: "meaninglessVoidOnNonCall", wantSpan: "void 0n", wantMessage: "void operator is useless here; it should only discard a call's return value", wantRepair: "Fix"},
+				{
+					wantId:      "meaninglessVoidOnNonCall",
+					wantSpan:    "void 0n",
+					wantMessage: "void operator is useless here; it should only discard a call's return value",
+					wantRepair:  "Fix",
+				},
 			},
 		},
 		{
@@ -332,7 +522,12 @@ func noMeaninglessVoidOperatorFiringRows() []noMeaninglessVoidOperatorRow {
 			optionsJson:     "",
 			wantComposedFix: "-0;\n",
 			wantFindings: []noMeaninglessVoidOperatorFinding{
-				{wantId: "meaninglessVoidOnNonCall", wantSpan: "void -0", wantMessage: "void operator is useless here; it should only discard a call's return value", wantRepair: "Fix"},
+				{
+					wantId:      "meaninglessVoidOnNonCall",
+					wantSpan:    "void -0",
+					wantMessage: "void operator is useless here; it should only discard a call's return value",
+					wantRepair:  "Fix",
+				},
 			},
 		},
 		{
@@ -341,7 +536,12 @@ func noMeaninglessVoidOperatorFiringRows() []noMeaninglessVoidOperatorRow {
 			optionsJson:     "",
 			wantComposedFix: "null;\n",
 			wantFindings: []noMeaninglessVoidOperatorFinding{
-				{wantId: "meaninglessVoidOnNonCall", wantSpan: "void null", wantMessage: "void operator is useless here; it should only discard a call's return value", wantRepair: "Fix"},
+				{
+					wantId:      "meaninglessVoidOnNonCall",
+					wantSpan:    "void null",
+					wantMessage: "void operator is useless here; it should only discard a call's return value",
+					wantRepair:  "Fix",
+				},
 			},
 		},
 		{
@@ -350,7 +550,12 @@ func noMeaninglessVoidOperatorFiringRows() []noMeaninglessVoidOperatorRow {
 			optionsJson:     "",
 			wantComposedFix: "undefined;\n",
 			wantFindings: []noMeaninglessVoidOperatorFinding{
-				{wantId: "meaninglessVoidOnNonCall", wantSpan: "void undefined", wantMessage: "void operator is useless here; it should only discard a call's return value", wantRepair: "Fix"},
+				{
+					wantId:      "meaninglessVoidOnNonCall",
+					wantSpan:    "void undefined",
+					wantMessage: "void operator is useless here; it should only discard a call's return value",
+					wantRepair:  "Fix",
+				},
 			},
 		},
 		{
@@ -359,7 +564,12 @@ func noMeaninglessVoidOperatorFiringRows() []noMeaninglessVoidOperatorRow {
 			optionsJson:     "",
 			wantComposedFix: "declare function make<T>(): T;\nmake<string>;\n",
 			wantFindings: []noMeaninglessVoidOperatorFinding{
-				{wantId: "meaninglessVoidOnNonCall", wantSpan: "void make<string>", wantMessage: "void operator is useless here; it should only discard a call's return value", wantRepair: "Fix"},
+				{
+					wantId:      "meaninglessVoidOnNonCall",
+					wantSpan:    "void make<string>",
+					wantMessage: "void operator is useless here; it should only discard a call's return value",
+					wantRepair:  "Fix",
+				},
 			},
 		},
 		{
@@ -368,7 +578,12 @@ func noMeaninglessVoidOperatorFiringRows() []noMeaninglessVoidOperatorRow {
 			optionsJson:     "",
 			wantComposedFix: "class Foo {}\nnew Foo();\n",
 			wantFindings: []noMeaninglessVoidOperatorFinding{
-				{wantId: "meaninglessVoidOnNonCall", wantSpan: "void new Foo()", wantMessage: "void operator is useless here; it should only discard a call's return value", wantRepair: "Fix"},
+				{
+					wantId:      "meaninglessVoidOnNonCall",
+					wantSpan:    "void new Foo()",
+					wantMessage: "void operator is useless here; it should only discard a call's return value",
+					wantRepair:  "Fix",
+				},
 			},
 		},
 		{
@@ -377,7 +592,12 @@ func noMeaninglessVoidOperatorFiringRows() []noMeaninglessVoidOperatorRow {
 			optionsJson:     "",
 			wantComposedFix: "declare function tag(strings: TemplateStringsArray): string;\ntag`x`;\n",
 			wantFindings: []noMeaninglessVoidOperatorFinding{
-				{wantId: "meaninglessVoidOnNonCall", wantSpan: "void tag`x`", wantMessage: "void operator is useless here; it should only discard a call's return value", wantRepair: "Fix"},
+				{
+					wantId:      "meaninglessVoidOnNonCall",
+					wantSpan:    "void tag`x`",
+					wantMessage: "void operator is useless here; it should only discard a call's return value",
+					wantRepair:  "Fix",
+				},
 			},
 		},
 		{
@@ -386,7 +606,12 @@ func noMeaninglessVoidOperatorFiringRows() []noMeaninglessVoidOperatorRow {
 			optionsJson:     "",
 			wantComposedFix: "declare let x: number;\n(x);\n",
 			wantFindings: []noMeaninglessVoidOperatorFinding{
-				{wantId: "meaninglessVoidOnNonCall", wantSpan: "void x", wantMessage: "void operator is useless here; it should only discard a call's return value", wantRepair: "Fix"},
+				{
+					wantId:      "meaninglessVoidOnNonCall",
+					wantSpan:    "void x",
+					wantMessage: "void operator is useless here; it should only discard a call's return value",
+					wantRepair:  "Fix",
+				},
 			},
 		},
 		{
@@ -395,7 +620,12 @@ func noMeaninglessVoidOperatorFiringRows() []noMeaninglessVoidOperatorRow {
 			optionsJson:     "",
 			wantComposedFix: "declare function fn(): void;\ndeclare function getValue(): string;\ndeclare const box: { value: string };\n(fn(), (getValue(), box.value));\n",
 			wantFindings: []noMeaninglessVoidOperatorFinding{
-				{wantId: "meaninglessVoidOnNonCall", wantSpan: "void (fn(), (getValue(), box.value))", wantMessage: "void operator is useless here; it should only discard a call's return value", wantRepair: "Fix"},
+				{
+					wantId:      "meaninglessVoidOnNonCall",
+					wantSpan:    "void (fn(), (getValue(), box.value))",
+					wantMessage: "void operator is useless here; it should only discard a call's return value",
+					wantRepair:  "Fix",
+				},
 			},
 		},
 		{
@@ -403,7 +633,12 @@ func noMeaninglessVoidOperatorFiringRows() []noMeaninglessVoidOperatorRow {
 			sourceText:  "declare let x: number;\nconst f = () => void x;",
 			optionsJson: "",
 			wantFindings: []noMeaninglessVoidOperatorFinding{
-				{wantId: "meaninglessVoidOnNonCall", wantSpan: "void x", wantMessage: "void operator is useless here; it should only discard a call's return value", wantRepair: "None"},
+				{
+					wantId:      "meaninglessVoidOnNonCall",
+					wantSpan:    "void x",
+					wantMessage: "void operator is useless here; it should only discard a call's return value",
+					wantRepair:  "None",
+				},
 			},
 		},
 		{
@@ -412,8 +647,18 @@ func noMeaninglessVoidOperatorFiringRows() []noMeaninglessVoidOperatorRow {
 			optionsJson:     "",
 			wantComposedFix: "function foo() {}\nfoo();\n",
 			wantFindings: []noMeaninglessVoidOperatorFinding{
-				{wantId: "meaninglessVoidOnNonCall", wantSpan: "void void foo()", wantMessage: "void operator is useless here; it should only discard a call's return value", wantRepair: "Fix"},
-				{wantId: "meaninglessVoidOperator", wantSpan: "void foo()", wantMessage: "void operator shouldn't be used on void; it should convey that a return value is being ignored", wantRepair: "Fix"},
+				{
+					wantId:      "meaninglessVoidOnNonCall",
+					wantSpan:    "void void foo()",
+					wantMessage: "void operator is useless here; it should only discard a call's return value",
+					wantRepair:  "Fix",
+				},
+				{
+					wantId:      "meaninglessVoidOperator",
+					wantSpan:    "void foo()",
+					wantMessage: "void operator shouldn't be used on void; it should convey that a return value is being ignored",
+					wantRepair:  "Fix",
+				},
 			},
 		},
 		{
@@ -422,7 +667,12 @@ func noMeaninglessVoidOperatorFiringRows() []noMeaninglessVoidOperatorRow {
 			optionsJson:     "",
 			wantComposedFix: "async function f(p: Promise<number>) {\n  await p;\n}\n",
 			wantFindings: []noMeaninglessVoidOperatorFinding{
-				{wantId: "meaninglessVoidOnNonCall", wantSpan: "void await p", wantMessage: "void operator is useless here; it should only discard a call's return value", wantRepair: "Fix"},
+				{
+					wantId:      "meaninglessVoidOnNonCall",
+					wantSpan:    "void await p",
+					wantMessage: "void operator is useless here; it should only discard a call's return value",
+					wantRepair:  "Fix",
+				},
 			},
 		},
 		{
@@ -431,7 +681,12 @@ func noMeaninglessVoidOperatorFiringRows() []noMeaninglessVoidOperatorRow {
 			optionsJson:     "",
 			wantComposedFix: "declare let x: number;\n(x as any);\n",
 			wantFindings: []noMeaninglessVoidOperatorFinding{
-				{wantId: "meaninglessVoidOnNonCall", wantSpan: "void (x as any)", wantMessage: "void operator is useless here; it should only discard a call's return value", wantRepair: "Fix"},
+				{
+					wantId:      "meaninglessVoidOnNonCall",
+					wantSpan:    "void (x as any)",
+					wantMessage: "void operator is useless here; it should only discard a call's return value",
+					wantRepair:  "Fix",
+				},
 			},
 		},
 		{
@@ -440,7 +695,12 @@ func noMeaninglessVoidOperatorFiringRows() []noMeaninglessVoidOperatorRow {
 			optionsJson:     "",
 			wantComposedFix: "declare const x: void;\nx;\n",
 			wantFindings: []noMeaninglessVoidOperatorFinding{
-				{wantId: "meaninglessVoidOnNonCall", wantSpan: "void x", wantMessage: "void operator is useless here; it should only discard a call's return value", wantRepair: "Fix"},
+				{
+					wantId:      "meaninglessVoidOnNonCall",
+					wantSpan:    "void x",
+					wantMessage: "void operator is useless here; it should only discard a call's return value",
+					wantRepair:  "Fix",
+				},
 			},
 		},
 		{
@@ -449,7 +709,12 @@ func noMeaninglessVoidOperatorFiringRows() []noMeaninglessVoidOperatorRow {
 			optionsJson:     "",
 			wantComposedFix: "declare const x: void | undefined;\nx;\n",
 			wantFindings: []noMeaninglessVoidOperatorFinding{
-				{wantId: "meaninglessVoidOnNonCall", wantSpan: "void x", wantMessage: "void operator is useless here; it should only discard a call's return value", wantRepair: "Fix"},
+				{
+					wantId:      "meaninglessVoidOnNonCall",
+					wantSpan:    "void x",
+					wantMessage: "void operator is useless here; it should only discard a call's return value",
+					wantRepair:  "Fix",
+				},
 			},
 		},
 		{
@@ -458,7 +723,12 @@ func noMeaninglessVoidOperatorFiringRows() []noMeaninglessVoidOperatorRow {
 			optionsJson:     "",
 			wantComposedFix: "declare const cond: boolean;\ndeclare function a(): void;\ndeclare function b(): void;\n(cond ? a() : b());\n",
 			wantFindings: []noMeaninglessVoidOperatorFinding{
-				{wantId: "meaninglessVoidOnNonCall", wantSpan: "void (cond ? a() : b())", wantMessage: "void operator is useless here; it should only discard a call's return value", wantRepair: "Fix"},
+				{
+					wantId:      "meaninglessVoidOnNonCall",
+					wantSpan:    "void (cond ? a() : b())",
+					wantMessage: "void operator is useless here; it should only discard a call's return value",
+					wantRepair:  "Fix",
+				},
 			},
 		},
 		{
@@ -467,7 +737,12 @@ func noMeaninglessVoidOperatorFiringRows() []noMeaninglessVoidOperatorRow {
 			optionsJson:     "",
 			wantComposedFix: "function foo(): undefined { return undefined; }\nfoo();\n",
 			wantFindings: []noMeaninglessVoidOperatorFinding{
-				{wantId: "meaninglessVoidOperator", wantSpan: "void foo()", wantMessage: "void operator shouldn't be used on undefined; it should convey that a return value is being ignored", wantRepair: "Fix"},
+				{
+					wantId:      "meaninglessVoidOperator",
+					wantSpan:    "void foo()",
+					wantMessage: "void operator shouldn't be used on undefined; it should convey that a return value is being ignored",
+					wantRepair:  "Fix",
+				},
 			},
 		},
 		{
@@ -476,7 +751,12 @@ func noMeaninglessVoidOperatorFiringRows() []noMeaninglessVoidOperatorRow {
 			optionsJson:     "",
 			wantComposedFix: "function foo() {}\nfoo();\n",
 			wantFindings: []noMeaninglessVoidOperatorFinding{
-				{wantId: "meaninglessVoidOperator", wantSpan: "void /* c */ foo()", wantMessage: "void operator shouldn't be used on void; it should convey that a return value is being ignored", wantRepair: "Fix"},
+				{
+					wantId:      "meaninglessVoidOperator",
+					wantSpan:    "void /* c */ foo()",
+					wantMessage: "void operator shouldn't be used on void; it should convey that a return value is being ignored",
+					wantRepair:  "Fix",
+				},
 			},
 		},
 		{
@@ -485,7 +765,12 @@ func noMeaninglessVoidOperatorFiringRows() []noMeaninglessVoidOperatorRow {
 			optionsJson:     "",
 			wantComposedFix: "function foo() {}\n(foo());\n",
 			wantFindings: []noMeaninglessVoidOperatorFinding{
-				{wantId: "meaninglessVoidOperator", wantSpan: "void(foo())", wantMessage: "void operator shouldn't be used on void; it should convey that a return value is being ignored", wantRepair: "Fix"},
+				{
+					wantId:      "meaninglessVoidOperator",
+					wantSpan:    "void(foo())",
+					wantMessage: "void operator shouldn't be used on void; it should convey that a return value is being ignored",
+					wantRepair:  "Fix",
+				},
 			},
 		},
 		{
@@ -494,7 +779,12 @@ func noMeaninglessVoidOperatorFiringRows() []noMeaninglessVoidOperatorRow {
 			optionsJson:     "{\"checkNever\": true}",
 			wantComposedFix: "declare const x: never;\nx;\n",
 			wantFindings: []noMeaninglessVoidOperatorFinding{
-				{wantId: "meaninglessVoidOnNonCall", wantSpan: "void x", wantMessage: "void operator is useless here; it should only discard a call's return value", wantRepair: "Fix"},
+				{
+					wantId:      "meaninglessVoidOnNonCall",
+					wantSpan:    "void x",
+					wantMessage: "void operator is useless here; it should only discard a call's return value",
+					wantRepair:  "Fix",
+				},
 			},
 		},
 		{
@@ -503,7 +793,12 @@ func noMeaninglessVoidOperatorFiringRows() []noMeaninglessVoidOperatorRow {
 			optionsJson:     "{\"checkNever\": true}",
 			wantComposedFix: "declare function fail(): void | never;\nfail();\n",
 			wantFindings: []noMeaninglessVoidOperatorFinding{
-				{wantId: "meaninglessVoidOperator", wantSpan: "void fail()", wantMessage: "void operator shouldn't be used on void; it should convey that a return value is being ignored", wantRepair: "Fix"},
+				{
+					wantId:      "meaninglessVoidOperator",
+					wantSpan:    "void fail()",
+					wantMessage: "void operator shouldn't be used on void; it should convey that a return value is being ignored",
+					wantRepair:  "Fix",
+				},
 			},
 		},
 		{
@@ -512,7 +807,12 @@ func noMeaninglessVoidOperatorFiringRows() []noMeaninglessVoidOperatorRow {
 			optionsJson:     "",
 			wantComposedFix: "declare const box: { method(): void } | undefined;\nbox?.method();\n",
 			wantFindings: []noMeaninglessVoidOperatorFinding{
-				{wantId: "meaninglessVoidOperator", wantSpan: "void box?.method()", wantMessage: "void operator shouldn't be used on void | undefined; it should convey that a return value is being ignored", wantRepair: "Fix"},
+				{
+					wantId:      "meaninglessVoidOperator",
+					wantSpan:    "void box?.method()",
+					wantMessage: "void operator shouldn't be used on void | undefined; it should convey that a return value is being ignored",
+					wantRepair:  "Fix",
+				},
 			},
 		},
 		{
@@ -521,7 +821,12 @@ func noMeaninglessVoidOperatorFiringRows() []noMeaninglessVoidOperatorRow {
 			optionsJson:     "",
 			wantComposedFix: "declare let x: number;\n(x satisfies number);\n",
 			wantFindings: []noMeaninglessVoidOperatorFinding{
-				{wantId: "meaninglessVoidOnNonCall", wantSpan: "void (x satisfies number)", wantMessage: "void operator is useless here; it should only discard a call's return value", wantRepair: "Fix"},
+				{
+					wantId:      "meaninglessVoidOnNonCall",
+					wantSpan:    "void (x satisfies number)",
+					wantMessage: "void operator is useless here; it should only discard a call's return value",
+					wantRepair:  "Fix",
+				},
 			},
 		},
 		{
@@ -530,7 +835,12 @@ func noMeaninglessVoidOperatorFiringRows() []noMeaninglessVoidOperatorRow {
 			optionsJson:     "",
 			wantComposedFix: "declare const box: { value: string };\nbox['value'];\n",
 			wantFindings: []noMeaninglessVoidOperatorFinding{
-				{wantId: "meaninglessVoidOnNonCall", wantSpan: "void box['value']", wantMessage: "void operator is useless here; it should only discard a call's return value", wantRepair: "Fix"},
+				{
+					wantId:      "meaninglessVoidOnNonCall",
+					wantSpan:    "void box['value']",
+					wantMessage: "void operator is useless here; it should only discard a call's return value",
+					wantRepair:  "Fix",
+				},
 			},
 		},
 		{
@@ -539,7 +849,12 @@ func noMeaninglessVoidOperatorFiringRows() []noMeaninglessVoidOperatorRow {
 			optionsJson:     "",
 			wantComposedFix: "'use strict';\n",
 			wantFindings: []noMeaninglessVoidOperatorFinding{
-				{wantId: "meaninglessVoidOnNonCall", wantSpan: "void 'use strict'", wantMessage: "void operator is useless here; it should only discard a call's return value", wantRepair: "Fix"},
+				{
+					wantId:      "meaninglessVoidOnNonCall",
+					wantSpan:    "void 'use strict'",
+					wantMessage: "void operator is useless here; it should only discard a call's return value",
+					wantRepair:  "Fix",
+				},
 			},
 		},
 		{
@@ -548,7 +863,12 @@ func noMeaninglessVoidOperatorFiringRows() []noMeaninglessVoidOperatorRow {
 			optionsJson:     "",
 			wantComposedFix: "declare let x: number;\n(x = 1, x);\n",
 			wantFindings: []noMeaninglessVoidOperatorFinding{
-				{wantId: "meaninglessVoidOnNonCall", wantSpan: "void (x = 1, x)", wantMessage: "void operator is useless here; it should only discard a call's return value", wantRepair: "Fix"},
+				{
+					wantId:      "meaninglessVoidOnNonCall",
+					wantSpan:    "void (x = 1, x)",
+					wantMessage: "void operator is useless here; it should only discard a call's return value",
+					wantRepair:  "Fix",
+				},
 			},
 		},
 	}
@@ -595,7 +915,12 @@ func TestNoMeaninglessVoidOperatorFires(test *testing.T) {
 					test.Fatalf("finding %d span: expected %q, got %q", position, want.wantSpan, gotSpan)
 				}
 				if diagnostic.Message.Description != want.wantMessage {
-					test.Fatalf("finding %d message: expected %q, got %q", position, want.wantMessage, diagnostic.Message.Description)
+					test.Fatalf(
+						"finding %d message: expected %q, got %q",
+						position,
+						want.wantMessage,
+						diagnostic.Message.Description,
+					)
 				}
 
 				switch want.wantRepair {
@@ -619,7 +944,11 @@ func TestNoMeaninglessVoidOperatorFires(test *testing.T) {
 							position, len(diagnostic.Fixes))
 					}
 					if len(diagnostic.Suggestions) != 1 {
-						test.Fatalf("finding %d: expected one suggestion, got %d", position, len(diagnostic.Suggestions))
+						test.Fatalf(
+							"finding %d: expected one suggestion, got %d",
+							position,
+							len(diagnostic.Suggestions),
+						)
 					}
 					suggestion := diagnostic.Suggestions[0]
 					if suggestion.Message.Description != want.wantSuggestionDescription {
@@ -684,7 +1013,9 @@ func TestDecodeNoMeaninglessVoidOperatorOptions(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, decodeNoMeaninglessVoidOperatorOptionsError := DecodeNoMeaninglessVoidOperatorOptions(json.RawMessage(testCase.raw))
+			decoded, decodeNoMeaninglessVoidOperatorOptionsError := DecodeNoMeaninglessVoidOperatorOptions(
+				json.RawMessage(testCase.raw),
+			)
 			if decodeNoMeaninglessVoidOperatorOptionsError != nil {
 				test.Fatalf("decoding %s: %v", testCase.raw, decodeNoMeaninglessVoidOperatorOptionsError)
 			}

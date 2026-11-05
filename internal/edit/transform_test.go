@@ -30,7 +30,12 @@ func TestTransformRunsAfterFixesAndSeesTheFixedText(test *testing.T) {
 		return strings.ReplaceAll(text, "const", "export const"), nil
 	}
 
-	result, err := FixAndTransformFile(fileName, proposeWhileContains("'old'", "'new'", "renamer"), transform, DefaultMaxPasses)
+	result, err := FixAndTransformFile(
+		fileName,
+		proposeWhileContains("'old'", "'new'", "renamer"),
+		transform,
+		DefaultMaxPasses,
+	)
 	if err != nil {
 		test.Fatalf("unexpected error: %v", err)
 	}
@@ -66,7 +71,12 @@ func TestATransformProducingInvalidSyntaxIsRefused(test *testing.T) {
 		return text + "function unclosed() {\n", nil
 	}
 
-	result, err := FixAndTransformFile(fileName, proposeWhileContains("'old'", "'new'", "renamer"), breaking, DefaultMaxPasses)
+	result, err := FixAndTransformFile(
+		fileName,
+		proposeWhileContains("'old'", "'new'", "renamer"),
+		breaking,
+		DefaultMaxPasses,
+	)
 	if err != nil {
 		test.Fatalf("unexpected error: %v", err)
 	}
@@ -110,7 +120,12 @@ func TestATransformThatErrorsDoesNotBlockFixes(test *testing.T) {
 		return "", errors.New("the formatter fell over")
 	}
 
-	result, err := FixAndTransformFile(fileName, proposeWhileContains("'old'", "'new'", "renamer"), failing, DefaultMaxPasses)
+	result, err := FixAndTransformFile(
+		fileName,
+		proposeWhileContains("'old'", "'new'", "renamer"),
+		failing,
+		DefaultMaxPasses,
+	)
 	if err != nil {
 		test.Fatalf("a transform error must not fail the whole file: %v", err)
 	}
@@ -148,9 +163,14 @@ func TestTransformRunsWhenNoFixLanded(test *testing.T) {
 		test.Fatal(writeError)
 	}
 
-	result, err := FixAndTransformFile(fileName, proposeOnce(), func(_ string, text string, _ *ast.SourceFile) (string, error) {
-		return "export " + text, nil
-	}, DefaultMaxPasses)
+	result, err := FixAndTransformFile(
+		fileName,
+		proposeOnce(),
+		func(_ string, text string, _ *ast.SourceFile) (string, error) {
+			return "export " + text, nil
+		},
+		DefaultMaxPasses,
+	)
 	if err != nil {
 		test.Fatalf("unexpected error: %v", err)
 	}
@@ -184,9 +204,14 @@ func TestAnIdentityTransformDoesNotTouchTheFile(test *testing.T) {
 		test.Fatal(err)
 	}
 
-	result, err := FixAndTransformFile(fileName, proposeOnce(), func(_ string, text string, _ *ast.SourceFile) (string, error) {
-		return text, nil
-	}, DefaultMaxPasses)
+	result, err := FixAndTransformFile(
+		fileName,
+		proposeOnce(),
+		func(_ string, text string, _ *ast.SourceFile) (string, error) {
+			return text, nil
+		},
+		DefaultMaxPasses,
+	)
 	if err != nil {
 		test.Fatalf("unexpected error: %v", err)
 	}
@@ -270,7 +295,12 @@ func TestFixFileIsFixAndTransformWithNoTransform(test *testing.T) {
 	if err != nil {
 		test.Fatal(err)
 	}
-	secondResult, err := FixAndTransformFile(withNilTransform, proposeWhileContains("'old'", "'new'", "renamer"), nil, DefaultMaxPasses)
+	secondResult, err := FixAndTransformFile(
+		withNilTransform,
+		proposeWhileContains("'old'", "'new'", "renamer"),
+		nil,
+		DefaultMaxPasses,
+	)
 	if err != nil {
 		test.Fatal(err)
 	}
@@ -420,9 +450,14 @@ func TestASkipWithNoReasonIsStillCounted(test *testing.T) {
 		test.Fatal(writeError)
 	}
 
-	result, fixAndTransformFileError := FixAndTransformFile(fileName, proposeOnce(), func(_ string, _ string, _ *ast.SourceFile) (string, error) {
-		return "", ErrSkipped
-	}, DefaultMaxPasses)
+	result, fixAndTransformFileError := FixAndTransformFile(
+		fileName,
+		proposeOnce(),
+		func(_ string, _ string, _ *ast.SourceFile) (string, error) {
+			return "", ErrSkipped
+		},
+		DefaultMaxPasses,
+	)
 	if fixAndTransformFileError != nil {
 		test.Fatalf("unexpected error: %v", fixAndTransformFileError)
 	}
@@ -468,7 +503,13 @@ func TestTheWholeSummaryLineReadsCorrectly(test *testing.T) {
 			name: "refusals stay attached to the refusal count",
 			results: []FileResult{
 				{FileName: "a.ts", Converged: true, Passes: 1, Rejected: []Rejection{{Reason: ReasonOverlap}}},
-				{FileName: "b.md", Converged: true, Passes: 1, TransformSkipped: true, TransformSkipReason: "markdown doubles a standalone tilde"},
+				{
+					FileName:            "b.md",
+					Converged:           true,
+					Passes:              1,
+					TransformSkipped:    true,
+					TransformSkipReason: "markdown doubles a standalone tilde",
+				},
 			},
 			want: "fix: 0 of 2 files rewritten, 0 fixes applied, 1 refused (1 overlaps another fix), " +
 				"1 not formatted (1 markdown doubles a standalone tilde)",
@@ -476,9 +517,22 @@ func TestTheWholeSummaryLineReadsCorrectly(test *testing.T) {
 		{
 			name: "a full run reads as one sentence",
 			results: []FileResult{
-				{FileName: "a.ts", Converged: true, Changed: true, Passes: 2, Applied: []Proposal{{RuleName: "r"}, {RuleName: "r"}}, Transformed: true},
+				{
+					FileName:    "a.ts",
+					Converged:   true,
+					Changed:     true,
+					Passes:      2,
+					Applied:     []Proposal{{RuleName: "r"}, {RuleName: "r"}},
+					Transformed: true,
+				},
 				{FileName: "b.ts", Converged: true, Changed: true, Passes: 1, Applied: []Proposal{{RuleName: "r"}}},
-				{FileName: "c.md", Converged: true, Passes: 1, TransformSkipped: true, TransformSkipReason: "markdown doubles a standalone tilde"},
+				{
+					FileName:            "c.md",
+					Converged:           true,
+					Passes:              1,
+					TransformSkipped:    true,
+					TransformSkipReason: "markdown doubles a standalone tilde",
+				},
 				{FileName: "d.ts", Failed: true},
 			},
 			want: "fix: 2 of 4 files rewritten, 3 fixes applied, 0 refused, 1 reformatted, " +
@@ -514,11 +568,21 @@ func TestCheckFileComputesTheWriteAndLeavesTheFile(test *testing.T) {
 		return strings.ReplaceAll(text, "const", "export const"), nil
 	}
 
-	checkResult, err := CheckFile(checked, proposeWhileContains("'old'", "'new'", "renamer"), transform, DefaultMaxPasses)
+	checkResult, err := CheckFile(
+		checked,
+		proposeWhileContains("'old'", "'new'", "renamer"),
+		transform,
+		DefaultMaxPasses,
+	)
 	if err != nil {
 		test.Fatal(err)
 	}
-	writeResult, err := FixAndTransformFile(written, proposeWhileContains("'old'", "'new'", "renamer"), transform, DefaultMaxPasses)
+	writeResult, err := FixAndTransformFile(
+		written,
+		proposeWhileContains("'old'", "'new'", "renamer"),
+		transform,
+		DefaultMaxPasses,
+	)
 	if err != nil {
 		test.Fatal(err)
 	}
@@ -526,7 +590,9 @@ func TestCheckFileComputesTheWriteAndLeavesTheFile(test *testing.T) {
 	if contents, _ := os.ReadFile(checked); string(contents) != original {
 		test.Fatalf("CheckFile wrote to disk:\n%s", contents)
 	}
-	if contents, _ := os.ReadFile(written); checkResult.Text != string(contents) || !checkResult.Changed || !checkResult.Transformed {
+	if contents, _ := os.ReadFile(
+		written,
+	); checkResult.Text != string(contents) || !checkResult.Changed || !checkResult.Transformed {
 		test.Fatalf("the check and the write disagree:\n  checked %q (changed %v, transformed %v)\n  written %q",
 			checkResult.Text, checkResult.Changed, checkResult.Transformed, contents)
 	}
@@ -543,7 +609,9 @@ func TestCheckFileComputesTheWriteAndLeavesTheFile(test *testing.T) {
 		!strings.Contains(line, "1 would be reformatted") {
 		test.Fatalf("a checked summary claims a rewrite: %s", line)
 	}
-	if line := Summarize([]FileResult{writeResult}).String(); !strings.Contains(line, "1 of 1 files rewritten, 1 fixes applied") {
+	if line := Summarize(
+		[]FileResult{writeResult},
+	).String(); !strings.Contains(line, "1 of 1 files rewritten, 1 fixes applied") {
 		test.Fatalf("the writing run's line moved: %s", line)
 	}
 }
@@ -559,7 +627,13 @@ func TestAFixThePrintedTextTriggersLandsInTheSameRun(test *testing.T) {
 	}
 	repairMultilineArrow := proposeWhileContains("() => {\n", "function() {\n", "no-multiline-arrow")
 
-	result, fixAndTransformTextError := FixAndTransformText("probe.ts", "register(() => { run(); });\n", repairMultilineArrow, breakArrow, DefaultMaxPasses)
+	result, fixAndTransformTextError := FixAndTransformText(
+		"probe.ts",
+		"register(() => { run(); });\n",
+		repairMultilineArrow,
+		breakArrow,
+		DefaultMaxPasses,
+	)
 	if fixAndTransformTextError != nil {
 		test.Fatal(fixAndTransformTextError)
 	}
@@ -589,7 +663,12 @@ func TestFixAndFormatThatUndoEachOtherAreBounded(test *testing.T) {
 		test.Fatal(fixAndTransformTextError)
 	}
 	if result.Text != source || result.Changed || result.Converged {
-		test.Fatalf("an unsettled file was not left as found: %q (changed %v, converged %v)", result.Text, result.Changed, result.Converged)
+		test.Fatalf(
+			"an unsettled file was not left as found: %q (changed %v, converged %v)",
+			result.Text,
+			result.Changed,
+			result.Converged,
+		)
 	}
 	if strings.Join(result.UnconvergedRules, ",") != "prefer-double,format" {
 		test.Fatalf("the unsettled pair was not named: %v", result.UnconvergedRules)

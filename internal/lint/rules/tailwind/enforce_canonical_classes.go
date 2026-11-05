@@ -171,7 +171,9 @@ var EnforceCanonicalClasses = rule.Rule{
 				}
 				// Upstream signs every class under the same options it collapses with, so a project that
 				// turns collapse off compares signatures without expanding shorthands.
-				canonicalizer := designSystem.Canonicalizer.WithFeatures(tailwindengine.SignatureFeaturesFor(collapse.enabled, collapse.logical))
+				canonicalizer := designSystem.Canonicalizer.WithFeatures(
+					tailwindengine.SignatureFeaturesFor(collapse.enabled, collapse.logical),
+				)
 				reportSingles(ruleContext, literal, ignored, designSystem.System, canonicalizer, merged)
 			}
 		}
@@ -363,7 +365,11 @@ type canonicalCollapseOptions struct {
 }
 
 // mergeOnce finds the first mergeable pair and returns what it becomes.
-func mergeOnce(classes []string, designSystem DesignSystemResult, collapse canonicalCollapseOptions) ([]string, string, bool) {
+func mergeOnce(
+	classes []string,
+	designSystem DesignSystemResult,
+	collapse canonicalCollapseOptions,
+) ([]string, string, bool) {
 	parsed := make([]candidateParts, 0, len(classes))
 	for _, className := range classes {
 		parts, canParse := splitCandidateIn(className, designSystem.System)

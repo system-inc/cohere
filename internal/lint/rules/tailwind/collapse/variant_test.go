@@ -123,7 +123,10 @@ func variantOrderVariantFromFixture(fixture *variantOrderShapeFixture) *ParsedVa
 		variant.Value = &ParsedVariantValue{Kind: ParsedValueKind(fixture.Value.Kind), Value: fixture.Value.Value}
 	}
 	if fixture.Modifier != nil {
-		variant.Modifier = &ParsedModifier{Kind: ParsedModifierKind(fixture.Modifier.Kind), Value: fixture.Modifier.Value}
+		variant.Modifier = &ParsedModifier{
+			Kind:  ParsedModifierKind(fixture.Modifier.Kind),
+			Value: fixture.Modifier.Value,
+		}
 	}
 	return variant
 }
@@ -161,7 +164,11 @@ func loadVariantOrderCorpus(test *testing.T) variantOrderCorpus {
 // orders carry one but cannot record the function itself. All four are breakpoint comparisons in a
 // default build, and their directions come from `variants.ts`: `max` and `@max` descend, the
 // breakpoint group and `@`/`@min` ascend.
-func variantOrderRegistryFrom(test *testing.T, fixture *variantOrderRegistryFixture, resolveBreakpoint func(ParsedVariant) (string, bool)) *VariantRegistry {
+func variantOrderRegistryFrom(
+	test *testing.T,
+	fixture *variantOrderRegistryFixture,
+	resolveBreakpoint func(ParsedVariant) (string, bool),
+) *VariantRegistry {
 	test.Helper()
 
 	registry := NewVariantRegistry()
@@ -261,7 +268,11 @@ func TestVariantOrderMatchesTheEngine(test *testing.T) {
 // repository's registry, so the lists are matched back to their repository by name prefix. Falling
 // back to the framework registry rather than skipping is deliberate: a synthetic case is built on a
 // default design system and has no registry of its own.
-func variantOrderRegistryForCase(test *testing.T, corpus variantOrderCorpus, aCase variantOrderCase) *variantOrderRegistryFixture {
+func variantOrderRegistryForCase(
+	test *testing.T,
+	corpus variantOrderCorpus,
+	aCase variantOrderCase,
+) *variantOrderRegistryFixture {
 	test.Helper()
 
 	if aCase.Registry != nil {
@@ -293,7 +304,10 @@ func variantOrderRegistryForCase(test *testing.T, corpus variantOrderCorpus, aCa
 // variant when it is arbitrary and falls back to the default scale by name, which is what both
 // repositories in the corpus use. A name this cannot resolve reports false, which is upstream's own
 // `null` branch and is ordered rather than skipped.
-func variantOrderBreakpointResolverFor(aCase variantOrderCase, corpus variantOrderCorpus) func(ParsedVariant) (string, bool) {
+func variantOrderBreakpointResolverFor(
+	aCase variantOrderCase,
+	corpus variantOrderCorpus,
+) func(ParsedVariant) (string, bool) {
 	return func(variant ParsedVariant) (string, bool) {
 		switch variant.Kind {
 		case ParsedVariantKindStatic:
@@ -339,7 +353,12 @@ var variantOrderDefaultContainerScale = map[string]string{
 }
 
 // checkVariantOrderIndices compares the port's dense indices against the engine's, for one case.
-func checkVariantOrderIndices(test *testing.T, name string, registry *VariantRegistry, fixture *variantOrderIndicesFixture) int {
+func checkVariantOrderIndices(
+	test *testing.T,
+	name string,
+	registry *VariantRegistry,
+	fixture *variantOrderIndicesFixture,
+) int {
 	test.Helper()
 
 	variants := make([]ParsedVariant, 0, len(fixture.Positions))
@@ -362,7 +381,12 @@ func checkVariantOrderIndices(test *testing.T, name string, registry *VariantReg
 		}
 		got, hasIndex := order.IndexOf(*variantOrderVariantFromFixture(position.Variant))
 		if !hasIndex {
-			test.Errorf("%s: the port assigned no index to %q, which the engine placed at %d", name, position.Raw, *position.Index)
+			test.Errorf(
+				"%s: the port assigned no index to %q, which the engine placed at %d",
+				name,
+				position.Raw,
+				*position.Index,
+			)
 			continue
 		}
 		if got != *position.Index {
@@ -379,7 +403,12 @@ func checkVariantOrderIndices(test *testing.T, name string, registry *VariantReg
 // ports can agree on every rank in a corpus while building the mask differently. The rank is the
 // observable behaviour, and a mask that is right in a way that does not reach the sort is not
 // worth much either.
-func checkVariantOrderClassOrder(test *testing.T, name string, registry *VariantRegistry, fixture variantOrderClassOrderFixture) (int, int) {
+func checkVariantOrderClassOrder(
+	test *testing.T,
+	name string,
+	registry *VariantRegistry,
+	fixture variantOrderClassOrderFixture,
+) (int, int) {
 	test.Helper()
 
 	// Every variant the engine saw for this class list, which is the population its dense indices
@@ -417,7 +446,12 @@ func checkVariantOrderClassOrder(test *testing.T, name string, registry *Variant
 		}
 		want, isNumeric := new(big.Int).SetString(*maskFixture.Mask, 10)
 		if !isNumeric {
-			test.Fatalf("%s: the fixture holds an unreadable mask %q for %q", name, *maskFixture.Mask, maskFixture.ClassName)
+			test.Fatalf(
+				"%s: the fixture holds an unreadable mask %q for %q",
+				name,
+				*maskFixture.Mask,
+				maskFixture.ClassName,
+			)
 		}
 		if got.Cmp(want) != 0 {
 			test.Errorf("%s: %q has mask %s in the port and %s in the engine", name, maskFixture.ClassName, got, want)
@@ -451,7 +485,13 @@ func checkVariantOrderClassOrder(test *testing.T, name string, registry *Variant
 
 	for index := range sorted {
 		if index < len(expected) && expected[index] != sorted[index] {
-			test.Errorf("%s: position %d is %q in the port and %q in the engine", name, index, sorted[index], expected[index])
+			test.Errorf(
+				"%s: position %d is %q in the port and %q in the engine",
+				name,
+				index,
+				sorted[index],
+				expected[index],
+			)
 		}
 	}
 
@@ -705,7 +745,12 @@ func TestRegistrationOrderIsSharedWithinAGroup(test *testing.T) {
 			continue
 		}
 		if order != shared {
-			test.Errorf("%q holds order %d and `sm` holds %d, so the group no longer shares one number", name, order, shared)
+			test.Errorf(
+				"%q holds order %d and `sm` holds %d, so the group no longer shares one number",
+				name,
+				order,
+				shared,
+			)
 		}
 	}
 
@@ -771,7 +816,12 @@ func TestCustomVariantOverridingAFrameworkNameKeepsItsOrder(test *testing.T) {
 			continue
 		}
 		if entry.Order != frameworkOrder {
-			test.Errorf("%q moved from order %d to %d when `dark` was overridden", entry.Name, frameworkOrder, entry.Order)
+			test.Errorf(
+				"%q moved from order %d to %d when `dark` was overridden",
+				entry.Name,
+				frameworkOrder,
+				entry.Order,
+			)
 		}
 	}
 	if len(overriding.Entries) != len(framework.Entries) {
@@ -884,7 +934,11 @@ func TestVariantOrderIsRunScoped(test *testing.T) {
 	large := registry.BuildVariantOrder([]ParsedVariant{
 		{Kind: ParsedVariantKindStatic, Root: "hover"},
 		{Kind: ParsedVariantKindStatic, Root: "focus"},
-		{Kind: ParsedVariantKindCompound, Root: "group", Variant: &ParsedVariant{Kind: ParsedVariantKindStatic, Root: "hover"}},
+		{
+			Kind:    ParsedVariantKindCompound,
+			Root:    "group",
+			Variant: &ParsedVariant{Kind: ParsedVariantKindStatic, Root: "hover"},
+		},
 	})
 
 	smallIndex, _ := small.IndexOf(ParsedVariant{Kind: ParsedVariantKindStatic, Root: "hover"})
@@ -944,7 +998,11 @@ func TestTiedVariantsShareAnIndex(test *testing.T) {
 	gammaIndex, _ := order.IndexOf(ParsedVariant{Kind: ParsedVariantKindStatic, Root: "gamma"})
 
 	if alphaIndex != betaIndex {
-		test.Errorf("variants whose comparison returns zero should share an index, got %d and %d", alphaIndex, betaIndex)
+		test.Errorf(
+			"variants whose comparison returns zero should share an index, got %d and %d",
+			alphaIndex,
+			betaIndex,
+		)
 	}
 	if gammaIndex != alphaIndex+1 {
 		test.Errorf(
@@ -1082,7 +1140,11 @@ func TestCompareBreakpointsBucketsByUnit(test *testing.T) {
 			test.Parallel()
 			order := CompareBreakpoints(testCase.left, testCase.right, testCase.ascending)
 			if order == 0 {
-				test.Fatalf("%q and %q tied, which the engine does not do for distinct values", testCase.left, testCase.right)
+				test.Fatalf(
+					"%q and %q tied, which the engine does not do for distinct values",
+					testCase.left,
+					testCase.right,
+				)
 			}
 			first := testCase.left
 			if order > 0 {
@@ -1163,7 +1225,11 @@ func TestCorpusHoldsRealClassLists(test *testing.T) {
 	}
 	for repository, count := range classListsByRepository {
 		if count < 100 {
-			test.Errorf("%s contributed only %d class lists, which is too few to measure agreement on", repository, count)
+			test.Errorf(
+				"%s contributed only %d class lists, which is too few to measure agreement on",
+				repository,
+				count,
+			)
 		}
 		test.Logf("%s: %d class lists, %d classes", repository, count, classesByRepository[repository])
 	}

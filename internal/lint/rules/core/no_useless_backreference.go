@@ -426,7 +426,11 @@ func resolveBackreference(reference backreference, groups []capturingGroup, grou
 // disjunction question. Direction decides between the two ordering problems, and the negative
 // lookaround check comes last because a group inside one can still be reachable in every other
 // respect.
-func classifyBackreference(reference backreference, group capturingGroup, nodes []regexNode) (backreferenceProblem, bool) {
+func classifyBackreference(
+	reference backreference,
+	group capturingGroup,
+	nodes []regexNode,
+) (backreferenceProblem, bool) {
 	if group.start <= reference.start && reference.end <= group.end {
 		return problemInsideItsOwnGroup, true
 	}

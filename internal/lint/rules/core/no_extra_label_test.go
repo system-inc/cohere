@@ -27,7 +27,10 @@ func TestNoExtraLabelFires(test *testing.T) {
 	}{
 		{"a labeled loop whose break names it", "A: while (a) break A;"},
 		{"a labeled loop reached past an inner labeled block", "A: while (a) { B: { continue A; } }"},
-		{"the innermost of three, where only the redundant one reports", "X: while (x) { A: while (a) { B: { break A; break B; continue X; } } }"},
+		{
+			"the innermost of three, where only the redundant one reports",
+			"X: while (x) { A: while (a) { B: { break A; break B; continue X; } } }",
+		},
 		{"a labeled do while", "A: do { break A; } while (a);"},
 		{"a labeled for", "A: for (;;) { break A; }"},
 		{"a labeled for in", "A: for (a in obj) { break A; }"},
@@ -35,7 +38,10 @@ func TestNoExtraLabelFires(test *testing.T) {
 		{"a labeled switch", "A: switch (a) { case 0: break A; }"},
 		{"a labeled switch inside another labeled loop", "X: while (x) { A: switch (a) { case 0: break A; } }"},
 		{"a labeled loop inside a labeled switch", "X: switch (a) { case 0: A: while (b) break A; }"},
-		{"only the break in the outer loop is redundant", "                A: while (true) {\n                    break A;\n                    while (true) {\n                        break A;\n                    }\n                }\n            "},
+		{
+			"only the break in the outer loop is redundant",
+			"                A: while (true) {\n                    break A;\n                    while (true) {\n                        break A;\n                    }\n                }\n            ",
+		},
 		{"a comment before the keyword still reports", "A: while(true) { /*comment*/break A; }"},
 		{"a comment between break and its label", "A: while(true) { break/**/ A; }"},
 		{"a comment between continue and its label", "A: while(true) { continue /**/ A; }"},
@@ -111,20 +117,56 @@ func TestNoExtraLabelFixes(test *testing.T) {
 		wantSource string
 	}{
 		{"a labeled loop whose break names it", "A: while (a) break A;", "A: while (a) break;"},
-		{"a labeled loop reached past an inner labeled block", "A: while (a) { B: { continue A; } }", "A: while (a) { B: { continue; } }"},
-		{"the innermost of three, where only the redundant one reports", "X: while (x) { A: while (a) { B: { break A; break B; continue X; } } }", "X: while (x) { A: while (a) { B: { break; break B; continue X; } } }"},
+		{
+			"a labeled loop reached past an inner labeled block",
+			"A: while (a) { B: { continue A; } }",
+			"A: while (a) { B: { continue; } }",
+		},
+		{
+			"the innermost of three, where only the redundant one reports",
+			"X: while (x) { A: while (a) { B: { break A; break B; continue X; } } }",
+			"X: while (x) { A: while (a) { B: { break; break B; continue X; } } }",
+		},
 		{"a labeled do while", "A: do { break A; } while (a);", "A: do { break; } while (a);"},
 		{"a labeled for", "A: for (;;) { break A; }", "A: for (;;) { break; }"},
 		{"a labeled for in", "A: for (a in obj) { break A; }", "A: for (a in obj) { break; }"},
 		{"a labeled for of", "A: for (a of ary) { break A; }", "A: for (a of ary) { break; }"},
 		{"a labeled switch", "A: switch (a) { case 0: break A; }", "A: switch (a) { case 0: break; }"},
-		{"a labeled switch inside another labeled loop", "X: while (x) { A: switch (a) { case 0: break A; } }", "X: while (x) { A: switch (a) { case 0: break; } }"},
-		{"a labeled loop inside a labeled switch", "X: switch (a) { case 0: A: while (b) break A; }", "X: switch (a) { case 0: A: while (b) break; }"},
-		{"only the break in the outer loop is redundant", "                A: while (true) {\n                    break A;\n                    while (true) {\n                        break A;\n                    }\n                }\n            ", "                A: while (true) {\n                    break;\n                    while (true) {\n                        break A;\n                    }\n                }\n            "},
-		{"a comment before the keyword still reports", "A: while(true) { /*comment*/break A; }", "A: while(true) { /*comment*/break; }"},
-		{"a comment after the label", "A: while(true) { continue A/*comment*/; }", "A: while(true) { continue/*comment*/; }"},
-		{"a line comment after the label", "A: while(true) { break A//comment\n }", "A: while(true) { break//comment\n }"},
-		{"a block comment after the label before a newline", "A: while(true) { break A/*comment*/\nfoo() }", "A: while(true) { break/*comment*/\nfoo() }"},
+		{
+			"a labeled switch inside another labeled loop",
+			"X: while (x) { A: switch (a) { case 0: break A; } }",
+			"X: while (x) { A: switch (a) { case 0: break; } }",
+		},
+		{
+			"a labeled loop inside a labeled switch",
+			"X: switch (a) { case 0: A: while (b) break A; }",
+			"X: switch (a) { case 0: A: while (b) break; }",
+		},
+		{
+			"only the break in the outer loop is redundant",
+			"                A: while (true) {\n                    break A;\n                    while (true) {\n                        break A;\n                    }\n                }\n            ",
+			"                A: while (true) {\n                    break;\n                    while (true) {\n                        break A;\n                    }\n                }\n            ",
+		},
+		{
+			"a comment before the keyword still reports",
+			"A: while(true) { /*comment*/break A; }",
+			"A: while(true) { /*comment*/break; }",
+		},
+		{
+			"a comment after the label",
+			"A: while(true) { continue A/*comment*/; }",
+			"A: while(true) { continue/*comment*/; }",
+		},
+		{
+			"a line comment after the label",
+			"A: while(true) { break A//comment\n }",
+			"A: while(true) { break//comment\n }",
+		},
+		{
+			"a block comment after the label before a newline",
+			"A: while(true) { break A/*comment*/\nfoo() }",
+			"A: while(true) { break/*comment*/\nfoo() }",
+		},
 	}
 
 	for _, testCase := range cases {
@@ -227,10 +269,22 @@ func TestNoExtraLabelStopsAtALabeledBlockOfTheSameName(test *testing.T) {
 		sourceText string
 		findings   int
 	}{
-		{"a labeled block inside a function shadows the outer loop label", "A: while (a) { function f() { A: { break A; } } }", 0},
+		{
+			"a labeled block inside a function shadows the outer loop label",
+			"A: while (a) { function f() { A: { break A; } } }",
+			0,
+		},
 		{"the same through an arrow", "A: while (a) { (() => { A: { break A; } })(); }", 0},
-		{"a labeled loop inside a function reports on its own", "A: while (a) { function f() { A: while (b) { break A; } } }", 1},
-		{"the outer loop still reports for a jump outside the function", "A: while (a) { function f() { A: { break A; } } break A; }", 1},
+		{
+			"a labeled loop inside a function reports on its own",
+			"A: while (a) { function f() { A: while (b) { break A; } } }",
+			1,
+		},
+		{
+			"the outer loop still reports for a jump outside the function",
+			"A: while (a) { function f() { A: { break A; } } break A; }",
+			1,
+		},
 	}
 
 	for _, testCase := range cases {

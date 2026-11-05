@@ -361,7 +361,12 @@ func TestParseSelectorFollowsJavaScriptSemantics(test *testing.T) {
 					testCase.input, difference, renderSelectorNodes(got), renderSelectorNodes(testCase.want))
 			}
 			if printed := SelectorToCss(got, false); printed != testCase.printed {
-				test.Errorf("SelectorToCss(ParseSelector(%q), false) = %q, upstream prints %q", testCase.input, printed, testCase.printed)
+				test.Errorf(
+					"SelectorToCss(ParseSelector(%q), false) = %q, upstream prints %q",
+					testCase.input,
+					printed,
+					testCase.printed,
+				)
 			}
 		})
 	}
@@ -403,7 +408,13 @@ func TestSelectorPredicates(test *testing.T) {
 	for _, testCase := range cases {
 		for _, predicate := range predicates {
 			if got, want := predicate.test(testCase.node), predicate.name == testCase.want; got != want {
-				test.Errorf("%s predicate on %s = %t, want %t", predicate.name, renderSelectorNodes([]SelectorNode{testCase.node}), got, want)
+				test.Errorf(
+					"%s predicate on %s = %t, want %t",
+					predicate.name,
+					renderSelectorNodes([]SelectorNode{testCase.node}),
+					got,
+					want,
+				)
 			}
 		}
 	}
@@ -445,7 +456,12 @@ func diffSelectorNodes(got, want []SelectorNode, path string) string {
 			return fmt.Sprintf("at %s: value %q, upstream says %q", here, got[index].Value, want[index].Value)
 		}
 		if (got[index].Nodes == nil) != (want[index].Nodes == nil) {
-			return fmt.Sprintf("at %s: nodes nil is %t, upstream's is %t", here, got[index].Nodes == nil, want[index].Nodes == nil)
+			return fmt.Sprintf(
+				"at %s: nodes nil is %t, upstream's is %t",
+				here,
+				got[index].Nodes == nil,
+				want[index].Nodes == nil,
+			)
 		}
 		if difference := diffSelectorNodes(got[index].Nodes, want[index].Nodes, here); difference != "" {
 			return difference

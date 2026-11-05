@@ -17,7 +17,11 @@ import (
 
 // exportRanges names the directory TestExportRangesForAdamic writes to. Only a test flag sets it, so
 // nothing in a cohere run can reach the export.
-var exportRanges = flag.String("export-ranges", "", "write the functions React Compiler's vendored fixtures lower to, with their effects, into this directory, in the cases format of Adamic's mutation_aliasing slice")
+var exportRanges = flag.String(
+	"export-ranges",
+	"",
+	"write the functions React Compiler's vendored fixtures lower to, with their effects, into this directory, in the cases format of Adamic's mutation_aliasing slice",
+)
 
 // TestExportRangesForAdamic writes every function React Compiler's own fixtures lower to, as this IR
 // hands it to mutation_aliasing.InferMutableRanges, for Adamic's port of that module (#dnv6f2c), which
@@ -74,7 +78,11 @@ func TestExportRangesForAdamic(test *testing.T) {
 			index := 0
 			var write func(function *Function)
 			write = func(function *Function) {
-				closures += writeAdamicRangesCase(&out, fmt.Sprintf("%s%s#%d", fixture.name, pipeline.suffix, index), function)
+				closures += writeAdamicRangesCase(
+					&out,
+					fmt.Sprintf("%s%s#%d", fixture.name, pipeline.suffix, index),
+					function,
+				)
 				index++
 				functions++
 				for _, nested := range function.Functions {
@@ -88,12 +96,22 @@ func TestExportRangesForAdamic(test *testing.T) {
 		if out.Len() == 0 {
 			continue
 		}
-		if writeError := os.WriteFile(filepath.Join(*exportRanges, fixture.name+".txt"), []byte(out.String()), 0o644); writeError != nil {
+		if writeError := os.WriteFile(
+			filepath.Join(*exportRanges, fixture.name+".txt"),
+			[]byte(out.String()),
+			0o644,
+		); writeError != nil {
 			test.Fatal(writeError)
 		}
 		fixtures++
 	}
-	test.Logf("%d fixtures, %d functions, %d closure answers, written to %s", fixtures, functions, closures, *exportRanges)
+	test.Logf(
+		"%d fixtures, %d functions, %d closure answers, written to %s",
+		fixtures,
+		functions,
+		closures,
+		*exportRanges,
+	)
 	if fixtures == 0 {
 		test.Fatal("no fixture lowered to anything, so the export holds nothing")
 	}
@@ -118,8 +136,13 @@ type recordingRangeGraph struct {
 	answers map[closureKey][]closureAnswer
 }
 
-func (graph recordingRangeGraph) Closure(function *Function, block *BasicBlock, index int, into static_single_assignment.IdentifierId,
-	kinds map[static_single_assignment.IdentifierId]mutation_aliasing.EffectValueKind) ([]Place, bool) {
+func (graph recordingRangeGraph) Closure(
+	function *Function,
+	block *BasicBlock,
+	index int,
+	into static_single_assignment.IdentifierId,
+	kinds map[static_single_assignment.IdentifierId]mutation_aliasing.EffectValueKind,
+) ([]Place, bool) {
 	captures, frozen := graph.rangeGraph.Closure(function, block, index, into, kinds)
 	if captures != nil {
 		key := closureKey{block: block.Id, index: index}
@@ -131,7 +154,10 @@ func (graph recordingRangeGraph) Closure(function *Function, block *BasicBlock, 
 // writeAdamicRangesCase writes one function as Adamic's mutation_aliasing cases records, returning how
 // many closure answers it holds.
 func writeAdamicRangesCase(out *strings.Builder, name string, function *Function) int {
-	graph := recordingRangeGraph{rangeGraph: newRangeGraph(function, InferAliasingEffects(function)), answers: map[closureKey][]closureAnswer{}}
+	graph := recordingRangeGraph{
+		rangeGraph: newRangeGraph(function, InferAliasingEffects(function)),
+		answers:    map[closureKey][]closureAnswer{},
+	}
 	ranges := mutation_aliasing.InferMutableRanges(graph, function, mutation_aliasing.Options{})
 
 	values := map[static_single_assignment.IdentifierId]bool{}

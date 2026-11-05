@@ -68,7 +68,11 @@ func correctnessNoUnclearedRaceTimeoutExpect(test *testing.T, result rule_testin
 			test.Fatalf("unexpected message id %q", diagnostic.Message.Id)
 		}
 		if len(diagnostic.Fixes) != 0 || len(diagnostic.Suggestions) != 0 {
-			test.Fatalf("expected no fix and no suggestion, got %d and %d", len(diagnostic.Fixes), len(diagnostic.Suggestions))
+			test.Fatalf(
+				"expected no fix and no suggestion, got %d and %d",
+				len(diagnostic.Fixes),
+				len(diagnostic.Suggestions),
+			)
 		}
 		got = append(got, text[diagnostic.Range.Pos():diagnostic.Range.End()])
 	}
@@ -135,7 +139,10 @@ func TestCorrectnessNoUnclearedRaceTimeoutFiresOnPhiSocialGenerator(test *testin
 func TestCorrectnessNoUnclearedRaceTimeoutStaysSilentOnFixedPhiSocialGenerator(test *testing.T) {
 	test.Parallel()
 
-	rule_testing.ExpectClean(test, correctnessNoUnclearedRaceTimeoutRun(test, correctnessNoUnclearedRaceTimeoutPhiSocial(true)))
+	rule_testing.ExpectClean(
+		test,
+		correctnessNoUnclearedRaceTimeoutRun(test, correctnessNoUnclearedRaceTimeoutPhiSocial(true)),
+	)
 }
 
 func TestCorrectnessNoUnclearedRaceTimeoutFires(test *testing.T) {
@@ -198,7 +205,10 @@ func TestCorrectnessNoUnclearedRaceTimeoutFires(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 
-			result := correctnessNoUnclearedRaceTimeoutRun(test, correctnessNoUnclearedRaceTimeoutSource(testCase.lines...))
+			result := correctnessNoUnclearedRaceTimeoutRun(
+				test,
+				correctnessNoUnclearedRaceTimeoutSource(testCase.lines...),
+			)
 			correctnessNoUnclearedRaceTimeoutExpect(test, result, testCase.want...)
 		})
 	}
@@ -284,7 +294,10 @@ func TestCorrectnessNoUnclearedRaceTimeoutStaysSilent(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 
-			rule_testing.ExpectClean(test, correctnessNoUnclearedRaceTimeoutRun(test, correctnessNoUnclearedRaceTimeoutSource(testCase.lines...)))
+			rule_testing.ExpectClean(
+				test,
+				correctnessNoUnclearedRaceTimeoutRun(test, correctnessNoUnclearedRaceTimeoutSource(testCase.lines...)),
+			)
 		})
 	}
 }

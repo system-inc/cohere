@@ -156,7 +156,13 @@ var PreferAsConst = rule.Rule{
 // and appending `as const` leaves a destructure of a string, which is a different program and would
 // not compile. The absence of that input from upstream's fourteen fix vectors is the corpus saying
 // the same thing.
-func reportAnnotation(ruleContext rule.Context, name *ast.Node, typeNode *ast.Node, initializer *ast.Node, canRepair bool) {
+func reportAnnotation(
+	ruleContext rule.Context,
+	name *ast.Node,
+	typeNode *ast.Node,
+	initializer *ast.Node,
+	canRepair bool,
+) {
 	literalType := literalTypeRestatingValue(typeNode, initializer)
 	if literalType == nil {
 		return

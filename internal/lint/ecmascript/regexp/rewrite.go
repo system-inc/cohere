@@ -240,7 +240,11 @@ func rewrite(source string, options rewriteOptions) (string, bool, error) {
 				group := groups[last]
 				groups = groups[:last]
 				current = group.options
-				if checkGroupQuantifierError := checkGroupQuantifier(group.kind, source[i+size:], options); checkGroupQuantifierError != nil {
+				if checkGroupQuantifierError := checkGroupQuantifier(
+					group.kind,
+					source[i+size:],
+					options,
+				); checkGroupQuantifierError != nil {
 					return "", false, checkGroupQuantifierError
 				}
 			}

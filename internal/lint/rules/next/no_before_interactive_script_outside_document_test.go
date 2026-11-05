@@ -57,7 +57,12 @@ func TestNoBeforeInteractiveScriptOutsideDocumentIsSilentOnUpstreamPassCases(tes
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.Run(test, NoBeforeInteractiveScriptOutsideDocument, testCase.fileName, testCase.source)
+			result := rule_testing.Run(
+				test,
+				NoBeforeInteractiveScriptOutsideDocument,
+				testCase.fileName,
+				testCase.source,
+			)
 			rule_testing.ExpectClean(test, result)
 		})
 	}
@@ -107,7 +112,12 @@ func TestNoBeforeInteractiveScriptOutsideDocumentFiresOnUpstreamFailCases(test *
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.Run(test, NoBeforeInteractiveScriptOutsideDocument, testCase.fileName, testCase.source)
+			result := rule_testing.Run(
+				test,
+				NoBeforeInteractiveScriptOutsideDocument,
+				testCase.fileName,
+				testCase.source,
+			)
 			rule_testing.ExpectFindings(test, result, "noBeforeInteractiveScriptOutsideDocument")
 		})
 	}
@@ -164,7 +174,10 @@ func TestNoBeforeInteractiveScriptOutsideDocumentRendersItsMessage(test *testing
 		test.Fatalf("description: unexpected ending in %q", got.Description)
 	}
 	if strings.Contains(got.Description, "  ") {
-		test.Fatalf("description has a doubled space, which is how a concatenated string goes wrong: %q", got.Description)
+		test.Fatalf(
+			"description has a doubled space, which is how a concatenated string goes wrong: %q",
+			got.Description,
+		)
 	}
 }
 
@@ -324,7 +337,12 @@ func TestNoBeforeInteractiveScriptOutsideDocumentIsSilentOnCasesUpstreamDoesNotW
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.Run(test, NoBeforeInteractiveScriptOutsideDocument, testCase.fileName, testCase.source)
+			result := rule_testing.Run(
+				test,
+				NoBeforeInteractiveScriptOutsideDocument,
+				testCase.fileName,
+				testCase.source,
+			)
 			rule_testing.ExpectClean(test, result)
 		})
 	}
@@ -409,7 +427,12 @@ func TestNoBeforeInteractiveScriptOutsideDocumentFiresOnCasesUpstreamDoesNotWrit
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.Run(test, NoBeforeInteractiveScriptOutsideDocument, testCase.fileName, testCase.source)
+			result := rule_testing.Run(
+				test,
+				NoBeforeInteractiveScriptOutsideDocument,
+				testCase.fileName,
+				testCase.source,
+			)
 			rule_testing.ExpectFindings(test, result, "noBeforeInteractiveScriptOutsideDocument")
 		})
 	}

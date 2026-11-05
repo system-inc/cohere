@@ -67,20 +67,48 @@ func TestNoElseReturnFires(test *testing.T) {
 		{"function foo2() { if (true) { var x = bar; return x; } else { var y = baz; return y; } }", nil, 1},
 		{"function foo3() { if (true) return x; else return y; }", nil, 1},
 		{"function foo4() { if (true) { if (false) return x; else return y; } else { return z; } }", nil, 2},
-		{"function foo5() { if (true) { if (false) { if (true) return x; else { w = y; } } else { w = x; } } else { return z; } }", nil, 1},
-		{"function foo6() { if (true) { if (false) { if (true) return x; else return y; } } else { return z; } }", nil, 1},
-		{"function foo7() { if (true) { if (false) { if (true) return x; else return y; } return w; } else { return z; } }", nil, 2},
-		{"function foo8() { if (true) { if (false) { if (true) return x; else return y; } else { w = x; } } else { return z; } }", nil, 2},
+		{
+			"function foo5() { if (true) { if (false) { if (true) return x; else { w = y; } } else { w = x; } } else { return z; } }",
+			nil,
+			1,
+		},
+		{
+			"function foo6() { if (true) { if (false) { if (true) return x; else return y; } } else { return z; } }",
+			nil,
+			1,
+		},
+		{
+			"function foo7() { if (true) { if (false) { if (true) return x; else return y; } return w; } else { return z; } }",
+			nil,
+			2,
+		},
+		{
+			"function foo8() { if (true) { if (false) { if (true) return x; else return y; } else { w = x; } } else { return z; } }",
+			nil,
+			2,
+		},
 		{"function foo9() {if (x) { return true; } else if (y) { return true; } else { notAReturn(); } }", nil, 1},
-		{"function foo9a() {if (x) { return true; } else if (y) { return true; } else { notAReturn(); } }", &boolFalse, 1},
+		{
+			"function foo9a() {if (x) { return true; } else if (y) { return true; } else { notAReturn(); } }",
+			&boolFalse,
+			1,
+		},
 		{"function foo9b() {if (x) { return true; } if (y) { return true; } else { notAReturn(); } }", &boolFalse, 1},
 		{"function foo10() { if (foo) return bar; else (foo).bar(); }", nil, 1},
 		{"function foo13() { if (foo) return bar; \nelse { [1, 2, 3].map(foo) } }", nil, 1},
 		{"function foo14() { if (foo) return bar \nelse { baz(); } \n[1, 2, 3].map(foo) }", nil, 1},
 		{"function foo17() { if (foo) return bar \nelse { baz() } \nqaz() }", nil, 1},
 		{"function foo19() { if (true) { return x; } else if (false) { return y; } }", &boolFalse, 1},
-		{"function foo20() {if (x) { return true; } else if (y) { notAReturn() } else { notAReturn(); } }", &boolFalse, 1},
-		{"function foo21() { var x = true; if (x) { return x; } else if (x === false) { return false; } }", &boolFalse, 1},
+		{
+			"function foo20() {if (x) { return true; } else if (y) { notAReturn() } else { notAReturn(); } }",
+			&boolFalse,
+			1,
+		},
+		{
+			"function foo21() { var x = true; if (x) { return x; } else if (x === false) { return false; } }",
+			&boolFalse,
+			1,
+		},
 		{"function foo() { var a; if (bar) { return true; } else { var a; } }", nil, 1},
 		{"function foo() { if (bar) { var a; if (baz) { return true; } else { var a; } } }", nil, 1},
 		{"function foo() { var a; if (bar) { return true; } else { var a; } }", nil, 1},
@@ -90,7 +118,11 @@ func TestNoElseReturnFires(test *testing.T) {
 		{"function foo() { if (bar) { if (baz) { return true; } else { let a; } } a; }", nil, 1},
 		{"function foo() { if (bar) { if (baz) { return true; } else { let a; } } if (quux) { var a; } }", nil, 1},
 		{"function foo() { if (quux) { var a; } if (bar) { if (baz) { return true; } else { let a; } } }", nil, 1},
-		{"function foo() { if (bar) { if (baz) { return true; } else { let a; } } if (quux) { function a(){}  } }", nil, 1},
+		{
+			"function foo() { if (bar) { if (baz) { return true; } else { let a; } } if (quux) { function a(){}  } }",
+			nil,
+			1,
+		},
 		{"function foo() { if (bar) { if (baz) { return true; } else { let a; } } function a(){} }", nil, 1},
 		{"if (foo) { return true; } else { let a; }", nil, 1},
 		{"function foo11() { if (foo) return bar \nelse { [1, 2, 3].map(foo) } }", nil, 1},
@@ -114,7 +146,11 @@ func TestNoElseReturnFires(test *testing.T) {
 		{"function foo() { if (bar) { return true; } else { let a; }  while (baz) { var a; } }", nil, 1},
 		{"function foo(a) { if (bar) { return true; } else { let a; } }", nil, 1},
 		{"function foo(a = 1) { if (bar) { return true; } else { let a; } }", nil, 1},
-		{"function foo(a, b = a) { if (bar) { return true; } else { let a; }  if (bar) { return true; } else { let b; }}", nil, 2},
+		{
+			"function foo(a, b = a) { if (bar) { return true; } else { let a; }  if (bar) { return true; } else { let b; }}",
+			nil,
+			2,
+		},
 		{"function foo(...args) { if (bar) { return true; } else { let args; } }", nil, 1},
 		{"function foo() { try {} catch (a) { if (bar) { return true; } else { let a; } } }", nil, 1},
 		{"function foo() { try {} catch ({bar, a = 1}) { if (baz) { return true; } else { let a; } } }", nil, 1},
@@ -169,8 +205,14 @@ func TestNoElseReturnStaysSilent(test *testing.T) {
 		{"function foo() {if (x) { notAReturn(); } else if (y) { return true; } else { notAReturn(); } }", nil},
 		{"function foo() {if (x) { return true; } else if (y) { notAReturn() } else { notAReturn(); } }", nil},
 		{"if (0) { if (0) {} else {} } else {}", nil},
-		{"\n            function foo() {\n                if (foo)\n                    if (bar) return;\n                    else baz;\n                else qux;\n            }\n        ", nil},
-		{"\n            function foo() {\n                while (foo)\n                    if (bar) return;\n                    else baz;\n            }\n        ", nil},
+		{
+			"\n            function foo() {\n                if (foo)\n                    if (bar) return;\n                    else baz;\n                else qux;\n            }\n        ",
+			nil,
+		},
+		{
+			"\n            function foo() {\n                while (foo)\n                    if (bar) return;\n                    else baz;\n            }\n        ",
+			nil,
+		},
 		{"function foo19() { if (true) { return x; } else if (false) { return y; } }", &boolTrue},
 		{"function foo20() {if (x) { return true; } else if (y) { notAReturn() } else { notAReturn(); } }", &boolTrue},
 		{"function foo21() { var x = true; if (x) { return x; } else if (x === false) { return false; } }", &boolTrue},
@@ -211,27 +253,111 @@ func TestNoElseReturnFixes(test *testing.T) {
 		wantSource  string
 		allowElseIf *bool
 	}{
-		{"function foo1() { if (true) { return x; } else { return y; } }", "function foo1() { if (true) { return x; }  return y;  }", nil},
-		{"function foo2() { if (true) { var x = bar; return x; } else { var y = baz; return y; } }", "function foo2() { if (true) { var x = bar; return x; }  var y = baz; return y;  }", nil},
-		{"function foo3() { if (true) return x; else return y; }", "function foo3() { if (true) return x; return y; }", nil},
-		{"function foo5() { if (true) { if (false) { if (true) return x; else { w = y; } } else { w = x; } } else { return z; } }", "function foo5() { if (true) { if (false) { if (true) return x;  w = y;  } else { w = x; } } else { return z; } }", nil},
-		{"function foo6() { if (true) { if (false) { if (true) return x; else return y; } } else { return z; } }", "function foo6() { if (true) { if (false) { if (true) return x; return y; } } else { return z; } }", nil},
-		{"function foo9() {if (x) { return true; } else if (y) { return true; } else { notAReturn(); } }", "function foo9() {if (x) { return true; } else if (y) { return true; }  notAReturn();  }", nil},
-		{"function foo9a() {if (x) { return true; } else if (y) { return true; } else { notAReturn(); } }", "function foo9a() {if (x) { return true; } if (y) { return true; } else { notAReturn(); } }", &boolFalse},
-		{"function foo9b() {if (x) { return true; } if (y) { return true; } else { notAReturn(); } }", "function foo9b() {if (x) { return true; } if (y) { return true; }  notAReturn();  }", &boolFalse},
-		{"function foo10() { if (foo) return bar; else (foo).bar(); }", "function foo10() { if (foo) return bar; (foo).bar(); }", nil},
-		{"function foo13() { if (foo) return bar; \nelse { [1, 2, 3].map(foo) } }", "function foo13() { if (foo) return bar; \n [1, 2, 3].map(foo)  }", nil},
-		{"function foo14() { if (foo) return bar \nelse { baz(); } \n[1, 2, 3].map(foo) }", "function foo14() { if (foo) return bar \n baz();  \n[1, 2, 3].map(foo) }", nil},
-		{"function foo17() { if (foo) return bar \nelse { baz() } \nqaz() }", "function foo17() { if (foo) return bar \n baz()  \nqaz() }", nil},
-		{"function foo19() { if (true) { return x; } else if (false) { return y; } }", "function foo19() { if (true) { return x; } if (false) { return y; } }", &boolFalse},
-		{"function foo20() {if (x) { return true; } else if (y) { notAReturn() } else { notAReturn(); } }", "function foo20() {if (x) { return true; } if (y) { notAReturn() } else { notAReturn(); } }", &boolFalse},
-		{"function foo21() { var x = true; if (x) { return x; } else if (x === false) { return false; } }", "function foo21() { var x = true; if (x) { return x; } if (x === false) { return false; } }", &boolFalse},
-		{"function foo() { var a; if (bar) { return true; } else { var a; } }", "function foo() { var a; if (bar) { return true; }  var a;  }", nil},
-		{"function foo() { if (bar) { var a; if (baz) { return true; } else { var a; } } }", "function foo() { if (bar) { var a; if (baz) { return true; }  var a;  } }", nil},
-		{"function foo() { var a; if (bar) { return true; } else { var a; } }", "function foo() { var a; if (bar) { return true; }  var a;  }", nil},
-		{"function foo() { if (bar) { var a; if (baz) { return true; } else { var a; } } }", "function foo() { if (bar) { var a; if (baz) { return true; }  var a;  } }", nil},
-		{"function foo() { if (bar) { if (baz) { return true; } else { let a; } } a; }", "function foo() { if (bar) { if (baz) { return true; }  let a;  } a; }", nil},
-		{"function foo() { if (bar) { if (baz) { return true; } else { let a; } } if (quux) { function a(){}  } }", "function foo() { if (bar) { if (baz) { return true; }  let a;  } if (quux) { function a(){}  } }", nil},
+		{
+			"function foo1() { if (true) { return x; } else { return y; } }",
+			"function foo1() { if (true) { return x; }  return y;  }",
+			nil,
+		},
+		{
+			"function foo2() { if (true) { var x = bar; return x; } else { var y = baz; return y; } }",
+			"function foo2() { if (true) { var x = bar; return x; }  var y = baz; return y;  }",
+			nil,
+		},
+		{
+			"function foo3() { if (true) return x; else return y; }",
+			"function foo3() { if (true) return x; return y; }",
+			nil,
+		},
+		{
+			"function foo5() { if (true) { if (false) { if (true) return x; else { w = y; } } else { w = x; } } else { return z; } }",
+			"function foo5() { if (true) { if (false) { if (true) return x;  w = y;  } else { w = x; } } else { return z; } }",
+			nil,
+		},
+		{
+			"function foo6() { if (true) { if (false) { if (true) return x; else return y; } } else { return z; } }",
+			"function foo6() { if (true) { if (false) { if (true) return x; return y; } } else { return z; } }",
+			nil,
+		},
+		{
+			"function foo9() {if (x) { return true; } else if (y) { return true; } else { notAReturn(); } }",
+			"function foo9() {if (x) { return true; } else if (y) { return true; }  notAReturn();  }",
+			nil,
+		},
+		{
+			"function foo9a() {if (x) { return true; } else if (y) { return true; } else { notAReturn(); } }",
+			"function foo9a() {if (x) { return true; } if (y) { return true; } else { notAReturn(); } }",
+			&boolFalse,
+		},
+		{
+			"function foo9b() {if (x) { return true; } if (y) { return true; } else { notAReturn(); } }",
+			"function foo9b() {if (x) { return true; } if (y) { return true; }  notAReturn();  }",
+			&boolFalse,
+		},
+		{
+			"function foo10() { if (foo) return bar; else (foo).bar(); }",
+			"function foo10() { if (foo) return bar; (foo).bar(); }",
+			nil,
+		},
+		{
+			"function foo13() { if (foo) return bar; \nelse { [1, 2, 3].map(foo) } }",
+			"function foo13() { if (foo) return bar; \n [1, 2, 3].map(foo)  }",
+			nil,
+		},
+		{
+			"function foo14() { if (foo) return bar \nelse { baz(); } \n[1, 2, 3].map(foo) }",
+			"function foo14() { if (foo) return bar \n baz();  \n[1, 2, 3].map(foo) }",
+			nil,
+		},
+		{
+			"function foo17() { if (foo) return bar \nelse { baz() } \nqaz() }",
+			"function foo17() { if (foo) return bar \n baz()  \nqaz() }",
+			nil,
+		},
+		{
+			"function foo19() { if (true) { return x; } else if (false) { return y; } }",
+			"function foo19() { if (true) { return x; } if (false) { return y; } }",
+			&boolFalse,
+		},
+		{
+			"function foo20() {if (x) { return true; } else if (y) { notAReturn() } else { notAReturn(); } }",
+			"function foo20() {if (x) { return true; } if (y) { notAReturn() } else { notAReturn(); } }",
+			&boolFalse,
+		},
+		{
+			"function foo21() { var x = true; if (x) { return x; } else if (x === false) { return false; } }",
+			"function foo21() { var x = true; if (x) { return x; } if (x === false) { return false; } }",
+			&boolFalse,
+		},
+		{
+			"function foo() { var a; if (bar) { return true; } else { var a; } }",
+			"function foo() { var a; if (bar) { return true; }  var a;  }",
+			nil,
+		},
+		{
+			"function foo() { if (bar) { var a; if (baz) { return true; } else { var a; } } }",
+			"function foo() { if (bar) { var a; if (baz) { return true; }  var a;  } }",
+			nil,
+		},
+		{
+			"function foo() { var a; if (bar) { return true; } else { var a; } }",
+			"function foo() { var a; if (bar) { return true; }  var a;  }",
+			nil,
+		},
+		{
+			"function foo() { if (bar) { var a; if (baz) { return true; } else { var a; } } }",
+			"function foo() { if (bar) { var a; if (baz) { return true; }  var a;  } }",
+			nil,
+		},
+		{
+			"function foo() { if (bar) { if (baz) { return true; } else { let a; } } a; }",
+			"function foo() { if (bar) { if (baz) { return true; }  let a;  } a; }",
+			nil,
+		},
+		{
+			"function foo() { if (bar) { if (baz) { return true; } else { let a; } } if (quux) { function a(){}  } }",
+			"function foo() { if (bar) { if (baz) { return true; }  let a;  } if (quux) { function a(){}  } }",
+			nil,
+		},
 		{"if (foo) { return true; } else { let a; }", "if (foo) { return true; }  let a; ", nil},
 	}
 
@@ -293,7 +419,11 @@ func TestNoElseReturnDeclinesToFix(test *testing.T) {
 		{"function foo() { if (bar) { return true; } else { let a; }  while (baz) { var a; } }", nil, 1},
 		{"function foo(a) { if (bar) { return true; } else { let a; } }", nil, 1},
 		{"function foo(a = 1) { if (bar) { return true; } else { let a; } }", nil, 1},
-		{"function foo(a, b = a) { if (bar) { return true; } else { let a; }  if (bar) { return true; } else { let b; }}", nil, 2},
+		{
+			"function foo(a, b = a) { if (bar) { return true; } else { let a; }  if (bar) { return true; } else { let b; }}",
+			nil,
+			2,
+		},
 		{"function foo(...args) { if (bar) { return true; } else { let args; } }", nil, 1},
 		{"function foo() { try {} catch (a) { if (bar) { return true; } else { let a; } } }", nil, 1},
 		{"function foo() { try {} catch ({bar, a = 1}) { if (baz) { return true; } else { let a; } } }", nil, 1},
@@ -357,11 +487,26 @@ func TestNoElseReturnDivergesOnScopeDepth(test *testing.T) {
 		sourceText     string
 		upstreamOutput string
 	}{
-		{"function foo() {let a; if (bar) { if (baz) { return true; } else { let a; } } }", "function foo() {let a; if (bar) { if (baz) { return true; }  let a;  } }"},
-		{"function foo() { try {} catch (a) { if (bar) { if (baz) { return true; } else { let a; } } } }", "function foo() { try {} catch (a) { if (bar) { if (baz) { return true; }  let a;  } } }"},
-		{"function foo() { if (bar) { if (baz) { return true; } else { let a; } } if (quux) { var a; } }", "function foo() { if (bar) { if (baz) { return true; }  let a;  } if (quux) { var a; } }"},
-		{"function foo() { if (quux) { var a; } if (bar) { if (baz) { return true; } else { let a; } } }", "function foo() { if (quux) { var a; } if (bar) { if (baz) { return true; }  let a;  } }"},
-		{"function foo() { if (bar) { if (baz) { return true; } else { let a; } } function a(){} }", "function foo() { if (bar) { if (baz) { return true; }  let a;  } function a(){} }"},
+		{
+			"function foo() {let a; if (bar) { if (baz) { return true; } else { let a; } } }",
+			"function foo() {let a; if (bar) { if (baz) { return true; }  let a;  } }",
+		},
+		{
+			"function foo() { try {} catch (a) { if (bar) { if (baz) { return true; } else { let a; } } } }",
+			"function foo() { try {} catch (a) { if (bar) { if (baz) { return true; }  let a;  } } }",
+		},
+		{
+			"function foo() { if (bar) { if (baz) { return true; } else { let a; } } if (quux) { var a; } }",
+			"function foo() { if (bar) { if (baz) { return true; }  let a;  } if (quux) { var a; } }",
+		},
+		{
+			"function foo() { if (quux) { var a; } if (bar) { if (baz) { return true; } else { let a; } } }",
+			"function foo() { if (quux) { var a; } if (bar) { if (baz) { return true; }  let a;  } }",
+		},
+		{
+			"function foo() { if (bar) { if (baz) { return true; } else { let a; } } function a(){} }",
+			"function foo() { if (bar) { if (baz) { return true; }  let a;  } function a(){} }",
+		},
 	}
 
 	for _, testCase := range cases {

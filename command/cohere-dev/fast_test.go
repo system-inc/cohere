@@ -29,10 +29,14 @@ import (
 // Not parallel: the package's other tests beside it would compete for the cores and stretch what it logs.
 func TestEveryLandingGateOnlyEntryStillEarnsItsPlace(test *testing.T) {
 	if os.Getenv(fastTierVariable) != "" {
-		test.Skip("measuring the landing gate's entries is the landing gate's job, left to it by cohere-dev test --fast")
+		test.Skip(
+			"measuring the landing gate's entries is the landing gate's job, left to it by cohere-dev test --fast",
+		)
 	}
 	if os.Getenv("CI") != "" {
-		test.Skip("CI is set: this measures the desk machine's CPU budget for the edit loop, which a runner's CPU says nothing about, so it runs on the desk")
+		test.Skip(
+			"CI is set: this measures the desk machine's CPU budget for the edit loop, which a runner's CPU says nothing about, so it runs on the desk",
+		)
 	}
 	root, err := filepath.Abs(filepath.Join("..", ".."))
 	if err != nil {
@@ -52,8 +56,12 @@ func TestEveryLandingGateOnlyEntryStillEarnsItsPlace(test *testing.T) {
 				test.Fatalf("%s is listed without its measured wall, CPU or reason", entry.pattern)
 			}
 			if entry.cpuSeconds <= fastBudgetCPUSeconds {
-				test.Fatalf("%s is recorded at %.1fs of CPU, at or under the fast budget of %.0fs, so it belongs in the fast tier",
-					entry.pattern, entry.cpuSeconds, float64(fastBudgetCPUSeconds))
+				test.Fatalf(
+					"%s is recorded at %.1fs of CPU, at or under the fast budget of %.0fs, so it belongs in the fast tier",
+					entry.pattern,
+					entry.cpuSeconds,
+					float64(fastBudgetCPUSeconds),
+				)
 			}
 			if entry.reads.Name != "" {
 				entry.reads.Root(test)
@@ -63,11 +71,23 @@ func TestEveryLandingGateOnlyEntryStillEarnsItsPlace(test *testing.T) {
 				fastWall, fastCPU := measureTests(test, root, entry.pattern, []string{entry.skippedBy + "=1"})
 				wall, cpu = wall-fastWall, cpu-fastCPU
 			}
-			test.Logf("%s: %.1fs wall, %.1fs CPU now (recorded %.1fs, %.1fs)", entry.pattern, wall, cpu, entry.wallSeconds, entry.cpuSeconds)
+			test.Logf(
+				"%s: %.1fs wall, %.1fs CPU now (recorded %.1fs, %.1fs)",
+				entry.pattern,
+				wall,
+				cpu,
+				entry.wallSeconds,
+				entry.cpuSeconds,
+			)
 			if cpu <= fastEvictionCPUSeconds {
-				test.Errorf("%s costs %.1fs of CPU alone (%.1fs of wall), at or under the eviction bar of %.0fs of CPU, so "+
-					"it belongs back in the fast tier: remove it from landingGateOnly", entry.pattern, cpu, wall,
-					float64(fastEvictionCPUSeconds))
+				test.Errorf(
+					"%s costs %.1fs of CPU alone (%.1fs of wall), at or under the eviction bar of %.0fs of CPU, so "+
+						"it belongs back in the fast tier: remove it from landingGateOnly",
+					entry.pattern,
+					cpu,
+					wall,
+					float64(fastEvictionCPUSeconds),
+				)
 			}
 		})
 	}
@@ -140,7 +160,13 @@ func TestAnInnerRunInheritsTheOuterDeadline(test *testing.T) {
 		{now.Add(10 * time.Second), true, "1s"},
 	} {
 		if got := inheritedTimeout(sample.deadline, sample.hasDeadline, now); got != sample.want {
-			test.Errorf("a deadline %v ahead (has one: %v) gave -timeout=%s, want %s", sample.deadline.Sub(now), sample.hasDeadline, got, sample.want)
+			test.Errorf(
+				"a deadline %v ahead (has one: %v) gave -timeout=%s, want %s",
+				sample.deadline.Sub(now),
+				sample.hasDeadline,
+				got,
+				sample.want,
+			)
 		}
 	}
 }
@@ -173,7 +199,11 @@ func TestTheFastTierListsPackagesInTheRunsEnvironment(test *testing.T) {
 // the cache the fast tier rests on, across nearly every package, with no slot.
 func TestTheFastTierRefusesCountOnce(test *testing.T) {
 	test.Parallel()
-	for _, arguments := range [][]string{{"--fast", "-count=1"}, {"--fast", "-count", "1"}, {"--fast", "-v", "--count=1"}} {
+	for _, arguments := range [][]string{
+		{"--fast", "-count=1"},
+		{"--fast", "-count", "1"},
+		{"--fast", "-v", "--count=1"},
+	} {
 		// --full-priority, so the refusal is all this asks of run: nothing nices this test process.
 		if code := run("test", append([]string{fullPriorityFlag}, arguments...)); code != 2 {
 			test.Errorf("cohere-dev test %v exited %d, want 2, the refusal", arguments, code)

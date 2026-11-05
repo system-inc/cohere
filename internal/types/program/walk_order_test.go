@@ -83,7 +83,10 @@ func TestWalkReturnsFindingsInFileThenPositionOrder(test *testing.T) {
 				collect(node)
 				slices.Reverse(declarations)
 				for _, declaration := range declarations {
-					ruleContext.ReportNode(declaration, rule.Message{Id: "only", Description: declarationName(declaration)})
+					ruleContext.ReportNode(
+						declaration,
+						rule.Message{Id: "only", Description: declarationName(declaration)},
+					)
 				}
 			}}
 		},

@@ -379,7 +379,10 @@ func statelessComponentFor(ruleContext rule.Context, node *ast.Node, detectedNam
 
 	// `React.memo(...)` and `React.forwardRef(...)`, including the destructured, imported, required
 	// and aliased spellings the corpus writes in eleven separate cases. Reports on the call.
-	if wrapper := pragmaComponentWrapperFor(node, detectedNames); wrapper != nil && returnsJsxOrNull(ruleContext, node) {
+	if wrapper := pragmaComponentWrapperFor(
+		node,
+		detectedNames,
+	); wrapper != nil && returnsJsxOrNull(ruleContext, node) {
 		return wrapper, true
 	}
 
@@ -717,7 +720,8 @@ func isJsxValue(ruleContext rule.Context, node *ast.Node, acceptNull bool) bool 
 
 	case ast.KindConditionalExpression:
 		conditional := node.AsConditionalExpression()
-		return isJsxValue(ruleContext, conditional.WhenTrue, acceptNull) || isJsxValue(ruleContext, conditional.WhenFalse, acceptNull)
+		return isJsxValue(ruleContext, conditional.WhenTrue, acceptNull) ||
+			isJsxValue(ruleContext, conditional.WhenFalse, acceptNull)
 
 	case ast.KindBinaryExpression:
 		binary := node.AsBinaryExpression()

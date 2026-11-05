@@ -52,8 +52,16 @@ func TestNoInnerDeclarationsStaysSilent(test *testing.T) {
 		{name: "valid5", source: "function decl() { var fn = function expr() { }; }", optionsJson: ""},
 		{name: "valid6", source: "function decl(arg) { var fn; if (arg) { fn = function() { }; } }", optionsJson: ""},
 		{name: "valid7", source: "var x = {doSomething() {function doSomethingElse() {}}}", optionsJson: ""},
-		{name: "valid8", source: "function decl(arg) { var fn; if (arg) { fn = function expr() { }; } }", optionsJson: ""},
-		{name: "valid9", source: "function decl(arg) { var fn; if (arg) { fn = function expr() { }; } }", optionsJson: ""},
+		{
+			name:        "valid8",
+			source:      "function decl(arg) { var fn; if (arg) { fn = function expr() { }; } }",
+			optionsJson: "",
+		},
+		{
+			name:        "valid9",
+			source:      "function decl(arg) { var fn; if (arg) { fn = function expr() { }; } }",
+			optionsJson: "",
+		},
 		{name: "valid10", source: "if (test) { var foo; }", optionsJson: ""},
 		{name: "valid11", source: "if (test) { let x = 1; }", optionsJson: `["both"]`},
 		{name: "valid12", source: "if (test) { const x = 1; }", optionsJson: `["both"]`},
@@ -79,13 +87,37 @@ func TestNoInnerDeclarationsStaysSilent(test *testing.T) {
 		{name: "valid30", source: "class C { method() { var x; } }", optionsJson: `["both"]`},
 		{name: "valid31", source: "class C { static { function foo() {} } }", optionsJson: `["both"]`},
 		{name: "valid32", source: "class C { static { var x; } }", optionsJson: `["both"]`},
-		{name: "valid33", source: "'use strict' \n if (test) { function doSomething() { } }", optionsJson: "[\"functions\", {\"blockScopedFunctions\": \"allow\"}]"},
-		{name: "valid34", source: "'use strict' \n if (test) { function doSomething() { } }", optionsJson: `["functions"]`},
-		{name: "valid35", source: "function foo() {'use strict' \n if (test) { function doSomething() { } } }", optionsJson: "[\"functions\", {\"blockScopedFunctions\": \"allow\"}]"},
+		{
+			name:        "valid33",
+			source:      "'use strict' \n if (test) { function doSomething() { } }",
+			optionsJson: "[\"functions\", {\"blockScopedFunctions\": \"allow\"}]",
+		},
+		{
+			name:        "valid34",
+			source:      "'use strict' \n if (test) { function doSomething() { } }",
+			optionsJson: `["functions"]`,
+		},
+		{
+			name:        "valid35",
+			source:      "function foo() {'use strict' \n if (test) { function doSomething() { } } }",
+			optionsJson: "[\"functions\", {\"blockScopedFunctions\": \"allow\"}]",
+		},
 		// Upstream sets sourceType module for this case; expressed by making the file one.
-		{name: "valid36", source: "export {};\nfunction foo() { { function bar() { } } }", optionsJson: "[\"functions\", {\"blockScopedFunctions\": \"allow\"}]"},
-		{name: "valid37", source: "class C { method() { if(test) { function somethingElse() { } } } }", optionsJson: "[\"functions\", {\"blockScopedFunctions\": \"allow\"}]"},
-		{name: "valid38", source: "const C = class { method() { if(test) { function somethingElse() { } } } }", optionsJson: "[\"functions\", {\"blockScopedFunctions\": \"allow\"}]"},
+		{
+			name:        "valid36",
+			source:      "export {};\nfunction foo() { { function bar() { } } }",
+			optionsJson: "[\"functions\", {\"blockScopedFunctions\": \"allow\"}]",
+		},
+		{
+			name:        "valid37",
+			source:      "class C { method() { if(test) { function somethingElse() { } } } }",
+			optionsJson: "[\"functions\", {\"blockScopedFunctions\": \"allow\"}]",
+		},
+		{
+			name:        "valid38",
+			source:      "const C = class { method() { if(test) { function somethingElse() { } } } }",
+			optionsJson: "[\"functions\", {\"blockScopedFunctions\": \"allow\"}]",
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -108,33 +140,168 @@ func TestNoInnerDeclarationsFires(test *testing.T) {
 		optionsJson string
 		want        [][2]string
 	}{
-		{name: "invalid0", source: "if (test) { function doSomething() { } }", optionsJson: `["both"]`, want: [][2]string{{"function", "program"}}},
-		{name: "invalid1", source: "if (foo) var a; ", optionsJson: `["both"]`, want: [][2]string{{"variable", "program"}}},
-		{name: "invalid2", source: "if (foo) /* some comments */ var a; ", optionsJson: `["both"]`, want: [][2]string{{"variable", "program"}}},
-		{name: "invalid3", source: "if (foo){ function f(){ if(bar){ var a; } } }", optionsJson: `["both"]`, want: [][2]string{{"function", "program"}, {"variable", "function body"}}},
-		{name: "invalid4", source: "if (foo) function f(){ if(bar) var a; }", optionsJson: `["both"]`, want: [][2]string{{"function", "program"}, {"variable", "function body"}}},
-		{name: "invalid5", source: "if (foo) { var fn = function(){} } ", optionsJson: `["both"]`, want: [][2]string{{"variable", "program"}}},
-		{name: "invalid6", source: "if (foo)  function f(){} ", optionsJson: "", want: [][2]string{{"function", "program"}}},
-		{name: "invalid7", source: "function bar() { if (foo) function f(){}; }", optionsJson: `["both"]`, want: [][2]string{{"function", "function body"}}},
-		{name: "invalid8", source: "function bar() { if (foo) var a; }", optionsJson: `["both"]`, want: [][2]string{{"variable", "function body"}}},
-		{name: "invalid9", source: "if (foo) { var a; }", optionsJson: `["both"]`, want: [][2]string{{"variable", "program"}}},
-		{name: "invalid10", source: "function doSomething() { do { function somethingElse() { } } while (test); }", optionsJson: "", want: [][2]string{{"function", "function body"}}},
-		{name: "invalid11", source: "(function() { if (test) { function doSomething() { } } }());", optionsJson: "", want: [][2]string{{"function", "function body"}}},
-		{name: "invalid12", source: "while (test) { var foo; }", optionsJson: `["both"]`, want: [][2]string{{"variable", "program"}}},
-		{name: "invalid13", source: "function doSomething() { if (test) { var foo = 42; } }", optionsJson: `["both"]`, want: [][2]string{{"variable", "function body"}}},
-		{name: "invalid14", source: "(function() { if (test) { var foo; } }());", optionsJson: `["both"]`, want: [][2]string{{"variable", "function body"}}},
-		{name: "invalid15", source: "const doSomething = () => { if (test) { var foo = 42; } }", optionsJson: `["both"]`, want: [][2]string{{"variable", "function body"}}},
-		{name: "invalid16", source: "class C { method() { if(test) { var foo; } } }", optionsJson: `["both"]`, want: [][2]string{{"variable", "function body"}}},
-		{name: "invalid17", source: "class C { static { if (test) { var foo; } } }", optionsJson: `["both"]`, want: [][2]string{{"variable", "class static block body"}}},
-		{name: "invalid18", source: "class C { static { if (test) { function foo() {} } } }", optionsJson: "[\"both\", {\"blockScopedFunctions\": \"disallow\"}]", want: [][2]string{{"function", "class static block body"}}},
-		{name: "invalid19", source: "class C { static { if (test) { if (anotherTest) { var foo; } } } }", optionsJson: `["both"]`, want: [][2]string{{"variable", "class static block body"}}},
-		{name: "invalid21", source: "if (test) { function doSomething() { } }", optionsJson: "[\"both\", {\"blockScopedFunctions\": \"disallow\"}]", want: [][2]string{{"function", "program"}}},
-		{name: "invalid22", source: "'use strict' \n if (test) { function doSomething() { } }", optionsJson: "[\"both\", {\"blockScopedFunctions\": \"disallow\"}]", want: [][2]string{{"function", "program"}}},
-		{name: "invalid23", source: "'use strict' \n if (test) { function doSomething() { } }", optionsJson: "[\"both\", {\"blockScopedFunctions\": \"disallow\"}]", want: [][2]string{{"function", "program"}}},
-		{name: "invalid25", source: "function foo() {'use strict' \n { function bar() { } } }", optionsJson: "[\"both\", {\"blockScopedFunctions\": \"disallow\"}]", want: [][2]string{{"function", "function body"}}},
-		{name: "invalid26", source: "function foo() {'use strict' \n { function bar() { } } }", optionsJson: "[\"both\", {\"blockScopedFunctions\": \"disallow\"}]", want: [][2]string{{"function", "function body"}}},
-		{name: "invalid27", source: "function doSomething() { 'use strict' \n do { function somethingElse() { } } while (test); }", optionsJson: "[\"both\", {\"blockScopedFunctions\": \"disallow\"}]", want: [][2]string{{"function", "function body"}}},
-		{name: "invalid28", source: "{ function foo () {'use strict' \n console.log('foo called'); } }", optionsJson: `["both"]`, want: [][2]string{{"function", "program"}}},
+		{
+			name:        "invalid0",
+			source:      "if (test) { function doSomething() { } }",
+			optionsJson: `["both"]`,
+			want:        [][2]string{{"function", "program"}},
+		},
+		{
+			name:        "invalid1",
+			source:      "if (foo) var a; ",
+			optionsJson: `["both"]`,
+			want:        [][2]string{{"variable", "program"}},
+		},
+		{
+			name:        "invalid2",
+			source:      "if (foo) /* some comments */ var a; ",
+			optionsJson: `["both"]`,
+			want:        [][2]string{{"variable", "program"}},
+		},
+		{
+			name:        "invalid3",
+			source:      "if (foo){ function f(){ if(bar){ var a; } } }",
+			optionsJson: `["both"]`,
+			want:        [][2]string{{"function", "program"}, {"variable", "function body"}},
+		},
+		{
+			name:        "invalid4",
+			source:      "if (foo) function f(){ if(bar) var a; }",
+			optionsJson: `["both"]`,
+			want:        [][2]string{{"function", "program"}, {"variable", "function body"}},
+		},
+		{
+			name:        "invalid5",
+			source:      "if (foo) { var fn = function(){} } ",
+			optionsJson: `["both"]`,
+			want:        [][2]string{{"variable", "program"}},
+		},
+		{
+			name:        "invalid6",
+			source:      "if (foo)  function f(){} ",
+			optionsJson: "",
+			want:        [][2]string{{"function", "program"}},
+		},
+		{
+			name:        "invalid7",
+			source:      "function bar() { if (foo) function f(){}; }",
+			optionsJson: `["both"]`,
+			want:        [][2]string{{"function", "function body"}},
+		},
+		{
+			name:        "invalid8",
+			source:      "function bar() { if (foo) var a; }",
+			optionsJson: `["both"]`,
+			want:        [][2]string{{"variable", "function body"}},
+		},
+		{
+			name:        "invalid9",
+			source:      "if (foo) { var a; }",
+			optionsJson: `["both"]`,
+			want:        [][2]string{{"variable", "program"}},
+		},
+		{
+			name:        "invalid10",
+			source:      "function doSomething() { do { function somethingElse() { } } while (test); }",
+			optionsJson: "",
+			want:        [][2]string{{"function", "function body"}},
+		},
+		{
+			name:        "invalid11",
+			source:      "(function() { if (test) { function doSomething() { } } }());",
+			optionsJson: "",
+			want:        [][2]string{{"function", "function body"}},
+		},
+		{
+			name:        "invalid12",
+			source:      "while (test) { var foo; }",
+			optionsJson: `["both"]`,
+			want:        [][2]string{{"variable", "program"}},
+		},
+		{
+			name:        "invalid13",
+			source:      "function doSomething() { if (test) { var foo = 42; } }",
+			optionsJson: `["both"]`,
+			want:        [][2]string{{"variable", "function body"}},
+		},
+		{
+			name:        "invalid14",
+			source:      "(function() { if (test) { var foo; } }());",
+			optionsJson: `["both"]`,
+			want:        [][2]string{{"variable", "function body"}},
+		},
+		{
+			name:        "invalid15",
+			source:      "const doSomething = () => { if (test) { var foo = 42; } }",
+			optionsJson: `["both"]`,
+			want:        [][2]string{{"variable", "function body"}},
+		},
+		{
+			name:        "invalid16",
+			source:      "class C { method() { if(test) { var foo; } } }",
+			optionsJson: `["both"]`,
+			want:        [][2]string{{"variable", "function body"}},
+		},
+		{
+			name:        "invalid17",
+			source:      "class C { static { if (test) { var foo; } } }",
+			optionsJson: `["both"]`,
+			want:        [][2]string{{"variable", "class static block body"}},
+		},
+		{
+			name:        "invalid18",
+			source:      "class C { static { if (test) { function foo() {} } } }",
+			optionsJson: "[\"both\", {\"blockScopedFunctions\": \"disallow\"}]",
+			want:        [][2]string{{"function", "class static block body"}},
+		},
+		{
+			name:        "invalid19",
+			source:      "class C { static { if (test) { if (anotherTest) { var foo; } } } }",
+			optionsJson: `["both"]`,
+			want:        [][2]string{{"variable", "class static block body"}},
+		},
+		{
+			name:        "invalid21",
+			source:      "if (test) { function doSomething() { } }",
+			optionsJson: "[\"both\", {\"blockScopedFunctions\": \"disallow\"}]",
+			want:        [][2]string{{"function", "program"}},
+		},
+		{
+			name:        "invalid22",
+			source:      "'use strict' \n if (test) { function doSomething() { } }",
+			optionsJson: "[\"both\", {\"blockScopedFunctions\": \"disallow\"}]",
+			want:        [][2]string{{"function", "program"}},
+		},
+		{
+			name:        "invalid23",
+			source:      "'use strict' \n if (test) { function doSomething() { } }",
+			optionsJson: "[\"both\", {\"blockScopedFunctions\": \"disallow\"}]",
+			want:        [][2]string{{"function", "program"}},
+		},
+		{
+			name:        "invalid25",
+			source:      "function foo() {'use strict' \n { function bar() { } } }",
+			optionsJson: "[\"both\", {\"blockScopedFunctions\": \"disallow\"}]",
+			want:        [][2]string{{"function", "function body"}},
+		},
+		{
+			name:        "invalid26",
+			source:      "function foo() {'use strict' \n { function bar() { } } }",
+			optionsJson: "[\"both\", {\"blockScopedFunctions\": \"disallow\"}]",
+			want:        [][2]string{{"function", "function body"}},
+		},
+		{
+			name:        "invalid27",
+			source:      "function doSomething() { 'use strict' \n do { function somethingElse() { } } while (test); }",
+			optionsJson: "[\"both\", {\"blockScopedFunctions\": \"disallow\"}]",
+			want:        [][2]string{{"function", "function body"}},
+		},
+		{
+			name:        "invalid28",
+			source:      "{ function foo () {'use strict' \n console.log('foo called'); } }",
+			optionsJson: `["both"]`,
+			want:        [][2]string{{"function", "program"}},
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
@@ -209,7 +376,9 @@ func TestDecodeNoInnerDeclarationsOptions(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			decoded, decodeNoInnerDeclarationsOptionsError := DecodeNoInnerDeclarationsOptions([]byte(testCase.optionsJson))
+			decoded, decodeNoInnerDeclarationsOptionsError := DecodeNoInnerDeclarationsOptions(
+				[]byte(testCase.optionsJson),
+			)
 			if decodeNoInnerDeclarationsOptionsError != nil {
 				test.Fatalf("decoding %q: %v", testCase.optionsJson, decodeNoInnerDeclarationsOptionsError)
 			}
@@ -239,7 +408,9 @@ func TestDecodeNoInnerDeclarationsOptions(test *testing.T) {
 		`["both", {"blockScopedFunction": "allow"}]`,
 		`["both", {"blockScopedFunctions": "allow"}, "functions"]`,
 	} {
-		if _, decodeNoInnerDeclarationsOptionsError := DecodeNoInnerDeclarationsOptions([]byte(bad)); decodeNoInnerDeclarationsOptionsError == nil {
+		if _, decodeNoInnerDeclarationsOptionsError := DecodeNoInnerDeclarationsOptions(
+			[]byte(bad),
+		); decodeNoInnerDeclarationsOptionsError == nil {
 			test.Errorf("decoding %q should have failed, and a silent fallback to the default would "+
 				"turn a typo into a configuration nobody wrote", bad)
 		}

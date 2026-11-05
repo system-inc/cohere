@@ -84,7 +84,11 @@ func findFirstPathRecursive(cwd string, start string, entries []string, fileExis
 }
 
 // loadTsconfigPaths reads a tsconfig and everything it extends into its path mapping.
-func loadTsconfigPaths(configurationPath string, readFile func(path string) (string, bool), fileExists func(path string) bool) (*tsconfigPaths, error) {
+func loadTsconfigPaths(
+	configurationPath string,
+	readFile func(path string) (string, bool),
+	fileExists func(path string) bool,
+) (*tsconfigPaths, error) {
 	configuration, loadTsconfigError := loadTsconfig(configurationPath, readFile, fileExists, map[string]bool{})
 	if loadTsconfigError != nil {
 		return nil, loadTsconfigError
@@ -99,7 +103,11 @@ func loadTsconfigPaths(configurationPath string, readFile func(path string) (str
 	var paths map[string][]string
 	if raw, isWritten := compilerOptions["paths"]; isWritten {
 		if decodeError := json.Unmarshal(raw, &paths); decodeError != nil {
-			return nil, fmt.Errorf("%s: compilerOptions.paths is not an object of string lists: %w", configurationPath, decodeError)
+			return nil, fmt.Errorf(
+				"%s: compilerOptions.paths is not an object of string lists: %w",
+				configurationPath,
+				decodeError,
+			)
 		}
 	}
 
@@ -156,7 +164,12 @@ func (file tsconfigFile) compilerOptions() map[string]json.RawMessage {
 }
 
 // loadTsconfig is tsconfig-paths' loadTsconfig: the file, with whatever it extends merged under it.
-func loadTsconfig(configurationPath string, readFile func(path string) (string, bool), fileExists func(path string) bool, visiting map[string]bool) (tsconfigFile, error) {
+func loadTsconfig(
+	configurationPath string,
+	readFile func(path string) (string, bool),
+	fileExists func(path string) bool,
+	visiting map[string]bool,
+) (tsconfigFile, error) {
 	if visiting[configurationPath] {
 		return nil, fmt.Errorf("%s extends itself", configurationPath)
 	}
@@ -168,8 +181,15 @@ func loadTsconfig(configurationPath string, readFile func(path string) (string, 
 		return nil, nil
 	}
 	configuration := tsconfigFile{}
-	if decodeError := json.Unmarshal([]byte(stripJsonComments(strings.TrimPrefix(text, "\ufeff"))), &configuration); decodeError != nil {
-		return nil, fmt.Errorf("%s is malformed: %w; cohere reads a tsconfig as JSON with comments and trailing commas", configurationPath, decodeError)
+	if decodeError := json.Unmarshal(
+		[]byte(stripJsonComments(strings.TrimPrefix(text, "\ufeff"))),
+		&configuration,
+	); decodeError != nil {
+		return nil, fmt.Errorf(
+			"%s is malformed: %w; cohere reads a tsconfig as JSON with comments and trailing commas",
+			configurationPath,
+			decodeError,
+		)
 	}
 
 	raw, extends := configuration["extends"]
@@ -189,7 +209,13 @@ func loadTsconfig(configurationPath string, readFile func(path string) (string, 
 
 	base := tsconfigFile{}
 	for _, value := range extended {
-		loaded, loadTsconfigFromExtendsError := loadTsconfigFromExtends(configurationPath, value, readFile, fileExists, visiting)
+		loaded, loadTsconfigFromExtendsError := loadTsconfigFromExtends(
+			configurationPath,
+			value,
+			readFile,
+			fileExists,
+			visiting,
+		)
 		if loadTsconfigFromExtendsError != nil {
 			return nil, loadTsconfigFromExtendsError
 		}
@@ -202,7 +228,12 @@ func loadTsconfig(configurationPath string, readFile func(path string) (string, 
 // appended when the value names no `.json` anywhere, a value holding both a `/` and a `.` that is not
 // beside the file is looked for under its `node_modules`, and an extended `baseUrl` is rebased by the
 // value's own directory so it reads relative to the extending file.
-func loadTsconfigFromExtends(configurationPath, value string, readFile func(path string) (string, bool), fileExists func(path string) bool, visiting map[string]bool) (tsconfigFile, error) {
+func loadTsconfigFromExtends(
+	configurationPath, value string,
+	readFile func(path string) (string, bool),
+	fileExists func(path string) bool,
+	visiting map[string]bool,
+) (tsconfigFile, error) {
 	if !strings.Contains(value, ".json") {
 		value += ".json"
 	}
@@ -320,7 +351,11 @@ func nextSignificant(text string, start int) byte {
 // directory index with each extension. A hit on the path as written is the file. A hit with an
 // extension or as an index stands for the path without it, which enhanced-resolve's stylesheet resolver
 // then reads as a stylesheet: as written, with `.css`, or as a package or an index.
-func (mapping *tsconfigPaths) resolve(specifier string, readFile func(path string) (string, bool), fileExists func(path string) bool) (string, bool) {
+func (mapping *tsconfigPaths) resolve(
+	specifier string,
+	readFile func(path string) (string, bool),
+	fileExists func(path string) bool,
+) (string, bool) {
 	if mapping == nil || specifier == "" || specifier[0] == '.' {
 		return "", false
 	}
@@ -380,7 +415,11 @@ func tsconfigMatchStar(pattern, search string) (string, bool) {
 
 // packageStyle is the file a directory's package.json names in `style`, the one main field the
 // plugin is given for stylesheets.
-func packageStyle(directory string, readFile func(path string) (string, bool), fileExists func(path string) bool) (string, bool) {
+func packageStyle(
+	directory string,
+	readFile func(path string) (string, bool),
+	fileExists func(path string) bool,
+) (string, bool) {
 	text, isRead := readFile(filepath.Join(directory, "package.json"))
 	if !isRead {
 		return "", false
@@ -389,7 +428,9 @@ func packageStyle(directory string, readFile func(path string) (string, bool), f
 	// the key `style` exactly.
 	var manifest map[string]json.RawMessage
 	var style string
-	if json.Unmarshal([]byte(text), &manifest) != nil || json.Unmarshal(manifest["style"], &style) != nil || style == "" {
+	if json.Unmarshal([]byte(text), &manifest) != nil ||
+		json.Unmarshal(manifest["style"], &style) != nil ||
+		style == "" {
 		return "", false
 	}
 	main := filepath.Join(directory, style)
@@ -401,7 +442,11 @@ func packageStyle(directory string, readFile func(path string) (string, bool), f
 
 // resolveStylesheetPath is enhanced-resolve's stylesheet resolver on an absolute path: the file, the
 // file with `.css`, the directory's package `style`, or its `index.css`.
-func resolveStylesheetPath(path string, readFile func(path string) (string, bool), fileExists func(path string) bool) (string, bool) {
+func resolveStylesheetPath(
+	path string,
+	readFile func(path string) (string, bool),
+	fileExists func(path string) bool,
+) (string, bool) {
 	for _, candidate := range []string{path, path + ".css"} {
 		if fileExists(candidate) {
 			return candidate, true
@@ -418,7 +463,12 @@ func resolveStylesheetPath(path string, readFile func(path string) (string, bool
 
 // tsconfigStylesheetResolver puts a tsconfig's mapping in front of a resolver, as the plugin sits in
 // front of enhanced-resolve's own lookup.
-func tsconfigStylesheetResolver(mapping *tsconfigPaths, next tailwindengine.StylesheetResolver, readFile func(path string) (string, bool), fileExists func(path string) bool) tailwindengine.StylesheetResolver {
+func tsconfigStylesheetResolver(
+	mapping *tsconfigPaths,
+	next tailwindengine.StylesheetResolver,
+	readFile func(path string) (string, bool),
+	fileExists func(path string) bool,
+) tailwindengine.StylesheetResolver {
 	if mapping == nil {
 		return next
 	}

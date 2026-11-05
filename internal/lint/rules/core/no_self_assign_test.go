@@ -188,7 +188,12 @@ func TestNoSelfAssignPropsOption(test *testing.T) {
 		{"a member with props on", `{"props": true}`, "export function run() { o.b = o.b; }\n", 1},
 		{"a member with props off", `{"props": false}`, "export function run() { o.b = o.b; }\n", 0},
 		{"a subscript with props off", `{"props": false}`, "export function run() { o[i] = o[i]; }\n", 0},
-		{"a member inside a pattern with props off", `{"props": false}`, "export function run() { [o.b] = [o.b]; }\n", 0},
+		{
+			"a member inside a pattern with props off",
+			`{"props": false}`,
+			"export function run() { [o.b] = [o.b]; }\n",
+			0,
+		},
 
 		// Props only gates the member half: a name assigned to itself reports either way.
 		{"a name with props off", `{"props": false}`, "export function run() { a = a; }\n", 1},
@@ -214,7 +219,9 @@ func TestNoSelfAssignRefusesUnknownOptions(test *testing.T) {
 	for _, raw := range []string{`{"prop": false}`, `{"Props": false}`, `{"props": "no"}`, `false`} {
 		test.Run(raw, func(test *testing.T) {
 			test.Parallel()
-			if _, decodeNoSelfAssignOptionsError := DecodeNoSelfAssignOptions([]byte(raw)); decodeNoSelfAssignOptionsError == nil {
+			if _, decodeNoSelfAssignOptionsError := DecodeNoSelfAssignOptions(
+				[]byte(raw),
+			); decodeNoSelfAssignOptionsError == nil {
 				test.Errorf("decoded %s, expected it refused", raw)
 			}
 		})

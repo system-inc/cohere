@@ -588,7 +588,10 @@ func TestVoidUseMemoMessages(test *testing.T) {
 		test.Errorf("unused-result id is %q", messageUseMemoResultUnused.Id)
 	}
 	if !strings.Contains(messageUseMemoCallbackReturnsNothing.Description, "does not return a value") {
-		test.Errorf("void-return description does not say what is wrong: %q", messageUseMemoCallbackReturnsNothing.Description)
+		test.Errorf(
+			"void-return description does not say what is wrong: %q",
+			messageUseMemoCallbackReturnsNothing.Description,
+		)
 	}
 	if !strings.Contains(messageUseMemoResultUnused.Description, "nothing reads it") {
 		test.Errorf("unused-result description does not say what is wrong: %q", messageUseMemoResultUnused.Description)

@@ -93,7 +93,15 @@ func factoryWhitespace(effects *Effects, ok State) State {
 }
 
 // factoryLabel is micromark-factory-label.
-func factoryLabel(self *Self, effects *Effects, ok State, nok State, tokenType string, markerType string, stringType string) State {
+func factoryLabel(
+	self *Self,
+	effects *Effects,
+	ok State,
+	nok State,
+	tokenType string,
+	markerType string,
+	stringType string,
+) State {
 	size := 0
 	seen := false
 
@@ -261,7 +269,17 @@ func factoryTitle(effects *Effects, ok State, nok State, tokenType string, marke
 }
 
 // factoryDestination is micromark-factory-destination. max 0 is upstream's undefined: no limit.
-func factoryDestination(effects *Effects, ok State, nok State, tokenType string, literalType string, literalMarkerType string, rawType string, stringType string, maximum int) State {
+func factoryDestination(
+	effects *Effects,
+	ok State,
+	nok State,
+	tokenType string,
+	literalType string,
+	literalMarkerType string,
+	rawType string,
+	stringType string,
+	maximum int,
+) State {
 	limit := maximum
 	unlimited := maximum == 0
 	balance := 0

@@ -64,37 +64,137 @@ func TestJsxKeyFires(test *testing.T) {
 		rawOptions string
 		wantIds    []string
 	}{
-		{"upstream valid-33", "\n        import Act from 'react';\n        import { Children as ReactChildren } from 'react';\n\n        const { Children } = Act;\n        const { toArray } = Children;\n\n        Act.Children.toArray([1, 2 ,3].map(x => <App />));\n        Act.Children.toArray(Array.from([1, 2 ,3], x => <App />));\n        Children.toArray([1, 2 ,3].map(x => <App />));\n        Children.toArray(Array.from([1, 2 ,3], x => <App />));\n        // ReactChildren.toArray([1, 2 ,3].map(x => <App />));\n        // ReactChildren.toArray(Array.from([1, 2 ,3], x => <App />));\n        // toArray([1, 2 ,3].map(x => <App />));\n        // toArray(Array.from([1, 2 ,3], x => <App />));\n      ", "", []string{"missingIterKey", "missingIterKey"}}, // upstream sets a pragma; cohere reads no React settings, so this is the unconfigured answer
-		{"upstream invalid-0", "\n        [1, 2, 3].map((item) => {\n          return item === 'bar' ? <div>{item}</div> : <span>{item}</span>;\n        })", "", []string{"missingIterKey", "missingIterKey"}},                                                                                                                                                                                                                                                           // Clone behavior; the installed 7.37.5 is silent here (see the rule doc)
-		{"upstream invalid-1", "\n        [1, 2, 3].map(function(item) {\n          return item === 'bar' ? <div>{item}</div> : <span>{item}</span>;\n        })", "", []string{"missingIterKey", "missingIterKey"}},                                                                                                                                                                                                                                                      // Clone behavior; the installed 7.37.5 is silent here (see the rule doc)
-		{"upstream invalid-2", "\n        Array.from([1, 2, 3], (item) => {\n          return item === 'bar' ? <div>{item}</div> : <span>{item}</span>;\n        })", "", []string{"missingIterKey", "missingIterKey"}},                                                                                                                                                                                                                                                   // Clone behavior; the installed 7.37.5 is silent here (see the rule doc)
-		{"upstream invalid-3", "\n        import { Fragment } from 'react';\n\n        const ITEMS = ['bar', 'foo'];\n\n        export default function BugIssue() {\n          return (\n            <Fragment>\n              {ITEMS.map((item) => {\n                return item === 'bar' ? <div>{item}</div> : <span>{item}</span>;\n              })}\n            </Fragment>\n          );\n        }\n      ", "", []string{"missingIterKey", "missingIterKey"}}, // Clone behavior; the installed 7.37.5 is silent here (see the rule doc)
+		{
+			"upstream valid-33",
+			"\n        import Act from 'react';\n        import { Children as ReactChildren } from 'react';\n\n        const { Children } = Act;\n        const { toArray } = Children;\n\n        Act.Children.toArray([1, 2 ,3].map(x => <App />));\n        Act.Children.toArray(Array.from([1, 2 ,3], x => <App />));\n        Children.toArray([1, 2 ,3].map(x => <App />));\n        Children.toArray(Array.from([1, 2 ,3], x => <App />));\n        // ReactChildren.toArray([1, 2 ,3].map(x => <App />));\n        // ReactChildren.toArray(Array.from([1, 2 ,3], x => <App />));\n        // toArray([1, 2 ,3].map(x => <App />));\n        // toArray(Array.from([1, 2 ,3], x => <App />));\n      ",
+			"",
+			[]string{"missingIterKey", "missingIterKey"},
+		}, // upstream sets a pragma; cohere reads no React settings, so this is the unconfigured answer
+		{
+			"upstream invalid-0",
+			"\n        [1, 2, 3].map((item) => {\n          return item === 'bar' ? <div>{item}</div> : <span>{item}</span>;\n        })",
+			"",
+			[]string{"missingIterKey", "missingIterKey"},
+		}, // Clone behavior; the installed 7.37.5 is silent here (see the rule doc)
+		{
+			"upstream invalid-1",
+			"\n        [1, 2, 3].map(function(item) {\n          return item === 'bar' ? <div>{item}</div> : <span>{item}</span>;\n        })",
+			"",
+			[]string{"missingIterKey", "missingIterKey"},
+		}, // Clone behavior; the installed 7.37.5 is silent here (see the rule doc)
+		{
+			"upstream invalid-2",
+			"\n        Array.from([1, 2, 3], (item) => {\n          return item === 'bar' ? <div>{item}</div> : <span>{item}</span>;\n        })",
+			"",
+			[]string{"missingIterKey", "missingIterKey"},
+		}, // Clone behavior; the installed 7.37.5 is silent here (see the rule doc)
+		{
+			"upstream invalid-3",
+			"\n        import { Fragment } from 'react';\n\n        const ITEMS = ['bar', 'foo'];\n\n        export default function BugIssue() {\n          return (\n            <Fragment>\n              {ITEMS.map((item) => {\n                return item === 'bar' ? <div>{item}</div> : <span>{item}</span>;\n              })}\n            </Fragment>\n          );\n        }\n      ",
+			"",
+			[]string{"missingIterKey", "missingIterKey"},
+		}, // Clone behavior; the installed 7.37.5 is silent here (see the rule doc)
 		{"upstream invalid-4", "[<App />];", "", []string{"missingArrayKey"}},
 		{"upstream invalid-5", "[<App {...key} />];", "", []string{"missingArrayKey"}},
 		{"upstream invalid-6", "[<App key={0}/>, <App />];", "", []string{"missingArrayKey"}},
 		{"upstream invalid-7", "[1, 2 ,3].map(function(x) { return <App /> });", "", []string{"missingIterKey"}},
 		{"upstream invalid-8", "[1, 2 ,3].map(x => <App />);", "", []string{"missingIterKey"}},
 		{"upstream invalid-9", "[1, 2 ,3].map(x => x && <App x={x} />);", "", []string{"missingIterKey"}},
-		{"upstream invalid-10", "[1, 2 ,3].map(x => x ? <App x={x} key=\"1\" /> : <OtherApp x={x} />);", "", []string{"missingIterKey"}},
-		{"upstream invalid-11", "[1, 2 ,3].map(x => x ? <App x={x} /> : <OtherApp x={x} key=\"2\" />);", "", []string{"missingIterKey"}},
+		{
+			"upstream invalid-10",
+			"[1, 2 ,3].map(x => x ? <App x={x} key=\"1\" /> : <OtherApp x={x} />);",
+			"",
+			[]string{"missingIterKey"},
+		},
+		{
+			"upstream invalid-11",
+			"[1, 2 ,3].map(x => x ? <App x={x} /> : <OtherApp x={x} key=\"2\" />);",
+			"",
+			[]string{"missingIterKey"},
+		},
 		{"upstream invalid-12", "[1, 2 ,3].map(x => { return <App /> });", "", []string{"missingIterKey"}},
-		{"upstream invalid-13", "Array.from([1, 2 ,3], function(x) { return <App /> });", "", []string{"missingIterKey"}},
+		{
+			"upstream invalid-13",
+			"Array.from([1, 2 ,3], function(x) { return <App /> });",
+			"",
+			[]string{"missingIterKey"},
+		},
 		{"upstream invalid-14", "Array.from([1, 2 ,3], (x => { return <App /> }));", "", []string{"missingIterKey"}},
 		{"upstream invalid-15", "Array.from([1, 2 ,3], (x => <App />));", "", []string{"missingIterKey"}},
 		{"upstream invalid-16", "[1, 2, 3]?.map(x => <BabelEslintApp />)", "", []string{"missingIterKey"}},
 		{"upstream invalid-17", "[1, 2, 3]?.map(x => <TypescriptEslintApp />)", "", []string{"missingIterKey"}},
-		{"upstream invalid-18", "[1, 2, 3].map(x => <>{x}</>);", "{\"checkFragmentShorthand\": true}", []string{"missingIterKeyUsePrag"}},          // upstream sets a pragma; cohere reads no React settings, so this is the unconfigured answer
-		{"upstream invalid-19", "[<></>];", "{\"checkFragmentShorthand\": true}", []string{"missingArrayKeyUsePrag"}},                              // upstream sets a pragma; cohere reads no React settings, so this is the unconfigured answer
-		{"upstream invalid-20", "[<App {...obj} key=\"keyAfterSpread\" />];", "{\"checkKeyMustBeforeSpread\": true}", []string{"keyBeforeSpread"}}, // upstream sets a pragma; cohere reads no React settings, so this is the unconfigured answer
-		{"upstream invalid-21", "[<div {...obj} key=\"keyAfterSpread\" />];", "{\"checkKeyMustBeforeSpread\": true}", []string{"keyBeforeSpread"}}, // upstream sets a pragma; cohere reads no React settings, so this is the unconfigured answer
-		{"upstream invalid-22", "\n        const spans = [\n          <span key=\"notunique\"/>,\n          <span key=\"notunique\"/>,\n        ];\n      ", "{\"warnOnDuplicates\": true}", []string{"nonUniqueKeys", "nonUniqueKeys"}},
-		{"upstream invalid-23", "\n        const div = (\n          <div>\n            <span key=\"notunique\"/>\n            <span key=\"notunique\"/>\n          </div>\n        );\n      ", "{\"warnOnDuplicates\": true}", []string{"nonUniqueKeys", "nonUniqueKeys"}},
-		{"upstream invalid-24", "\n        const Test = () => {\n          const list = [1, 2, 3, 4, 5];\n\n          return (\n            <div>\n              {list.map(item => {\n                if (item < 2) {\n                  return <div>{item}</div>;\n                }\n\n                return <div />;\n              })}\n            </div>\n          );\n        };\n      ", "", []string{"missingIterKey", "missingIterKey"}},
-		{"upstream invalid-25", "\n        const TestO = () => {\n          const list = [1, 2, 3, 4, 5];\n\n          return (\n            <div>\n              {list.map(item => {\n                if (item < 2) {\n                  return <div>{item}</div>;\n                } else if (item < 5) {\n                  return <div></div>\n                }  else {\n                  return <div></div>\n                }\n\n                return <div />;\n              })}\n            </div>\n          );\n        };\n      ", "", []string{"missingIterKey", "missingIterKey", "missingIterKey", "missingIterKey"}},
-		{"upstream invalid-26", "\n        const TestCase = () => {\n          const list = [1, 2, 3, 4, 5];\n\n          return (\n            <div>\n              {list.map(item => {\n                if (item < 2) return <div>{item}</div>;\n                else if (item < 5) return <div />;\n                else return <div />;\n              })}\n            </div>\n          );\n        };\n      ", "", []string{"missingIterKey", "missingIterKey", "missingIterKey"}},
-		{"upstream invalid-27", "\n        const TestCase = () => {\n          const list = [1, 2, 3, 4, 5];\n\n          return (\n            <div>\n              {list.map(x => <div {...spread} key={x} />)}\n            </div>\n          );\n        };\n      ", "{\"checkKeyMustBeforeSpread\": true}", []string{"keyBeforeSpread"}},
-		{"upstream invalid-28", "[1, 2, 3].map(x => { return x && <App />; });", "", []string{"missingIterKey"}},      // Clone behavior; the installed 7.37.5 is silent here (see the rule doc)
-		{"upstream invalid-29", "[1, 2, 3].map(x => { return x || y || <App />; });", "", []string{"missingIterKey"}}, // Clone behavior; the installed 7.37.5 is silent here (see the rule doc)
+		{
+			"upstream invalid-18",
+			"[1, 2, 3].map(x => <>{x}</>);",
+			"{\"checkFragmentShorthand\": true}",
+			[]string{"missingIterKeyUsePrag"},
+		}, // upstream sets a pragma; cohere reads no React settings, so this is the unconfigured answer
+		{
+			"upstream invalid-19",
+			"[<></>];",
+			"{\"checkFragmentShorthand\": true}",
+			[]string{"missingArrayKeyUsePrag"},
+		}, // upstream sets a pragma; cohere reads no React settings, so this is the unconfigured answer
+		{
+			"upstream invalid-20",
+			"[<App {...obj} key=\"keyAfterSpread\" />];",
+			"{\"checkKeyMustBeforeSpread\": true}",
+			[]string{"keyBeforeSpread"},
+		}, // upstream sets a pragma; cohere reads no React settings, so this is the unconfigured answer
+		{
+			"upstream invalid-21",
+			"[<div {...obj} key=\"keyAfterSpread\" />];",
+			"{\"checkKeyMustBeforeSpread\": true}",
+			[]string{"keyBeforeSpread"},
+		}, // upstream sets a pragma; cohere reads no React settings, so this is the unconfigured answer
+		{
+			"upstream invalid-22",
+			"\n        const spans = [\n          <span key=\"notunique\"/>,\n          <span key=\"notunique\"/>,\n        ];\n      ",
+			"{\"warnOnDuplicates\": true}",
+			[]string{"nonUniqueKeys", "nonUniqueKeys"},
+		},
+		{
+			"upstream invalid-23",
+			"\n        const div = (\n          <div>\n            <span key=\"notunique\"/>\n            <span key=\"notunique\"/>\n          </div>\n        );\n      ",
+			"{\"warnOnDuplicates\": true}",
+			[]string{"nonUniqueKeys", "nonUniqueKeys"},
+		},
+		{
+			"upstream invalid-24",
+			"\n        const Test = () => {\n          const list = [1, 2, 3, 4, 5];\n\n          return (\n            <div>\n              {list.map(item => {\n                if (item < 2) {\n                  return <div>{item}</div>;\n                }\n\n                return <div />;\n              })}\n            </div>\n          );\n        };\n      ",
+			"",
+			[]string{"missingIterKey", "missingIterKey"},
+		},
+		{
+			"upstream invalid-25",
+			"\n        const TestO = () => {\n          const list = [1, 2, 3, 4, 5];\n\n          return (\n            <div>\n              {list.map(item => {\n                if (item < 2) {\n                  return <div>{item}</div>;\n                } else if (item < 5) {\n                  return <div></div>\n                }  else {\n                  return <div></div>\n                }\n\n                return <div />;\n              })}\n            </div>\n          );\n        };\n      ",
+			"",
+			[]string{"missingIterKey", "missingIterKey", "missingIterKey", "missingIterKey"},
+		},
+		{
+			"upstream invalid-26",
+			"\n        const TestCase = () => {\n          const list = [1, 2, 3, 4, 5];\n\n          return (\n            <div>\n              {list.map(item => {\n                if (item < 2) return <div>{item}</div>;\n                else if (item < 5) return <div />;\n                else return <div />;\n              })}\n            </div>\n          );\n        };\n      ",
+			"",
+			[]string{"missingIterKey", "missingIterKey", "missingIterKey"},
+		},
+		{
+			"upstream invalid-27",
+			"\n        const TestCase = () => {\n          const list = [1, 2, 3, 4, 5];\n\n          return (\n            <div>\n              {list.map(x => <div {...spread} key={x} />)}\n            </div>\n          );\n        };\n      ",
+			"{\"checkKeyMustBeforeSpread\": true}",
+			[]string{"keyBeforeSpread"},
+		},
+		{
+			"upstream invalid-28",
+			"[1, 2, 3].map(x => { return x && <App />; });",
+			"",
+			[]string{"missingIterKey"},
+		}, // Clone behavior; the installed 7.37.5 is silent here (see the rule doc)
+		{
+			"upstream invalid-29",
+			"[1, 2, 3].map(x => { return x || y || <App />; });",
+			"",
+			[]string{"missingIterKey"},
+		}, // Clone behavior; the installed 7.37.5 is silent here (see the rule doc)
 
 		// --- cases upstream does not cover, each measured against the installed build 7.37.5 ---
 		//
@@ -106,8 +206,18 @@ func TestJsxKeyFires(test *testing.T) {
 		// matching attribute rather than once per element. Written for a mutant that returned only
 		// the first match, which survived the whole imported corpus because nothing in it doubles
 		// an attribute.
-		{"two key attributes, key after spread", "[<App {...o} key=\"a\" key=\"b\" />];", "{\"checkKeyMustBeforeSpread\":true}", []string{"keyBeforeSpread", "keyBeforeSpread"}},
-		{"two identical key attributes on one element", "[<App key=\"a\" key=\"a\" />];", "{\"warnOnDuplicates\":true}", []string{"nonUniqueKeys", "nonUniqueKeys"}},
+		{
+			"two key attributes, key after spread",
+			"[<App {...o} key=\"a\" key=\"b\" />];",
+			"{\"checkKeyMustBeforeSpread\":true}",
+			[]string{"keyBeforeSpread", "keyBeforeSpread"},
+		},
+		{
+			"two identical key attributes on one element",
+			"[<App key=\"a\" key=\"a\" />];",
+			"{\"warnOnDuplicates\":true}",
+			[]string{"nonUniqueKeys", "nonUniqueKeys"},
+		},
 
 		{"map arrow", "[1,2,3].map(x => <App />);", "", []string{"missingIterKey"}},
 		{"map block", "[1,2,3].map(x => { return <App /> });", "", []string{"missingIterKey"}},
@@ -117,26 +227,116 @@ func TestJsxKeyFires(test *testing.T) {
 		{"uppercase KEY attr in array", "[<App KEY={1} />];", "", []string{"missingArrayKey"}},
 		{"spread satisfies map", "[1,2,3].map(x => <App {...p} />);", "", []string{"missingIterKey"}},
 		{"spread in array", "[<App {...p} />];", "", []string{"missingArrayKey"}},
-		{"dup array warn", "const s = [<span key=\"a\"/>, <span key=\"a\"/>];", "{\"warnOnDuplicates\": true}", []string{"nonUniqueKeys", "nonUniqueKeys"}},
-		{"dup children warn", "const d = (<div><span key=\"a\"/><span key=\"a\"/></div>);", "{\"warnOnDuplicates\": true}", []string{"nonUniqueKeys", "nonUniqueKeys"}},
-		{"triple dup warn", "const s = [<span key=\"a\"/>, <span key=\"a\"/>, <span key=\"a\"/>];", "{\"warnOnDuplicates\": true}", []string{"nonUniqueKeys", "nonUniqueKeys", "nonUniqueKeys"}},
-		{"keyBeforeSpread array", "[<App {...obj} key=\"k\" />];", "{\"checkKeyMustBeforeSpread\": true}", []string{"keyBeforeSpread"}},
-		{"keyBeforeSpread map", "[1,2,3].map(x => <div {...s} key={x} />);", "{\"checkKeyMustBeforeSpread\": true}", []string{"keyBeforeSpread"}},
-		{"fragment shorthand map opt", "[1,2,3].map(x => <>{x}</>);", "{\"checkFragmentShorthand\": true}", []string{"missingIterKeyUsePrag"}},
-		{"nested element only reports dup", "<div><App key=\"a\"/><App key=\"a\"/></div>;", "{\"warnOnDuplicates\": true}", []string{"nonUniqueKeys", "nonUniqueKeys"}},
-		{"kbs children span", "<div><App {...obj} key=\"k\" /></div>;", "{\"checkKeyMustBeforeSpread\": true}", []string{"keyBeforeSpread"}},
-		{"dup span", "[<span key=\"a\"/>, <span key=\"a\"/>];", "{\"warnOnDuplicates\": true}", []string{"nonUniqueKeys", "nonUniqueKeys"}},
-		{"block if return", "[1,2,3].map(x => { if (x) { return <App />; } return <B />; });", "", []string{"missingIterKey", "missingIterKey"}},
-		{"block if else return", "[1,2,3].map(x => { if (x) return <A />; else return <B />; });", "", []string{"missingIterKey", "missingIterKey"}},
-		{"block ternary return", "[1,2,3].map(x => { return x ? <A /> : <B />; });", "", []string{"missingIterKey", "missingIterKey"}}, // Clone behavior; the installed 7.37.5 is silent here
-		{"block logical return", "[1,2,3].map(x => { return x && <A />; });", "", []string{"missingIterKey"}},                          // Clone behavior; the installed 7.37.5 is silent here
-		{"arrow ternary body", "[1,2,3].map(x => x ? <A /> : <B />);", "", []string{"missingIterKey", "missingIterKey"}},
+		{
+			"dup array warn",
+			"const s = [<span key=\"a\"/>, <span key=\"a\"/>];",
+			"{\"warnOnDuplicates\": true}",
+			[]string{"nonUniqueKeys", "nonUniqueKeys"},
+		},
+		{
+			"dup children warn",
+			"const d = (<div><span key=\"a\"/><span key=\"a\"/></div>);",
+			"{\"warnOnDuplicates\": true}",
+			[]string{"nonUniqueKeys", "nonUniqueKeys"},
+		},
+		{
+			"triple dup warn",
+			"const s = [<span key=\"a\"/>, <span key=\"a\"/>, <span key=\"a\"/>];",
+			"{\"warnOnDuplicates\": true}",
+			[]string{"nonUniqueKeys", "nonUniqueKeys", "nonUniqueKeys"},
+		},
+		{
+			"keyBeforeSpread array",
+			"[<App {...obj} key=\"k\" />];",
+			"{\"checkKeyMustBeforeSpread\": true}",
+			[]string{"keyBeforeSpread"},
+		},
+		{
+			"keyBeforeSpread map",
+			"[1,2,3].map(x => <div {...s} key={x} />);",
+			"{\"checkKeyMustBeforeSpread\": true}",
+			[]string{"keyBeforeSpread"},
+		},
+		{
+			"fragment shorthand map opt",
+			"[1,2,3].map(x => <>{x}</>);",
+			"{\"checkFragmentShorthand\": true}",
+			[]string{"missingIterKeyUsePrag"},
+		},
+		{
+			"nested element only reports dup",
+			"<div><App key=\"a\"/><App key=\"a\"/></div>;",
+			"{\"warnOnDuplicates\": true}",
+			[]string{"nonUniqueKeys", "nonUniqueKeys"},
+		},
+		{
+			"kbs children span",
+			"<div><App {...obj} key=\"k\" /></div>;",
+			"{\"checkKeyMustBeforeSpread\": true}",
+			[]string{"keyBeforeSpread"},
+		},
+		{
+			"dup span",
+			"[<span key=\"a\"/>, <span key=\"a\"/>];",
+			"{\"warnOnDuplicates\": true}",
+			[]string{"nonUniqueKeys", "nonUniqueKeys"},
+		},
+		{
+			"block if return",
+			"[1,2,3].map(x => { if (x) { return <App />; } return <B />; });",
+			"",
+			[]string{"missingIterKey", "missingIterKey"},
+		},
+		{
+			"block if else return",
+			"[1,2,3].map(x => { if (x) return <A />; else return <B />; });",
+			"",
+			[]string{"missingIterKey", "missingIterKey"},
+		},
+		{
+			"block ternary return",
+			"[1,2,3].map(x => { return x ? <A /> : <B />; });",
+			"",
+			[]string{"missingIterKey", "missingIterKey"},
+		}, // Clone behavior; the installed 7.37.5 is silent here
+		{
+			"block logical return",
+			"[1,2,3].map(x => { return x && <A />; });",
+			"",
+			[]string{"missingIterKey"},
+		}, // Clone behavior; the installed 7.37.5 is silent here
+		{
+			"arrow ternary body",
+			"[1,2,3].map(x => x ? <A /> : <B />);",
+			"",
+			[]string{"missingIterKey", "missingIterKey"},
+		},
 		{"arrow logical body", "[1,2,3].map(x => x && <A />);", "", []string{"missingIterKey"}},
-		{"block nested fn return", "[1,2,3].map(x => { function f() { return <A />; } return <B />; });", "", []string{"missingIterKey"}},
-		{"deep if nesting", "[1,2,3].map(x => { if (a) { if (b) { return <A />; } } });", "", []string{"missingIterKey"}},
-		{"children toArray wrong ns", "Foo.Children.toArray([1,2,3].map(x => <App />));", "", []string{"missingIterKey"}},
+		{
+			"block nested fn return",
+			"[1,2,3].map(x => { function f() { return <A />; } return <B />; });",
+			"",
+			[]string{"missingIterKey"},
+		},
+		{
+			"deep if nesting",
+			"[1,2,3].map(x => { if (a) { if (b) { return <A />; } } });",
+			"",
+			[]string{"missingIterKey"},
+		},
+		{
+			"children toArray wrong ns",
+			"Foo.Children.toArray([1,2,3].map(x => <App />));",
+			"",
+			[]string{"missingIterKey"},
+		},
 		{"toArray bare fn", "toArray([1,2,3].map(x => <App />));", "", []string{"missingIterKey"}},
-		{"Children toArray then outside", "React.Children.toArray([1,2,3].map(x => <App />)); [<B />];", "", []string{"missingArrayKey"}},
+		{
+			"Children toArray then outside",
+			"React.Children.toArray([1,2,3].map(x => <App />)); [<B />];",
+			"",
+			[]string{"missingArrayKey"},
+		},
 		{"array in array", "[[<App />]];", "", []string{"missingArrayKey"}},
 		{"array holes", "[, <App />];", "", []string{"missingArrayKey"}},
 		{"member map on obj", "obj.list.map(x => <App />);", "", []string{"missingIterKey"}},
@@ -151,7 +351,12 @@ func TestJsxKeyFires(test *testing.T) {
 		{"paren element in array", "[(<App />)];", "", []string{"missingArrayKey"}},
 		{"paren return arg", "[1,2,3].map(x => { return (<App />); });", "", []string{"missingIterKey"}},
 		{"paren arrow body", "[1,2,3].map(x => (<App />));", "", []string{"missingIterKey"}},
-		{"paren conditional return", "[1,2,3].map(x => { return (c ? <A/> : <B/>); });", "", []string{"missingIterKey", "missingIterKey"}}, // Clone behavior; the installed 7.37.5 is silent here
+		{
+			"paren conditional return",
+			"[1,2,3].map(x => { return (c ? <A/> : <B/>); });",
+			"",
+			[]string{"missingIterKey", "missingIterKey"},
+		}, // Clone behavior; the installed 7.37.5 is silent here
 	}
 
 	for _, testCase := range cases {
@@ -172,7 +377,11 @@ func TestJsxKeyStaysSilent(test *testing.T) {
 		sourceText string
 		rawOptions string
 	}{
-		{"upstream valid-0", "\n        [1, 2, 3].map((item) => {\n         return item === 'bar' ? <div key={item}>{item}</div> : <span key={item}>{item}</span>;\n        })", ""},
+		{
+			"upstream valid-0",
+			"\n        [1, 2, 3].map((item) => {\n         return item === 'bar' ? <div key={item}>{item}</div> : <span key={item}>{item}</span>;\n        })",
+			"",
+		},
 		{"upstream valid-1", "fn()", ""},
 		{"upstream valid-2", "[1, 2, 3].map(function () {})", ""},
 		{"upstream valid-3", "<App />;", ""},
@@ -196,15 +405,47 @@ func TestJsxKeyStaysSilent(test *testing.T) {
 		{"upstream valid-21", "<App {...{}} />;", ""},
 		{"upstream valid-22", "<App key=\"keyBeforeSpread\" {...{}} />;", "{\"checkKeyMustBeforeSpread\": true}"},
 		{"upstream valid-23", "<div key=\"keyBeforeSpread\" {...{}} />;", "{\"checkKeyMustBeforeSpread\": true}"},
-		{"upstream valid-24", "\n        const spans = [\n          <span key=\"notunique\"/>,\n          <span key=\"notunique\"/>,\n        ];\n      ", ""},
-		{"upstream valid-25", "\n        function Component(props) {\n          return hasPayment ? (\n            <div className=\"stuff\">\n              <BookingDetailSomething {...props} />\n              {props.modal && props.calculatedPrice && (\n                <SomeOtherThing items={props.something} discount={props.discount} />\n              )}\n            </div>\n          ) : null;\n        }\n      ", ""},
-		{"upstream valid-26", "\n        import React, { FC, useRef, useState } from 'react';\n\n        import './ResourceVideo.sass';\n        import VimeoVideoPlayInModal from '../vimeoVideoPlayInModal/VimeoVideoPlayInModal';\n\n        type Props = {\n          videoUrl: string;\n          videoTitle: string;\n        };\n        const ResourceVideo: FC<Props> = ({\n          videoUrl,\n          videoTitle,\n        }: Props): JSX.Element => {\n          return (\n            <div className=\"resource-video\">\n              <VimeoVideoPlayInModal videoUrl={videoUrl} />\n              <h3>{videoTitle}</h3>\n            </div>\n          );\n        };\n\n        export default ResourceVideo;\n      ", ""},
-		{"upstream valid-27", "\n        // testrule.jsx\n        const trackLink = () => {};\n        const getAnalyticsUiElement = () => {};\n\n        const onTextButtonClick = (e, item) => trackLink([, getAnalyticsUiElement(item), item.name], e);\n      ", ""},
-		{"upstream valid-28", "\n        function Component({ allRatings }) {\n          return (\n            <RatingDetailsStyles>\n              {Object.entries(allRatings)?.map(([key, value], index) => {\n                const rate = value?.split(/(?=[%, /])/);\n\n                if (!rate) return null;\n\n                return (\n                  <li key={`${entertainment.tmdbId}${index}`}>\n                    <img src={`/assets/rating/${key}.png`} />\n                    <span className=\"rating-details--rate\">{rate?.[0]}</span>\n                    <span className=\"rating-details--rate-suffix\">{rate?.[1]}</span>\n                  </li>\n                );\n              })}\n            </RatingDetailsStyles>\n          );\n        }\n      ", ""},
-		{"upstream valid-29", "\n        const baz = foo?.bar?.()?.[1] ?? 'qux';\n\n        qux()?.map()\n\n        const directiveRanges = comments?.map(tryParseTSDirective)\n      ", ""},
-		{"upstream valid-30", "\n        import { observable } from \"mobx\";\n\n        export interface ClusterFrameInfo {\n          frameId: number;\n          processId: number;\n        }\n\n        export const clusterFrameMap = observable.map<string, ClusterFrameInfo>();\n      ", ""},
+		{
+			"upstream valid-24",
+			"\n        const spans = [\n          <span key=\"notunique\"/>,\n          <span key=\"notunique\"/>,\n        ];\n      ",
+			"",
+		},
+		{
+			"upstream valid-25",
+			"\n        function Component(props) {\n          return hasPayment ? (\n            <div className=\"stuff\">\n              <BookingDetailSomething {...props} />\n              {props.modal && props.calculatedPrice && (\n                <SomeOtherThing items={props.something} discount={props.discount} />\n              )}\n            </div>\n          ) : null;\n        }\n      ",
+			"",
+		},
+		{
+			"upstream valid-26",
+			"\n        import React, { FC, useRef, useState } from 'react';\n\n        import './ResourceVideo.sass';\n        import VimeoVideoPlayInModal from '../vimeoVideoPlayInModal/VimeoVideoPlayInModal';\n\n        type Props = {\n          videoUrl: string;\n          videoTitle: string;\n        };\n        const ResourceVideo: FC<Props> = ({\n          videoUrl,\n          videoTitle,\n        }: Props): JSX.Element => {\n          return (\n            <div className=\"resource-video\">\n              <VimeoVideoPlayInModal videoUrl={videoUrl} />\n              <h3>{videoTitle}</h3>\n            </div>\n          );\n        };\n\n        export default ResourceVideo;\n      ",
+			"",
+		},
+		{
+			"upstream valid-27",
+			"\n        // testrule.jsx\n        const trackLink = () => {};\n        const getAnalyticsUiElement = () => {};\n\n        const onTextButtonClick = (e, item) => trackLink([, getAnalyticsUiElement(item), item.name], e);\n      ",
+			"",
+		},
+		{
+			"upstream valid-28",
+			"\n        function Component({ allRatings }) {\n          return (\n            <RatingDetailsStyles>\n              {Object.entries(allRatings)?.map(([key, value], index) => {\n                const rate = value?.split(/(?=[%, /])/);\n\n                if (!rate) return null;\n\n                return (\n                  <li key={`${entertainment.tmdbId}${index}`}>\n                    <img src={`/assets/rating/${key}.png`} />\n                    <span className=\"rating-details--rate\">{rate?.[0]}</span>\n                    <span className=\"rating-details--rate-suffix\">{rate?.[1]}</span>\n                  </li>\n                );\n              })}\n            </RatingDetailsStyles>\n          );\n        }\n      ",
+			"",
+		},
+		{
+			"upstream valid-29",
+			"\n        const baz = foo?.bar?.()?.[1] ?? 'qux';\n\n        qux()?.map()\n\n        const directiveRanges = comments?.map(tryParseTSDirective)\n      ",
+			"",
+		},
+		{
+			"upstream valid-30",
+			"\n        import { observable } from \"mobx\";\n\n        export interface ClusterFrameInfo {\n          frameId: number;\n          processId: number;\n        }\n\n        export const clusterFrameMap = observable.map<string, ClusterFrameInfo>();\n      ",
+			"",
+		},
 		{"upstream valid-31", "React.Children.toArray([1, 2 ,3].map(x => <App />));", ""},
-		{"upstream valid-32", "\n        import { Children } from \"react\";\n        Children.toArray([1, 2 ,3].map(x => <App />));\n      ", ""},
+		{
+			"upstream valid-32",
+			"\n        import { Children } from \"react\";\n        Children.toArray([1, 2 ,3].map(x => <App />));\n      ",
+			"",
+		},
 		{"upstream valid-34", "[1, 2, 3].map(x => { return x && <App key={x} />; });", ""},
 		{"upstream valid-35", "[1, 2, 3].map(x => { return x && y && <App key={x} />; });", ""},
 		{"upstream valid-36", "[1, 2, 3].map(x => { return x && foo(); });", ""},
@@ -272,8 +513,16 @@ func TestJsxKeyStaysSilent(test *testing.T) {
 		// paren to see an element and then read the paren's attributes, and reported a missing key on
 		// all 103 such sites in ahra and www (#ge8899e). Each measured silent on eslint-plugin-react 7.37.5.
 		{"keyed element in a parenthesized arrow body", "[1,2,3].map((x) => (<div key={x}>{x}</div>));", ""},
-		{"keyed elements in parenthesized arms of a returned conditional", "[1,2,3].map(function(x) { return c ? (<div key={x} />) : (<span key={x} />); });", ""},
-		{"keyed elements in parenthesized arms of an arrow conditional", "[1,2,3].map((x) => c ? (<div key={x} />) : (<span key={x} />));", ""},
+		{
+			"keyed elements in parenthesized arms of a returned conditional",
+			"[1,2,3].map(function(x) { return c ? (<div key={x} />) : (<span key={x} />); });",
+			"",
+		},
+		{
+			"keyed elements in parenthesized arms of an arrow conditional",
+			"[1,2,3].map((x) => c ? (<div key={x} />) : (<span key={x} />));",
+			"",
+		},
 		{"keyed element doubly parenthesized", "[1,2,3].map((x) => ((<div key={x} />)));", ""},
 	}
 

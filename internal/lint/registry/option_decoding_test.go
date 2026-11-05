@@ -73,7 +73,12 @@ type optionDecodingFindings struct {
 
 // findOptionDecodes loads the packages matching patterns from moduleRoot and walks every decode in
 // their non-test files.
-func findOptionDecodes(test *testing.T, moduleRoot string, rulesRoot string, patterns ...string) optionDecodingFindings {
+func findOptionDecodes(
+	test *testing.T,
+	moduleRoot string,
+	rulesRoot string,
+	patterns ...string,
+) optionDecodingFindings {
 	test.Helper()
 	loaded := loadRules(test, moduleRoot, patterns...)
 
@@ -116,7 +121,13 @@ func findOptionDecodes(test *testing.T, moduleRoot string, rulesRoot string, pat
 						target:   target,
 					}
 					findings.decodes = append(findings.decodes, decode)
-					reachesStruct := walkOptionType(target, loadedPackage.Fset, rulesRoot, untagged, map[types.Type]bool{})
+					reachesStruct := walkOptionType(
+						target,
+						loadedPackage.Fset,
+						rulesRoot,
+						untagged,
+						map[types.Type]bool{},
+					)
 					if reachesStruct && (name == "Unmarshal" || name == "Decode") {
 						if _, lenient := lenientOptionDecodes[site]; lenient {
 							findings.lenientAt[site] = true
@@ -160,7 +171,10 @@ func optionDecodeTarget(info *types.Info, call *ast.CallExpr) (string, types.Typ
 			return "", nil
 		}
 		object := info.Uses[selector.Sel]
-		if object != nil && object.Pkg() != nil && strings.HasSuffix(object.Pkg().Path(), "/lint/rule") && object.Name() == "DecodeOptionsInto" {
+		if object != nil &&
+			object.Pkg() != nil &&
+			strings.HasSuffix(object.Pkg().Path(), "/lint/rule") &&
+			object.Name() == "DecodeOptionsInto" {
 			return "DecodeOptionsInto", info.TypeOf(function.Index)
 		}
 	}
@@ -171,7 +185,13 @@ func optionDecodeTarget(info *types.Info, call *ast.CallExpr) (string, types.Typ
 // it reaches that declares no `json` key, as `file:line Type.Field`.
 //
 // Mutates: seen the walk marks each type it enters, so a recursive type is walked once
-func walkOptionType(valueType types.Type, fileSet *token.FileSet, rulesRoot string, untagged map[string]bool, seen map[types.Type]bool) bool {
+func walkOptionType(
+	valueType types.Type,
+	fileSet *token.FileSet,
+	rulesRoot string,
+	untagged map[string]bool,
+	seen map[types.Type]bool,
+) bool {
 	unaliased := types.Unalias(valueType)
 	if seen[unaliased] {
 		return false
@@ -207,7 +227,14 @@ func walkOptionType(valueType types.Type, fileSet *token.FileSet, rulesRoot stri
 // walks a type.
 //
 // Mutates: untagged the walk records every exported field with no `json` key, so one set gathers a whole tree
-func walkOptionStruct(structure *types.Struct, owner string, fileSet *token.FileSet, rulesRoot string, untagged map[string]bool, seen map[types.Type]bool) {
+func walkOptionStruct(
+	structure *types.Struct,
+	owner string,
+	fileSet *token.FileSet,
+	rulesRoot string,
+	untagged map[string]bool,
+	seen map[types.Type]bool,
+) {
 	for index := range structure.NumFields() {
 		field := structure.Field(index)
 		tag := reflect.StructTag(structure.Tag(index)).Get("json")
@@ -284,8 +311,12 @@ func TestEveryOptionDecodeIsStrictAndEveryOptionFieldDeclaresItsKey(test *testin
 			strict++
 		}
 	}
-	test.Logf("%d option decodes, %d through rule.UnmarshalOptions or rule.DecodeOptionsInto, %d lenient by upstream's schema",
-		len(findings.decodes), strict, len(findings.lenientAt))
+	test.Logf(
+		"%d option decodes, %d through rule.UnmarshalOptions or rule.DecodeOptionsInto, %d lenient by upstream's schema",
+		len(findings.decodes),
+		strict,
+		len(findings.lenientAt),
+	)
 	if len(findings.decodes) < 200 || strict < 150 {
 		test.Fatalf("found %d option decodes, %d of them strict, so this walk examined too little to mean anything",
 			len(findings.decodes), strict)
@@ -328,7 +359,11 @@ func TestTheOptionDecodingGuardSeesALooseDecodeAndAnUntaggedField(test *testing.
 		_, field, _ := strings.Cut(finding, " ")
 		untagged[field] = true
 	}
-	for _, field := range []string{"plantedOptions.Untagged", "plantedNested.Deep", "plantedStrictOptions.AlsoUntagged"} {
+	for _, field := range []string{
+		"plantedOptions.Untagged",
+		"plantedNested.Deep",
+		"plantedStrictOptions.AlsoUntagged",
+	} {
 		if !untagged[field] {
 			test.Errorf("the planted untagged field %s was not found; found %v", field, findings.untagged)
 		}

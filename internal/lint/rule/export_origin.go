@@ -72,8 +72,12 @@ func (resolver *exportOriginResolver) requireShape(node *ast.Node) {
 			// Invariant: the shape fingerprint covers the home file and every declaration outside a function
 			// body, so a read inside another file's body would serve a stale cached finding; the walk turns this
 			// panic into a crashed file that is never cached.
-			panic(fmt.Sprintf("rule.ExportNameIn read a %s at %s:%d, inside a function body in another file, which the shape fingerprint does not cover",
-				node.Kind, fileName, node.Pos()))
+			panic(fmt.Sprintf(
+				"rule.ExportNameIn read a %s at %s:%d, inside a function body in another file, which the shape fingerprint does not cover",
+				node.Kind,
+				fileName,
+				node.Pos(),
+			))
 		}
 	}
 }
@@ -150,8 +154,12 @@ func (resolver *exportOriginResolver) symbol(symbol *ast.Symbol) moduleExport {
 				return origin
 			}
 		case ast.KindVariableDeclaration:
-			if declaration.Parent != nil && declaration.Parent.Kind == ast.KindVariableDeclarationList && declaration.Parent.Flags&ast.NodeFlagsConst != 0 {
-				if origin := resolver.expression(declaration.AsVariableDeclaration().Initializer); origin.module != nil {
+			if declaration.Parent != nil &&
+				declaration.Parent.Kind == ast.KindVariableDeclarationList &&
+				declaration.Parent.Flags&ast.NodeFlagsConst != 0 {
+				if origin := resolver.expression(
+					declaration.AsVariableDeclaration().Initializer,
+				); origin.module != nil {
 					return origin
 				}
 			}

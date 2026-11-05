@@ -23,7 +23,12 @@ func TestNextLeavesImportMetaPathsToTestsAndEslintConfigs(test *testing.T) {
 			test.Errorf("%s: %s should run in an ordinary module", file, name)
 		}
 	}
-	for _, file := range []string{"command-line/StructureProcess.test.ts", "source/system/StandardStreams.node.test.ts", "eslint.config.mjs", "eslint.config.ts"} {
+	for _, file := range []string{
+		"command-line/StructureProcess.test.ts",
+		"source/system/StandardStreams.node.test.ts",
+		"eslint.config.mjs",
+		"eslint.config.ts",
+	} {
 		if loaded.Resolve(filepath.Join(directory, file)).Enabled(name) {
 			test.Errorf("%s: %s should be off, since Node runs the file directly", file, name)
 		}

@@ -67,7 +67,11 @@ type correctnessRequireResponseStatusCheckFinding struct {
 
 // correctnessRequireResponseStatusCheckExpect asserts the findings in source order. The harness
 // trims the subject file before writing it, so spans are read from the program's own text.
-func correctnessRequireResponseStatusCheckExpect(test *testing.T, result rule_testing.Result, want []correctnessRequireResponseStatusCheckFinding) {
+func correctnessRequireResponseStatusCheckExpect(
+	test *testing.T,
+	result rule_testing.Result,
+	want []correctnessRequireResponseStatusCheckFinding,
+) {
 	test.Helper()
 	diagnostics := append(result.Diagnostics[:0:0], result.Diagnostics...)
 	sort.SliceStable(diagnostics, func(left int, right int) bool {
@@ -83,9 +87,16 @@ func correctnessRequireResponseStatusCheckExpect(test *testing.T, result rule_te
 	text := result.SourceFile.Text()
 	var got []correctnessRequireResponseStatusCheckFinding
 	for _, diagnostic := range diagnostics {
-		got = append(got, correctnessRequireResponseStatusCheckFinding{diagnostic.Message.Id, text[diagnostic.Range.Pos():diagnostic.Range.End()]})
+		got = append(got, correctnessRequireResponseStatusCheckFinding{
+			diagnostic.Message.Id,
+			text[diagnostic.Range.Pos():diagnostic.Range.End()],
+		})
 		if len(diagnostic.Fixes) != 0 || len(diagnostic.Suggestions) != 0 {
-			test.Fatalf("expected no fix and no suggestion, got %d and %d", len(diagnostic.Fixes), len(diagnostic.Suggestions))
+			test.Fatalf(
+				"expected no fix and no suggestion, got %d and %d",
+				len(diagnostic.Fixes),
+				len(diagnostic.Suggestions),
+			)
 		}
 	}
 	if len(got) != len(want) {
@@ -146,10 +157,19 @@ func correctnessRequireResponseStatusCheckFinanceReview(fixed bool) string {
 			"    }",
 		)
 	}
-	lines := []string{"async function postCategorize(variables: { transactionId: string; categoryId: string | null }): Promise<void> {"}
+	lines := []string{
+		"async function postCategorize(variables: { transactionId: string; categoryId: string | null }): Promise<void> {",
+	}
 	lines = append(lines, request("/api/finance/categorize", "JSON.stringify(variables)")...)
-	lines = append(lines, "}", "async function postRule(variables: { targetCategoryId: string; matchValue: string; entityId: string }): Promise<void> {")
-	lines = append(lines, request("/api/finance/rules", "JSON.stringify({ ...variables, matchField: 'Merchant', source: 'Learned' })")...)
+	lines = append(
+		lines,
+		"}",
+		"async function postRule(variables: { targetCategoryId: string; matchValue: string; entityId: string }): Promise<void> {",
+	)
+	lines = append(
+		lines,
+		request("/api/finance/rules", "JSON.stringify({ ...variables, matchField: 'Merchant', source: 'Learned' })")...,
+	)
 	lines = append(lines, "}", "export const actions = { postCategorize, postRule };")
 	return correctnessRequireResponseStatusCheckSource(lines...)
 }
@@ -180,15 +200,22 @@ func TestCorrectnessRequireResponseStatusCheckFiresOnFinanceReview(test *testing
 
 	result := correctnessRequireResponseStatusCheckRun(test, correctnessRequireResponseStatusCheckFinanceReview(false))
 	correctnessRequireResponseStatusCheckExpect(test, result, []correctnessRequireResponseStatusCheckFinding{
-		correctnessRequireResponseStatusCheckDiscard("await networkService.request('/api/finance/categorize', {\n        method: 'POST',\n        body: JSON.stringify(variables),\n    });"),
-		correctnessRequireResponseStatusCheckDiscard("await networkService.request('/api/finance/rules', {\n        method: 'POST',\n        body: JSON.stringify({ ...variables, matchField: 'Merchant', source: 'Learned' }),\n    });"),
+		correctnessRequireResponseStatusCheckDiscard(
+			"await networkService.request('/api/finance/categorize', {\n        method: 'POST',\n        body: JSON.stringify(variables),\n    });",
+		),
+		correctnessRequireResponseStatusCheckDiscard(
+			"await networkService.request('/api/finance/rules', {\n        method: 'POST',\n        body: JSON.stringify({ ...variables, matchField: 'Merchant', source: 'Learned' }),\n    });",
+		),
 	})
 }
 
 func TestCorrectnessRequireResponseStatusCheckStaysSilentOnFixedFinanceReview(test *testing.T) {
 	test.Parallel()
 
-	rule_testing.ExpectClean(test, correctnessRequireResponseStatusCheckRun(test, correctnessRequireResponseStatusCheckFinanceReview(true)))
+	rule_testing.ExpectClean(
+		test,
+		correctnessRequireResponseStatusCheckRun(test, correctnessRequireResponseStatusCheckFinanceReview(true)),
+	)
 }
 
 func TestCorrectnessRequireResponseStatusCheckFires(test *testing.T) {
@@ -199,67 +226,111 @@ func TestCorrectnessRequireResponseStatusCheckFires(test *testing.T) {
 		lines []string
 		want  []correctnessRequireResponseStatusCheckFinding
 	}{
-		{"the platform fetch, parsed and returned", []string{
-			"export async function load() {",
-			"    const response = await fetch(url);",
-			"    return response.json();",
-			"}",
-		}, []correctnessRequireResponseStatusCheckFinding{correctnessRequireResponseStatusCheckBody("response.json()")}},
-		{"fetch reached through globalThis", []string{
-			"export async function load() {",
-			"    const response = await globalThis.fetch(url);",
-			"    return await response.text();",
-			"}",
-		}, []correctnessRequireResponseStatusCheckFinding{correctnessRequireResponseStatusCheckBody("response.text()")}},
-		{"the base API request", []string{
-			"export async function load() {",
-			"    const response = await networkService.baseApiRequest('/tasks');",
-			"    return (await response.json()) as TaskInterface[];",
-			"}",
-		}, []correctnessRequireResponseStatusCheckFinding{correctnessRequireResponseStatusCheckBody("response.json()")}},
+		{
+			"the platform fetch, parsed and returned",
+			[]string{
+				"export async function load() {",
+				"    const response = await fetch(url);",
+				"    return response.json();",
+				"}",
+			},
+			[]correctnessRequireResponseStatusCheckFinding{
+				correctnessRequireResponseStatusCheckBody("response.json()"),
+			},
+		},
+		{
+			"fetch reached through globalThis",
+			[]string{
+				"export async function load() {",
+				"    const response = await globalThis.fetch(url);",
+				"    return await response.text();",
+				"}",
+			},
+			[]correctnessRequireResponseStatusCheckFinding{
+				correctnessRequireResponseStatusCheckBody("response.text()"),
+			},
+		},
+		{
+			"the base API request",
+			[]string{
+				"export async function load() {",
+				"    const response = await networkService.baseApiRequest('/tasks');",
+				"    return (await response.json()) as TaskInterface[];",
+				"}",
+			},
+			[]correctnessRequireResponseStatusCheckFinding{
+				correctnessRequireResponseStatusCheckBody("response.json()"),
+			},
+		},
 		{"a body read inline, on a Response nothing else can see", []string{
 			"export async function load() {",
 			"    return (await fetch(url)).json();",
 			"}",
-		}, []correctnessRequireResponseStatusCheckFinding{correctnessRequireResponseStatusCheckBody("(await fetch(url)).json()")}},
-		{"a then callback that parses", []string{
-			"export function load() {",
-			"    return fetch(url).then(function(response) {",
-			"        return response.json();",
-			"    });",
-			"}",
-		}, []correctnessRequireResponseStatusCheckFinding{correctnessRequireResponseStatusCheckBody("response.json()")}},
-		{"a body field tested in place of the status", []string{
-			"export async function load() {",
-			"    const response = await fetch(url);",
-			"    const data = (await response.json()) as { error?: string };",
-			"    if(data.error) {",
-			"        use(response.status);",
-			"        throw new Error(data.error);",
-			"    }",
-			"    return data;",
-			"}",
-		}, []correctnessRequireResponseStatusCheckFinding{correctnessRequireResponseStatusCheckBody("response.json()")}},
-		{"a check on one branch only", []string{
-			"export async function load() {",
-			"    const response = await fetch(url);",
-			"    if(flag) {",
-			"        if(!response.ok) throw new Error('failed');",
-			"    }",
-			"    return response.json();",
-			"}",
-		}, []correctnessRequireResponseStatusCheckFinding{correctnessRequireResponseStatusCheckBody("response.json()")}},
-		{"a catch that returns normally", []string{
-			"export async function load() {",
-			"    try {",
-			"        const response = await fetch(url);",
-			"        return await response.json();",
-			"    }",
-			"    catch {",
-			"        return null;",
-			"    }",
-			"}",
-		}, []correctnessRequireResponseStatusCheckFinding{correctnessRequireResponseStatusCheckBody("response.json()")}},
+		}, []correctnessRequireResponseStatusCheckFinding{
+			correctnessRequireResponseStatusCheckBody("(await fetch(url)).json()"),
+		}},
+		{
+			"a then callback that parses",
+			[]string{
+				"export function load() {",
+				"    return fetch(url).then(function(response) {",
+				"        return response.json();",
+				"    });",
+				"}",
+			},
+			[]correctnessRequireResponseStatusCheckFinding{
+				correctnessRequireResponseStatusCheckBody("response.json()"),
+			},
+		},
+		{
+			"a body field tested in place of the status",
+			[]string{
+				"export async function load() {",
+				"    const response = await fetch(url);",
+				"    const data = (await response.json()) as { error?: string };",
+				"    if(data.error) {",
+				"        use(response.status);",
+				"        throw new Error(data.error);",
+				"    }",
+				"    return data;",
+				"}",
+			},
+			[]correctnessRequireResponseStatusCheckFinding{
+				correctnessRequireResponseStatusCheckBody("response.json()"),
+			},
+		},
+		{
+			"a check on one branch only",
+			[]string{
+				"export async function load() {",
+				"    const response = await fetch(url);",
+				"    if(flag) {",
+				"        if(!response.ok) throw new Error('failed');",
+				"    }",
+				"    return response.json();",
+				"}",
+			},
+			[]correctnessRequireResponseStatusCheckFinding{
+				correctnessRequireResponseStatusCheckBody("response.json()"),
+			},
+		},
+		{
+			"a catch that returns normally",
+			[]string{
+				"export async function load() {",
+				"    try {",
+				"        const response = await fetch(url);",
+				"        return await response.json();",
+				"    }",
+				"    catch {",
+				"        return null;",
+				"    }",
+				"}",
+			},
+			[]correctnessRequireResponseStatusCheckFinding{
+				correctnessRequireResponseStatusCheckBody("response.json()"),
+			},
+		},
 		{"the body streamed", []string{
 			"export async function download() {",
 			"    const response = await fetch(url);",
@@ -270,35 +341,54 @@ func TestCorrectnessRequireResponseStatusCheckFires(test *testing.T) {
 			correctnessRequireResponseStatusCheckBody("response.body"),
 			correctnessRequireResponseStatusCheckBody("response.body"),
 		}},
-		{"a loop that never leaves, so only the next turn ends the Response", []string{
-			"export async function poll() {",
-			"    while(true) {",
-			"        const response = await fetch(url);",
-			"        results.push(await response.json());",
-			"    }",
-			"}",
-		}, []correctnessRequireResponseStatusCheckFinding{correctnessRequireResponseStatusCheckBody("response.json()")}},
+		{
+			"a loop that never leaves, so only the next turn ends the Response",
+			[]string{
+				"export async function poll() {",
+				"    while(true) {",
+				"        const response = await fetch(url);",
+				"        results.push(await response.json());",
+				"    }",
+				"}",
+			},
+			[]correctnessRequireResponseStatusCheckFinding{
+				correctnessRequireResponseStatusCheckBody("response.json()"),
+			},
+		},
 		{"a Response awaited as a statement", []string{
 			"export async function ping() {",
 			"    await fetch(url, { method: 'POST' });",
 			"}",
-		}, []correctnessRequireResponseStatusCheckFinding{correctnessRequireResponseStatusCheckDiscard("await fetch(url, { method: 'POST' });")}},
+		}, []correctnessRequireResponseStatusCheckFinding{
+			correctnessRequireResponseStatusCheckDiscard("await fetch(url, { method: 'POST' });"),
+		}},
 		{"a Response kept and never referenced", []string{
 			"export async function ping() {",
 			"    const response = await fetch(url, { method: 'POST' });",
 			"}",
-		}, []correctnessRequireResponseStatusCheckFinding{correctnessRequireResponseStatusCheckDiscard("await fetch(url, { method: 'POST' })")}},
-		{"a module-level fetch", []string{
-			"const response = await fetch(url);",
-			"export const configuration = await response.json();",
-		}, []correctnessRequireResponseStatusCheckFinding{correctnessRequireResponseStatusCheckBody("response.json()")}},
+		}, []correctnessRequireResponseStatusCheckFinding{
+			correctnessRequireResponseStatusCheckDiscard("await fetch(url, { method: 'POST' })"),
+		}},
+		{
+			"a module-level fetch",
+			[]string{
+				"const response = await fetch(url);",
+				"export const configuration = await response.json();",
+			},
+			[]correctnessRequireResponseStatusCheckFinding{
+				correctnessRequireResponseStatusCheckBody("response.json()"),
+			},
+		},
 	}
 
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 
-			result := correctnessRequireResponseStatusCheckRun(test, correctnessRequireResponseStatusCheckSource(testCase.lines...))
+			result := correctnessRequireResponseStatusCheckRun(
+				test,
+				correctnessRequireResponseStatusCheckSource(testCase.lines...),
+			)
 			correctnessRequireResponseStatusCheckExpect(test, result, testCase.want)
 		})
 	}
@@ -468,7 +558,10 @@ func TestCorrectnessRequireResponseStatusCheckStaysSilent(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 
-			rule_testing.ExpectClean(test, correctnessRequireResponseStatusCheckRun(test, correctnessRequireResponseStatusCheckSource(testCase.lines...)))
+			rule_testing.ExpectClean(test, correctnessRequireResponseStatusCheckRun(
+				test,
+				correctnessRequireResponseStatusCheckSource(testCase.lines...),
+			))
 		})
 	}
 }
@@ -491,10 +584,13 @@ func TestCorrectnessRequireResponseStatusCheckIgnoresANamespacedFetch(test *test
 		"    return response.json();",
 		"}",
 	}, "\n")
-	rule_testing.ExpectClean(test, rule_testing.RunTypedFiles(test, CorrectnessRequireResponseStatusCheck, map[string]string{
-		"/repository/types/strict-client.d.ts": declarations,
-		"/repository/source/Load.ts":           subject,
-	}, "/repository/source/Load.ts"))
+	rule_testing.ExpectClean(
+		test,
+		rule_testing.RunTypedFiles(test, CorrectnessRequireResponseStatusCheck, map[string]string{
+			"/repository/types/strict-client.d.ts": declarations,
+			"/repository/source/Load.ts":           subject,
+		}, "/repository/source/Load.ts"),
+	)
 }
 
 // `fetch` as `@types/node` declares it: inside `declare global` in a module, not in a global script.

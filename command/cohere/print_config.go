@@ -33,7 +33,13 @@ type printedDeparture struct {
 // writeResolvedConfig answers language questions from the same program the lint run builds.
 // Globals come from TypeScript declarations, including the selected standard libraries; naming the
 // declaration files explains their origin without pretending ESLint's writable/readonly knob exists.
-func writeResolvedConfig(out *bufio.Writer, config *configuration.Config, resolved configuration.Resolved, location projectLocation, path string) error {
+func writeResolvedConfig(
+	out *bufio.Writer,
+	config *configuration.Config,
+	resolved configuration.Resolved,
+	location projectLocation,
+	path string,
+) error {
 	base := optionsBase(config, location.Root)
 	if checkSettingsError := registry.CheckSettings(base); checkSettingsError != nil {
 		return fmt.Errorf("validating the lint config: %w", checkSettingsError)
@@ -42,7 +48,9 @@ func writeResolvedConfig(out *bufio.Writer, config *configuration.Config, resolv
 	if err != nil {
 		return err
 	}
-	graph, err := program.Build(program.Options{ConfigFileName: location.ConfigFileName, CurrentDirectory: location.Root, SingleThreaded: true})
+	graph, err := program.Build(
+		program.Options{ConfigFileName: location.ConfigFileName, CurrentDirectory: location.Root, SingleThreaded: true},
+	)
 	if err != nil {
 		return err
 	}
@@ -81,9 +89,18 @@ func writeResolvedConfig(out *bufio.Writer, config *configuration.Config, resolv
 		override := config.Overrides[index]
 		rules := map[string][]json.RawMessage{}
 		for name, setting := range override.Rules {
-			rules[name] = append([]json.RawMessage{json.RawMessage(strconv.Itoa(int(setting.Severity)))}, setting.Options...)
+			rules[name] = append(
+				[]json.RawMessage{json.RawMessage(strconv.Itoa(int(setting.Severity)))},
+				setting.Options...,
+			)
 		}
-		overrides = append(overrides, printedOverride{Index: index, File: override.File, Files: override.Files, Reason: override.Reason, Rules: rules})
+		overrides = append(overrides, printedOverride{
+			Index:  index,
+			File:   override.File,
+			Files:  override.Files,
+			Reason: override.Reason,
+			Rules:  rules,
+		})
 	}
 	departures := map[string]printedDeparture{}
 	for name, departure := range config.Departures {
@@ -106,8 +123,14 @@ func writeResolvedConfig(out *bufio.Writer, config *configuration.Config, resolv
 		// is ESLint's linterOptions.reportUnusedDisableDirectives, as a severity.
 		UnusedDisable int                          `json:"unusedDisable"`
 		Rules         map[string][]json.RawMessage `json:"rules"`
-	}{Settings: settings, Overrides: overrides, Departures: departures, RuleAliases: resolved.RuleAliases(registeredRuleNames()),
-		UnusedDisable: int(resolved.UnusedDisableSeverity()), Rules: resolvedConfigRules(resolved)}
+	}{
+		Settings:      settings,
+		Overrides:     overrides,
+		Departures:    departures,
+		RuleAliases:   resolved.RuleAliases(registeredRuleNames()),
+		UnusedDisable: int(resolved.UnusedDisableSeverity()),
+		Rules:         resolvedConfigRules(resolved),
+	}
 	document.LanguageOptions.SourceType = sourceType
 	document.LanguageOptions.Target = strings.ToLower(graph.Program.Options().GetEmitScriptTarget().String())
 	document.LanguageOptions.Tsconfig = graph.ConfigFileName
@@ -120,7 +143,11 @@ func writeResolvedConfig(out *bufio.Writer, config *configuration.Config, resolv
 // settingsForFile asks the registered readers which keys enabled rules consume. Settings keep their
 // configured values (paths are relative to ConfigDirectory), rather than mixing in a rule's own
 // options or inventing plugin defaults. A later settings reader needs no change to this command.
-func settingsForFile(base rule.OptionsBase, resolved configuration.Resolved, registrations []rule.SettingsRegistration) (map[string]json.RawMessage, error) {
+func settingsForFile(
+	base rule.OptionsBase,
+	resolved configuration.Resolved,
+	registrations []rule.SettingsRegistration,
+) (map[string]json.RawMessage, error) {
 	settings := map[string]json.RawMessage{}
 	for _, registration := range registrations {
 		for _, namespace := range registration.Namespaces {
