@@ -21,7 +21,7 @@ import (
 //
 // Go's simple uppercase stands in for String.prototype.toUpperCase, once the
 // characters whose full uppercase spans more than one UTF-16 code unit are
-// held back — `ß` is the familiar one — because JavaScript keeps the original
+// held back (`ß` is the familiar one), because JavaScript keeps the original
 // character there.
 //
 // https://tc39.es/ecma262/2024/multipage/text-processing.html#sec-runtime-semantics-canonicalize-ch
@@ -70,8 +70,8 @@ func expandsOnUppercase(r rune) bool {
 // and must not be modified.
 //
 // A caller comparing one character against another can just canonicalize both.
-// This is for a caller that has to widen a set — the members of a regexp
-// character class, say — to cover everything a case-insensitive comparison
+// This is for a caller that has to widen a set (the members of a regexp
+// character class, say) to cover everything a case-insensitive comparison
 // would accept.
 func CaseEquivalents(r rune, unicodeMode bool) []rune {
 	byMember, _ := caseTables(unicodeMode)
@@ -117,8 +117,8 @@ func buildCaseTables(unicodeMode bool) (map[rune][]rune, [][]rune) {
 	}
 	// Every character that canonicalizes onto another one has a case mapping,
 	// so the case ranges name them all. Folding reaches further than
-	// the uppercase mapping does, though — `U+212A KELVIN SIGN` joins `k` and
-	// `K` without any of the three having the other as its uppercase — so each
+	// the uppercase mapping does, though (`U+212A KELVIN SIGN` joins `k` and
+	// `K` without any of the three having the other as its uppercase), so each
 	// orbit is walked out rather than assumed to be a pair.
 	for _, caseRange := range unicode.CaseRanges {
 		for r := rune(caseRange.Lo); r <= rune(caseRange.Hi); r++ {

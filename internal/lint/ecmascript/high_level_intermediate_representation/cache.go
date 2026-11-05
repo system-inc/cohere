@@ -18,8 +18,8 @@ import (
 // a state setter, and a JSX tag was lowered three times and converted to single-assignment form
 // three times. Measured with `cohere --timing` before this existed: set-state-in-effect 829ms,
 // set-state-in-render 535ms, static-components 494ms, against every syntactic react rule under
-// 20ms. The author of the most expensive one named the cause exactly — "a property of lowering, not
-// this rule" — and a shared per-file cache as the fix.
+// 20ms. The author of the most expensive one named the cause exactly ("a property of lowering, not
+// this rule") and a shared per-file cache as the fix.
 //
 // # Why Construct is inside the cached value rather than left to the caller
 //
@@ -29,7 +29,7 @@ import (
 // Construct over the same graph moved it from 1 phi and 5 named values to 2 phis and 6 named
 // values.
 //
-// The dangerous part is that the doubly-constructed graph is still well-formed — `VerifySSA`
+// The dangerous part is that the doubly-constructed graph is still well-formed: `VerifySSA`
 // reports zero violations on it. So a cache that handed out a raw lowering and let each of the
 // three callers run its own Construct would have given the second and third caller a graph carrying
 // phis that correspond to no branch in the source, with no verifier, no panic, and no test
@@ -135,7 +135,7 @@ func AsCompilationUnit(
 // during render, and with the call erased the first shape becomes the second, so two fixtures
 // reported twice. `refs` misnamed a finding on `error.maybe-mutable-ref-not-preserved`, and
 // `immutability` failed too. The pass mutates in place, so sharing it silently changes what every
-// later rule sees — the same hazard the Construct note above describes, in a form no verifier
+// later rule sees: the same hazard the Construct note above describes, in a form no verifier
 // catches.
 //
 // So the erasure is one rule family's view of the graph, not the representation's, and it gets its

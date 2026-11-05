@@ -30,8 +30,8 @@ import (
 // at all.** Its `accessKind` switch carries no arm for `KindSpreadElement` or
 // `KindSpreadAssignment`, so both fall through to the default and are classified as reads.
 //
-// That gap was measured independently by three rules — `no-const-assign` on its imported corpus,
-// `prefer-const` on its own, and `no-unused-private-class-members` citing both — and each wrote a
+// That gap was measured independently by three rules (`no-const-assign` on its imported corpus,
+// `prefer-const` on its own, and `no-unused-private-class-members` citing both), and each wrote a
 // different workaround. Measured across 57 inputs, `ast.IsWriteAccess` disagrees with all three
 // workarounds on twelve of them, every one a rest element in an assignment target:
 //
@@ -52,7 +52,7 @@ import (
 //
 // `no-const-assign` and `prefer-const` both gate their climb on the *immediate* parent being a
 // spread or a literal. A `KindParenthesizedExpression` is neither, so both bail on the first step
-// and report no write. `no-class-assign` walks parentheses and gets both right — it had shipped the
+// and report no write. `no-class-assign` walks parentheses and gets both right. It had shipped the
 // same defect for a plain assignment target and fixed it, recording at its own line that `(A) = 1`
 // "is a write and read as a read before this line existed; neither upstream's corpus nor ours had a
 // parenthesized assignment target, which is why it shipped silently."
@@ -73,8 +73,8 @@ import (
 // from either slot and call both a write.
 //
 // The six rules that share `writesToItsIdentifier` list the shorthand as a transparent wrapper with
-// no position test, so they answer true for the default-value read. Measured with node —
-// `let a = "ORIGINAL"; ({ files = a } = {})` leaves `a` untouched — and it is upstream's own clean
+// no position test, so they answer true for the default-value read. Measured with node
+// (`let a = "ORIGINAL"; ({ files = a } = {})` leaves `a` untouched), and it is upstream's own clean
 // case for `no-const-assign`, quoted in that rule as "FOO is the default value, a read."
 //
 // That is a latent defect rather than a live one: all four rules route a shorthand through
@@ -125,8 +125,8 @@ func WritesToBinding(identifier *ast.Node) bool {
 	for current.Parent != nil {
 		switch current.Parent.Kind {
 		// The wrappers a rest element reaches its assignment through. A nested rest interleaves
-		// them — `[a, b, ...[c, ...d]] = xs` puts `d` under spread, array, spread, array before
-		// reaching the assignment — so both the spreads and the literals have to be walked or
+		// them (`[a, b, ...[c, ...d]] = xs` puts `d` under spread, array, spread, array before
+		// reaching the assignment), so both the spreads and the literals have to be walked or
 		// neither is enough. Measured: a spread-only climb passed twenty-two of upstream's
 		// twenty-four failing cases for `no-const-assign` and went silent on two.
 		//

@@ -31,7 +31,7 @@
 // obstruction: for `f(g(x), h(y))` the hooks fire at each identifier read, but nothing reports that
 // `g(x)` produced a value, that the value is the first argument to `f`, or which of the two calls
 // the current block belongs to when they fork. Recovering that means walking the expression tree
-// alongside the graph and re-deriving evaluation order — which is lowering, performed by the
+// alongside the graph and re-deriving evaluation order, which is lowering, performed by the
 // consumer, without the builder's cooperation, once per consumer.
 //
 // The second obstruction is layout. `controlflow` deliberately reproduces ESLint's code-path

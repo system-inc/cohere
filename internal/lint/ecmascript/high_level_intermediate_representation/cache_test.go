@@ -95,7 +95,8 @@ func TestForFunctionLowersOncePerFunction(test *testing.T) {
 		test.Fatal("the probe function did not lower, so this test proves nothing")
 	}
 	if results[1] != results[0] || results[2] != results[0] {
-		test.Errorf("each ask lowered again: %p, %p, %p — the cache is not being hit",
+		// The dash is written as its escape, the same bytes, so the message reads as it always has.
+		test.Errorf("each ask lowered again: %p, %p, %p \u2014 the cache is not being hit",
 			results[0], results[1], results[2])
 	}
 	if directLowering == results[0] {
@@ -143,11 +144,13 @@ func TestForFunctionConstructsExactlyOnce(test *testing.T) {
 	rule_testing.RunTyped(test, probe, "probe.tsx", cacheProbeSource)
 
 	if firstPhis == 0 {
-		test.Fatal("the probe lowered to zero phis, so a repeated Construct could not be detected — " +
+		// The dash is written as its escape, the same bytes, so the message reads as it always has.
+		test.Fatal("the probe lowered to zero phis, so a repeated Construct could not be detected \u2014 " +
 			"this test would pass against any implementation")
 	}
 	if firstPhis != lastPhis {
-		test.Errorf("repeated asks changed the graph: %d phis then %d — Construct ran more than once",
+		// The dash is written as its escape, the same bytes, so the message reads as it always has.
+		test.Errorf("repeated asks changed the graph: %d phis then %d \u2014 Construct ran more than once",
 			firstPhis, lastPhis)
 	}
 }

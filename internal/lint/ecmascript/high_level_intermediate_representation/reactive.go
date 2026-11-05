@@ -748,8 +748,8 @@ func IsHookCallee(function *Function, id static_single_assignment.IdentifierId) 
 	// The callers enumerated when that verdict was taken, because this kind of verdict expires when
 	// a caller is added: `visitBlock`'s two call sites, on `CallExpression.Callee` and on
 	// `MethodCall.Property`. Both receive a place produced by lowering a callee expression. A future
-	// caller passing an identifier that names a local binding — a hook stored in a variable, which
-	// lowering would give a real `Name` — makes the name branch reachable again and this deletion
+	// caller passing an identifier that names a local binding (a hook stored in a variable, which
+	// lowering would give a real `Name`) makes the name branch reachable again and this deletion
 	// has to be re-argued rather than assumed to still hold.
 	//
 	// Re-checked when this was lifted for `pruneNonEscapingScopes`: that pass also asks about a

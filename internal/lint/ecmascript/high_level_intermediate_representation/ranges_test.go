@@ -797,7 +797,7 @@ export function f(c: boolean) {
 // TestRangesRequireEvaluationOrder pins that an unnumbered graph yields nothing rather than
 // nonsense.
 //
-// Opening a range at order zero would write the unset value, which reads back as "no range" — a
+// Opening a range at order zero would write the unset value, which reads back as "no range": a
 // wrong answer wearing the shape of a right one. The pass skips instead, so a caller who forgot
 // `Finalize` gets an empty table they can notice.
 func TestRangesRequireEvaluationOrder(test *testing.T) {
