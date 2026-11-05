@@ -304,6 +304,190 @@ func TestOneSwiftPackageAsksNoCoverage(t *testing.T) {
 	}
 }
 
+// Swift files no package holds, here an app's App/ beside apple/Toy, the shape of ahraos-presence's
+// CapturePhone, are named in the notes, on the summary line and on the verdict line, and change nothing
+// else: a clean run stays green and a failing one exits as it would without them (#ybspptb). The package's
+// own files are no gap.
+func TestSwiftFilesNoPackageChecksAreSaidAndFailNothing(t *testing.T) {
+	t.Parallel()
+	binary := buildCohere(t)
+	clean := fakeSwiftEngine(t, "cat "+filepath.Join(contractDirectory(t), "Clean.jsonl"))
+	findings := fakeSwiftEngine(t, "cat "+filepath.Join(contractDirectory(t), "Findings.jsonl")+"\nexit 1")
+
+	without := mixedRepository(t, "apple/Toy")
+	with := mixedRepository(t, "apple/Toy")
+	writeTree(t, filepath.Join(with, "App"), map[string]string{
+		"Sources/App/App.swift":    "let app = 1\n",
+		"Sources/App/Screen.swift": "let screen = 1\n",
+		"Tests/AppTests.swift":     "let tests = 1\n",
+	})
+
+	for _, engine := range []string{clean, findings} {
+		output, exitCode := runWithEngine(t, binary, engine, with, "--no-fix")
+		_, exitCodeWithout := runWithEngine(t, binary, engine, without, "--no-fix")
+		if exitCode != exitCodeWithout {
+			t.Errorf("Swift no package checks moved the exit code to %d from %d:\n%s", exitCode, exitCodeWithout, output)
+		}
+		for _, want := range []string{
+			"  App/: 3 Swift files no Swift package checks",
+			"; not checked: 3 Swift files no Swift package checks, in 1 directory;",
+			"⚠ Swift files no package checks: App/",
+		} {
+			if !strings.Contains(output, want) {
+				t.Errorf("the report lacks %q:\n%s", want, output)
+			}
+		}
+		if strings.Contains(output, "apple/: ") || strings.Contains(output, "checks: apple/") {
+			t.Errorf("the package's own files were named as checked by no package:\n%s", output)
+		}
+	}
+	// The verdict line is the run's last, the one every view prints.
+	output, _ := runWithEngine(t, binary, clean, with, "--no-fix")
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	if last := lines[len(lines)-1]; !strings.HasPrefix(last, "✓ 💎 ") || !strings.HasSuffix(last, " • ⚠ Swift files no package checks: App/") {
+		t.Errorf("the verdict line is %q, want it green and ending on the gap", last)
+	}
+}
+
+// A package another package's run checks holds its files as surely as one that runs, since the covering run
+// checks them: here A's run checks its sibling B, which is not run, and B's Swift is no gap.
+func TestSwiftACoveredPackageHoldsIsNoGap(t *testing.T) {
+	t.Parallel()
+	binary := buildCohere(t)
+	root := newRepository(t, nil)
+	for _, directory := range []string{"A", "B"} {
+		writeTree(t, filepath.Join(root, directory), map[string]string{
+			"Package.swift":         discoveryPackage,
+			"Sources/Toy/Toy.swift": "let toy = 1\n",
+		})
+	}
+	engine, _ := coveringSwiftEngine(t, "checked=\"\\\"$root\\\"\"\n"+
+		"case \"$root\" in */A) checked=\"$checked,\\\"$root/../B\\\"\";; esac\n"+
+		"echo \"{\\\"kind\\\":\\\"coveredPackages\\\",\\\"root\\\":\\\"$root\\\",\\\"checked\\\":[$checked],\\\"vendored\\\":[]}\"\n"+
+		"exit 0")
+
+	output, exitCode := runWithEngine(t, binary, engine, root, "--no-fix")
+	if exitCode != 0 || !strings.Contains(output, "B not run: checked as part of A") {
+		t.Fatalf("A's run did not cover B, so this does not test a covered package (exit %d):\n%s", exitCode, output)
+	}
+	if strings.Contains(output, "no Swift package checks") || strings.Contains(output, "no package checks") {
+		t.Errorf("a covered package's files were named as checked by no package:\n%s", output)
+	}
+}
+
+// Swift the walk never enters, under node_modules, or that .gitignore or the root's ignorePatterns match, is
+// no gap, since nobody expects it checked. App/, beside them, is the control: the same walk does name
+// unclaimed Swift.
+func TestSwiftIgnoredOrInADependencyIsNoGap(t *testing.T) {
+	t.Parallel()
+	binary := buildCohere(t)
+	clean := fakeSwiftEngine(t, "cat "+filepath.Join(contractDirectory(t), "Clean.jsonl"))
+	root := mixedRepository(t, "apple/Toy")
+	writeTree(t, root, map[string]string{
+		".gitignore":                         "tsconfig.tsbuildinfo\nGenerated/\n*.generated.swift\n",
+		"CohereSettings.json":                "{ \"rules\": {}, \"ignorePatterns\": [\"Legacy/**\"] }\n",
+		"Generated/Sources/Generated.swift":  "let generated = 1\n",
+		"node_modules/dependency/Lib.swift":  "let dependency = 1\n",
+		"Scripts/Made.generated.swift":       "let made = 1\n",
+		"Legacy/Old.swift":                   "let old = 1\n",
+		"App/Sources/App.swift":              "let app = 1\n",
+		"App/Sources/Screen.generated.swift": "let screen = 1\n",
+	})
+
+	output, exitCode := runWithEngine(t, binary, clean, root, "--no-fix")
+	if exitCode != 0 {
+		t.Errorf("the run exited %d:\n%s", exitCode, output)
+	}
+	if !strings.Contains(output, "  App/: 1 Swift file no Swift package checks") || !strings.Contains(output, "⚠ Swift files no package checks: App/\n") {
+		t.Errorf("the control, App/ with its one file .gitignore keeps, is not named alone:\n%s", output)
+	}
+	for _, passedOver := range []string{"Generated/", "node_modules/", "Scripts/", "Legacy/"} {
+		if strings.Contains(output, passedOver+": ") || strings.Contains(output, ", "+passedOver) {
+			t.Errorf("%s was named as Swift no package checks:\n%s", passedOver, output)
+		}
+	}
+}
+
+// Unclaimed Swift at any depth is named by the top directory holding it, its files counted together, and a
+// directory holding a package names only the files outside it. Past three directories the verdict line
+// names three and counts the rest, while the notes name every one.
+func TestUnclaimedSwiftIsNamedByItsTopDirectoryAndCountedPastThree(t *testing.T) {
+	t.Parallel()
+	binary := buildCohere(t)
+	clean := fakeSwiftEngine(t, "cat "+filepath.Join(contractDirectory(t), "Clean.jsonl"))
+	root := mixedRepository(t, "Tools/Sim")
+	writeTree(t, root, map[string]string{
+		"Root.swift":                                 "let root = 1\n",
+		"CapturePhone/Sources/App/App.swift":         "let app = 1\n",
+		"CapturePhone/Sources/App/Deep/Screen.swift": "let screen = 1\n",
+		"CapturePhone/Tests/CaptureTests.swift":      "let tests = 1\n",
+		"Beta/Beta.swift":                            "let beta = 1\n",
+		"Alpha/One/Two/Alpha.swift":                  "let alpha = 1\n",
+		"Tools/script.swift":                         "let script = 1\n",
+	})
+
+	output, _ := runWithEngine(t, binary, clean, root, "--no-fix")
+	for _, want := range []string{
+		"  .: 1 Swift file no Swift package checks",
+		"  Alpha/: 1 Swift file no Swift package checks",
+		"  Beta/: 1 Swift file no Swift package checks",
+		"  CapturePhone/: 3 Swift files no Swift package checks",
+		"  Tools/: 1 Swift file no Swift package checks",
+		"; not checked: 7 Swift files no Swift package checks, in 5 directories;",
+		"⚠ Swift files no package checks: ., Alpha/, Beta/ and 2 more\n",
+	} {
+		if !strings.Contains(output, want) {
+			t.Errorf("the report lacks %q:\n%s", want, output)
+		}
+	}
+	for _, nested := range []string{"CapturePhone/Sources", "CapturePhone/Tests", "Alpha/One", "Tools/Sim"} {
+		if strings.Contains(output, nested+"/: ") || strings.Contains(output, nested+": ") {
+			t.Errorf("%s was named rather than the top directory holding it:\n%s", nested, output)
+		}
+	}
+}
+
+// A root with one TypeScript program and an app's Swift beside it finds one project, which runs in this
+// process with no report of projects. Its own footer says the gap, a replay of that run says it too, and once
+// the Swift is gone the next run says nothing of it.
+func TestTheOneProjectRunHereSaysTheSwiftNoPackageChecks(t *testing.T) {
+	t.Parallel()
+	binary := buildCohere(t)
+	// The cache is ignored, so the second run's inputs are the first's and it replays.
+	root := newRepository(t, map[string]string{
+		"tsconfig.json":         incrementalFixtureConfig + "\n",
+		"CohereSettings.json":   "{ \"rules\": {} }\n",
+		"index.ts":              "export const value = 1;\n",
+		".gitignore":            ".cache/\ntsconfig.tsbuildinfo\n",
+		"App/Sources/App.swift": "let app = 1\n",
+	})
+
+	for _, run := range []string{"fresh", "replayed"} {
+		output, exitCode := runWithEngine(t, binary, "", root, "--no-fix")
+		if exitCode != 0 || strings.Contains(output, "projects under ") {
+			t.Fatalf("the %s run of the one project did not run here, green (exit %d):\n%s", run, exitCode, output)
+		}
+		if replayed := strings.Contains(output, "cached: no input has changed"); replayed != (run == "replayed") {
+			t.Fatalf("the %s run replayed: %t, so this does not test both paths:\n%s", run, replayed, output)
+		}
+		lines := strings.Split(strings.TrimSpace(output), "\n")
+		if last := lines[len(lines)-1]; !strings.HasPrefix(last, "✓ 💎 ") || !strings.HasSuffix(last, " • ⚠ Swift files no package checks: App/") {
+			t.Errorf("the %s run's footer is %q, want it green and ending on the gap", run, last)
+		}
+		if !strings.Contains(output, "cohere: App/: 1 Swift file no Swift package checks") {
+			t.Errorf("the %s run's notes do not name App/:\n%s", run, output)
+		}
+	}
+
+	if err := os.Remove(filepath.Join(root, "App", "Sources", "App.swift")); err != nil {
+		t.Fatal(err)
+	}
+	output, exitCode := runWithEngine(t, binary, "", root, "--no-fix")
+	if exitCode != 0 || strings.Contains(output, "no package checks") {
+		t.Errorf("with the Swift gone the run still names it (exit %d):\n%s", exitCode, output)
+	}
+}
+
 // contractDirectory is where the Swift contract's fixtures are.
 func contractDirectory(t *testing.T) string {
 	t.Helper()

@@ -5,6 +5,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -32,6 +33,18 @@ import (
 //     its drift reported read-only, as it always was.
 //
 // A marker the root's ignorePatterns match is refused rather than run, and named.
+//
+// The walk also notes every .swift file it passes that no discovered Swift package's directory holds, since
+// nothing checks it (#ybspptb). An app xcodegen generates has Swift sources and no Package.swift, and beside a
+// TypeScript program, a green run read clean over code nobody looked at. Such files are named by the top
+// directory holding them, in the notes and on the verdict line, and fail nothing: a run says what it covered
+// as well as what it found. Files the walk never enters, or that .gitignore or the root's ignorePatterns
+// match, are not counted, since nobody expects those checked.
+//
+// A file inside a package's directory that none of its targets compiles is not this walk's to judge: the
+// directory claims it, and the engine knows which files it checks. ahraos-presence's CapturePhone sits inside
+// the root package's directory, so naming it there is the engine's not-checked list made a gap, which the
+// Xcode half of #ybspptb takes up.
 
 // neverDescended are the directory names discovery never enters, whatever any ignore file says.
 var neverDescended = map[string]bool{
@@ -82,6 +95,10 @@ type discovery struct {
 	// SwiftCoverage is what asking the Swift projects which packages their runs cover decided. See
 	// swift_coverage.go.
 	SwiftCoverage swiftCoverage
+
+	// UnclaimedSwift are the top directories holding .swift files no discovered Swift package holds, which
+	// no run checks, in path order.
+	UnclaimedSwift []unclaimedSwiftDirectory
 
 	// Listings are every directory listing the walk read, for the build to serve its tsconfig's include
 	// enumeration from rather than listing the same directories again (#bjv0tg4).
@@ -214,6 +231,8 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 		group      sync.WaitGroup
 		reading    = make(chan struct{}, discoveryParallelism)
 		firstError error
+		// swiftFiles counts the .swift files in each directory that holds any, by directory relative to root.
+		swiftFiles = map[string]int{}
 	)
 	fail := func(err error) {
 		lock.Lock()
@@ -261,7 +280,24 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 				return
 			}
 		}
+		// Counted from the listing already read, so noting Swift no package holds costs no pass of its own. A
+		// file .gitignore or the root's ignorePatterns match is no more expected checked than an ignored
+		// directory is.
+		swiftFileCount := 0
+		for _, entry := range entries {
+			if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".swift") {
+				continue
+			}
+			filePath := path.Join(relative, entry.Name())
+			if scope.Ignored(fromRepository(filePath), false) || configuration.MatchAny(ignorePatterns, filePath) {
+				continue
+			}
+			swiftFileCount++
+		}
 		lock.Lock()
+		if swiftFileCount > 0 {
+			swiftFiles[relative] = swiftFileCount
+		}
 		for _, marker := range []struct {
 			name   string
 			engine projectEngine
@@ -313,7 +349,58 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 	found.sortProjects()
 	sort.Strings(found.Refused)
 	sort.Strings(found.NestedRepositories)
+	found.UnclaimedSwift = unclaimedSwiftDirectories(swiftFiles, found.Projects)
 	return found, nil
+}
+
+// unclaimedSwiftDirectory is one top directory holding .swift files no discovered Swift package holds.
+type unclaimedSwiftDirectory struct {
+	// Directory is the shallowest directory under the root holding the files, relative to it and ending in
+	// a slash, such as "CapturePhone/", or "." for files directly in the root.
+	Directory string `json:"directory"`
+
+	// Files counts the unclaimed .swift files at any depth below it.
+	Files int `json:"files"`
+}
+
+// unclaimedSwiftDirectories is the .swift files no Swift package among projects holds, grouped by the top
+// directory holding them. A package claims every file under its directory, whether it runs or another
+// package's run covers it, since then the covering run checks its files. Every Swift package discovery found
+// is one or the other, so the claim is decided here, before coverage is asked.
+//
+// The top directory is a path's first segment: that directory is outside every package, or the files below
+// it would be claimed, so it is the shallowest one holding them. So CapturePhone/Sources/App and
+// CapturePhone/Tests are both CapturePhone/.
+func unclaimedSwiftDirectories(swiftFiles map[string]int, projects []discoveredProject) []unclaimedSwiftDirectory {
+	var packages []string
+	for _, project := range projects {
+		if project.Engine == engineSwift {
+			packages = append(packages, project.Directory)
+		}
+	}
+	byTop := map[string]int{}
+	for directory, count := range swiftFiles {
+		if slices.ContainsFunc(packages, func(packageDirectory string) bool {
+			return directory == packageDirectory || isBelow(directory, packageDirectory)
+		}) {
+			continue
+		}
+		top := "."
+		if directory != "." {
+			top, _, _ = strings.Cut(directory, "/")
+			top += "/"
+		}
+		byTop[top] += count
+	}
+	unclaimed := make([]unclaimedSwiftDirectory, 0, len(byTop))
+	for top, count := range byTop {
+		unclaimed = append(unclaimed, unclaimedSwiftDirectory{Directory: top, Files: count})
+	}
+	// In path order, the root's first, so the report reads the same on every run.
+	sort.Slice(unclaimed, func(left, right int) bool {
+		return pathBefore(strings.TrimSuffix(unclaimed[left].Directory, "/"), strings.TrimSuffix(unclaimed[right].Directory, "/"))
+	})
+	return unclaimed
 }
 
 // sortProjects puts parents before children, TypeScript before Swift in one directory, and a directory's

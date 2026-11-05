@@ -221,6 +221,10 @@ type runGaps struct {
 	// FixesHeld is a run whose lint fixes were held because a generated file is missing (#46ern7e): none was
 	// proposed or written, and formatting ran alone.
 	FixesHeld bool `json:"fixesHeld,omitempty"`
+	// UnclaimedSwift is the directories of Swift files no package holds that discovery found beside the one
+	// project it ran here (#ybspptb). Nothing checked them, and the run neither fails nor passes on them. It
+	// is this invocation's walk, never recorded, so a replay says what its own walk found.
+	UnclaimedSwift []unclaimedSwiftDirectory `json:"unclaimedSwift,omitempty"`
 }
 
 // failed is whether errors, required rewrites, crashes or a missing generated file fail the run. Warnings
