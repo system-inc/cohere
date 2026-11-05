@@ -65,7 +65,7 @@ func relationMessages(test *testing.T, files map[string]string, anotherFirst boo
 }
 
 // TestTheRelationRulesPrintTheSameTextWhateverTheCheckerMetFirst: the two relation rules name the same types in
-// the same words whether the checker normalized another file's literals first or not, which at GOMAXPROCS=16 is
+// the same words whether the checker normalized another file's literals first or not, which at `GOMAXPROCS=16` is
 // a matter of scheduling (#dq881as). TypeToString printed `extra?: never` first in one and last in the other.
 // The fixture is held to that: each rule must report in both orders, or the comparison proves nothing.
 func TestTheRelationRulesPrintTheSameTextWhateverTheCheckerMetFirst(test *testing.T) {

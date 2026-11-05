@@ -48,7 +48,7 @@ func runNoWarningComments(test *testing.T, testCase noWarningCommentsCase) rule_
 // The corpus is ESLint's own, extracted mechanically rather than retyped.
 //
 // `tests/lib/rules/no-warning-comments.js` was loaded with its RuleTester stubbed so every case came
-// out as data with its options attached, then replayed against the INSTALLED rule to record what it
+// out as data with its options attached, then replayed against the installed rule to record what it
 // reports and which term each finding names. All 61 reproduced, and all 61 are importable -- this
 // rule reads only comments, so nothing about it depends on a parser feature or a source type the
 // harness cannot express.
@@ -154,7 +154,7 @@ func TestNoWarningCommentsStaysSilent(test *testing.T) {
 	}
 }
 
-// Which TERM each finding names, which the message-id assertions above cannot see.
+// Which term each finding names, which the message-id assertions above cannot see.
 //
 // The term is chosen from the configured set by which pattern matched, so a rule that matched on the
 // right comment through the wrong term reports the right count with the wrong word in the message.
@@ -189,7 +189,7 @@ func TestNoWarningCommentsNamesTheMatchedTerm(test *testing.T) {
 
 // The quoted comment in the message, truncated the way upstream truncates it.
 //
-// Upstream rebuilds the quote word by word and stops BEFORE exceeding forty characters, appending an
+// Upstream rebuilds the quote word by word and stops before exceeding forty characters, appending an
 // ellipsis when it stopped early. Two consequences, and both are in its corpus:
 //
 //	the quote never splits a word, so the cut lands on whatever boundary comes before the limit
@@ -234,7 +234,7 @@ func TestNoWarningCommentsTruncatesOnAWordBoundary(test *testing.T) {
 			if len(result.Diagnostics) == 0 {
 				test.Fatal("wanted at least one finding")
 			}
-			// EVERY finding on one comment quotes that same comment, so the quote is asserted on
+			// Every finding on one comment quotes that same comment, so the quote is asserted on
 			// all of them rather than on the first. A comment carrying three configured terms
 			// reports three times, and a rule that computed the quote per-term rather than
 			// per-comment would differ only on the second and third.
@@ -261,7 +261,7 @@ func TestNoWarningCommentsTruncatesOnAWordBoundary(test *testing.T) {
 //
 // The six rows below are where the two would disagree if they did. All six were driven through the
 // installed rule and through Go's own regexp engine, and both agree on every one: a non-ASCII letter
-// is a NON-word character to both, so a term adjacent to one is bounded and matches.
+// is a non-word character to both, so a term adjacent to one is bounded and matches.
 //
 // The Cyrillic row is the control that makes the rest meaningful -- it is clean because the Te is a
 // different letter from an ASCII T, not because of any boundary rule.
@@ -296,15 +296,15 @@ func TestNoWarningCommentsUsesAsciiWordBoundaries(test *testing.T) {
 	}
 }
 
-// The comment VALUE is the body without delimiters, and the difference is load-bearing.
+// The comment value is the body without delimiters, and the difference is load-bearing.
 //
-// Upstream matches against `node.value`, which strips `//` or `/*` and `*/` and NOTHING else. Our
+// Upstream matches against `node.value`, which strips `//` or `/*` and `*/` and nothing else. Our
 // comment reader hands back the full source text including delimiters, so they are removed in the
 // rule, and getting that wrong in either direction moves a whole class of comment across the line:
 // leaving the delimiters in would put `/` between the Start anchor and the term and silence every
 // block comment, while stripping too much would make `/** TODO */` report.
 //
-// That last row is the one to read. `/** TODO */` is CLEAN by default because the surviving asterisk
+// That last row is the one to read. `/** TODO */` is clean by default because the surviving asterisk
 // sits between the anchor and the term, and configuring that asterisk as a decoration character
 // makes the same comment report. Both measured.
 func TestNoWarningCommentsReadsTheCommentValue(test *testing.T) {
@@ -347,10 +347,10 @@ func fmtOptions(options any) string {
 	return string(encoded)
 }
 
-// A directive comment configuring THIS rule is exempt, and both halves of that test matter.
+// A directive comment configuring this rule is exempt, and both halves of that test matter.
 //
 // Upstream's guard is `isDirectiveComment(node) && /\bno-warning-comments\b/`, so a comment must be
-// a directive AND name this rule. Dropping either half breaks a different case: without the name
+// a directive and name this rule. Dropping either half breaks a different case: without the name
 // test, an `eslint-disable` for any other rule would be exempt; without the directive test, an
 // ordinary comment discussing the rule would be.
 func TestNoWarningCommentsExemptsItsOwnDirective(test *testing.T) {
@@ -362,7 +362,7 @@ func TestNoWarningCommentsExemptsItsOwnDirective(test *testing.T) {
 		{"/* eslint no-warning-comments: [2, { terms: [\"todo\"] }] */", nil, nil, nil},
 		{"/* eslint no-warning-comments: \"error\" */ // TODO", nil,
 			[]string{"unexpectedComment"}, []string{"todo"}},
-		// A directive for a DIFFERENT rule is not exempt from being read as a comment, though it
+		// A directive for a different rule is not exempt from being read as a comment, though it
 		// carries no term either.
 		{"/* eslint no-console: \"error\" */", nil, nil, nil},
 		// An ordinary comment mentioning the rule name is not a directive, so it is not exempt.

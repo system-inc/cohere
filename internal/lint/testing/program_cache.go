@@ -18,7 +18,7 @@ import (
 // fast.
 //
 // The memo is bounded, because unbounded it was the largest memory cost in the suite (#7nx3z1n): measured
-// at GOMAXPROCS=3 it peaked at 69 GB in registry, 31 GB in rules/core and 29 GB in rules/typescript, past
+// at `GOMAXPROCS=3` it peaked at 69 GB in registry, 31 GB in rules/core and 29 GB in rules/typescript, past
 // a 7 GB CI runner, which then swapped into the test timeout. Most of it held nothing a later test would
 // ask for. Counted per package, rules/core asked 8,269 times for 6,923 distinct fixtures, and registry
 // 20,046 times for 16,353, so nearly every entry was used once and kept forever.
@@ -28,15 +28,15 @@ import (
 // fixture itself. So every build here, cached or not, takes its lib files from one shared parse
 // (libraryParses, #0rj7wvg), and an entry is only what its fixture adds.
 //
-// Together, measured interleaved against the unbounded memo at GOMAXPROCS=3: every package peaks under
+// Together, measured interleaved against the unbounded memo at `GOMAXPROCS=3`: every package peaks under
 // 1.6 GB and runs no slower, registry 69 GB and 41s to 372 MB and 10s, rules/core 30 GB and 18.6s to
 // 99 MB and 5.7s. The corpus walkers in `high_level_intermediate_representation` were the case a bound
 // alone could not serve: thirty-seven walks of one pinned corpus ask 14,730 times for 1,529 fixtures,
-// but each recurs only after the whole corpus has gone by, which no affordable LRU reaches. Bounded
-// without the shared parse they ran 66s to about 93s; with it, 76.5s to 69.4s at 117 MB against 9.9 GB,
-// because a rebuild now costs the fixture and not its libs.
+// but each recurs only after the whole corpus has gone by, which no affordable least-recently-used cache
+// reaches. Bounded without the shared parse they ran 66s to about 93s; with it, 76.5s to 69.4s at 117 MB
+// against 9.9 GB, because a rebuild now costs the fixture and not its libs.
 //
-// What is deliberately NOT shared is the checker. Upstream owns a checker per worker, keyed by the
+// What is deliberately not shared is the checker. Upstream owns a checker per worker, keyed by the
 // file's position in the program's file list, and it is thread-affine: reaching one from two
 // goroutines produced `fatal error: concurrent map read and map write` inside `core.LinkStore.Get`,
 // which is a runtime fatal rather than a recoverable panic. `checker_concurrency_test.go` records

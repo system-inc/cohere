@@ -20,7 +20,7 @@ type noContinueCase struct {
 	// source is upstream's `code`, byte for byte.
 	source string
 
-	// options is the RAW JSON of upstream's options object, routed through the rule's own
+	// options is the raw JSON of upstream's options object, routed through the rule's own
 	// exported decoder rather than built as a struct, so the decoder's defaults and its
 	// empty-input path are under test.
 	options string

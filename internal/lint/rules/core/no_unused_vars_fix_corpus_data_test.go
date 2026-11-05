@@ -6,7 +6,7 @@ package core
 // suggestions, extracted by loading the three test files with RuleTester stubbed. 15 edge rows were added for
 // what they leave open. Before recording, every upstream row was linted untyped, as upstream's RuleTester runs it,
 // and agreed with upstream's own assertions: ids, lines, columns, each suggestion's id and output, and the fix
-// output. Every row was then replayed against the INSTALLED rule (@typescript-eslint/eslint-plugin
+// output. Every row was then replayed against the installed rule (@typescript-eslint/eslint-plugin
 // 8.71.0, one program per row) under noUnusedVarsOptionsCorpusTsconfig, a JSX row as file.tsx with its
 // pragma and fragment name as jsxFactory and jsxFragmentFactory, on the bytes this harness writes: the source
 // trimmed plus one newline. A suggestion's output is the file with that one suggestion applied, and output is

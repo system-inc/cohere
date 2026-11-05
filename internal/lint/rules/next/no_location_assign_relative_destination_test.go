@@ -126,7 +126,7 @@ func TestNoLocationAssignRelativeDestinationStaysSilent(test *testing.T) {
 		{"a default import of the name", "import location from \"./globals\";\nlocation.assign(\"/dashboard\");\n"},
 		{"a namespace import of the name", "import * as window from \"./globals\";\nwindow.location.href = \"/dashboard\";\n"},
 		{"an import renamed to the name", "import { anything as location } from \"./globals\";\nlocation.assign(\"/dashboard\");\n"},
-		// These two must USE the shadowed name as a receiver, not merely bind it. A fixture that
+		// These two must use the shadowed name as a receiver, not merely bind it. A fixture that
 		// declares the name and never navigates stays silent whatever the rule does, so it reads as
 		// coverage while testing nothing; the mutation sweep found exactly that and both branches
 		// survived until the use was added.

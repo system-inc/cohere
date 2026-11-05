@@ -150,7 +150,7 @@ var (
 // A query assembled with `+` from plain strings, a quote that opens in one template and closes in
 // another, and a value interpolated inside a double-quoted string (a string in MySQL, a name in
 // standard SQL) are all missed. So is SQL that starts with a lowercase keyword or with an
-// interpolation. LIKE wildcards (`%`, `_`) in a value are not a quote problem and are not reported.
+// interpolation. `LIKE` wildcards (`%`, `_`) in a value are not a quote problem and are not reported.
 //
 // # No fix
 //
