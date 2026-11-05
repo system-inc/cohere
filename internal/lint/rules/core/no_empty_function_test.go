@@ -2436,14 +2436,15 @@ func applyEmptyFunctionSuggestion(test *testing.T, source string, suggestion rul
 	sort.Slice(ordered, func(first, second int) bool {
 		return ordered[first].Range.Pos() > ordered[second].Range.Pos()
 	})
+	fixed := source
 	for _, fix := range ordered {
-		if fix.Range.Pos() < 0 || fix.Range.End() > len(source) || fix.Range.Pos() > fix.Range.End() {
+		if fix.Range.Pos() < 0 || fix.Range.End() > len(fixed) || fix.Range.Pos() > fix.Range.End() {
 			test.Fatalf("fix range [%d,%d) is outside the source, which is a defect in the rule",
 				fix.Range.Pos(), fix.Range.End())
 		}
-		source = source[:fix.Range.Pos()] + fix.Text + source[fix.Range.End():]
+		fixed = fixed[:fix.Range.Pos()] + fix.Text + fixed[fix.Range.End():]
 	}
-	return source
+	return fixed
 }
 
 // The span upstream reports, measured against the installed eslint at 10.8.1.

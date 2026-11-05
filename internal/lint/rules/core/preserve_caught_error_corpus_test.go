@@ -35,7 +35,7 @@ type preserveCaughtErrorFinding struct {
 	suggestion string
 }
 
-func TestPreserveCaughtErrorAgreesWithESLint(test *testing.T) {
+func TestPreserveCaughtErrorAgreesWithEsLint(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct {

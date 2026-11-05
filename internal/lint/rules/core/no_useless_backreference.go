@@ -10,6 +10,9 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rule"
 )
 
+// regExpCallTraceMap asks the tracker for every call and construction of the global RegExp.
+var regExpCallTraceMap = map[string]*reference.TraceMap{"RegExp": {Call: true, Construct: true}}
+
 // NoUselessBackreference flags a backreference that can never match the group it names.
 //
 //	valid:   /(a)\1/
@@ -106,9 +109,6 @@ var NoUselessBackreference = rule.Rule{
 	},
 }
 
-// regExpCallTraceMap asks the tracker for every call and construction of the global RegExp.
-var regExpCallTraceMap = map[string]*reference.TraceMap{"RegExp": {Call: true, Construct: true}}
-
 // checkBackreferencesInRegExpCall checks a call or construction of RegExp whose pattern is a constant.
 func checkBackreferencesInRegExpCall(ruleContext rule.Context, call *ast.Node) {
 	arguments := call.Arguments()
@@ -177,6 +177,49 @@ type regexStructure struct {
 	backreferences []backreference
 }
 
+// backreferenceProblem is one of the five ways a group cannot have run.
+type backreferenceProblem struct {
+	id     string
+	reason string
+}
+
+// describe builds the finding's sentence from the reference and the group it names.
+func (problem backreferenceProblem) describe(reference string, group string, otherGroups int) string {
+	also := ""
+	switch {
+	case otherGroups == 1:
+		also = " (and so does one other group of that name)"
+	case otherGroups > 1:
+		also = fmt.Sprintf(" (and so do %d other groups of that name)", otherGroups)
+	}
+	return fmt.Sprintf("The backreference %s can never match, because %s %s%s. It matches the empty "+
+		"string instead of failing, so the pattern quietly matches more than it looks like it does.",
+		reference, group, problem.reason, also)
+}
+
+var (
+	problemInsideItsOwnGroup = backreferenceProblem{
+		id:     "nested",
+		reason: "encloses the reference and so has captured nothing yet when it is reached",
+	}
+	problemAnotherAlternative = backreferenceProblem{
+		id:     "disjunctive",
+		reason: "sits in a different branch of the same disjunction, and only one branch ever runs",
+	}
+	problemBeforeItsGroup = backreferenceProblem{
+		id:     "forward",
+		reason: "appears later in the pattern, and matching runs left to right",
+	}
+	problemAfterItsGroupInLookbehind = backreferenceProblem{
+		id:     "backward",
+		reason: "appears earlier in a lookbehind, which matches right to left",
+	}
+	problemIntoNegativeLookaround = backreferenceProblem{
+		id:     "intoNegativeLookaround",
+		reason: "sits in a negative lookaround, so it only runs on a path that then fails",
+	}
+)
+
 // reportUselessBackreferences scans one pattern and reports every backreference that cannot match, at
 // the node the pattern came from.
 func reportUselessBackreferences(ruleContext rule.Context, node *ast.Node, pattern string, flagsText string) {
@@ -218,7 +261,8 @@ func reportUselessBackreferences(ruleContext rule.Context, node *ast.Node, patte
 			problem backreferenceProblem
 			group   capturingGroup
 		}
-		var all, sameDisjunction []judged
+		var all []judged
+		var sameDisjunction []judged
 		reachable := false
 		for _, group := range groups {
 			problem, ok := classifyBackreference(reference, group, structure.nodes)
@@ -346,49 +390,6 @@ func opensQuantifier(pattern string, index int) bool {
 	}
 	return cursor < len(pattern) && pattern[cursor] == '}'
 }
-
-// backreferenceProblem is one of the five ways a group cannot have run.
-type backreferenceProblem struct {
-	id     string
-	reason string
-}
-
-// describe builds the finding's sentence from the reference and the group it names.
-func (problem backreferenceProblem) describe(reference string, group string, otherGroups int) string {
-	also := ""
-	switch {
-	case otherGroups == 1:
-		also = " (and so does one other group of that name)"
-	case otherGroups > 1:
-		also = fmt.Sprintf(" (and so do %d other groups of that name)", otherGroups)
-	}
-	return fmt.Sprintf("The backreference %s can never match, because %s %s%s. It matches the empty "+
-		"string instead of failing, so the pattern quietly matches more than it looks like it does.",
-		reference, group, problem.reason, also)
-}
-
-var (
-	problemInsideItsOwnGroup = backreferenceProblem{
-		id:     "nested",
-		reason: "encloses the reference and so has captured nothing yet when it is reached",
-	}
-	problemAnotherAlternative = backreferenceProblem{
-		id:     "disjunctive",
-		reason: "sits in a different branch of the same disjunction, and only one branch ever runs",
-	}
-	problemBeforeItsGroup = backreferenceProblem{
-		id:     "forward",
-		reason: "appears later in the pattern, and matching runs left to right",
-	}
-	problemAfterItsGroupInLookbehind = backreferenceProblem{
-		id:     "backward",
-		reason: "appears earlier in a lookbehind, which matches right to left",
-	}
-	problemIntoNegativeLookaround = backreferenceProblem{
-		id:     "intoNegativeLookaround",
-		reason: "sits in a negative lookaround, so it only runs on a path that then fails",
-	}
-)
 
 // resolveBackreference finds the group a reference names.
 //

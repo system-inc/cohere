@@ -30,9 +30,9 @@ const (
 type GroupedAccessorPairsOptions struct {
 	Order GroupedAccessorPairsOrder
 
-	// EnforceForTSTypes also checks the accessor signatures in an interface body or a type literal.
+	// EnforceForTsTypes also checks the accessor signatures in an interface body or a type literal.
 	// Off by default, as upstream's is.
-	EnforceForTSTypes bool
+	EnforceForTsTypes bool
 }
 
 // DecodeGroupedAccessorPairsOptions turns the configured array into options.
@@ -71,12 +71,12 @@ func DecodeGroupedAccessorPairsOptions(list []byte) (any, error) {
 
 	// The second element's only key is `enforceForTSTypes`.
 	var second struct {
-		EnforceForTSTypes bool `json:"enforceForTSTypes"`
+		EnforceForTsTypes bool `json:"enforceForTSTypes"`
 	}
 	if unmarshalOptionsError := rule.UnmarshalOptions(configured[1], &second); unmarshalOptionsError != nil {
 		return options, fmt.Errorf("grouped-accessor-pairs element 2: %w", unmarshalOptionsError)
 	}
-	options.EnforceForTSTypes = second.EnforceForTSTypes
+	options.EnforceForTsTypes = second.EnforceForTsTypes
 	return options, nil
 }
 
@@ -167,7 +167,7 @@ var GroupedAccessorPairs = rule.Rule{
 				checkGroupedAccessorClassBody(ruleContext, settings.Order, node.AsClassExpression().Members.Nodes)
 			},
 		}
-		if settings.EnforceForTSTypes {
+		if settings.EnforceForTsTypes {
 			listeners[ast.KindInterfaceDeclaration] = func(node *ast.Node) {
 				checkGroupedAccessorList(ruleContext, settings.Order, node.AsInterfaceDeclaration().Members.Nodes, nil)
 			}

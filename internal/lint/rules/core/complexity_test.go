@@ -592,95 +592,95 @@ func TestComplexityNameBuilderBranches(test *testing.T) {
 	}{
 		{
 			source: "function a() {}",
-			find:   func(n *ast.Node) bool { return n.Kind == ast.KindFunctionDeclaration },
+			find:   func(node *ast.Node) bool { return node.Kind == ast.KindFunctionDeclaration },
 			want:   "Function 'a'",
 		},
 		{
 			source: "var f = function () {};",
-			find:   func(n *ast.Node) bool { return n.Kind == ast.KindFunctionExpression },
+			find:   func(node *ast.Node) bool { return node.Kind == ast.KindFunctionExpression },
 			want:   "Function",
 		},
 		{
 			source: "function* g() {}",
-			find:   func(n *ast.Node) bool { return n.Kind == ast.KindFunctionDeclaration },
+			find:   func(node *ast.Node) bool { return node.Kind == ast.KindFunctionDeclaration },
 			want:   "Generator function 'g'",
 		},
 		{
 			source: "async function h() {}",
-			find:   func(n *ast.Node) bool { return n.Kind == ast.KindFunctionDeclaration },
+			find:   func(node *ast.Node) bool { return node.Kind == ast.KindFunctionDeclaration },
 			want:   "Async function 'h'",
 		},
 		{
 			source: "async function* i() {}",
-			find:   func(n *ast.Node) bool { return n.Kind == ast.KindFunctionDeclaration },
+			find:   func(node *ast.Node) bool { return node.Kind == ast.KindFunctionDeclaration },
 			want:   "Async generator function 'i'",
 		},
 		{
 			source: "var a = () => {};",
-			find:   func(n *ast.Node) bool { return n.Kind == ast.KindArrowFunction },
+			find:   func(node *ast.Node) bool { return node.Kind == ast.KindArrowFunction },
 			want:   "Arrow function",
 		},
 		{
 			source: "class C { m() {} }",
-			find:   func(n *ast.Node) bool { return n.Kind == ast.KindMethodDeclaration },
+			find:   func(node *ast.Node) bool { return node.Kind == ast.KindMethodDeclaration },
 			want:   "Method 'm'",
 		},
 		{
 			source: "class C { static m() {} }",
-			find:   func(n *ast.Node) bool { return n.Kind == ast.KindMethodDeclaration },
+			find:   func(node *ast.Node) bool { return node.Kind == ast.KindMethodDeclaration },
 			want:   "Static method 'm'",
 		},
 		{
 			source: "class C { get g() {} }",
-			find:   func(n *ast.Node) bool { return n.Kind == ast.KindGetAccessor },
+			find:   func(node *ast.Node) bool { return node.Kind == ast.KindGetAccessor },
 			want:   "Getter 'g'",
 		},
 		{
 			source: "class C { set s(v) {} }",
-			find:   func(n *ast.Node) bool { return n.Kind == ast.KindSetAccessor },
+			find:   func(node *ast.Node) bool { return node.Kind == ast.KindSetAccessor },
 			want:   "Setter 's'",
 		},
 		{
 			source: "class C { constructor() {} }",
-			find:   func(n *ast.Node) bool { return n.Kind == ast.KindConstructor },
+			find:   func(node *ast.Node) bool { return node.Kind == ast.KindConstructor },
 			want:   "Constructor",
 		},
 		{
 			// The private name is unquoted, unlike every other name.
 			source: "class C { #p() {} }",
-			find:   func(n *ast.Node) bool { return n.Kind == ast.KindMethodDeclaration },
+			find:   func(node *ast.Node) bool { return node.Kind == ast.KindMethodDeclaration },
 			want:   "Private method #p",
 		},
 		{
 			source: "class C { static #p() {} }",
-			find:   func(n *ast.Node) bool { return n.Kind == ast.KindMethodDeclaration },
+			find:   func(node *ast.Node) bool { return node.Kind == ast.KindMethodDeclaration },
 			want:   "Static private method #p",
 		},
 		{
 			source: "class C { static { } }",
-			find:   func(n *ast.Node) bool { return n.Kind == ast.KindClassStaticBlockDeclaration },
+			find:   func(node *ast.Node) bool { return node.Kind == ast.KindClassStaticBlockDeclaration },
 			want:   "Class static block",
 		},
 		{
 			source: "class C { x = 1; }",
-			find:   func(n *ast.Node) bool { return n.Kind == ast.KindPropertyDeclaration },
+			find:   func(node *ast.Node) bool { return node.Kind == ast.KindPropertyDeclaration },
 			want:   "Class field initializer",
 		},
 		{
 			// A function that borrows its name from what it is assigned to, which is the branch
 			// three end-to-end defects came from.
 			source: "class C { x = () => 1; }",
-			find:   func(n *ast.Node) bool { return n.Kind == ast.KindArrowFunction },
+			find:   func(node *ast.Node) bool { return node.Kind == ast.KindArrowFunction },
 			want:   "Method 'x'",
 		},
 		{
 			source: "var o = { b: (a) => 1 };",
-			find:   func(n *ast.Node) bool { return n.Kind == ast.KindArrowFunction },
+			find:   func(node *ast.Node) bool { return node.Kind == ast.KindArrowFunction },
 			want:   "Method 'b'",
 		},
 		{
 			source: "var o = { c: function () {} };",
-			find:   func(n *ast.Node) bool { return n.Kind == ast.KindFunctionExpression },
+			find:   func(node *ast.Node) bool { return node.Kind == ast.KindFunctionExpression },
 			want:   "Method 'c'",
 		},
 		{
@@ -689,12 +689,12 @@ func TestComplexityNameBuilderBranches(test *testing.T) {
 			// own id only when the property name is not static. Measured against the installed
 			// rule, which renders "Method 'd'" here.
 			source: "var o = { d: function named() {} };",
-			find:   func(n *ast.Node) bool { return n.Kind == ast.KindFunctionExpression },
+			find:   func(node *ast.Node) bool { return node.Kind == ast.KindFunctionExpression },
 			want:   "Method 'd'",
 		},
 		{
 			source: "var o = { e() {} };",
-			find:   func(n *ast.Node) bool { return n.Kind == ast.KindMethodDeclaration },
+			find:   func(node *ast.Node) bool { return node.Kind == ast.KindMethodDeclaration },
 			want:   "Method 'e'",
 		},
 	}

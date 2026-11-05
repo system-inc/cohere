@@ -70,6 +70,113 @@ func runNoBitwise(test *testing.T, testCase noBitwiseCase) rule_testing.Result {
 		decodeNoBitwiseOptionsForTest(test, testCase.optionsJson))
 }
 
+// noBitwiseCleanCases are upstream's `valid` list, verbatim.
+var noBitwiseCleanCases = []noBitwiseCase{
+	{name: "upstream valid[0]", source: `a + b`, optionsJson: ""},
+	{name: "upstream valid[1]", source: `!a`, optionsJson: ""},
+	{name: "upstream valid[2]", source: `a && b`, optionsJson: ""},
+	{name: "upstream valid[3]", source: `a || b`, optionsJson: ""},
+	{name: "upstream valid[4]", source: `a += b`, optionsJson: ""},
+	{name: "upstream valid[5]", source: `a &&= b`, optionsJson: ""},
+	{name: "upstream valid[6]", source: `a ||= b`, optionsJson: ""},
+	{name: "upstream valid[7]", source: `a ??= b`, optionsJson: ""},
+	{name: "upstream valid[8]", source: `~[1, 2, 3].indexOf(1)`, optionsJson: `{"allow": ["~"]}`},
+	{name: "upstream valid[9]", source: `~1<<2 === -8`, optionsJson: `{"allow": ["~", "<<"]}`},
+	{name: "upstream valid[10]", source: `a|0`, optionsJson: `{"int32Hint": true}`},
+	{name: "upstream valid[11]", source: `a|0`, optionsJson: `{"allow": ["|"], "int32Hint": false}`},
+}
+
+// noBitwiseReportingCases are upstream's `invalid` list, verbatim.
+//
+// Upstream asserts only a count, so the spans and the rendered operator were measured by
+// driving the installed 10.8.1 build.
+var noBitwiseReportingCases = []noBitwiseCase{
+	{
+		name:        "upstream invalid[0]",
+		source:      `a ^ b`,
+		optionsJson: "",
+		findings:    []noBitwiseExpectation{{line: 1, column: 1, endLine: 1, endColumn: 6, operator: "^"}},
+	},
+	{
+		name:        "upstream invalid[1]",
+		source:      `a | b`,
+		optionsJson: "",
+		findings:    []noBitwiseExpectation{{line: 1, column: 1, endLine: 1, endColumn: 6, operator: "|"}},
+	},
+	{
+		name:        "upstream invalid[2]",
+		source:      `a & b`,
+		optionsJson: "",
+		findings:    []noBitwiseExpectation{{line: 1, column: 1, endLine: 1, endColumn: 6, operator: "&"}},
+	},
+	{
+		name:        "upstream invalid[3]",
+		source:      `a << b`,
+		optionsJson: "",
+		findings:    []noBitwiseExpectation{{line: 1, column: 1, endLine: 1, endColumn: 7, operator: "<<"}},
+	},
+	{
+		name:        "upstream invalid[4]",
+		source:      `a >> b`,
+		optionsJson: "",
+		findings:    []noBitwiseExpectation{{line: 1, column: 1, endLine: 1, endColumn: 7, operator: ">>"}},
+	},
+	{
+		name:        "upstream invalid[5]",
+		source:      `a >>> b`,
+		optionsJson: "",
+		findings:    []noBitwiseExpectation{{line: 1, column: 1, endLine: 1, endColumn: 8, operator: ">>>"}},
+	},
+	{
+		name:        "upstream invalid[6]",
+		source:      `a|0`,
+		optionsJson: "",
+		findings:    []noBitwiseExpectation{{line: 1, column: 1, endLine: 1, endColumn: 4, operator: "|"}},
+	},
+	{
+		name:        "upstream invalid[7]",
+		source:      `~a`,
+		optionsJson: "",
+		findings:    []noBitwiseExpectation{{line: 1, column: 1, endLine: 1, endColumn: 3, operator: "~"}},
+	},
+	{
+		name:        "upstream invalid[8]",
+		source:      `a ^= b`,
+		optionsJson: "",
+		findings:    []noBitwiseExpectation{{line: 1, column: 1, endLine: 1, endColumn: 7, operator: "^="}},
+	},
+	{
+		name:        "upstream invalid[9]",
+		source:      `a |= b`,
+		optionsJson: "",
+		findings:    []noBitwiseExpectation{{line: 1, column: 1, endLine: 1, endColumn: 7, operator: "|="}},
+	},
+	{
+		name:        "upstream invalid[10]",
+		source:      `a &= b`,
+		optionsJson: "",
+		findings:    []noBitwiseExpectation{{line: 1, column: 1, endLine: 1, endColumn: 7, operator: "&="}},
+	},
+	{
+		name:        "upstream invalid[11]",
+		source:      `a <<= b`,
+		optionsJson: "",
+		findings:    []noBitwiseExpectation{{line: 1, column: 1, endLine: 1, endColumn: 8, operator: "<<="}},
+	},
+	{
+		name:        "upstream invalid[12]",
+		source:      `a >>= b`,
+		optionsJson: "",
+		findings:    []noBitwiseExpectation{{line: 1, column: 1, endLine: 1, endColumn: 8, operator: ">>="}},
+	},
+	{
+		name:        "upstream invalid[13]",
+		source:      `a >>>= b`,
+		optionsJson: "",
+		findings:    []noBitwiseExpectation{{line: 1, column: 1, endLine: 1, endColumn: 9, operator: ">>>="}},
+	},
+}
+
 // TestNoBitwiseStaysSilent runs upstream's whole `valid` list.
 func TestNoBitwiseStaysSilent(test *testing.T) {
 	test.Parallel()
@@ -312,119 +419,12 @@ func TestNoBitwiseLogicalOperatorsStayClean(test *testing.T) {
 	}
 }
 
-// noBitwiseCleanCases are upstream's `valid` list, verbatim.
-var noBitwiseCleanCases = []noBitwiseCase{
-	{name: "upstream valid[0]", source: `a + b`, optionsJson: ""},
-	{name: "upstream valid[1]", source: `!a`, optionsJson: ""},
-	{name: "upstream valid[2]", source: `a && b`, optionsJson: ""},
-	{name: "upstream valid[3]", source: `a || b`, optionsJson: ""},
-	{name: "upstream valid[4]", source: `a += b`, optionsJson: ""},
-	{name: "upstream valid[5]", source: `a &&= b`, optionsJson: ""},
-	{name: "upstream valid[6]", source: `a ||= b`, optionsJson: ""},
-	{name: "upstream valid[7]", source: `a ??= b`, optionsJson: ""},
-	{name: "upstream valid[8]", source: `~[1, 2, 3].indexOf(1)`, optionsJson: `{"allow": ["~"]}`},
-	{name: "upstream valid[9]", source: `~1<<2 === -8`, optionsJson: `{"allow": ["~", "<<"]}`},
-	{name: "upstream valid[10]", source: `a|0`, optionsJson: `{"int32Hint": true}`},
-	{name: "upstream valid[11]", source: `a|0`, optionsJson: `{"allow": ["|"], "int32Hint": false}`},
-}
-
-// noBitwiseReportingCases are upstream's `invalid` list, verbatim.
-//
-// Upstream asserts only a count, so the spans and the rendered operator were measured by
-// driving the installed 10.8.1 build.
-var noBitwiseReportingCases = []noBitwiseCase{
-	{
-		name:        "upstream invalid[0]",
-		source:      `a ^ b`,
-		optionsJson: "",
-		findings:    []noBitwiseExpectation{{line: 1, column: 1, endLine: 1, endColumn: 6, operator: "^"}},
-	},
-	{
-		name:        "upstream invalid[1]",
-		source:      `a | b`,
-		optionsJson: "",
-		findings:    []noBitwiseExpectation{{line: 1, column: 1, endLine: 1, endColumn: 6, operator: "|"}},
-	},
-	{
-		name:        "upstream invalid[2]",
-		source:      `a & b`,
-		optionsJson: "",
-		findings:    []noBitwiseExpectation{{line: 1, column: 1, endLine: 1, endColumn: 6, operator: "&"}},
-	},
-	{
-		name:        "upstream invalid[3]",
-		source:      `a << b`,
-		optionsJson: "",
-		findings:    []noBitwiseExpectation{{line: 1, column: 1, endLine: 1, endColumn: 7, operator: "<<"}},
-	},
-	{
-		name:        "upstream invalid[4]",
-		source:      `a >> b`,
-		optionsJson: "",
-		findings:    []noBitwiseExpectation{{line: 1, column: 1, endLine: 1, endColumn: 7, operator: ">>"}},
-	},
-	{
-		name:        "upstream invalid[5]",
-		source:      `a >>> b`,
-		optionsJson: "",
-		findings:    []noBitwiseExpectation{{line: 1, column: 1, endLine: 1, endColumn: 8, operator: ">>>"}},
-	},
-	{
-		name:        "upstream invalid[6]",
-		source:      `a|0`,
-		optionsJson: "",
-		findings:    []noBitwiseExpectation{{line: 1, column: 1, endLine: 1, endColumn: 4, operator: "|"}},
-	},
-	{
-		name:        "upstream invalid[7]",
-		source:      `~a`,
-		optionsJson: "",
-		findings:    []noBitwiseExpectation{{line: 1, column: 1, endLine: 1, endColumn: 3, operator: "~"}},
-	},
-	{
-		name:        "upstream invalid[8]",
-		source:      `a ^= b`,
-		optionsJson: "",
-		findings:    []noBitwiseExpectation{{line: 1, column: 1, endLine: 1, endColumn: 7, operator: "^="}},
-	},
-	{
-		name:        "upstream invalid[9]",
-		source:      `a |= b`,
-		optionsJson: "",
-		findings:    []noBitwiseExpectation{{line: 1, column: 1, endLine: 1, endColumn: 7, operator: "|="}},
-	},
-	{
-		name:        "upstream invalid[10]",
-		source:      `a &= b`,
-		optionsJson: "",
-		findings:    []noBitwiseExpectation{{line: 1, column: 1, endLine: 1, endColumn: 7, operator: "&="}},
-	},
-	{
-		name:        "upstream invalid[11]",
-		source:      `a <<= b`,
-		optionsJson: "",
-		findings:    []noBitwiseExpectation{{line: 1, column: 1, endLine: 1, endColumn: 8, operator: "<<="}},
-	},
-	{
-		name:        "upstream invalid[12]",
-		source:      `a >>= b`,
-		optionsJson: "",
-		findings:    []noBitwiseExpectation{{line: 1, column: 1, endLine: 1, endColumn: 8, operator: ">>="}},
-	},
-	{
-		name:        "upstream invalid[13]",
-		source:      `a >>>= b`,
-		optionsJson: "",
-		findings:    []noBitwiseExpectation{{line: 1, column: 1, endLine: 1, endColumn: 9, operator: ">>>="}},
-	},
-}
-
 // TestNoBitwiseEveryAcceptedSpellingActuallyExempts ties the decoder to the rule.
 //
 // The decoder decides which spellings a project may write in `allow`; the operator map decides which
 // operators the rule can act on. Nothing structural forced those to agree while they were two
 // literals, and a mutation changing one spelling in the decoder's list survived the entire fixture
-// set — because each side is internally consistent and every fixture exercises one side or the
+// set, because each side is internally consistent and every fixture exercises one side or the
 // other.
 //
 // The two failure directions are both silent:

@@ -23,7 +23,7 @@ import (
  * And `x += JSON`, which ESLint follows into x and the tracker does not, since x then holds a string.
  * Their own tests say what the rule does instead.
  */
-func TestNoObjCallsAgreesWithESLint(test *testing.T) {
+func TestNoObjCallsAgreesWithEsLint(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct {

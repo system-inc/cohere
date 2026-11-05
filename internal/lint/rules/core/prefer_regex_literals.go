@@ -248,22 +248,23 @@ func isStringRawTag(ruleContext rule.Context, tag *ast.Node) bool {
 	// declined. Unwrapped in a loop because `((String.raw))` nests.
 	//
 	// Not `ast.SkipParentheses`: it dereferences its argument, and this one is optional.
-	for tag != nil && tag.Kind == ast.KindParenthesizedExpression {
-		tag = tag.AsParenthesizedExpression().Expression
+	unwrapped := tag
+	for unwrapped != nil && unwrapped.Kind == ast.KindParenthesizedExpression {
+		unwrapped = unwrapped.AsParenthesizedExpression().Expression
 	}
-	if tag == nil {
+	if unwrapped == nil {
 		return false
 	}
 	var receiver *ast.Node
-	switch tag.Kind {
+	switch unwrapped.Kind {
 	case ast.KindPropertyAccessExpression:
-		access := tag.AsPropertyAccessExpression()
+		access := unwrapped.AsPropertyAccessExpression()
 		if access.Name() == nil || access.Name().Text() != "raw" {
 			return false
 		}
 		receiver = access.Expression
 	case ast.KindElementAccessExpression:
-		access := tag.AsElementAccessExpression()
+		access := unwrapped.AsElementAccessExpression()
 		argument := access.ArgumentExpression
 		if argument == nil {
 			return false
@@ -436,18 +437,19 @@ func padSoTokensStayApart(ruleContext rule.Context, span core.TextRange, text st
 		return text
 	}
 	source := ruleContext.SourceFile.Text()
+	padded := text
 
 	// No hashbang arm here, deliberately. Upstream pads only when the neighbour actually touches
 	// the node, `tokenBefore.range[1] === node.range[0]`, and a hashbang is a whole line above the
 	// call, so the newline already separates them. Only the allowlist gate in
 	// `precedingTokenAllowsALiteral` needs to know a hashbang is one token; padding does not, and
 	// adding it there produced a leading space upstream's expected output does not carry.
-	if span.Pos() > 0 && span.Pos() <= len(source) && text[0] == '/' {
+	if span.Pos() > 0 && span.Pos() <= len(source) && padded[0] == '/' {
 		// A `/` before a `/` opens a line comment, and a `*` before one closes a block comment
 		// that was never opened. Both are upstream's `canTokensBeAdjacent` answering no for a
 		// left `/` against a regular expression.
 		if previous := source[span.Pos()-1]; previous == '/' {
-			text = " " + text
+			padded = " " + padded
 		}
 	}
 	if span.End() >= 0 && span.End() < len(source) {
@@ -455,10 +457,10 @@ func padSoTokensStayApart(ruleContext rule.Context, span core.TextRange, text st
 		// tokenizes as one literal with flags `in`. Upstream reaches the same answer by asking
 		// whether two identifier-ish tokens can sit together.
 		if next := source[span.End()]; isWordByteForRegexAdjacency(next) {
-			text = text + " "
+			padded += " "
 		}
 	}
-	return text
+	return padded
 }
 
 // sourceStartsWithHashbangBefore reports whether everything before offset is a single hashbang line.
@@ -476,9 +478,9 @@ func sourceStartsWithHashbangBefore(source string, offset int) bool {
 	return text.TrimWhitespace(source[firstNewline+1:offset]) == ""
 }
 
-func isWordByteForRegexAdjacency(b byte) bool {
-	return b == '_' || b == '$' || (b >= '0' && b <= '9') ||
-		(b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z')
+func isWordByteForRegexAdjacency(character byte) bool {
+	return character == '_' || character == '$' || (character >= '0' && character <= '9') ||
+		(character >= 'a' && character <= 'z') || (character >= 'A' && character <= 'Z')
 }
 
 func mergeRegexFlags(first string, second string) string {
@@ -500,7 +502,7 @@ func flagsAreEqual(first string, second string) bool {
 
 func sortedFlags(flags string) string {
 	runes := []rune(flags)
-	sort.Slice(runes, func(a int, b int) bool { return runes[a] < runes[b] })
+	sort.Slice(runes, func(first int, second int) bool { return runes[first] < runes[second] })
 	return string(runes)
 }
 
