@@ -21,8 +21,8 @@ import (
 //     and zero bytes on both stdout and stderr. Measured directly on a staged darwin/arm64 build.
 //
 // That second case is the reason to sign. It is reached whenever the binary travels as a file
-// rather than as a package — a release asset downloaded from a browser or curl, a tarball someone
-// forwards, a binary copied out of CI — and it fails in the worst available way: silently, with no
+// rather than as a package (a release asset downloaded from a browser or curl, a tarball someone
+// forwards, a binary copied out of CI), and it fails in the worst available way: silently, with no
 // output to explain it. A developer seeing an empty result would reasonably read it as a clean run,
 // which is precisely the confusion cohere exists to eliminate.
 //
@@ -67,7 +67,7 @@ func (signing Signing) IsConfigured() bool {
 // CanNotarize reports whether notarization can run.
 //
 // Signing and notarizing are separate steps with separate credentials, and a release can legitimately
-// do the first without the second — a signed binary still fails a quarantined launch until the
+// do the first without the second: a signed binary still fails a quarantined launch until the
 // notary service has seen it, but it fails differently and it is a strictly better state than
 // unsigned. Treating them as one step would mean losing the signature when only the notary
 // credentials are missing.
@@ -78,7 +78,7 @@ func (signing Signing) CanNotarize() bool {
 // Sign codesigns a macOS binary in place.
 //
 // The signature is applied with a hardened runtime and a timestamp because the notary service
-// rejects binaries without either, and it rejects them after the upload rather than before — so
+// rejects binaries without either, and it rejects them after the upload rather than before, so
 // omitting these turns a fast local error into a slow remote one.
 func Sign(binaryPath string, signing Signing) error {
 	if !signing.IsConfigured() {
@@ -129,7 +129,7 @@ func VerifySignature(binaryPath string) error {
 	}
 	if strings.Contains(string(details), "Signature=adhoc") {
 		return fmt.Errorf(
-			"%s carries only an ad-hoc signature, which Gatekeeper does not accept — the signing step did not take",
+			"%s carries only an ad-hoc signature, which Gatekeeper does not accept, so the signing step did not take",
 			binaryPath,
 		)
 	}
@@ -240,8 +240,10 @@ func DescribeSigningState(signing Signing) string {
 	case signing.CanNotarize():
 		return "macOS binaries: signed and notarized"
 	case signing.IsConfigured():
-		return "macOS binaries: signed, NOT notarized — a quarantined launch will still be blocked until the notary service has seen this build"
+		return "macOS binaries: signed but not notarized, so a quarantined launch will still be blocked " +
+			"until the notary service has seen this build"
 	default:
-		return "macOS binaries: NOT signed — fine for an npm install, but a copied or downloaded binary will be killed by Gatekeeper with no output"
+		return "macOS binaries: not signed, which is fine for an npm install, but a copied or downloaded " +
+			"binary will be killed by Gatekeeper with no output"
 	}
 }

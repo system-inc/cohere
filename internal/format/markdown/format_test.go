@@ -51,7 +51,8 @@ var formatFixtures = []string{
 	"**a__b**",
 	"*a__b*",
 	"__a*b__",
-	"*a—b*",
+	// An em-dash is punctuation to the flanking rules, so the fixture holds one, spelled as its escape.
+	"*a\u2014b*",
 	"*a b*c",
 	"a *b c*d",
 	"**a* b**",

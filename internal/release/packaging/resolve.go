@@ -40,7 +40,7 @@ var ErrNoBinary = errors.New("no cohere binary for this platform")
 // while Go is what built it. They disagree in two places: Go says `windows` where npm says `win32`,
 // and Go says `amd64` where npm says `x64`. Publishing under the Go spelling produces a package
 // that installs correctly and is never found, which on the machine is indistinguishable from a
-// platform we never shipped — so the translation happens here, once, and every caller passes Go
+// platform we never shipped. So the translation happens here, once, and every caller passes Go
 // names in.
 func PlatformPackageName(goOperatingSystem string, goArchitecture string) string {
 	return fmt.Sprintf(
@@ -96,7 +96,7 @@ func BinaryFileName(operatingSystem string) string {
 // rule this package exists to hold, and it is worth restating at the place it is enforced: the gate
 // cohere replaces printed a green checkmark over zero files for days because a resolver walked up
 // looking for a binary, found none, fell through to the bare name `oxlint`, and the failed spawn
-// produced an empty file list — which is indistinguishable from a clean tree. So there is no
+// produced an empty file list, which is indistinguishable from a clean tree. So there is no
 // fallback to PATH, no fallback to a bare command name, and no fallback to a binary built for
 // another platform. A missing binary exits non-zero naming the platform, every time.
 //
@@ -124,7 +124,7 @@ func Resolve(searchRoots []string) (string, error) {
 			if requireExecutableError := requireExecutable(candidate, information); requireExecutableError != nil {
 				// A binary that exists but cannot run is reported rather than skipped. Continuing
 				// past it would end in "no binary for this platform", which sends whoever reads it
-				// looking for a packaging bug that is not there — the file shipped fine, its mode
+				// looking for a packaging bug that is not there: the file shipped fine, its mode
 				// did not survive.
 				return "", requireExecutableError
 			}
@@ -178,7 +178,7 @@ func resolveOverride(path string) (string, error) {
 //
 // Without this the failure surfaces at exec as a permission error, which reads like a machine
 // problem rather than a packaging one. The most common cause is a packaging step that lost the
-// mode bit — a tarball repacked without preserving permissions — so the message names that.
+// mode bit (a tarball repacked without preserving permissions), so the message names that.
 func requireExecutable(path string, information os.FileInfo) error {
 	if runtime.GOOS == "windows" {
 		// Windows has no executable bit; the extension decides. Checking the mode there would
@@ -207,7 +207,7 @@ func binaryCandidates(root string, packageName string, binaryFileName string) []
 
 		// pnpm's isolated store keeps real packages under `.pnpm/` and symlinks the top level. The
 		// symlink is what the line above follows, so this is only reached when the top-level link
-		// is missing while the package is genuinely installed — which happens with
+		// is missing while the package is genuinely installed, which happens with
 		// `node-linker=isolated` and a dependency that only a nested package depends on.
 		filepath.Join(nodeModules, ".pnpm", "node_modules", filepath.FromSlash(packageName), "bin", binaryFileName),
 	}

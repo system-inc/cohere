@@ -52,7 +52,7 @@ func TestAControlTheComparisonMissedIsReportedMissed(test *testing.T) {
 // A control found on the wrong side is not a pass.
 //
 // This is the failure a naive check misses. The finding is there, the rule matches, the file
-// matches — and the harness has proven the opposite of what it set out to prove, because the
+// matches. And the harness has proven the opposite of what it set out to prove, because the
 // direction is the whole claim.
 func TestAControlOnTheWrongSideIsNotDetected(test *testing.T) {
 	test.Parallel()
@@ -83,8 +83,9 @@ func TestAControlOnTheWrongSideIsNotDetected(test *testing.T) {
 // reintroduced by the file that reports the evidence.
 func TestAbsentCoverageReadsAsZeroRatherThanAGuess(test *testing.T) {
 	test.Parallel()
+	// Cohere's own summary lines, whose em-dashes are spelled as escapes so the bytes stay verbatim.
 	filesWalked, rulesRun := cohereCoverageFrom([]string{
-		"graph built in 1.642s — 9973 files in the program, 3407 of them ours",
+		"graph built in 1.642s \u2014 9973 files in the program, 3407 of them ours",
 		"  note: rule consistency-no-utils-folder listened to no files",
 	})
 	if filesWalked != 0 || rulesRun != 0 {
@@ -95,9 +96,9 @@ func TestAbsentCoverageReadsAsZeroRatherThanAGuess(test *testing.T) {
 		)
 	}
 
-	// The real line, so this test cannot pass by never parsing anything.
+	// The real line, so this test cannot pass by never parsing anything. Its em-dash is an escape, as above.
 	filesWalked, rulesRun = cohereCoverageFrom([]string{
-		"lint: 1 findings — 23 rules over 3407 files, 2098302 nodes visited, in 813ms",
+		"lint: 1 findings \u2014 23 rules over 3407 files, 2098302 nodes visited, in 813ms",
 	})
 	if filesWalked != 3407 || rulesRun != 23 {
 		test.Fatalf(
