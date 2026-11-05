@@ -318,6 +318,8 @@ var RestrictTemplateExpressions = rule.Rule{
 //
 // `seen` reproduces upstream's cycle guard rather than adding one. It is load-bearing on interfaces,
 // where a declaration-merged hierarchy can reach itself.
+//
+// Mutates: seen the recursion shares one visited set down every base-type hop
 func matchesAllowedTypeOrBaseType(ruleContext rule.Context, candidate *checker.Type,
 	settings RestrictTemplateExpressionsOptions, seen map[*checker.Type]struct{}) bool {
 	if candidate == nil {

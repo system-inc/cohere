@@ -139,6 +139,8 @@ var NoDupeClassMembers = rule.Rule{
 // can observe it: the walk is single-threaded per file and hands one node to one listener at a time.
 // That is the invariant this depends on, and it is written here rather than assumed because
 // widening it, running rules concurrently over one tree, would make this unsafe rather than slow.
+//
+// Mutates: members the swap is the caller's to ask for, and the restore it returns writes the original back
 func swapOutComputedClassMembers(members **ast.NodeList) func() {
 	original := *members
 	if original == nil {

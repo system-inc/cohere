@@ -499,6 +499,8 @@ func reportClassLiteralFieldsShouldBeGetters(ruleContext rule.Context, members [
 // assignment inside a nested function, whose `this` need not be the instance. The same question is
 // answered here by walking down and refusing to descend into a nested function-like, which reaches
 // the same set without the upward walk.
+//
+// Mutates: excluded the caller builds one exclusion set across every constructor of the class
 func classLiteralCollectConstructorAssignments(ruleContext rule.Context, constructor *ast.Node, excluded map[string]bool) {
 	body := constructor.AsConstructorDeclaration().Body
 	if body == nil {
