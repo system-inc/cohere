@@ -19,6 +19,15 @@ var (
 
 var packageFirst, packageSecond int
 
+const (
+	packageLow  = 1
+	packageHigh = 2
+)
+
+var (
+	packageLeft, packageRight int
+)
+
 func oneNamePerStatement() {
 	var width = 3
 	var height int
@@ -38,6 +47,35 @@ func commaOk(cache map[string]int, anything any, channel chan int) {
 	var text, isString = anything.(string)
 	var received, open = <-channel
 	use(cached, found, text, isString, received, open)
+}
+
+// iota counts the specs of one block, so a function-level const block that counts with it needs the block.
+func groupedConstWithIota() {
+	const (
+		first = iota
+		second
+	)
+	use(first, second)
+}
+
+// iota inside a larger value counts the same way.
+func groupedConstWithShiftedIota() {
+	const (
+		read = 1 << iota
+		write
+		execute
+	)
+	use(read, write, execute)
+}
+
+// A block whose first value is fixed and whose later values count with iota still needs the block for its count.
+func groupedConstWithLaterIota() {
+	const (
+		unknown = -1
+		first   = iota
+		second
+	)
+	use(unknown, first, second)
 }
 
 // A short declaration is never judged: a multi-return call is grammar, and a parallel assignment is how Go swaps.
