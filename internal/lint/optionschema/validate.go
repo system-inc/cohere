@@ -234,28 +234,29 @@ func (compiler *compiler) compile(value JsonValue, pointer string) (*node, error
 		}
 		return compiled, nil
 	default:
-		return nil, fmt.Errorf("a schema must be an object or a boolean, not %s", untypedGoName(value))
+		// No embedded schema reaches this (TestEveryEmbeddedSchemaCompiles): it is for a regenerated one.
+		return nil, fmt.Errorf("a schema must be an object or a boolean, not %s", shapeName(value))
 	}
 }
 
-// untypedGoName is the name `%T` printed for a value of this shape when the schema was decoded untyped, so
-// a schema that is neither an object nor a boolean is refused in the words it always was.
-func untypedGoName(value JsonValue) string {
+// shapeName names a value's JSON shape in words, as a refusal reads it: "not an array".
+func shapeName(value JsonValue) string {
 	switch value.(type) {
 	case JsonNull:
-		return "<nil>"
+		return "null"
 	case JsonBoolean:
-		return "bool"
+		return "a boolean"
 	case JsonNumber:
-		return "json.Number"
+		return "a number"
 	case JsonString:
-		return "string"
+		return "a string"
 	case JsonArray:
-		return "[]interface {}"
+		return "an array"
 	case JsonObject:
-		return "map[string]interface {}"
+		return "an object"
 	}
-	return fmt.Sprintf("%T", value)
+	// Only a nil interface lands here, which ParseJsonValue never returns.
+	return "no JSON value"
 }
 
 // keyword compiles one keyword of a schema object into the node that object compiles to.

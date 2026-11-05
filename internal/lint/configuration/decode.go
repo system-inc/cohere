@@ -155,11 +155,6 @@ func refuseNulls(elements []json.RawMessage) error {
 			// Malformed JSON is the decoder's to report, in its own words.
 			continue
 		}
-		// An untyped decode read every number as a float64 and failed on one past its range, which left the
-		// whole element to the decoder, so such an element is still left to it.
-		if hasOverflowingNumber(value) {
-			continue
-		}
 		if path, found := nullPath(value, ""); found {
 			at := fmt.Sprintf("element %d", index+1)
 			if path != "" {
@@ -197,28 +192,6 @@ func nullPath(value optionschema.JsonValue, path string) (string, bool) {
 		}
 	}
 	return "", false
-}
-
-// hasOverflowingNumber reports whether a decoded JSON value holds a number float64 cannot read, anywhere in it.
-func hasOverflowingNumber(value optionschema.JsonValue) bool {
-	switch typed := value.(type) {
-	case optionschema.JsonNumber:
-		_, float64Error := json.Number(typed).Float64()
-		return float64Error != nil
-	case optionschema.JsonArray:
-		for _, member := range typed {
-			if hasOverflowingNumber(member) {
-				return true
-			}
-		}
-	case optionschema.JsonObject:
-		for _, member := range typed {
-			if hasOverflowingNumber(member) {
-				return true
-			}
-		}
-	}
-	return false
 }
 
 func joinPath(path, key string) string {
