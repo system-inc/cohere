@@ -7,16 +7,6 @@ import (
 
 var cause = errors.New("permission denied")
 
-// Analyzer is an exported name in the package, so a text may open on it.
-type Analyzer struct{}
-
-// Validate is an exported function, and DefaultLimit an exported constant, so each is a proper name here.
-func Validate() error { return nil }
-
-const DefaultLimit = 10
-
-var Registry = map[string]int{}
-
 // A lowercase clause, with or without a wrapped cause, is the house shape.
 func clauses() []error {
 	return []error{
@@ -27,34 +17,45 @@ func clauses() []error {
 		errors.New("reading v1.2 of the schema"),
 		errors.New("closing the stream (twice)"),
 		errors.New("is this the right file?"),
+		errors.New("the file is locked"),
+		errors.New("couldn't insert the row"),
 	}
 }
 
-// A name declared where the error is made keeps its capital: a type, a function, a constant, a variable, and a local
-// declared before the call.
-func declaredNames() []error {
-	Local := 3
+// A capitalized word outside the vocabulary may be a proper name, a language, a tool, a type here or in another
+// package, and its shape cannot tell, so it is never flagged, whatever follows it.
+func properNamesByAnyShape() []error {
 	return []error{
+		errors.New("Swift is not available on this machine"),
+		errors.New("Prettier config remains unresolved"),
+		errors.New("Node.Text on a nil node"),
 		errors.New("Analyzer has no rules"),
-		fmt.Errorf("Validate refused %d entries", Local),
-		errors.New("DefaultLimit reached"),
-		errors.New("Registry is empty"),
-		errors.New("Local count is wrong"),
-		errors.New("Analyzer.Run stopped"),
+		errors.New("JSON is malformed"),
+		errors.New("TypeScript build broke"),
+		errors.New("Go toolchain not found"),
+		errors.New("Opening config"),
+		errors.New("I/O stalled"),
+		errors.New("It's locked"),
 	}
 }
 
-// An initialism, a word with a capital inside, and Go itself are proper names without being declared anywhere.
-func otherProperNames() []error {
+// A vocabulary word with a capital after its first letter is an initialism or a code, not a sentence's capital.
+func initialismsSpellingAWord() []error {
 	return []error{
-		errors.New("JSON is malformed"),
-		errors.New("HTTP request timed out"),
-		errors.New("ID missing from the row"),
-		errors.New("MacOS refused the entitlement"),
-		errors.New("TypeScript build broke"),
-		errors.New("HTTP2 frame too large"),
-		errors.New("Go toolchain not found"),
-		errors.New("Go"),
+		errors.New("IT department mailbox is full"),
+		errors.New("NO_PROXY is set twice"),
+		errors.New("ON clause has no columns"),
+		errors.New("IF statement in the template is unclosed"),
+	}
+}
+
+// A vocabulary word that only opens a longer identifier is read whole, as the identifier, which is no word.
+func identifiersOpeningOnAWord() []error {
+	return []error{
+		errors.New("No_proxy is set twice"),
+		errors.New("Not2 is reserved"),
+		errors.New("Thereby is no word here"),
+		errors.New("Ann is unknown to the roster"),
 	}
 }
 
