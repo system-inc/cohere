@@ -410,14 +410,14 @@ func parseRegexCharacterClass(
 				// and abort class parsing (caller will skip the regex).
 				return nil, start, false
 			}
-			minEl := out[pendingIndex]
+			minimumEl := out[pendingIndex]
 			rangeEl := RegexCharElement{
 				Kind:        RegexCharRange,
-				Value:       minEl.Value,
-				IsUBrace:    minEl.IsUBrace,
+				Value:       minimumEl.Value,
+				IsUBrace:    minimumEl.IsUBrace,
 				Max:         nextEl.Value,
 				MaxIsUBrace: nextEl.IsUBrace,
-				Start:       minEl.Start,
+				Start:       minimumEl.Start,
 				End:         nextEl.End,
 			}
 			out[pendingIndex] = rangeEl

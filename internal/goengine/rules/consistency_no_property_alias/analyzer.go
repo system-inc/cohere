@@ -138,16 +138,16 @@ func judge(
 	if !isSelector || selector.Sel.Name != local.Name || local.Name == "_" {
 		return
 	}
-	localObject, isVar := pass.TypesInfo.Defs[local].(*types.Var)
-	if !isVar {
+	localObject, isVariable := pass.TypesInfo.Defs[local].(*types.Var)
+	if !isVariable {
 		return
 	}
 	root := chainRoot(pass, selector)
 	if root == nil {
 		return
 	}
-	rootObject, rootIsVar := pass.TypesInfo.Uses[root].(*types.Var)
-	if !rootIsVar {
+	rootObject, rootIsVariable := pass.TypesInfo.Uses[root].(*types.Var)
+	if !rootIsVariable {
 		return
 	}
 	read := onlyRead(pass, body, localObject)

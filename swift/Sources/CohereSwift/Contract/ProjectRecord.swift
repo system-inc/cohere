@@ -33,6 +33,11 @@ public struct ProjectRecord: Codable, Equatable, Sendable {
     public var kind = "project"
     public var root: String
     public var package: String
+    /*
+     `SwiftPackage`, `XcodeGen` or `XcodeProject`: what `package` was read from. Additive within contract 3, so it is
+     optional, and a stream from an engine before it decodes and renders as it did.
+     */
+    public var projectKind: String?
     public var elapsedMilliseconds: Int
     public var filesInPackage: Int
     public var filesOurs: Int
@@ -51,9 +56,11 @@ public struct ProjectRecord: Codable, Equatable, Sendable {
         scopeDescription: String,
         targets: [Target],
         excluded: [ExcludedFile],
+        projectKind: String? = nil,
     ) {
         self.root = root
         self.package = package
+        self.projectKind = projectKind
         self.elapsedMilliseconds = elapsedMilliseconds
         self.filesInPackage = filesInPackage
         self.filesOurs = filesOurs

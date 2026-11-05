@@ -133,9 +133,9 @@ func TestShapeReadersHandBackNoSyntax(test *testing.T) {
 	test.Parallel()
 
 	var rulePackage *gotypes.Package
-	for _, pkg := range lintPackages(test, guardOverlay(test)) {
-		if strings.HasSuffix(pkg.ImportPath, "/internal/lint/rule") {
-			rulePackage = pkg
+	for _, lintPackage := range lintPackages(test, guardOverlay(test)) {
+		if strings.HasSuffix(lintPackage.ImportPath, "/internal/lint/rule") {
+			rulePackage = lintPackage
 		}
 	}
 	if rulePackage == nil || rulePackage.Types == nil || len(rulePackage.Errors) > 0 {
@@ -321,24 +321,24 @@ func scanTypeReach(test *testing.T, overlay map[string][]byte) typeReachScan {
 		info *types.Info
 	}
 	var ruleFiles []ruleFile
-	for _, pkg := range loaded {
-		for _, file := range pkg.Syntax {
-			path := pkg.Fset.Position(file.Pos()).Filename
+	for _, loadedPackage := range loaded {
+		for _, file := range loadedPackage.Syntax {
+			path := loadedPackage.Fset.Position(file.Pos()).Filename
 			if strings.Contains(path, "/internal/lint/rules/") && !strings.HasSuffix(path, "_test.go") {
-				ruleFiles = append(ruleFiles, ruleFile{path, file, pkg.TypesInfo})
+				ruleFiles = append(ruleFiles, ruleFile{path, file, loadedPackage.TypesInfo})
 			}
 			for _, declaration := range file.Decls {
 				switch typed := declaration.(type) {
 				case *ast.FuncDecl:
-					if object := pkg.TypesInfo.Defs[typed.Name]; object != nil && typed.Body != nil {
-						bodies[object] = body{typed, pkg.TypesInfo}
+					if object := loadedPackage.TypesInfo.Defs[typed.Name]; object != nil && typed.Body != nil {
+						bodies[object] = body{typed, loadedPackage.TypesInfo}
 					}
 				case *ast.GenDecl:
 					for _, spec := range typed.Specs {
 						if value, ok := spec.(*ast.ValueSpec); ok {
 							for _, name := range value.Names {
-								if object := pkg.TypesInfo.Defs[name]; object != nil {
-									bodies[object] = body{value, pkg.TypesInfo}
+								if object := loadedPackage.TypesInfo.Defs[name]; object != nil {
+									bodies[object] = body{value, loadedPackage.TypesInfo}
 								}
 							}
 						}

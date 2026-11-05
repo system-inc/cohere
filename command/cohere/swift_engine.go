@@ -63,6 +63,15 @@ func runSwiftEngine(location projectLocation, given map[string]bool, positionals
 	run.details = given["coverage"] && flagValue("coverage") == "true"
 	run.engineSourceCommit = sourceCommit
 	run.requested = engineRequestedPhases(given, flagValue)
+	// What this run leaves to the Swift projects below it, when it is one project of several (see
+	// discovery.swiftYield). Resolved once here, as the engine's paths are resolved against it.
+	yield, activeProjectYieldError := activeProjectYield()
+	if activeProjectYieldError != nil {
+		return 1, activeProjectYieldError
+	}
+	for _, directory := range yield.Directories {
+		run.yieldedDirectories = append(run.yieldedDirectories, resolvedPath(directory))
+	}
 	return runEngineBinary(binaryPath, arguments, run, os.Stderr)
 }
 

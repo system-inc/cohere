@@ -54,7 +54,7 @@ const slowFixNotice = 30 * time.Second
 // Unused-disable warnings are advisory: a check reports them without proposing their repairs,
 // while a writing run applies them. Otherwise their would-change finding would defeat warn.
 func applyProposedFixes(
-	ctx context.Context,
+	callerContext context.Context,
 	graph *program.Graph,
 	projectFiles []*ast.SourceFile,
 	rules []rule.Entry,
@@ -131,7 +131,7 @@ func applyProposedFixes(
 
 	var result program.Result
 	if len(projectFiles) > 0 {
-		walked, walkError := graph.Walk(ctx, projectFiles, rules)
+		walked, walkError := graph.Walk(callerContext, projectFiles, rules)
 		if walkError != nil {
 			if early != nil {
 				speculation = early.speculationOf()

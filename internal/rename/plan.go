@@ -16,7 +16,7 @@ import (
 // The separation is the safety property: a plan is computed from the type graph, printed in full,
 // and only then applied. Nothing here mutates, so a dry run and a real run compute the identical
 // answer and the preview cannot drift from what lands.
-func Build(ctx context.Context, graph *program.Graph, at Position, newName string) (*Plan, error) {
+func Build(callerContext context.Context, graph *program.Graph, at Position, newName string) (*Plan, error) {
 	files := graph.ProjectFiles()
 
 	plan := &Plan{NewName: newName}
@@ -29,7 +29,7 @@ func Build(ctx context.Context, graph *program.Graph, at Position, newName strin
 		return plan, nil
 	}
 
-	anchor, anchorNode, resolveAnchorError := resolveAnchor(ctx, graph, files, at)
+	anchor, anchorNode, resolveAnchorError := resolveAnchor(callerContext, graph, files, at)
 	if resolveAnchorError != nil {
 		return nil, resolveAnchorError
 	}
@@ -65,13 +65,13 @@ func Build(ctx context.Context, graph *program.Graph, at Position, newName strin
 		return plan, nil
 	}
 
-	collectEdits(ctx, graph, files, anchor, plan)
+	collectEdits(callerContext, graph, files, anchor, plan)
 
 	// The new name being taken in a scope the rename reaches is a collision, and a collision is a
 	// refusal rather than something to write and let the type phase find. A rename that produces a
 	// duplicate binding may still compile — a shadowing collision does — so this cannot be left to a
 	// downstream check.
-	if collision := findCollision(ctx, graph, files, anchor, newName, plan); collision != "" {
+	if collision := findCollision(callerContext, graph, files, anchor, newName, plan); collision != "" {
 		plan.Refusals = append(plan.Refusals, collision)
 	}
 
@@ -151,9 +151,9 @@ func describeDeclaration(symbol *ast.Symbol, inProject map[string]bool) (string,
 // The walk is over identifier positions rather than over a list of reference forms, for the reason
 // `internal/unused` gives: a reference is a use wherever it appears, and enumerating the forms would
 // miss whichever one nobody thought of.
-func collectEdits(ctx context.Context, graph *program.Graph, files []*ast.SourceFile, anchor *ast.Symbol, plan *Plan) {
+func collectEdits(callerContext context.Context, graph *program.Graph, files []*ast.SourceFile, anchor *ast.Symbol, plan *Plan) {
 	for _, file := range files {
-		fileChecker, release := graph.CheckerForFile(ctx, file)
+		fileChecker, release := graph.CheckerForFile(callerContext, file)
 		if fileChecker == nil {
 			release()
 			continue
@@ -344,7 +344,7 @@ func isOwnDeclarationName(node *ast.Node) bool {
 // silent shadow, and a silent shadow COMPILES. Refusing loudly beats guessing, which is the line
 // this codebase already holds elsewhere.
 func findCollision(
-	ctx context.Context,
+	callerContext context.Context,
 	graph *program.Graph,
 	files []*ast.SourceFile,
 	anchor *ast.Symbol,
@@ -360,7 +360,7 @@ func findCollision(
 		if !touched[file.FileName().AsString()] {
 			continue
 		}
-		fileChecker, release := graph.CheckerForFile(ctx, file)
+		fileChecker, release := graph.CheckerForFile(callerContext, file)
 		if fileChecker == nil {
 			release()
 			continue

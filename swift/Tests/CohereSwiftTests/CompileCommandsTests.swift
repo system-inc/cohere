@@ -102,14 +102,96 @@ struct CompileCommandsTests {
         #expect(commands.command(for: URL(fileURLWithPath: "/App/Other.swift")) == nil)
     }
 
+    /* An Xcode target's module is named for its product (CapturePhone's is `Capture`), so the modules our files are in are the ones their compiles name. */
+    @Test func theModulesOfFilesAreTheOnesTheirCompilesName() {
+        let commands = CompileCommands(commands: [
+            CompileCommands.Command(
+                moduleName: "Capture",
+                arguments: [],
+                files: ["/App/Phone.swift"],
+                testable: false,
+            ),
+            CompileCommands.Command(
+                moduleName: "CaptureWire",
+                arguments: [],
+                files: ["/Wire/Wire.swift"],
+                testable: false,
+            ),
+        ])
+        let files = [URL(fileURLWithPath: "/App/Phone.swift"), URL(fileURLWithPath: "/App/Uncompiled.swift")]
+        #expect(commands.modules(compiling: files) == ["Capture"])
+    }
+
     @Test func aScratchWithNoBuildDescriptionIsAFailure() {
         let empty = FileManager.default.temporaryDirectory.appendingPathComponent(
             "cohere-swift-no-build-\(UUID().uuidString)",
             isDirectory: true,
         )
         #expect(throws: CompileCommands.ReadFailure.self) {
-            try CompileCommands.read(scratchPath: empty)
+            try CompileCommands.read(layout: .swiftPackage(scratchPath: empty))
         }
+    }
+
+    /* A build description `name` holding `store`, written where the layout's build system writes one. */
+    static func writeBuildDescription(_ store: [UInt8], named name: String, in layout: BuildLayout) throws {
+        let buildData = CompileCommands.buildData(in: layout)
+        try FileManager.default.createDirectory(
+            at: buildData.appendingPathComponent("\(name).xcbuilddata"),
+            withIntermediateDirectories: true,
+        )
+        try "older\n\(name)\n".write(
+            to: buildData.appendingPathComponent("prior-build-descriptions.txt"),
+            atomically: true,
+            encoding: .utf8,
+        )
+        try Data(store).write(to: buildData.appendingPathComponent("\(name).xcbuilddata/task-store.msgpack"))
+    }
+
+    /*
+     The same store read from both roots it was measured at: SwiftPM's `<scratch>/out/`, and an xcodebuild's
+     `<derivedData>/Build/`, whose index store is `Index.noindex/DataStore` rather than SwiftPM's `out`.
+     */
+    @Test func bothLayoutsResolveTheirBuildDescriptionAndIndexStore() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "cohere-swift-layouts-\(UUID().uuidString)",
+            isDirectory: true,
+        ).resolvingSymlinksInPath()
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let source = directory.appendingPathComponent("Shape.swift")
+        try "".write(to: source, atomically: true, encoding: .utf8)
+        let list = directory.appendingPathComponent("Shape.SwiftFileList")
+        try "\(source.path)\n".write(to: list, atomically: true, encoding: .utf8)
+        let store = Self.array(["builtin-SwiftDriver", "--", Self.swiftc, "-module-name", "Shape", "@\(list.path)"])
+
+        let scratch = directory.appendingPathComponent("scratch", isDirectory: true)
+        let derivedData = scratch.appendingPathComponent("xcode-build", isDirectory: true)
+        try Self.writeBuildDescription(store, named: "package", in: .swiftPackage(scratchPath: scratch))
+        try Self.writeBuildDescription(store, named: "project", in: .xcode(derivedData: derivedData))
+
+        #expect(
+            FileManager.default.fileExists(
+                atPath: scratch.appendingPathComponent("out/Intermediates.noindex/XCBuildData/package.xcbuilddata").path
+            )
+        )
+        #expect(
+            FileManager.default.fileExists(
+                atPath: derivedData.appendingPathComponent(
+                    "Build/Intermediates.noindex/XCBuildData/project.xcbuilddata"
+                ).path
+            )
+        )
+        for layout in [BuildLayout.swiftPackage(scratchPath: scratch), .xcode(derivedData: derivedData)] {
+            let commands = try CompileCommands.read(layout: layout)
+            #expect(commands.command(for: source)?.moduleName == "Shape")
+        }
+        #expect(
+            IndexStore.storePath(layout: .swiftPackage(scratchPath: scratch)).path
+                == scratch.appendingPathComponent("out").path
+        )
+        #expect(
+            IndexStore.storePath(layout: .xcode(derivedData: derivedData)).path
+                == derivedData.appendingPathComponent("Index.noindex/DataStore").path
+        )
     }
 
     /* A task store with no Swift compile in it means the format moved, and must say so rather than read as no files. */
@@ -118,21 +200,13 @@ struct CompileCommandsTests {
             "cohere-swift-empty-store-\(UUID().uuidString)",
             isDirectory: true,
         )
-        let buildData = scratch.appendingPathComponent("out/Intermediates.noindex/XCBuildData", isDirectory: true)
-        try FileManager.default.createDirectory(
-            at: buildData.appendingPathComponent("abc.xcbuilddata"),
-            withIntermediateDirectories: true,
-        )
-        try "older\nabc\n".write(
-            to: buildData.appendingPathComponent("prior-build-descriptions.txt"),
-            atomically: true,
-            encoding: .utf8,
-        )
-        try Data(Self.array(["something", "else"])).write(
-            to: buildData.appendingPathComponent("abc.xcbuilddata/task-store.msgpack")
+        try Self.writeBuildDescription(
+            Self.array(["something", "else"]),
+            named: "abc",
+            in: .swiftPackage(scratchPath: scratch),
         )
         #expect(throws: CompileCommands.ReadFailure.self) {
-            try CompileCommands.read(scratchPath: scratch)
+            try CompileCommands.read(layout: .swiftPackage(scratchPath: scratch))
         }
     }
 }

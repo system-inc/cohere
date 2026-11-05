@@ -363,19 +363,19 @@ func (parser *parser) decl(tokens []token, customProperty bool) {
 			break
 		} else if lowered == "important" {
 			cache := copyTokens(tokens, 0, len(tokens))
-			str := ""
+			text := ""
 			for j := index; j > 0; j-- {
 				kind := cache[j].kind
-				if strings.HasPrefix(strings.TrimFunc(str, ecmascripttext.IsWhitespace), "!") && kind != "space" {
+				if strings.HasPrefix(strings.TrimFunc(text, ecmascripttext.IsWhitespace), "!") && kind != "space" {
 					break
 				}
-				str = cache[len(cache)-1].value + str
+				text = cache[len(cache)-1].value + text
 				cache = cache[:len(cache)-1]
 			}
-			if strings.HasPrefix(strings.TrimFunc(str, ecmascripttext.IsWhitespace), "!") {
+			if strings.HasPrefix(strings.TrimFunc(text, ecmascripttext.IsWhitespace), "!") {
 				node.important = true
 				node.mark("important")
-				node.raws["important"] = str
+				node.raws["important"] = text
 				tokens = cache
 			}
 		}
@@ -468,10 +468,10 @@ func (parser *parser) freeSemicolon(each token) {
 // Helpers
 
 func (parser *parser) getPosition(offset int) *position {
-	pos := parser.input.fromOffset(offset)
+	lineAndColumn := parser.input.fromOffset(offset)
 	return &position{
-		column: pos.column,
-		line:   pos.line,
+		column: lineAndColumn.column,
+		line:   lineAndColumn.line,
 		offset: offset,
 	}
 }

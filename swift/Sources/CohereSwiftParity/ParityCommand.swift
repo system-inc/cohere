@@ -9,7 +9,8 @@ import Foundation
      cohere-swift-parity --types-oracle [--package <dir>] [--examples <n>]
 
  `--types-oracle` compares a different incumbent: the build's own compiler records against sourcekitd in
- this process, file by file (see `TypesOracle`). It builds the package into the engine's scratch.
+ this process, file by file (see `TypesOracle`). It builds the package, or an Xcode root's project, into the
+ engine's scratch.
 
  The file set is the engine's own (`FileSet`), so the incumbents read exactly the files cohere checks: the
  same vendored, git-ignored and generated exclusions, with no second list to drift. Nothing is written to
@@ -128,7 +129,7 @@ struct ParityCommand {
         /* Coverage first, so a comparison over nothing cannot read as agreement. */
         print("types oracle over \(report.filesOwned) files in \(root.path)")
         print(
-            "asked sourcekitd about \(report.filesAsked); no compile command for \(report.filesWithoutCommand.count); unanswered \(report.filesUnanswered.count)"
+            "asked sourcekitd about \(report.filesAsked); no compile command for \(report.filesWithoutCommand.count); unanswered \(report.filesUnanswered.count); no fresh build record for \(report.filesWithoutRecord.count)"
         )
         print(
             "build: \(report.build.count) diagnostics in \(report.buildMilliseconds)ms; sourcekitd: \(report.sourcekitd.count) in \(report.sourcekitdMilliseconds)ms"
@@ -161,6 +162,10 @@ struct ParityCommand {
             print(
                 "  group \(built.isEmpty ? "(none)" : built) against \(asked.isEmpty ? "(none)" : asked): \(show(diagnostic))"
             )
+        }
+        /* The build's own gap: what it said about these files, it said without compiling them, so neither side's count is the whole answer. */
+        for file in report.filesWithoutRecord.prefix(examples) {
+            print("  no fresh build record, so the build did not vouch for it: \(PackagePath.relative(file, to: root))")
         }
         for file in report.filesWithoutCommand.prefix(examples) {
             print("  no compile command: \(PackagePath.relative(file, to: root))")

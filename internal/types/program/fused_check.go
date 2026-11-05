@@ -56,7 +56,7 @@ func NewFusedCheck() *FusedCheck {
 // inside the call, so it must not be held: the walk calls this before it takes a checker for the file's
 // rules, never while holding one.
 func (check *FusedCheck) checkFile(
-	ctx context.Context,
+	callerContext context.Context,
 	g *Graph,
 	sourceFile *ast.SourceFile,
 	checkerFile *ast.SourceFile,
@@ -69,9 +69,9 @@ func (check *FusedCheck) checkFile(
 	}
 	var diagnostics []*ast.Diagnostic
 	if checkerFile == sourceFile {
-		diagnostics = g.Program.GetSemanticDiagnostics(ctx, sourceFile)
+		diagnostics = g.Program.GetSemanticDiagnostics(callerContext, sourceFile)
 	} else {
-		diagnostics = semanticDiagnosticsOn(ctx, g.Program, sourceFile, checkerFile)
+		diagnostics = semanticDiagnosticsOn(callerContext, g.Program, sourceFile, checkerFile)
 	}
 	check.mutex.Lock()
 	check.checked[sourceFile] = diagnostics
@@ -81,7 +81,7 @@ func (check *FusedCheck) checkFile(
 // semanticDiagnosticsOn is GetSemanticDiagnostics with the checker that owns checkerFile instead of the one
 // that owns sourceFile: the same skip, the same call on the checker, the same filter and sort.
 func semanticDiagnosticsOn(
-	ctx context.Context,
+	callerContext context.Context,
 	program *compiler.Program,
 	sourceFile *ast.SourceFile,
 	checkerFile *ast.SourceFile,
@@ -89,8 +89,8 @@ func semanticDiagnosticsOn(
 	if program.SkipTypeChecking(sourceFile, false) {
 		return nil
 	}
-	fileChecker, release := program.GetTypeCheckerForFileExclusive(ctx, checkerFile)
-	diagnostics := compiler.Program_getSemanticDiagnosticsWithChecker(program, ctx, fileChecker, sourceFile)
+	fileChecker, release := program.GetTypeCheckerForFileExclusive(callerContext, checkerFile)
+	diagnostics := compiler.Program_getSemanticDiagnosticsWithChecker(program, callerContext, fileChecker, sourceFile)
 	release()
 	return compiler.FilterAndSortDiagnostics(diagnostics)
 }
@@ -105,12 +105,12 @@ func (check *FusedCheck) Checked() int {
 // DiagnosticParts is the check's parts, as AllDiagnosticParts would have returned them. A program file the
 // walk did not check (a third-party declaration, a file the config ignores, any file when no walk ran) is
 // checked here, on its own checker, a goroutine per checker.
-func (check *FusedCheck) DiagnosticParts(ctx context.Context, g *Graph) TypeDiagnosticParts {
-	syntactic := g.Program.GetSyntacticDiagnostics(ctx, nil)
+func (check *FusedCheck) DiagnosticParts(callerContext context.Context, g *Graph) TypeDiagnosticParts {
+	syntactic := g.Program.GetSyntacticDiagnostics(callerContext, nil)
 	if len(syntactic) > 0 {
 		return TypeDiagnosticParts{Syntactic: syntactic}
 	}
-	bind := g.Program.GetBindDiagnostics(ctx, nil)
+	bind := g.Program.GetBindDiagnostics(callerContext, nil)
 
 	programFiles := g.Program.GetSourceFiles()
 	var unchecked []*ast.SourceFile
@@ -121,7 +121,7 @@ func (check *FusedCheck) DiagnosticParts(ctx context.Context, g *Graph) TypeDiag
 		}
 	}
 	check.mutex.Unlock()
-	for index, diagnostics := range g.semanticDiagnosticsOf(ctx, unchecked) {
+	for index, diagnostics := range g.semanticDiagnosticsOf(callerContext, unchecked) {
 		check.checked[unchecked[index]] = diagnostics
 	}
 

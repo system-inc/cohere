@@ -501,7 +501,7 @@ func findSetStateCall(
 		local[id] = place
 	}
 
-	isDerivedFromRef := func(place high_level_intermediate_representation.Place) bool {
+	isDerivedFromReference := func(place high_level_intermediate_representation.Place) bool {
 		return referenceDerived[place.Identifier] || isRefTyped(ruleContext, function, place)
 	}
 
@@ -512,7 +512,7 @@ func findSetStateCall(
 	// and a branch on `reference.current` taints through the same loop that later reaches the
 	// setter. The predicate is only ever called at a setter, by which point every instruction above
 	// it in the walk has been seen.
-	isRefControlledBlock := high_level_intermediate_representation.ControlDominators(function, isDerivedFromRef)
+	isRefControlledBlock := high_level_intermediate_representation.ControlDominators(function, isDerivedFromReference)
 
 	for _, block := range function.Blocks {
 		// A phi joining a ref-derived operand is ref-derived. Upstream does the same, and it is
@@ -543,7 +543,7 @@ func findSetStateCall(
 
 			// Any instruction reading a ref-derived operand produces a ref-derived value, which is
 			// what makes `r.current + 1` and `arr[r.current]` exempt.
-			if instructionReadsRefDerived(instruction, isDerivedFromRef) {
+			if instructionReadsRefDerived(instruction, isDerivedFromReference) {
 				referenceDerived[target] = true
 
 				// A store binds through its own lvalue as well as the instruction's, and both have

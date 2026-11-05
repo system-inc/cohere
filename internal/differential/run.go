@@ -126,7 +126,7 @@ type Control struct {
 // single run. Running the gates twice, once clean and once planted, would double the cost and
 // introduce a window in which the tree changed underneath the two runs — and on a tree with several
 // authors in it, that window is not theoretical.
-func Run(ctx context.Context, options RunOptions) (Report, error) {
+func Run(callerContext context.Context, options RunOptions) (Report, error) {
 	planted, cleanup, err := plantControls(options)
 	// cleanup is deferred before the error check on purpose: plantControls may have written some
 	// files before failing, and leaving a planted violation behind in a shared tree would be a
@@ -142,11 +142,11 @@ func Run(ctx context.Context, options RunOptions) (Report, error) {
 		return Report{}, err
 	}
 
-	verifyOutput, cohereErr := runGate(ctx, cohereCommand)
+	verifyOutput, cohereErr := runGate(callerContext, cohereCommand)
 	if cohereErr != nil {
 		return Report{}, fmt.Errorf("running cohere: %w", cohereErr)
 	}
-	gateOutput, gateErr := runGate(ctx, options.Gate)
+	gateOutput, gateErr := runGate(callerContext, options.Gate)
 	if gateErr != nil {
 		return Report{}, fmt.Errorf("running the gate: %w", gateErr)
 	}
@@ -207,7 +207,7 @@ func Run(ctx context.Context, options RunOptions) (Report, error) {
 		CohereRulesRun:    cohereRulesRun,
 		GateRulesRun:      len(options.ConfiguredRules),
 		CohereCommand:     options.Cohere.String(),
-		CohereVersion:     cohereVersionOf(ctx, options.Cohere),
+		CohereVersion:     cohereVersionOf(callerContext, options.Cohere),
 		GateCommand:       options.Gate.String(),
 		ControlsRun:       checkControls(planted, report, cohereParsed.Findings, gateParsed.Findings),
 	}
@@ -426,8 +426,8 @@ func plantControls(options RunOptions) ([]Control, func(), error) {
 // A non-zero exit is expected and is not an error: both gates exit 1 when they find something, which
 // is the common case. Only a failure to run at all is an error — and it must be one, because a gate
 // that never launched produces empty output that reads exactly like a clean result.
-func runGate(ctx context.Context, command GateCommand) (string, error) {
-	execution := exec.CommandContext(ctx, command.Program, command.Arguments...)
+func runGate(callerContext context.Context, command GateCommand) (string, error) {
+	execution := exec.CommandContext(callerContext, command.Program, command.Arguments...)
 	execution.Dir = command.Directory
 
 	// Stderr is captured and surfaced rather than discarded. `exec.Output` drops it, and a gate
@@ -635,11 +635,11 @@ func cohereCommandWithExtraRules(options RunOptions) (GateCommand, func(), error
 // A failure here is recorded as unknown rather than raised. The version is context for a reader,
 // not an input to any verdict, and refusing to compare because a binary declined to introduce
 // itself would be the harness failing over something that changes nothing about the comparison.
-func cohereVersionOf(ctx context.Context, command GateCommand) string {
+func cohereVersionOf(callerContext context.Context, command GateCommand) string {
 	probe := command
 	probe.Arguments = []string{"-version"}
 
-	output, runGateError := runGate(ctx, probe)
+	output, runGateError := runGate(callerContext, probe)
 	if runGateError != nil {
 		return "version unknown: " + runGateError.Error()
 	}

@@ -47,7 +47,15 @@ public struct RuleConfiguration: Equatable, Sendable {
         severities[ruleName] ?? .error
     }
 
-    public static func load(packageRoot: URL, explicitPath: URL?) throws -> RuleConfiguration {
+    /*
+     `definition` is the file the project is defined by, which the config is looked for beside and the note names:
+     `Package.swift` for a package, `project.yml` for an xcodegen root, the `.xcodeproj` for a committed project.
+     */
+    public static func load(
+        packageRoot: URL,
+        explicitPath: URL?,
+        definition: String = "Package.swift",
+    ) throws -> RuleConfiguration {
         let path = explicitPath ?? packageRoot.appendingPathComponent("CohereSettings.json")
         guard FileManager.default.fileExists(atPath: path.path) else {
             if explicitPath != nil {
@@ -59,7 +67,7 @@ public struct RuleConfiguration: Equatable, Sendable {
             return RuleConfiguration(
                 severities: [:],
                 note:
-                    "config: no CohereSettings.json beside Package.swift, so every house rule ran at error — put one at \(path.path) to change that",
+                    "config: no CohereSettings.json beside \(definition), so every house rule ran at error — put one at \(path.path) to change that",
             )
         }
         return try parse(Data(contentsOf: path), path: path.path)

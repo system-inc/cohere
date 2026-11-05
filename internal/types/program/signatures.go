@@ -90,7 +90,7 @@ const syntaxDefinition = "syntax2:"
 // Signatures returns every project file's signature, keyed by file name, and how many were computed rather
 // than carried forward from previous.
 func (graph *Graph) Signatures(
-	ctx context.Context,
+	callerContext context.Context,
 	previous map[string]SignatureEntry,
 ) (map[string]SignatureEntry, int) {
 	projectFiles := graph.ProjectFiles()
@@ -143,7 +143,7 @@ func (graph *Graph) Signatures(
 
 	var mutex sync.Mutex
 	graph.signatureEmits += len(stale)
-	graph.Program.Emit(ctx, compiler.EmitOptions{
+	graph.Program.Emit(callerContext, compiler.EmitOptions{
 		TargetSourceFiles: stale,
 		EmitOnly:          compiler.EmitOnlyBuilderSignature,
 		WriteFile: func(fileName tspath.RootedFilePath, text string, data *compiler.WriteFileData) error {

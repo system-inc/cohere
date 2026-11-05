@@ -825,7 +825,10 @@ struct SecurityNoInterpolatedSqlStringTests {
                 nodeCount: 0,
             )
         }
-        var provider = SymbolProvider(scratchPaths: [Pipeline.scratchPath(for: root)], runner: ProcessRunner())
+        var provider = SymbolProvider(
+            layouts: [.swiftPackage(scratchPath: Pipeline.scratchPath(for: root))],
+            runner: ProcessRunner(),
+        )
         provider.ownedModules = ["Control"]
         let symbols = provider.symbols(for: parsed)
         var lines: [String: [Int]] = [:]

@@ -213,17 +213,17 @@ func (state *unstableNestedState) validate(node *ast.Node) {
 		return
 	}
 
-	isDeclaredInsideProps := state.isComponentInProp(node)
+	isDeclaredInsideProperties := state.isComponentInProp(node)
 
 	if !state.isComponent[node] &&
 		!state.isFunctionComponentInsideClassComponent(node) &&
-		!isDeclaredInsideProps {
+		!isDeclaredInsideProperties {
 		return
 	}
 
 	switch {
 	// The `allowAsProps` option, and the render-prop exemption that applies regardless of it.
-	case isDeclaredInsideProps && (state.allowAsProps || state.isComponentInRenderProp(node)):
+	case isDeclaredInsideProperties && (state.allowAsProps || state.isComponentInRenderProp(node)):
 		return
 
 	// A component created inside `items.map(...)` is a callback rather than a nested component.
@@ -278,7 +278,7 @@ func (state *unstableNestedState) validate(node *ast.Node) {
 	// The enumerated callers are this file's own `KindSourceFile` walk and nothing else. If a
 	// second entry point is ever added, this verdict is void.
 	message := unstableNestedMessage(parentName)
-	if isDeclaredInsideProps && !state.allowAsProps {
+	if isDeclaredInsideProperties && !state.allowAsProps {
 		message += componentAsPropsInfo
 	}
 

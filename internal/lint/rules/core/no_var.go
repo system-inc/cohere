@@ -51,7 +51,7 @@ var NoVar = rule.Rule[rule.NoOptions]{
 		// let and const both carry a flag, and `var` is the absence of both. Reading it as an
 		// absence rather than as a keyword is what makes `using` and `await using` fall through
 		// correctly, since those carry their own flags.
-		reportIfVar := func(declarationList *ast.Node) {
+		reportIfVariable := func(declarationList *ast.Node) {
 			if declarationList == nil {
 				return
 			}
@@ -88,19 +88,19 @@ var NoVar = rule.Rule[rule.NoOptions]{
 					parent.Parent != nil && ast.IsGlobalScopeAugmentation(parent.Parent) {
 					return
 				}
-				reportIfVar(node.AsVariableStatement().DeclarationList)
+				reportIfVariable(node.AsVariableStatement().DeclarationList)
 			},
 
 			ast.KindForStatement: func(node *ast.Node) {
-				reportIfVar(loopInitializer(node.AsForStatement().Initializer))
+				reportIfVariable(loopInitializer(node.AsForStatement().Initializer))
 			},
 
 			ast.KindForInStatement: func(node *ast.Node) {
-				reportIfVar(loopInitializer(node.AsForInOrOfStatement().Initializer))
+				reportIfVariable(loopInitializer(node.AsForInOrOfStatement().Initializer))
 			},
 
 			ast.KindForOfStatement: func(node *ast.Node) {
-				reportIfVar(loopInitializer(node.AsForInOrOfStatement().Initializer))
+				reportIfVariable(loopInitializer(node.AsForInOrOfStatement().Initializer))
 			},
 		}
 	},

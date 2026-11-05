@@ -83,14 +83,14 @@ func TestCoverageCountsAddUpToTheRuleTotal(test *testing.T) {
 			}
 		}
 	}
-	config := &configuration.Config{Rules: map[string]configuration.RuleSetting{
+	lintConfiguration := &configuration.Config{Rules: map[string]configuration.RuleSetting{
 		"rule-00":         {Severity: configuration.SeverityError},
 		"unported-one":    {Severity: configuration.SeverityError},
 		"plugin/unported": {Severity: configuration.SeverityWarn},
 		"unported-off":    {Severity: configuration.SeverityOff},
 	}}
 
-	summary := classifyTypeScriptCoverage(rules, coverage, config)
+	summary := classifyTypeScriptCoverage(rules, coverage, lintConfiguration)
 	if summary.total() != len(rules)+2 {
 		test.Fatalf(
 			"the summary accounts for %d rules, want %d registered plus 2 not ported",
@@ -116,7 +116,7 @@ func TestCoverageCountsAddUpToTheRuleTotal(test *testing.T) {
 	}
 
 	output := renderLintReport(
-		lintReport{Result: program.Result{Coverage: coverage}, Rules: rules, LintConfig: config, WalkCost: "in 1s"},
+		lintReport{Result: program.Result{Coverage: coverage}, Rules: rules, LintConfig: lintConfiguration, WalkCost: "in 1s"},
 	)
 	total, terms := countedLineTerms(test, output)
 	printedSum := 0
@@ -137,7 +137,7 @@ func TestCoverageCountsAddUpToTheRuleTotal(test *testing.T) {
 	swift, classifyEngineCoverageError := classifyEngineCoverage(&engineLintRecord{
 		RulesRun: 9, RulesWatchedAndQuiet: 3, RulesSilent: []string{"a", "b", "c"},
 		RulesNotConfigured: []string{"a"}, RulesScopedOff: map[string]int{"b": 2, "quiet-but-partly-off": 1},
-	})
+	}, swiftLanguage)
 	if classifyEngineCoverageError != nil {
 		test.Fatal(classifyEngineCoverageError)
 	}
@@ -156,6 +156,7 @@ func TestSwiftCoverageRefusesPartsLargerThanTheWhole(test *testing.T) {
 	test.Parallel()
 	_, classifyEngineCoverageError := classifyEngineCoverage(
 		&engineLintRecord{RulesRun: 2, RulesWatchedAndQuiet: 2, RulesSilent: []string{"a"}},
+		swiftLanguage,
 	)
 	if classifyEngineCoverageError == nil || !strings.Contains(classifyEngineCoverageError.Error(), "more than that") {
 		test.Fatalf("a record counting 3 rules among 2 was accepted: %v", classifyEngineCoverageError)
@@ -248,14 +249,14 @@ func TestCoverageDetailsNameEachRuleOnce(test *testing.T) {
 			"off-and-unconfigured": 785,
 		},
 	}
-	config := &configuration.Config{
+	lintConfiguration := &configuration.Config{
 		Rules: map[string]configuration.RuleSetting{"not-ported": {Severity: configuration.SeverityError}},
 	}
 
 	output := renderLintReport(lintReport{
 		Result:     program.Result{Coverage: coverage},
 		Rules:      rules,
-		LintConfig: config,
+		LintConfig: lintConfiguration,
 		WalkCost:   "in 1s",
 		Details:    true,
 	})
@@ -406,14 +407,14 @@ func TestActionableCoverageAlwaysPrintsByDefault(test *testing.T) {
 
 	// Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 	test.Run("config keys that match no rule", func(test *testing.T) {
-		config := &configuration.Config{Rules: map[string]configuration.RuleSetting{
+		lintConfiguration := &configuration.Config{Rules: map[string]configuration.RuleSetting{
 			"quiet-rule":   {Severity: configuration.SeverityError},
 			"no-dupe-keys": {Severity: configuration.SeverityOff},
 		}}
 		output := renderLintReport(lintReport{
 			Result:     program.Result{Coverage: cleanCoverage()},
 			Rules:      rules,
-			LintConfig: config,
+			LintConfig: lintConfiguration,
 			WalkCost:   "in 1s",
 		})
 		requireLines(test, output, `  config: key "no-dupe-keys" matches no registered rule, so its off never applies`)
@@ -516,7 +517,7 @@ func TestActionableCoverageAlwaysPrintsByDefault(test *testing.T) {
 
 	// Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 	test.Run("parity", func(test *testing.T) {
-		config := &configuration.Config{Rules: map[string]configuration.RuleSetting{
+		lintConfiguration := &configuration.Config{Rules: map[string]configuration.RuleSetting{
 			"quiet-rule":    {Severity: configuration.SeverityError},
 			"not-yet-here":  {Severity: configuration.SeverityError},
 			"turned-off-be": {Severity: configuration.SeverityOff},
@@ -524,7 +525,7 @@ func TestActionableCoverageAlwaysPrintsByDefault(test *testing.T) {
 		output := renderLintReport(lintReport{
 			Result:     program.Result{Coverage: cleanCoverage()},
 			Rules:      rules,
-			LintConfig: config,
+			LintConfig: lintConfiguration,
 			WalkCost:   "in 1s",
 		})
 		requireLines(test, output,
@@ -633,7 +634,7 @@ func TestADepartureFromAHouseRulingPrintsByDefault(test *testing.T) {
 // Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 func TestAnOverrideWithAReasonPrintsByDefault(test *testing.T) {
 	root := "/repository"
-	config := &configuration.Config{
+	lintConfiguration := &configuration.Config{
 		Root: root,
 		Overrides: []configuration.Override{
 			{
@@ -652,7 +653,7 @@ func TestAnOverrideWithAReasonPrintsByDefault(test *testing.T) {
 			},
 		},
 	}
-	output := renderLintReport(lintReport{LintConfig: config})
+	output := renderLintReport(lintReport{LintConfig: lintConfiguration})
 	want := "  override: **/api/graphql/*.generated.ts in structure/StructureCohereSettings.json sets " +
 		"@typescript-eslint/no-explicit-any off, nexus/consistency-no-abbreviated-identifier off: " +
 		"until the generator emits real scalar types"
@@ -681,7 +682,7 @@ func TestAnOffPrintsItsReasonAndAnUnreasonedOffIsCountedByDefault(test *testing.
 		RulesScopedOff:    map[string]int{"prefer-arrow-callback": 40, "no-continue": 40},
 		RulesUnconfigured: map[string]int{},
 	}
-	config := &configuration.Config{
+	lintConfiguration := &configuration.Config{
 		Root: root,
 		Rules: map[string]configuration.RuleSetting{
 			"prefer-arrow-callback": {Severity: configuration.SeverityOff},
@@ -697,7 +698,7 @@ func TestAnOffPrintsItsReasonAndAnUnreasonedOffIsCountedByDefault(test *testing.
 	report := lintReport{
 		Result:     program.Result{Coverage: coverage},
 		Rules:      rules,
-		LintConfig: config,
+		LintConfig: lintConfiguration,
 		WalkCost:   "in 1s",
 	}
 

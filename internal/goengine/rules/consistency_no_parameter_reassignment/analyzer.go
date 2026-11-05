@@ -95,7 +95,7 @@ func parametersOf(pass *analysis.Pass, file *ast.File) map[*types.Var]bool {
 		}
 		for _, field := range fields.List {
 			for _, name := range field.Names {
-				if parameter, isVar := pass.TypesInfo.Defs[name].(*types.Var); isVar {
+				if parameter, isVariable := pass.TypesInfo.Defs[name].(*types.Var); isVariable {
 					parameters[parameter] = true
 				}
 			}
@@ -143,8 +143,8 @@ func parameterNamed(
 	if !isIdentifier {
 		return nil, nil
 	}
-	parameter, isVar := pass.TypesInfo.Uses[identifier].(*types.Var)
-	if !isVar || !parameters[parameter] {
+	parameter, isVariable := pass.TypesInfo.Uses[identifier].(*types.Var)
+	if !isVariable || !parameters[parameter] {
 		return nil, nil
 	}
 	return identifier, parameter

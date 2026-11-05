@@ -279,23 +279,23 @@ var NoFloatingPromises = rule.Rule[NoFloatingPromisesOptions]{
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
 	Run: func(ruleContext rule.Context, options rule.Given[NoFloatingPromisesOptions]) rule.Listeners {
-		opts, ok := options.Read()
+		settings, ok := options.Read()
 		if !ok {
-			opts = NoFloatingPromisesOptions{
+			settings = NoFloatingPromisesOptions{
 				AllowForKnownSafeCalls:          []type_checking.TypeOrValueSpecifier{},
 				AllowForKnownSafeCallsInline:    []string{},
 				AllowForKnownSafePromises:       []type_checking.TypeOrValueSpecifier{},
 				AllowForKnownSafePromisesInline: []string{},
 			}
 		}
-		if opts.CheckThenables == nil {
-			opts.CheckThenables = type_checking.Ref(false)
+		if settings.CheckThenables == nil {
+			settings.CheckThenables = type_checking.Ref(false)
 		}
-		if opts.IgnoreIIFE == nil {
-			opts.IgnoreIIFE = type_checking.Ref(false)
+		if settings.IgnoreIIFE == nil {
+			settings.IgnoreIIFE = type_checking.Ref(false)
 		}
-		if opts.IgnoreVoid == nil {
-			opts.IgnoreVoid = type_checking.Ref(true)
+		if settings.IgnoreVoid == nil {
+			settings.IgnoreVoid = type_checking.Ref(true)
 		}
 
 		isHigherPrecedenceThanUnary := func(node *ast.Node) bool {
@@ -337,7 +337,7 @@ var NoFloatingPromises = rule.Rule[NoFloatingPromisesOptions]{
 			return false
 		}
 
-		isFunctionParam := func(
+		isFunctionParameter := func(
 			parameter *ast.Symbol,
 			node *ast.Node,
 		) bool {
@@ -362,8 +362,8 @@ var NoFloatingPromises = rule.Rule[NoFloatingPromisesOptions]{
 			// The highest priority is to allow anything allowlisted
 			if type_checking.TypeMatchesSomeSpecifier(
 				t,
-				opts.AllowForKnownSafePromises,
-				opts.AllowForKnownSafePromisesInline,
+				settings.AllowForKnownSafePromises,
+				settings.AllowForKnownSafePromisesInline,
 				ruleContext.Program,
 			) {
 				return false
@@ -378,7 +378,7 @@ var NoFloatingPromises = rule.Rule[NoFloatingPromisesOptions]{
 			}
 
 			// ...and only check all Thenables if explicitly told to
-			if !*opts.CheckThenables {
+			if !*settings.CheckThenables {
 				return false
 			}
 
@@ -398,8 +398,8 @@ var NoFloatingPromises = rule.Rule[NoFloatingPromisesOptions]{
 					func(signature *checker.Signature) bool {
 						parameters := checker.Signature_parameters(signature)
 						return len(parameters) >= 2 &&
-							isFunctionParam(parameters[0], node) &&
-							isFunctionParam(parameters[1], node)
+							isFunctionParameter(parameters[0], node) &&
+							isFunctionParameter(parameters[1], node)
 					}) {
 					return true
 				}
@@ -442,8 +442,8 @@ var NoFloatingPromises = rule.Rule[NoFloatingPromisesOptions]{
 
 			return type_checking.TypeMatchesSomeSpecifier(
 				t,
-				opts.AllowForKnownSafeCalls,
-				opts.AllowForKnownSafeCallsInline,
+				settings.AllowForKnownSafeCalls,
+				settings.AllowForKnownSafeCallsInline,
 				ruleContext.Program,
 			)
 		}
@@ -496,7 +496,7 @@ var NoFloatingPromises = rule.Rule[NoFloatingPromisesOptions]{
 				return isUnhandledPromise(expr.Right)
 			}
 
-			if !*opts.IgnoreVoid && ast.IsVoidExpression(node) {
+			if !*settings.IgnoreVoid && ast.IsVoidExpression(node) {
 				// Similarly, a `void` expression always returns undefined, so we need to
 				// see what's inside it without checking the type of the overall expression.
 				return isUnhandledPromise(node.Expression())
@@ -590,7 +590,7 @@ var NoFloatingPromises = rule.Rule[NoFloatingPromisesOptions]{
 
 				exprStatement := node.AsExpressionStatement()
 
-				if *opts.IgnoreIIFE && isAsyncIife(exprStatement) {
+				if *settings.IgnoreIIFE && isAsyncIife(exprStatement) {
 					return
 				}
 
@@ -607,13 +607,13 @@ var NoFloatingPromises = rule.Rule[NoFloatingPromisesOptions]{
 				}
 				if promiseArray {
 					var message rule.Message
-					if *opts.IgnoreVoid {
+					if *settings.IgnoreVoid {
 						message = buildFloatingPromiseArrayVoidMessage()
 					} else {
 						message = buildFloatingPromiseArrayMessage()
 					}
 					ruleContext.ReportNode(node, message)
-				} else if *opts.IgnoreVoid {
+				} else if *settings.IgnoreVoid {
 					var message rule.Message
 					if nonFunctionHandler {
 						message = buildFloatingUselessRejectionHandlerVoidMessage()

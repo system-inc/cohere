@@ -66,7 +66,7 @@ func run(pass *analysis.Pass) (any, error) {
 		}
 		byVariable := map[*types.Var]*collection{}
 		for _, found := range collections {
-			if variable, isVar := pass.TypesInfo.Defs[found.name].(*types.Var); isVar {
+			if variable, isVariable := pass.TypesInfo.Defs[found.name].(*types.Var); isVariable {
 				byVariable[variable] = found
 			}
 		}
@@ -94,8 +94,8 @@ func freshCollections(pass *analysis.Pass, file *ast.File) []*collection {
 	var collections []*collection
 	consider := func(name *ast.Ident, initializer ast.Expr) {
 		// Defs holds only a new variable: a := that reuses a name records it in Uses, and the blank name has none.
-		variable, isVar := pass.TypesInfo.Defs[name].(*types.Var)
-		if !isVar || !isCollection(variable.Type()) || !isFresh(pass, initializer) {
+		variable, isVariable := pass.TypesInfo.Defs[name].(*types.Var)
+		if !isVariable || !isCollection(variable.Type()) || !isFresh(pass, initializer) {
 			return
 		}
 		collections = append(collections, &collection{name: name})
@@ -180,8 +180,8 @@ func judgeReferences(pass *analysis.Pass, file *ast.File, byVariable map[*types.
 			return true
 		}
 		// Uses, by object, so a shadowing variable of the same name in an inner scope is never this one.
-		variable, isVar := pass.TypesInfo.Uses[identifier].(*types.Var)
-		if !isVar {
+		variable, isVariable := pass.TypesInfo.Uses[identifier].(*types.Var)
+		if !isVariable {
 			return true
 		}
 		found, isCandidate := byVariable[variable]
