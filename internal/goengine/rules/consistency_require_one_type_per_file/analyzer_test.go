@@ -23,7 +23,8 @@ func TestRuleIsAWellFormedHouseRule(test *testing.T) {
 }
 
 // The flagged fixtures carry a // want on every extra type a file serves, declared or receiver only, generic or in a
-// test file, a variant with one real method beside its marker, here or in another file, and a marker with a result.
+// test file, a variant with one real method beside its marker, here or in another file, a marker with a result, and
+// no-ops whose empty methods take parameters.
 // analysistest fails on a finding no want expects as much as on a want nothing found, so the allowed and lookalike
 // fixtures prove the rule stays quiet on one type and its themed method files, plain structs and interfaces beside a
 // type, a sum type's variants whose only methods are empty markers, declared here or elsewhere, an alias, and a

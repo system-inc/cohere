@@ -14,11 +14,14 @@ package markertype
 import "go/ast"
 
 // IsMarkerOnly is whether methods, every method a type declares, are all marker methods, so the type counts as no type
-// with methods. A marker method has a receiver, an empty body and no results: `func (A) kind() int { return 0 }`
-// answers something and is a real method, and so is one with no body at all, which is written in assembly. An empty
-// body is one with no statements, so a comment inside it, which an empty function is asked to carry to say why it is
-// empty, keeps it empty. A type with no methods at all is no marker type, so IsMarkerOnly of none is false: whether a
-// method-less type counts is its caller's question, and a caller that already skips those never asks this.
+// with methods. A marker method has a receiver, no parameters, an empty body and no results:
+// `func (A) kind() int { return 0 }` answers something and is a real method, and so is one with no body at all, which
+// is written in assembly. So is `func (noopTracer) Trace(event Event) {}`, empty as it is: a method that takes
+// something is an operation its callers ask for, and a null object that performs it as nothing is behavior a reader
+// looks for in its own file, where a marker is only a name the type answers to. An empty body is one with no
+// statements, so a comment inside it, which an empty function is asked to carry to say why it is empty, keeps it
+// empty. A type with no methods at all is no marker type, so IsMarkerOnly of none is false: whether a method-less type
+// counts is its caller's question, and a caller that already skips those never asks this.
 func IsMarkerOnly(methods []*ast.FuncDecl) bool {
 	if len(methods) == 0 {
 		return false
@@ -31,11 +34,13 @@ func IsMarkerOnly(methods []*ast.FuncDecl) bool {
 	return true
 }
 
-// isMarkerMethod is whether method declares membership and nothing else. NumFields is zero both for no result list
-// and for an empty one, `func (A) kind() ()`, which declares no result either. In code that compiles a method with a
-// result always ends in a return, so its body is never empty, but the results are still read: a caller working from
-// syntax alone can be handed `func (A) kind() int {}`, which parses, and it is no marker.
+// isMarkerMethod is whether method declares membership and nothing else. NumFields is zero for a nil field list, so it
+// reads a missing parameter or result list as an empty one, and an empty result list, `func (A) kind() ()`, declares
+// no result either. A parameter, even a blank `_ int`, is a field, so a method taking one is an operation and no
+// marker. In code that compiles a method with a result always ends in a return, so its body is never empty, but the
+// results are still read: a caller working from syntax alone can be handed `func (A) kind() int {}`, which parses,
+// and it is no marker.
 func isMarkerMethod(method *ast.FuncDecl) bool {
 	return method.Recv != nil && method.Body != nil && len(method.Body.List) == 0 &&
-		method.Type.Results.NumFields() == 0
+		method.Type.Params.NumFields() == 0 && method.Type.Results.NumFields() == 0
 }
