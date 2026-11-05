@@ -1,0 +1,13 @@
+{
+  "rules": {
+    "Go": "cohere-go/correctness-require-wrapped-error"
+  },
+  "messages": {
+    "unwrappedError": {
+      "text": "This error is formatted with `{{verb}}`, which keeps its text and drops the error itself, so `errors.Is` and `errors.As` in every caller can no longer find it. Format it with `%w` instead: the message reads the same, and the chain the caller checks stays whole."
+    },
+    "rebuiltError": {
+      "text": "This builds a new error from the text of `{{error}}`, which drops the original, so `errors.Is` and `errors.As` in every caller can no longer find it. Wrap the error itself instead, with `fmt.Errorf(\"<what was being done>: %w\", {{error}})`: the message reads the same, and the chain the caller checks stays whole."
+    }
+  }
+}
