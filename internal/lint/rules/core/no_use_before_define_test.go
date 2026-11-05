@@ -1409,7 +1409,7 @@ func TestNoUseBeforeDefineDefaultsSurviveAnAbsentConfiguration(test *testing.T) 
 	}
 
 	// And the rule must actually report through that path, not merely hold the right settings.
-	result := rule_testing.RunTypedWithOptions(test, NoUseBeforeDefine, "fixture.ts", "a++; var a=19;", nil)
+	result := rule_testing.RunTyped(test, NoUseBeforeDefine, "fixture.ts", "a++; var a=19;")
 	rule_testing.ExpectFindings(test, result, "usedBeforeDefined")
 }
 

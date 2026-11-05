@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -33,16 +34,16 @@ type yodaCase struct {
 func yodaStringPointer(value string) *string { return new(value) }
 
 // decodeYodaOptionsForTest routes a case's options through the shipped decoder.
-func decodeYodaOptionsForTest(test *testing.T, optionsJson string) any {
+func decodeYodaOptionsForTest(test *testing.T, optionsJson string) rule.Given[YodaSettings] {
 	test.Helper()
 	if optionsJson == "" {
-		return nil
+		return rule.Given[YodaSettings]{}
 	}
 	decoded, decodeYodaOptionsError := DecodeYodaOptions(json.RawMessage(optionsJson))
 	if decodeYodaOptionsError != nil {
 		test.Fatalf("decoding options %q: %v", optionsJson, decodeYodaOptionsError)
 	}
-	return decoded
+	return rule.Configured(decoded)
 }
 
 var yodaCleanCases = []yodaCase{
@@ -651,7 +652,7 @@ func TestYodaFires(test *testing.T) {
 	for _, testCase := range yodaFiringCases {
 		test.Run(testCase.source, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, Yoda, yodaFile, testCase.source,
+			result := rule_testing.RunGiven(test, Yoda, yodaFile, testCase.source,
 				decodeYodaOptionsForTest(test, testCase.optionsJson))
 
 			wantIds := make([]string, len(testCase.findings))
@@ -697,7 +698,7 @@ func TestYodaStaysSilent(test *testing.T) {
 	for _, testCase := range yodaCleanCases {
 		test.Run(testCase.source, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, Yoda, yodaFile,
+			rule_testing.ExpectClean(test, rule_testing.RunGiven(test, Yoda, yodaFile,
 				testCase.source, decodeYodaOptionsForTest(test, testCase.optionsJson)))
 		})
 	}
@@ -796,7 +797,7 @@ func TestYodaTypeScriptOperandsSurviveTheFix(test *testing.T) {
 	for _, testCase := range yodaTypeScriptCases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, Yoda, yodaFile, testCase.source,
+			result := rule_testing.RunGiven(test, Yoda, yodaFile, testCase.source,
 				decodeYodaOptionsForTest(test, testCase.optionsJson))
 			rule_testing.ExpectFindings(test, result, "expected")
 			rule_testing.ExpectFixedSource(test, result, testCase.fixedSource)
@@ -821,7 +822,7 @@ func TestYodaRangeTestRequiresLessThanOperators(test *testing.T) {
 
 	// The control: a genuine range test, exempt.
 	rule_testing.ExpectClean(test,
-		rule_testing.RunWithOptions(test, Yoda, yodaFile, "if (0 <= x && x < 1) {}", options))
+		rule_testing.RunGiven(test, Yoda, yodaFile, "if (0 <= x && x < 1) {}", options))
 
 	for _, source := range []string{
 		"if (1 > x && x > 0) {}",
@@ -833,7 +834,7 @@ func TestYodaRangeTestRequiresLessThanOperators(test *testing.T) {
 		test.Run(source, func(test *testing.T) {
 			test.Parallel()
 			rule_testing.ExpectFindings(test,
-				rule_testing.RunWithOptions(test, Yoda, yodaFile, source, options), "expected")
+				rule_testing.RunGiven(test, Yoda, yodaFile, source, options), "expected")
 		})
 	}
 }

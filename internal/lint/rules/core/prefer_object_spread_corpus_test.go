@@ -499,7 +499,13 @@ func TestPreferObjectSpreadAgreesWithEsLint(test *testing.T) {
 	}
 
 	for index, testCase := range cases {
-		result := rule_testing.RunTypedVerbatimWithOptions(test, PreferObjectSpread, "input.ts", testCase.code, nil)
+		result := rule_testing.RunTypedVerbatimGiven(
+			test,
+			PreferObjectSpread,
+			"input.ts",
+			testCase.code,
+			rule.Given[rule.NoOptions]{},
+		)
 		source := result.SourceFile.Text()
 		got := []string{}
 		fixes := 0
@@ -552,7 +558,13 @@ func fixToConvergence(test *testing.T, code string) string {
 	test.Helper()
 	fixed := code
 	for pass := 0; pass < 10; pass++ {
-		result := rule_testing.RunTypedVerbatimWithOptions(test, PreferObjectSpread, "input.ts", fixed, nil)
+		result := rule_testing.RunTypedVerbatimGiven(
+			test,
+			PreferObjectSpread,
+			"input.ts",
+			fixed,
+			rule.Given[rule.NoOptions]{},
+		)
 		type finding struct {
 			start, end int
 			fixes      []rule.Fix

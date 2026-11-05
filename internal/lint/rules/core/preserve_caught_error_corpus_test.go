@@ -1169,7 +1169,7 @@ func TestPreserveCaughtErrorAgreesWithEsLint(test *testing.T) {
 
 	decode := rule.DecodeOptionsInto[PreserveCaughtErrorOptions]()
 	for index, testCase := range cases {
-		var options any
+		var options rule.Given[PreserveCaughtErrorOptions]
 		if testCase.options != "" {
 			decoded, err := decode([]byte(testCase.options))
 			if err != nil {
@@ -1181,9 +1181,9 @@ func TestPreserveCaughtErrorAgreesWithEsLint(test *testing.T) {
 					err,
 				)
 			}
-			options = decoded
+			options = rule.Configured(decoded)
 		}
-		result := rule_testing.RunTypedWithOptions(test, PreserveCaughtError, "input.ts", testCase.code, options)
+		result := rule_testing.RunTypedGiven(test, PreserveCaughtError, "input.ts", testCase.code, options)
 		source := result.SourceFile.Text()
 		if source != testCase.code {
 			test.Fatalf(

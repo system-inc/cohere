@@ -185,7 +185,7 @@ func TestPreserveCaughtErrorRequireCatchParameterDefaultsOff(test *testing.T) {
 
 	rule_testing.ExpectClean(
 		test,
-		rule_testing.RunTypedWithOptions(test, PreserveCaughtError, "input.ts", bareCatch, nil),
+		rule_testing.RunTyped(test, PreserveCaughtError, "input.ts", bareCatch),
 	)
 
 	explicitFalse, err := decode([]byte(`{"requireCatchParameter": false}`))

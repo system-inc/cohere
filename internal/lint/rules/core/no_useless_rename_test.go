@@ -13,7 +13,7 @@ const uselessRenameFile = "/repository/source/UselessRename.ts"
 
 // uselessRenameOptions routes the options through the rule's own exported decoder.
 func uselessRenameOptions(test *testing.T, ignoreDestructuring bool, ignoreImport bool,
-	ignoreExport bool) any {
+	ignoreExport bool) NoUselessRenameSettings {
 	test.Helper()
 	raw, err := json.Marshal(map[string]bool{
 		"ignoreDestructuring": ignoreDestructuring,
@@ -706,11 +706,11 @@ func TestDecodeNoUselessRenameOptions(test *testing.T) {
 
 	test.Run("a bare severity leaves the rule on its defaults", func(test *testing.T) {
 		test.Parallel()
-		// A rule configured as "error" is handed nil options, which arrives at Run as an untyped
-		// nil rather than as settings. Asserting through the rule covers the fallback inside Run,
-		// which no decoder test can reach.
-		rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoUselessRename,
-			uselessRenameFile, "let {foo: foo} = obj;", nil), "unnecessarilyRenamed")
+		// A rule configured as "error" is handed no options, which arrives at Run unconfigured rather
+		// than as settings. Asserting through the rule covers the fallback inside Run, which no
+		// decoder test can reach.
+		rule_testing.ExpectFindings(test, rule_testing.Run(test, NoUselessRename,
+			uselessRenameFile, "let {foo: foo} = obj;"), "unnecessarilyRenamed")
 	})
 }
 

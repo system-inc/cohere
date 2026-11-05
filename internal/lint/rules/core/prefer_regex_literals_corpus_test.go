@@ -770,7 +770,7 @@ func TestPreferRegexLiteralsAgreesWithEsLint(test *testing.T) {
 	}
 
 	for index, testCase := range cases {
-		var options any
+		var options rule.Given[PreferRegexLiteralsOptions]
 		if testCase.options != "" {
 			decoded, err := decode([]byte(testCase.options))
 			if err != nil {
@@ -782,9 +782,9 @@ func TestPreferRegexLiteralsAgreesWithEsLint(test *testing.T) {
 					err,
 				)
 			}
-			options = decoded
+			options = rule.Configured(decoded)
 		}
-		result := rule_testing.RunTypedVerbatimWithOptions(
+		result := rule_testing.RunTypedVerbatimGiven(
 			test,
 			PreferRegexLiterals,
 			"input.ts",
