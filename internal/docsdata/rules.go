@@ -93,6 +93,9 @@ var ruleSourceNotes = map[string]string{
 	"typeScriptRules": "swift/HouseRuleVerdicts.json, read from the Swift side: the TypeScript rules whose verdict names this rule",
 }
 
+// houseOrigin is the origin of a rule this organization wrote rather than ported.
+const houseOrigin = "house"
+
 // swiftOrigins are the origins a Swift rule may declare. One outside them refuses the build, so a new
 // upstream tool cannot publish without being named here.
 var swiftOrigins = map[string]bool{houseOrigin: true, "swiftlint": true, "swift-format": true}
@@ -115,9 +118,6 @@ var namespaceOrigins = map[string]string{
 	"nexus":                             "house",
 	"adamic":                            "house",
 }
-
-// houseOrigin is the origin of a rule this organization wrote rather than ported.
-const houseOrigin = "house"
 
 // corePackage is the Go package ESLint core's ports register from. A bare name registered anywhere else
 // is a house rule.

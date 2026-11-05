@@ -59,6 +59,9 @@ const cacheTrimPoll = 250 * time.Millisecond
 // trimCacheVerb runs cohere-dev as the background trim. It is what startCacheTrim starts.
 const trimCacheVerb = "trim-cache"
 
+// errPoolNeverEmpty is holdThePool's answer when every look found a token in use.
+var errPoolNeverEmpty = errors.New("the pool was never empty")
+
 func cacheCapBytes() (int64, error) {
 	value := os.Getenv(cacheCapVariable)
 	if value == "" {
@@ -199,9 +202,6 @@ func trimCache() int {
 		cacheTrimSpare, time.Since(started).Round(time.Millisecond)))
 	return 0
 }
-
-// errPoolNeverEmpty is holdThePool's answer when every look found a token in use.
-var errPoolNeverEmpty = errors.New("the pool was never empty")
 
 // holdThePool takes every token in one step, once none is in use, and returns what gives them back. While
 // any token is in use it holds none, so it never keeps a token idle while another runs; it looks again every

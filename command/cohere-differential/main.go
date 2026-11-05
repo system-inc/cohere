@@ -3,7 +3,7 @@
 // This is the acceptance instrument for the whole project. cohere replaces the gate only when it
 // can be shown to find what the gate finds and stay silent where the gate is silent, and until this
 // command existed that claim was established by a person running two commands and comparing counts
-// by eye — which is not a harness, does not survive that person, and cannot answer the question it
+// by eye, which is not a harness, does not survive that person, and cannot answer the question it
 // appears to answer.
 //
 // The question it appears to answer is "do the two gates agree." The question it has to answer
@@ -29,8 +29,26 @@ import (
 	"github.com/system-inc/cohere/internal/lint/configuration"
 )
 
+// ruleListProbeFile is the file `-explain` is pointed at to enumerate the measured binary's rules.
+//
+// Any file in the program works, because every compiled rule is accounted for in that output
+// whether it listened to the file, declined it, or was never configured. This one is chosen for
+// being unremarkable: a file no rule finds interesting still names all of them.
+const ruleListProbeFile = "modules/mcp/McpApi.ts"
+
+// gateRunnerPath is the gate as it actually ships, run through its own cached runner rather than by
+// invoking oxlint directly. Comparing against a hand-rolled oxlint invocation would measure a gate
+// nobody runs.
+var gateRunnerPath = filepath.Join(
+	"libraries", "structure", "libraries", "nexus", "code-quality", "oxlint", "RunCachedOxlint.ts",
+)
+
+// defaultRoot is the tree this instrument was commissioned to measure.
+var defaultRoot = filepath.Join(os.Getenv("HOME"), "Projects", "ahra")
+
 func main() {
 	if runError := run(); runError != nil {
+		// Ignored: the exit code below says the run failed even when standard error cannot.
 		fmt.Fprintf(os.Stderr, "cohere-differential: %v\n", runError)
 		os.Exit(1)
 	}
@@ -77,7 +95,9 @@ func run() error {
 
 	rendered := &strings.Builder{}
 	differential.Write(rendered, report)
-	fmt.Print(rendered.String())
+	if _, printError := fmt.Print(rendered.String()); printError != nil {
+		return fmt.Errorf("printing the report: %w", printError)
+	}
 
 	// The exit code comes from the same value the reader sees rather than being recomputed, so the
 	// two cannot disagree. Agreed() is false for a disagreement and equally false for a run that
@@ -87,13 +107,6 @@ func run() error {
 	}
 	return nil
 }
-
-// ruleListProbeFile is the file `-explain` is pointed at to enumerate the measured binary's rules.
-//
-// Any file in the program works, because every compiled rule is accounted for in that output
-// whether it listened to the file, declined it, or was never configured. This one is chosen for
-// being unremarkable: a file no rule finds interesting still names all of them.
-const ruleListProbeFile = "modules/mcp/McpApi.ts"
 
 // configuredRuleNames is every rule the lint config switches on.
 //
@@ -197,7 +210,7 @@ func parseArguments(rest []string) (arguments, error) {
 //
 // The first version of this planted an enum and expected cohere alone to see it. It missed, and the
 // miss was correct: `consistency-no-enum` is implemented on both sides and enabled in the config, so
-// both gates saw the plant and it matched. The control was wrong, not the harness — and the harness
+// both gates saw the plant and it matched. The control was wrong, not the harness, and the harness
 // caught it, refused a verdict, and printed the difference list as not-a-measurement, which is the
 // behavior it was built for.
 //
@@ -218,8 +231,8 @@ func parseArguments(rest []string) (arguments, error) {
 //
 // What is planted instead is a shared control: a violation both gates must see. It does not prove
 // direction, and `ControlsProven` still returns false because of that. It does prove the pipeline
-// end to end — process launched, output parsed, paths normalized, rule names collapsed across two
-// decoration schemes, comparison run — which is the layer where a silent total mismatch lives. A
+// end to end (process launched, output parsed, paths normalized, rule names collapsed across two
+// decoration schemes, comparison run), which is the layer where a silent total mismatch lives. A
 // plant that both sides report as one shared finding, rather than as two one-sided ones, is
 // positive evidence that path normalization and rule-name normalization both worked.
 //
@@ -363,16 +376,6 @@ func cohereOnlyRuleSettings(root string) map[string]any {
 		},
 	}
 }
-
-// gateRunnerPath is the gate as it actually ships, run through its own cached runner rather than by
-// invoking oxlint directly. Comparing against a hand-rolled oxlint invocation would measure a gate
-// nobody runs.
-var gateRunnerPath = filepath.Join(
-	"libraries", "structure", "libraries", "nexus", "code-quality", "oxlint", "RunCachedOxlint.ts",
-)
-
-// defaultRoot is the tree this instrument was commissioned to measure.
-var defaultRoot = filepath.Join(os.Getenv("HOME"), "Projects", "ahra")
 
 // checkControlsAreLintable refuses to run when a control was placed where its rule cannot fire.
 //

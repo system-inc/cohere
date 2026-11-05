@@ -37,9 +37,12 @@ func TestSwiftMessagesTypeTheValuesAndTheOptions(test *testing.T) {
 		`static let sourceDigest = "digest"`,
 		`"ConsistencyNoThing.otherThing",` + "\n" + `        "ConsistencyNoThing.thing",`,
 		"    /* cohere-swift/consistency-no-thing */\n    enum ConsistencyNoThing {",
-		`static func otherThing(name: String) -> Message {` + "\n" + `            Message(` + "\n" +
-			`                id: "otherThing",` + "\n" + `                text:` + "\n" +
-			`                    #"Another is \#(name). A thing hides what it is."#,` + "\n" + `            )`,
+		`static func otherThing(name: String) -> Message {
+            Message(
+                id: "otherThing",
+                text:
+                    #"Another is \#(name). A thing hides what it is."#,
+            )`,
 		"        enum ExitCount {\n            case one\n            case several(count: String)\n        }",
 		`static func thing(name: String, exitCount: ExitCount) -> Message {`,
 		"case .one:\n                        #\"\"#",

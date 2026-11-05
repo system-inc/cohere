@@ -206,7 +206,7 @@ func mergeMain(worktree string, mainCommit string) error {
 		return fmt.Errorf("main at %s conflicts with this work in:\n%s\nmerge main and resolve them, then land again",
 			shortCommit(mainCommit), conflicts)
 	}
-	return fmt.Errorf("merging main at %s: %v\n%s", shortCommit(mainCommit), gitCombinedError, output)
+	return fmt.Errorf("merging main at %s: %w\n%s", shortCommit(mainCommit), gitCombinedError, output)
 }
 
 // gate runs the landing gate on the worktree through a pool token: go vet, then the rule CPU budget

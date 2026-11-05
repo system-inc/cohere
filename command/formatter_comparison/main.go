@@ -25,6 +25,7 @@ func main() {
 	flag.Parse()
 
 	if *root == "" {
+		// Ignored: the exit code below says the run failed even when standard error cannot.
 		fmt.Fprintln(os.Stderr, "formatdiff: -root is required")
 		os.Exit(1)
 	}
@@ -37,23 +38,25 @@ func main() {
 		files, err = collect(*root, *limit)
 	}
 	if err != nil {
+		// Ignored: the exit code below says the run failed even when standard error cannot.
 		fmt.Fprintf(os.Stderr, "formatdiff: %v\n", err)
 		os.Exit(1)
 	}
 	if len(files) == 0 {
 		// An empty corpus reads exactly like a clean one, and that is the failure this whole repo
 		// exists to make impossible.
+		// Ignored: the exit code below says the run failed even when standard error cannot.
 		fmt.Fprintln(os.Stderr, "formatdiff: found no files to measure, refusing to report a clean run")
 		os.Exit(1)
 	}
 
-	var (
-		parsed, identical, differing int
-		unparseable                  []string
-		panicked                     []string
-		kinds                        = map[string]int{}
-		examples                     = map[string][]string{}
-	)
+	parsed := 0
+	identical := 0
+	differing := 0
+	var unparseable []string
+	var panicked []string
+	kinds := map[string]int{}
+	examples := map[string][]string{}
 
 	for _, file := range files {
 		raw, readErr := os.ReadFile(file)
@@ -87,41 +90,49 @@ func main() {
 		}
 	}
 
-	fmt.Printf(
+	// The report is written whole and printed in one call, so a reader who never got it is told by the exit code.
+	report := &strings.Builder{}
+	fmt.Fprintf(
+		report,
 		"corpus:      %d files found, %d parsed, %d unparseable, %d panicked the formatter\n",
 		len(files), parsed, len(unparseable), len(panicked),
 	)
-	fmt.Printf("agreement:   %d identical, %d differing", identical, differing)
+	fmt.Fprintf(report, "agreement:   %d identical, %d differing", identical, differing)
 	if parsed > 0 {
-		fmt.Printf("  (%.1f%% of parsed files differ)", 100*float64(differing)/float64(parsed))
+		fmt.Fprintf(report, "  (%.1f%% of parsed files differ)", 100*float64(differing)/float64(parsed))
 	}
-	fmt.Println()
+	fmt.Fprintln(report)
 
 	if len(panicked) > 0 {
-		fmt.Printf("\nthe formatter panicked on %d files:\n", len(panicked))
+		fmt.Fprintf(report, "\nthe formatter panicked on %d files:\n", len(panicked))
 		for _, entry := range panicked[:min(len(panicked), 10)] {
-			fmt.Printf("  %s\n", entry)
+			fmt.Fprintf(report, "  %s\n", entry)
 		}
 	}
 
 	if len(unparseable) > 0 {
-		fmt.Printf("\nunparseable (%d):\n", len(unparseable))
+		fmt.Fprintf(report, "\nunparseable (%d):\n", len(unparseable))
 		for _, file := range unparseable[:min(len(unparseable), 10)] {
-			fmt.Printf("  %s\n", rel(*root, file))
+			fmt.Fprintf(report, "  %s\n", rel(*root, file))
 		}
 	}
 
-	fmt.Println("\ndifference kinds, by how many files each appears in:")
+	fmt.Fprintln(report, "\ndifference kinds, by how many files each appears in:")
 	ordered := make([]string, 0, len(kinds))
 	for kind := range kinds {
 		ordered = append(ordered, kind)
 	}
 	sort.Slice(ordered, func(a, b int) bool { return kinds[ordered[a]] > kinds[ordered[b]] })
 	for _, kind := range ordered {
-		fmt.Printf("\n  %-28s %5d files\n", kind, kinds[kind])
+		fmt.Fprintf(report, "\n  %-28s %5d files\n", kind, kinds[kind])
 		for _, example := range examples[kind] {
-			fmt.Printf("      %s\n", example)
+			fmt.Fprintf(report, "      %s\n", example)
 		}
+	}
+	if _, printError := fmt.Print(report.String()); printError != nil {
+		// Ignored: the exit code below says the report never arrived even when standard error cannot.
+		fmt.Fprintf(os.Stderr, "formatdiff: printing the report: %v\n", printError)
+		os.Exit(1)
 	}
 }
 

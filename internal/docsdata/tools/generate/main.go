@@ -67,6 +67,7 @@ func main() {
 
 	if runError := run(*check, *checkRendering, *recapture); runError != nil {
 		if !errors.Is(runError, errStale) {
+			// Ignored: the exit code below says the run failed even when standard error cannot.
 			fmt.Fprintln(os.Stderr, runError)
 		}
 		os.Exit(1)
@@ -92,17 +93,24 @@ func run(check bool, checkRendering bool, recapture bool) error {
 			return staleFilesError
 		}
 		for _, path := range stale {
-			fmt.Printf("stale: %s\n", path)
+			if _, printError := fmt.Printf("stale: %s\n", path); printError != nil {
+				return fmt.Errorf("naming a stale file: %w", printError)
+			}
 		}
 		if checkRendering {
-			fmt.Println(notRecaptured)
+			if _, printError := fmt.Println(notRecaptured); printError != nil {
+				return fmt.Errorf("saying the examples were not recaptured: %w", printError)
+			}
 		}
 		if len(stale) > 0 {
 			// Returned rather than exiting here, so the scratch directory is still removed.
 			return errStale
 		}
 		if check {
-			fmt.Println("every file is current, the examples recaptured from the lint tests")
+			_, printError := fmt.Println("every file is current, the examples recaptured from the lint tests")
+			if printError != nil {
+				return fmt.Errorf("saying every file is current: %w", printError)
+			}
 		}
 		return nil
 	}
@@ -122,6 +130,7 @@ func run(check bool, checkRendering bool, recapture bool) error {
 	}
 	sort.Strings(paths)
 	for _, path := range paths {
+		// Ignored: a file missing or unreadable is written afresh, and a write that fails returns its error below.
 		existing, _ := os.ReadFile(path)
 		if bytes.Equal(existing, files[path]) {
 			continue
@@ -132,7 +141,9 @@ func run(check bool, checkRendering bool, recapture bool) error {
 		if writeError := os.WriteFile(path, files[path], 0o644); writeError != nil {
 			return writeError
 		}
-		fmt.Printf("wrote %s\n", path)
+		if _, printError := fmt.Printf("wrote %s\n", path); printError != nil {
+			return fmt.Errorf("saying %s was written: %w", path, printError)
+		}
 	}
 	orphans, err := docsdata.OrphanedExamples(".", files)
 	if err != nil {
@@ -142,10 +153,14 @@ func run(check bool, checkRendering bool, recapture bool) error {
 		if removeError := os.Remove(path); removeError != nil {
 			return removeError
 		}
-		fmt.Printf("removed %s\n", path)
+		if _, printError := fmt.Printf("removed %s\n", path); printError != nil {
+			return fmt.Errorf("saying %s was removed: %w", path, printError)
+		}
 	}
 	if !recapture {
-		fmt.Println(notRecaptured)
+		if _, printError := fmt.Println(notRecaptured); printError != nil {
+			return fmt.Errorf("saying the examples were not recaptured: %w", printError)
+		}
 	}
 	return nil
 }
@@ -194,7 +209,11 @@ func gather(source sources, scratch string, recapture bool) (docsdata.Inputs, er
 	}
 	var withOptions int
 	inputs.Examples, withOptions = docsdata.PickExamples(records)
-	fmt.Printf("captured %d records; %d distinct cases ran with options, counted for message ids and never shown\n", len(records), withOptions)
+	_, printError := fmt.Printf("captured %d records; %d distinct cases ran with options, counted for message ids and never shown\n",
+		len(records), withOptions)
+	if printError != nil {
+		return inputs, fmt.Errorf("saying what was captured: %w", printError)
+	}
 	return inputs, nil
 }
 
@@ -265,6 +284,7 @@ func helpOutput(binary string, arguments ...string) ([]byte, error) {
 // removeScratch removes the temporary directory's files one by one, by name, and then the directories.
 func removeScratch(scratch string) {
 	var directories []string
+	// Ignored: a temporary directory left behind costs disk, never a wrong file.
 	_ = filepath.WalkDir(scratch, func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
 			return nil
@@ -276,6 +296,6 @@ func removeScratch(scratch string) {
 		return os.Remove(path)
 	})
 	for index := len(directories) - 1; index >= 0; index-- {
-		_ = os.Remove(directories[index])
+		_ = os.Remove(directories[index]) // Ignored: a temporary directory left behind costs disk, never a wrong file.
 	}
 }

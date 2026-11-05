@@ -99,6 +99,29 @@ func document(ruleNames []string, nexusTier bool) (map[string]any, error) {
 	return schema, nil
 }
 
+// ignoredKeyShapes says what a key the loader accepts without decoding holds. The format block is built
+// from formatoptions.BlockKeys.
+var ignoredKeyShapes = map[string]func() map[string]any{
+	"$schema": func() map[string]any { return map[string]any{"type": "string"} },
+	"jsPlugins": func() map[string]any {
+		return map[string]any{"type": "array", "items": map[string]any{"type": "string"}}
+	},
+	"output": func() map[string]any {
+		return map[string]any{
+			"type":                 "object",
+			"additionalProperties": false,
+			"properties": map[string]any{
+				"phases": map[string]any{
+					"type":        "boolean",
+					"description": "Put where the time went first in the footer's parentheses, as --phases does.",
+				},
+			},
+		}
+	},
+	"go":      goShape,
+	FormatKey: formatShape,
+}
+
 // keyShape is the schema for one top-level key's value, read off the Go type the loader decodes it into.
 func keyShape(key configuration.TopLevelKey) (map[string]any, error) {
 	if key.Name == "settings" {
@@ -158,29 +181,6 @@ func typeShape(name string, fieldType reflect.Type) (map[string]any, error) {
 		return map[string]any{"type": "array", "items": map[string]any{"$ref": "#/$defs/override"}}, nil
 	}
 	return nil, fmt.Errorf("settingsschema: %q decodes into %s, which the schema has no shape for; teach typeShape", name, fieldType)
-}
-
-// ignoredKeyShapes says what a key the loader accepts without decoding holds. The format block is built
-// from formatoptions.BlockKeys.
-var ignoredKeyShapes = map[string]func() map[string]any{
-	"$schema": func() map[string]any { return map[string]any{"type": "string"} },
-	"jsPlugins": func() map[string]any {
-		return map[string]any{"type": "array", "items": map[string]any{"type": "string"}}
-	},
-	"output": func() map[string]any {
-		return map[string]any{
-			"type":                 "object",
-			"additionalProperties": false,
-			"properties": map[string]any{
-				"phases": map[string]any{
-					"type":        "boolean",
-					"description": "Put where the time went first in the footer's parentheses, as --phases does.",
-				},
-			},
-		}
-	},
-	"go":      goShape,
-	FormatKey: formatShape,
 }
 
 // goShape is the Go engine's block, as internal/goengine/settings reads it: rules alone, each a severity or

@@ -37,7 +37,9 @@ func run() error {
 	frozen := false
 	wait := waitIsRequested()
 
-	for len(arguments) > 0 {
+	// The dispatcher's flags end at the first argument it does not own, which goes to cohere with the rest.
+	ownFlags := true
+	for ownFlags && len(arguments) > 0 {
 		switch arguments[0] {
 		case "--wait":
 			wait = true
@@ -52,10 +54,10 @@ func run() error {
 			frozen = true
 			arguments = arguments[1:]
 		default:
-			goto parsed
+			ownFlags = false
 		}
 	}
-parsed:
+
 	// The launcher's own lines print in full under its own flag or cohere's --verbose, which it forwards
 	// rather than owns; otherwise a build is one line on a terminal that clears before cohere prints.
 	dispatch.Report.SetVerbose(verbose || asksForVerbose(arguments))
@@ -228,7 +230,7 @@ func resolveInstalled(reason error) (string, error) {
 
 	binaryPath, resolveError := release.Resolve(release.SearchRoots(workingDirectory, executablePath))
 	if resolveError != nil {
-		return "", fmt.Errorf("%w\n(no local build was possible: %s)", resolveError, reason)
+		return "", fmt.Errorf("%w\n(no local build was possible: %w)", resolveError, reason)
 	}
 	return binaryPath, nil
 }

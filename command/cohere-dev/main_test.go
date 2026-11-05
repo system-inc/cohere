@@ -94,18 +94,27 @@ func TestASecondWholeModuleRunWaitsAndSaysForWhom(test *testing.T) {
 
 	began := time.Now()
 	outputs := make([]string, 2)
+	// firstEnded closes when the first run returns: a first run that ended without leaving its mark never will,
+	// so the second stops waiting on that signal rather than on a clock a loaded machine can outrun.
+	firstEnded := make(chan struct{})
 	var group sync.WaitGroup
 	for index := range outputs {
 		group.Add(1)
 		go func() {
 			defer group.Done()
+			if index == 0 {
+				defer close(firstEnded)
+			}
 			if index == 1 {
 				for _, err := os.Stat(started); err != nil; _, err = os.Stat(started) {
-					if time.Since(began) > time.Minute {
-						test.Errorf("the first run never started testing")
-						return
+					select {
+					case <-firstEnded:
+						if _, statError := os.Stat(started); statError != nil {
+							test.Errorf("the first run ended without starting to test")
+							return
+						}
+					case <-time.After(10 * time.Millisecond):
 					}
-					time.Sleep(10 * time.Millisecond)
 				}
 			}
 			output, err := run("./...")

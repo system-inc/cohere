@@ -182,6 +182,8 @@ func ExamplePath(ruleName string) string {
 func Stale(root string, files map[string][]byte) ([]string, error) {
 	var stale []string
 	for path, contents := range files {
+		// Ignored: a file missing or unreadable is not what Build produced, so its nil contents read as stale,
+		// which is the answer either way.
 		existing, _ := os.ReadFile(filepath.Join(root, path))
 		if !bytes.Equal(existing, contents) {
 			stale = append(stale, path)
