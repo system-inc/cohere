@@ -22,7 +22,7 @@ func noRestrictedTypesCaseName(index int) string {
 // hand-built struct would leave every line of it untested. The options text below is the bare
 // object rather than upstream's one-element array, because cohere's config layer unwraps the
 // severity tuple before a decoder ever sees it.
-func noRestrictedTypesDecoded(test *testing.T, optionsJson string) any {
+func noRestrictedTypesDecoded(test *testing.T, optionsJson string) NoRestrictedTypesOptions {
 	test.Helper()
 	decoded, decodeNoRestrictedTypesOptionsError := DecodeNoRestrictedTypesOptions([]byte(optionsJson))
 	if decodeNoRestrictedTypesOptionsError != nil {
@@ -760,8 +760,8 @@ func TestNoRestrictedTypesSurvivesNilOptions(test *testing.T) {
 
 	// A nil options value is what the rule is handed when the config names it with no options at
 	// all. It must decline rather than panic.
-	rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoRestrictedTypes,
-		noRestrictedTypesFile, "let value: string;\n", nil))
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NoRestrictedTypes,
+		noRestrictedTypesFile, "let value: string;\n"))
 
 	// The control: the same source with `string` banned has to report, or the row above proves
 	// nothing about why the rule was silent.
