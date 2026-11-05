@@ -51,6 +51,11 @@ const Name = "cohere-go/correctness-require-declared-walk"
 // Analyzer runs the rule over one package.
 var Analyzer = newAnalyzer()
 
+// readsFileOption names the file of reads lines a planner holds each // Reads: glob against, such as Adamic's
+// cloud/fast-gate/executors.txt, which Adamic's rule hardcoded. It is the rule's switch as well as its message's
+// pointer: a repository with no such planner leaves it empty, and the rule reports nothing.
+const readsFileOption = "readsFile"
+
 // Rule is this rule's entry in the Go engine's registry.
 var Rule = rule.Rule{
 	Name:      Name,
@@ -65,11 +70,6 @@ var Rule = rule.Rule{
 var undeclaredWalkMessage = policy.MessageOf(Name, "undeclaredWalk")
 
 var readsWithoutGlobMessage = policy.MessageOf(Name, "readsWithoutGlob")
-
-// readsFileOption names the file of reads lines a planner holds each // Reads: glob against, such as Adamic's
-// cloud/fast-gate/executors.txt, which Adamic's rule hardcoded. It is the rule's switch as well as its message's
-// pointer: a repository with no such planner leaves it empty, and the rule reports nothing.
-const readsFileOption = "readsFile"
 
 // readsMarker opens the comment that declares a walk. It is matched as written, with nothing before it, because a
 // planner reads the glob after it, and a comment the rule took as a declaration the planner skipped would leave the

@@ -146,8 +146,8 @@ func judge(program string, arguments []argument) (string, bool) {
 }
 
 // killNamesAProcess is whether kill's arguments hold an operand that is a name, a constant that doesn't parse as an
-// integer. util-linux's kill takes a name there and stops every process carrying it. Every option, a signal like -9 or
-// -TERM included, opens with a dash, and the value an option takes is no operand, so neither is judged.
+// integer. util-linux's kill takes a name there and stops every process carrying it. Every option, a signal like
+// `-9` or `-TERM` included, opens with a dash, and the value an option takes is no operand, so neither is judged.
 func killNamesAProcess(arguments []argument) bool {
 	for _, given := range arguments {
 		// Listing signals kills nothing, and the operand of -l is a signal or an exit status, never a process.

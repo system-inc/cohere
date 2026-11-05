@@ -353,7 +353,9 @@ func TestFixtureRecordsReencodeToTheSameJSON(test *testing.T) {
 				continue
 			}
 			compared++
-			var reencoded, original any
+			// Every record is a JSON object, so each side decodes into one.
+			reencoded := map[string]any{}
+			original := map[string]any{}
 			if decodeError := json.Unmarshal(output.Bytes(), &reencoded); decodeError != nil {
 				test.Fatalf("%s: the reencoded %s record does not decode: %v\n%s", filepath.Base(fixture), envelope.Kind, decodeError, output.String())
 			}
@@ -361,11 +363,9 @@ func TestFixtureRecordsReencodeToTheSameJSON(test *testing.T) {
 				test.Fatal(decodeError)
 			}
 			// A fixture from before an additive field has none, and this engine always writes it.
-			if reencodedObject, isObject := reencoded.(map[string]any); isObject {
-				for _, additive := range additiveFields[envelope.Kind] {
-					if !strings.Contains(line, `"`+additive+`"`) {
-						delete(reencodedObject, additive)
-					}
+			for _, additive := range additiveFields[envelope.Kind] {
+				if !strings.Contains(line, `"`+additive+`"`) {
+					delete(reencoded, additive)
 				}
 			}
 			if !reflect.DeepEqual(reencoded, original) {

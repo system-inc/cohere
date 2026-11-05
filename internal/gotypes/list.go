@@ -121,9 +121,9 @@ func runList(directory string, environment []string, patterns []string) (*listin
 }
 
 // goEnvironment is the environment every go command here runs in: this process's, with environment added
-// and without any -overlay in GOFLAGS. The loader reads an overlay itself, in place of the files it names,
+// and without any `-overlay` in `GOFLAGS`. The loader reads an overlay itself, in place of the files it names,
 // and an -overlay go saw would only make go list answer for files the loader reads anyway; a runner that
-// never builds refuses a go command whose GOFLAGS carries one.
+// never builds refuses a go command whose `GOFLAGS` carries one.
 func goEnvironment(environment []string) []string {
 	result := []string{}
 	for _, variable := range append(os.Environ(), environment...) {

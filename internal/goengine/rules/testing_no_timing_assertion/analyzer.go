@@ -293,6 +293,18 @@ func slowFailingComparisons(
 	return nil
 }
 
+// mirroredComparison is each comparison with its operands swapped, `limit < elapsed` read as `elapsed > limit`.
+var mirroredComparison = map[token.Token]token.Token{
+	token.LSS: token.GTR, token.GTR: token.LSS, token.LEQ: token.GEQ, token.GEQ: token.LEQ,
+	token.EQL: token.EQL, token.NEQ: token.NEQ,
+}
+
+// negatedComparison is each comparison under a !, `!(elapsed <= limit)` read as `elapsed > limit`.
+var negatedComparison = map[token.Token]token.Token{
+	token.LSS: token.GEQ, token.GEQ: token.LSS, token.GTR: token.LEQ, token.LEQ: token.GTR,
+	token.EQL: token.NEQ, token.NEQ: token.EQL,
+}
+
 // failsWhenLong is whether a comparison by operator, with the measured duration on the left or the right, runs the
 // if's body as the duration grows. The comparison is first read with the duration on the left, then turned over when
 // the condition is negated, and what remains fails a slow run when it is >, >= or !=: `elapsed > limit` fails a slow
@@ -306,18 +318,6 @@ func failsWhenLong(operator token.Token, measuredOnLeft bool, positive bool) boo
 		operator = negatedComparison[operator]
 	}
 	return operator == token.GTR || operator == token.GEQ || operator == token.NEQ
-}
-
-// mirroredComparison is each comparison with its operands swapped, `limit < elapsed` read as `elapsed > limit`.
-var mirroredComparison = map[token.Token]token.Token{
-	token.LSS: token.GTR, token.GTR: token.LSS, token.LEQ: token.GEQ, token.GEQ: token.LEQ,
-	token.EQL: token.EQL, token.NEQ: token.NEQ,
-}
-
-// negatedComparison is each comparison under a !, `!(elapsed <= limit)` read as `elapsed > limit`.
-var negatedComparison = map[token.Token]token.Token{
-	token.LSS: token.GEQ, token.GEQ: token.LSS, token.GTR: token.LEQ, token.LEQ: token.GTR,
-	token.EQL: token.NEQ, token.NEQ: token.EQL,
 }
 
 // failsTestDirectly is whether body calls a failure method on a *testing.T, in it or in a block nested in it. A

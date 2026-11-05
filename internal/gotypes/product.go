@@ -30,7 +30,7 @@ import (
 // ADAMIC_BUILD_LOG when that is set.
 //
 // The key is a hash of what changes the export data and nothing else (#t37sw0f): the Go release, the target
-// platform, GOEXPERIMENT, and for each package its import path and the files go list selects for it, by name
+// platform, `GOEXPERIMENT`, and for each package its import path and the files go list selects for it, by name
 // for a standard package (the release fixes their contents), by module version for a module from the module
 // cache (go.sum fixes theirs), and by repository-relative path and content for a package in the repository,
 // with its module's go.mod. Never the -p a machine computes, nor any absolute path, nor which go.work file
@@ -131,6 +131,7 @@ func (product Product) state() (*productState, error) {
 func productKey(product Product, root string, environment map[string]string, listed *listing, exported map[string]bool) (string, string, error) {
 	hash := sha256.New()
 	field := func(writer io.Writer, kind, value string) {
+		// Ignored: every writer handed here is a sha256 hash, whose Write never returns an error.
 		fmt.Fprintf(writer, "%s %d\n%s\n", kind, len(value), value)
 	}
 	lines := []string{
@@ -344,6 +345,8 @@ func (product Product) Build() (*Exports, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Ignored: a scratch directory left behind is only space in the cache, under a name no key reads, and the
+	// build's outcome stands either way.
 	defer os.RemoveAll(scratch)
 	if compileError := product.compile(state, scratch); compileError != nil {
 		return nil, compileError
@@ -358,6 +361,7 @@ func (product Product) Build() (*Exports, error) {
 			if renameError := os.Rename(destination, retired); renameError != nil {
 				return nil, renameError
 			}
+			// Ignored: the retired product is out of the key's place already, so leaving it behind costs only space.
 			defer os.RemoveAll(retired)
 		}
 	}
@@ -461,11 +465,12 @@ func (product Product) compile(state *productState, directory string) error {
 	return os.WriteFile(filepath.Join(directory, manifestName), append(encoded, '\n'), 0o644)
 }
 
-// exportDataOnly is a compiled package's archive cut to its export data: the archive's __.PKGDEF member,
+// exportDataOnly is a compiled package's archive cut to its export data: the archive's `__.PKGDEF` member,
 // which is all go/importer reads. The object code beside it is the archive's bulk (215 MB of the checker's
 // 216 MB, measured Oct 10) and no type checker reads it.
 func exportDataOnly(archive []byte) ([]byte, error) {
-	const magic, headerSize = "!<arch>\n", 60
+	const magic = "!<arch>\n"
+	const headerSize = 60
 	if !bytes.HasPrefix(archive, []byte(magic)) {
 		return nil, errors.New("it is not an archive")
 	}
@@ -501,6 +506,9 @@ func record(product Product, key, outcome string, started time.Time) {
 	if openError != nil {
 		return
 	}
+	// Ignored: the census line is best effort, as the open above is. record has no caller to hand a failure to,
+	// and the build it counts succeeded either way.
 	defer file.Close()
+	// Ignored: a census line that does not land is lost the same best-effort way the open above loses one.
 	fmt.Fprintf(file, "build %s %s %s %.2f\n", strings.ReplaceAll("go types "+product.Name, " ", "_"), key[:12], outcome, time.Since(started).Seconds())
 }

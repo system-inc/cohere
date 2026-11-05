@@ -20,6 +20,12 @@ import (
 // Name is what a finding of this rule prints.
 const Name = "cohere-go/consistency-no-long-file"
 
+// limitOption is the option naming the most lines a file may hold.
+const limitOption = "limit"
+
+// defaultLimit is the house limit, Kirk's ruling of 2026-10-03 (#r3hfpe8), shared with cohere-swift's file-length.
+const defaultLimit = 2000
+
 // NewAnalyzer builds the rule's analyzer with a flag set of its own. The rule reads its limit option from the
 // analyzer running it, so a test can run a configured and the default analyzer side by side without one setting a
 // flag the other reads.
@@ -47,12 +53,6 @@ var Analyzer = NewAnalyzer()
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: false, Analyzer: Analyzer}
 
 var tooManyLinesMessage = policy.MessageOf(Name, "tooManyLines")
-
-// limitOption is the option naming the most lines a file may hold.
-const limitOption = "limit"
-
-// defaultLimit is the house limit, Kirk's ruling of 2026-10-03 (#r3hfpe8), shared with cohere-swift's file-length.
-const defaultLimit = 2000
 
 // lineLimit is the limit option's value. It is a flag.Value of its own, rather than flag.Int, so a limit below one,
 // which would flag every file or name a line no file has, and a limit above the house's, which would let a file grow
