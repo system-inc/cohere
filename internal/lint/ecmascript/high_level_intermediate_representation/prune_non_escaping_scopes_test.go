@@ -364,7 +364,7 @@ func TestPruneNonEscapingScopesVisitsASequenceNestedInALogical(test *testing.T) 
 		LValue: &result,
 		Value: &ReactiveLogicalValue{
 			Operator: "??",
-			Left:     &ReactiveInstructionValue{Value: &Primitive{}},
+			Left:     &ReactiveInstructionValue{Value: &Primitive{Value: PrimitiveUndefined{}}},
 			Right:    nested,
 		},
 	}

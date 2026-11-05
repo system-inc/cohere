@@ -109,16 +109,29 @@ func isModuleHookCall(function *Function, producers *calleeProducers, instructio
 			if !ok {
 				return false
 			}
-			name, ok := property.Value.(string)
-			return ok && (!requireHook || isHookName(name)) && resolve(definition.Object.Identifier, false)
+			// A numeric or bigint key names a property as much as a string does, so
+			// `modules[0].useThing()` reaches its module through the first entry. Only a string can
+			// pass the hook test, but an object on the way to the callee need not.
+			var name string
+			switch key := property.Value.(type) {
+			case PrimitiveString:
+				name = string(key)
+			case PrimitiveNumber:
+				name = string(key)
+			case PrimitiveBigInt:
+				name = string(key)
+			default:
+				return false
+			}
+			return (!requireHook || isHookName(name)) && resolve(definition.Object.Identifier, false)
 		default:
 			return false
 		}
 	}
 	if call, ok := instruction.Value.(*MethodCall); ok {
 		if property, ok := producers.producer(call.Property.Identifier).(*Primitive); ok {
-			name, ok := property.Value.(string)
-			return ok && isHookName(name) && resolve(call.Receiver.Identifier, false)
+			name, ok := property.Value.(PrimitiveString)
+			return ok && isHookName(string(name)) && resolve(call.Receiver.Identifier, false)
 		}
 	}
 	return resolve(callee.Identifier, true)

@@ -16,7 +16,7 @@ import (
 // lowerExpressionToPlace lowers an expression and returns the value it produces.
 func (builder *builder) lowerExpressionToPlace(node *ast.Node) Place {
 	if node == nil {
-		return builder.emit(&Primitive{Value: nil}, nil)
+		return builder.emit(&Primitive{Value: PrimitiveUndefined{}}, nil)
 	}
 
 	switch node.Kind {
@@ -24,17 +24,17 @@ func (builder *builder) lowerExpressionToPlace(node *ast.Node) Place {
 		return builder.lowerIdentifier(node)
 
 	case ast.KindNumericLiteral:
-		return builder.emit(&Primitive{Value: node.Text()}, node)
+		return builder.emit(&Primitive{Value: PrimitiveNumber(node.Text())}, node)
 	case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral:
-		return builder.emit(&Primitive{Value: node.Text()}, node)
+		return builder.emit(&Primitive{Value: PrimitiveString(node.Text())}, node)
 	case ast.KindTrueKeyword:
-		return builder.emit(&Primitive{Value: true}, node)
+		return builder.emit(&Primitive{Value: PrimitiveBoolean(true)}, node)
 	case ast.KindFalseKeyword:
-		return builder.emit(&Primitive{Value: false}, node)
+		return builder.emit(&Primitive{Value: PrimitiveBoolean(false)}, node)
 	case ast.KindNullKeyword:
-		return builder.emit(&Primitive{Value: nil}, node)
+		return builder.emit(&Primitive{Value: PrimitiveNull{}}, node)
 	case ast.KindBigIntLiteral:
-		return builder.emit(&Primitive{Value: node.Text()}, node)
+		return builder.emit(&Primitive{Value: PrimitiveBigInt(node.Text())}, node)
 
 	case ast.KindRegularExpressionLiteral:
 		pattern, flags := splitRegExp(node.Text())
@@ -127,7 +127,8 @@ func (builder *builder) lowerExpressionToPlace(node *ast.Node) Place {
 	case ast.KindJsxExpression:
 		inner := node.AsJsxExpression().Expression
 		if inner == nil {
-			return builder.emit(&Primitive{Value: nil}, node)
+			// An empty `{}` child, or one holding only a comment, renders nothing: undefined.
+			return builder.emit(&Primitive{Value: PrimitiveUndefined{}}, node)
 		}
 		return builder.lowerExpressionToPlace(inner)
 
@@ -157,7 +158,7 @@ func (builder *builder) lowerExpressionToPlace(node *ast.Node) Place {
 func (builder *builder) lowerIdentifier(node *ast.Node) Place {
 	name := node.Text()
 	if name == "undefined" {
-		return builder.emit(&Primitive{Value: nil}, node)
+		return builder.emit(&Primitive{Value: PrimitiveUndefined{}}, node)
 	}
 
 	symbol := builder.symbolOf(node)
@@ -229,7 +230,7 @@ func (builder *builder) lowerCallExpression(node *ast.Node) Place {
 		if access.Name() != nil {
 			name = access.Name().Text()
 		}
-		property := builder.emit(&Primitive{Value: name}, access.Name())
+		property := builder.emit(&Primitive{Value: PrimitiveString(name)}, access.Name())
 		args := builder.lowerArguments(expression.Arguments)
 		return builder.emit(&MethodCall{
 			CalleeOrigin: origin,
@@ -544,7 +545,7 @@ func (builder *builder) lowerPostfixUnary(node *ast.Node) Place {
 func (builder *builder) lowerDeleteExpression(node *ast.Node) Place {
 	target := node.AsDeleteExpression().Expression
 	if target == nil {
-		return builder.emit(&Primitive{Value: true}, node)
+		return builder.emit(&Primitive{Value: PrimitiveBoolean(true)}, node)
 	}
 	switch target.Kind {
 	case ast.KindPropertyAccessExpression:
@@ -562,7 +563,7 @@ func (builder *builder) lowerDeleteExpression(node *ast.Node) Place {
 		return builder.emit(&ComputedDelete{Object: object, Property: property}, node)
 	}
 	builder.lowerExpressionToPlace(target)
-	return builder.emit(&Primitive{Value: true}, node)
+	return builder.emit(&Primitive{Value: PrimitiveBoolean(true)}, node)
 }
 
 func (builder *builder) lowerObjectLiteral(node *ast.Node) Place {
@@ -781,7 +782,7 @@ func (builder *builder) lowerJsxAttributes(attributes *ast.Node) []JsxAttribute 
 			}
 			if attribute.Initializer == nil {
 				// A bare attribute is `true`.
-				value := builder.emit(&Primitive{Value: true}, property)
+				value := builder.emit(&Primitive{Value: PrimitiveBoolean(true)}, property)
 				properties = append(properties, JsxAttribute{Name: name, Value: value})
 				continue
 			}

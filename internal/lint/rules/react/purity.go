@@ -941,11 +941,11 @@ func (unit *purityUnit) recordByName(
 //
 // # There is no separate string test, and that is measured rather than an oversight
 //
-// The obvious form returns `primitive.Value.(string)`'s ok flag as well. A mutation ignoring that
-// flag survived, and it is subsumed rather than a fixture gap: a failed assertion yields the empty
-// string, the empty string is not a key in `purityImpureBuiltins` or in any of its inner maps, and
-// the only consumers of this name are those two lookups. So a numeric or boolean key reaches
-// silence either way. Confirmed on `(Math as any)[0]()` and `(Math as any)[true]()`, both silent
+// The obvious form returns the ok flag of the `PrimitiveString` assertion as well. A mutation
+// ignoring that flag survived, and it is subsumed rather than a fixture gap: a failed assertion
+// yields the empty string, the empty string is not a key in `purityImpureBuiltins` or in any of
+// its inner maps, and the only consumers of this name are those two lookups. So a numeric or
+// boolean key reaches silence either way. Confirmed on `(Math as any)[0]()` and `(Math as any)[true]()`, both silent
 // with the flag and without it.
 func purityPropertyName(
 	function *high_level_intermediate_representation.Function,
@@ -961,8 +961,8 @@ func purityPropertyName(
 			if !isPrimitive {
 				return "", false
 			}
-			name, _ := primitive.Value.(string)
-			return name, true
+			name, _ := primitive.Value.(high_level_intermediate_representation.PrimitiveString)
+			return string(name), true
 		}
 	}
 	return "", false

@@ -689,13 +689,13 @@ func TestAliasingRefinementMatchesAbstractKinds(test *testing.T) {
 			}
 
 			from := place()
-			fromInstruction := &Instruction{LValue: from, Value: &Primitive{Value: 1}}
+			fromInstruction := &Instruction{LValue: from, Value: &Primitive{Value: PrimitiveNumber("1")}}
 			function.AddInstruction(block, fromInstruction)
 			into := place()
 			edgeInstruction := &Instruction{LValue: into, Value: &ObjectExpression{}}
 			function.AddInstruction(block, edgeInstruction)
 			result := place()
-			mutationInstruction := &Instruction{LValue: result, Value: &Primitive{Value: 0}}
+			mutationInstruction := &Instruction{LValue: result, Value: &Primitive{Value: PrimitiveNumber("0")}}
 			function.AddInstruction(block, mutationInstruction)
 			function.Returns = result
 			block.Terminal = &Return{Value: result}
@@ -869,7 +869,7 @@ func TestCreateFromMutationPropagatesTransitively(test *testing.T) {
 	derivedInstruction := &Instruction{LValue: derived, Value: &PropertyLoad{Object: source, Property: "value"}}
 	function.AddInstruction(block, derivedInstruction)
 	result := place()
-	mutationInstruction := &Instruction{LValue: result, Value: &Primitive{Value: 0}}
+	mutationInstruction := &Instruction{LValue: result, Value: &Primitive{Value: PrimitiveNumber("0")}}
 	function.AddInstruction(block, mutationInstruction)
 	function.Returns = result
 	block.Terminal = &Return{Value: result}
