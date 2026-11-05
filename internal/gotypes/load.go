@@ -13,8 +13,8 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"unicode"
-	"unicode/utf8"
+
+	"github.com/system-inc/cohere/internal/testfunctions"
 )
 
 // Config says where and how to load.
@@ -494,76 +494,14 @@ func filesNamed(fileSet *token.FileSet, parsed []*ast.File, names []string) []*a
 	return files
 }
 
-// testFunctionErrors is what go test refuses in test files before it builds a test's main: a Test, Benchmark
-// or Fuzz function, or TestMain, whose signature is not the one its kind must have, as go's own check reads
-// it (cmd/go/internal/load's checkTestFunc: one parameter, a pointer to a type named T, B, F or M, no results,
-// no type parameters).
+// testFunctionErrors is what go test refuses in test files before it builds a test's main
+// (testfunctions.Problems), each as go test words it, its position first.
 func testFunctionErrors(fileSet *token.FileSet, files []*ast.File) []error {
 	var found []error
-	for _, file := range files {
-		for _, declaration := range file.Decls {
-			function, ok := declaration.(*ast.FuncDecl)
-			if !ok || function.Recv != nil {
-				continue
-			}
-			name := function.Name.Name
-			kind := ""
-			switch {
-			case name == "TestMain":
-				if isTestFunction(function, "T") {
-					continue
-				}
-				kind = "M"
-			case isTestName(name, "Test"):
-				kind = "T"
-			case isTestName(name, "Benchmark"):
-				kind = "B"
-			case isTestName(name, "Fuzz"):
-				kind = "F"
-			default:
-				continue
-			}
-			position := fileSet.Position(function.Pos())
-			if function.Type.TypeParams != nil && function.Type.TypeParams.NumFields() > 0 {
-				found = append(found, fmt.Errorf("%s: test functions cannot have type parameters", position))
-			} else if !isTestFunction(function, kind) {
-				found = append(found, fmt.Errorf("%s: wrong signature for %s, must be: func %s(%s *testing.%s)", position, name, name, strings.ToLower(kind), kind))
-			}
-		}
+	for _, problem := range testfunctions.Problems(fileSet, files) {
+		found = append(found, fmt.Errorf("%s: %s", problem.Position, problem.Message))
 	}
 	return found
-}
-
-// isTestName is go test's isTest: name is prefix followed by nothing or by something that is not a lower-case
-// letter, so TestMain and Test are tests and Testify is not.
-func isTestName(name, prefix string) bool {
-	if !strings.HasPrefix(name, prefix) {
-		return false
-	}
-	if len(name) == len(prefix) {
-		return true
-	}
-	next, _ := utf8.DecodeRuneInString(name[len(prefix):])
-	return !unicode.IsLower(next)
-}
-
-// isTestFunction is go test's isTestFunc: one parameter, of type *T or *anything.T for kind T, and no results.
-func isTestFunction(function *ast.FuncDecl, kind string) bool {
-	if function.Type.Results != nil && len(function.Type.Results.List) > 0 || function.Type.Params.List == nil ||
-		len(function.Type.Params.List) != 1 || len(function.Type.Params.List[0].Names) > 1 {
-		return false
-	}
-	pointer, ok := function.Type.Params.List[0].Type.(*ast.StarExpr)
-	if !ok {
-		return false
-	}
-	if name, ok := pointer.X.(*ast.Ident); ok && name.Name == kind {
-		return true
-	}
-	if selector, ok := pointer.X.(*ast.SelectorExpr); ok && selector.Sel.Name == kind {
-		return true
-	}
-	return false
 }
 
 type importerFunc func(path string) (*types.Package, error)
