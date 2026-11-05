@@ -52,7 +52,7 @@ func TestTest(test *testing.T) {
 		{name: "i sigma final", source: "^\u03a3$", flags: "i", subject: "\u03c2", want: true},
 		{name: "i sigma small", source: "^\u03a3$", flags: "i", subject: "\u03c3", want: true},
 		// A character outside ASCII never folds into ASCII, so these do not
-		// match — which is where Unicode folding gives the other answer.
+		// match, which is where Unicode folding gives the other answer.
 		{name: "i kelvin sign", source: "^k$", flags: "i", subject: "\u212a"},
 		{name: "i long s", source: "^s$", flags: "i", subject: "\u017f"},
 		{name: "i eszett", source: "^\u00df$", flags: "i", subject: "\u1e9e"},
@@ -313,7 +313,7 @@ func TestAccessorsKeepTheWrittenForm(test *testing.T) {
 // TestMatchingIsBounded covers the bound on how long one subject may spend in
 // one pattern. A pattern a user wrote can backtrack exponentially, so this
 // reads the bound off the compiled pattern rather than handing it one that
-// needs it — running the pathological case to watch it stop costs a core for
+// needs it: running the pathological case to watch it stop costs a core for
 // as long as the bound allows, every time the suite runs.
 func TestMatchingIsBounded(test *testing.T) {
 	test.Parallel()

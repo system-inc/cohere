@@ -326,7 +326,7 @@ func (builder *Builder[E]) typeParameters(node *ast.Node) {
 }
 
 // nestedFunction keeps evaluating the parts of a nested function that belong to
-// the enclosing code path — a computed member name and decorators — while its
+// the enclosing code path (a computed member name and decorators) while its
 // parameters and body form their own code path root.
 func (builder *Builder[E]) nestedFunction(node *ast.Node) {
 	builder.memberHeader(node)
@@ -359,8 +359,8 @@ func (builder *Builder[E]) classLike(node *ast.Node) {
 
 // memberHeader evaluates the parts of a class or object member that belong to
 // the enclosing code path: its decorators, its computed key, and its type
-// annotation. A member with a body of its own — a method, accessor, or
-// property initializer — forms its own code path, so its parameters and
+// annotation. A member with a body of its own (a method, accessor, or
+// property initializer) forms its own code path, so its parameters and
 // return type are walked there instead; an index signature has no body, so
 // its parameter and return types are walked here.
 func (builder *Builder[E]) memberHeader(node *ast.Node) {

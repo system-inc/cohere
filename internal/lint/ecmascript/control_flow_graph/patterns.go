@@ -17,7 +17,7 @@ func (builder *Builder[E]) patternReads(node *ast.Node) {
 		// A compound-assignment or update-expression target reads the
 		// variable before writing it; a plain assignment target does not,
 		// but ESLint still counts naming it as a point where the enclosing
-		// `try` block can throw — so the handler sees the value the target
+		// `try` block can throw, so the handler sees the value the target
 		// had before the assignment.
 		builder.read(node)
 		if isThrowableIdentifier(node) {

@@ -193,7 +193,7 @@ func (builder *Builder[E]) doStatement(node *ast.Node) {
 	after := builder.newBlock()
 
 	// A `continue` restarts a `do`…`while` at its test, not at its body, so it
-	// is not what starts another iteration — the test passing is.
+	// is not what starts another iteration: the test passing is.
 	builder.pushJump(node, after, test, nil)
 	builder.enter(body)
 	builder.statement(stmt.Statement)
@@ -454,7 +454,7 @@ func (builder *Builder[E]) tryStatement(node *ast.Node) {
 		builder.statement(stmt.FinallyBlock)
 		if builder.cur.Reachable {
 			// A `return` inside this `try`/`catch` still needs to run every
-			// enclosing `finally` on its way out, not just this one — so this
+			// enclosing `finally` on its way out, not just this one. So this
 			// second copy's own abrupt exit must keep propagating outward.
 			if frame.returnedAny {
 				if i := builder.returnFrame(); i >= 0 {

@@ -119,7 +119,7 @@ func decodeEscape(source string, i int, escaping escapeContext) (decodedEscape, 
 		return decodedEscape{kind: escapeAssertion, width: size, negated: true}, nil
 	case 'k':
 		// `\k<name>` is read whole before this. What is left is a `\k` naming
-		// nothing, which Annex B reads as the letter — but only in a pattern
+		// nothing, which Annex B reads as the letter, but only in a pattern
 		// that opens no named group, since one that does makes the reference
 		// mandatory.
 		if escaping.named {
@@ -152,7 +152,7 @@ func decodeUnicodeEscape(source string, i int, size int, escaping escapeContext)
 
 // decodeFixedHex reads the fixed-width hexadecimal escapes, `\xXX` and
 // `\uXXXX`. Without `u`, one that no hex digits complete is not an error but an
-// identity escape, so `/\x/` matches an `x` — and under `i` an `X` as well.
+// identity escape, so `/\x/` matches an `x`, and under `i` an `X` as well.
 func decodeFixedHex(source string, i int, size int, digits int, escaping escapeContext) (decodedEscape, error) {
 	start := i + size
 	if start+digits <= len(source) {
