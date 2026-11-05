@@ -29,7 +29,7 @@ var Analyzer = &analysis.Analyzer{
 	Doc: "Flags every type with methods after the first that a file serves, where a file serves each type it " +
 		"declares that has a method anywhere in the package and each type it declares a method of. A type without " +
 		"methods, an interface among them, never counts, nor does a sum type's variant whose every method is a " +
-		"marker, with an empty body and no results.",
+		"marker, with no parameters, an empty body and no results.",
 	Run: run,
 }
 
