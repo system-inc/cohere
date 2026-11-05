@@ -58,7 +58,7 @@ func printCommaSeparatedValueGroup(path *astPath, options *printerOptions, print
 
 		// If the node is comment and last node print it in a line suffix
 		if isInlineValueCommentNode(iNode) && iNextNode == nil {
-			// TODO: Improve this part
+			// Upstream: `TODO: Improve this part`
 			// This `lineSuffix` should be done in `value-comment` print
 			// But since we add `line` to groups in `value-paren_group`,
 			// The format result looks bad for now
