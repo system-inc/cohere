@@ -37,6 +37,8 @@ public struct CommandOptions: Equatable, Sendable {
     public var listRules = false
     public var listRulesEnabled = false
     public var showVersion = false
+    /* Print which packages inside the root a run there checks, and exit: the front door's answer to which nested packages it may skip. */
+    public var listCoveredPackages = false
     public var unused = false
     public var paths: [String] = []
 
@@ -102,6 +104,7 @@ public struct CommandOptions: Equatable, Sendable {
                 case "--rules": options.listRules = true
                 case "--rules-enabled": options.listRulesEnabled = true
                 case "--version": options.showVersion = true
+                case "--covered-packages": options.listCoveredPackages = true
                 case "--unused", "--unused-all", "--unused-deep": options.unused = true
                 case "--timing", "--explain":
                     throw UsageFailure(

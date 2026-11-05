@@ -92,6 +92,26 @@ public struct Pipeline {
             throw RunFailure(description: "\(root.path) holds no Package.swift, so there is no package to check")
         }
 
+        /* The packages a run here accounts for, from the same traversal the run uses: manifests only, no build. */
+        if options.listCoveredPackages {
+            let package = try PackageModel.load(
+                root: root,
+                scratchPath: runScratch(for: root),
+                runner: runner,
+                toolchain: toolchain,
+            )
+            let inside = package.localPackages.filter { PackageModel.isInside($0.root, root) }
+            let path = { (model: PackageModel) in model.root.standardizedFileURL.path }
+            try writer.write(
+                CoveredPackagesRecord(
+                    root: path(package),
+                    checked: ([package] + inside.filter { !package.isVendored($0) }).map(path),
+                    vendored: inside.filter { package.isVendored($0) }.map(path),
+                )
+            )
+            return 0
+        }
+
         /*
          The abbreviation vocabulary, loaded before anything is checked. A compiled-in copy that would not load
          refuses the run with exit 2: a naming rule with no words to judge would report nothing and read as a
