@@ -23,7 +23,7 @@ func (custom *strictCustom) UnmarshalJSON(raw []byte) error {
 
 type strictOptions struct {
 	strictEmbedded
-	EnforceForTSTypes bool          `json:"enforceForTSTypes"`
+	EnforceForTsTypes bool          `json:"enforceForTSTypes"`
 	Paths             []strictInner `json:"paths"`
 	Ignore            []string      // untagged: reached through Go's case-insensitive match
 	Custom            strictCustom  `json:"custom"`
@@ -39,7 +39,7 @@ func TestUnmarshalOptionsRefusesWhatUpstreamRefuses(test *testing.T) {
 	if unmarshalOptionsError := UnmarshalOptions([]byte(valid), &decoded); unmarshalOptionsError != nil {
 		test.Fatalf("baseline: a valid config was refused: %v", unmarshalOptionsError)
 	}
-	if !decoded.Shared || !decoded.EnforceForTSTypes || len(decoded.Paths) != 1 || decoded.Paths[0].Pattern != "x" ||
+	if !decoded.Shared || !decoded.EnforceForTsTypes || len(decoded.Paths) != 1 || decoded.Paths[0].Pattern != "x" ||
 		len(decoded.Ignore) != 1 || decoded.Custom.value == "" {
 		test.Fatalf("baseline: decoded %+v", decoded)
 	}

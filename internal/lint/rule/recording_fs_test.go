@@ -26,7 +26,7 @@ func TestARecordingFileSystemNotesEveryPathAndRefusesWrites(test *testing.T) {
 	if writeError := os.WriteFile(project+"/source/theme.css", []byte("@import 'tailwindcss';"), 0o644); writeError != nil {
 		test.Fatal(writeError)
 	}
-	recording := NewRecordingFS(osvfs.FS())
+	recording := NewRecordingFs(osvfs.FS())
 
 	recording.FileExists(tspath.RootedFilePath(project + "/source/theme.css"))
 	recording.FileExists(tspath.RootedFilePath(project + "/app/globals.css"))

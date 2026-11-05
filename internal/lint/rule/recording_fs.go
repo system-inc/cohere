@@ -39,8 +39,8 @@ type RecordingFS struct {
 
 var _ vfs.FS = (*RecordingFS)(nil)
 
-// NewRecordingFS wraps underlying.
-func NewRecordingFS(underlying vfs.FS) *RecordingFS {
+// NewRecordingFs wraps underlying.
+func NewRecordingFs(underlying vfs.FS) *RecordingFS {
 	return &RecordingFS{underlying: underlying, reads: map[string]FileRead{}}
 }
 

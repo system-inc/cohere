@@ -25,11 +25,11 @@ func TestDesignSystemReadsAreKeptPerProgram(test *testing.T) {
 	}
 	first, second, neither := &compiler.Program{}, &compiler.Program{}, &compiler.Program{}
 
-	firstRecorder := NewRecordingFS(osvfs.FS())
-	recordDesignSystemFS(first, firstRecorder)
+	firstRecorder := NewRecordingFs(osvfs.FS())
+	recordDesignSystemFs(first, firstRecorder)
 	firstRecorder.ReadFile(tspath.RootedFilePath(theme))
-	secondRecorder := NewRecordingFS(osvfs.FS())
-	recordDesignSystemFS(second, secondRecorder)
+	secondRecorder := NewRecordingFs(osvfs.FS())
+	recordDesignSystemFs(second, secondRecorder)
 	secondRecorder.FileExists(tspath.RootedFilePath(filepath.Join(directory, "missing.css")))
 
 	reads, loaded := DesignSystemReads(first)
@@ -53,7 +53,7 @@ func TestDesignSystemReadsDoNotHoldTheirProgram(test *testing.T) {
 	test.Parallel()
 	gone := weak.Make(func() *compiler.Program {
 		program := &compiler.Program{}
-		recordDesignSystemFS(program, NewRecordingFS(osvfs.FS()))
+		recordDesignSystemFs(program, NewRecordingFs(osvfs.FS()))
 		return program
 	}())
 	for attempt := 0; attempt < 5 && gone.Value() != nil; attempt++ {
@@ -63,7 +63,7 @@ func TestDesignSystemReadsDoNotHoldTheirProgram(test *testing.T) {
 		test.Fatal("a program held only by its design system entry was not collected")
 	}
 	kept := &compiler.Program{}
-	recordDesignSystemFS(kept, NewRecordingFS(osvfs.FS()))
+	recordDesignSystemFs(kept, NewRecordingFs(osvfs.FS()))
 	designSystemRecordings.Lock()
 	_, stillThere := designSystemRecordings.byProgram[gone]
 	designSystemRecordings.Unlock()

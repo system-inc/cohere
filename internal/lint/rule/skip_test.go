@@ -22,9 +22,9 @@ func TestEverySkipSaysWhichKindItIs(test *testing.T) {
 		if err != nil || entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
 			return err
 		}
-		file, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
-		if err != nil {
-			return err
+		file, parseError := parser.ParseFile(token.NewFileSet(), path, nil, 0)
+		if parseError != nil {
+			return parseError
 		}
 		ast.Inspect(file, func(node ast.Node) bool {
 			call, isCall := node.(*ast.CallExpr)
