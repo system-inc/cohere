@@ -18,12 +18,15 @@ import (
 	"github.com/system-inc/cohere/internal/release/dispatch"
 	"github.com/system-inc/cohere/internal/release/packaging"
 	"github.com/system-inc/cohere/internal/sentence"
+	"github.com/system-inc/cohere/internal/streams"
 )
 
 func main() {
 	if runError := run(); runError != nil {
+		// The launcher's report writes to stderr itself, so what this process said first is delivered first.
+		streams.Show(streams.Errors)
 		dispatch.Report.Fail("cohere: %s", sentence.FromError(runError))
-		os.Exit(1)
+		os.Exit(streams.Finish(1))
 	}
 }
 
@@ -73,6 +76,8 @@ parsed:
 		return resolveBinaryError
 	}
 
+	// The launcher's report writes to stderr itself, so what resolving said is delivered before it clears.
+	streams.Show(streams.Errors)
 	dispatch.Report.Clear()
 	return execute(binaryPath, arguments, wait)
 }
@@ -138,10 +143,10 @@ func resolveFrozenBinary() (string, error) {
 		return "", err
 	}
 
-	fmt.Fprintf(os.Stderr, "cohere: --frozen, so the rules on disk were never checked against this binary.\n")
-	fmt.Fprintf(os.Stderr, "  running: %s\n", filepath.Base(frozen.Path))
-	fmt.Fprintf(os.Stderr, "  hash:    %s\n", frozen.Hash)
-	fmt.Fprintf(os.Stderr, "  built:   %s\n", frozen.ModifiedAt)
+	fmt.Fprintf(streams.Errors, "cohere: --frozen, so the rules on disk were never checked against this binary.\n")
+	fmt.Fprintf(streams.Errors, "  running: %s\n", filepath.Base(frozen.Path))
+	fmt.Fprintf(streams.Errors, "  hash:    %s\n", frozen.Hash)
+	fmt.Fprintf(streams.Errors, "  built:   %s\n", frozen.ModifiedAt)
 
 	return frozen.Path, nil
 }
@@ -190,10 +195,10 @@ func resolveBinary(development bool, verbose bool) (string, error) {
 		}
 		// On every run, not only when it rebuilds. The binary carries every member's uncommitted edits
 		// in the shared checkout, and a reader of its findings has to know that before they read them.
-		fmt.Fprintf(os.Stderr, "cohere: --dev runs the working tree in %s, uncommitted edits included "+
+		fmt.Fprintf(streams.Errors, "cohere: --dev runs the working tree in %s, uncommitted edits included "+
 			"(anyone's, not only yours), so no commit reproduces these results\n", moduleDirectory)
 		if built && verbose {
-			fmt.Fprintf(os.Stderr, "cohere: working tree changed, rebuilt %s\n", filepath.Base(binaryPath))
+			fmt.Fprintf(streams.Errors, "cohere: working tree changed, rebuilt %s\n", filepath.Base(binaryPath))
 		}
 		return binaryPath, nil
 	}
@@ -203,7 +208,7 @@ func resolveBinary(development bool, verbose bool) (string, error) {
 		return "", resolveCommittedError
 	}
 	if built && verbose {
-		fmt.Fprintf(os.Stderr, "cohere: built %s from commit %s\n", filepath.Base(binaryPath), commit)
+		fmt.Fprintf(streams.Errors, "cohere: built %s from commit %s\n", filepath.Base(binaryPath), commit)
 	}
 	return binaryPath, nil
 }
@@ -214,6 +219,8 @@ func resolveBinary(development bool, verbose bool) (string, error) {
 // fixes: no module means the install is incomplete, while no toolchain in a real checkout means the
 // developer needs Go. A single message covering both would send half its readers the wrong way.
 func resolveInstalled(reason error) (string, error) {
+	// Ignored: SearchRoots passes over an empty start, so a working directory that can't be read leaves the
+	// executable's own place to search, and a binary found in neither is the error below.
 	workingDirectory, _ := os.Getwd()
 
 	executablePath := ""

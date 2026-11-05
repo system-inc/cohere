@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/system-inc/cohere/internal/goengine/project"
+	"github.com/system-inc/cohere/internal/streams"
 )
 
 // cohere-dev worktree: one worktree per name at a path that stays, moved between units of work with git, so
@@ -62,17 +63,17 @@ func namedWorktree(arguments []string) int {
 		case name == "" && !strings.HasPrefix(argument, "-"):
 			name = argument
 		default:
-			fmt.Fprintf(os.Stderr, "cohere-dev: worktree does not take %q\n%s\n", argument, worktreeUsage)
+			fmt.Fprintf(streams.Errors, "cohere-dev: worktree does not take %q\n%s\n", argument, worktreeUsage)
 			return 2
 		}
 	}
 	if checkWorktreeNameError := checkWorktreeName(name); checkWorktreeNameError != nil {
-		fmt.Fprintf(os.Stderr, "cohere-dev: %v\n%s\n", checkWorktreeNameError, worktreeUsage)
+		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n%s\n", checkWorktreeNameError, worktreeUsage)
 		return 2
 	}
 	// A branch that began with a dash would reach git switch as a flag.
 	if branchGiven && (branch == "" || strings.HasPrefix(branch, "-")) {
-		fmt.Fprintf(os.Stderr, "cohere-dev: --branch takes a branch name, and %q is not one\n%s\n", branch, worktreeUsage)
+		fmt.Fprintf(streams.Errors, "cohere-dev: --branch takes a branch name, and %q is not one\n%s\n", branch, worktreeUsage)
 		return 2
 	}
 	mainCheckout, path, code := namedWorktreePath(name)
@@ -85,7 +86,7 @@ func namedWorktree(arguments []string) int {
 			return code
 		}
 	} else if statError != nil {
-		fmt.Fprintf(os.Stderr, "cohere-dev: reading %s: %v\n", path, statError)
+		fmt.Fprintf(streams.Errors, "cohere-dev: reading %s: %v\n", path, statError)
 		return 1
 	} else if code := moveNamedWorktree(mainCheckout, path); code != 0 {
 		return code
@@ -93,12 +94,14 @@ func namedWorktree(arguments []string) int {
 
 	if branch != "" {
 		if output, gitCombinedError := gitCombined(path, "switch", "-c", branch); gitCombinedError != nil {
-			fmt.Fprintf(os.Stderr, "cohere-dev: starting branch %s in %s: %v\n%s\n", branch, path, gitCombinedError, output)
+			fmt.Fprintf(streams.Errors, "cohere-dev: starting branch %s in %s: %v\n%s\n", branch, path, gitCombinedError, output)
 			return 1
 		}
-		fmt.Fprintf(os.Stderr, "cohere-dev: %s is on a new branch %s\n", path, branch)
+		fmt.Fprintf(streams.Errors, "cohere-dev: %s is on a new branch %s\n", path, branch)
 	}
-	fmt.Println(path)
+	// Its notes first, as they were when each print went out at once, then the path a caller reads.
+	streams.Show(streams.Errors)
+	fmt.Fprintln(streams.Output, path)
 	return 0
 }
 
@@ -119,12 +122,12 @@ func checkWorktreeName(name string) error {
 func namedWorktreePath(name string) (string, string, int) {
 	top, err := gitOutput("", "rev-parse", "--show-toplevel")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "cohere-dev: worktree runs inside a checkout of cohere: %v\n", err)
+		fmt.Fprintf(streams.Errors, "cohere-dev: worktree runs inside a checkout of cohere: %v\n", err)
 		return "", "", 2
 	}
 	mainCheckout, err := checkoutOfMain(top)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "cohere-dev: %v\n", err)
+		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", err)
 		return "", "", 1
 	}
 	return mainCheckout, filepath.Join(filepath.Dir(mainCheckout), worktreePrefix+name), 0
@@ -133,15 +136,16 @@ func namedWorktreePath(name string) (string, string, int) {
 // createNamedWorktree adds a worktree at main, its submodules linked to the checkout of main's.
 func createNamedWorktree(mainCheckout string, path string) int {
 	if output, gitCombinedError := gitCombined(mainCheckout, "worktree", "add", "--detach", path, "main"); gitCombinedError != nil {
-		fmt.Fprintf(os.Stderr, "cohere-dev: adding a worktree at %s: %v\n%s\n", path, gitCombinedError, output)
+		fmt.Fprintf(streams.Errors, "cohere-dev: adding a worktree at %s: %v\n%s\n", path, gitCombinedError, output)
 		return 1
 	}
 	if linkSubmodulesError := linkSubmodules(mainCheckout, path); linkSubmodulesError != nil {
-		fmt.Fprintf(os.Stderr, "cohere-dev: %v\n", linkSubmodulesError)
+		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", linkSubmodulesError)
 		return 1
 	}
+	// Ignored: head only names the commit in the line below; the worktree is made either way.
 	head, _ := gitOutput(path, "rev-parse", "HEAD")
-	fmt.Fprintf(os.Stderr, "cohere-dev: created %s at main, %s\n", path, shortCommit(head))
+	fmt.Fprintf(streams.Errors, "cohere-dev: created %s at main, %s\n", path, shortCommit(head))
 	return 0
 }
 
@@ -154,27 +158,27 @@ func moveNamedWorktree(mainCheckout string, path string) int {
 	}
 	before, err := gitOutput(path, "rev-parse", "HEAD")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "cohere-dev: reading %s's head: %v\n", path, err)
+		fmt.Fprintf(streams.Errors, "cohere-dev: reading %s's head: %v\n", path, err)
 		return 1
 	}
 	if output, gitCombinedError := gitCombined(path, "switch", "--detach", "main"); gitCombinedError != nil {
-		fmt.Fprintf(os.Stderr, "cohere-dev: moving %s to main: %v\n%s\n", path, gitCombinedError, output)
+		fmt.Fprintf(streams.Errors, "cohere-dev: moving %s to main: %v\n%s\n", path, gitCombinedError, output)
 		return 1
 	}
 	// git replaces a symlinked submodule with an empty directory when the move changes its pin, and adds one
 	// for a submodule main gained.
 	if linkSubmodulesError := linkSubmodules(mainCheckout, path); linkSubmodulesError != nil {
-		fmt.Fprintf(os.Stderr, "cohere-dev: %v\n", linkSubmodulesError)
+		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", linkSubmodulesError)
 		return 1
 	}
 	after, err := gitOutput(path, "rev-parse", "HEAD")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "cohere-dev: reading %s's head: %v\n", path, err)
+		fmt.Fprintf(streams.Errors, "cohere-dev: reading %s's head: %v\n", path, err)
 		return 1
 	}
 	changed, err := gitOutput(path, "diff", "--name-only", before, after)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "cohere-dev: listing the files the move changed: %v\n", err)
+		fmt.Fprintf(streams.Errors, "cohere-dev: listing the files the move changed: %v\n", err)
 		return 1
 	}
 	count := 0
@@ -185,7 +189,7 @@ func moveNamedWorktree(mainCheckout string, path string) int {
 	if count == 1 {
 		files = "file"
 	}
-	fmt.Fprintf(os.Stderr, "cohere-dev: moved %s from %s to %s, %d %s changed\n", path, shortCommit(before), shortCommit(after), count, files)
+	fmt.Fprintf(streams.Errors, "cohere-dev: moved %s from %s to %s, %d %s changed\n", path, shortCommit(before), shortCommit(after), count, files)
 	return 0
 }
 
@@ -196,24 +200,24 @@ func moveNamedWorktree(mainCheckout string, path string) int {
 func checkWorktreeHoldsNoWork(mainCheckout string, path string, doing string) int {
 	registered, err := isWorktreeOf(mainCheckout, path)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "cohere-dev: %v\n", err)
+		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", err)
 		return 1
 	}
 	if !registered {
-		fmt.Fprintf(os.Stderr, "cohere-dev: %s exists and is not a worktree of %s's repository, so it is not %s it; "+
-			"move it aside or pick another name\n", path, mainCheckout, doing)
+		fmt.Fprintf(streams.Errors, "cohere-dev: %s exists and is not a worktree of %s's repository, so it is not %s "+
+			"it; move it aside or pick another name\n", path, mainCheckout, doing)
 		return 2
 	}
 	// Submodules are left out, since git status refuses a worktree whose submodule is a symlink, as the team
 	// makes them. Untracked files count: they are work, and a removal would take them.
 	changes, err := gitOutput(path, "status", "--porcelain", "--ignore-submodules=all")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "cohere-dev: reading %s's status: %v\n", path, err)
+		fmt.Fprintf(streams.Errors, "cohere-dev: reading %s's status: %v\n", path, err)
 		return 1
 	}
 	if changes != "" {
-		fmt.Fprintf(os.Stderr, "cohere-dev: %s has changes or untracked files, so it is not %s it; commit them or "+
-			"take them out:\n%s\n", path, doing, changes)
+		fmt.Fprintf(streams.Errors, "cohere-dev: %s has changes or untracked files, so it is not %s it; commit them "+
+			"or take them out:\n%s\n", path, doing, changes)
 		return 2
 	}
 	// A commit whose patch main holds counts as landed: a lead brings a hand's unit home by cherry-pick, which
@@ -221,11 +225,11 @@ func checkWorktreeHoldsNoWork(mainCheckout string, path string, doing string) in
 	// differs at all, a conflict resolved, still counts as unlanded, which keeps the refusal on the safe side.
 	unlanded, err := gitOutput(path, "log", "--oneline", "--cherry-pick", "--right-only", "main...HEAD")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "cohere-dev: reading %s's commits that main does not hold: %v\n", path, err)
+		fmt.Fprintf(streams.Errors, "cohere-dev: reading %s's commits that main does not hold: %v\n", path, err)
 		return 1
 	}
 	if unlanded != "" {
-		fmt.Fprintf(os.Stderr, "cohere-dev: %s holds commits that main does not, so it is not %s it; land them "+
+		fmt.Fprintf(streams.Errors, "cohere-dev: %s holds commits that main does not, so it is not %s it; land them "+
 			"(cohere-dev land), or keep them on a branch in another worktree:\n%s\n", path, doing, unlanded)
 		return 2
 	}
@@ -287,7 +291,7 @@ func linkSubmodules(mainCheckout string, worktree string) error {
 		if symlinkError := os.Symlink(source, directory); symlinkError != nil {
 			return fmt.Errorf("linking %s's submodule %s to %s: %w", worktree, link.Path, source, symlinkError)
 		}
-		fmt.Fprintf(os.Stderr, "cohere-dev: linked %s to %s\n", directory, source)
+		fmt.Fprintf(streams.Errors, "cohere-dev: linked %s to %s\n", directory, source)
 	}
 	return nil
 }
@@ -295,12 +299,12 @@ func linkSubmodules(mainCheckout string, worktree string) error {
 // removeNamedWorktree retires a named worktree, refusing as a move does, and changing nothing when it does.
 func removeNamedWorktree(arguments []string) int {
 	if len(arguments) != 1 {
-		fmt.Fprintf(os.Stderr, "cohere-dev: worktree remove takes one name\n%s\n", worktreeUsage)
+		fmt.Fprintf(streams.Errors, "cohere-dev: worktree remove takes one name\n%s\n", worktreeUsage)
 		return 2
 	}
 	name := arguments[0]
 	if checkWorktreeNameError := checkWorktreeName(name); checkWorktreeNameError != nil {
-		fmt.Fprintf(os.Stderr, "cohere-dev: %v\n%s\n", checkWorktreeNameError, worktreeUsage)
+		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n%s\n", checkWorktreeNameError, worktreeUsage)
 		return 2
 	}
 	mainCheckout, path, code := namedWorktreePath(name)
@@ -308,10 +312,10 @@ func removeNamedWorktree(arguments []string) int {
 		return code
 	}
 	if _, statError := os.Lstat(path); errors.Is(statError, fs.ErrNotExist) {
-		fmt.Fprintf(os.Stderr, "cohere-dev: there is no worktree named %s, at %s, to remove\n", name, path)
+		fmt.Fprintf(streams.Errors, "cohere-dev: there is no worktree named %s, at %s, to remove\n", name, path)
 		return 2
 	} else if statError != nil {
-		fmt.Fprintf(os.Stderr, "cohere-dev: reading %s: %v\n", path, statError)
+		fmt.Fprintf(streams.Errors, "cohere-dev: reading %s: %v\n", path, statError)
 		return 1
 	}
 	if code := checkWorktreeHoldsNoWork(mainCheckout, path, "removing"); code != 0 {
@@ -325,7 +329,7 @@ func removeNamedWorktree(arguments []string) int {
 	// which holds work of its own that the checks above did not look at, is refused.
 	links, gitlinksOfError := project.GitlinksOf(path)
 	if gitlinksOfError != nil {
-		fmt.Fprintf(os.Stderr, "cohere-dev: %v\n", gitlinksOfError)
+		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", gitlinksOfError)
 		return 1
 	}
 	symlinks := map[string]string{}
@@ -336,21 +340,21 @@ func removeNamedWorktree(arguments []string) int {
 			continue
 		}
 		if statError != nil {
-			fmt.Fprintf(os.Stderr, "cohere-dev: reading %s: %v\n", directory, statError)
+			fmt.Fprintf(streams.Errors, "cohere-dev: reading %s: %v\n", directory, statError)
 			return 1
 		}
 		if info.Mode()&fs.ModeSymlink != 0 {
 			target, readLinkError := os.Readlink(directory)
 			if readLinkError != nil {
-				fmt.Fprintf(os.Stderr, "cohere-dev: reading %s: %v\n", directory, readLinkError)
+				fmt.Fprintf(streams.Errors, "cohere-dev: reading %s: %v\n", directory, readLinkError)
 				return 1
 			}
 			symlinks[directory] = target
 			continue
 		}
 		if entries, readDirectoryError := os.ReadDir(directory); readDirectoryError != nil || len(entries) > 0 {
-			fmt.Fprintf(os.Stderr, "cohere-dev: %s's submodule %s is checked out in it, not linked, and may hold work "+
-				"of its own, so it is not removing it; remove that worktree by hand\n", path, link.Path)
+			fmt.Fprintf(streams.Errors, "cohere-dev: %s's submodule %s is checked out in it, not linked, and may hold "+
+				"work of its own, so it is not removing it; remove that worktree by hand\n", path, link.Path)
 			return 2
 		}
 	}
@@ -358,25 +362,25 @@ func removeNamedWorktree(arguments []string) int {
 		// os.Remove of a symlink unlinks the link itself and never follows it, so the checkout of main's
 		// submodule it points to is untouched.
 		if removeError := os.Remove(directory); removeError != nil {
-			fmt.Fprintf(os.Stderr, "cohere-dev: unlinking %s: %v\n", directory, removeError)
+			fmt.Fprintf(streams.Errors, "cohere-dev: unlinking %s: %v\n", directory, removeError)
 			return 1
 		}
 		if createDirectoryError := os.Mkdir(directory, 0o755); createDirectoryError != nil {
-			fmt.Fprintf(os.Stderr, "cohere-dev: replacing %s with an empty directory: %v\n", directory, createDirectoryError)
+			fmt.Fprintf(streams.Errors, "cohere-dev: replacing %s with an empty directory: %v\n", directory, createDirectoryError)
 			relinkSubmodules(symlinks)
 			return 1
 		}
 	}
 	if output, gitCombinedError := gitCombined(mainCheckout, "worktree", "remove", path); gitCombinedError != nil {
 		relinkSubmodules(symlinks)
-		fmt.Fprintf(os.Stderr, "cohere-dev: removing %s: %v\n%s\n", path, gitCombinedError, output)
+		fmt.Fprintf(streams.Errors, "cohere-dev: removing %s: %v\n%s\n", path, gitCombinedError, output)
 		return 1
 	}
 	if output, gitCombinedError := gitCombined(mainCheckout, "worktree", "prune"); gitCombinedError != nil {
-		fmt.Fprintf(os.Stderr, "cohere-dev: removed %s, and pruning the repository's worktrees failed: %v\n%s\n", path, gitCombinedError, output)
+		fmt.Fprintf(streams.Errors, "cohere-dev: removed %s, and pruning the repository's worktrees failed: %v\n%s\n", path, gitCombinedError, output)
 		return 1
 	}
-	fmt.Fprintf(os.Stderr, "cohere-dev: removed %s\n", path)
+	fmt.Fprintf(streams.Errors, "cohere-dev: removed %s\n", path)
 	return 0
 }
 
@@ -386,9 +390,10 @@ func relinkSubmodules(symlinks map[string]string) {
 		if info, statError := os.Lstat(directory); statError == nil && info.Mode()&fs.ModeSymlink != 0 {
 			continue
 		}
-		os.Remove(directory)
+		// Ignored: a directory that won't go makes the symlink below fail, and that failure is said.
+		_ = os.Remove(directory)
 		if symlinkError := os.Symlink(target, directory); symlinkError != nil {
-			fmt.Fprintf(os.Stderr, "cohere-dev: putting back %s, a symlink to %s: %v\n", directory, target, symlinkError)
+			fmt.Fprintf(streams.Errors, "cohere-dev: putting back %s, a symlink to %s: %v\n", directory, target, symlinkError)
 		}
 	}
 }

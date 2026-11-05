@@ -86,7 +86,9 @@ func startCacheTrim(poolDirectory string) {
 	if startError := trim.Start(); startError != nil {
 		return
 	}
-	trim.Process.Release()
+	// Ignored: the trim runs on its own whether or not this process lets go of its handle, and on Unix the
+	// release frees nothing else.
+	_ = trim.Process.Release()
 }
 
 // claimCacheLook reports whether the cache is due a look, and claims it, so runs ending together start one
@@ -129,6 +131,7 @@ func trimCache() int {
 	if err != nil {
 		return 1
 	}
+	// Ignored: the trim lock is never written, and its lock goes with the descriptor.
 	defer lock.Close()
 	if taken, tryLockFileError := tryLockFile(lock); tryLockFileError != nil || !taken {
 		return 0
@@ -216,13 +219,16 @@ func holdThePool(directory string, tokens int, why string, patience time.Duratio
 		if held != nil {
 			line := fmt.Sprintf("pid %d since %s: %s", os.Getpid(), time.Now().Format("15:04:05"), why)
 			for token := 1; token <= tokens; token++ {
-				os.WriteFile(holderPath(directory, token), []byte(line+"\n"), 0o644)
+				// Ignored: the line only tells a waiting run why it waits; the tokens are held by their locks,
+				// and a token without its line reads as held by a run that has not named itself.
+				_ = os.WriteFile(holderPath(directory, token), []byte(line+"\n"), 0o644)
 			}
 			return func() {
 				for index, lock := range held {
-					os.Remove(holderPath(directory, index+1))
+					// Ignored: a holder line left behind names no one, since heldBy reads the lock first.
+					_ = os.Remove(holderPath(directory, index+1))
 					unlockFile(lock)
-					lock.Close()
+					_ = lock.Close() // Ignored: never written, and its lock goes with the descriptor.
 				}
 			}, nil
 		}
@@ -240,7 +246,7 @@ func takeEveryToken(directory string, tokens int) ([]*os.File, error) {
 	letGo := func() {
 		for _, lock := range held {
 			unlockFile(lock)
-			lock.Close()
+			_ = lock.Close() // Ignored: never written, and its lock goes with the descriptor.
 		}
 	}
 	for token := 1; token <= tokens; token++ {
@@ -251,7 +257,7 @@ func takeEveryToken(directory string, tokens int) ([]*os.File, error) {
 		}
 		taken, err := tryLockFile(lock)
 		if err != nil || !taken {
-			lock.Close()
+			_ = lock.Close() // Ignored: never written, and the lock's error, if any, is the one returned.
 			letGo()
 			return nil, err
 		}
@@ -299,15 +305,19 @@ func goCacheDirectory() (string, error) {
 }
 
 // recordCacheLook keeps the last look at the cache, for cohere-dev status, and appends it to the trim log.
+//
+// Its failures go unsaid because there is no one to say them to: the trim is started with its output nowhere
+// and its exit code unread (startCacheTrim). The status and the log each hold the look, so either one landing
+// keeps it, and a status that never moved into place leaves the last look's.
 func recordCacheLook(directory string, what string) {
 	line := time.Now().Format("2006-01-02 15:04:05") + " " + what
 	temporary := filepath.Join(directory, ".gocache.status")
 	if os.WriteFile(temporary, []byte(line+"\n"), 0o644) == nil {
-		os.Rename(temporary, filepath.Join(directory, "gocache.status"))
+		_ = os.Rename(temporary, filepath.Join(directory, "gocache.status")) // Ignored: no one to tell, as above.
 	}
 	if log, openError := os.OpenFile(filepath.Join(directory, "gocache-trim.log"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644); openError == nil {
-		fmt.Fprintln(log, line)
-		log.Close()
+		_, _ = fmt.Fprintln(log, line) // Ignored: no one to tell, as above.
+		_ = log.Close()                // Ignored: no one to tell, as above.
 	}
 }
 

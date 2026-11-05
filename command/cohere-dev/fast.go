@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/system-inc/cohere/internal/corpus"
+	"github.com/system-inc/cohere/internal/streams"
 )
 
 // The fast tier is the edit loop (#nxgt2ca, ruled by @system_cohere on Kirk's two-tier call):
@@ -103,17 +104,19 @@ var landingGateOnly = []landingGateEntry{
 
 // fastTest runs the fast tier in the environment given and returns go test's exit code.
 func fastTest(base []string, arguments []string) int {
-	fmt.Fprintf(os.Stderr, "cohere-dev: fast tier, at load %s\n", machineLoad())
+	fmt.Fprintf(streams.Errors, "cohere-dev: fast tier, at load %s\n", machineLoad())
+	// Listing the module's packages takes a moment, and a person watches for the run to begin.
+	streams.Show(streams.Errors)
 
 	packages, err := modulePackages(base)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "cohere-dev: %v\n", err)
+		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", err)
 		return 1
 	}
 	skippedPackages := map[string]bool{}
 	for _, entry := range landingGateOnly {
 		if !packages[entry.pattern] {
-			fmt.Fprintf(os.Stderr, "cohere-dev: the fast tier's landing-gate list names %s, which is not a package of this "+
+			fmt.Fprintf(streams.Errors, "cohere-dev: the fast tier's landing-gate list names %s, which is not a package of this "+
 				"module; fix landingGateOnly in command/cohere-dev/fast.go\n", entry.pattern)
 			return 2
 		}
@@ -132,32 +135,35 @@ func fastTest(base []string, arguments []string) int {
 
 	environment, uncovered, err := testEnvironment(base)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "cohere-dev: %v\n", err)
+		fmt.Fprintf(streams.Errors, "cohere-dev: %v\n", err)
 		return 2
 	}
 	command := exec.Command("go", append(append([]string{"test"}, arguments...), selected...)...)
 	command.Env = append(environment, fastTierVariable+"=1")
 	command.Stdin, command.Stdout, command.Stderr = os.Stdin, os.Stdout, os.Stderr
+	// go test writes to the terminal itself, so what this run said first is delivered first.
+	streams.Show(streams.Output)
+	streams.Show(streams.Errors)
 	code := 0
 	if runError := command.Run(); runError != nil {
 		exited, ok := runError.(*exec.ExitError)
 		if !ok {
-			fmt.Fprintf(os.Stderr, "cohere-dev: running go test: %v\n", runError)
+			fmt.Fprintf(streams.Errors, "cohere-dev: running go test: %v\n", runError)
 			return 1
 		}
 		code = exited.ExitCode()
 	}
 
-	fmt.Fprintln(os.Stderr, "cohere-dev: the fast tier left these to the landing gate:")
+	fmt.Fprintln(streams.Errors, "cohere-dev: the fast tier left these to the landing gate:")
 	for _, entry := range landingGateOnly {
 		what := entry.pattern
 		if entry.skippedBy != "" {
 			what += "'s corpus walks"
 		}
-		fmt.Fprintf(os.Stderr, "  %s (%.1fs alone): %s\n", what, entry.wallSeconds, entry.reason)
+		fmt.Fprintf(streams.Errors, "  %s (%.1fs alone): %s\n", what, entry.wallSeconds, entry.reason)
 	}
-	printUncovered(os.Stderr, uncovered)
-	fmt.Fprintln(os.Stderr, "fast tier: not the landing gate. Run cohere-dev test ./... through the lock before landing on main.")
+	printUncovered(streams.Errors, uncovered)
+	fmt.Fprintln(streams.Errors, "fast tier: not the landing gate. Run cohere-dev test ./... through the lock before landing on main.")
 	return code
 }
 
