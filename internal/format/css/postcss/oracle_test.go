@@ -331,7 +331,11 @@ func TestParseAgreesWithPostcss(test *testing.T) {
 		if decodeError := json.Unmarshal([]byte(line), &record); decodeError != nil {
 			test.Fatal(decodeError)
 		}
-		oracle[record["name"].(string)] = record
+		name, isString := record["name"].(string)
+		if !isString {
+			test.Fatalf("the oracle printed a record without a name: %s", line)
+		}
+		oracle[name] = record
 	}
 
 	identical, refusedByBoth, corpusRefused, different := 0, 0, 0, 0
@@ -442,7 +446,13 @@ func dumpParseValue(value any, offsets func(int) int) any {
 			end, hasEnd := source["end"].(map[string]any)
 			wantRange := [2]int{0, 0}
 			if start != nil && hasEnd {
-				wantRange = [2]int{start["offset"].(int), end["offset"].(int)}
+				startOffset, startIsInt := start["offset"].(int)
+				endOffset, endIsInt := end["offset"].(int)
+				if !startIsInt || !endIsInt {
+					result["range"] = fmt.Sprintf("source offsets %#v and %#v are not both ints", start["offset"], end["offset"])
+					return result
+				}
+				wantRange = [2]int{startOffset, endOffset}
 			}
 			if typed.Range != wantRange {
 				result["range"] = fmt.Sprintf("Range %v is not source's %v", typed.Range, wantRange)

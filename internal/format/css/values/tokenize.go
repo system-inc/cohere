@@ -286,10 +286,10 @@ func tokenize(input []uint16, options Options) []token {
 
 		case backslash:
 			next = pos
-			code = charCodeAt(next + 1)
 
-			// Upstream tests an `escape` variable here that nothing assigns, so the backslash is always
-			// a one-character word and the branch that would take the escaped character is dead.
+			// Upstream reads the next character's code here and tests an `escape` variable that nothing
+			// assigns, so the backslash is always a one-character word and the branch that would take
+			// the escaped character, the only reader of that code, is dead.
 
 			push("word", slice(pos, next+1), line, pos-offset, line, next-offset, pos)
 
@@ -372,9 +372,9 @@ func tokenize(input []uint16, options Options) []token {
 			} else if (code == lowerU || code == upperU) && charCodeAt(pos+1) == plus {
 				next = pos + 2
 
+				// Upstream also reads each code here, which the loop test and everything after never read.
 				for {
 					next += 1
-					code = charCodeAt(next)
 					if !(next < length && unicodeRange(css[next])) {
 						break
 					}

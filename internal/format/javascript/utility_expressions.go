@@ -4,8 +4,7 @@ import "github.com/system-inc/cohere/internal/format/estree"
 
 // utilities/left-side.js, utilities/starts-with-no-lookahead-token.js,
 // utilities/strip-chain-element-wrappers.js, utilities/is-nullish-coalescing.js,
-// utilities/is-signed-numeric-literal.js, utilities/is-simple-expression-by-node-count.js,
-// utilities/has-node.js (with hasDescendant from src/utilities/ast.js),
+// utilities/is-signed-numeric-literal.js, utilities/has-node.js (with hasDescendant from src/utilities/ast.js),
 // utilities/is-meaningful-empty-statement.js, utilities/is-shorthand-specifier.js.
 
 // hasNakedLeftSide is upstream's hasNakedLeftSide.
@@ -147,35 +146,6 @@ func isSignedNumericLiteral(node Node) bool {
 	return node.Is("UnaryExpression") &&
 		(node.String("operator") == "+" || node.String("operator") == "-") &&
 		isNumericLiteral(node.Child("argument"))
-}
-
-// getExpressionInnerNodeCount is upstream's getExpressionInnerNodeCount. Upstream's `for...in`
-// counts every property holding an object with a string `type`, which is every child node and never
-// an array, so the Go counts the node-valued properties in insertion order.
-func getExpressionInnerNodeCount(node Node, maxCount int) int {
-	count := 0
-	for _, key := range node.Keys() {
-		if property, isNode := node.Get(key).(Node); isNode && property != nil {
-			count++
-			count += getExpressionInnerNodeCount(property, maxCount-count)
-		}
-
-		// Bail early to protect against bad performance.
-		if count > maxCount {
-			return count
-		}
-	}
-	return count
-}
-
-// isSimpleExpressionByNodeCount is upstream's isSimpleExpressionByNodeCount. Upstream's default
-// maxInnerNodeCount is 5; Go has no default parameters, so callers pass it.
-//
-// Attempts to gauge the rough complexity of a node, for example
-// to detect deeply-nested booleans, call expressions with lots of arguments, etc.
-func isSimpleExpressionByNodeCount(node Node, maxInnerNodeCount int) bool {
-	count := getExpressionInnerNodeCount(node, maxInnerNodeCount)
-	return count <= maxInnerNodeCount
 }
 
 // hasNode is upstream's hasNode.
