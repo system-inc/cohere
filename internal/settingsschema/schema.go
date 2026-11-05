@@ -204,6 +204,8 @@ func goShape() map[string]any {
 	return map[string]any{
 		"type":                 "object",
 		"additionalProperties": false,
+		// The engine refuses a go block with no rules, since it reads as configured and configures nothing.
+		"required": []string{"rules"},
 		"properties": map[string]any{
 			"rules": map[string]any{
 				"type":                 "object",
