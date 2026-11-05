@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -59,7 +60,8 @@ func (registration Registration[Options]) entry() (Entry, error) {
 	entry := Entry{
 		Traits:          traitsOf(subject),
 		RequiresOptions: registration.RequiresOptions,
-		Unconfigured:    bind(subject, Given[Options]{}),
+		Unconfigured:    Bind(subject, Given[Options]{}),
+		RunPackage:      runPackage(subject.Run),
 	}
 	decoders := 0
 	if registration.Decode != nil {
@@ -84,7 +86,7 @@ func (registration Registration[Options]) entry() (Entry, error) {
 			if decodeError != nil {
 				return Bound{}, decodeError
 			}
-			return bind(subject, Configured(decoded)), nil
+			return Bind(subject, Configured(decoded)), nil
 		}
 	}
 	if decoders > 1 {
@@ -100,12 +102,38 @@ func bindDecoded[Options any](subject Rule[Options], raw []byte, decode func([]b
 	if decodeError != nil {
 		return Bound{}, decodeError
 	}
-	return bind(subject, Configured(decoded)), nil
+	return Bind(subject, Configured(decoded)), nil
 }
 
-// bind is the rule with its options decided: Run and ProgramFingerprint closed over options, so the walk hands
-// a file to Bound.Run and never sees the options' type.
-func bind[Options any](subject Rule[Options], options Given[Options]) Bound {
+// EntryOf is a registration as Register would hold it, for a test that hands rules to the walk without
+// registering them in the process-wide catalog.
+func EntryOf[Options any](registration Registration[Options]) (Entry, error) {
+	return registration.entry()
+}
+
+// runPackage is the import path of the package whose code run is, read off the function itself, so the docs
+// tell a bare house rule from an ESLint core port by where its Run lives rather than by a list. It is read from
+// the author's Run before Bind wraps it, since the wrapper lives in this package.
+func runPackage[Options any](run func(ruleContext Context, options Given[Options]) Listeners) string {
+	function := runtime.FuncForPC(reflect.ValueOf(run).Pointer())
+	if function == nil {
+		return ""
+	}
+	// A function's name is its import path, then a dot, then the symbol and any closure suffixes. The
+	// path's last segment may hold dots of its own only in a domain, which comes before the last slash.
+	name := function.Name()
+	slash := strings.LastIndex(name, "/")
+	dot := strings.Index(name[slash+1:], ".")
+	if dot < 0 {
+		return name
+	}
+	return name[:slash+1+dot]
+}
+
+// Bind is the rule with its options decided: Run and ProgramFingerprint closed over options, so the walk hands
+// a file to Bound.Run and never sees the options' type. The framework binds through an Entry; a test harness
+// holding the Rule itself binds it here.
+func Bind[Options any](subject Rule[Options], options Given[Options]) Bound {
 	bound := Bound{
 		Traits: traitsOf(subject),
 		Run: func(ruleContext Context) Listeners {
@@ -163,6 +191,10 @@ type Entry struct {
 
 	// Unconfigured is the rule as a bare severity runs it, handed no options.
 	Unconfigured Bound
+
+	// RunPackage is the import path of the package the rule's own Run is written in, which the docs read to
+	// tell a bare house rule from an ESLint core port.
+	RunPackage string
 
 	// Bind decodes the rule's options and returns the rule ready to run with them. raw is the one option
 	// element for OptionArityOne and OptionArityAt (nil for a bare severity under OptionArityAt, so the
