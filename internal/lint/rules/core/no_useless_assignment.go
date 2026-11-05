@@ -148,16 +148,17 @@ func isLocalVariableDeclaration(declaration *ast.Node) bool {
 	// `KindBindingElement` whose parent is a `KindArrayBindingPattern` and whose grandparent is the
 	// `KindVariableDeclaration`. Requiring the node's own kind declined every destructured binding,
 	// which cost the two diagnostics upstream reports on exactly that shape.
-	for declaration != nil && (declaration.Kind == ast.KindBindingElement ||
-		declaration.Kind == ast.KindObjectBindingPattern ||
-		declaration.Kind == ast.KindArrayBindingPattern) {
-		declaration = declaration.Parent
+	declarator := declaration
+	for declarator != nil && (declarator.Kind == ast.KindBindingElement ||
+		declarator.Kind == ast.KindObjectBindingPattern ||
+		declarator.Kind == ast.KindArrayBindingPattern) {
+		declarator = declarator.Parent
 	}
-	if declaration == nil || declaration.Kind != ast.KindVariableDeclaration {
+	if declarator == nil || declarator.Kind != ast.KindVariableDeclaration {
 		return false
 	}
 	// The declarator sits inside a declaration list that carries the let/const/var flag.
-	list := declaration.Parent
+	list := declarator.Parent
 	if list == nil || list.Kind != ast.KindVariableDeclarationList {
 		return false
 	}

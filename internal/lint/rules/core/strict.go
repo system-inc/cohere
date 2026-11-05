@@ -229,13 +229,23 @@ type strictWalker struct {
 	mode StrictMode
 }
 
+// strictModeModule is the mode a module collapses to. Not one of the configurable four, which is
+// why it is a package constant rather than a StrictMode the decoder accepts.
+const strictModeModule StrictMode = "module"
+
+// strictModeImplied is the mode a TypeScript file collapses to when the compiler makes it strict. Like
+// strictModeModule it is selected by the file rather than configured, which is upstream's shape too:
+// `impliedStrict` is a parser feature, and `implied` is not one of the option's four values.
+const strictModeImplied StrictMode = "implied"
+
 // checkStrict resolves the mode for this file and walks it.
 func checkStrict(ruleContext rule.Context, file *ast.Node, mode StrictMode) {
 	source := file.AsSourceFile()
+	resolvedMode := mode
 
 	if type_checking.CompilerImpliesStrict(ruleContext, source) {
-		mode = strictModeImplied
-	} else if mode == StrictSafe {
+		resolvedMode = strictModeImplied
+	} else if resolvedMode == StrictSafe {
 		// Upstream picks Global when the file is CommonJS or the parser allows a top-level
 		// return, and Function otherwise.
 		//
@@ -250,22 +260,22 @@ func checkStrict(ruleContext rule.Context, file *ast.Node, mode StrictMode) {
 		// even this half is narrower here than upstream, and Safe resolves to Function for
 		// effectively every script this tree can produce.
 		if source.CommonJSModuleIndicator != nil {
-			mode = StrictGlobal
+			resolvedMode = StrictGlobal
 		} else {
-			mode = StrictFunction
+			resolvedMode = StrictFunction
 		}
 	}
 	// A module overrides everything, including an explicitly configured mode. This is upstream's
 	// first act inside its Program listener and it is why the option is nearly inert in this tree.
 	if ast.IsExternalModule(source) {
-		mode = strictModeModule
+		resolvedMode = strictModeModule
 	}
 
-	walker := strictWalker{ctx: ruleContext, mode: mode}
+	walker := strictWalker{ctx: ruleContext, mode: resolvedMode}
 	statements := source.Statements.Nodes
 	directives := strictDirectivesIn(ruleContext, statements)
 
-	if mode == StrictGlobal {
+	if resolvedMode == StrictGlobal {
 		// The global form wants exactly one directive at the top. A file with statements and no
 		// directive is reported once, on the span covering every statement, which is upstream's
 		// `loc` spanning the first through the last.
@@ -276,22 +286,13 @@ func checkStrict(ruleContext rule.Context, file *ast.Node, mode StrictMode) {
 		}
 		walker.reportAllExceptFirst(directives, messageStrictMultiple, true)
 	} else {
-		walker.reportAll(directives, walker.fileLevelMessage(), strictShouldFix(mode))
+		walker.reportAll(directives, walker.fileLevelMessage(), strictShouldFix(resolvedMode))
 	}
 
 	// The function arms. Under the function form the walk carries whether the enclosing scope is
 	// already strict and whether we are inside a class body; every other mode ignores both.
 	walker.walkStatements(statements, false, false, false)
 }
-
-// strictModeModule is the mode a module collapses to. Not one of the configurable four, which is
-// why it is a package constant rather than a StrictMode the decoder accepts.
-const strictModeModule StrictMode = "module"
-
-// strictModeImplied is the mode a TypeScript file collapses to when the compiler makes it strict. Like
-// strictModeModule it is selected by the file rather than configured, which is upstream's shape too:
-// `impliedStrict` is a parser feature, and `implied` is not one of the option's four values.
-const strictModeImplied StrictMode = "implied"
 
 // fileLevelMessage is what a directive at the top of the file means under the current mode.
 func (w strictWalker) fileLevelMessage() rule.Message {

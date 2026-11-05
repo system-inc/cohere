@@ -525,6 +525,8 @@ func blockScopedNamesDeclaredIn(block *ast.Node) map[string]bool {
 }
 
 // collectBindingNames records every name a binding introduces, walking patterns.
+//
+// Mutates: into the walk records every name it finds, so one set gathers a whole pattern
 func collectBindingNames(name *ast.Node, into map[string]bool) {
 	if name == nil {
 		return

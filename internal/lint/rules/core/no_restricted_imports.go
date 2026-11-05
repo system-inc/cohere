@@ -603,15 +603,15 @@ func (c *noRestrictedImportsChecker) check(
 ) {
 	// Upstream trims the specifier before comparing, so `import x from ' fs '` is restricted by
 	// `fs`. The trim applies to both the path list and the pattern list.
-	source = text.TrimWhitespace(source)
+	trimmedSource := text.TrimWhitespace(source)
 
-	c.checkPaths(node, source, bindings, declarationIsTypeOnly)
+	c.checkPaths(node, trimmedSource, bindings, declarationIsTypeOnly)
 
 	for _, pattern := range c.patterns {
-		if !c.patternMatches(pattern, source) {
+		if !c.patternMatches(pattern, trimmedSource) {
 			continue
 		}
-		c.reportForPattern(node, pattern, source, bindings, declarationIsTypeOnly)
+		c.reportForPattern(node, pattern, trimmedSource, bindings, declarationIsTypeOnly)
 	}
 }
 

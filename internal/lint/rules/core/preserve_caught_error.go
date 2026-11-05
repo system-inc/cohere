@@ -256,22 +256,22 @@ type constructedError struct {
 // An optional call is declined: ESLint's tree wraps it in a chain expression, which is neither a new
 // expression nor a call, so `throw Error?.("m")` is silent there.
 func thrownConstruction(thrown *ast.Node) (constructedError, bool) {
-	thrown = ast.SkipParentheses(thrown)
-	if thrown == nil {
+	unwrapped := ast.SkipParentheses(thrown)
+	if unwrapped == nil {
 		return constructedError{}, false
 	}
-	construction := constructedError{node: thrown}
-	switch thrown.Kind {
+	construction := constructedError{node: unwrapped}
+	switch unwrapped.Kind {
 	case ast.KindNewExpression:
-		expression := thrown.AsNewExpression()
+		expression := unwrapped.AsNewExpression()
 		construction.callee = expression.Expression
 		construction.typeArguments = expression.TypeArguments
 		construction.argumentList = expression.Arguments
 	case ast.KindCallExpression:
-		if ast.IsOptionalChain(thrown) {
+		if ast.IsOptionalChain(unwrapped) {
 			return constructedError{}, false
 		}
-		expression := thrown.AsCallExpression()
+		expression := unwrapped.AsCallExpression()
 		construction.callee = expression.Expression
 		construction.typeArguments = expression.TypeArguments
 		construction.argumentList = expression.Arguments

@@ -231,6 +231,8 @@ func patternSource(pattern string, allowEscape bool) memberSource {
 }
 
 // checkRegExpConstructorCall checks a call or construction of RegExp, as ESLint's tracker loop does.
+//
+// Mutates: checkedByACall a literal this call checks is marked, so the literal listener steps aside for it
 func checkRegExpConstructorCall(
 	ruleContext rule.Context,
 	call *ast.Node,
@@ -632,6 +634,9 @@ func isAcceptableEscape(source string, value uint32) bool {
 	return true
 }
 
+// zeroWidthJoiner is U+200D, the code point that splices emoji into one glyph.
+const zeroWidthJoiner = 0x200D
+
 // misleadingSequenceFindings runs every detector over one run of adjacent characters.
 //
 // All five run, and each reports independently, so one run can produce findings of several kinds.
@@ -765,6 +770,13 @@ func unicodeFlagSuggestionForLiteral(node *ast.Node, text string, flags string) 
 	}}
 }
 
+// unicodeFlagSafeEscapes are the escape characters whose meaning the `u` flag leaves alone.
+//
+// Everything here is either a syntax character that must be escaped in both modes, a named escape,
+// or a class shorthand. An identity escape of anything else is legal without the flag and rejected
+// with it, which is the case this list exists to exclude.
+const unicodeFlagSafeEscapes = `^$\.*+?()[]{}|/dDsSwWbBnrtvf0123456789xuck<>=!:,-`
+
 // patternMeaningChangesUnderUnicodeFlag reports whether adding `u` could change how a pattern parses.
 //
 // Three constructs are legal without the flag and are errors or mean something else with it: an
@@ -860,16 +872,6 @@ func quantifierBraceEnds(pattern string, index int) bool {
 	}
 	return scan < len(pattern) && pattern[scan] == '}'
 }
-
-// unicodeFlagSafeEscapes are the escape characters whose meaning the `u` flag leaves alone.
-//
-// Everything here is either a syntax character that must be escaped in both modes, a named escape,
-// or a class shorthand. An identity escape of anything else is legal without the flag and rejected
-// with it, which is the case this list exists to exclude.
-const unicodeFlagSafeEscapes = `^$\.*+?()[]{}|/dDsSwWbBnrtvf0123456789xuck<>=!:,-`
-
-// zeroWidthJoiner is U+200D, the code point that splices emoji into one glyph.
-const zeroWidthJoiner = 0x200D
 
 // isRegionalIndicatorSymbol reports whether a code point is one of the 26 letters that pair into a
 // flag. Each stands for one Latin letter, and two of them make an ISO 3166 country code.

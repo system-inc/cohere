@@ -82,6 +82,8 @@ func yodaSettingsFromWhen(when string) (YodaSettings, error) {
 }
 
 // applyYodaFlags copies whichever flags were written, leaving the rest at their defaults.
+//
+// Mutates: settings the decoder hands in what it read off the enum, and the written flags land on it in place
 func applyYodaFlags(settings *YodaSettings, object yodaObjectWire) {
 	if object.ExceptRange != nil {
 		settings.ExceptRange = *object.ExceptRange
@@ -367,11 +369,12 @@ func yodaParseNumber(text string) (float64, bool) {
 	if text == "" {
 		return 0, false
 	}
-	if text[len(text)-1] == 'n' {
-		text = text[:len(text)-1]
+	decimal := text
+	if decimal[len(decimal)-1] == 'n' {
+		decimal = decimal[:len(decimal)-1]
 	}
 	var value float64
-	if _, scanError := fmt.Sscanf(text, "%g", &value); scanError != nil {
+	if _, scanError := fmt.Sscanf(decimal, "%g", &value); scanError != nil {
 		return 0, false
 	}
 	return value, true
@@ -466,8 +469,8 @@ func yodaIsParenthesised(ruleContext rule.Context, node *ast.Node) bool {
 // token, so `if (/* c */ 0 <= x && x < 1)` is parenthesised there and is not here. No corpus case
 // writes that shape, so the divergence is recorded rather than measured, and it errs toward
 // reporting rather than toward silence.
-func yodaIsSpace(b byte) bool {
-	switch b {
+func yodaIsSpace(character byte) bool {
+	switch character {
 	case ' ', '\t', '\n', '\r', '\v', '\f':
 		return true
 	}
@@ -489,32 +492,32 @@ func yodaIsSpace(b byte) bool {
 // variable. That last part is what keeps `if (0 <= a[b()] && a[b()] < 1)` reporting: two calls are
 // not knowably the same reference even though the text matches.
 func yodaIsSameReference(left *ast.Node, right *ast.Node) bool {
-	left = yodaUnwrapParentheses(left)
-	right = yodaUnwrapParentheses(right)
-	if left == nil || right == nil {
+	unwrappedLeft := yodaUnwrapParentheses(left)
+	unwrappedRight := yodaUnwrapParentheses(right)
+	if unwrappedLeft == nil || unwrappedRight == nil {
 		return false
 	}
 
 	// The static-key equivalence, which is checked before the kind comparison because it is what
 	// lets a property access equal an element access.
-	if yodaIsAccess(left) && yodaIsAccess(right) {
-		if name, known := yodaStaticPropertyName(left); known {
-			otherName, otherKnown := yodaStaticPropertyName(right)
+	if yodaIsAccess(unwrappedLeft) && yodaIsAccess(unwrappedRight) {
+		if name, known := yodaStaticPropertyName(unwrappedLeft); known {
+			otherName, otherKnown := yodaStaticPropertyName(unwrappedRight)
 			return otherKnown && name == otherName &&
-				yodaIsSameReference(yodaAccessObject(left), yodaAccessObject(right))
+				yodaIsSameReference(yodaAccessObject(unwrappedLeft), yodaAccessObject(unwrappedRight))
 		}
 	}
 
-	if left.Kind != right.Kind {
+	if unwrappedLeft.Kind != unwrappedRight.Kind {
 		return false
 	}
 
-	switch left.Kind {
+	switch unwrappedLeft.Kind {
 	case ast.KindThisKeyword, ast.KindSuperKeyword:
 		return true
 
 	case ast.KindIdentifier, ast.KindPrivateIdentifier:
-		return left.Text() == right.Text()
+		return unwrappedLeft.Text() == unwrappedRight.Text()
 
 	case ast.KindStringLiteral, ast.KindNumericLiteral, ast.KindBigIntLiteral,
 		ast.KindTrueKeyword, ast.KindFalseKeyword, ast.KindNullKeyword,
@@ -522,19 +525,19 @@ func yodaIsSameReference(left *ast.Node, right *ast.Node) bool {
 		// Upstream compares cooked literal values, and `Text()` is the cooked value for a string
 		// and the canonical rendering for a number, so `0x10` and `16` compare equal here exactly
 		// as they do upstream.
-		return left.Text() == right.Text()
+		return unwrappedLeft.Text() == unwrappedRight.Text()
 
 	case ast.KindPropertyAccessExpression:
-		return yodaIsSameReference(left.AsPropertyAccessExpression().Name(),
-			right.AsPropertyAccessExpression().Name()) &&
-			yodaIsSameReference(left.AsPropertyAccessExpression().Expression,
-				right.AsPropertyAccessExpression().Expression)
+		return yodaIsSameReference(unwrappedLeft.AsPropertyAccessExpression().Name(),
+			unwrappedRight.AsPropertyAccessExpression().Name()) &&
+			yodaIsSameReference(unwrappedLeft.AsPropertyAccessExpression().Expression,
+				unwrappedRight.AsPropertyAccessExpression().Expression)
 
 	case ast.KindElementAccessExpression:
-		return yodaIsSameReference(left.AsElementAccessExpression().ArgumentExpression,
-			right.AsElementAccessExpression().ArgumentExpression) &&
-			yodaIsSameReference(left.AsElementAccessExpression().Expression,
-				right.AsElementAccessExpression().Expression)
+		return yodaIsSameReference(unwrappedLeft.AsElementAccessExpression().ArgumentExpression,
+			unwrappedRight.AsElementAccessExpression().ArgumentExpression) &&
+			yodaIsSameReference(unwrappedLeft.AsElementAccessExpression().Expression,
+				unwrappedRight.AsElementAccessExpression().Expression)
 	}
 	return false
 }
@@ -588,10 +591,11 @@ func yodaAccessObject(node *ast.Node) *ast.Node {
 // A loop rather than one step, because `((x))` nests, and written out rather than through
 // `ast.SkipParentheses`, which dereferences its argument.
 func yodaUnwrapParentheses(node *ast.Node) *ast.Node {
-	for node != nil && node.Kind == ast.KindParenthesizedExpression {
-		node = node.AsParenthesizedExpression().Expression
+	current := node
+	for current != nil && current.Kind == ast.KindParenthesizedExpression {
+		current = current.AsParenthesizedExpression().Expression
 	}
-	return node
+	return current
 }
 
 // yodaFlippedString is upstream's `getFlippedString`, and the shape of it is the safety argument.
@@ -708,7 +712,8 @@ func yodaCharactersFuse(left byte, right byte) bool {
 }
 
 // yodaIsWordCharacter says whether a byte can appear inside an identifier or a number.
-func yodaIsWordCharacter(b byte) bool {
-	return b == '_' || b == '$' ||
-		(b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || (b >= '0' && b <= '9')
+func yodaIsWordCharacter(character byte) bool {
+	return character == '_' || character == '$' ||
+		(character >= 'a' && character <= 'z') || (character >= 'A' && character <= 'Z') ||
+		(character >= '0' && character <= '9')
 }

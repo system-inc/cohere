@@ -310,12 +310,12 @@ func preferPromiseRejectErrorsIsGlobalUndefined(ruleContext rule.Context, expres
 // not whether it does. An identifier, a call, a member read and an await are all opaque, so they
 // pass. Everything the syntax settles as not-an-Error reports.
 func preferPromiseRejectErrorsCouldBeError(node *ast.Node) bool {
-	node = preferPromiseRejectErrorsUnwrap(node)
-	if node == nil {
+	unwrapped := preferPromiseRejectErrorsUnwrap(node)
+	if unwrapped == nil {
 		return false
 	}
 
-	switch node.Kind {
+	switch unwrapped.Kind {
 	case ast.KindIdentifier,
 		ast.KindCallExpression,
 		ast.KindNewExpression,
@@ -331,10 +331,10 @@ func preferPromiseRejectErrorsCouldBeError(node *ast.Node) bool {
 		return true
 
 	case ast.KindBinaryExpression:
-		return preferPromiseRejectErrorsBinaryCouldBeError(node.AsBinaryExpression())
+		return preferPromiseRejectErrorsBinaryCouldBeError(unwrapped.AsBinaryExpression())
 
 	case ast.KindConditionalExpression:
-		conditional := node.AsConditionalExpression()
+		conditional := unwrapped.AsConditionalExpression()
 		return preferPromiseRejectErrorsCouldBeError(conditional.WhenTrue) ||
 			preferPromiseRejectErrorsCouldBeError(conditional.WhenFalse)
 	}
@@ -413,14 +413,15 @@ func preferPromiseRejectErrorsIsFunction(node *ast.Node) bool {
 // value is an Error. `no_unsafe_optional_chaining.go:317` and `no_misleading_character_class.go:418`
 // take the same set for the same stated reason.
 func preferPromiseRejectErrorsUnwrap(node *ast.Node) *ast.Node {
-	for node != nil {
-		switch node.Kind {
+	current := node
+	for current != nil {
+		switch current.Kind {
 		case ast.KindParenthesizedExpression, ast.KindAsExpression, ast.KindSatisfiesExpression,
 			ast.KindTypeAssertionExpression, ast.KindNonNullExpression:
-			node = node.Expression()
+			current = current.Expression()
 		default:
-			return node
+			return current
 		}
 	}
-	return node
+	return current
 }

@@ -109,15 +109,16 @@ func spellsANonCallableGlobal(text string) bool {
 // identifier's own name, or the static name of the member it reads, through parentheses. A callee of
 // any other shape has none.
 func calleeName(callee *ast.Node) string {
-	callee = ast.SkipParentheses(callee)
-	switch callee.Kind {
+	unwrapped := ast.SkipParentheses(callee)
+	switch unwrapped.Kind {
 	case ast.KindIdentifier:
-		return callee.Text()
+		return unwrapped.Text()
 	case ast.KindPropertyAccessExpression:
-		name, _ := property.Name(callee.AsPropertyAccessExpression().Name(), property.Named|property.Private)
+		name, _ := property.Name(unwrapped.AsPropertyAccessExpression().Name(), property.Named|property.Private)
 		return name
 	case ast.KindElementAccessExpression:
-		name, _ := property.Name(callee.AsElementAccessExpression().ArgumentExpression, property.Quoted|property.Templated|property.Numeric)
+		name, _ := property.Name(unwrapped.AsElementAccessExpression().ArgumentExpression,
+			property.Quoted|property.Templated|property.Numeric)
 		return name
 	}
 	return ""

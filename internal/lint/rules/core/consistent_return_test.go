@@ -110,13 +110,13 @@ func TestConsistentReturnFires(test *testing.T) {
 				testCase.source, decodeConsistentReturnOptionsForTest(test, testCase.optionsJson))
 
 			wantIds := make([]string, len(testCase.findings))
-			for i, finding := range testCase.findings {
-				wantIds[i] = finding.id
+			for index, finding := range testCase.findings {
+				wantIds[index] = finding.id
 			}
 			rule_testing.ExpectFindings(test, result, wantIds...)
 
-			for i, finding := range testCase.findings {
-				got := result.Diagnostics[i].Message.Description
+			for index, finding := range testCase.findings {
+				got := result.Diagnostics[index].Message.Description
 				// Upstream's three message templates, rendered with the name it asserts.
 				var want string
 				switch finding.id {
@@ -130,18 +130,18 @@ func TestConsistentReturnFires(test *testing.T) {
 					test.Fatalf("unknown message id %q", finding.id)
 				}
 				if !strings.HasPrefix(got, want) {
-					test.Errorf("finding %d: message should begin %q, got %q", i, want, got)
+					test.Errorf("finding %d: message should begin %q, got %q", index, want, got)
 				}
 
 				// The span. Upstream asserts a line and a column; `Run` does not trim its input, so
 				// the literal above is byte for byte what is on disk and the offset can be turned
 				// into a one-based line and column directly.
 				line, column := consistentReturnLineAndColumn(testCase.source,
-					result.Diagnostics[i].Range.Pos())
+					result.Diagnostics[index].Range.Pos())
 				if line != finding.line || column != finding.column {
 					test.Errorf("finding %d should point at line %d column %d, got line %d column %d "+
-						"(reported text %q)", i, finding.line, finding.column, line, column,
-						testCase.source[result.Diagnostics[i].Range.Pos():result.Diagnostics[i].Range.End()])
+						"(reported text %q)", index, finding.line, finding.column, line, column,
+						testCase.source[result.Diagnostics[index].Range.Pos():result.Diagnostics[index].Range.End()])
 				}
 			}
 		})
@@ -154,8 +154,8 @@ func TestConsistentReturnFires(test *testing.T) {
 // the Program case asserts column 1 for offset 0 while the rule's own `loc` says column 0.
 func consistentReturnLineAndColumn(source string, offset int) (int, int) {
 	line, column := 1, 1
-	for i := 0; i < offset && i < len(source); i++ {
-		if source[i] == '\n' {
+	for index := 0; index < offset && index < len(source); index++ {
+		if source[index] == '\n' {
 			line++
 			column = 1
 			continue
