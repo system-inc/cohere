@@ -32,7 +32,7 @@ func TestAWaiterNamesEachNewHolder(test *testing.T) {
 		test.Fatalf("taking the token: %v", takeSlotError)
 	}
 	tickets := func() int {
-		entries, _ := os.ReadDir(queueDirectory(slots))
+		entries := listMaybeMissing(test, queueDirectory(slots))
 		live := 0
 		for _, entry := range entries {
 			if !strings.HasPrefix(entry.Name(), ".") {
@@ -114,5 +114,30 @@ func TestStatusShowsTheLandLock(test *testing.T) {
 	if output := status(); !strings.Contains(output, "land lock: pid") || !strings.Contains(output, "landing 1234abcd") ||
 		!strings.Contains(output, "land line: 1 waiting") {
 		test.Errorf("status does not show the land lock's holder and its line:\n%s", output)
+	}
+}
+
+// A held token whose holder file can't be read says so, rather than that its run has not named itself, which
+// is what a holder file not yet written means.
+func TestAHeldTokenWhoseHolderCannotBeReadSaysSo(test *testing.T) {
+	test.Parallel()
+	if runtime.GOOS == "windows" {
+		test.Skip("a token is a Unix lock")
+	}
+	slots := test.TempDir()
+	held, takeSlotError := takeSlot(slots, 1, "a run whose holder file the test replaces")
+	if takeSlotError != nil || held == nil {
+		test.Fatalf("taking the token: %v", takeSlotError)
+	}
+	defer held.release()
+	// A directory where the holder file was: reading it fails, and not because it is missing.
+	if removeError := os.Remove(held.holder); removeError != nil {
+		test.Fatal(removeError)
+	}
+	if createDirectoryError := os.Mkdir(held.holder, 0o755); createDirectoryError != nil {
+		test.Fatal(createDirectoryError)
+	}
+	if holder := heldBy(slots, 1); !strings.HasPrefix(holder, "held, and its holder could not be read: ") {
+		test.Errorf("a held token whose holder can't be read reads %q", holder)
 	}
 }

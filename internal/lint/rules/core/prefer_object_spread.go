@@ -38,17 +38,17 @@ var messagePreferObjectSpreadUseLiteral = rule.Message{
 //
 // # Three declines, and each rules out a shape spread cannot express
 //
-// An ARRAY SPREAD argument, `Object.assign({}, ...foo)`, has no object-spread equivalent: the call
+// An array spread argument, `Object.assign({}, ...foo)`, has no object-spread equivalent: the call
 // spreads a list of sources and `{ ...foo }` would spread the array itself.
 //
-// An ACCESSOR in any object-literal argument, when there are two or more arguments. Object spread
-// evaluates a getter and copies its RESULT, while `Object.assign` also invokes it but the
+// An accessor in any object-literal argument, when there are two or more arguments. Object spread
+// evaluates a getter and copies its result, while `Object.assign` also invokes it but the
 // difference shows when the accessor is on a later source being merged onto an earlier one.
 // Upstream declines only for the multi-argument case, so a lone `Object.assign({ get a() {} })`
 // still reports. Measured against the installed rule, which reports the single-argument form and
 // is silent on both two-argument forms.
 //
-// A SHADOWED `Object`. The calls come from the shelf's port of eslint-utils' ReferenceTracker, as
+// A shadowed `Object`. The calls come from the shelf's port of eslint-utils' ReferenceTracker, as
 // ESLint finds them, so a parameter, a local binding or an import named `Object` is not the global
 // and the call is not this rule's business, while an alias such as `const { assign } = Object` is
 // (#jjfa7qb). A file that writes `Object` anywhere is not followed at all: the tracker declines a
@@ -61,7 +61,7 @@ var messagePreferObjectSpreadUseLiteral = rule.Message{
 // the call's callee, its parentheses, and the braces of literal arguments. Nothing inside an
 // argument is rebuilt, so a type assertion, a template literal or a comment survives.
 //
-// The parenthesization is upstream's and it defaults to WRAPPING, which is the safe direction. An
+// The parenthesization is upstream's and it defaults to wrapping, which is the safe direction. An
 // arrow body is the case that makes it load bearing: `() => Object.assign({}, foo)` must become
 // `() => ({ ...foo})` and not `() => { ...foo}`, which parses as a block and returns nothing.
 // Measured against the installed rule.
@@ -110,10 +110,10 @@ func checkPreferObjectSpread(ruleContext rule.Context, node *ast.Node) {
 	// The first argument must be an object literal. `Object.assign(foo, bar)` mutates `foo`, which
 	// is a different operation entirely rather than a longer spelling of one.
 	//
-	// Unwrapped for the JUDGMENT, because our parser keeps a KindParenthesizedExpression where
+	// Unwrapped for the judgment, because our parser keeps a KindParenthesizedExpression where
 	// upstream's folds it away: `Object.assign(({ a: 1 }), (foo))` is a plain object literal there
 	// and a wrapper here, and without this the rule goes silent on one of upstream's own firing
-	// cases. The FIX still reads the wrapped node, since upstream removes those parentheses too.
+	// cases. The fix still reads the wrapped node, since upstream removes those parentheses too.
 	if preferObjectSpreadUnwrap(arguments[0]).Kind != ast.KindObjectLiteralExpression {
 		return
 	}
@@ -174,7 +174,7 @@ func preferObjectSpreadHasArgumentWithAccessors(arguments []*ast.Node) bool {
 // Upstream finds the parentheses with token queries against a token stream this tree does not
 // expose the same way, and its arithmetic reads `node.range[0]` to `leftParen.range[0]` for the
 // callee removal. Reproducing that offset blindly is the failure this brief warns about, so the
-// opening parenthesis is found by scanning forward from the CALLEE's end rather than by assuming
+// opening parenthesis is found by scanning forward from the callee's end rather than by assuming
 // it is adjacent. Measured: it is adjacent for `Object.assign(`, two characters later for
 // `Object.assign  (`, and five later for `Object.assign<Foo>(`, and the last of those is the one
 // an offset assumption would corrupt.
@@ -204,10 +204,10 @@ func preferObjectSpreadFix(ruleContext rule.Context, node *ast.Node,
 	// a brace over something that is not a parenthesis. Measured on the corpus's HTML-comment case,
 	// which TypeScript does not parse: the span ends on the `d` of `weird`.
 	//
-	// This guard is REDUNDANT with the argument-span check further down, and that took a paired
-	// mutation to establish. Neutralising either alone SURVIVES every fixture, because the other
+	// This guard is redundant with the argument-span check further down, and that took a paired
+	// mutation to establish. Neutralising either alone survives every fixture, because the other
 	// declines the same input: with a malformed span the second argument extends past this wrong
-	// `rightParen` and the argument check refuses. Neutralising BOTH fails 4 lines. Kept because
+	// `rightParen` and the argument check refuses. Neutralising both fails 4 lines. Kept because
 	// declining at the earliest point that can tell is cheaper than declining after building
 	// per-argument edits, and because the two ask different questions of the same bad parse.
 	rightParen := nodeSpan.End() - 1
@@ -274,8 +274,8 @@ func preferObjectSpreadArgumentFix(ruleContext rule.Context, argument *ast.Node,
 	}
 
 	if inner.Kind == ast.KindObjectLiteralExpression {
-		// Upstream collects the braces AND every wrapping parenthesis into one sorted list, takes
-		// the OUTERMOST pair as `left`/`right`, removes the inner ones bare, and strips whitespace
+		// Upstream collects the braces and every wrapping parenthesis into one sorted list, takes
+		// the outermost pair as `left`/`right`, removes the inner ones bare, and strips whitespace
 		// around the outermost pair only. The order matters: stripping around the braces instead
 		// eats the indentation that upstream keeps, which is a one-case difference in output and
 		// exactly what the corpus's multi-line parenthesized argument pins.
@@ -309,7 +309,7 @@ func preferObjectSpreadArgumentFix(ruleContext rule.Context, argument *ast.Node,
 		}
 		openBrace, closeBrace = outermostOpen, outermostClose
 
-		// Upstream removes the brace AND the whitespace just inside it, which is what turns
+		// Upstream removes the brace and the whitespace just inside it, which is what turns
 		// `{ a: 1 }` into `a: 1` rather than ` a: 1 `. It declines to eat leading whitespace when a
 		// line comment precedes the brace, since doing so would pull the brace's line onto the
 		// comment's and comment out the code.
@@ -323,7 +323,7 @@ func preferObjectSpreadArgumentFix(ruleContext rule.Context, argument *ast.Node,
 			rule.RemoveRange(core.NewTextRange(rightStart, closeBrace+1)))
 
 		// Remove the comma that separated this argument from the next, when keeping it would
-		// double up. Two shapes need it and upstream names both: an EMPTY literal, which leaves
+		// double up. Two shapes need it and upstream names both: an empty literal, which leaves
 		// nothing before the comma at all and produces `({, ...foo})`, and a literal that already
 		// ends in a trailing comma, which would produce `({a: 1,, ...foo})`.
 		//
@@ -354,8 +354,8 @@ func preferObjectSpreadArgumentFix(ruleContext rule.Context, argument *ast.Node,
 
 // preferObjectSpreadNeedsParens says whether the resulting object literal must be wrapped.
 //
-// The default is to WRAP, and that direction is the safety property rather than a preference: an
-// unwrapped `{ ... }` in expression position parses as a BLOCK, which either fails to parse or,
+// The default is to wrap, and that direction is the safety property rather than a preference: an
+// unwrapped `{ ... }` in expression position parses as a block, which either fails to parse or,
 // worse, parses as a block that returns nothing. `() => Object.assign({}, foo)` becoming
 // `() => { ...foo}` is the case that makes it concrete, and it is the same class of meaning-changing
 // repair this tree has shipped twice before.
@@ -381,7 +381,7 @@ func preferObjectSpreadNeedsParens(ruleContext rule.Context, node *ast.Node) boo
 		if binary != nil && binary.OperatorToken != nil &&
 			binary.OperatorToken.Kind == ast.KindEqualsToken {
 			// Upstream's AssignmentExpression arm: `parent.left === node && !isParenthesised`.
-			// The RIGHT side needs no wrap at all, since a brace there is unambiguously a literal.
+			// The right side needs no wrap at all, since a brace there is unambiguously a literal.
 			// Measured: `eventData = Object.assign({}, eventData, {a:1})` repairs to
 			// `eventData = { ... }` with no parentheses.
 			if binary.Left != node {
@@ -409,13 +409,13 @@ func preferObjectSpreadIsParenthesised(node *ast.Node) bool {
 // starting a new one when that line had no semicolon. Upstream inserts `;` in front for exactly
 // that case, and its own corpus writes `const x = 1\nObject.assign({}, foo)` to pin it.
 //
-// Asked only when the call IS the whole expression statement, since that is the only position where
+// Asked only when the call is the whole expression statement, since that is the only position where
 // a leading `(` can be misread.
 func preferObjectSpreadNeedsPrecedingSemicolon(ruleContext rule.Context, node *ast.Node,
 	nodeSpan core.TextRange) bool {
 	_ = nodeSpan
 
-	// Upstream asks `isStartOfExpressionStatement`, which is whether the node BEGINS an expression
+	// Upstream asks `isStartOfExpressionStatement`, which is whether the node begins an expression
 	// statement rather than whether it is the whole of one. The difference is real and the corpus
 	// pins it: `foo\nObject.assign({}, bar).doSomething()` and `foo\nObject.assign({}, bar), 2`
 	// both need the semicolon, and in neither is the call the statement's own expression.
@@ -462,7 +462,7 @@ func preferObjectSpreadEndWithSpaces(source string, start int) int {
 
 // preferObjectSpreadStartWithSpaces returns the offset of the whitespace run ending at `end`.
 //
-// Upstream refuses to walk back over whitespace when the token before is a LINE comment, because
+// Upstream refuses to walk back over whitespace when the token before is a line comment, because
 // pulling the closing brace up onto that line would comment it out. Reproduced by scanning for a
 // line comment in the whitespace being crossed rather than by asking a token stream.
 func preferObjectSpreadStartWithSpaces(ruleContext rule.Context, source string, end int) int {

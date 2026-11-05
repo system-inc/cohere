@@ -269,7 +269,7 @@ func TestNoUndefInitReportsTheWholeDeclarator(test *testing.T) {
 //
 // `no_new_native_nonconstructor.go` asks whether the symbol's first declaration lives in a
 // declaration file, which is the right question for `Symbol` and `BigInt`. Measured with a probe:
-// the real global `undefined` resolves to a symbol with ZERO declarations, so that predicate answers
+// the real global `undefined` resolves to a symbol with zero declarations, so that predicate answers
 // false for it and a rule built on it is silent on every reporting case. This asks the complement.
 //
 // Three shadow shapes, each a different binding kind, and all three confirmed silent on the
@@ -299,10 +299,10 @@ func TestNoUndefInitDeclinesAShadowedUndefined(test *testing.T) {
 		"function f() { let foo = undefined; return foo; }"), "unnecessaryUndefinedInit")
 }
 
-// An ambient declaration in a .d.ts is NOT a shadow, which only a multi-file fixture can see.
+// An ambient declaration in a .d.ts is not a shadow, which only a multi-file fixture can see.
 //
 // The shadow test declines a declaration living in a declaration file, and that arm is invisible to
-// every single-file fixture: measured with a probe, `undefined` gets ZERO declarations in ordinary
+// every single-file fixture: measured with a probe, `undefined` gets zero declarations in ordinary
 // source, and even `declare var undefined` written in a .ts file counts as a source declaration. A
 // mutant dropping the `!IsDeclarationFile` half survived all fifty-five fixtures for exactly that
 // reason, and it is a blind spot rather than an equivalence: with a real .d.ts in the program the
@@ -312,7 +312,7 @@ func TestNoUndefInitDeclinesAShadowedUndefined(test *testing.T) {
 // Reproducing upstream's decision is what settles which way it should fall. ESLint's scope analysis
 // is per-file and cannot see another file's ambient declaration at all, so upstream reports
 // `let a = undefined;` whatever a neighbouring .d.ts says. Driven on the installed rule to confirm.
-// Our checker CAN see it, and fidelity is to the decision rather than to the mechanism, so an
+// Our checker can see it, and fidelity is to the decision rather than to the mechanism, so an
 // ambient declaration must not suppress the finding.
 //
 // The control is the same two-file shape with the declaration written in source instead, which is a

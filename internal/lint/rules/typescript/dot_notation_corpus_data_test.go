@@ -1,10 +1,10 @@
 package typescript
 
-// Code generated from typescript-eslint v8.71.0's tests/rules/dot-notation.test.ts and edge rows. DO NOT EDIT BY HAND.
+// Code generated from typescript-eslint v8.71.0's tests/rules/dot-notation.test.ts and edge rows. Do not edit by hand.
 //
 // The 38 valid and 25 invalid rows were extracted by loading upstream's test file with its RuleTester stubbed,
 // and 40 edge rows were added for what that corpus leaves open. Every row was replayed against the
-// INSTALLED rule (@typescript-eslint/eslint-plugin 8.71.0, one program per row) under dotNotationCorpusTsconfig, on
+// installed rule (@typescript-eslint/eslint-plugin 8.71.0, one program per row) under dotNotationCorpusTsconfig, on
 // the bytes this harness writes: the source trimmed plus one newline. Before recording, every upstream
 // row was replayed on its own bytes and agreed with upstream's own assertions. Each finding records the
 // message id and the exact text the installed rule's location covers, and output is what one pass of

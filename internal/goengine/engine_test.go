@@ -62,6 +62,7 @@ import (
 	"github.com/system-inc/cohere/internal/goengine/rules/correctness_require_response_status_check"
 	"github.com/system-inc/cohere/internal/goengine/rules/security_no_interpolated_shell_command"
 	"github.com/system-inc/cohere/internal/goengine/rules/security_no_interpolated_sql_string"
+	"github.com/system-inc/cohere/internal/goengine/settings"
 )
 
 var update = flag.Bool("update", false, "rewrite each case's expected.jsonl and expected.stderr from the engine")
@@ -117,7 +118,9 @@ var generatedFileRules = []rule.Rule{
 	consistency_no_label.Rule,
 	consistency_no_lone_block.Rule,
 	consistency_no_lonely_if.Rule,
-	consistency_no_long_file.Rule,
+	// The case sets this rule's limit, so it runs on an analyzer of its own: an option set on the registry's
+	// analyzer would outlive this case and reach every case running beside it.
+	withOwnAnalyzer(consistency_no_long_file.Rule, consistency_no_long_file.NewAnalyzer()),
 	consistency_no_long_line.Rule,
 	consistency_no_parameter_reassignment.Rule,
 	consistency_no_property_alias.Rule,
@@ -270,11 +273,16 @@ func runCase(test *testing.T, endToEnd endToEndCase) {
 	test.Helper()
 	fixture := cmp.Or(endToEnd.fixture, endToEnd.name)
 	root := copyFixture(test, filepath.Join("testdata", fixture))
+	registered := endToEnd.rules
+	if registered == nil {
+		registered = rules.All()
+	}
 	if endToEnd.prepare != nil {
 		if prepareError := endToEnd.prepare(root); prepareError != nil {
 			test.Fatalf("preparing the copy: %v", prepareError)
 		}
 	}
+	refuseSharedOptions(test, root, registered)
 
 	// Cloned, since the table is shared by every subtest and {root} is each one's own.
 	arguments := slices.Clone(endToEnd.arguments)
@@ -283,10 +291,6 @@ func runCase(test *testing.T, endToEnd endToEndCase) {
 	}
 	for index, argument := range arguments {
 		arguments[index] = strings.ReplaceAll(argument, "{root}", root)
-	}
-	registered := endToEnd.rules
-	if registered == nil {
-		registered = rules.All()
 	}
 
 	var standardOutput bytes.Buffer
@@ -303,6 +307,38 @@ func runCase(test *testing.T, endToEnd endToEndCase) {
 	compareExpected(test, filepath.Join("testdata", endToEnd.name, "expected.stderr"), prose)
 	if endToEnd.verify != nil {
 		endToEnd.verify(test, root)
+	}
+}
+
+// withOwnAnalyzer is registered with analyzer in place of the one it was registered with, for a case that sets one
+// of its options.
+func withOwnAnalyzer(registered rule.Rule, analyzer *analysis.Analyzer) rule.Rule {
+	registered.Analyzer = analyzer
+	return registered
+}
+
+// refuseSharedOptions fails a case whose settings set an option on an analyzer the registry holds. The engine sets
+// options on the analyzer's flags, which outlive a run: in its own process that is one run, but here every case runs
+// in one process, in parallel, so the value would reach whichever case runs that rule next, and a golden written
+// then records the leak. Such a case registers the rule with an analyzer of its own (withOwnAnalyzer).
+func refuseSharedOptions(test *testing.T, root string, registered []rule.Rule) {
+	test.Helper()
+	ruleSettings, loadError := settings.Load(root, "", knownRuleNames(registered))
+	if loadError != nil {
+		// Ignored: a case whose settings are refused is testing that refusal, and the engine configures nothing
+		// before it, so no option can be set on any analyzer.
+		return
+	}
+	shared := map[*analysis.Analyzer]bool{}
+	for _, registryRule := range rules.All() {
+		shared[registryRule.Analyzer] = true
+	}
+	for _, registeredRule := range registered {
+		setting, configured := ruleSettings.Rules[registeredRule.Name]
+		if configured && setting.Options != nil && shared[registeredRule.Analyzer] {
+			test.Fatalf("the settings set options on %s's registry analyzer, which every case shares; register it "+
+				"with withOwnAnalyzer", registeredRule.Name)
+		}
 	}
 }
 

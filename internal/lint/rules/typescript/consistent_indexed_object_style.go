@@ -28,7 +28,7 @@ func DefaultConsistentIndexedObjectStyleSettings() ConsistentIndexedObjectStyleO
 
 // DecodeConsistentIndexedObjectStyleOptions reads the rule's configuration.
 //
-// The wire value is a bare STRING rather than an object, which is why this cannot use
+// The wire value is a bare string rather than an object, which is why this cannot use
 // `rule.DecodeOptionsInto` at all: there is no struct to decode into. Empty input and `null` are a
 // rule configured as a bare `"error"`, and get upstream's default.
 //
@@ -86,7 +86,7 @@ func DecodeConsistentIndexedObjectStyleOptions(raw []byte) (any, error) {
 // builtin `Mutable<T>`, so a minus-readonly mapped type cannot be written as a Record at all.
 // Reporting without a repair is the subset that can be shown correct.
 //
-// # A comment inside the replaced span downgrades the fix to a SUGGESTION
+// # A comment inside the replaced span downgrades the fix to a suggestion
 //
 // The repair reads only the key type and the value type, so a comment sitting anywhere else inside
 // the node would be dropped by the rewrite. Upstream detects that and offers the change rather than
@@ -99,10 +99,10 @@ func DecodeConsistentIndexedObjectStyleOptions(raw []byte) (any, error) {
 // itself through a type argument rather than through a member and TypeScript rejects it. Upstream
 // answers this with `isDeeplyReferencingType`, walking its scope manager's definitions.
 //
-// This port resolves identifiers through the CHECKER instead and compares symbols against the
+// This port resolves identifiers through the checker instead and compares symbols against the
 // enclosing declaration's own symbol, which answers the same question without a scope manager.
 // Probed before the rule was written, including the case that separates it from a naive name
-// match: `namespace A { export type Foo = 1 }` beside `type Foo = { [k: string]: A.Foo }` is NOT
+// match: `namespace A { export type Foo = 1 }` beside `type Foo = { [k: string]: A.Foo }` is not
 // circular, because `A.Foo` resolves to a different symbol, and upstream reports it.
 //
 // # Cost
@@ -134,7 +134,7 @@ var ConsistentIndexedObjectStyle = rule.Rule{
 		// inside the replaced range that does not sit inside one of the sub-nodes the repair copies
 		// out?
 		//
-		// It takes the RANGE the repair replaces rather than a node, because for an interface those
+		// It takes the range the repair replaces rather than a node, because for an interface those
 		// differ: the modifiers sit inside the node and outside the replacement, so a comment between
 		// `export` and `interface` survives the rewrite and must not downgrade it.
 		//
@@ -144,7 +144,7 @@ var ConsistentIndexedObjectStyle = rule.Rule{
 		// The comment ranges are scanned out of the source text here rather than read from the
 		// shelf's `comments.ForFile`, and that is a measured decision rather than a preference.
 		// Probed on upstream's own case, a line comment sitting between a mapped type's opening
-		// brace and its key: `comments.ForFile` returned ZERO comments for it. That helper anchors
+		// brace and its key: `comments.ForFile` returned zero comments for it. That helper anchors
 		// its scan on node positions and documents a known family of gaps around empty lists; this
 		// comment falls in a different gap, before the key of a mapped type. The question here is
 		// narrower than the one that helper answers, being only "is any byte in this range inside a
@@ -210,7 +210,7 @@ var ConsistentIndexedObjectStyle = rule.Rule{
 		// constructor that a Record can legally hold, so the rewrite compiles. A union, an
 		// intersection, a conditional or a bare alias hop does not, so those are followed.
 		//
-		// The traversal therefore recurses only through the TYPE-TRANSPARENT kinds upstream lists
+		// The traversal therefore recurses only through the type-transparent kinds upstream lists
 		// and stops everywhere else, rather than walking every child. A walk over every child was
 		// the first version of this and it got eight of upstream's cases wrong in both directions at
 		// once: it missed `Foo1` to `Foo2` to `Foo1`, and it wrongly silenced all four wrapper
@@ -351,7 +351,7 @@ var ConsistentIndexedObjectStyle = rule.Rule{
 		// type alias while a type literal is replaced in place.
 		//
 		// `replacedRange` is both what the finding underlines and what the repair overwrites, and for
-		// an interface it starts at the `interface` keyword, AFTER the modifiers. That is what keeps
+		// an interface it starts at the `interface` keyword, after the modifiers. That is what keeps
 		// `export` and `declare`: the repair rebuilds only `type <name><generics> = ...`, so it must
 		// replace only the text that spelling covers. Replacing from the first modifier is how this
 		// fixer once turned `export interface X` into `type X` and broke six imports.
@@ -445,7 +445,7 @@ var ConsistentIndexedObjectStyle = rule.Rule{
 			return listeners
 		}
 
-		// interfaceReplacedRange is the interface's span WITHOUT its leading modifiers.
+		// interfaceReplacedRange is the interface's span without its leading modifiers.
 		//
 		// `rule.TokenRange` starts at the first token, which for `export interface Foo` is `export`.
 		// Upstream's node begins at the `interface` keyword, because estree hangs the export off a
@@ -521,9 +521,9 @@ var ConsistentIndexedObjectStyle = rule.Rule{
 			// A `keyof` constraint preserves the source type's own modifiers through the mapped
 			// type, which a Record does not, so the two are not equivalent and upstream declines.
 			//
-			// The exemption applies ONLY to an unparenthesized keyof. Upstream writes that as
+			// The exemption applies only to an unparenthesized keyof. Upstream writes that as
 			// `!isParenthesized(constraint)`, and it looks like an oversight until you see the case
-			// built for it: `{ [k in (keyof ParseResult)]: unknown }` REPORTS and repairs to
+			// built for it: `{ [k in (keyof ParseResult)]: unknown }` reports and repairs to
 			// `Record<keyof ParseResult, unknown>`. Our parser gives the parenthesized form a
 			// `KindParenthesizedType` wrapper, so the operator test simply does not match it, which
 			// reproduces upstream's behavior without a separate parenthesis check.
@@ -548,7 +548,7 @@ var ConsistentIndexedObjectStyle = rule.Rule{
 			if mapped.Type != nil {
 				valueText = textOf(mapped.Type)
 			}
-			// The key text is read from INSIDE any parentheses. estree has no parenthesized type
+			// The key text is read from inside any parentheses. estree has no parenthesized type
 			// node, so upstream's `getText(constraint)` on `(keyof P)` yields `keyof P`, and the
 			// repair it records is `Record<keyof ParseResult, unknown>` rather than one carrying the
 			// brackets. Measured on the one corpus case that writes a parenthesized constraint.
@@ -641,10 +641,10 @@ func enclosingTypeAliasDeclaration(node *ast.Node) *ast.Node {
 			return current
 		}
 
-		// Upstream stops the walk at a type ANNOTATION, and that stop is load-bearing rather than
+		// Upstream stops the walk at a type annotation, and that stop is load-bearing rather than
 		// tidiness. estree gives an index signature's value a `TSTypeAnnotation` wrapper, so for
 		// `type Foo = { [k: string]: { [k: string]: Foo } }` the inner literal's walk halts there,
-		// finds no declaration, runs no circularity check, and REPORTS. The outer literal does find
+		// finds no declaration, runs no circularity check, and reports. The outer literal does find
 		// `Foo`, is circular, and stays silent. One input, two nested nodes, opposite verdicts.
 		//
 		// Our tree has no annotation wrapper: the value type is the index signature's own `Type`

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -24,8 +25,9 @@ func zeroConfigTailwindProject(test *testing.T, files map[string]string) string 
 	// machine (#sycrdr6). It used to be ahra's installed copy, through the ahra corpus.
 	packageRoot := vendored.TailwindPackageRoot()
 	root := test.TempDir()
-	files["tsconfig.json"] = tailwindProjectConfig
-	writeTree(test, root, files)
+	tree := maps.Clone(files)
+	tree["tsconfig.json"] = tailwindProjectConfig
+	writeTree(test, root, tree)
 	if createDirectoryError := os.MkdirAll(filepath.Join(root, "node_modules"), 0o755); createDirectoryError != nil {
 		test.Fatal(createDirectoryError)
 	}

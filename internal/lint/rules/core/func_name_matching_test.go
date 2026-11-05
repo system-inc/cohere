@@ -20,7 +20,7 @@ type funcNameMatchingCase struct {
 	// source is upstream's `code`, byte for byte.
 	source string
 
-	// options is the RAW JSON of upstream's options object, routed through the rule's own
+	// options is the raw JSON of upstream's options object, routed through the rule's own
 	// exported decoder rather than built as a struct, so the decoder's defaults and its
 	// empty-input path are under test.
 	options string
@@ -1083,7 +1083,7 @@ func TestFuncNameMatchingStaysSilent(test *testing.T) {
 
 // TestFuncNameMatchingResolvesAVersionGateTowardEs6 pins a case held out of the tables above.
 //
-// Upstream's corpus carries `var obj = { 'ᢅ': function foo() {} };` TWICE, byte for byte
+// Upstream's corpus carries `var obj = { 'ᢅ': function foo() {} };` twice, byte for byte
 // identical, with opposite verdicts:
 //
 //	invalid[49]   languageOptions: {ecmaVersion: 6}                      reports
@@ -1096,7 +1096,7 @@ func TestFuncNameMatchingStaysSilent(test *testing.T) {
 //
 // `rule.Context` carries no `ecmaVersion`, so this rule must answer one way for both rows. It
 // answers ES6, deliberately: nothing cohere lints is pinned below ES2015, and choosing ES5 would
-// drop findings on modern source. The ES5 row is therefore a KNOWN divergence, recorded here with
+// drop findings on modern source. The ES5 row is therefore a known divergence, recorded here with
 // both verdicts rather than removed.
 //
 // If an `ecmaVersion` channel is ever added, this test is where the choice is written down and the

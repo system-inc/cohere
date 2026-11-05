@@ -20,7 +20,7 @@ const radixFile = "/repository/source/Radix.ts"
 // Extracted by loading upstream's tester with a stubbed RuleTester and rendering these literals
 // from that JSON, so nothing was retyped. The generator refuses any byte outside printable ASCII.
 //
-// Run through the TYPED harness because the shadow question is resolution: a local parseInt is
+// Run through the typed harness because the shadow question is resolution: a local parseInt is
 // not the global one, and only the checker can say which a name is.
 func TestRadixFires(test *testing.T) {
 	test.Parallel()
@@ -85,7 +85,7 @@ func TestRadixFires(test *testing.T) {
 
 // The clean cases, which carry most of this rule's discrimination.
 //
-// Four groups matter. A radix the rule cannot evaluate is ACCEPTED rather than guessed at, which
+// Four groups matter. A radix the rule cannot evaluate is accepted rather than guessed at, which
 // is why foo, +radix and ~1 are all here. A spread in either of the first two positions abandons
 // the call. A shadowed parseInt or Number is not the global one. And a private name or a computed
 // key that is not a literal string is not Number.parseInt at all.
@@ -149,7 +149,7 @@ func TestRadixStaysSilent(test *testing.T) {
 
 // The suggestion vectors, which are upstream's own suggestion outputs.
 //
-// rule_testing can apply a FIX but not a SUGGESTION, so the repair is applied by hand here. That
+// rule_testing can apply a fix but not a suggestion, so the repair is applied by hand here. That
 // is required rather than optional: a suggestion writing the right text over the wrong span
 // passes every message-id assertion above, and this rule's insertion point is computed from the
 // source text rather than from a node, which is exactly where such a defect would live.
@@ -270,9 +270,9 @@ func TestRadixPointsAtTheWholeCall(test *testing.T) {
 
 // Shadowing is resolved per call site here, where upstream resolves it per file.
 //
-// Upstream asks eslint-scope for the PROGRAM scope's `parseInt` variable and reports only if
+// Upstream asks eslint-scope for the program scope's `parseInt` variable and reports only if
 // nothing defines it, which makes the answer whole-file. Measured against the installed rule,
-// `{ let parseInt; } parseInt("10");` is CLEAN upstream, even though the block-scoped binding cannot
+// `{ let parseInt; } parseInt("10");` is clean upstream, even though the block-scoped binding cannot
 // reach the call and the call really is the global `parseInt` missing a radix.
 //
 // This port resolves the identifier at the call site, so that input reports. The divergence is

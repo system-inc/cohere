@@ -13,25 +13,25 @@ import (
 
 // AccessorPairsOptions configures which half of the pairing this rule enforces, and where.
 //
-// Every field is a pointer because two of the four default to TRUE upstream. The config layer hands
+// Every field is a pointer because two of the four default to `true` upstream. The config layer hands
 // a rule configured as a bare severity a nil, and a bool field behind a nil decodes to false, which
 // would invert those two defaults silently. A pointer keeps "absent" and "written as false" apart,
 // which is the whole reason the decoder below is hand-rolled rather than `rule.DecodeOptionsInto`.
 type AccessorPairsOptions struct {
-	// GetWithoutSet reports a getter with no matching setter. Defaults to FALSE upstream.
+	// GetWithoutSet reports a getter with no matching setter. Defaults to `false` upstream.
 	//
 	// Off by default because a read-only property is an ordinary and intentional thing, while a
 	// write-only one almost never is. The asymmetry is upstream's and is the reason the two options
 	// exist separately rather than as one switch.
 	GetWithoutSet *bool `json:"getWithoutSet"`
 
-	// SetWithoutGet reports a setter with no matching getter. Defaults to TRUE upstream.
+	// SetWithoutGet reports a setter with no matching getter. Defaults to `true` upstream.
 	SetWithoutGet *bool `json:"setWithoutGet"`
 
-	// EnforceForClassMembers extends the check to class bodies. Defaults to TRUE upstream.
+	// EnforceForClassMembers extends the check to class bodies. Defaults to `true` upstream.
 	EnforceForClassMembers *bool `json:"enforceForClassMembers"`
 
-	// EnforceForTSTypes extends the check to interface bodies and type literals. Defaults to FALSE.
+	// EnforceForTSTypes extends the check to interface bodies and type literals. Defaults to `false`.
 	//
 	// Off by default because a type declaring only `get prop(): T` is a legitimate way to describe a
 	// readonly-through-an-accessor shape, and a setter with no getter in a type is far less
@@ -134,7 +134,7 @@ var messageAccessorPairsMissingSetterInDescriptor = rule.Message{
 //
 // The pairing is positional rather than semantic: two accessors pair when they share a container and
 // a key, where a container is one object literal, one class's static side, one class's instance
-// side, or one type body. So `class A { get a() {} static set a(v) {} }` reports TWICE, because the
+// side, or one type body. So `class A { get a() {} static set a(v) {} }` reports twice, because the
 // static and instance sides are separate containers even though the class is one. That is measured
 // against the installed rule rather than inferred, and it is the case a port written around "does
 // the class declare both" would get wrong in the quiet direction.
@@ -143,7 +143,7 @@ var messageAccessorPairsMissingSetterInDescriptor = rule.Message{
 //
 // A key whose value the syntax settles compares by that value, so `get 1()` pairs with `set '1'()`
 // and `0x10` pairs with `16`. A key the syntax does not settle -- a computed one -- compares by its
-// TOKEN LIST instead, so `[x + 1]` pairs with `[x  +  1]` while `[x]` and `[y]` do not. Upstream
+// token list instead, so `[x + 1]` pairs with `[x  +  1]` while `[x]` and `[y]` do not. Upstream
 // falls back to `sourceCode.getTokens(node.key)` for exactly this, and dropping the fallback would
 // leave every computed accessor unpaired and report both halves of a correct pair.
 //
@@ -154,7 +154,7 @@ var messageAccessorPairsMissingSetterInDescriptor = rule.Message{
 // # The property descriptor is a second, independent judgment on the same node
 //
 // An object literal passed as the descriptor argument of `Object.defineProperty`, `Reflect.
-// defineProperty`, `Object.defineProperties`, or `Object.create` is checked a SECOND time under
+// defineProperty`, `Object.defineProperties`, or `Object.create` is checked a second time under
 // different rules: there the accessors are ordinary `get:`/`set:` properties rather than accessor
 // syntax, so the question is whether both names are present. Both checks run on the same node and
 // one input can report from each.
@@ -229,7 +229,7 @@ type accessorPairsToken struct {
 // checkAccessorPairsList groups a container's accessors by key and reports the unpaired ones.
 //
 // The grouping is upstream's, including its order: groups are created in source order and each new
-// accessor joins the FIRST group whose key matches, so the reports come out in the order the
+// accessor joins the first group whose key matches, so the reports come out in the order the
 // accessors were written rather than sorted by key.
 func checkAccessorPairsList(
 	ruleContext rule.Context,
@@ -285,7 +285,7 @@ func checkAccessorPairsList(
 
 // accessorPairsFinding is one pending report, held until the caller can order them.
 //
-// The grouping walk produces findings grouped by KEY, and a class produces two such walks, so the
+// The grouping walk produces findings grouped by key, and a class produces two such walks, so the
 // natural order is neither upstream's nor stable. Upstream gets source order for free by visiting
 // nodes rather than groups; this recovers it by sorting at the end. Measured: `class A { get a() {}
 // static set a(foo) {} }` reports the getter first upstream, and grouping alone reports the static
@@ -312,7 +312,7 @@ func reportAccessorPairsInSourceOrder(ruleContext rule.Context, findings []acces
 // Two settled keys compare by value; two unsettled ones compare by token list; a settled key never
 // equals an unsettled one, which is why `{ get a() {}, set [a](v) {} }` reports both halves even
 // though the computed key spells the same identifier. That last arm is the one an intuitive reading
-// gets wrong, and it is deliberate upstream: `[a]` names whatever the VARIABLE `a` holds, which is
+// gets wrong, and it is deliberate upstream: `[a]` names whatever the variable `a` holds, which is
 // not the property `a`.
 func accessorPairsKeysEqual(
 	group *accessorPairsGroup,
@@ -340,16 +340,16 @@ func accessorPairsKeysEqual(
 // accessorPairsKeyOf answers the settled property name of an accessor's key, if the syntax gives one.
 //
 // `property.Static` is the shelf's spelling of upstream's `getStaticPropertyName`, and it agrees with
-// it on every spelling this rule can meet with ONE exception, handled here rather than on the shelf:
+// it on every spelling this rule can meet with one exception, handled here rather than on the shelf:
 // upstream returns null for a private name, because `#a` is neither a non-computed Identifier nor a
-// Literal, so two private accessors pair through the TOKEN path rather than the value path. The shelf
+// Literal, so two private accessors pair through the token path rather than the value path. The shelf
 // helper accepts private names, which is the more useful answer for its other callers and the wrong
 // one here.
 //
 // Reproducing upstream's null rather than the shelf's answer changes no verdict measured -- a private
 // key's token list is a single token whose text is the name, so both routes pair `#a` with `#a` and
 // separate it from `a`. It is written this way so the mechanism matches, because the rendered message
-// differs between the two paths and that IS visible.
+// differs between the two paths and that is visible.
 func accessorPairsKeyOf(ruleContext rule.Context, accessor *ast.Node) (string, bool) {
 	name := accessor.Name()
 	if name == nil {
@@ -369,7 +369,7 @@ func accessorPairsKeyOf(ruleContext rule.Context, accessor *ast.Node) (string, b
 //
 // The obvious implementation points `GetScannerForSourceFile` at the key and scans to its end. It is
 // wrong on templates, and wrong in the loud direction: a scanner started mid-expression has no
-// template stack, so after `${a}` it reads the closing backtick as the OPENING of a new template and
+// template stack, so after `${a}` it reads the closing backtick as the opening of a new template and
 // swallows the rest of the file into one token. Measured on `[`+"`"+`${a}`+"`"+`]`, the token text came back as
 // "`+"`"+`]() {}, set [`+"`"+`" -- different for two keys that are textually identical, so a correct pair
 // reported both halves. Walking the parsed tree cannot make that mistake, because the parser already
@@ -377,13 +377,13 @@ func accessorPairsKeyOf(ruleContext rule.Context, accessor *ast.Node) (string, b
 //
 // # Parentheses are skipped, which is fidelity rather than tidiness
 //
-// Upstream compares `sourceCode.getTokens(node.key)`, and in ESTree a computed key's `key` IS the
+// Upstream compares `sourceCode.getTokens(node.key)`, and in ESTree a computed key's `key` is the
 // inner expression: the brackets are not in it, and neither are the outer parentheses, because
 // `(a)` parses to the Identifier `a` with no node of its own. So `[a]` and `[(a)]` produce identical
 // token lists upstream and pair, which is one of upstream's own clean cases. Our parser keeps the
 // parentheses as a node, so they are skipped here to ask the same question.
 //
-// Only the OUTER parentheses vanish this way, in both parsers: `[(a) + 1]` keeps its inner pair as
+// Only the outer parentheses vanish this way, in both parsers: `[(a) + 1]` keeps its inner pair as
 // tokens upstream and as a node here, so the two spellings stay separated on both sides.
 func accessorPairsTokensOf(ruleContext rule.Context, accessor *ast.Node) []accessorPairsToken {
 	name := accessor.Name()
@@ -392,7 +392,7 @@ func accessorPairsTokensOf(ruleContext rule.Context, accessor *ast.Node) []acces
 	}
 	key := name
 	if name.Kind == ast.KindComputedPropertyName {
-		// `SkipParentheses` DEREFERENCES its argument, so the nil test comes first rather than
+		// `SkipParentheses` dereferences its argument, so the nil test comes first rather than
 		// after. A malformed computed key recovers to one with no expression, and the parse the
 		// error recovery hands back is not the parse the grammar describes.
 		inner := name.AsComputedPropertyName().Expression
@@ -412,7 +412,7 @@ func accessorPairsTokensOf(ruleContext rule.Context, accessor *ast.Node) []acces
 
 // accessorPairsCollectTokens appends a structural rendering of one expression, in source order.
 //
-// Each node contributes a marker carrying its KIND before its children contribute theirs, and a leaf
+// Each node contributes a marker carrying its kind before its children contribute theirs, and a leaf
 // contributes its text. The kind marker is what separates `[a]` from `[a++]` and `[-a]`: our parser
 // hangs a unary operator off the node kind rather than off a child, so a walk that emitted only
 // leaves would render all three as the single token `a` and pair keys upstream keeps apart. That is
@@ -493,7 +493,7 @@ func accessorPairsOperatorTokenOf(ruleContext rule.Context, node *ast.Node) stri
 // The span runs from the accessor's first modifier-or-keyword token through the end of its key, so
 // `static set a(v) {}` reports `static set a` and `set 'a b'(v) {}` reports `set 'a b'`. Measured
 // against the installed rule across nine shapes rather than read off the source: upstream builds it
-// from `getFunctionHeadLoc`, whose input is the function VALUE rather than the property, and the two
+// from `getFunctionHeadLoc`, whose input is the function value rather than the property, and the two
 // descriptions of the resulting span do not obviously agree.
 //
 // Built from `TokenRange` rather than `Pos()`, because `Pos()` carries leading trivia and would put
@@ -533,7 +533,7 @@ func reportAccessorPairsAccessor(
 // accessorPairsDescribe renders an accessor the way upstream's `getFunctionNameWithKind` does.
 //
 // The parts, in upstream's order: `static`, then `private` for a private name, then `getter` or
-// `setter`, then the key in single quotes. A private name renders BARE and hash-carrying (`private
+// `setter`, then the key in single quotes. A private name renders bare and hash-carrying (`private
 // setter #a`) while a string key that happens to spell one renders quoted (`setter '#a'`), which is
 // the pair of shapes that tells you the two paths are distinct rather than one path with a quoting
 // bug.
@@ -598,7 +598,7 @@ func checkAccessorPairsClassBody(
 			instanceSide = append(instanceSide, member)
 		}
 	}
-	// The two sides are separate containers for PAIRING and one file for REPORTING, so they are
+	// The two sides are separate containers for pairing and one file for reporting, so they are
 	// walked apart and merged back into source order. Upstream never has to do this because it
 	// reports as it visits; here the grouping walk is what reorders things.
 	findings := checkAccessorPairsList(ruleContext, staticSide, settings,
@@ -638,7 +638,7 @@ func accessorPairsMembersOf(node *ast.Node) []*ast.Node {
 
 // checkAccessorPairsDescriptor runs the second, independent judgment on a property descriptor.
 //
-// The question here is not accessor syntax at all: a descriptor names its halves with ORDINARY
+// The question here is not accessor syntax at all: a descriptor names its halves with ordinary
 // properties called `get` and `set`, so `{ get: g }` and `{ get() {} }` and `{ get }` are all a
 // getter while `{ ['get']: g }` is not. Upstream reads the key name of every non-computed `init`
 // property, which is what makes the computed spelling decline: a computed key names whatever the
@@ -674,7 +674,7 @@ func checkAccessorPairsDescriptor(
 // accessorPairsDescriptorPropertyName answers the name a descriptor member declares, if any.
 //
 // Upstream restricts this to `kind === "init"` properties, which excludes accessor syntax: a
-// descriptor written `{ get set(v) {} }` declares an ACCESSOR named `set`, not a setter for the
+// descriptor written `{ get set(v) {} }` declares an accessor named `set`, not a setter for the
 // described property, so it must not count. Our parser separates those by node kind, which is the
 // same distinction reached a shorter way.
 //
@@ -703,8 +703,8 @@ func accessorPairsDescriptorPropertyName(member *ast.Node) string {
 // accessorPairsIsPropertyDescriptor answers whether an object literal is being passed as one.
 //
 // Four call shapes qualify, and they split into two arrangements. `Object.defineProperty(o, k, D)`
-// and `Reflect.defineProperty(o, k, D)` take the descriptor DIRECTLY as their third argument.
-// `Object.defineProperties(o, M)` and `Object.create(o, M)` take a MAP whose values are descriptors,
+// and `Reflect.defineProperty(o, k, D)` take the descriptor directly as their third argument.
+// `Object.defineProperties(o, M)` and `Object.create(o, M)` take a map whose values are descriptors,
 // so the literal qualifies when it is the value of a property of that second argument.
 //
 // The receiver must resolve to the real global. `var Object = {}; Object.defineProperty(...)` is

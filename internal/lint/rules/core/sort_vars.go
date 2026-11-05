@@ -25,7 +25,7 @@ func DefaultSortVarsSettings() SortVarsSettings {
 // DecodeSortVarsOptions reads the one flag off the config.
 //
 // The wire shape is a single object and every default is false, so the generic decoder would work.
-// It is hand rolled anyway for one reason: `rule.DecodeOptionsInto` ERRORS on empty input, and a
+// It is hand rolled anyway for one reason: `rule.DecodeOptionsInto` errors on empty input, and a
 // rule configured as a bare "error" is handed nil. Upstream's default is a working configuration
 // rather than a disabled one, so nil has to decode rather than fail.
 func DecodeSortVarsOptions(raw []byte) (any, error) {
@@ -65,29 +65,29 @@ var messageSortVarsSortVars = rule.Message{
 //	invalid: var b, a;             (fixed to `var a, b;`)
 //	invalid: var b = foo(), a;     (reported, NOT fixed: the initializer is not a literal)
 //
-// # The rule compares only IDENTIFIER declarators, and that filter runs before everything else
+// # The rule compares only identifier declarators, and that filter runs before everything else
 //
 // `node.declarations.filter(decl => decl.id.type === "Identifier")` drops destructuring patterns
 // entirely, so `var {b} = x, a;` compares nothing and is clean. The filtered list is also what the
 // fixer rewrites, which matters: a pattern sitting between two identifiers is left where it is and
 // only the identifiers move around it.
 //
-// # The fixer preserves the text BETWEEN declarators, which is what makes it safe
+// # The fixer preserves the text between declarators, which is what makes it safe
 //
 // Upstream rebuilds the span from the first identifier declarator to the last, and for each sorted
-// declarator appends the declarator's own text plus the ORIGINAL separator that followed the
+// declarator appends the declarator's own text plus the original separator that followed the
 // declarator in that position. So commas, newlines, indentation and comments stay where they were
 // and only the names move through them. A fixer that joined with ", " would reflow the block and
 // silently delete any comment inside it, which is the class of repair the standard warns about.
 //
 // # Two declines, both upstream's, both asserted by `output: null` in the corpus
 //
-// `unfixable` is true when ANY identifier declarator has a non-literal initializer, and it declines
+// `unfixable` is true when any identifier declarator has a non-literal initializer, and it declines
 // the whole block: reordering `var b = foo(), a = bar();` would change evaluation order, and only
 // the author knows whether that is safe. A literal initializer has no side effect, so reordering is
 // spelling rather than behaviour.
 //
-// `fixed` allows at most ONE repair per declaration block. Upstream reports every out-of-order
+// `fixed` allows at most one repair per declaration block. Upstream reports every out-of-order
 // declarator but attaches a fix only to the first, because the first fix already sorts the whole
 // block and a second edit over the same span would be refused by the engine anyway.
 //
@@ -116,7 +116,7 @@ var SortVars = rule.Rule{
 type sortVarsDeclarator struct {
 	node *ast.Node
 	name string
-	// start is upstream's `range[0]`: the declarator's first TOKEN, excluding the leading trivia
+	// start is upstream's `range[0]`: the declarator's first token, excluding the leading trivia
 	// that `Pos()` includes. Using `Pos()` here would drag the preceding whitespace and any comment
 	// into the moved text and duplicate it.
 	start int
@@ -157,7 +157,7 @@ func checkSortVarsDeclarationList(ruleContext rule.Context, node *ast.Node, sett
 		return
 	}
 
-	// Upstream's reduce: compare each declarator against the last one that was IN ORDER, not
+	// Upstream's reduce: compare each declarator against the last one that was in order, not
 	// against its immediate predecessor. So `var c, b, a;` reports twice, on `b` and on `a`, both
 	// against `c`.
 	fixed := false
@@ -175,7 +175,7 @@ func checkSortVarsDeclarationList(ruleContext rule.Context, node *ast.Node, sett
 				sortVarsFix(ruleContext, declarators, settings))
 		}
 		fixed = true
-		// Deliberately NOT advancing `previous`. Upstream returns `memo` from this branch, so an
+		// Deliberately not advancing `previous`. Upstream returns `memo` from this branch, so an
 		// out-of-order declarator is not treated as the new baseline.
 	}
 }
@@ -191,7 +191,7 @@ func sortVarsNameFor(name string, settings SortVarsSettings) string {
 // sortVarsIsLiteral answers upstream's `decl.init.type !== "Literal"`.
 //
 // ESTree's `Literal` covers a string, a number, a boolean, `null` and a regular expression, and it
-// is ONE node type there. Our parser gives each its own kind, and `true`/`false`/`null` are
+// is one node type there. Our parser gives each its own kind, and `true`/`false`/`null` are
 // keywords rather than literals, so the set has to be written out. A template literal is
 // deliberately absent: ESTree models it as `TemplateLiteral`, not `Literal`, so upstream treats it
 // as unfixable and so does this.
@@ -209,7 +209,7 @@ func sortVarsIsLiteral(node *ast.Node) bool {
 // declarators sorted and the original separators kept in place.
 //
 // The separator for position `index` is the text between declarator `index`'s end and declarator
-// `index+1`'s start in the ORIGINAL order, which is upstream's `textAfterIdentifier`. That is what
+// `index+1`'s start in the original order, which is upstream's `textAfterIdentifier`. That is what
 // keeps a comment or a newline attached to its position in the block rather than to the name that
 // happened to be there.
 func sortVarsFix(ruleContext rule.Context, declarators []sortVarsDeclarator,

@@ -164,9 +164,9 @@ func DecodeEqeqeqOptions(list []byte) (any, error) {
 // relation that is not transitive, which is the property every reader unconsciously assumes a
 // comparison has. `===` compares without coercion and is transitive.
 //
-// # The repair is a fix sometimes and a suggestion otherwise, and that split IS the rule
+// # The repair is a fix sometimes and a suggestion otherwise, and that split is the rule
 //
-// Changing `==` to `===` changes what the code DOES wherever the operands can differ in type, so
+// Changing `==` to `===` changes what the code does wherever the operands can differ in type, so
 // applying it unattended could turn a passing comparison into a failing one. Upstream draws the line
 // where it can prove coercion is impossible:
 //
@@ -181,7 +181,7 @@ func DecodeEqeqeqOptions(list []byte) (any, error) {
 // # `null` is its own axis
 //
 // `x == null` is the idiomatic test for "null or undefined", so it is broken out as a separate
-// option rather than folded into the general judgment. Under `Null: Never` the rule INVERTS for
+// option rather than folded into the general judgment. Under `Null: Never` the rule inverts for
 // null, reporting `x === null` and asking for `==` -- the only configuration in which this rule
 // reports an identity operator at all.
 //
@@ -190,7 +190,7 @@ func DecodeEqeqeqOptions(list []byte) (any, error) {
 // All three predicates see through them, and that is fidelity rather than a widening: espree gives a
 // parenthesized expression no node, so upstream's direct field reads already look past them.
 // Measured against the installed build -- `(typeof a) == 'number'` and `(1) == (2)` both take the
-// FIX arm, and `x == (null)` takes the null arm. Reading the operands directly would put all three
+// fix arm, and `x == (null)` takes the null arm. Reading the operands directly would put all three
 // on the wrong arm while every unparenthesized case stayed green.
 var Eqeqeq = rule.Rule{
 	Name: "eqeqeq",
@@ -223,7 +223,7 @@ func checkEqeqeq(ruleContext rule.Context, node *ast.Node, settings eqeqeqSettin
 	case ast.KindEqualsEqualsToken, ast.KindExclamationEqualsToken:
 		// A loose operator, which is the ordinary case.
 	case ast.KindEqualsEqualsEqualsToken, ast.KindExclamationEqualsEqualsToken:
-		// An identity operator is reported ONLY under the inverted null policy, and only against
+		// An identity operator is reported only under the inverted null policy, and only against
 		// null. Everywhere else it is the repair this rule asks for.
 		if settings.null == EqeqeqNullNever && isNull {
 			reportEqeqeq(ruleContext, node, binary, eqeqeqLooseSpellingOf(binary.OperatorToken.Kind))
@@ -252,11 +252,11 @@ func checkEqeqeq(ruleContext rule.Context, node *ast.Node, settings eqeqeqSettin
 // reportEqeqeq reports one comparison, with a fix where coercion is provably impossible and a
 // suggestion everywhere else.
 //
-// The finding is anchored on the OPERATOR TOKEN rather than on the whole expression, which is
+// The finding is anchored on the operator token rather than on the whole expression, which is
 // upstream's `loc: operatorToken.loc`. That matters for a reader: a finding spanning `a == b` puts
 // the caret on `a`, and the thing being complained about is the two characters in the middle.
 func reportEqeqeq(ruleContext rule.Context, node *ast.Node, binary *ast.BinaryExpression, expected string) {
-	// The operator's spelling comes from the SOURCE rather than from `Text()`, which panics on a
+	// The operator's spelling comes from the source rather than from `Text()`, which panics on a
 	// token node: `Unhandled case in Node.Text: *ast.Token`. That is the same hazard the shelf's
 	// `property.Name` documents for a computed key, arriving through a different kind, and it takes
 	// the whole file down rather than returning empty.
@@ -275,7 +275,7 @@ func reportEqeqeq(ruleContext rule.Context, node *ast.Node, binary *ast.BinaryEx
 
 	// The fix arm: both operands are provably the same type, so swapping the operator cannot change
 	// what the comparison answers. Everything else is offered rather than applied, because there
-	// the swap CHANGES BEHAVIOUR and a human has to agree to it.
+	// the swap changes behaviour and a human has to agree to it.
 	if eqeqeqHasTypeOfOperand(binary) || eqeqeqOperandsAreSameTypedLiterals(binary) {
 		ruleContext.ReportRangeWithFixes(operatorRange, message,
 			rule.ReplaceRange(operatorRange, expected))
@@ -332,7 +332,7 @@ func eqeqeqIsTypeOfExpression(operand *ast.Node) bool {
 // class.
 //
 // Upstream's `areLiteralsAndSameType`, which compares `typeof node.value` for each side. Two string
-// literals are the same type; a number and a string are not; a number and a bigint are NOT, because
+// literals are the same type; a number and a string are not; a number and a bigint are not, because
 // `typeof 1n` is `"bigint"` -- measured, `1 == 1n` takes the suggestion arm.
 func eqeqeqOperandsAreSameTypedLiterals(binary *ast.BinaryExpression) bool {
 	leftType := eqeqeqLiteralTypeOf(binary.Left)
@@ -344,7 +344,7 @@ func eqeqeqOperandsAreSameTypedLiterals(binary *ast.BinaryExpression) bool {
 // Upstream reads `typeof node.value` on an ESTree `Literal`, which is one node kind covering every
 // literal form; our parser splits them by kind, so the mapping is written out. A no-substitution
 // template counts as a string, matching upstream's `isStaticTemplateLiteral` branch, while a
-// template WITH substitutions does not, because its value is not known until it runs.
+// template with substitutions does not, because its value is not known until it runs.
 //
 // A regular expression literal answers "object", which is what `typeof /a/` evaluates to, and is why
 // `/a/ == /a/` takes the fix arm -- measured against the installed build rather than reasoned about,

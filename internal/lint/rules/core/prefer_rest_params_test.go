@@ -200,7 +200,7 @@ func TestPreferRestParamsResolvesShadowsWherverTheyAreDeclared(test *testing.T) 
 	}
 
 	// And the direction that catches an over-eager shadow test. A function boundary reintroduces
-	// the implicit binding, so an outer declaration does NOT shadow an inner function's own
+	// the implicit binding, so an outer declaration does not shadow an inner function's own
 	// `arguments`. A rule that walked outward looking for any declaration of the name would go
 	// silent on all three of these.
 	fires := []struct {

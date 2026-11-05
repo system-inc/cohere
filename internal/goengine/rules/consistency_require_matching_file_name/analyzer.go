@@ -8,18 +8,16 @@
 package consistency_require_matching_file_name
 
 import (
-	"cmp"
 	"go/ast"
-	"go/token"
-	"go/types"
+	"go/build/constraint"
 	"path/filepath"
-	"slices"
 	"strings"
 	"unicode"
 
 	"golang.org/x/tools/go/analysis"
 
 	"github.com/system-inc/cohere/internal/goengine/rule"
+	"github.com/system-inc/cohere/internal/goengine/rules/served"
 	"github.com/system-inc/cohere/policy"
 )
 
@@ -30,14 +28,17 @@ const Name = "cohere-go/consistency-require-matching-file-name"
 var Analyzer = &analysis.Analyzer{
 	Name: "consistency_require_matching_file_name",
 	Doc: "Flags a file that serves exactly one type with methods and is not named for it: a file declaring the type " +
-		"is its name in snake_case, with Go's own _GOOS, _GOARCH or _GOOS_GOARCH suffix if it has one, and a file " +
-		"of only its methods may add a theme, graph_walk.go for Graph. A test file, main.go in package main, and " +
-		"a file serving no type or several are not judged.",
+		"is its name in snake_case, with Go's own _GOOS, _GOARCH or _GOOS_GOARCH suffix if it has one, or one " +
+		"trailing word naming its variant if it carries a //go:build line, registry_unix.go, and a file of only " +
+		"its methods may add a theme, graph_walk.go for Graph. A test file, main.go in package main, and a file " +
+		"serving no type or several are not judged, and a sum type's variant whose every method is an empty " +
+		"marker serves nothing, as in the one type per file rule.",
 	Run: run,
 }
 
-// Rule is this rule's entry in the Go engine's registry. It resolves every receiver through the types, as the one
-// type per file rule does, so the type a file is judged against is the one that rule counts.
+// Rule is this rule's entry in the Go engine's registry. It reads the types a file serves from package served, which
+// resolves every receiver through the types and which the one type per file rule reads too, so the type a file is
+// judged against is the one that rule counts.
 var Rule = rule.Rule{Name: Name, Origin: rule.OriginHouse, TypeAware: true, Analyzer: Analyzer}
 
 var requireMatchingFileNameMessage = policy.MessageOf(Name, "requireMatchingFileName")
@@ -65,35 +66,18 @@ var knownArchitectures = map[string]bool{
 	"s390x": true, "sparc": true, "sparc64": true, "wasm": true,
 }
 
-// servedType is one type a file serves, with the node a finding about it points at, and whether the file declares it
-// or only holds methods of it.
-type servedType struct {
-	typeName *types.TypeName
-	node     ast.Node
-	declared bool
-}
-
 func run(pass *analysis.Pass) (any, error) {
-	// A type counts in a file that declares it only if it has a method somewhere in the package, and its methods may
-	// sit in any file, generated and test files included, so every file is read before any is judged.
-	hasMethods := map[*types.TypeName]bool{}
+	// The types a file serves come from package served, which consistency-require-one-type-per-file reads too, so the
+	// type a file is judged against is the one that rule counts, a sum type's marker-only variants left out alike.
+	index := served.NewIndex(pass)
 	for _, file := range pass.Files {
-		for _, declaration := range file.Decls {
-			if function, isFunction := declaration.(*ast.FuncDecl); isFunction {
-				if typeName := receiverTypeName(pass, function); typeName != nil {
-					hasMethods[typeName] = true
-				}
-			}
-		}
-	}
-	for _, file := range pass.Files {
-		judgeFile(pass, file, hasMethods)
+		judgeFile(pass, file, index)
 	}
 	return nil, nil
 }
 
 // judgeFile reports the one type file serves when the file's name does not name it.
-func judgeFile(pass *analysis.Pass, file *ast.File, hasMethods map[*types.TypeName]bool) {
+func judgeFile(pass *analysis.Pass, file *ast.File, index *served.Index) {
 	// The name the file has on disk, not one a //line directive gives it, since the disk's name is the one a reader
 	// searches for.
 	fileName := filepath.Base(pass.Fset.PositionFor(file.Package, false).Filename)
@@ -108,100 +92,45 @@ func judgeFile(pass *analysis.Pass, file *ast.File, hasMethods map[*types.TypeNa
 	if fileName == "main.go" && pass.Pkg.Name() == "main" {
 		return
 	}
-	served := servedTypes(pass, file, hasMethods)
+	servedTypes := index.Types(file)
 	// A file serving several types is the one type per file rule's finding, and which of them the file should be
 	// named for is a guess until the split answers it.
-	if len(served) != 1 {
+	if len(servedTypes) != 1 {
 		return
 	}
-	only := served[0]
+	only := servedTypes[0]
 	stem := fileStem(fileName)
+	buildConstrained := hasBuildConstraint(file)
 	allowedTail := isToolchainSuffix
-	if !only.declared {
+	// A type split across build variants, registry_unix.go and registry_other.go, needs a name per variant, and a
+	// build tag such as unix, other or cgo is no suffix go/build reads, so the file's //go:build line is what makes
+	// its last word the variant's name rather than a theme.
+	if buildConstrained {
+		allowedTail = isVariantSuffix
+	}
+	if !only.Declared {
 		allowedTail = isThemeSuffix
 	}
-	if namesType(stem, only.typeName.Name(), allowedTail) {
+	if namesType(stem, only.TypeName.Name(), allowedTail) {
 		return
 	}
+	suffix := variantSuffix(stem, buildConstrained)
 	values := map[string]string{
-		"typeName":     only.typeName.Name(),
+		"typeName":     only.TypeName.Name(),
 		"fileName":     fileName,
-		"typeFileName": snakeCase(only.typeName.Name()) + toolchainSuffix(stem) + ".go",
+		"typeFileName": snakeCase(only.TypeName.Name()) + suffix + ".go",
 	}
 	alternative := noAlternative
-	if !only.declared {
-		values["themedFileName"] = snakeCase(only.typeName.Name()) + "_<purpose>" + toolchainSuffix(stem) + ".go"
+	if !only.Declared {
+		values["themedFileName"] = snakeCase(only.TypeName.Name()) + "_<purpose>" + suffix + ".go"
 		alternative = methodFileAlternative
 	}
 	pass.Report(analysis.Diagnostic{
-		Pos:      only.node.Pos(),
-		End:      only.node.End(),
+		Pos:      only.Node.Pos(),
+		End:      only.Node.End(),
 		Category: requireMatchingFileNameMessage.Id,
 		Message:  requireMatchingFileNameMessage.Render(values, alternative),
 	})
-}
-
-// servedTypes is every type file serves, in source order: each type it declares that has a method in the package,
-// placed at its declaration, and each type declared elsewhere that it declares a method of, placed at the receiver
-// of the first. It counts exactly what the one type per file rule counts, so the two rules never disagree about
-// which type a file is for.
-func servedTypes(pass *analysis.Pass, file *ast.File, hasMethods map[*types.TypeName]bool) []servedType {
-	served := []servedType{}
-	isServed := map[*types.TypeName]bool{}
-	// Declarations are read before receivers, so a type this file declares is placed at its declaration wherever its
-	// methods here sit. An alias declares no type of its own, so its object never has methods and never counts.
-	for _, declaration := range file.Decls {
-		general, isGeneral := declaration.(*ast.GenDecl)
-		if !isGeneral || general.Tok != token.TYPE {
-			continue
-		}
-		for _, spec := range general.Specs {
-			typeSpec, isTypeSpec := spec.(*ast.TypeSpec)
-			if !isTypeSpec {
-				continue
-			}
-			typeName, isTypeName := pass.TypesInfo.Defs[typeSpec.Name].(*types.TypeName)
-			if !isTypeName || !hasMethods[typeName] || isServed[typeName] {
-				continue
-			}
-			served = append(served, servedType{typeName: typeName, node: typeSpec.Name, declared: true})
-			isServed[typeName] = true
-		}
-	}
-	for _, declaration := range file.Decls {
-		function, isFunction := declaration.(*ast.FuncDecl)
-		if !isFunction {
-			continue
-		}
-		typeName := receiverTypeName(pass, function)
-		if typeName == nil || isServed[typeName] {
-			continue
-		}
-		served = append(served, servedType{typeName: typeName, node: function.Recv.List[0].Type})
-		isServed[typeName] = true
-	}
-	slices.SortFunc(served, func(left, right servedType) int {
-		return cmp.Compare(left.node.Pos(), right.node.Pos())
-	})
-	return served
-}
-
-// receiverTypeName is the named type a method belongs to, or nil when function is no method. The receiver's type is
-// read from the types rather than its spelling, with the pointer stripped, an alias followed to the type it names,
-// and a generic receiver's type arguments dropped, so `*List[T]` resolves to List itself.
-func receiverTypeName(pass *analysis.Pass, function *ast.FuncDecl) *types.TypeName {
-	if function.Recv == nil || len(function.Recv.List) != 1 {
-		return nil
-	}
-	receiverType := types.Unalias(pass.TypesInfo.TypeOf(function.Recv.List[0].Type))
-	if pointer, isPointer := receiverType.(*types.Pointer); isPointer {
-		receiverType = types.Unalias(pointer.Elem())
-	}
-	named, isNamed := receiverType.(*types.Named)
-	if !isNamed {
-		return nil
-	}
-	return named.Origin().Obj()
 }
 
 // fileStem is a file's name up to its first dot, the part go/build reads a toolchain suffix from.
@@ -255,6 +184,31 @@ func isToolchainSuffix(tail string) bool {
 	}
 }
 
+// isVariantSuffix is whether tail names a build-constrained file's variant: a suffix go/build reads, or one word, the
+// build tag the file is split by, as unix in registry_unix.go. Two words are a theme and a variant, which a file
+// declaring its type does not take.
+func isVariantSuffix(tail string) bool {
+	return isToolchainSuffix(tail) || !strings.Contains(tail, "_")
+}
+
+// hasBuildConstraint is whether file carries a //go:build line before its package clause, where go/build reads one.
+// The comments are read from the AST, so //go:build in a sentence, in a string, or after the package clause, where
+// it constrains nothing, does not count.
+func hasBuildConstraint(file *ast.File) bool {
+	for _, group := range file.Comments {
+		// The comment groups are in source order, so the first past the package clause ends the search.
+		if group.Pos() >= file.Package {
+			return false
+		}
+		for _, comment := range group.List {
+			if constraint.IsGoBuild(comment.Text) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // isThemeSuffix accepts any tail, since a file of one type's methods may be named for their theme as well as their
 // type, graph_walk.go beside graph.go, and a toolchain suffix is one more such tail.
 func isThemeSuffix(string) bool {
@@ -277,6 +231,21 @@ func toolchainSuffix(stem string) string {
 		return "_" + parts[count-1]
 	}
 	return ""
+}
+
+// variantSuffix is the suffix a suggested name keeps, so following the suggestion never changes what the file builds
+// for: the toolchain suffix stem ends with, or else, in a build-constrained file, its last word, which names the
+// variant when anything does. The name it makes always passes the rule.
+func variantSuffix(stem string, buildConstrained bool) string {
+	if suffix := toolchainSuffix(stem); suffix != "" || !buildConstrained {
+		return suffix
+	}
+	index := strings.LastIndex(stem, "_")
+	// A stem with no underscore, or only a leading or trailing one, has no word after a name to keep.
+	if index <= 0 || index == len(stem)-1 {
+		return ""
+	}
+	return stem[index:]
 }
 
 // snakeCase is name in lowercase with an underscore at each word boundary: before a capital that follows a lowercase

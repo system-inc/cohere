@@ -28,6 +28,8 @@ type pragmaBindingReader struct {
 func IsReactPragmaBinding(home *ast.SourceFile, typeChecker *checker.Checker, cache *FileCache, identifier *ast.Node) bool {
 	reader := pragmaBindingReader{home: home, coverage: Cached(cache, "rule.IsReactPragmaBinding.coverage", func() map[*ast.Node]pragmaCoverage { return map[*ast.Node]pragmaCoverage{} })}
 	if home == nil || identifier == nil || reader.cover(identifier).root != home.AsNode() {
+		// Invariant: every caller hands an identifier from the file its rule is walking, which is the only
+		// file the findings cache keys this answer on.
 		panic("rule.IsReactPragmaBinding requires an identifier in the rule's own file")
 	}
 	if typeChecker == nil {
@@ -60,6 +62,8 @@ func (r *pragmaBindingReader) cover(node *ast.Node) pragmaCoverage {
 	result := pragmaCoverage{}
 	if node.Parent == nil {
 		if node.Kind != ast.KindSourceFile {
+			// Invariant: a parsed node's parent chain always ends at its source file, so a root of another
+			// kind means the tree was built by hand or torn apart.
 			panic("pragma declaration has no source file")
 		}
 		result.root = node
@@ -82,6 +86,8 @@ func (r *pragmaBindingReader) requireHeader(node *ast.Node) {
 	}
 	coverage := r.cover(node)
 	if coverage.root != r.home.AsNode() && coverage.inside {
+		// Invariant: foreign syntax is read only outside a SignatureEntry body cut, the part the fingerprint
+		// covers; a read inside one would serve a stale finding, so the walk reports it and refuses caching.
 		panic(fmt.Sprintf("rule.IsReactPragmaBinding read foreign syntax inside a SignatureEntry body cut at %d", node.Pos()))
 	}
 }

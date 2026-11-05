@@ -32,13 +32,13 @@ var messageNoLabelVar = rule.Message{
 // the same question of the checker, and the meaning it is asked for is what has to match.
 //
 // `SymbolFlagsValue` is that meaning, measured rather than chosen. Upstream's `getVariableByName`
-// returns ANY scope variable, so a function declaration, a class, a `let` and a `const` all clash,
+// returns any scope variable, so a function declaration, a class, a `let` and a `const` all clash,
 // not only a `var`. Probed against sixteen inputs on the installed build at 10.8.1, the two agree on
 // every one, including the four `SymbolFlagsVariable` gets wrong.
 //
 // # Two upstream behaviours that read as false positives, reproduced
 //
-// `Object: for(;;) {}` and `undefined: for(;;) {}` both REPORT, measured. The scope chain ends at
+// `Object: for(;;) {}` and `undefined: for(;;) {}` both report, measured. The scope chain ends at
 // the global scope, where every standard library name is a variable, so any label named after a
 // builtin clashes. That is upstream's actual behaviour rather than an oversight in this port, and
 // widening or narrowing it here would be a different rule.

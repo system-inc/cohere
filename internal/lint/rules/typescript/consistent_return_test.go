@@ -34,7 +34,7 @@ type consistentReturnCase struct {
 	findings    []consistentReturnExpectation
 }
 
-// decodeConsistentReturnOptionsForTest routes a case's options through the SHIPPED decoder.
+// decodeConsistentReturnOptionsForTest routes a case's options through the shipped decoder.
 //
 // Not a hand-built settings struct. A fixture that constructs the options directly never exercises
 // the decoder, so a decoder wrong about the shape the config layer delivers passes every fixture.
@@ -67,8 +67,8 @@ func consistentReturnOffsetOf(test *testing.T, source string, line int, column i
 	text := asTheTypedConsistentReturnHarnessWroteIt(source)
 	// Upstream's asserted line numbers count the leading newline every case in its tester carries,
 	// and `RunTyped` trims it. So upstream's line N is the harness's line N-1, and a helper that did
-	// not shift would report an off-by-one-LINE that reads exactly like a defect in the rule's span
-	// computation. Measured: every reported span here already covered the right TEXT while the
+	// not shift would report an off-by-one-line that reads exactly like a defect in the rule's span
+	// computation. Measured: every reported span here already covered the right text while the
 	// arithmetic disagreed, which is the tell.
 	line -= consistentReturnLeadingBlankLines(source)
 	offset := 0
@@ -93,55 +93,6 @@ func runConsistentReturn(test *testing.T, testCase consistentReturnCase) rule_te
 	test.Helper()
 	return rule_testing.RunTypedWithOptions(test, ConsistentReturn, consistentReturnFile,
 		testCase.source, decodeConsistentReturnOptionsForTest(test, testCase.optionsJson))
-}
-
-// TestConsistentReturnStaysSilent runs upstream's whole `valid` list.
-//
-// Thirteen of these nineteen report under the bare core rule and are silent here, which is the whole
-// difference between the two rules. See the rule's doc comment for the measurement.
-func TestConsistentReturnStaysSilent(test *testing.T) {
-	test.Parallel()
-	for _, testCase := range consistentReturnCleanCases {
-		test.Run(testCase.name, func(test *testing.T) {
-			test.Parallel()
-			rule_testing.ExpectClean(test, runConsistentReturn(test, testCase))
-		})
-	}
-}
-
-// TestConsistentReturnFires runs upstream's whole `invalid` list and asserts every span it states.
-func TestConsistentReturnFires(test *testing.T) {
-	test.Parallel()
-	for _, testCase := range consistentReturnReportingCases {
-		test.Run(testCase.name, func(test *testing.T) {
-			test.Parallel()
-			result := runConsistentReturn(test, testCase)
-
-			// The message ids and the count through the harness, so the mechanical fixture-pair
-			// guard in `internal/lint/registry` can see that this rule is proven to fire. The spans
-			// below are the part that guard does not check and that this rule most needs: it
-			// computes a different report position per node kind, and upstream states all four
-			// coordinates on every one of these cases.
-			wantIds := make([]string, 0, len(testCase.findings))
-			for _, expected := range testCase.findings {
-				wantIds = append(wantIds, expected.id)
-			}
-			rule_testing.ExpectFindings(test, result, wantIds...)
-
-			for index, expected := range testCase.findings {
-				diagnostic := result.Diagnostics[index]
-				wantPos := consistentReturnOffsetOf(test, testCase.source, expected.line, expected.column)
-				wantEnd := consistentReturnOffsetOf(test, testCase.source, expected.endLine, expected.endColumn)
-				if diagnostic.Range.Pos() != wantPos || diagnostic.Range.End() != wantEnd {
-					test.Errorf("finding %d: expected span [%d,%d) (%d:%d-%d:%d), got [%d,%d) %q",
-						index, wantPos, wantEnd,
-						expected.line, expected.column, expected.endLine, expected.endColumn,
-						diagnostic.Range.Pos(), diagnostic.Range.End(),
-						asTheTypedConsistentReturnHarnessWroteIt(testCase.source)[diagnostic.Range.Pos():diagnostic.Range.End()])
-				}
-			}
-		})
-	}
 }
 
 // consistentReturnCleanCases are upstream's `valid` list, verbatim.
@@ -390,6 +341,20 @@ function foo(flag: boolean): undefined {
 	},
 }
 
+// TestConsistentReturnStaysSilent runs upstream's whole `valid` list.
+//
+// Thirteen of these nineteen report under the bare core rule and are silent here, which is the whole
+// difference between the two rules. See the rule's doc comment for the measurement.
+func TestConsistentReturnStaysSilent(test *testing.T) {
+	test.Parallel()
+	for _, testCase := range consistentReturnCleanCases {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			rule_testing.ExpectClean(test, runConsistentReturn(test, testCase))
+		})
+	}
+}
+
 // consistentReturnReportingCases are upstream's `invalid` list, verbatim, with the spans it asserts.
 var consistentReturnReportingCases = []consistentReturnCase{
 	{
@@ -552,6 +517,41 @@ function foo(flag: boolean) {
 	},
 }
 
+// TestConsistentReturnFires runs upstream's whole `invalid` list and asserts every span it states.
+func TestConsistentReturnFires(test *testing.T) {
+	test.Parallel()
+	for _, testCase := range consistentReturnReportingCases {
+		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
+			result := runConsistentReturn(test, testCase)
+
+			// The message ids and the count through the harness, so the mechanical fixture-pair
+			// guard in `internal/lint/registry` can see that this rule is proven to fire. The spans
+			// below are the part that guard does not check and that this rule most needs: it
+			// computes a different report position per node kind, and upstream states all four
+			// coordinates on every one of these cases.
+			wantIds := make([]string, 0, len(testCase.findings))
+			for _, expected := range testCase.findings {
+				wantIds = append(wantIds, expected.id)
+			}
+			rule_testing.ExpectFindings(test, result, wantIds...)
+
+			for index, expected := range testCase.findings {
+				diagnostic := result.Diagnostics[index]
+				wantPos := consistentReturnOffsetOf(test, testCase.source, expected.line, expected.column)
+				wantEnd := consistentReturnOffsetOf(test, testCase.source, expected.endLine, expected.endColumn)
+				if diagnostic.Range.Pos() != wantPos || diagnostic.Range.End() != wantEnd {
+					test.Errorf("finding %d: expected span [%d,%d) (%d:%d-%d:%d), got [%d,%d) %q",
+						index, wantPos, wantEnd,
+						expected.line, expected.column, expected.endLine, expected.endColumn,
+						diagnostic.Range.Pos(), diagnostic.Range.End(),
+						asTheTypedConsistentReturnHarnessWroteIt(testCase.source)[diagnostic.Range.Pos():diagnostic.Range.End()])
+				}
+			}
+		})
+	}
+}
+
 // TestConsistentReturnDecoderAcceptsTheShapesTheConfigLayerDelivers crosses the config boundary.
 //
 // Every fixture above reaches the decoder with bytes this test file built. The config layer builds
@@ -561,7 +561,7 @@ function foo(flag: boolean) {
 // right on every fixture and wrong on every real configuration, and nothing else in this file can
 // see that.
 //
-// `meta.schema` for this rule declares ONE element, so the two spellings coincide and the object
+// `meta.schema` for this rule declares one element, so the two spellings coincide and the object
 // arrives whole. That is the fact being pinned, rather than assumed: if it were variadic there would
 // be a second shape to accept.
 func TestConsistentReturnDecoderAcceptsTheShapesTheConfigLayerDelivers(test *testing.T) {
@@ -807,11 +807,11 @@ function foo(flag: boolean): undefined {
 
 // TestConsistentReturnTypedUndefinedReadsTheArgumentsType pins the second filter's two sides.
 //
-// Both rows come from upstream's corpus and both are about the TYPE rather than the spelling: the
+// Both rows come from upstream's corpus and both are about the type rather than the spelling: the
 // syntactic test in the shared judgment matches a bare `undefined` identifier and a `void`
 // expression, and neither row here is either of those.
 //
-// What this deliberately does NOT assert is that the filter's `==` differs from an `&`. A first
+// What this deliberately does not assert is that the filter's `==` differs from an `&`. A first
 // draft claimed it did, with a reasoned argument that a union would carry extra bits. Measured, a
 // union carries the Union flag alone and no input separates the two spellings. The rule's doc
 // comment carries the measurement; there is no distinction here to pin.
@@ -855,8 +855,8 @@ function foo(flag: boolean) {
 
 // TestConsistentReturnDoesNotPanicOnShapesWithNoUsefulType is the crash guard.
 //
-// `Checker_getTypeArguments` PANICS on a type that is not a reference, reproduced directly while
-// this rule was being written. The walk recovers per FILE rather than per rule, so one such node
+// `Checker_getTypeArguments` panics on a type that is not a reference, reproduced directly while
+// this rule was being written. The walk recovers per file rather than per rule, so one such node
 // costs every rule in the package its verdict on that file. Each row here reaches the filter with
 // something other than an ordinary annotated function.
 func TestConsistentReturnDoesNotPanicOnShapesWithNoUsefulType(test *testing.T) {
@@ -885,7 +885,7 @@ func TestConsistentReturnDoesNotPanicOnShapesWithNoUsefulType(test *testing.T) {
 // TestConsistentReturnPromiseVoidGuardsAreBothLoadBearing pins the two tests inside isPromiseVoid.
 //
 // `isPromiseVoid` asks two questions before it unwraps: is the type thenable, and is it a type
-// reference. Neither is implied by the other, and a mutation removing either SURVIVED upstream's
+// reference. Neither is implied by the other, and a mutation removing either survived upstream's
 // whole 30-case corpus, because every promise upstream writes answers both the same way.
 //
 // Measured in `internal/consistent_return_ext_probe` across ten return types, five diverge:
@@ -894,12 +894,12 @@ func TestConsistentReturnDoesNotPanicOnShapesWithNoUsefulType(test *testing.T) {
 //	void[], Map<string, void>, Pair<void>         thenable F  reference T   DIVERGE
 //	a bare `interface T { then(...) }`            thenable T  reference F   DIVERGE
 //
-// The two directions fail differently and that is why both rows below exist. Dropping the THENABLE
+// The two directions fail differently and that is why both rows below exist. Dropping the thenable
 // test lets an ordinary generic whose first type argument happens to be `void` suppress a real
 // finding -- `Promise<Map<string, void>>` unwraps to `Map<string, void>`, then to `string`, and a
-// version that unwrapped without checking thenability would walk into it. Dropping the REFERENCE
+// version that unwrapped without checking thenability would walk into it. Dropping the reference
 // test is worse than wrong: `Checker_getTypeArguments` panics on a non-reference, and the walk
-// recovers per FILE, so one such return type costs every rule in the package its verdict on that
+// recovers per file, so one such return type costs every rule in the package its verdict on that
 // file.
 //
 // Every expectation here was taken by driving the installed 8.67.0 extension. All six report.
@@ -989,7 +989,7 @@ async function foo(flag: boolean): Weird {
 
 // TestConsistentReturnSuppressingTheFirstReturnMovesTheExpectation is the shape found on real source.
 //
-// This is the case that proves the void filter has to be an INPUT to the judgment rather than a
+// This is the case that proves the void filter has to be an input to the judgment rather than a
 // filter over its findings, and it was found by running the rule over the ahra tree rather than
 // reasoned about. Two of the tree's findings appear under the extension that the bare core rule does
 // not report at all, which looks backwards for a rule that only ever suppresses.

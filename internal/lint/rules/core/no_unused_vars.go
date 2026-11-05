@@ -83,8 +83,8 @@ func noUnusedVarsMessage(name string, assigned bool, underscoreSilences bool) ru
 // analysis. The differential compares our findings against oxlint's. A rule that is *more* correct
 // than upstream produces a difference, and a difference costs the harness its meaning whether the
 // extra finding is right or wrong. Measured on upstream's own corpus, the two approaches genuinely
-// disagree: `test_vars_self_use` ships `chain = chain.extend()` inside a `for` loop as a PASS and
-// the same statement outside a loop as a FAIL. A liveness pass sees a store whose value no later
+// disagree: `test_vars_self_use` ships `chain = chain.extend()` inside a `for` loop as a pass and
+// the same statement outside a loop as a fail. A liveness pass sees a store whose value no later
 // read observes in both cases and would report both. Upstream's answer is the loop-shape test at
 // `usage.rs:612` (`is_in_for_loop_test_or_update`) and `:634` (`is_in_loop_body`), which is a
 // syntactic proxy for the flow fact that a loop's back edge makes the store observable on the next
@@ -139,7 +139,7 @@ func noUnusedVarsMessage(name string, assigned bool, underscoreSilences bool) ru
 // it told every finding to prefix an underscore, including `_nextContent` under a `^$` config.
 //
 // Worth stating plainly because it has been assumed twice in the other direction: the missing
-// finding is NOT evidence that this rule is blind to type declarations. It is not. A seeded probe
+// finding is not evidence that this rule is blind to type declarations. It is not. A seeded probe
 // carrying an unused `type` alias, an unused `interface` and an unused `const` reports all three,
 // and the two type findings above are ones this rule already makes on the real tree. The
 // `bindingType` arm in `collectCandidateBindings` is what does it. A port of the namespaced rule
@@ -180,7 +180,7 @@ var NoUnusedVars = rule.Rule{
 				// in a template the linter never parses, so a binding used in the markup looks
 				// unused in the script.
 				//
-				// The `.d.ts` arm is SUBSUMED rather than load-bearing, and it is kept anyway.
+				// The `.d.ts` arm is subsumed rather than load-bearing, and it is kept anyway.
 				// Measured: with this suffix test disabled, `interface Unreferenced {}` in a
 				// `a.d.ts` still reports nothing, because typescript-go marks every declaration in
 				// a declaration file ambient and `isInsideSignatureOrAmbientDeclaration` already
@@ -188,7 +188,7 @@ var NoUnusedVars = rule.Rule{
 				// the fixture asserting it passes for a reason one layer down from what it names.
 				//
 				// It stays because the two guards answer different questions and only coincide
-				// today: this one is about the FILE and would keep holding if a future `.d.ts`
+				// today: this one is about the file and would keep holding if a future `.d.ts`
 				// carried a non-ambient binding, which is the shape the ambient test would miss.
 				// Recorded here so the next reader does not delete it believing it does nothing,
 				// and does not add a fixture believing it can be measured.
@@ -281,6 +281,7 @@ func analyzeUnusedBindings(ruleContext rule.Context, sourceFile *ast.Node, setti
 	// backreference its user wrote, and reads `\s` and `\b` differently (#7mztrdd).
 	var destructuredArrayIgnore *esregexp.RegExp
 	if settings.DestructuredArrayIgnorePattern != "" {
+		// Ignored: an unparseable pattern leaves this nil, which ignores nothing.
 		destructuredArrayIgnore, _ = esregexp.Compile(settings.DestructuredArrayIgnorePattern, "u")
 	}
 
@@ -534,7 +535,7 @@ func isInsideTypeQuery(identifier *ast.Node) bool {
 // declaringScopeOf returns the variable scope a symbol is declared in, or nil when that cannot be
 // established.
 //
-// The FIRST declaration is deliberate rather than arbitrary here, and the question it answers is
+// The first declaration is deliberate rather than arbitrary here, and the question it answers is
 // "where does this name live", which every declaration of a merged symbol answers identically: a
 // symbol's declarations all bind the same name in the same scope, which is what makes them merge.
 // A rule asking a different question of a merged symbol would need a different choice.
@@ -557,7 +558,7 @@ func declaringScopeOf(ruleContext rule.Context, symbol *ast.Symbol) *ast.Node {
 // a clean tree.
 //
 // A pure write is not a use. `let y = 10; y = 5;` leaves `y` unused, because nothing ever observes
-// either value. An update (`y++`, `y += 1`) is deliberately NOT excluded: it loads before it
+// either value. An update (`y++`, `y += 1`) is deliberately not excluded: it loads before it
 // stores, so it is a genuine read of the previous value. That asymmetry is upstream's and it is the
 // difference between `y = 5` and `y++` in the documentation's own examples.
 func countsAsRead(identifier *ast.Node, declaringScope *ast.Node) bool {
@@ -577,7 +578,7 @@ func countsAsRead(identifier *ast.Node, declaringScope *ast.Node) bool {
 	// nothing downstream can observe the left one. Upstream calls this a discarded read
 	// (`usage.rs:709`) and reports the binding.
 	//
-	// Only the LEFT operand qualifies, and that is the whole discrimination: `(0, a) + 1` is a
+	// Only the left operand qualifies, and that is the whole discrimination: `(0, a) + 1` is a
 	// genuine read because `a` is the value the sequence produces. Both spellings sit in the corpus
 	// and a fix that ignored the side would trade two findings for a false positive.
 	if isDiscardedSequenceOperandRead(identifier) {
@@ -590,7 +591,7 @@ func countsAsRead(identifier *ast.Node, declaringScope *ast.Node) bool {
 	// upstream reports the parameter.
 	//
 	// This is deliberately narrow, and the narrowness is upstream's rather than caution of ours.
-	// Two neighbouring shapes are upstream PASS cases and must stay clean: an immediately-invoked
+	// Two neighbouring shapes are upstream pass cases and must stay clean: an immediately-invoked
 	// function expression (`cb = function(a){ return cb(1+a); }()`, which runs now and so really
 	// does read `cb`) and a sequence whose value is the binding itself (`cb = (function(a){...},
 	// cb)`). Upstream ships both spellings of the sequence form in its fail list too, commented
@@ -687,11 +688,11 @@ func isDeclaringName(identifier *ast.Node) bool {
 		ast.KindSetAccessor:
 		return parent.Name() == identifier
 
-	// An import specifier declares BOTH of its names, and the export specifier below declares
+	// An import specifier declares both of its names, and the export specifier below declares
 	// neither of its own, which is why the two cannot share the simple `parent.Name()` test above.
 	//
 	// `import { a as b } from './m'` puts `a` in the `propertyName` slot and `b` in `name`. Neither
-	// is a reference to anything in THIS file: `b` is the binding being created, and `a` names an
+	// is a reference to anything in this file: `b` is the binding being created, and `a` names an
 	// export of the other module. The plain `parent.Name() == identifier` test answered true only
 	// for `b`, so the source name `a` fell through and was walked as an ordinary reference.
 	//
@@ -716,7 +717,7 @@ func isDeclaringName(identifier *ast.Node) bool {
 	// why `const y = 1; export { y };` is clean. Its `propertyName` slot, when present, is the
 	// local side and the `name` slot is the exported alias, so `export { y as z }` reads `y`.
 	case ast.KindExportSpecifier:
-		// An export specifier inside `export { x } from './m'` names something in the OTHER
+		// An export specifier inside `export { x } from './m'` names something in the other
 		// module, not the local binding. So `import { resolve } from "path"; export { resolve }
 		// from "path";` leaves the import genuinely unused, and upstream reports it, while the
 		// same file without the `from` clause is clean because there the specifier does read the
@@ -747,7 +748,7 @@ func isDeclaringName(identifier *ast.Node) bool {
 		// The type-position equivalent of a member access: `N.T` reads `N`, not `T`.
 		return parent.AsQualifiedName().Right == identifier
 
-	// A `typeof x` inside x's OWN declaration is not a use of it. `function foo(...args: typeof
+	// A `typeof x` inside x's own declaration is not a use of it. `function foo(...args: typeof
 	// args) {}` names the parameter in its own type annotation, which is self-reference rather than
 	// consumption, and upstream reports the parameter. Same judgment as a recursive function or a
 	// self-referential type alias, arriving through a type query.
@@ -894,7 +895,7 @@ func collectCandidateBindings(sourceFile *ast.Node) []candidateBinding {
 
 		switch current.Kind {
 		case ast.KindVariableDeclaration:
-			// A catch binding is spelled `KindVariableDeclaration` in this AST and is ALSO reached
+			// A catch binding is spelled `KindVariableDeclaration` in this AST and is also reached
 			// through its catch clause below, where it gets its own kind and its own ignore
 			// pattern. Collecting it here as well reported it twice, which a span fixture caught
 			// and a message-id fixture would not have: two findings with the right id at the right
@@ -947,7 +948,7 @@ func collectCandidateBindings(sourceFile *ast.Node) []candidateBinding {
 
 		// Types, interfaces, enums and namespaces are checked exactly like values. Upstream states
 		// this outright: "Enums and namespaces are treated the same as variables, classes,
-		// functions, etc." An enum's MEMBERS are deliberately not candidates, because only the
+		// functions, etc." An enum's members are deliberately not candidates, because only the
 		// enum itself is checked.
 		case ast.KindInterfaceDeclaration,
 			ast.KindTypeAliasDeclaration,
@@ -1081,7 +1082,7 @@ func isGlobalScopeBinding(sourceFile *ast.SourceFile, candidate candidateBinding
 // of an array pattern, which is what `destructuredArrayIgnorePattern` applies to.
 //
 // Upstream asks it of the definition's ESTree parent and of every reference's, so the identifier has
-// to BE the element. Measured on the installed 8.71.0, each of these follows:
+// to be the element. Measured on the installed 8.71.0, each of these follows:
 //
 //	const [_a, b] = list            skipped       so is a parameter `([_a, b])`, a catch `([_e])`,
 //	const { x: [_a] } = n           skipped       and a for-of head `for (const [_k, v] of entries)`
@@ -1187,7 +1188,7 @@ func isExemptFromUnusedReport(
 	// in `{ [K in Slots]?: React.ReactNode }`. Upstream states this as a bare no-op arm at
 	// `mod.rs:388` with the comment "Mapped type keys are always used within the type definition".
 	//
-	// This is a deliberate divergence from ESLint, which DOES report it: measured with ESLint's own
+	// This is a deliberate divergence from ESLint, which does report it: measured with ESLint's own
 	// Linter API, `type S<T extends string> = { [K in T]?: string }` reports `K` as unused. oxc is
 	// the differential authority, so oxc's answer ships, and the tree agrees with oxc: the one
 	// occurrence in our own source is a correct mapped type that ESLint would have flagged.
@@ -1246,7 +1247,7 @@ func isUsedBinding(ruleContext rule.Context, candidate candidateBinding, symbol 
 	// closes that gap without widening what a read means.
 	//
 	// An `import X = Y` is excluded, and this is the one place the two alias forms must be told
-	// apart. There the aliased symbol is a LOCAL binding in the same file, so a read of `Y`
+	// apart. There the aliased symbol is a local binding in the same file, so a read of `Y`
 	// anywhere — including the `= Y` in the alias's own declaration — would count as a read of `X`
 	// and keep every such alias permanently alive. A module import has no such hazard because the
 	// symbol it aliases lives in another file that this rule never reads.
@@ -1274,7 +1275,7 @@ func isUsedBinding(ruleContext rule.Context, candidate candidateBinding, symbol 
 	// An exported binding is read by a file this rule cannot see. See the rule's doc comment for
 	// why that stays an assumption rather than becoming a program-wide lookup.
 	//
-	// EVERY declaration of the symbol is asked, not just the one this candidate came from, because
+	// Every declaration of the symbol is asked, not just the one this candidate came from, because
 	// declaration merging can put the `export` on a sibling: `interface Foo {}` beside
 	// `export const Foo = 'bar'` is one exported symbol wearing two declarations, and upstream
 	// treats it as exported. Both orderings appear in the corpus as clean cases, which is what
@@ -1301,7 +1302,7 @@ func isUsedBinding(ruleContext rule.Context, candidate candidateBinding, symbol 
 // way to say "everything but this key" is a helper that cannot be typed without a cast.
 //
 // Upstream asks `hasRestSibling` of the identifier's ESTree parent, so the binding has to sit
-// DIRECTLY in a property of that pattern. Measured on the installed 8.71.0, each of these follows:
+// directly in a property of that pattern. Measured on the installed 8.71.0, each of these follows:
 //
 //	const { a, ...rest } = o           silent        so is `{ a: b, ...rest }`, `{ [k]: a, ...rest }`
 //	const { a = 1, ...rest } = o       reports `a`   a default makes the parent an AssignmentPattern
@@ -1365,7 +1366,7 @@ func isWrittenBesideARestProperty(identifier *ast.Node) bool {
 // isReadInsideAClosureAssignedToItself reports whether a read sits inside a function expression
 // that is being assigned to the very binding being read.
 //
-// See the call site for the two neighbouring shapes that must NOT match, and why.
+// See the call site for the two neighbouring shapes that must not match, and why.
 func isReadInsideAClosureAssignedToItself(identifier *ast.Node) bool {
 	name := identifier.Text()
 
@@ -1379,7 +1380,7 @@ func isReadInsideAClosureAssignedToItself(identifier *ast.Node) bool {
 			return false
 
 		case ast.KindFunctionExpression, ast.KindArrowFunction:
-			// The closure must be the DIRECT right-hand side of the assignment. A call wrapping it
+			// The closure must be the direct right-hand side of the assignment. A call wrapping it
 			// means it runs immediately, and a sequence means the assigned value is something
 			// else; both are upstream passing cases.
 			parent := current.Parent
@@ -1464,7 +1465,7 @@ func isSelfReassignmentRead(identifier *ast.Node, declaringScope *ast.Node) bool
 			ast.KindNonNullExpression,
 			ast.KindAsExpression,
 			ast.KindCallExpression:
-			// A call whose ARGUMENTS contain the reference is a genuine use: the value escapes
+			// A call whose arguments contain the reference is a genuine use: the value escapes
 			// into the callee. Only the callee position stays transparent, which is what keeps
 			// `cancel = cancel?.()` self-referential while `f(a)` is not.
 			if parent.Kind == ast.KindCallExpression &&
@@ -1512,7 +1513,7 @@ func isSelfReassignmentRead(identifier *ast.Node, declaringScope *ast.Node) bool
 			if target == nil || target.Kind != ast.KindIdentifier || target.Text() != name {
 				return false
 			}
-			// Upstream compares the REFERENCE's variable scope against the BINDING's declaring
+			// Upstream compares the reference's variable scope against the binding's declaring
 			// scope, not the two identifiers against each other: those are always in the same
 			// scope as one another, so that comparison is vacuously true and the exemption never
 			// fires. `let cancel = () => {}; export function close() { cancel = cancel?.() }` is
@@ -1570,7 +1571,7 @@ func isDiscardedResult(expression *ast.Node) bool {
 				current = parent
 				continue
 			}
-			// An assignment feeding the value straight back into the SAME binding discards it as
+			// An assignment feeding the value straight back into the same binding discards it as
 			// surely as a bare statement does: `a = ++a` and `a = (0, ++a)` leave nothing any
 			// reader can observe, and upstream reports both. The target has to be the same name,
 			// otherwise `b = a++` is a genuine escape into `b`.
@@ -1707,7 +1708,7 @@ func isInsideLoop(node *ast.Node) bool {
 // abandoned call graph looking alive. This tree's `internal/unused` package reaches the identical
 // verdict from an argument rather than from a corpus; this is the corpus confirming it.
 //
-// The comparison is on SYMBOL identity rather than on the spelled name, and that is load-bearing
+// The comparison is on symbol identity rather than on the spelled name, and that is load-bearing
 // rather than tidy. `function foo() { var foo = 1; return foo }` returns the inner variable, not the
 // function, and a name comparison calls it a self-reference and reports a variable upstream calls
 // clean. The same shape arrives as a shadowing parameter in `function foo(foo) { return foo }`.
@@ -1959,7 +1960,7 @@ func moduleBlockHasExplicitExports(block *ast.Node) bool {
 func isInsideSignatureOrAmbientDeclaration(declaration *ast.Node) bool {
 	for current := declaration; current != nil; current = current.Parent {
 		if ast.GetCombinedNodeFlags(current)&ast.NodeFlagsAmbient != 0 {
-			// An ambient module exempts its contents only when it declares NO explicit exports.
+			// An ambient module exempts its contents only when it declares no explicit exports.
 			// `declare module 'm' { type T = any; }` has no export, so everything in it is part of
 			// the ambient surface and nothing is judged. Add one export and the block becomes a
 			// module with a stated interface, so upstream judges the rest of its contents against
@@ -1977,7 +1978,7 @@ func isInsideSignatureOrAmbientDeclaration(declaration *ast.Node) bool {
 			// an interface's are left alone. That split is upstream's and it is visible only in
 			// the snapshot: `declare module 'bun:test' { type Matchers2<T> = {} }` reports `T` and
 			// `{ class MyClass<T> {} }` reports both the class and `T`, while
-			// `declare module 'vitest' { interface Matchers<T> {...} }` is CLEAN.
+			// `declare module 'vitest' { interface Matchers<T> {...} }` is clean.
 			//
 			// The reason is what an interface in an ambient module is for. It is the declaration
 			// merging idiom: a library augments a type it does not own, and the type parameter is
@@ -2006,9 +2007,9 @@ func isInsideSignatureOrAmbientDeclaration(declaration *ast.Node) bool {
 			ast.KindMethodDeclaration,
 			ast.KindConstructor:
 			// A body-less declaration is an overload signature or an abstract member, and its
-			// parameter names are documentation. But that only holds when the declaration IS the
+			// parameter names are documentation. But that only holds when the declaration is the
 			// thing being judged or encloses it: `export namespace N { function foo() }` has a
-			// body-less `foo` whose own NAME is the candidate, and upstream reports it. The
+			// body-less `foo` whose own name is the candidate, and upstream reports it. The
 			// signature exemption is about what a signature's parameters mean, not about the
 			// signature's own name.
 			if current == declaration {
@@ -2091,33 +2092,33 @@ func isParameterBeforeAUsedOne(
 func isExportedBinding(declaration *ast.Node) bool {
 	for current := declaration; current != nil; current = current.Parent {
 		switch current.Kind {
-		// A parameter of an exported function is NOT exported. The function leaves the file; its
+		// A parameter of an exported function is not exported. The function leaves the file; its
 		// parameter list does not, and no importer can read a parameter name. Climbing past these
 		// exempted every parameter of every exported function, which was 18 of this port's 35
 		// missed cases and the largest single group of them.
 		//
-		// The boundary is the declaration that OWNS a parameter list or a body, rather than a
+		// The boundary is the declaration that owns a parameter list or a body, rather than a
 		// scope boundary generally: `export const f = () => { const inner = 1; }` must still stop
 		// at the arrow, because `inner` is not exported either.
 		// A parameter is never exported, whatever encloses it. The function leaves the file; its
 		// parameter list does not, and no importer can read a parameter name. This is checked on
-		// the parameter ITSELF rather than only on the way past one, because a parameter is where
+		// the parameter itself rather than only on the way past one, because a parameter is where
 		// the climb starts and a `current != declaration` guard would let it walk straight up to
 		// the exported function it belongs to. That was the bug in the first attempt at this, and
 		// it read as the narrowing simply having no effect.
 		case ast.KindParameter:
 			return false
 
-		// A TYPE PARAMETER is never exported either, for the same reason and with the same
+		// A type parameter is never exported either, for the same reason and with the same
 		// mechanics: `export interface M<T> {}` exports `M`, and no importer can name `T`. It has
-		// to answer on the node ITSELF rather than on the way past one, because a type parameter is
+		// to answer on the node itself rather than on the way past one, because a type parameter is
 		// where the climb starts. Upstream reports `T` here and reports the `R` bound by an `infer`
 		// in an exported conditional type, both of which stayed silent while the climb walked up to
 		// the exported declaration.
 		case ast.KindTypeParameter:
 			return false
 
-		// The declarations that own a body. Anything reached THROUGH one of these is inside a
+		// The declarations that own a body. Anything reached through one of these is inside a
 		// scope rather than at the top of an exported statement, so it does not leave the file:
 		// `export const f = () => { const inner = 1; }` exports `f` and not `inner`. The
 		// `current != declaration` guard is what lets the declaration itself still be judged, since

@@ -32,6 +32,7 @@ package abbreviation
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -211,7 +212,12 @@ func Load(data []byte) (*Vocabulary, error) {
 			loaded.WholeByName[entry.Abbreviation] = entry
 		}
 		if entry.Prefix != nil {
-			loaded.prefixPatterns[entry.Abbreviation] = regexp.MustCompile(`^` + entry.Abbreviation + `[A-Z]`)
+			// A bad entry is refused with its reason rather than panicking, so a malformed file reads as an error.
+			prefixPattern, compileError := regexp.Compile(`^` + entry.Abbreviation + `[A-Z]`)
+			if compileError != nil {
+				return nil, fmt.Errorf("entry %q's prefix pattern: %w", entry.Abbreviation, compileError)
+			}
+			loaded.prefixPatterns[entry.Abbreviation] = prefixPattern
 			if entry.Prefix.Phase == "early" {
 				loaded.EarlyPrefixes = append(loaded.EarlyPrefixes, entry)
 			} else {
@@ -224,10 +230,16 @@ func Load(data []byte) (*Vocabulary, error) {
 		if entry.Segment != nil {
 			word := Capitalize(entry.Abbreviation)
 			loaded.Segments = append(loaded.Segments, entry)
+			boundary, boundaryError := regexp.Compile(`(^|[^a-zA-Z])` + word + `($|[A-Z0-9])`)
+			camel, camelError := regexp.Compile(`[a-z0-9]` + word + `($|[A-Z0-9])`)
+			replace, replaceError := regexp.Compile(word + `($|[A-Z0-9])`)
+			if compileError := errors.Join(boundaryError, camelError, replaceError); compileError != nil {
+				return nil, fmt.Errorf("entry %q's segment patterns: %w", entry.Abbreviation, compileError)
+			}
 			loaded.segmentPatterns[entry.Abbreviation] = wordSegmentPatterns{
-				boundary: regexp.MustCompile(`(^|[^a-zA-Z])` + word + `($|[A-Z0-9])`),
-				camel:    regexp.MustCompile(`[a-z0-9]` + word + `($|[A-Z0-9])`),
-				replace:  regexp.MustCompile(word + `($|[A-Z0-9])`),
+				boundary: boundary,
+				camel:    camel,
+				replace:  replace,
 			}
 		}
 	}

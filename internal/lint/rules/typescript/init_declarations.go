@@ -32,7 +32,7 @@ type InitDeclarationsOptions struct {
 	IgnoreForLoopInit bool
 }
 
-// DefaultInitDeclarationsSettings is what an UNCONFIGURED rule does, which is nothing.
+// DefaultInitDeclarationsSettings is what an unconfigured rule does, which is nothing.
 //
 // This is not upstream's stated default and the difference is measured rather than chosen. Upstream
 // writes `defaultOptions: ['always']`, but it writes it as a createRule property rather than as
@@ -141,7 +141,7 @@ func initDeclarationsModeOf(name string) InitDeclarationsMode {
 // a variable whose type the reader has to infer from a later assignment; under `never` an initializer
 // on a `var` is a value that will be reassigned before it is read.
 //
-// # An unconfigured rule does NOTHING, and that is upstream's behavior rather than a decision here
+// # An unconfigured rule does nothing, and that is upstream's behavior rather than a decision here
 //
 // Upstream declares `defaultOptions: ['always']` and it never takes effect, because it is written as a
 // createRule property rather than as `meta.defaultOptions` and ESLint 10 reads only the latter. A rule
@@ -155,7 +155,7 @@ func initDeclarationsModeOf(name string) InitDeclarationsMode {
 // the gate being replaced does not report. The audit predicted zero, the first version of this port
 // produced 512, and the audit was right.
 //
-// # The span differs by MODE, and reproducing that is most of this port
+// # The span differs by mode, and reproducing that is most of this port
 //
 // This is an extension rule: upstream wraps ESLint's core rule and its only live contribution is
 // narrowing where the finding points. Under `always` the report covers the identifier alone, so
@@ -179,7 +179,7 @@ func initDeclarationsModeOf(name string) InitDeclarationsMode {
 // itself, and so does one nested three namespaces deep, one inside `declare module`, one inside
 // `declare global`, and one written `declare var` inside a plain namespace. Measured over six shapes
 // rather than assumed. So the ancestor walk and the enter/exit bookkeeping are both replaced by a
-// flag test on the declaration list, which is the same DECISION reached without reproducing a
+// flag test on the declaration list, which is the same decision reached without reproducing a
 // workaround for a constraint we do not have.
 //
 // # `never` exempts a constant binding, and there are three of them
@@ -194,7 +194,7 @@ func initDeclarationsModeOf(name string) InitDeclarationsMode {
 // `for (var foo in [])` and `for (var foo of [])` bind `foo` on each pass, and `for (var i = 0;;)`
 // carries its initializer in the head. Upstream expresses this as "if the enclosing block is a loop,
 // ask whether this declaration is the loop's own binding position rather than whether it has an
-// initializer". Reproduced exactly, including that a declaration in a loop's BODY is not in that
+// initializer". Reproduced exactly, including that a declaration in a loop's body is not in that
 // position: `for (var a in []) var foo;` reports, because `var foo` is the loop's statement rather
 // than its binding.
 //
@@ -297,7 +297,7 @@ func buildInitDeclarationsMessage(messageId string, variableName string) rule.Me
 	}
 }
 
-// enclosingLoopOfDeclarationList answers the loop a declaration list is the HEAD of, if any.
+// enclosingLoopOfDeclarationList answers the loop a declaration list is the `HEAD` of, if any.
 //
 // Upstream reads `declaration.parent` and asks whether it is a loop. Ours has a variable statement
 // between a declaration list and its enclosing statement when the list is a statement of its own, and
@@ -333,7 +333,7 @@ func isDeclarationInitialized(
 		// A for-in or for-of binds on each pass, so its binding position counts as initialized.
 		// Upstream compares against `block.left`; ours is the loop's own initializer field.
 		//
-		// The comparison is SUBSUMED and kept anyway. A mutation replacing it with a bare true
+		// The comparison is subsumed and kept anyway. A mutation replacing it with a bare true
 		// survives every fixture, so eight parses were run to ask why: a for-in or for-of statement
 		// has exactly one declaration-list child and it is always the initializer, including in four
 		// malformed shapes the parser has to recover from, a missing binding name, a missing right

@@ -17,11 +17,11 @@ func requireArraySortCompareCaseName(index int) string {
 	return "case" + strconv.Itoa(index)
 }
 
-// requireArraySortCompareOptionsFor routes a case's options through the rule's OWN decoder.
+// requireArraySortCompareOptionsFor routes a case's options through the rule's own decoder.
 //
 // This is the line that matters most in this file. Building the options struct directly would leave
 // the decoder untested, and this rule's decoder is the one most likely to be wrong: the single
-// option DEFAULTS TO TRUE, so a generic `DecodeOptionsInto` would hand back a zero-value struct that
+// option defaults to true, so a generic `DecodeOptionsInto` would hand back a zero-value struct that
 // silently inverts the rule, and every fixture built from a struct would pass anyway.
 //
 // An empty specifier means the case ran with no options at all, which is upstream's default and is
@@ -150,12 +150,12 @@ func TestRequireArraySortCompareStaysSilentOnUpstreamPassCases(test *testing.T) 
 // field, since the rule ships no repair.
 //
 // The span is measured rather than transcribed, and it matters here: upstream reports
-// `callee.parent`, which is the whole CALL expression rather than the member access, so the finding
+// `callee.parent`, which is the whole call expression rather than the member access, so the finding
 // underlines `a.sort()` with its parentheses. Both readings are defensible and the message id
 // cannot tell them apart.
 //
 // The harness writes each fixture as `strings.TrimSpace(source)+"\n"`, so every span assertion here
-// slices the TRIMMED text rather than the Go literal. Every case in this corpus carries a leading
+// slices the trimmed text rather than the Go literal. Every case in this corpus carries a leading
 // newline, so comparing against the literal would be off by one byte on all seventeen and would read
 // exactly like an off-by-one in the rule.
 func TestRequireArraySortCompareFiresOnUpstreamFailCases(test *testing.T) {
@@ -283,7 +283,7 @@ func TestRequireArraySortCompareFiresOnUpstreamFailCases(test *testing.T) {
 
 // TestDecodeRequireArraySortCompareOptionsKeepsTheDefaultWhenTheKeyIsAbsent pins the inversion trap.
 //
-// This rule's single option DEFAULTS TO TRUE, which makes the generic `rule.DecodeOptionsInto`
+// This rule's single option defaults to true, which makes the generic `rule.DecodeOptionsInto`
 // actively wrong here rather than merely insufficient: it yields a zero-value struct, so an absent
 // key would read as `ignoreStringArrays: false` and the rule would report every string array
 // upstream deliberately exempts.
@@ -322,7 +322,7 @@ func TestDecodeRequireArraySortCompareOptionsKeepsTheDefaultWhenTheKeyIsAbsent(t
 	}
 }
 
-// TestRequireArraySortCompareFallsBackToTheDefaultOnNilOptions pins the OTHER half of the trap.
+// TestRequireArraySortCompareFallsBackToTheDefaultOnNilOptions pins the other half of the trap.
 //
 // A rule configured as a bare "error" is handed nil options, and `options.(T)` on nil yields the
 // zero value rather than failing, which for this rule is the inverse of upstream's default. Every
@@ -369,7 +369,7 @@ func TestRequireArraySortCompareNeedsTheTypedHarness(test *testing.T) {
 //
 // Every verdict was measured against the installed 8.x build over a real program. The tuple pair is
 // the one worth reading twice: an all-string tuple is exempt through the exemption's tuple branch,
-// while a mixed tuple is silent for a DIFFERENT reason, that a tuple is not an array type and so
+// while a mixed tuple is silent for a different reason, that a tuple is not an array type and so
 // fails the report test. Two clean verdicts, two mechanisms, and a port could get one right by
 // accident while breaking the other.
 func TestRequireArraySortCompareStaysSilentOnShapesTheCorpusDoesNotWrite(test *testing.T) {
@@ -398,7 +398,7 @@ func TestRequireArraySortCompareStaysSilentOnShapesTheCorpusDoesNotWrite(test *t
 			// Computed keys that are not string literals. Upstream folds a key only when it can
 			// read a static value, and none of these is `sort`, so all four are clean there too.
 			//
-			// These exist because a mutant accepting EVERY computed key kind survived the whole
+			// These exist because a mutant accepting every computed key kind survived the whole
 			// corpus. `a[0]()` is the one that separates the two versions without crashing: a
 			// numeric literal's Text() is "0", which is simply not a member name the rule wants,
 			// so the mutant reports a call that has nothing to do with sorting.
@@ -418,7 +418,7 @@ func TestRequireArraySortCompareStaysSilentOnShapesTheCorpusDoesNotWrite(test *t
 			sourceText: "function f(a: number[]) {\n  a[Symbol.iterator]();\n}",
 		},
 		{
-			// A zero-argument call to some OTHER array method. The member name is the only thing
+			// A zero-argument call to some other array method. The member name is the only thing
 			// declining these, so they are what separates a name test from no name test at all.
 			// Added after a mutant that accepted every member name survived the whole corpus:
 			// upstream writes no such case, because it never occurred to anyone that a rule about
@@ -533,11 +533,11 @@ func TestRequireArraySortCompareFiresOnShapesTheCorpusDoesNotWrite(test *testing
 // scope-analysis and constant-folding layer this tree does not have, and building it for one rule
 // would be a substrate project rather than a port.
 //
-// So this is recorded as a FALSE NEGATIVE rather than papered over. It is the safe direction for a
+// So this is recorded as a false negative rather than papered over. It is the safe direction for a
 // rule that ships no repair, and it is pinned as a fixture so that if the folding layer ever lands,
 // this test fails and tells whoever built it that a rule wants rewiring.
 //
-// The controls matter as much as the case: the literal-key spelling of the same access DOES report
+// The controls matter as much as the case: the literal-key spelling of the same access does report
 // here, so the silence below is specifically about folding through a binding rather than about
 // computed access being unsupported.
 func TestRequireArraySortCompareDoesNotConstantFoldAComputedKey(test *testing.T) {

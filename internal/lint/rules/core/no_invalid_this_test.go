@@ -11,13 +11,13 @@ import (
 const noInvalidThisFile = "/repository/source/NoInvalidThis.ts"
 
 // The corpus is ESLint's own, taken from
-// /tmp/lint-sources-fresh/eslint/tests/lib/rules/no-invalid-this.js by RUNNING that file with
-// RuleTester intercepted, so upstream's own NORMAL / USE_STRICT / IMPLIED_STRICT / MODULES matrix
+// /tmp/lint-sources-fresh/eslint/tests/lib/rules/no-invalid-this.js by running that file with
+// RuleTester intercepted, so upstream's own `NORMAL` / `USE_STRICT` / `IMPLIED_STRICT` / `MODULES` matrix
 // expansion produced the cases rather than a parser of mine. The file makes two RuleTester.run
 // calls -- a 474-case JavaScript matrix and a 98-case TypeScript block -- and both were captured;
 // an earlier single-slot interceptor kept only the last and silently lost 83% of the corpus.
 //
-// Every expectation below is what the INSTALLED ESLint 10.8.1 core rule answered when driven over
+// Every expectation below is what the installed ESLint 10.8.1 core rule answered when driven over
 // that case through the Linter interface under `sourceType: module` with the typescript-eslint
 // parser, which is the only configuration cohere has. That is not what the corpus file annotates,
 // and the difference is the point: 62 of the 474 matrix verdicts change between sloppy-mode script
@@ -26,7 +26,7 @@ const noInvalidThisFile = "/repository/source/NoInvalidThis.ts"
 //
 // The 572 expanded cases collapse to 215 distinct (source, options) pairs once the matrix's
 // condition markers are stripped, and that collapse was checked rather than assumed: grouping by
-// stripped source gives 215 groups and ZERO of them contain members whose verdicts disagree.
+// stripped source gives 215 groups and zero of them contain members whose verdicts disagree.
 //
 //	100 reporting cases, 115 clean cases, 45 carrying the capIsConstructor option.
 func TestNoInvalidThisFires(test *testing.T) {
@@ -285,7 +285,7 @@ func TestNoInvalidThisStaysSilent(test *testing.T) {
 }
 
 // TestNoInvalidThisComputedKeysAreOutsideTheMember pins the six shapes where the installed core
-// rule and the installed @typescript-eslint extension were measured to DISAGREE, plus the seventh
+// rule and the installed @typescript-eslint extension were measured to disagree, plus the seventh
 // where this tree's namespaced port diverges from both.
 //
 // This is the reason the rule exists beside the already-enabled namespaced one. Driving both
@@ -293,7 +293,7 @@ func TestNoInvalidThisStaysSilent(test *testing.T) {
 // are one class: a `this` inside the computed key of a class field, which the extension exempts
 // because its PropertyDefinition arm pushes valid=true over the whole member including its key.
 //
-// The rows are asserted with explicit spans, because a rule that reports the right COUNT while
+// The rows are asserted with explicit spans, because a rule that reports the right count while
 // pointing at the value instead of the key would pass a count-only fixture while being wrong about
 // the thing this test exists to check.
 func TestNoInvalidThisComputedKeysAreOutsideTheMember(test *testing.T) {
@@ -315,7 +315,7 @@ func TestNoInvalidThisComputedKeysAreOutsideTheMember(test *testing.T) {
 		// The seventh, where the extension agrees with core and the namespaced port here does not.
 		{"class C {\n  [this.a]() {}\n}\n", []string{"this"}},
 
-		// A field carrying BOTH: the key's `this` reports and the value's does not. This is the
+		// A field carrying both: the key's `this` reports and the value's does not. This is the
 		// discriminating shape -- a port that exempted the whole member reports zero here, and one
 		// that exempted nothing reports two.
 		{"class C {\n  [this.a] = this.b;\n}\n", []string{"this"}},
@@ -361,7 +361,7 @@ func TestNoInvalidThisMessageText(test *testing.T) {
 	if got.Id != "unexpectedThis" {
 		test.Errorf("message id is %q, want unexpectedThis", got.Id)
 	}
-	// The WHOLE description, not a prefix or a Contains. A predicate weaker than the property it
+	// The whole description, not a prefix or a Contains. A predicate weaker than the property it
 	// guards is not a guard: a two-hash string contains a one-hash needle, which is how a rule
 	// shipped a doubled `#` behind a green fixture.
 	if got.Description != messageNoInvalidThisUnexpectedThis.Description {
@@ -377,8 +377,8 @@ func TestNoInvalidThisMessageText(test *testing.T) {
 // exported decoder rather than building the settings struct, which is what puts the default
 // inversion under test.
 //
-// The zero value of noInvalidThisSettings says capIsConstructor is FALSE and upstream's default is
-// TRUE, so a rule reaching its settings through a generic decoder on empty input would silently
+// The zero value of noInvalidThisSettings says capIsConstructor is `false` and upstream's default is
+// `true`, so a rule reaching its settings through a generic decoder on empty input would silently
 // report every capitalized constructor function in the tree. The nil case matters just as much:
 // a rule configured as a bare "error" is handed nil options.
 func TestNoInvalidThisDecoderDefaultsCapIsConstructorTrue(test *testing.T) {
@@ -437,7 +437,7 @@ func TestNoInvalidThisDecoderDefaultsCapIsConstructorTrue(test *testing.T) {
 //	parent.Initializer() != current made constant       separated by a function in a field's key
 //
 // The last two are worth naming carefully, because their shape is easy to mistake. They are arms of
-// the outward walk in thisIsDefaultBoundIn, reached by a FUNCTION whose parent is the member -- not
+// the outward walk in thisIsDefaultBoundIn, reached by a function whose parent is the member -- not
 // by the stack push that a `this` inside a method body goes through. The corpus exercises the push
 // heavily and the arm not at all, so the arm was dead against every imported case while being
 // load-bearing on real source. That is the standard's "a guard can be dead against every imported
@@ -462,7 +462,7 @@ func TestNoInvalidThisShapesTheCorpusDoesNotWrite(test *testing.T) {
 		{"Float64Array.from([], function () {\n  this.x;\n}, obj);\n", 0},
 		{"MyArray.from([], function () {\n  this.x;\n}, obj);\n", 0},
 
-		// A function sitting in a member's COMPUTED KEY has no receiver, while the same function
+		// A function sitting in a member's computed key has no receiver, while the same function
 		// as the member's value does. These are the outward walk's member arms.
 		{"class C {\n  [function () {\n    this.x;\n  }]() {}\n}\n", 1},
 		{"const obj = {\n  [function () {\n    this.x;\n  }]: 1,\n};\n", 1},

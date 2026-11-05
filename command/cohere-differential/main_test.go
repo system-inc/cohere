@@ -20,9 +20,9 @@ import (
 // guarantee to a run that has none.
 func TestAControlWhereItsRuleCannotFireIsRefused(test *testing.T) {
 	test.Parallel()
-	lintConfig := configFrom(test, map[string]any{
-		"rules":          map[string]any{"nexus/consistency-no-enum": "error"},
-		"ignorePatterns": []string{"ignored-here/**"},
+	lintConfig := configFrom(test, lintConfigFile{
+		Rules:          map[string]string{"nexus/consistency-no-enum": "error"},
+		IgnorePatterns: []string{"ignored-here/**"},
 	})
 
 	// The good case first, so a check that rejects everything cannot pass this test.
@@ -65,11 +65,11 @@ func TestAControlWhereItsRuleCannotFireIsRefused(test *testing.T) {
 // an override turned that rule off for exactly that directory.
 func TestAnOverrideThatScopesTheRuleOffIsCaught(test *testing.T) {
 	test.Parallel()
-	lintConfig := configFrom(test, map[string]any{
-		"rules": map[string]any{"nexus/consistency-no-enum": "error"},
-		"overrides": []any{map[string]any{
-			"files": []string{"generated/**/*.ts"},
-			"rules": map[string]any{"nexus/consistency-no-enum": "off"},
+	lintConfig := configFrom(test, lintConfigFile{
+		Rules: map[string]string{"nexus/consistency-no-enum": "error"},
+		Overrides: []lintConfigOverride{{
+			Files: []string{"generated/**/*.ts"},
+			Rules: map[string]string{"nexus/consistency-no-enum": "off"},
 		}},
 	})
 
@@ -97,8 +97,8 @@ func TestAnOverrideThatScopesTheRuleOffIsCaught(test *testing.T) {
 // because the opposite fix, dropping the check, is the tempting one.
 func TestABareRuleNameFindsItsPluginPrefixedConfigKey(test *testing.T) {
 	test.Parallel()
-	lintConfig := configFrom(test, map[string]any{
-		"rules": map[string]any{"nexus/consistency-no-enum": "error"},
+	lintConfig := configFrom(test, lintConfigFile{
+		Rules: map[string]string{"nexus/consistency-no-enum": "error"},
 	})
 
 	if got := pluginQualified(lintConfig, "consistency-no-enum"); got != "nexus/consistency-no-enum" {
@@ -111,12 +111,26 @@ func TestABareRuleNameFindsItsPluginPrefixedConfigKey(test *testing.T) {
 	}
 }
 
+// lintConfigFile is the part of a lint config file these tests write: each rule's severity, the paths it
+// ignores, and the overrides that scope rules by path.
+type lintConfigFile struct {
+	Rules          map[string]string    `json:"rules"`
+	IgnorePatterns []string             `json:"ignorePatterns,omitempty"`
+	Overrides      []lintConfigOverride `json:"overrides,omitempty"`
+}
+
+// lintConfigOverride is one override: the files it matches and each rule's severity there.
+type lintConfigOverride struct {
+	Files []string          `json:"files"`
+	Rules map[string]string `json:"rules"`
+}
+
 // configFrom writes a lint config to disk and loads it through the real loader.
 //
 // Built through configuration.Load rather than by hand so the test exercises the same parsing, override
 // ordering, and root resolution the command does. A hand-built Config would test this guard against
 // a shape the loader never produces.
-func configFrom(test *testing.T, raw map[string]any) *configuration.Config {
+func configFrom(test *testing.T, raw lintConfigFile) *configuration.Config {
 	test.Helper()
 
 	directory := test.TempDir()

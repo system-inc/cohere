@@ -17,7 +17,7 @@ func restrictTemplateExpressionsCaseName(index int) string {
 // restrictTemplateExpressionsSettingsFor routes an option object through the rule's own decoder.
 //
 // Building the struct directly would leave the two lines most likely to be wrong untested: five of
-// the seven flags default to TRUE, so a decoder reading an absent key as false silently turns an
+// the seven flags default to true, so a decoder reading an absent key as false silently turns an
 // unconfigured rule into upstream's strict preset, and the `allow` default is upstream's three
 // standard-library types rather than an empty list.
 //
@@ -101,8 +101,8 @@ func TestRestrictTemplateExpressionsStaysSilent(test *testing.T) {
 		{sourceText: "\ninterface Root {\n  root: string;\n}\ninterface Another {\n  another: string;\n}\ninterface Base extends Root, Another {\n  value: string;\n}\ninterface Other {\n  other: number;\n}\ninterface Derived extends Base, Other {\n  extra: boolean;\n}\ndeclare const obj: Derived;\n`${obj}`;\n      ", wire: "{\"allow\": [{\"from\": \"file\", \"name\": \"Another\"}]}"},
 		{sourceText: "\ntype Custom = { value: string };\ndeclare const obj: Custom;\n`${obj}`;\n      ", wire: "{\"allow\": [{\"from\": \"file\", \"name\": \"Custom\"}]}"},
 
-		// A GENERIC class or interface extending an allowed base. The base types live on the type
-		// reference's TARGET rather than on the reference itself, so without that hop the allowlist
+		// A generic class or interface extending an allowed base. The base types live on the type
+		// reference's target rather than on the reference itself, so without that hop the allowlist
 		// never reaches `Base` and both of these report. Measured silent on the installed build,
 		// and a mutant removing the hop reports both while passing all eighty six imported cases:
 		// upstream's transitive-base cases are all non-generic, so nothing imported can see it.
@@ -533,8 +533,8 @@ func TestRestrictTemplateExpressionsFires(test *testing.T) {
 			},
 		},
 
-		// An array under the DEFAULT options, where allowArray is one of only two flags that default to
-		// FALSE. Every one of upstream's eleven array cases supplies allowArray explicitly, so nothing in
+		// An array under the default options, where allowArray is one of only two flags that default to
+		// false. Every one of upstream's eleven array cases supplies allowArray explicitly, so nothing in
 		// the imported corpus exercises the default, and a mutant flipping it to true survived the whole
 		// suite. These two are the pair that holds it: without them the rule could ship allowing arrays
 		// and every fixture would still pass.
@@ -554,7 +554,7 @@ func TestRestrictTemplateExpressionsFires(test *testing.T) {
 			},
 		},
 		// The same under a number element type, so the finding is about the array rather than about what
-		// is in it: allowNumber defaults ON and does not rescue this.
+		// is in it: allowNumber defaults on and does not rescue this.
 		{
 			sourceText: "declare const a: number[];\n`${a}`;\n",
 			wire:       "",
@@ -571,7 +571,7 @@ func TestRestrictTemplateExpressionsFires(test *testing.T) {
 			},
 		},
 
-		// `never` under the DEFAULT options, the other flag that defaults to FALSE. Upstream's four
+		// `never` under the default options, the other flag that defaults to false. Upstream's four
 		// never cases all supply allowNever explicitly, so a mutant flipping the default to true
 		// survived every imported case.
 		{
@@ -643,7 +643,7 @@ func TestRestrictTemplateExpressionsFires(test *testing.T) {
 // as a bare severity takes, which no fixture routed through the decoder can reach.
 //
 // This is the failure mode the brief describes as the expensive one: the config layer hands a
-// non-required rule nil options, the type assertion in Run fails, and a fallback to the ZERO VALUE
+// non-required rule nil options, the type assertion in Run fails, and a fallback to the zero value
 // gives every flag its false meaning. For this rule that is not merely inert, it is upstream's
 // `strict` preset, so a bare `"error"` would silently enforce a far stricter rule than upstream's
 // default while every fixture supplying options stayed green. A mutant replacing the fallback with
@@ -700,7 +700,7 @@ func TestRestrictTemplateExpressionsRequiresTheTypedHarness(test *testing.T) {
 // with upstream's default list, which is a real decision and not a detail.
 //
 // Upstream's defaultOptions carries `allow: [{ name: ['Error', 'URL', 'URLSearchParams'], from:
-// 'lib' }]`, and ESLint merges defaults key by key, so supplying `allow` REPLACES that list rather
+// 'lib' }]`, and ESLint merges defaults key by key, so supplying `allow` replaces that list rather
 // than adding to it while supplying any other key leaves it alone. Measured on the installed build,
 // all three rows below, because the merge semantics are the sort of thing a port gets subtly wrong
 // in a way no imported case catches: every one of upstream's allow cases supplies a list, so the
@@ -716,7 +716,7 @@ func TestRestrictTemplateExpressionsAllowReplacesTheDefault(test *testing.T) {
 		restrictTemplateExpressionsSettingsFor(test, `{"allow":[{"from":"file","name":"Whatever"}]}`)),
 		"invalidType")
 
-	// An EMPTY allow list drops it too, which is the row that separates replace from merge: under
+	// An empty allow list drops it too, which is the row that separates replace from merge: under
 	// merge semantics an empty list would change nothing.
 	rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, RestrictTemplateExpressions,
 		restrictTemplateExpressionsFile, sourceText,

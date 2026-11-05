@@ -26,20 +26,20 @@ type correctnessRequireSerializableNullableParityFinding struct {
 // the eslint interface with a real program.
 //
 // The row worth reading twice is a bare `@SerializableField()` on a nullable property, which
-// REPORTS. An absent `optional` is read as false rather than skipped, so absent and explicitly-false
+// reports. An absent `optional` is read as false rather than skipped, so absent and explicitly-false
 // are the same claim. Reading the source suggests otherwise, because the guard it writes tests for
 // a null that absent never produces.
 func TestSerializableNullableParityStaysSilent(test *testing.T) {
 	test.Parallel()
 
 	cases := []string{
-		// A DIFFERENT decorator carrying the same option key, and the same decorator on a METHOD
+		// A different decorator carrying the same option key, and the same decorator on a method
 		// rather than a property. Each closes a mutant the rest of the corpus could not see: one
 		// that accepts any decorator name, and one that accepts any owner kind. Both measured
 		// clean against the real rule.
 		"\ndeclare function OrmColumn(o?: any): any;\ndeclare function TimestampColumn(o?: any): any;\ndeclare function OrmJoinColumn(o?: any): any;\ndeclare function OrmManyToOne(o?: any): any;\ndeclare function OrmOneToMany(o?: any): any;\ndeclare function SerializableField(o?: any): any;\nclass A { @OrmColumn({ optional: true }) x!: string; }",
 		"\ndeclare function OrmColumn(o?: any): any;\ndeclare function TimestampColumn(o?: any): any;\ndeclare function OrmJoinColumn(o?: any): any;\ndeclare function OrmManyToOne(o?: any): any;\ndeclare function OrmOneToMany(o?: any): any;\ndeclare function SerializableField(o?: any): any;\nclass A { @SerializableField({ optional: true }) m(): string { return \"a\"; } }",
-		// A non-boolean `optional` on a NULLABLE property. These two are what separate the skip
+		// A non-boolean `optional` on a nullable property. These two are what separate the skip
 		// branch from the rest of the rule: with skip ignored, an absent-or-false optional beside a
 		// nullable type reports, so only a nullable property can see the difference. The corpus
 		// first written here had `optional: 'items'` on a non-nullable property only, which both the

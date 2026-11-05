@@ -14,7 +14,7 @@ import (
 // tuple before dispatch, so the decoder receives that object directly rather than upstream's
 // one-element array.
 //
-// `EnforceForClassFields` is a POINTER because its default is TRUE. A plain bool decodes an absent
+// `EnforceForClassFields` is a pointer because its default is true. A plain bool decodes an absent
 // option to false, which silently narrows the rule to methods only and drops every class-field
 // finding; the generic `rule.DecodeOptionsInto` would do exactly that.
 type ClassMethodsUseThisOptions struct {
@@ -83,9 +83,9 @@ func classMethodsUseThisMissingThis(name string) rule.Message {
 //
 // The stack semantics are preserved exactly, and two of them are load-bearing:
 //
-//   - A nested function gets its OWN frame, so `foo() { function inner() { this.x; } }` does not
+//   - A nested function gets its own frame, so `foo() { function inner() { this.x; } }` does not
 //     count: the inner `this` is a different `this`.
-//   - An ARROW function does not, because an arrow has no `this` of its own. So
+//   - An arrow function does not, because an arrow has no `this` of its own. So
 //     `foo() { return () => this.x; }` does count, and the corpus pins it.
 //
 // # A static block is its own frame, and that is not the same as being exempt
@@ -96,7 +96,7 @@ func classMethodsUseThisMissingThis(name string) rule.Message {
 //
 // # `super` counts as using `this`
 //
-// Upstream's `Super: markThisUsed` is easy to read past. `foo() { super.bar(); }` is CLEAN, because
+// Upstream's `Super: markThisUsed` is easy to read past. `foo() { super.bar(); }` is clean, because
 // a `super` reference is only meaningful against an instance. Both a super call and a super property
 // access count.
 //
@@ -147,7 +147,7 @@ type classMethodsUseThisChecker struct {
 	ignoreWithImplements  string
 
 	// stack mirrors upstream's array of booleans: one frame per function-like construct that has
-	// its own `this`. An arrow function deliberately pushes NO frame; see the rule doc.
+	// its own `this`. An arrow function deliberately pushes no frame; see the rule doc.
 	stack []bool
 }
 
@@ -161,7 +161,7 @@ func (checker *classMethodsUseThisChecker) walk(node *ast.Node) {
 		checker.markThisUsed()
 	}
 
-	// A PROPERTY DECLARATION opens a frame of its own, unconditionally, and this is the arm that is
+	// A property declaration opens a frame of its own, unconditionally, and this is the arm that is
 	// easiest to leave out because it is not a function.
 	//
 	// Upstream spells it `"PropertyDefinition > *.key:exit": pushContext` and `"PropertyDefinition:exit":
@@ -170,17 +170,17 @@ func (checker *classMethodsUseThisChecker) walk(node *ast.Node) {
 	// own `this`, so a `this` written there must not satisfy whatever encloses the class.
 	//
 	// The corpus case that needs it is `class A { foo () { return class { foo = this }; } }`, where
-	// upstream reports the OUTER method. Without this frame the inner field's `this` bubbles up and
+	// upstream reports the outer method. Without this frame the inner field's `this` bubbles up and
 	// marks the outer method as satisfied, and that one finding is lost.
 	//
 	// The `> *.key:exit` half of upstream's selector is equally load-bearing, and getting it wrong
-	// costs a finding in the other direction. The frame opens AFTER the key, so a `this` written in
-	// a COMPUTED key belongs to whatever encloses the class rather than to the field. That is
+	// costs a finding in the other direction. The frame opens after the key, so a `this` written in
+	// a computed key belongs to whatever encloses the class rather than to the field. That is
 	// `class A { foo() { return class { [this.foo] = 1 }; } }`, upstream's valid[21], which is clean
 	// precisely because the key's `this` still reaches the outer method. A frame opened at the
 	// property instead of after its key swallows it and the outer method reports.
 	//
-	// Rather than model "after the key", the key is walked OUTSIDE the frame and the rest inside,
+	// Rather than model "after the key", the key is walked outside the frame and the rest inside,
 	// which is the same thing expressed as a traversal.
 	opensFrame := classMethodsUseThisOpensFrame(node) ||
 		(checker.enforceForClassFields && classMethodsUseThisIsClassFieldArrow(node))
@@ -226,11 +226,11 @@ func (checker *classMethodsUseThisChecker) markThisUsed() {
 
 // classMethodsUseThisOpensFrame answers whether a node has its own `this` binding.
 //
-// An ARROW FUNCTION is deliberately absent, and it is the single most important line here: an arrow
+// An arrow function is deliberately absent, and it is the single most important line here: an arrow
 // closes over the enclosing `this`, so `foo() { return () => this.x; }` must count as using `this`.
 // Adding arrows to this list would give that arrow its own frame and lose the finding.
 //
-// A static block IS present, for the opposite reason: it has its own `this`, so a `this` inside one
+// A static block is present, for the opposite reason: it has its own `this`, so a `this` inside one
 // must not satisfy the member around it. It is never itself judged, because
 // `isIncludedInstanceMember` declines its kind.
 func classMethodsUseThisOpensFrame(node *ast.Node) bool {
@@ -262,14 +262,14 @@ func classMethodsUseThisMarksThisUsed(node *ast.Node) bool {
 // isIncludedInstanceMember answers upstream's `isIncludedInstanceMethod`.
 //
 // The order of the filters is upstream's and matters: `override` and `implements` are consulted
-// before the name, and a COMPUTED member returns true before `exceptMethods` is consulted at all,
+// before the name, and a computed member returns true before `exceptMethods` is consulted at all,
 // because a computed key has no name to compare.
 func (checker *classMethodsUseThisChecker) isIncludedInstanceMember(node *ast.Node) bool {
 	member := classMethodsUseThisMemberOf(node)
 	if member == nil {
 		return false
 	}
-	// A member with no BODY cannot use `this`, and judging it is a false positive rather than a
+	// A member with no body cannot use `this`, and judging it is a false positive rather than a
 	// finding. Two TypeScript shapes reach here and upstream's JavaScript corpus contains neither:
 	//
 	//	abstract parse(value: unknown): TOutput;    an abstract method
@@ -279,7 +279,7 @@ func (checker *classMethodsUseThisChecker) isIncludedInstanceMember(node *ast.No
 	// Both are declarations rather than definitions, so `this` is not merely unused but
 	// unmentionable. Measured against ESLint on `BaseSchema.ts`: it reports 2 and an earlier draft
 	// here reported 8, with the six extra all bodiless. The overload case is the sharper one,
-	// because the same NAME then reports twice and reads as a duplicate rather than as a wrong
+	// because the same name then reports twice and reads as a duplicate rather than as a wrong
 	// verdict.
 	if classMethodsUseThisHasNoBody(member) {
 		return false
@@ -335,14 +335,14 @@ func (checker *classMethodsUseThisChecker) isInstanceMember(member *ast.Node) bo
 
 // classMethodsUseThisMemberOf finds the class member a function-like node belongs to.
 //
-// A method, accessor or constructor IS the member. A function or arrow assigned to a class field is
+// A method, accessor or constructor is the member. A function or arrow assigned to a class field is
 // the field's initializer, so the member is its parent -- and only when it is the initializer
 // rather than, say, a default value nested somewhere inside it.
 func classMethodsUseThisMemberOf(node *ast.Node) *ast.Node {
 	switch node.Kind {
 	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
 		// `KindMethodDeclaration` covers an object literal's shorthand method as well as a class
-		// method, and this rule is about CLASSES: `({ a(){} })` is upstream's valid[7] and must
+		// method, and this rule is about classes: `({ a(){} })` is upstream's valid[7] and must
 		// stay clean. The parent kind is what separates them.
 		if node.Parent == nil || !ast.IsClassLike(node.Parent) {
 			return nil
@@ -365,9 +365,9 @@ func classMethodsUseThisMemberOf(node *ast.Node) *ast.Node {
 
 // classMethodsUseThisReportAnchor picks the node the finding points at.
 //
-// Upstream reports on the FUNCTION and then narrows the location to the function's head with
+// Upstream reports on the function and then narrows the location to the function's head with
 // `getFunctionHeadLoc`, so the span covers the signature rather than the whole body. For a method
-// the closest equivalent here is the member's NAME, which is what a reader is shown.
+// the closest equivalent here is the member's name, which is what a reader is shown.
 func classMethodsUseThisReportAnchor(node *ast.Node) *ast.Node {
 	if member := classMethodsUseThisMemberOf(node); member != nil {
 		if name := member.Name(); name != nil {
@@ -381,10 +381,10 @@ func classMethodsUseThisReportAnchor(node *ast.Node) *ast.Node {
 // classMethodsUseThisMemberName reads a member's name, and says whether it could be read.
 //
 // The kind guard before the text read is load-bearing rather than defensive: `Node.Text()` panics
-// on several kinds rather than returning empty, and the walk recovers per FILE rather than per rule,
+// on several kinds rather than returning empty, and the walk recovers per file rather than per rule,
 // so one such member would cost every rule in this package its verdict on that file.
 //
-// A private name is returned WITH its hash, matching upstream's `hashIfNeeded + name`, because that
+// A private name is returned with its hash, matching upstream's `hashIfNeeded + name`, because that
 // is the spelling `exceptMethods` entries use.
 func classMethodsUseThisMemberName(member *ast.Node) (string, bool) {
 	name := member.Name()
@@ -396,12 +396,12 @@ func classMethodsUseThisMemberName(member *ast.Node) (string, bool) {
 		return name.Text(), true
 	case ast.KindPrivateIdentifier:
 		// Upstream builds `hashIfNeeded + name` because ESTree's `key.name` for a private member
-		// omits the hash. Ours does NOT: `Text()` on a private identifier returns `#foo`, measured
+		// omits the hash. Ours does not: `Text()` on a private identifier returns `#foo`, measured
 		// directly by printing it from a probe rule rather than inferred.
 		//
 		// The measurement is recorded because reasoning from mutation results got it backwards once.
-		// Removing the `HasPrefix` guard SURVIVES, which reads as dead code and invites deleting the
-		// hash handling entirely; adding the hash unconditionally is CAUGHT. Both are consistent with
+		// Removing the `HasPrefix` guard survives, which reads as dead code and invites deleting the
+		// hash handling entirely; adding the hash unconditionally is caught. Both are consistent with
 		// "Text() already carries it", and neither distinguishes that from the opposite claim -- only
 		// asking the parser does. The guard is therefore correct and its condition is genuinely
 		// always true here, which is why it is kept as a cheap assertion of a fact upstream's own
@@ -552,7 +552,7 @@ func classMethodsUseThisIsGenerator(node *ast.Node) bool {
 
 // DefaultClassMethodsUseThisOptions is the unconfigured answer.
 //
-// `enforceForClassFields` defaults to TRUE, which is why the field is a pointer: an absent option
+// `enforceForClassFields` defaults to true, which is why the field is a pointer: an absent option
 // must not decode to the zero value.
 func DefaultClassMethodsUseThisOptions() ClassMethodsUseThisOptions {
 	enforceForClassFields := true
@@ -583,8 +583,8 @@ func DecodeClassMethodsUseThisOptions(raw []byte) (any, error) {
 // classMethodsUseThisIsClassFieldArrow answers upstream's
 // `"PropertyDefinition > ArrowFunctionExpression.value"` listener.
 //
-// An arrow normally opens NO frame, because it closes over the enclosing `this` -- that is what
-// makes `foo() { return () => this.x; }` clean. But an arrow that IS a class field's value is the
+// An arrow normally opens no frame, because it closes over the enclosing `this` -- that is what
+// makes `foo() { return () => this.x; }` clean. But an arrow that is a class field's value is the
 // member's whole body, so upstream registers enter/exit for exactly that position, gated on
 // `enforceForClassFields`. Without this, `class A { foo = () => {} }` is never judged and two of
 // upstream's reporting cases go silent.
@@ -604,12 +604,12 @@ func classMethodsUseThisIsClassFieldArrow(node *ast.Node) bool {
 // walkPropertyDeclaration walks a class field the way upstream's two selectors do.
 //
 // Upstream opens the field's frame at `"PropertyDefinition > *.key:exit"` and closes it at
-// `"PropertyDefinition:exit"`, so the key is visited OUTSIDE the frame and everything after it
+// `"PropertyDefinition:exit"`, so the key is visited outside the frame and everything after it
 // inside. Reproduced here as a traversal rather than as a position test: the key is walked first
 // with the enclosing frame still current, then the frame opens for the remainder.
 //
 // Both halves are pinned by the corpus, in opposite directions. `foo = this` inside a nested class
-// must NOT satisfy the enclosing method (invalid[19]), and `[this.foo] = 1` inside one MUST
+// must not satisfy the enclosing method (invalid[19]), and `[this.foo] = 1` inside one must
 // (valid[21]).
 func (checker *classMethodsUseThisChecker) walkPropertyDeclaration(node *ast.Node) {
 	declaration := node.AsPropertyDeclaration()
@@ -636,7 +636,7 @@ func (checker *classMethodsUseThisChecker) walkPropertyDeclaration(node *ast.Nod
 	usedThis := checker.stack[len(checker.stack)-1]
 	checker.stack = checker.stack[:len(checker.stack)-1]
 
-	// The field's own frame is opened for CONTAINMENT rather than for judgment: it keeps a `this`
+	// The field's own frame is opened for containment rather than for judgment: it keeps a `this`
 	// written in the initializer from satisfying whatever encloses the class. A field whose value is
 	// a function is judged by that function's own frame, inside the walk above, so there is nothing
 	// to report here and `usedThis` is deliberately discarded.

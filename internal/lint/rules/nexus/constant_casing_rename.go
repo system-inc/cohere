@@ -18,7 +18,7 @@ var unbindableGlobals = map[string]bool{
 }
 
 // fileLocalRenameFix renames a constant nothing outside its file can name, at its declaration and
-// at every reference, as ONE edit.
+// at every reference, as one edit.
 //
 // One edit rather than one per site, because the engine applies a diagnostic's fixes as independent
 // proposals and resolves overlap per proposal. A rename split into pieces can land half-applied when

@@ -34,7 +34,7 @@ func noUselessDefaultAssignmentOptionsFor(test *testing.T, optionsJson string) a
 
 // TestNoUselessDefaultAssignmentStaysSilent is upstream's sixty two passing cases verbatim.
 //
-// Each was re-measured one file per program against the installed 8.67.0 build under THIS
+// Each was re-measured one file per program against the installed 8.67.0 build under this
 // harness's compiler options. Three of them are written by upstream against a
 // `noUncheckedIndexedAccess` project our harness cannot express; measured, all three stay clean
 // under our options too, so the option is not what decides them and importing them costs nothing.
@@ -118,12 +118,12 @@ func TestNoUselessDefaultAssignmentStaysSilent(test *testing.T) {
 // TestNoUselessDefaultAssignmentFires is upstream's twenty three reporting cases verbatim.
 //
 // Every row asserts the span, the id, the whole rendered message, and the rewritten file. The
-// rewrite carries the most weight: the repair deletes a range computed from the BOUND NAME's end
+// rewrite carries the most weight: the repair deletes a range computed from the bound name's end
 // rather than the default's start, so a fixer built the obvious way leaves `function foo(a = )`,
 // which still satisfies every message id while producing source that does not parse. One case's
 // repair also inserts a `?`, and one keeps a comment sitting between the name and the annotation.
 //
-// Three of these are written by upstream against a project WITHOUT strictNullChecks, where
+// Three of these are written by upstream against a project without strictNullChecks, where
 // upstream emits an extra file-level `noStrictNullCheck` finding alongside the real one. Measured
 // under our options, the real finding is identical and the file-level one is absent, which is
 // what these rows assert. See the rule's doc comment for why the gate is a decline here.

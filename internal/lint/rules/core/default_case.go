@@ -63,13 +63,13 @@ var messageDefaultCaseMissingDefaultCase = rule.Message{
 // `switch (a) {}` is clean, and upstream says why in a comment at the line: there is "no easy way to
 // extract comments inside it now". That is a limitation of what ESLint's source code object can
 // answer, not a judgment that an empty switch is fine. We could answer it here -- the comment
-// scanner has no such restriction -- but reproducing the DECISION means reproducing the silence,
+// scanner has no such restriction -- but reproducing the decision means reproducing the silence,
 // because a port that reports on empty switches disagrees with the corpus and with every project
 // currently relying on the rule. Recorded rather than silently improved.
 //
 // # Where the excusing comment has to be, and why the answer is not "inside the switch"
 //
-// Upstream reads `sourceCode.getCommentsAfter(lastCase)` and takes the LAST of them. So the comment
+// Upstream reads `sourceCode.getCommentsAfter(lastCase)` and takes the last of them. So the comment
 // must follow the final case clause, and when several comments follow it only the last one is
 // consulted:
 //
@@ -93,11 +93,11 @@ var DefaultCase = rule.Rule{
 		pattern := defaultCaseDefaultCommentPattern
 		if resolved, isDefaultCaseOptions := rule.OptionsAs[DefaultCaseOptions](options); isDefaultCaseOptions &&
 			resolved.CommentPattern != "" {
-			// Upstream builds `new RegExp(options.commentPattern, "u")`, which THROWS on a bad
+			// Upstream builds `new RegExp(options.commentPattern, "u")`, which throws on a bad
 			// pattern and takes the lint run down naming the rule. The pattern is read as JavaScript
 			// reads it (#7mztrdd), so a lookaround or a backreference compiles and takes effect; one
 			// JavaScript itself would refuse is kept as the default here instead: the rule keeps
-			// enforcing rather than crashing, and a crash costs every OTHER rule its verdict on that
+			// enforcing rather than crashing, and a crash costs every other rule its verdict on that
 			// file because the walk recovers per file. Same drop `core/no-param-reassign` takes for
 			// the same reason.
 			if compiled, compileError := esregexp.Compile(resolved.CommentPattern, "u"); compileError == nil {
@@ -141,12 +141,12 @@ var DefaultCase = rule.Rule{
 
 // defaultCaseHasExcusingComment answers upstream's `getCommentsAfter(lastCase)` plus the pattern test.
 //
-// Upstream takes the LAST comment after the final case clause, not any of them, so a matching
+// Upstream takes the last comment after the final case clause, not any of them, so a matching
 // comment followed by a non-matching one does not excuse the switch. Both orderings are in the
 // corpus.
 //
 // The search window is bounded by the case block's closing brace rather than running to the end of
-// the file, which is what keeps a `// no default` comment written AFTER the switch from excusing it.
+// the file, which is what keeps a `// no default` comment written after the switch from excusing it.
 // No corpus case writes that shape, so the bound is a decision this port makes rather than one it
 // inherits, and it is the conservative direction: reporting where upstream might not is visible,
 // while silently excusing is not.
@@ -162,7 +162,7 @@ func defaultCaseHasExcusingComment(
 		return false
 	}
 
-	// Read the shared list ONCE. `ForFile` is cached per file, so calling it inside the loop is
+	// Read the shared list once. `ForFile` is cached per file, so calling it inside the loop is
 	// not a rescan, but it is a map lookup and a closure call per comment for no reason.
 	fileComments := comments.ForFile(ruleContext)
 
@@ -185,7 +185,7 @@ func defaultCaseHasExcusingComment(
 // defaultCaseCommentBody strips a comment's delimiters and trims it, matching upstream's
 // `comment.value.trim()`.
 //
-// ESLint's `comment.value` is the text BETWEEN the delimiters; the shelf's `Text` includes them,
+// ESLint's `comment.value` is the text between the delimiters; the shelf's `Text` includes them,
 // because what counts as content differs by rule. So the delimiters come off here rather than in the
 // shelf. A block comment's closing delimiter is removed only when present, since an unterminated
 // block comment at end of file has none.

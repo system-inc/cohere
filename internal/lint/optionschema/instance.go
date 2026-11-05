@@ -151,6 +151,8 @@ func validate(schema *node, value any, path string) *Violation {
 
 	switch typed := value.(type) {
 	case json.Number:
+		// Ignored: the decoder only yields a valid number literal, and one past float64's range comes back
+		// as an infinity of its sign with the range error, which still compares truthfully to both bounds.
 		number, _ := typed.Float64()
 		if schema.minimum != nil && number < *schema.minimum {
 			return &Violation{Path: pathOrRoot(path), Expected: fmt.Sprintf("a number of at least %s, got %s", formatNumber(*schema.minimum), typed)}

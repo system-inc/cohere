@@ -15,7 +15,7 @@ const invalidThisFile = "/repository/source/InvalidThis.ts"
 // through a shell or an editor on the way in. It carries 47 valid cases and
 // 44 invalid ones.
 //
-// Every case below was first driven through the INSTALLED @typescript-eslint 8.67.0 rule with the
+// Every case below was first driven through the installed @typescript-eslint 8.67.0 rule with the
 // ESLint Linter interface, and the expectations here are that run's output rather than the test
 // file's annotations. The two agree on all 91. See the rule's doc
 // comment for why they were run under sourceType module, and for the two cases whose declared
@@ -311,7 +311,7 @@ func TestNoInvalidThisSeesThroughParentheses(test *testing.T) {
 	}
 }
 
-// The option defaults to TRUE, so a decoder filling a zero-value struct inverts it. Routed through
+// The option defaults to true, so a decoder filling a zero-value struct inverts it. Routed through
 // the exported decoder rather than by building the struct, because the inversion is exactly what a
 // struct-built fixture cannot see.
 func TestDecodeNoInvalidThisOptions(test *testing.T) {
@@ -483,7 +483,7 @@ func TestNoInvalidThisNullishReceiversDoNotBind(test *testing.T) {
 
 // The constructor-name test is upstream's `name[0] !== name[0].toLocaleLowerCase()`, which asks
 // "does this character have a different lowercase form" rather than "is this character uppercase".
-// The two answers diverge on TITLECASE letters, and the shelf's react.IsLikelyComponentName uses the
+// The two answers diverge on titlecase letters, and the shelf's react.IsLikelyComponentName uses the
 // IsUpper form, which is why it is the wrong helper here and this rule spells the test out.
 //
 // U+01C5 is the distinguishing character: unicode.ToLower moves it, so upstream reads it as a
@@ -531,7 +531,7 @@ func TestNoInvalidThisBindingShapesBeyondTheCorpus(test *testing.T) {
 			source:   "obj[0] = function () {\n  this.x;\n};",
 			findings: 0,
 		},
-		// A property merely NAMED bind is not a call to Function.prototype.bind. It is silent for a
+		// A property merely named bind is not a call to Function.prototype.bind. It is silent for a
 		// different reason than it looks: the parent is a PropertyAssignment rather than a property
 		// access, so the bind arm is never reached at all and the property-value arm answers.
 		{
@@ -539,7 +539,7 @@ func TestNoInvalidThisBindingShapesBeyondTheCorpus(test *testing.T) {
 			source:   "var q = {\n  bind: function () {\n    this.x;\n  },\n};",
 			findings: 0,
 		},
-		// A property binds only its VALUE, and a computed key is not one. Both spellings below
+		// A property binds only its value, and a computed key is not one. Both spellings below
 		// report by reaching the walk's default arm rather than through the property arm, because
 		// typescript-go wraps a computed key in its own node. See the rule's PropertyAssignment
 		// case for the measurement.

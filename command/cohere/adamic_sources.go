@@ -1,8 +1,8 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
-	"io"
 	"path/filepath"
 	"sort"
 
@@ -51,7 +51,7 @@ func adamicIncluded(configFileName string) (map[string]struct{}, error) {
 // silence. `.a` is the static library's extension, and C and C++ ignore templates list `*.a`, which is how
 // Adamic source lands there. Only `.a`: a `.ts` file git ignores is usually generated, and naming those would
 // be noise.
-func reportIgnoredAdamic(out io.Writer, root string, held map[string]struct{}) int {
+func reportIgnoredAdamic(out *bufio.Writer, root string, held map[string]struct{}) int {
 	names := make([]string, 0, len(held))
 	for fileName := range held {
 		names = append(names, fileName)

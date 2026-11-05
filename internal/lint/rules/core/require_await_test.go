@@ -31,7 +31,7 @@ func runRequireAwait(test *testing.T, testCase requireAwaitCase) rule_testing.Re
 // The corpus is ESLint's own, extracted mechanically rather than retyped.
 //
 // `tests/lib/rules/require-await.js` was loaded with its RuleTester stubbed so every case came out
-// as data, then replayed against the INSTALLED rule to record what it reports, how each finding
+// as data, then replayed against the installed rule to record what it reports, how each finding
 // names its function, and what each suggestion writes. All 41 reproduced.
 //
 // Every finding this rule produces carries a suggestion and none carries a fix, so there is no
@@ -115,7 +115,7 @@ func TestRequireAwaitStaysSilent(test *testing.T) {
 	}
 }
 
-// How each finding NAMES its function, which the message-id assertions cannot see.
+// How each finding names its function, which the message-id assertions cannot see.
 //
 // Upstream renders nine distinct descriptions from `getFunctionNameWithKind`, and the differences
 // between them are real judgments rather than formatting: a method is named by its property rather
@@ -145,7 +145,7 @@ func TestRequireAwaitNamesTheFunction(test *testing.T) {
 	}
 }
 
-// What each suggestion WRITES, which is the repair half of this rule.
+// What each suggestion writes, which is the repair half of this rule.
 //
 // Every finding carries exactly one suggestion and none carries a fix, so a rule that offered its
 // repair as a fix would rewrite source the engine should only have offered to rewrite. Both halves
@@ -204,8 +204,8 @@ func TestRequireAwaitSuggestsRemovingAsync(test *testing.T) {
 // The two halves of the semicolon condition, separated.
 //
 // Written for a surviving mutant: removing the continuation test left all 41 imported rows green,
-// because in every corpus case the two halves agree. They only disagree when the previous member IS
-// a continuable expression and the token after `async` is NOT one that could continue it, which the
+// because in every corpus case the two halves agree. They only disagree when the previous member is
+// a continuable expression and the token after `async` is not one that could continue it, which the
 // corpus never writes.
 //
 // `a = 0` followed by `async m()` is that shape. A plain identifier cannot extend `0` into a larger
@@ -249,11 +249,11 @@ func TestRequireAwaitSemicolonNeedsBothHalves(test *testing.T) {
 	}
 }
 
-// A function carrying modifiers BEFORE `async`, which the corpus never writes.
+// A function carrying modifiers before `async`, which the corpus never writes.
 //
 // Written for a surviving mutant: the loop that finds the `async` keyword skips any modifier that is
 // not `async`, and deleting that skip left all 48 imported rows green. Every corpus case has `async`
-// as its only modifier, so the first modifier IS the right one and a loop that takes the first
+// as its only modifier, so the first modifier is the right one and a loop that takes the first
 // blindly agrees by accident.
 //
 // Real code does not look like that. `static async`, `public async` and `export async` are ordinary,
@@ -293,15 +293,15 @@ func TestRequireAwaitFindsAsyncPastOtherModifiers(test *testing.T) {
 	}
 }
 
-// WHERE each finding is reported, which no message-id assertion can see.
+// Where each finding is reported, which no message-id assertion can see.
 //
 // This is the arm the imported corpus was blind to. `rule_testing` compares message ids, so all 48
 // rows passed while five of these eleven shapes reported on the wrong column: the span started at
 // the `async` keyword where upstream starts at the property that owns the function. The differential
-// against the installed rule over the ahra tree agreed on every LINE and disagreed on 490 of 767
-// COLUMNS, which is what a line-only comparison reports as perfect agreement.
+// against the installed rule over the ahra tree agreed on every line and disagreed on 490 of 767
+// columns, which is what a line-only comparison reports as perfect agreement.
 //
-// The branch order is the substance. Upstream tests the parent BEFORE the arrow case, so a property
+// The branch order is the substance. Upstream tests the parent before the arrow case, so a property
 // holding an arrow reports on the property rather than on the arrow token. Both orderings produce a
 // plausible span and only one matches. Every expectation below was measured against the installed
 // rule.
@@ -317,7 +317,7 @@ func TestRequireAwaitReportsOnTheFunctionHead(test *testing.T) {
 		{"class A { foo = async function(a) { return 1; } }", "foo = async function"},
 		{"class A { static foo = async function(a) { return 1; } }", "static foo = async function"},
 		// The same branch with an arrow, where the ordering is load-bearing: an arrow reached
-		// through a property reports on the property, NOT on the arrow token.
+		// through a property reports on the property, not on the arrow token.
 		{"const o = { run: async (a) => { return 1; } };", "run: async "},
 		{"class A { foo = async (a) => { return 1; } }", "foo = async "},
 		// The arrow branch, reached only when no parent claimed the head.
@@ -329,7 +329,7 @@ func TestRequireAwaitReportsOnTheFunctionHead(test *testing.T) {
 		{"async function foo(a) { return 1; }", "async function foo"},
 		{"const f = async function(a) { return 1; };", "async function"},
 		{"const f = async function named(a) { return 1; };", "async function named"},
-		// The parent branch requires the function to BE the value, not merely to sit somewhere
+		// The parent branch requires the function to be the value, not merely to sit somewhere
 		// inside it. A function nested in an array or a call within the initializer reports on
 		// itself, and an arrow in that position falls through to the arrow branch. Without the
 		// value test these four would take the property's start and every span would be wrong by
@@ -339,7 +339,7 @@ func TestRequireAwaitReportsOnTheFunctionHead(test *testing.T) {
 		{"const o = { run: [async function(a) { return 1; }] };", "async function"},
 		{"const o = { run: bar(async (a) => { return 1; }) };", "=>"},
 		// An `export` is a wrapper around the declaration rather than part of it, so the span
-		// starts at `async`; a class member modifier IS part of the head and is kept. Both
+		// starts at `async`; a class member modifier is part of the head and is kept. Both
 		// directions are pinned because skipping every modifier looks just as correct from the
 		// inside and breaks the other half.
 		{"export async function foo(a) { return 1; }", "async function foo"},
@@ -369,7 +369,7 @@ func TestRequireAwaitReportsOnTheFunctionHead(test *testing.T) {
 // A function written into a position whose declared type demands a promise has to be async, and
 // reporting it would be telling the author to make their code not compile. The exemption is only
 // sound if it is narrow, so both directions are asserted here: the contract case stays silent, and
-// the same body in a position that does NOT demand a promise still reports.
+// the same body in a position that does not demand a promise still reports.
 func TestRequireAwaitExemptsAPromiseContract(test *testing.T) {
 	test.Parallel()
 
@@ -428,7 +428,7 @@ void handler;
 
 // TestRequireAwaitDoesNotLetAGenericInferItsOwnContract guards the exemption against self-inference.
 //
-// A generic position's type parameter is inferred FROM the function being judged, so asking for the
+// A generic position's type parameter is inferred from the function being judged, so asking for the
 // contextual type after inference reads the function's own `Promise` back as the position's demand,
 // and every async callback handed to `map`, `useMemo`, `useCallback` or an identity helper exempted
 // itself. Measured on ahra before the fix: `useMetricsExportMenu.tsx:74` and `:92`, an
@@ -524,7 +524,7 @@ void runTask(async function () {
 `)
 	rule_testing.ExpectClean(test, result)
 
-	// A method of a generic INTERFACE is an instantiated signature with no type parameters of its
+	// A method of a generic interface is an instantiated signature with no type parameters of its
 	// own: `T` was fixed by the declared receiver, not inferred from this argument. Reading its
 	// uninstantiated parameter type would lose the demand and report code that cannot drop the
 	// keyword.

@@ -173,7 +173,7 @@ func TestNoUnsafeUnaryMinusTheErrorTypeIsAny(test *testing.T) {
 		}
 	}
 
-	// The control: a type the lib DOES carry, negated, still reports. Without this the assertions
+	// The control: a type the lib does carry, negated, still reports. Without this the assertions
 	// above would pass just as well if the rule had stopped running altogether.
 	control := rule_testing.RunTyped(test, NoUnsafeUnaryMinus, noUnsafeUnaryMinusFile, "declare const x: string;\n-x;")
 	if len(control.Diagnostics) != 1 {
@@ -247,7 +247,7 @@ func TestNoUnsafeUnaryMinusSpansAndText(test *testing.T) {
 	test.Run("the message names the offending union part rather than the whole type", func(test *testing.T) {
 		test.Parallel()
 		// This is the measured divergence from `@typescript-eslint`, which renders
-		// "is string | number instead" for the same input because it passes the WHOLE argument type
+		// "is string | number instead" for the same input because it passes the whole argument type
 		// to typeToString while tsgolint passes the loop's current part. tsgolint wins because
 		// oxlint runs tsgolint, so this assertion is what records which reference was ported.
 		source := "declare const a: number | string;\nconst negated = -a;"
@@ -301,10 +301,10 @@ func TestNoUnsafeUnaryMinusSpansAndText(test *testing.T) {
 //
 // This rule is the silent kind rather than the panicking kind under a nil checker, which is the
 // more dangerous of the two: moved to `rule_testing.Run`, every Fires case would fail and every silent
-// case would pass VACUOUSLY. The nil guard the standing advice asks for now lives at the top of the
+// case would pass vacuously. The nil guard the standing advice asks for now lives at the top of the
 // listener, because absorbing the rule off the adapter made that listener ours to edit. It is
 // unreachable through registration, since `NeedsTypeChecker` is declared; it covers the harness
-// path, where a Context is built by hand. This test pins the declaration AND the guard.
+// path, where a Context is built by hand. This test pins the declaration and the guard.
 func TestNoUnsafeUnaryMinusRequiresTheTypedHarness(test *testing.T) {
 	test.Parallel()
 

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"os"
 	"path/filepath"
@@ -23,7 +24,8 @@ func TestTheSwiftEngineLineNamesACommitOnlyWhenOneIsVouchedFor(test *testing.T) 
 
 	render := func(sourceCommit string) string {
 		var out bytes.Buffer
-		run := newEngineRun(&out, engineModeVersion, swiftLanguage, "", time.Now())
+		stream := bufio.NewWriter(&out)
+		run := newEngineRun(stream, engineModeVersion, swiftLanguage, "", time.Now())
 		run.engineSourceCommit = sourceCommit
 		if acceptError := run.accept([]byte(provenance)); acceptError != nil {
 			test.Fatal(acceptError)
@@ -31,6 +33,7 @@ func TestTheSwiftEngineLineNamesACommitOnlyWhenOneIsVouchedFor(test *testing.T) 
 		if _, finishError := run.finish(0, "exited 0"); finishError != nil {
 			test.Fatal(finishError)
 		}
+		flushStream(test, stream)
 		return out.String()
 	}
 

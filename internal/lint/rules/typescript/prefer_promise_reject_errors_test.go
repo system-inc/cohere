@@ -248,14 +248,14 @@ func TestPreferPromiseRejectErrorsWithOptions(test *testing.T) {
 // than the `from: package` specifier they exist to cover.
 const preferPromiseRejectErrorsErrorsModule = "// @ts-ignore\ndeclare module 'errors' {\n  class ErrorLike {}\n\n  export function createError(): ErrorLike;\n}\n"
 
-// The two `from: package` rows below are recorded as REPORTING, and upstream has them clean.
+// The two `from: package` rows below are recorded as reporting, and upstream has them clean.
 // That is a fact about this harness rather than about the rule, and weakening the rule to
 // make them green would turn a harness limitation into a rule limitation.
 //
 // ruletest pins `moduleDetection: "force"` (internal/rule_testing/program.go:27), which makes an
 // ambient `declare module 'errors'` unresolvable. Measured with two controls: the same input
 // with no options reports (so the rule sees the call), and the same input with
-// `allowThrowingAny: true` goes CLEAN, which is only possible if the imported type resolved to
+// `allowThrowingAny: true` goes clean, which is only possible if the imported type resolved to
 // `any`. An `any` carries no symbol, so no specifier can match it and the allowlist cannot
 // fire. The rows are pinned here so that a future harness change makes this test fail loudly
 // rather than leaving the divergence unrecorded.
@@ -297,11 +297,11 @@ func TestPreferPromiseRejectErrorsAcrossFiles(test *testing.T) {
 	}
 }
 
-// TestPreferPromiseRejectErrorsSpans pins WHERE the finding points, which ExpectFindings
+// TestPreferPromiseRejectErrorsSpans pins where the finding points, which ExpectFindings
 // cannot see. The finding covers the whole call expression rather than the argument, which is
 // what makes the no-argument case reportable at all.
 //
-// The expected text is read from the RAW case at upstream's own line and column, then compared
+// The expected text is read from the raw case at upstream's own line and column, then compared
 // against the source the harness actually wrote, which is the trimmed text. Deriving it from
 // the trimmed source instead lands one line early and reads exactly like an off-by-one in the
 // rule.
@@ -448,7 +448,7 @@ func TestPreferPromiseRejectErrorsExecutorShape(test *testing.T) {
 	}
 }
 
-// TestPreferPromiseRejectErrorsStaticReceiver pins that the RECEIVER's type decides, not the
+// TestPreferPromiseRejectErrorsStaticReceiver pins that the receiver's type decides, not the
 // property name. The object-literal row is the one that would report if the name alone were
 // enough, and it is clean upstream.
 func TestPreferPromiseRejectErrorsStaticReceiver(test *testing.T) {
@@ -478,12 +478,12 @@ func TestPreferPromiseRejectErrorsStaticReceiver(test *testing.T) {
 	}
 }
 
-// TestPreferPromiseRejectErrorsDefaultsAreOff is the fixture that BYPASSES the decoder, which is the
+// TestPreferPromiseRejectErrorsDefaultsAreOff is the fixture that bypasses the decoder, which is the
 // only way to see the nil-options path a rule configured as bare "error" actually takes.
 //
 // Every default here is false, so the zero value is already correct and the rule needs no defaulting
 // code. That is the opposite of only-throw-error, whose three same-looking booleans all default to
-// TRUE and which therefore has to carry pointers. Copying that neighbour's shape would make an
+// true and which therefore has to carry pointers. Copying that neighbour's shape would make an
 // unconfigured rule silently permissive here, and no fixture reaching the rule through the decoder
 // could see it.
 func TestPreferPromiseRejectErrorsDefaultsAreOff(test *testing.T) {
@@ -518,7 +518,7 @@ func TestPreferPromiseRejectErrorsSpreadArgumentReports(test *testing.T) {
 	rule_testing.ExpectFindings(test, result, "rejectAnError")
 }
 
-// TestPreferPromiseRejectErrorsDuplicateParameterNamesIsADivergence pins a case upstream REPORTS and
+// TestPreferPromiseRejectErrorsDuplicateParameterNamesIsADivergence pins a case upstream reports and
 // this port does not, so the difference is recorded rather than silent.
 //
 // ESLint's scope manager merges same-named parameters into one variable; our checker gives each its

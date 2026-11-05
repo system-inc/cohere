@@ -14,7 +14,7 @@ import (
 // Upstream's schema is a two element list: an enum, then an object. The rule registers with
 // `DecodeOptionList`, so both arrive as written; see the decoder.
 type YodaSettings struct {
-	// Always requires the literal on the LEFT. Upstream's `"always"`; the default is `"never"`.
+	// Always requires the literal on the left. Upstream's `"always"`; the default is `"never"`.
 	Always bool
 	// ExceptRange exempts a comparison that forms a range test, `0 <= x && x < 1`.
 	ExceptRange bool
@@ -107,7 +107,7 @@ var messageYodaExpected = rule.Message{
 //
 // # What counts as a literal is wider than the literal node
 //
-// Upstream's `looksLikeLiteral` accepts two shapes beyond a plain literal: a NEGATED numeric
+// Upstream's `looksLikeLiteral` accepts two shapes beyond a plain literal: a negated numeric
 // literal, so `-1` is one atom rather than a unary expression, and a template with no
 // substitutions. Both matter in the corpus: `if (-1 < str.indexOf(substr))` reports, and
 // a template with no substitution reports while one carrying a substitution does not, because a
@@ -122,26 +122,26 @@ var messageYodaExpected = rule.Message{
 // tests the operator against a fixed set rather than accepting every binary expression, and its two
 // bitwise cases are what state it.
 //
-// # exceptRange is a structural test on the PARENT, and it is the bulk of this rule
+// # exceptRange is a structural test on the parent, and it is the bulk of this rule
 //
 // A range test is `0 <= x && x < 1` or `x < 0 || 1 <= x`: a logical expression whose two sides are
 // comparisons using `<` or `<=`, whose shared operand is the same reference on both sides, and
-// which is WRAPPED IN PARENTHESES. Every one of those four conditions is load bearing and the
+// which is wrapped in parentheses. Every one of those four conditions is load bearing and the
 // corpus states each.
 //
 // The parenthesis requirement is the one that reads as a bug and is not. Upstream asks
 // `isParenthesised`, so `if (0 <= x && x < 1)` qualifies because the `if` supplies the parens, and
-// a bare `0 < a && a < 1` as an expression statement does NOT, which is upstream's own failing case
+// a bare `0 < a && a < 1` as an expression statement does not, which is upstream's own failing case
 // `i22`. Our parser keeps a `KindParenthesizedExpression` where upstream folds it away, so this is
 // asked of the source text rather than of the tree; see `yodaIsParenthesised`.
 //
 // The literal ordering matters too: `0 <= x && x < 1` is a range and `1 < a && a < 0` is not,
-// because the low bound must not exceed the high one. Upstream compares the two literal VALUES,
+// because the low bound must not exceed the high one. Upstream compares the two literal values,
 // and where either side is not a literal it accepts the shape anyway.
 //
 // # Same reference, with static keys enabled
 //
-// `isSameReference` is called here with no third argument, so `disableStaticComputedKey` is FALSE
+// `isSameReference` is called here with no third argument, so `disableStaticComputedKey` is `false`
 // and `x.y` compares equal to `x["y"]`. That is the opposite of how `operator-assignment` calls the
 // same helper, which is why this rule carries its own copy rather than sharing that one: the flag
 // changes the answer on `if (0 <= a.b && a["b"] <= 100)`, a clean case here.
@@ -149,8 +149,8 @@ var messageYodaExpected = rule.Message{
 // # The fixer reorders verbatim slices rather than rebuilding the expression
 //
 // Upstream's `getFlippedString` cuts the source at the operator token and reassembles
-// `right + betweenText + flippedOperator + afterText + left`. Both operands are copied BYTE FOR
-// BYTE out of the original, so nothing inside them can be lost, which is what separates this fixer
+// `right + betweenText + flippedOperator + afterText + left`. Both operands are copied byte for
+// byte out of the original, so nothing inside them can be lost, which is what separates this fixer
 // from the two in this tree that dropped type information: those built a replacement from node
 // properties, and this one moves existing text.
 //
@@ -158,7 +158,7 @@ var messageYodaExpected = rule.Message{
 // intact: `as`, `satisfies`, a non-null `!`, optional chaining, an angle-bracket assertion, a
 // generic call, and comments in all three positions. The comment behaviour is worth stating because
 // it is not what a reader would guess: a comment between an operand and the operator stays with the
-// OPERATOR, so `'red' /* mid */ === color` becomes `color /* mid */ === 'red'`.
+// operator, so `'red' /* mid */ === color` becomes `color /* mid */ === 'red'`.
 var Yoda = rule.Rule{
 	Name: "yoda",
 	Run: func(ruleContext rule.Context, options any) rule.Listeners {
@@ -193,12 +193,12 @@ func checkYodaComparison(ruleContext rule.Context, node *ast.Node, settings Yoda
 		return
 	}
 
-	// Unwrapped for the JUDGMENT only. Our parser keeps a `KindParenthesizedExpression` where
+	// Unwrapped for the judgment only. Our parser keeps a `KindParenthesizedExpression` where
 	// upstream's folds it away, so `(5)` is a Literal there and a wrapper here, and without this
 	// the rule goes silent on eleven of upstream's own firing cases including
 	// `while ((a) === 0)` and `if (((((((((((foo)))))))))) === ((((((5))))))) `.
 	//
-	// The FIX still slices the wrapped operands, because upstream keeps the parentheses in its
+	// The fix still slices the wrapped operands, because upstream keeps the parentheses in its
 	// output: `while ((a) === 0)` repairs to `while (0 === (a))`. Unwrapping for the fix as well
 	// would delete them, which is a change of text upstream does not make.
 	expectedLiteral, expectedNonLiteral := yodaUnwrapParentheses(binary.Right),
@@ -255,9 +255,9 @@ func isYodaComparisonOperator(operator ast.Kind) bool {
 	return false
 }
 
-// isYodaEqualityOperator is upstream's `/^(?:==|===)$/u`, and it is NARROWER than it looks.
+// isYodaEqualityOperator is upstream's `/^(?:==|===)$/u`, and it is narrower than it looks.
 //
-// Only the two positive forms count. `!=` and `!==` are NOT equality for this option's purposes, so
+// Only the two positive forms count. `!=` and `!==` are not equality for this option's purposes, so
 // `onlyEquality` exempts them along with the relational operators. That reads as an oversight and
 // it is upstream's behaviour: measured against the installed rule, `'foo' !== x` under
 // `onlyEquality` reports nothing while the same input without the option reports.
@@ -275,9 +275,9 @@ func isYodaEqualityOperator(operator ast.Kind) bool {
 
 // yodaLooksLikeLiteral is upstream's `node.type === "Literal" || looksLikeLiteral(node)`.
 //
-// Three shapes count. A plain literal; a NEGATED numeric literal, which upstream folds into one
+// Three shapes count. A plain literal; a negated numeric literal, which upstream folds into one
 // atom so `-1` compares as a literal rather than as a unary expression; and a template with no
-// substitutions. A template carrying a substitution is NOT a literal, which is what keeps
+// substitutions. A template carrying a substitution is not a literal, which is what keeps
 // a comparison of two templates clean when either carries a substitution.
 func yodaLooksLikeLiteral(node *ast.Node) bool {
 	if node == nil {
@@ -377,7 +377,7 @@ func yodaParseNumber(text string) (float64, bool) {
 	return value, true
 }
 
-// yodaIsRangeTest is upstream's `isRangeTest`, asked of the comparison's PARENT.
+// yodaIsRangeTest is upstream's `isRangeTest`, asked of the comparison's parent.
 //
 // Four conditions, all load bearing and each stated by the corpus: the parent is a logical `&&` or
 // `||`, both its sides are comparisons using `<` or `<=`, the shared operand is the same reference
@@ -411,8 +411,8 @@ func yodaIsRangeTest(ruleContext rule.Context, parent *ast.Node) bool {
 		return false
 	}
 
-	// A "between" test shares the INNER operands, `0 <= x && x < 1`; an "outside" test shares the
-	// OUTER ones, `x < 0 || 1 <= x`. Which pair is compared is what distinguishes them.
+	// A "between" test shares the inner operands, `0 <= x && x < 1`; an "outside" test shares the
+	// outer ones, `x < 0 || 1 <= x`. Which pair is compared is what distinguishes them.
 	between := isAnd &&
 		yodaIsSameReference(leftComparison.Right, rightComparison.Left) &&
 		yodaLiteralNotGreater(leftComparison.Left, rightComparison.Right)
@@ -437,7 +437,7 @@ func isYodaRangeOperator(operator ast.Kind) bool {
 // of our tree instead, and the difference is the whole point: our parser keeps a
 // `KindParenthesizedExpression` node only where the source actually wrote parentheses, while the
 // parentheses of an `if` belong to the `if` statement and produce no node at all. Upstream counts
-// BOTH, which is why `if (0 <= x && x < 1)` is a range test and the bare expression statement
+// both, which is why `if (0 <= x && x < 1)` is a range test and the bare expression statement
 // `0 < a && a < 1` is not -- upstream's own failing case.
 //
 // Read off the source text for that reason, scanning past trivia in each direction.
@@ -462,7 +462,7 @@ func yodaIsParenthesised(ruleContext rule.Context, node *ast.Node) bool {
 
 // yodaIsSpace says whether a byte is whitespace.
 //
-// Comments are deliberately NOT skipped. Upstream walks a token stream where a comment is not a
+// Comments are deliberately not skipped. Upstream walks a token stream where a comment is not a
 // token, so `if (/* c */ 0 <= x && x < 1)` is parenthesised there and is not here. No corpus case
 // writes that shape, so the divergence is recorded rather than measured, and it errs toward
 // reporting rather than toward silence.
@@ -474,11 +474,11 @@ func yodaIsSpace(b byte) bool {
 	return false
 }
 
-// yodaIsSameReference is upstream's `isSameReference` with `disableStaticComputedKey` FALSE.
+// yodaIsSameReference is upstream's `isSameReference` with `disableStaticComputedKey` `false`.
 //
-// A separate copy from `operatorAssignmentIsSameReference`, which passes that flag as TRUE, and the
+// A separate copy from `operatorAssignmentIsSameReference`, which passes that flag as `true`, and the
 // flag changes real answers rather than being a detail. With it false a dot access and a bracket
-// access with the same static key are the SAME reference, so `a.b` equals `a["b"]` equals
+// access with the same static key are the same reference, so `a.b` equals `a["b"]` equals
 // a template subscript naming the same key. Upstream's clean case
 // `if (0 <= a.b && a["b"] <= 100)` and its firing case
 // `if (0 <= a[b] && a.b < 1) {}` are the pair that separates the two settings: sharing the other
@@ -495,7 +495,7 @@ func yodaIsSameReference(left *ast.Node, right *ast.Node) bool {
 		return false
 	}
 
-	// The static-key equivalence, which is checked BEFORE the kind comparison because it is what
+	// The static-key equivalence, which is checked before the kind comparison because it is what
 	// lets a property access equal an element access.
 	if yodaIsAccess(left) && yodaIsAccess(right) {
 		if name, known := yodaStaticPropertyName(left); known {
@@ -519,7 +519,7 @@ func yodaIsSameReference(left *ast.Node, right *ast.Node) bool {
 	case ast.KindStringLiteral, ast.KindNumericLiteral, ast.KindBigIntLiteral,
 		ast.KindTrueKeyword, ast.KindFalseKeyword, ast.KindNullKeyword,
 		ast.KindNoSubstitutionTemplateLiteral, ast.KindRegularExpressionLiteral:
-		// Upstream compares COOKED literal values, and `Text()` is the cooked value for a string
+		// Upstream compares cooked literal values, and `Text()` is the cooked value for a string
 		// and the canonical rendering for a number, so `0x10` and `16` compare equal here exactly
 		// as they do upstream.
 		return left.Text() == right.Text()
@@ -539,10 +539,10 @@ func yodaIsSameReference(left *ast.Node, right *ast.Node) bool {
 	return false
 }
 
-// yodaStaticPropertyName is upstream's `getStaticPropertyName`, which is WIDER than the shelf's.
+// yodaStaticPropertyName is upstream's `getStaticPropertyName`, which is wider than the shelf's.
 //
 // `property.AccessedName` answers for an identifier, a string, a template and a number, and
-// declines a REGULAR EXPRESSION literal. Upstream's `getStaticStringValue` renders one as
+// declines a regular expression literal. Upstream's `getStaticStringValue` renders one as
 // `/pattern/flags`, so `a[/(?<zero>0)/]` and `a['/(?<zero>0)/']` are the same reference there. That
 // exact pair is one of upstream's clean cases and it is the only thing in this corpus that
 // separates the two spellings.
@@ -596,18 +596,18 @@ func yodaUnwrapParentheses(node *ast.Node) *ast.Node {
 
 // yodaFlippedString is upstream's `getFlippedString`, and the shape of it is the safety argument.
 //
-// The two operands are copied BYTE FOR BYTE out of the source, cut at the operator token, and
+// The two operands are copied byte for byte out of the source, cut at the operator token, and
 // reassembled in the other order with the operator flipped. Nothing is rebuilt from node
 // properties, so nothing a node carries can be dropped: a type assertion, a `satisfies`, a non-null
 // `!`, optional chaining, type arguments and comments all move with the text they belong to. That
 // is the difference between this fixer and the two in this tree that silently deleted type
-// information, both of which CONSTRUCTED a replacement.
+// information, both of which constructed a replacement.
 //
 // Measured against the installed rule on nine TypeScript operands, all intact after the flip.
 //
 // The spacing halves are upstream's too. A flip can put two tokens against each other that could
 // not be adjacent, `a=1 === x` becoming `a=x === 1` is fine but a bare `-1<x` would not be, so a
-// space is inserted only when the neighbouring token is flush AND the pair would fuse.
+// space is inserted only when the neighbouring token is flush and the pair would fuse.
 func yodaFlippedString(ruleContext rule.Context, node *ast.Node,
 	binary *ast.BinaryExpression) (string, bool) {
 

@@ -10,7 +10,7 @@ import (
 
 // The corpus for use-unknown-in-catch-callback-variable, taken verbatim from upstream's own tester.
 //
-// Every case below was extracted by PARSING the upstream test file with the TypeScript compiler and
+// Every case below was extracted by parsing the upstream test file with the TypeScript compiler and
 // serialising each `code` and `output` string through a JSON encoder, so no source string was ever
 // retyped or passed through a shell. Each extracted string was then byte-compared against the
 // upstream file it came from, with a control string asserted absent, and all 57 cases plus all 26
@@ -18,7 +18,7 @@ import (
 // sitting in an awkward place, and one turns on a `?` between a name and its annotation, both of
 // which a hand-copy silently normalises away.
 //
-// The whole corpus was additionally driven through the INSTALLED rule at 8.67.0 on a real type
+// The whole corpus was additionally driven through the installed rule at 8.67.0 on a real type
 // graph, and its verdicts agreed with upstream's recorded expectations on all 57 inputs and all 26
 // suggestion outputs. So the oracle used to settle every question below is itself pinned against
 // the corpus rather than trusted.
@@ -130,8 +130,8 @@ func TestUseUnknownInCatchCallbackVariableFires(test *testing.T) {
 // TestUseUnknownInCatchCallbackVariableSuggestions applies each suggested repair and compares the
 // whole rewritten file against the output upstream records for it.
 //
-// This is the assertion the harness does not supply. ExpectFixedSource applies FIXES, and every
-// repair this rule offers is a SUGGESTION, which the engine never applies unattended, so the applier
+// This is the assertion the harness does not supply. ExpectFixedSource applies fixes, and every
+// repair this rule offers is a suggestion, which the engine never applies unattended, so the applier
 // is the one in this package that await-thenable already needed.
 //
 // It is where this rule can be wrong invisibly. A finding carrying a repair that overwrites the
@@ -185,9 +185,9 @@ func TestUseUnknownInCatchCallbackVariableSuggestions(test *testing.T) {
 			source := strings.TrimSpace(testCase.sourceText) + "\n"
 			want := strings.TrimSpace(testCase.wantOutput) + "\n"
 
-			// Two cases report several findings that all carry the SAME suggestion id, one per
+			// Two cases report several findings that all carry the same suggestion id, one per
 			// callback in the expression, and upstream records a separate output for each. So the
-			// row is matched by what the repair PRODUCES rather than by its id alone: picking the
+			// row is matched by what the repair produces rather than by its id alone: picking the
 			// first id match would compare one callback's repair against another's expectation and
 			// fail on a rule that is right. Both the id and the output still have to agree.
 			matchedTheId := false
@@ -214,7 +214,7 @@ func TestUseUnknownInCatchCallbackVariableSuggestions(test *testing.T) {
 // this rule does not reproduce, and pins the spelling it does reproduce beside it.
 //
 // Upstream resolves a computed member key with ESLint's `getStaticValue`, a constant folder over the
-// scope. This resolves it with the checker's `getAccessedPropertyName`, which reads the key's TYPE.
+// scope. This resolves it with the checker's `getAccessedPropertyName`, which reads the key's type.
 // The two agree wherever a literal type survives and part ways on `let`, because a `let` initialised
 // with a string literal widens to `string` and leaves the checker nothing to read.
 //
@@ -223,7 +223,7 @@ func TestUseUnknownInCatchCallbackVariableSuggestions(test *testing.T) {
 // fails this test loudly instead of the divergence going unnoticed.
 //
 // The `const` row is the control, and it is the half that makes this a measurement rather than an
-// excuse: it is the same shape with the same rule and it REPORTS, which is what shows the silence
+// excuse: it is the same shape with the same rule and it reports, which is what shows the silence
 // above comes from the widening rather than from the computed access being unhandled. It is also
 // something a literal-only test would lose, so it pins the reach as well as the limit.
 func TestUseUnknownInCatchCallbackVariableComputedKeyDivergence(test *testing.T) {
@@ -243,7 +243,7 @@ func TestUseUnknownInCatchCallbackVariableComputedKeyDivergence(test *testing.T)
 	})
 }
 
-// TestUseUnknownInCatchCallbackVariableThisParameter pins an upstream DEFECT that this port
+// TestUseUnknownInCatchCallbackVariableThisParameter pins an upstream defect that this port
 // reproduces on purpose.
 //
 // A `this` parameter is not a parameter. The checker's signature omits it, while both ESTree's
@@ -252,7 +252,7 @@ func TestUseUnknownInCatchCallbackVariableComputedKeyDivergence(test *testing.T)
 // first real parameter and then points at `this`, offering a repair that would write
 // `function (this: unknown, err: Error)`. That is broken code.
 //
-// Measured against the installed rule at 8.67.0, with two controls that pin the MECHANISM rather
+// Measured against the installed rule at 8.67.0, with two controls that pin the mechanism rather
 // than the symptom, since the finding alone is consistent with several wrong explanations:
 //
 //	p.catch(function (this: W, err: Error) {})     reports, span "this: W", suggests over ": W"
@@ -304,7 +304,7 @@ func TestUseUnknownInCatchCallbackVariableThisParameter(test *testing.T) {
 //
 // This rule is the silent kind rather than the panicking kind, which is the more dangerous of the
 // two. Under rule_testing.Run the checker is nil, Run returns nil listeners, and every StaysSilent case
-// above would pass VACUOUSLY while every Fires case failed. The count below is what makes the
+// above would pass vacuously while every Fires case failed. The count below is what makes the
 // difference visible: a rule that fires on nothing is not the same as a rule that discriminates.
 func TestUseUnknownInCatchCallbackVariableRequiresTheTypedHarness(test *testing.T) {
 	test.Parallel()
@@ -389,9 +389,9 @@ func TestUseUnknownInCatchCallbackVariableMessages(test *testing.T) {
 // the recursion site. The other two sites were found by mutation and confirmed against the
 // installed rule, which reports all three shapes.
 //
-// The callee row is the one that earns its place. Its mutant SURVIVED the whole imported corpus
+// The callee row is the one that earns its place. Its mutant survived the whole imported corpus
 // including that last case, and the first input tried for it was not distinguishing: `(p).catch(f)`
-// parenthesizes the RECEIVER, leaving the callee itself unparenthesized, so it reports either way.
+// parenthesizes the receiver, leaving the callee itself unparenthesized, so it reports either way.
 // It is kept below as the control that makes that visible. Measured with the skip removed:
 //
 //	(p.catch)(err => {})     pristine reports, mutant SILENT   distinguishes
@@ -425,7 +425,7 @@ func TestUseUnknownInCatchCallbackVariableParentheses(test *testing.T) {
 // TestUseUnknownInCatchCallbackVariableSurvivesMalformedCalls runs the rule over call shapes where a
 // node it reaches for is absent or is not what the well-formed grammar produces.
 //
-// A panic here would be worse than a wrong finding by a wide margin. The walk recovers per FILE
+// A panic here would be worse than a wrong finding by a wide margin. The walk recovers per file
 // rather than per rule, so one nil dereference does not cost this rule one verdict, it takes the
 // whole file away from every rule running on it, and the run still prints a green summary line.
 //
@@ -433,18 +433,18 @@ func TestUseUnknownInCatchCallbackVariableParentheses(test *testing.T) {
 // synthesizes nodes that well-formed source never produces, and those are the ones a rule written
 // against the grammar has not seen.
 //
-// What this test does NOT prove is worth stating, because the obvious reading of it is wrong.
+// What this test does not prove is worth stating, because the obvious reading of it is wrong.
 // `ast.SkipParentheses` dereferences its argument and this rule routes every call through a helper
 // that answers nil for nil, which reads as though these shapes exercise that guard. They do not.
-// Removing the guard entirely leaves this test GREEN, measured rather than assumed, because our
+// Removing the guard entirely leaves this test green, measured rather than assumed, because our
 // parser synthesizes a missing element-access key as an identifier instead of leaving the field
 // absent: `p[]` arrives as `KindIdentifier`. Probed at both skip sites over five malformed shapes,
 // the nil count was zero.
 //
 // So this is a guard against the rule's own arithmetic and indexing on shapes it was not written
-// for, which is a real thing to guard, and it is NOT evidence that the nil check is load-bearing.
+// for, which is a real thing to guard, and it is not evidence that the nil check is load-bearing.
 //
-// This runs through the TYPED harness. Under rule_testing.Run the rule returns before installing a
+// This runs through the typed harness. Under rule_testing.Run the rule returns before installing a
 // listener, so the untyped harness would pass without executing a line of it.
 func TestUseUnknownInCatchCallbackVariableSurvivesMalformedCalls(test *testing.T) {
 	test.Parallel()

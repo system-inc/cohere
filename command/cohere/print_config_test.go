@@ -108,21 +108,23 @@ func TestPrintConfigExplainsAFile(test *testing.T) {
 		}
 		previous = position
 	}
-	wantJSON := func(section string, want string) {
-		test.Helper()
-		var gotValue, wantValue any
-		if decodeError := json.Unmarshal(doc[section], &gotValue); decodeError != nil {
-			test.Errorf("%s: %v", section, decodeError)
-			return
-		}
-		if decodeError := json.Unmarshal([]byte(want), &wantValue); decodeError != nil {
-			test.Fatal(decodeError)
-		}
-		if !reflect.DeepEqual(gotValue, wantValue) {
-			test.Errorf("%s = %s, want %s", section, doc[section], want)
-		}
+	// The settings are read whole: a key printed beyond these in a plugin's settings fails the decode, and a
+	// plugin beyond this one fails the comparison.
+	type tailwindSettings struct {
+		EntryPoint          string
+		Attributes, Callees []string
 	}
-	wantJSON("settings", `{"better-tailwindcss":{"entryPoint":"./theme.css","attributes":["className"],"callees":["cn"]}}`)
+	var printedSettings map[string]tailwindSettings
+	settingsDecoder := json.NewDecoder(bytes.NewReader(doc["settings"]))
+	settingsDecoder.DisallowUnknownFields()
+	wantSettings := map[string]tailwindSettings{
+		"better-tailwindcss": {EntryPoint: "./theme.css", Attributes: []string{"className"}, Callees: []string{"cn"}},
+	}
+	if decodeError := settingsDecoder.Decode(&printedSettings); decodeError != nil {
+		test.Errorf("settings: %v", decodeError)
+	} else if !reflect.DeepEqual(printedSettings, wantSettings) {
+		test.Errorf("settings = %s, want %+v", doc["settings"], wantSettings)
+	}
 	var language struct {
 		SourceType, Target, Tsconfig string
 		Globals                      map[string][]string
@@ -194,7 +196,8 @@ func TestPrintConfigExplainsAFile(test *testing.T) {
 		test.Errorf("other file's settings/sourceType = %+v", otherDoc)
 	}
 	help := exec.Command(binary, "--help")
-	helpText, _ := help.CombinedOutput()
+	helpText, helpError := help.CombinedOutput()
+	requireChildRan(test, helpError)
 	for _, phrase := range []string{"plugin package versions", "parser names", "settings.react"} {
 		if !strings.Contains(string(helpText), phrase) {
 			test.Errorf("help does not explain %s", phrase)

@@ -17,7 +17,7 @@ import (
 // semantics, and reproducing the decision means reproducing the spelling test's output.
 //
 // Derived from the `globals` package this repository actually installs (16.4.0, key `es2026`, 62
-// globals of which 49 survive the filter) and then VERIFIED against the installed eslint 10.8.1
+// globals of which 49 survive the filter) and then verified against the installed eslint 10.8.1
 // build: all 49 report on `<name>.prototype.p = 0` and the 9 lowercase or non-global controls
 // (`parseFloat`, `parseInt`, `escape`, `decodeURI`, `isNaN`, `undefined`, `globalThis`, `x`, `Foo`)
 // are clean. Written out rather than computed because we have no equivalent of that package, and a
@@ -101,7 +101,7 @@ type NoExtendNativeOptions struct {
 //
 // Upstream recognises exactly two shapes. An assignment whose target is a property of `*.prototype`,
 // where the finding is the whole `AssignmentExpression`; and a call to `Object.defineProperty` or
-// `Object.defineProperties` whose FIRST argument is `*.prototype`, where the finding is the whole
+// `Object.defineProperties` whose first argument is `*.prototype`, where the finding is the whole
 // `CallExpression`. Measured on eslint 10.8.1:
 //
 //	Object.prototype.p = 0                                    columns 1 through 23, the assignment
@@ -117,12 +117,12 @@ type NoExtendNativeOptions struct {
 //	Object.defineProperty(x, Array.prototype)  clean, the prototype is not the FIRST argument
 //
 // The first two read like gaps and they are upstream's, reproduced rather than improved on. The
-// logical assignments `&&=`, `||=` and `??=` DO report, and the corpus asserts all three, so the
+// logical assignments `&&=`, `||=` and `??=` do report, and the corpus asserts all three, so the
 // assignment test has to accept every assignment operator rather than only `=`.
 //
 // `Object.defineProperty(Array.prototype)` with no further arguments reports, which is worth stating
 // because it looks like an incomplete call the rule should decline: only the first argument is
-// examined and the corpus's own `Object.defineProperty()` clean case is clean for having NO first
+// examined and the corpus's own `Object.defineProperty()` clean case is clean for having no first
 // argument rather than for being incomplete.
 //
 // # The shadow question, and why this reads the checker
@@ -151,7 +151,7 @@ var NoExtendNative = rule.Rule{
 	TypeReach:        rule.TypeReachShapes,
 
 	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		// A rule configured as a bare `"error"` is handed NIL rather than a decoded struct, because
+		// A rule configured as a bare `"error"` is handed `nil` rather than a decoded struct, because
 		// `DecodeOptionsInto` errors on empty input and the config turns that into nil. The zero
 		// value is the right default here, and naming it makes that a decision rather than an
 		// accident. `TestNoExtendNativeDefaultsWithoutTheDecoder` bypasses the decoder to pin it.
@@ -230,7 +230,7 @@ var NoExtendNative = rule.Rule{
 				if target == nil {
 					return
 				}
-				// The assignment target must be a property OF the prototype, which is what makes
+				// The assignment target must be a property of the prototype, which is what makes
 				// `Object.prototype = 0` clean and `Object.prototype.p.q = 0` clean too.
 				if builtin := builtinExtendedBy(accessedObject(target)); builtin != "" {
 					report(node, builtin)
@@ -249,7 +249,7 @@ var NoExtendNative = rule.Rule{
 				if !isObjectDefinePropertyCallee(ruleContext, call.Expression) {
 					return
 				}
-				// Only the FIRST argument, which is why `Object.defineProperty(x, Array.prototype)`
+				// Only the first argument, which is why `Object.defineProperty(x, Array.prototype)`
 				// is clean on the installed build.
 				if builtin := builtinExtendedBy(call.Arguments.Nodes[0]); builtin != "" {
 					report(node, builtin)
@@ -263,7 +263,7 @@ var NoExtendNative = rule.Rule{
 // `Object.defineProperties` on the real global `Object`.
 //
 // Upstream spells this as `isSpecificMemberAccess(callee, "Object", /^definePropert(?:y|ies)$/u)`,
-// which tests the receiver's NAME only. This additionally asks `resolvesToAGlobal` about that
+// which tests the receiver's name only. This additionally asks `resolvesToAGlobal` about that
 // receiver, which is a deliberate narrowing and it is stated here rather than left to be discovered:
 // a local `Object` calling `defineProperty` on a native prototype is a shape upstream reports and
 // this declines. No corpus case writes it, and the rule already requires the global for the

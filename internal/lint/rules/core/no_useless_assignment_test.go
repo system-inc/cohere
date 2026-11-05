@@ -415,7 +415,7 @@ func TestNoUselessAssignmentConditionalWritesDoNotKill(test *testing.T) {
 			wantCount:  0,
 		},
 		{
-			// The other half of the same arm: an update's STORE is a candidate, so a trailing
+			// The other half of the same arm: an update's store is a candidate, so a trailing
 			// compound assignment nothing reads is reported. Without this the two cases above would
 			// also pass a rule that had stopped judging updates entirely.
 			name:       "a trailing compound assignment nothing reads is reported",
@@ -423,7 +423,7 @@ func TestNoUselessAssignmentConditionalWritesDoNotKill(test *testing.T) {
 			wantCount:  1,
 		},
 		{
-			// The control: with BOTH arms writing, the initializer really is dead on every path and
+			// The control: with both arms writing, the initializer really is dead on every path and
 			// upstream reports it. Without this case the three above would also pass a rule that had
 			// simply stopped reporting initializers at all.
 			name:       "a write on every arm does kill the initializer",
@@ -633,7 +633,7 @@ func TestNoUselessAssignmentSwitchFlow(test *testing.T) {
 // the shape that slipped past it.
 //
 // ESLint's rule says it "will not report variables that are never read", leaving them to
-// `no-unused-vars`, so a binding nothing reads gets ONE finding there and none here. cohere carried
+// `no-unused-vars`, so a binding nothing reads gets one finding there and none here. cohere carried
 // the same guard and still reported every write to `let provenance: string;` in
 // `modules/finance/FinancePositionCommandLineInterface.ts` (three writes, beside the one
 // `no-unused-vars` finding), because a declarator with no initializer is classified as a read for

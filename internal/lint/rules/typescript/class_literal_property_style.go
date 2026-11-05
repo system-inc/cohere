@@ -46,6 +46,19 @@ func messageClassLiteralPropertyStylePreferGetterSuggestion() rule.Message {
 	}
 }
 
+// ClassLiteralPropertyStyleSetting is upstream's one option, `'fields' | 'getters'`.
+type ClassLiteralPropertyStyleSetting string
+
+const (
+	// ClassLiteralPropertyStyleFields is `"fields"`, upstream's default: a literal is a readonly
+	// field and a getter returning a literal reports.
+	ClassLiteralPropertyStyleFields ClassLiteralPropertyStyleSetting = "fields"
+
+	// ClassLiteralPropertyStyleGetters is `"getters"`: a literal is a getter and a readonly field
+	// holding one reports.
+	ClassLiteralPropertyStyleGetters ClassLiteralPropertyStyleSetting = "getters"
+)
+
 // ClassLiteralPropertyStyle requires one spelling for a class literal, a readonly field or a getter.
 //
 //	valid (fields):   class C { readonly x = 1; }
@@ -59,9 +72,9 @@ func messageClassLiteralPropertyStylePreferGetterSuggestion() rule.Message {
 // `packages/eslint-plugin/src/rules/class-literal-property-style.ts` and measuring every verdict and
 // every repair against the installed 8.67.0 build driven through the ESLint 10.8.1 Linter API.
 //
-// # It offers SUGGESTIONS, not fixes, and the difference is the whole safety story
+// # It offers suggestions, not fixes, and the difference is the whole safety story
 //
-// `meta` carries `hasSuggestions: true` and NO `fixable`, so the edit engine never applies this
+// `meta` carries `hasSuggestions: true` and no `fixable`, so the edit engine never applies this
 // repair unattended. Measured rather than read: `cohereAndFix` on a reporting input returns
 // `fixed: false` and leaves the source untouched.
 //
@@ -82,7 +95,7 @@ func messageClassLiteralPropertyStylePreferGetterSuggestion() rule.Message {
 // # The field direction preserves the return type, and the mechanism is worth copying
 //
 // A naive rebuild of `get x(): number { return 1; }` into a field would write `readonly x = 1;` and
-// drop the annotation. Upstream does not: it splices the RAW SOURCE between the parameter list's
+// drop the annotation. Upstream does not: it splices the raw source between the parameter list's
 // closing parenthesis and the body's opening brace, so whatever lives there survives byte for byte.
 // Measured on the installed build:
 //
@@ -95,7 +108,7 @@ func messageClassLiteralPropertyStylePreferGetterSuggestion() rule.Message {
 // what might live in the span, it copies the span. Nothing inside it can be lost because nothing
 // inside it is re-rendered.
 //
-// # A decorated getter reports with NO suggestion
+// # A decorated getter reports with no suggestion
 //
 // `getFixOrSuggest({ fixOrSuggest: node.decorators.length === 0 ? 'suggest' : 'none' })`. A
 // decorator applies to the member as declared, so rewriting a getter into a field would change what
@@ -193,7 +206,7 @@ func reportClassLiteralGetterShouldBeField(ruleContext rule.Context, node *ast.N
 	}
 
 	// A getter paired with a setter of the same name is exempt: turning it into a field would leave
-	// the setter with nothing to pair against. Upstream compares the STATIC MEMBER ACCESS VALUE
+	// the setter with nothing to pair against. Upstream compares the static member access value
 	// rather than the source text, so `get x` pairs with `set 'x'`.
 	if classLiteralHasMatchingSetter(ruleContext, node, name) {
 		return
@@ -287,10 +300,10 @@ func classLiteralConversionBreaksAnOverride(ruleContext rule.Context, member *as
 }
 
 // classLiteralBaseIsAbstractOrInterface is the checker's arePropertiesAbstractOrInterface: when it
-// holds, base and derived kinds need not match. A synthetic (intersection) property needs ANY
+// holds, base and derived kinds need not match. A synthetic (intersection) property needs any
 // declaration to qualify, every other property needs ALL of them.
 //
-// The checker also requires an abstract PROPERTY to have no initializer. That clause is omitted: an
+// The checker also requires an abstract property to have no initializer. That clause is omitted: an
 // abstract property with an initializer is itself TS1267, so on compiling code it never decides, and
 // a mutation deleting it survived every fixture for that reason.
 func classLiteralBaseIsAbstractOrInterface(base *ast.Symbol, baseModifiers ast.ModifierFlags) bool {
@@ -377,7 +390,7 @@ func classLiteralFieldReplacementFor(
 // for well-formed source and it degrades to a decline rather than a panic on anything else, which
 // is what the boolean on the caller is for.
 //
-// Returning an offset PAST the paren rather than at it, matching upstream's `closingParen.range[1]`.
+// Returning an offset past the paren rather than at it, matching upstream's `closingParen.range[1]`.
 func classLiteralClosingParenBefore(ruleContext rule.Context, node *ast.Node, body *ast.Node) int {
 	sourceText := ruleContext.SourceFile.Text()
 	memberRange := rule.TokenRange(ruleContext.SourceFile, node)
@@ -482,10 +495,12 @@ func reportClassLiteralFieldsShouldBeGetters(ruleContext rule.Context, members [
 // classLiteralCollectConstructorAssignments records every `this.x = ...` written in a constructor.
 //
 // Upstream's selector is `MethodDefinition[kind="constructor"] ThisExpression` followed by a walk up
-// to the nearest function, checking that function IS the constructor. That walk exists to decline an
+// to the nearest function, checking that function is the constructor. That walk exists to decline an
 // assignment inside a nested function, whose `this` need not be the instance. The same question is
 // answered here by walking down and refusing to descend into a nested function-like, which reaches
 // the same set without the upward walk.
+//
+// Mutates: excluded the caller builds one exclusion set across every constructor of the class
 func classLiteralCollectConstructorAssignments(ruleContext rule.Context, constructor *ast.Node, excluded map[string]bool) {
 	body := constructor.AsConstructorDeclaration().Body
 	if body == nil {
@@ -498,7 +513,7 @@ func classLiteralCollectConstructorAssignments(ruleContext rule.Context, constru
 			return
 		}
 		// A nested function gets its own `this`, so an assignment inside one is not an assignment
-		// to this instance. An arrow function does NOT rebind `this`, so it is walked into.
+		// to this instance. An arrow function does not rebind `this`, so it is walked into.
 		switch node.Kind {
 		case ast.KindFunctionDeclaration, ast.KindFunctionExpression,
 			ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor,
@@ -557,7 +572,7 @@ func classLiteralThisPropertyKey(ruleContext rule.Context, target *ast.Node) (st
 
 // classLiteralHasMatchingSetter is upstream's `hasDuplicateKeySetter`.
 //
-// The comparison is on the static member access VALUE rather than on the source text, so a getter
+// The comparison is on the static member access value rather than on the source text, so a getter
 // keyed `x` pairs with a setter keyed `'x'` or `["x"]`.
 func classLiteralHasMatchingSetter(ruleContext rule.Context, getter *ast.Node, name *ast.Node) bool {
 	key, keyed := classLiteralStaticMemberAccessValue(ruleContext, name)
@@ -617,7 +632,7 @@ func classLiteralStaticMemberAccessValue(ruleContext rule.Context, key *ast.Node
 
 // classLiteralStaticValueOf evaluates the shapes a key can take, upstream's `getStaticValue`.
 //
-// Two arms. A literal answers its own cooked text. An IDENTIFIER is resolved through a `const` or
+// Two arms. A literal answers its own cooked text. An identifier is resolved through a `const` or
 // `let` declaration in the same file whose initializer is itself a literal, which is the subset of
 // upstream's scope-backed evaluation this rule actually needs.
 //
@@ -633,13 +648,13 @@ func classLiteralStaticMemberAccessValue(ruleContext rule.Context, key *ast.Node
 //
 // The fourth is why a syntactic name comparison is wrong: upstream pairs a computed key with a bare
 // one when the values agree, and no amount of matching source text reaches that. The fifth is why
-// the resolution must not fall back to comparing expressions: two identical unevaluable keys do NOT
+// the resolution must not fall back to comparing expressions: two identical unevaluable keys do not
 // pair upstream.
 //
 // # What this declines, stated rather than left silent
 //
 // Upstream evaluates arbitrary constant expressions against scope, so `[PREFIX + 'x']` and a member
-// of a `const enum` are keyed there and are not here. Both cost an EXEMPTION rather than adding a
+// of a `const enum` are keyed there and are not here. Both cost an exemption rather than adding a
 // finding, so the failure direction is a false positive on a getter that upstream would have paired
 // with its setter. No case in the corpus and no shape measured in this tree reaches it. Closing the
 // gap means a constant evaluator with scope, which is substrate rather than a line in this rule.
@@ -664,7 +679,7 @@ func classLiteralStaticValueOf(ruleContext rule.Context, expression *ast.Node) (
 // is a variable initialized to a literal. Anything else declines, which loses an exemption rather
 // than inventing a finding.
 //
-// The LAST matching declaration wins, matching how a reader would read the file and how a second
+// The last matching declaration wins, matching how a reader would read the file and how a second
 // declaration of the same name shadows the first at the point the class is written. No corpus case
 // writes two, so this is stated rather than measured, and it is stated because the alternative is a
 // reader assuming the first wins.
@@ -733,14 +748,14 @@ func classLiteralIsSupportedLiteral(node *ast.Node) bool {
 
 	case ast.KindTemplateExpression:
 		// A template carrying substitutions has more than one quasi upstream and is unsupported.
-		// typescript-go only produces a TemplateExpression when there IS a substitution, so this
+		// typescript-go only produces a TemplateExpression when there is a substitution, so this
 		// arm exists to decline rather than to accept, and it is written out because the intuitive
 		// reading is that a template literal is a literal.
 		//
-		// Rerouting this LABEL to another kind survives the sweep, and that survival is inert
+		// Rerouting this label to another kind survives the sweep, and that survival is inert
 		// rather than a fixture gap: the arm returns false and so does the default below it, so an
 		// unreachable label and the real behavior produce identical output. Mutating the arm's
-		// EFFECT settles it instead, and returning true here fails seven lines. This is the label
+		// effect settles it instead, and returning true here fails seven lines. This is the label
 		// trap the porting brief names, met on the one arm in this rule whose whole content is a
 		// refusal.
 		return false
@@ -821,8 +836,8 @@ func classLiteralHasDecorator(node *ast.Node) bool {
 // classLiteralNameText renders a member's key the way upstream's suggestion writes it.
 //
 // Upstream reads `sourceCode.getText(node.key)`, where TSESTree's `key` for a computed member is the
-// INNER expression, and then re-adds the brackets with `node.computed ? `[${name}]` : name`. Our
-// `Name()` for a computed member IS the bracketed node, so its own text already carries them and
+// inner expression, and then re-adds the brackets with `node.computed ? `[${name}]` : name`. Our
+// `Name()` for a computed member is the bracketed node, so its own text already carries them and
 // re-adding would double them. Same output, one fewer step.
 func classLiteralNameText(ruleContext rule.Context, name *ast.Node) (string, bool) {
 	return classLiteralNodeText(ruleContext, name)
@@ -830,7 +845,7 @@ func classLiteralNameText(ruleContext rule.Context, name *ast.Node) (string, boo
 
 // classLiteralReportedKey is the node a finding points at.
 //
-// Upstream reports `node.key`, and TSESTree's `key` for a computed member is the INNER expression
+// Upstream reports `node.key`, and TSESTree's `key` for a computed member is the inner expression
 // with the brackets living on the member rather than on the key. Our `Name()` is the bracketed node,
 // so reporting it directly spans one character more on each side than upstream does.
 //
@@ -860,22 +875,9 @@ func classLiteralNodeText(ruleContext rule.Context, node *ast.Node) (string, boo
 	return sourceText[trimmed.Pos():trimmed.End()], true
 }
 
-// ClassLiteralPropertyStyleSetting is upstream's one option, `'fields' | 'getters'`.
-type ClassLiteralPropertyStyleSetting string
-
-const (
-	// ClassLiteralPropertyStyleFields is `"fields"`, upstream's default: a literal is a readonly
-	// field and a getter returning a literal reports.
-	ClassLiteralPropertyStyleFields ClassLiteralPropertyStyleSetting = "fields"
-
-	// ClassLiteralPropertyStyleGetters is `"getters"`: a literal is a getter and a readonly field
-	// holding one reports.
-	ClassLiteralPropertyStyleGetters ClassLiteralPropertyStyleSetting = "getters"
-)
-
 // ClassLiteralPropertyStyleOptions is the rule's configuration.
 //
-// Upstream's schema is a bare STRING rather than an object, which is unusual enough to be worth
+// Upstream's schema is a bare string rather than an object, which is unusual enough to be worth
 // naming: `schema: [{ type: 'string', enum: ['fields', 'getters'] }]` and
 // `defaultOptions: ['fields']`.
 type ClassLiteralPropertyStyleOptions struct {
@@ -893,7 +895,7 @@ func DefaultClassLiteralPropertyStyleOptions() ClassLiteralPropertyStyleOptions 
 
 // DecodeClassLiteralPropertyStyleOptions reads upstream's bare-string option.
 //
-// Hand-written rather than `rule.DecodeOptionsInto` for two reasons. The wire value is a JSON STRING
+// Hand-written rather than `rule.DecodeOptionsInto` for two reasons. The wire value is a JSON string
 // rather than an object, so there is no struct for the generic helper to unmarshal into. And the
 // default is `fields` rather than a Go zero value, so a generic decode would hand the rule an empty
 // style that matches no arm and silences it while every fixture stayed green.

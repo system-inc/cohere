@@ -34,7 +34,7 @@ type preferDestructuringCase struct {
 	findings []preferDestructuringExpectation
 }
 
-// decodePreferDestructuringOptionsForTest routes a case's options through the SHIPPED decoder.
+// decodePreferDestructuringOptionsForTest routes a case's options through the shipped decoder.
 func decodePreferDestructuringOptionsForTest(test *testing.T, optionsJson string) any {
 	test.Helper()
 	if optionsJson == "" {
@@ -168,7 +168,7 @@ func TestPreferDestructuringDeclinesEveryRepairUpstreamDeclines(test *testing.T)
 
 // TestPreferDestructuringDecoderReadsBothSchemaElements is the config-boundary contract.
 //
-// Upstream's `meta.schema` has TWO elements and reads `context.options[1].enforceForRenamedProperties`.
+// Upstream's `meta.schema` has two elements and reads `context.options[1].enforceForRenamedProperties`.
 // The config layer used to keep `tuple[1]` and drop the rest without an error, so a config written
 // the upstream way ran with that option permanently off while the file said otherwise. The rule now
 // registers with `DecodeOptionList`, and these rows are the list shapes the config layer delivers.
@@ -375,7 +375,7 @@ var preferDestructuringCleanCases = []preferDestructuringCase{
 // preferDestructuringReportingCases are upstream's `invalid` list, verbatim.
 //
 // `output` is upstream's fixed source where it asserts one, and "" where it asserts `null`,
-// meaning the case is reported and deliberately NOT repaired. Thirty of the forty-eight are
+// meaning the case is reported and deliberately not repaired. Thirty of the forty-eight are
 // declines, and they are the fixer's real specification.
 var preferDestructuringReportingCases = []preferDestructuringCase{
 	{
@@ -784,7 +784,7 @@ var preferDestructuringReportingCases = []preferDestructuringCase{
 
 // TestPreferDestructuringArrayIndexIsIntegerByVALUE pins the array arm's discriminator.
 //
-// Upstream tests `Number.isInteger(node.property.value)`, which is a question about the VALUE rather
+// Upstream tests `Number.isInteger(node.property.value)`, which is a question about the value rather
 // than the spelling. Its corpus writes only `array[0]`, so a mutation loosening the digit test
 // survives every imported case.
 //
@@ -850,7 +850,7 @@ func TestPreferDestructuringArrayIndexIsIntegerByVALUE(test *testing.T) {
 //
 // In ESTree `object?.foo` is a ChainExpression wrapping the member access, so upstream's
 // `rightNode.type !== "MemberExpression"` guard declines it and both of its optional-chaining cases
-// are VALID. Our parser keeps one node kind and marks the token, so without an explicit exclusion
+// are valid. Our parser keeps one node kind and marks the token, so without an explicit exclusion
 // this rule reports two of upstream's own passing cases.
 //
 // Both directions are asserted, because a guard that declined ALL property access would also pass

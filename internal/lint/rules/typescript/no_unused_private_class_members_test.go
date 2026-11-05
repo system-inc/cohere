@@ -22,7 +22,7 @@ func noUnusedPrivateClassMembersCaseName(index int) string {
 // which this rule must leave to the core rule of the same name.
 //
 // The shapes worth naming, because each is a class of false positive a plausible port ships:
-// a use through a NON-this receiver typed as the class, a use through an alias of `this` and
+// a use through a non-this receiver typed as the class, a use through an alias of `this` and
 // through an alias of that alias, a write to a setter (which calls a body and so is a read), a
 // destructuring read, and a computed key that reads the member to decide which property to take.
 func TestNoUnusedPrivateClassMembersStaysSilent(test *testing.T) {
@@ -95,7 +95,7 @@ func TestNoUnusedPrivateClassMembersStaysSilent(test *testing.T) {
 
 // noUnusedPrivateClassMembersFinding is one expected finding with the layers it can be wrong at.
 //
-// One message id, so the id proves little. The rendered text names the member, and the SPAN is what
+// One message id, so the id proves little. The rendered text names the member, and the span is what
 // separates a property from a constructor parameter property: upstream reports the whole parameter
 // there, so the span covers the type annotation, which no id assertion can see.
 type noUnusedPrivateClassMembersFinding struct {
@@ -533,7 +533,7 @@ func TestNoUnusedPrivateClassMembersFires(test *testing.T) {
 			// Measured, not imported. `this` inside a nested class is the nested class, so neither
 			// row reaches the outer member: the first reads the nested class's own `a`, the second
 			// reads nothing the checker resolves. Both report, here and on the installed 8.67.0 build.
-			// A receiver of the OUTER type does reach it from the nested class, which
+			// A receiver of the outer type does reach it from the nested class, which
 			// TestNoUnusedPrivateClassMembersDivergesOnReceiverReach pins (#yfkhkvy).
 			sourceText: "class C {\n  private a = 1;\n  m() {\n    return class D {\n      private a = 2;\n      n() { return this.a; }\n    };\n  }\n}\n",
 			wantFindings: []noUnusedPrivateClassMembersFinding{
@@ -584,7 +584,7 @@ func TestNoUnusedPrivateClassMembersFires(test *testing.T) {
 // TestNoUnusedPrivateClassMembersDivergesOnReceiverReach records where this port and upstream
 // disagree, and which way.
 //
-// Upstream reaches a use through scope analysis and follows exactly ONE hop of `const self = this`.
+// Upstream reaches a use through scope analysis and follows exactly one hop of `const self = this`.
 // Measured on the installed 8.67.0 build across three depths:
 //
 //	const a = this; a.prop            clean
@@ -596,12 +596,12 @@ func TestNoUnusedPrivateClassMembersFires(test *testing.T) {
 // We resolve the property name through the checker instead of tracking aliases, so depth costs
 // nothing and all three are clean here.
 //
-// The SAME divergence has a second face, found on the real tree rather than by construction. A
-// receiver held in a LOCAL is not followed either:
+// The same divergence has a second face, found on the real tree rather than by construction. A
+// receiver held in a local is not followed either:
 //
 //	class Foo { private helper() {...}  m() { const other = this.clone(); return other.helper(); } }
 //
-// Upstream reports `helper` there and is silent when the receiver is a PARAMETER annotated as the
+// Upstream reports `helper` there and is silent when the receiver is a parameter annotated as the
 // class, which its own corpus carries as a passing case. So the line it draws is not "only this"
 // but "this, a one-hop alias, or an annotated parameter", and a local holding the same type falls
 // outside it. Measured against the installed build both ways.

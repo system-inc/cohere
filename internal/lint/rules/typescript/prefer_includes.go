@@ -54,7 +54,7 @@ func messagePreferStringIncludes() rule.Message {
 // about eighteen are patterns upstream would rewrite. So the regex half is where the value is, and
 // it is also the half with no substrate on the shelf. See `preferIncludesSimplePatternText`.
 //
-// # `includes` has to exist AND take the same parameters
+// # `includes` has to exist and take the same parameters
 //
 // Upstream walks every declaration of the `indexOf` symbol, takes the type that declares it, and
 // requires an `includes` on that type whose parameter list is textually identical to some
@@ -62,13 +62,13 @@ func messagePreferStringIncludes() rule.Message {
 // user type declaring `indexOf(x, fromIndex?)` beside `includes(x)` is clean, and so is one
 // declaring `includes: boolean`.
 //
-// The comparison is on the parameter's SOURCE TEXT, not on its type. That is upstream's own
+// The comparison is on the parameter's source text, not on its type. That is upstream's own
 // shortcut and it is reproduced rather than improved: comparing types would make `includes(x: any)`
 // pair with `indexOf(x: unknown)`, which upstream leaves alone.
 //
 // # The sentinel is evaluated, not matched
 //
-// `isNumber(node.right, -1)` runs `getStaticValue`, so the right-hand side has to EVALUATE to the
+// `isNumber(node.right, -1)` runs `getStaticValue`, so the right-hand side has to evaluate to the
 // sentinel. A negative literal is a unary expression rather than a numeric literal in every parser
 // involved, which is why `-1` needs its own arm rather than reading a literal's text.
 //
@@ -153,7 +153,7 @@ func reportPreferIncludesComparison(ruleContext rule.Context, node *ast.Node) {
 	// Three edits, upstream's, in upstream's order: a leading `!` for the negative direction, the
 	// method name, and the removal of everything from the call's end to the comparison's end.
 	//
-	// The removal is by RANGE rather than by node, and it deliberately spans the operator and the
+	// The removal is by range rather than by node, and it deliberately spans the operator and the
 	// sentinel together. Nothing type-bearing lives inside it: the left operand ends at the call and
 	// the right operand is the numeric sentinel this rule already evaluated, so the span holds only
 	// the comparison itself.
@@ -207,7 +207,7 @@ func preferIncludesCheckDirection(ruleContext rule.Context, comparison *ast.Bina
 // # What this declines, stated rather than left silent
 //
 // A sentinel written as `const NOT_FOUND = -1` and compared as `a.indexOf(b) !== NOT_FOUND` is
-// evaluated by upstream and declined here. That costs a FINDING rather than adding one, so the
+// evaluated by upstream and declined here. That costs a finding rather than adding one, so the
 // failure direction is silence. Measured on this tree with a control: five `indexOf` presence
 // comparisons in total and none of them names a constant, so the narrowing has no exposure here.
 // Closing it means a constant evaluator with scope, which is substrate rather than a line in this
@@ -232,7 +232,7 @@ func preferIncludesEvaluatesTo(ruleContext rule.Context, node *ast.Node, want in
 
 // preferIncludesNumericLiteralIs answers whether a node is a numeric literal of this magnitude.
 //
-// A `NumericLiteral`'s `Text()` already holds the CANONICAL rendering of the double rather than the
+// A `NumericLiteral`'s `Text()` already holds the canonical rendering of the double rather than the
 // source spelling, which is what lets a text comparison stand in for evaluating the literal. Probed
 // against the installed build on the three spellings upstream accepts and this reads identically:
 //
@@ -298,7 +298,7 @@ func preferIncludesTypeHasMatchingIncludes(ruleContext rule.Context, propertyNam
 // preferIncludesHasSameParameters is upstream's `hasSameParameters`.
 //
 // Both declarations must be function-like with the same parameter count, and each parameter's
-// SOURCE TEXT must match. Comparing text rather than type is upstream's own shortcut and is
+// source text must match. Comparing text rather than type is upstream's own shortcut and is
 // reproduced: it is what makes a `includes: boolean` property decline, since a property declaration
 // is not function-like and has no parameters to compare.
 func preferIncludesHasSameParameters(ruleContext rule.Context, first *ast.Node, second *ast.Node) bool {
@@ -326,7 +326,7 @@ func preferIncludesHasSameParameters(ruleContext rule.Context, first *ast.Node, 
 // `Parameters()` reaches `FunctionLikeData()` and dereferences it, so it panics on a node that is
 // not function-like, and a property declaration reaching here is exactly that shape. The kinds are
 // named rather than tried, matching upstream's `ts.isFunctionLike` guard. The walk recovers per
-// FILE rather than per rule, so one panic would cost every rule that file.
+// file rather than per rule, so one panic would cost every rule that file.
 func preferIncludesParametersOf(declaration *ast.Node) ([]*ast.Node, bool) {
 	if declaration == nil {
 		return nil, false
@@ -400,12 +400,12 @@ func preferIncludesRegexReplacement(
 	text string,
 ) (string, bool) {
 	// Our parser keeps `KindParenthesizedExpression` and TSESTree folds it away, so upstream is
-	// handed the INNER expression with a range that excludes the parentheses while we are handed the
+	// handed the inner expression with a range that excludes the parentheses while we are handed the
 	// wrapper. Both the shape test below and the text slice have to see what upstream sees.
 	//
 	// This is not cosmetic. Upstream's own `/bar/.test((1 + 1, a))` case is a sequence expression,
 	// which needs parentheses in receiver position, and upstream adds them because its range never
-	// carried any. Without the unwrap the wrapper reads as a shape needing parentheses AND already
+	// carried any. Without the unwrap the wrapper reads as a shape needing parentheses and already
 	// carries them, so the repair writes `((1 + 1, a)).includes(...)`. That is what this fixture
 	// caught, and it is the only upstream case that can see it.
 	//
@@ -458,7 +458,7 @@ func preferIncludesRegexReplacement(
 // preferIncludesArgumentHasIncludes answers whether the argument's type carries an `includes`.
 //
 // This is what makes `/bar/.test(a)` clean when `a` is untyped and reporting when it is a string.
-// Upstream reads the CONSTRAINED type, so a type parameter is judged by its constraint.
+// Upstream reads the constrained type, so a type parameter is judged by its constraint.
 func preferIncludesArgumentHasIncludes(ruleContext rule.Context, argument *ast.Node) bool {
 	argumentType := ruleContext.TypeChecker.GetTypeAtLocation(argument)
 	if argumentType == nil {
@@ -497,7 +497,7 @@ func preferIncludesPatternTextOf(ruleContext rule.Context, receiver *ast.Node) (
 // as a literal. Both shapes are covered here because both are in upstream's corpus, and both are
 // resolved only through a file-scope variable whose initializer is one of them.
 //
-// The LAST matching declaration wins, matching how a second declaration of the same name shadows the
+// The last matching declaration wins, matching how a second declaration of the same name shadows the
 // first at the point the call is written.
 func preferIncludesResolveRegexVariable(ruleContext rule.Context, name string) (string, bool) {
 	text := ""
@@ -576,7 +576,7 @@ func preferIncludesSimplePatternFromLiteral(literalText string) (string, bool) {
 //
 // # Why this is written here rather than taken from the shelf
 //
-// `regexpattern.Walk` is the shelf's pattern walker and it CANNOT answer this, which was measured
+// `regexpattern.Walk` is the shelf's pattern walker and it cannot answer this, which was measured
 // rather than assumed. Walk reports characters with a depth counter and erases exactly the
 // distinctions the question turns on. Run over this rule's own patterns it renders `b.r` as `b.r`,
 // `^bar` and `bar$` and `(bar)` and `b(?:a)r` all as `bar`, and `foo|bar` as `foobar`, so a port
@@ -588,7 +588,7 @@ func preferIncludesSimplePatternFromLiteral(literalText string) (string, bool) {
 // does. `regexsyntax.SkipPatternEscape` handles the escape grammar and everything else is a
 // metacharacter test, which is the whole of upstream's question and none of a parse tree.
 //
-// Note `SkipPatternEscape` returns a LENGTH rather than an absolute index. A probe reading it as an
+// Note `SkipPatternEscape` returns a length rather than an absolute index. A probe reading it as an
 // index panicked on the third pattern it saw, which is recorded here because the name reads like an
 // index and the two agree for the first escape in a pattern.
 //
@@ -638,7 +638,7 @@ func preferIncludesSimplePatternText(pattern string, flags regexsyntax.RegexFlag
 
 // preferIncludesDecodeEscape answers the character an escape sequence matches, or declines.
 //
-// A SET escape has no single character to answer and declines, which is what makes `/\d/` clean.
+// A set escape has no single character to answer and declines, which is what makes `/\d/` clean.
 // `\b` and `\B` are assertions outside a class and decline for the same reason.
 func preferIncludesDecodeEscape(escaped string) (rune, bool) {
 	if len(escaped) < 2 || escaped[0] != '\\' {

@@ -775,7 +775,7 @@ func TestMethodSignatureStyleNilOptionsFallsBackToUpstreamDefault(test *testing.
 //
 // The repair scans the raw source backwards for a parameter list's opening parenthesis and forwards
 // for its closing one, and error recovery produces signatures with neither. The walk recovers per
-// FILE rather than per rule, so one panic would cost every rule that file rather than one finding.
+// file rather than per rule, so one panic would cost every rule that file rather than one finding.
 //
 // There is no finding to assert; the assertion is that the run completes.
 func TestMethodSignatureStyleSurvivesMalformedSignatures(test *testing.T) {

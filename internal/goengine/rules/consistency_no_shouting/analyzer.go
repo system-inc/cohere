@@ -140,19 +140,13 @@ func judgeGroup(pass *analysis.Pass, group *ast.CommentGroup, marker *ast.Commen
 	}
 }
 
-// bodyOf is the text of comment the masks read. A // comment loses its slashes and the one space after them, as
-// go/ast's CommentGroup.Text strips them, so a tab or the further spaces after it are indentation the indented code
-// block mask can measure. A block comment is kept whole, delimiters included, as the TypeScript rule reads one, since
-// the masks already know its gutter. A go/doc note marker opening the comment is blanked, keeping every offset.
+// bodyOf is the text of comment the masks read: shouting.GoCommentBody, which the warning-comment rule reads too, so
+// the two rules measure a code block's indentation alike. A block comment is kept whole, as the TypeScript rule reads
+// one. A go/doc note marker opening the comment is blanked, keeping every offset.
 func bodyOf(comment *ast.Comment) string {
-	start := 0
-	if strings.HasPrefix(comment.Text, "//") {
-		start = len("//")
-		if strings.HasPrefix(comment.Text[start:], " ") {
-			start++
-		}
-	}
-	body := comment.Text[start:]
+	body := shouting.GoCommentBody(comment.Text)
+	// The body is a suffix of the text, so what it lost from the front is where it starts.
+	start := len(comment.Text) - len(body)
 	location := noteMarker.FindStringSubmatchIndex(comment.Text)
 	if location == nil {
 		return body

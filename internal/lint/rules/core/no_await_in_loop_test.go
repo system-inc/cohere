@@ -17,9 +17,9 @@ const noAwaitInLoopFile = "/repository/source/NoAwaitInLoop.ts"
 // way in, and every verdict was reproduced by driving the installed eslint at 10.8.1 first.
 //
 // Four of the clean cases are the ones a port is most likely to get wrong, and each is here for a
-// different reason: an await on a for-of ITERABLE runs once, a for-await-of that is not itself
+// different reason: an await on a for-of iterable runs once, a for-await-of that is not itself
 // nested is deliberate asynchronous iteration, a plain `using` does not wait, and an `await using`
-// in a for-loop INITIALIZER runs once.
+// in a for-loop initializer runs once.
 func TestNoAwaitInLoopFires(test *testing.T) {
 	test.Parallel()
 
@@ -96,7 +96,7 @@ func TestNoAwaitInLoopStaysSilent(test *testing.T) {
 // TestNoAwaitInLoopSpans pins where each of the three waiting shapes points.
 //
 // The `await using` rows are the reason this test exists. Upstream reports ESTree's
-// `VariableDeclaration`, whose span INCLUDES a trailing semicolon in a statement and has none to
+// `VariableDeclaration`, whose span includes a trailing semicolon in a statement and has none to
 // include in a for-of header. Those are two different nodes in this parser, so the rule chooses
 // between them, and a port always taking one is off by one character on half the cases while every
 // message-id fixture stays green.
@@ -174,7 +174,7 @@ func TestNoAwaitInLoopMessage(test *testing.T) {
 // clean for a constructor, a getter, a setter and a static block each containing a bare `await`,
 // and all four are clean upstream for a reason that has nothing to do with this rule: `await` is not
 // legal in a non-async constructor, accessor or static initialization block, so eslint fails at
-// PARSE and no rule runs. That is the brief's "a case whose verdict is decided above the rule",
+// parse and no rule runs. That is the brief's "a case whose verdict is decided above the rule",
 // arriving as a syntax error rather than as a suppression, and the tell was that eslint returned a
 // fatal rather than an empty list. The cases below are legal source, so the boundary is what makes
 // them clean, and a firing control was run alongside them to prove the measurement could see a
@@ -191,11 +191,11 @@ func TestNoAwaitInLoopBoundariesBeyondUpstreamsThree(test *testing.T) {
 		{"an async generator method", "async function f(){ while (true) { class C { async *m() { await bar; } } } }"},
 		{"an async arrow returned from a method", "async function f(){ while (true) { class C { m() { return async () => await bar; } } } }"},
 
-		// These four are ILLEGAL source and are here for that reason rather than in spite of it.
+		// These four are illegal source and are here for that reason rather than in spite of it.
 		// `await` is not allowed in a non-async constructor, accessor or static initialization
 		// block, so eslint fails at parse and upstream can never reach its boundary check with
 		// them. typescript-go recovers instead and hands the rule a real await expression inside a
-		// real accessor, so the arms naming those kinds are load-bearing HERE and in no upstream
+		// real accessor, so the arms naming those kinds are load-bearing here and in no upstream
 		// test. Measured both ways: with the four kinds removed from the boundary list, every one
 		// of these reports; with them present, all four are clean and a firing control still
 		// reports. That is the grammar and the parser disagreeing, which is exactly the case a

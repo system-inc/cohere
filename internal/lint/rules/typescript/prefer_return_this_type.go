@@ -25,7 +25,7 @@ import (
 //
 // # The judgment is type identity, not name matching, and both halves are load-bearing
 //
-// Upstream compares the returned expression's type against two REFERENCE-identical types: the
+// Upstream compares the returned expression's type against two reference-identical types: the
 // class's own declared type, and that type's `thisType`. Name matching would be wrong in both
 // directions and the corpus pins each:
 //
@@ -68,16 +68,16 @@ import (
 // That shared omission is a behavior rather than an oversight, and it is the right one: a `return
 // this` inside a callback returns from the callback, not from the method. Measured on the installed
 // 8.67.0 build, `class Foo { f(): Foo { [1].forEach(() => { return this; }); return this; } }`
-// reports on the strength of its OUTER return, and removing that outer return makes it silent.
+// reports on the strength of its outer return, and removing that outer return makes it silent.
 //
-// # Parentheses, and the reason this rule reads TWO trees
+// # Parentheses, and the reason this rule reads two trees
 //
 // This is the one part of the port that is not a transcription, and getting it wrong cost this port
 // two false positives before a probe caught them.
 //
-// typescript-eslint's rule straddles two trees. It reads the estree tree for the return TYPE, where
-// there is no parenthesized-expression node at all, and it reads the TYPESCRIPT tree for the return
-// VALUE, through `services.esTreeNodeToTSNodeMap`, where parentheses survive exactly as they do
+// typescript-eslint's rule straddles two trees. It reads the estree tree for the return type, where
+// there is no parenthesized-expression node at all, and it reads the TypeScript tree for the return
+// value, through `services.esTreeNodeToTSNodeMap`, where parentheses survive exactly as they do
 // here. So a parenthesis is invisible on one side and load-bearing on the other, and our parser
 // matches upstream on the second side already.
 //
@@ -106,7 +106,7 @@ import (
 //	  reference however transparent it is to the checker. A mutant disabling it fails a fixture.
 //
 // The rule that falls out is worth more than the three instances: unwrap before a question you put
-// to the CHECKER, never before a question you put to a node KIND, because upstream's own keyword
+// to the checker, never before a question you put to a node kind, because upstream's own keyword
 // tests run on a tree that kept the parentheses.
 //
 // The unwraps that remain are loops rather than single steps, because `((this))` nests, and are
@@ -130,7 +130,7 @@ import (
 // same node it rewrites, so the span and the edit are the same range and a reader is always shown
 // the text that is about to change.
 //
-// A union with the class name written twice reports ONCE and rewrites ONCE, leaving the second
+// A union with the class name written twice reports once and rewrites once, leaving the second
 // occurrence. `f(): Foo | Foo` becomes `f(): this | Foo` in a single pass. Upstream's own tester
 // shows `this | this` only because `cohereAndFix` re-lints until the source stops changing;
 // measured against a single application of the same messages, upstream writes `this | Foo` too.
@@ -182,7 +182,7 @@ var PreferReturnThisType = rule.Rule{
 			if initializer == nil {
 				return
 			}
-			// CRASH PROTECTION as well as a filter, and the crash is the part a fixture cannot
+			// Crash protection as well as a filter, and the crash is the part a fixture cannot
 			// see. `checkFunction` calls `Parameters()`, which dereferences the function-like data
 			// a non-function node does not have. A type assertion is the reachable shape:
 			// `f = <Foo>this;` answers `Type()` with `Foo`, so it clears the return-type gate, and
@@ -233,7 +233,7 @@ var PreferReturnThisType = rule.Rule{
 // set of return statements.
 func functionReturnsOnlyThis(ruleContext rule.Context, function *ast.Node, class *ast.Node) bool {
 	// `f(this: Foo): Foo` pins the receiver type explicitly, so the author has already said what
-	// they mean and the rule declines. Upstream tests only the FIRST parameter, because that is the
+	// they mean and the rule declines. Upstream tests only the first parameter, because that is the
 	// only position the grammar allows a `this` parameter in.
 	parameters := function.Parameters()
 	if len(parameters) > 0 {
@@ -278,11 +278,11 @@ func functionReturnsOnlyThis(ruleContext rule.Context, function *ast.Node, class
 			return false
 		}
 
-		// Deliberately NOT unwrapped: see the parentheses section in the doc comment. Upstream
+		// Deliberately not unwrapped: see the parentheses section in the doc comment. Upstream
 		// tests this keyword on the TypeScript node, which keeps parentheses, so `(this)` has to
 		// fall through to the comparison below.
 		//
-		// Upstream calls this a "fast check" and it is NOT one. A literal `this` keyword is
+		// Upstream calls this a "fast check" and it is not one. A literal `this` keyword is
 		// accepted without asking the checker, and that is a separate judgment rather than an
 		// optimization, because the checker does not answer the same on four measured shapes:
 		//
@@ -333,7 +333,7 @@ func functionReturnsOnlyThis(ruleContext rule.Context, function *ast.Node, class
 // typeReferenceNamed is upstream's `tryGetNameInType`: the type node itself when it is a reference
 // to the given name, or the first such reference inside a union, recursively.
 //
-// Deliberately NOT extended to intersections. Upstream recurses through unions only, so
+// Deliberately not extended to intersections. Upstream recurses through unions only, so
 // `f(): Foo & {}` is silent on the installed build, and that gap is reproduced rather than closed.
 func typeReferenceNamed(name string, typeNode *ast.Node) *ast.Node {
 	if typeNode == nil {
@@ -406,14 +406,14 @@ func thisTypeOf(classType *checker.Type) *checker.Type {
 // than comparing itself, because upstream guards on `isUnionType` first and the caller has already
 // tested plain identity.
 //
-// The `IsUnion` test is CRASH PROTECTION rather than a behavioral filter, and it is not
+// The `IsUnion` test is crash protection rather than a behavioral filter, and it is not
 // interchangeable with a nil check. `AsUnionType` is an unchecked type assertion on the type's data
 // pointer: handed an intrinsic it panics with `checker.TypeData is *checker.IntrinsicType, not
 // *checker.UnionType` rather than returning nil. That is reachable from real source and this port
 // shipped it briefly: `class Foo { f = function (): Foo { return this; } }` gives `this` inside a
 // plain function expression the type `any`, which is an intrinsic, and it arrives here whenever the
 // `this` keyword fast path above does not consume the return first. The cohere walk recovers per
-// FILE rather than per rule, so one panic here costs every rule its verdict on that file.
+// file rather than per rule, so one panic here costs every rule its verdict on that file.
 //
 // Found by a mutation that neutralized the fast path, which is worth recording: the fast path was
 // masking a crash on the exact shape upstream's own corpus writes, so no fixture could see it while
@@ -439,7 +439,7 @@ func unionContainsType(candidate *checker.Type, wanted *checker.Type) bool {
 // f(): Foo { return this; } }` is silent while `const Foo = class Bar { f(): Bar ... }` reports.
 // Both measured on the installed build.
 // The identifier test upstream writes has no counterpart here, and that is measured rather than
-// assumed. A class's name field is typed `*IdentifierNode`, and the parser answers NIL rather than
+// assumed. A class's name field is typed `*IdentifierNode`, and the parser answers nil rather than
 // some other node for every malformed spelling probed: `class 123 {}`, `class 'str' {}`,
 // `class [x] {}`, `class {}`, `const A = class 5 {};` and `class default {}` all yield a nil name
 // under error recovery. So an `ast.IsIdentifier` guard beside the nil test would be dead, and a

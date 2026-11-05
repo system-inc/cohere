@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"os/exec"
 	"syscall"
 	"testing"
@@ -22,4 +23,21 @@ func childExitCode(test testing.TB, exitError *exec.ExitError) int {
 			int(status.Signal()), status.Signal())
 	}
 	return exitError.ExitCode()
+}
+
+// requireChildRan fails the test when a cohere child did not run to an exit of its own. An exit that is not
+// zero passes, as a run with findings ends; an error that is no exit at all means the child never started or
+// could not be waited for, and its output is then nothing to assert on. Errorf rather than Fatalf, for the
+// reason childExitCode gives.
+func requireChildRan(test testing.TB, runError error) {
+	test.Helper()
+	if runError == nil {
+		return
+	}
+	var exitError *exec.ExitError
+	if !errors.As(runError, &exitError) {
+		test.Errorf("running cohere: %v", runError)
+		return
+	}
+	childExitCode(test, exitError)
 }

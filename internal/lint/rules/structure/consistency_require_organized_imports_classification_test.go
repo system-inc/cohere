@@ -9,7 +9,7 @@ import (
 
 // TestConsistencyOrganizeImportsClassification is the differential against the TypeScript rule.
 //
-// Each row is one import statement and the group the LIVE original put it in, harvested by running
+// Each row is one import statement and the group the live original put it in, harvested by running
 // that rule's own fixer through ESLint's Linter API and reading back the header it emitted. No row
 // here was reasoned about: the table is a recording, and it is the only thing standing between this
 // port and a classifier that agrees with its own author.

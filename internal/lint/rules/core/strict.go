@@ -186,7 +186,7 @@ func messageStrictWrapFor(description string) rule.Message {
 // # Three findings the author cannot fix by moving the directive
 //
 // `nonSimpleParameterList` is the sharpest: since ES2016 a directive inside a function with a
-// default, rest or destructured parameter is a SYNTAX ERROR, so that code does not run at all.
+// default, rest or destructured parameter is a syntax error, so that code does not run at all.
 // Upstream reports it and deliberately offers no repair, because the fix is a judgment about which
 // half to change. `wrap` is its counterpart under the function form, where the function cannot be
 // made strict without restructuring it.
@@ -239,7 +239,7 @@ func checkStrict(ruleContext rule.Context, file *ast.Node, mode StrictMode) {
 		// Upstream picks Global when the file is CommonJS or the parser allows a top-level
 		// return, and Function otherwise.
 		//
-		// Only the first half is expressible. `ecmaFeatures.globalReturn` is a PARSER feature
+		// Only the first half is expressible. `ecmaFeatures.globalReturn` is a parser feature
 		// with no counterpart in cohere, so the second half can never fire here -- and it is not
 		// a detail: seventeen of upstream's cases turn on it, and the same source under the same
 		// options is clean with it and reports twice without it. Those cases are recorded as
@@ -321,7 +321,7 @@ func strictShouldFix(mode StrictMode) bool {
 
 // walkStatements descends the tree, tracking strictness and class nesting.
 //
-// `insideAnyFunction` says whether ANY function encloses this node, strict or not, which is
+// `insideAnyFunction` says whether any function encloses this node, strict or not, which is
 // upstream's `scopes.length > 0` and is what suppresses the global-level arms. `parentIsStrict`
 // says whether the nearest enclosing function runs strict, which is upstream's `scopes.at(-1)`
 // and turns a directive into `unnecessary`. The two are genuinely independent: a non-strict
@@ -415,8 +415,8 @@ func (w strictWalker) enterFunctionInFunctionMode(
 	inClass bool,
 ) {
 	// Upstream's `scopes.length === 0 && classScopes.length === 0`. `scopes` is pushed on
-	// entering ANY function, strict or not, so this asks whether a function encloses this one
-	// rather than whether a STRICT one does. Deriving it from strictness instead reported both
+	// entering any function, strict or not, so this asks whether a function encloses this one
+	// rather than whether a strict one does. Deriving it from strictness instead reported both
 	// the `function` and the `wrap` message on a nested function upstream leaves alone, caught
 	// by `(function() { function foo(a = 0) { } }())`.
 	isParentGlobal := !insideAnyFunction && !inClass
@@ -507,7 +507,7 @@ func strictRemoveDirective(ruleContext rule.Context, directive *ast.Node) rule.F
 
 // strictDirectivesIn returns the `use strict` directives at the head of a statement list.
 //
-// Upstream reads the DIRECTIVE PROLOGUE, which is the run of expression statements whose expression
+// Upstream reads the directive prologue, which is the run of expression statements whose expression
 // is a string literal, starting at the first statement. The scan stops at the first statement that
 // is not one, so a directive after any real code is not a directive at all -- it is a string
 // expression, and the engine ignores it.
@@ -525,10 +525,10 @@ func strictDirectivesIn(ruleContext rule.Context, statements []*ast.Node) []*ast
 			break
 		}
 		if expression.Text() != "use strict" {
-			// A different prologue directive, such as `use asm`. Upstream writes into a SPARSE
+			// A different prologue directive, such as `use asm`. Upstream writes into a sparse
 			// array here -- `directives[i] = statement`, indexed by the statement's own position
 			// -- and skips the assignment for anything that is not `use strict`. Its later
-			// `forEach` and `slice` then skip the holes, so a `use strict` sitting AFTER another
+			// `forEach` and `slice` then skip the holes, so a `use strict` sitting after another
 			// directive is never reported at all.
 			//
 			// Measured against the installed rule: `'use asm'; 'use strict';` is clean and
@@ -537,7 +537,7 @@ func strictDirectivesIn(ruleContext rule.Context, statements []*ast.Node) []*ast
 			// reproduced rather than corrected, because the corpus is the specification and a
 			// port that quietly reported the case would disagree with the tool it replaces.
 			//
-			// Reproduced by STOPPING here rather than by continuing, which is what makes the
+			// Reproduced by stopping here rather than by continuing, which is what makes the
 			// dense slice below equivalent to upstream's sparse one: once a hole exists, nothing
 			// after it can be reported.
 			break
@@ -551,7 +551,7 @@ func strictDirectivesIn(ruleContext rule.Context, statements []*ast.Node) []*ast
 //
 // Since ES2016 a `use strict` directive is a syntax error in a function whose parameter list uses a
 // default, a rest element or destructuring, so this is what separates a redundant directive from
-// one that stops the file running. A TypeScript annotation does NOT make a parameter non-simple:
+// one that stops the file running. A TypeScript annotation does not make a parameter non-simple:
 // `function f(a: string)` is still a plain name with a type on it, which is a distinction upstream's
 // JavaScript corpus cannot express and which is measured here rather than assumed.
 func strictHasSimpleParameterList(node *ast.Node) bool {

@@ -34,6 +34,8 @@ func cleanSummary() runSummary {
 }
 
 // warmSummary is a green warm run: three files edited and checked, the rest from the cache.
+//
+// Mutates: summary a case's summary func turns the clean summary it is handed into the run it names
 func warmSummary(summary *runSummary) {
 	summary.Total = 700 * time.Millisecond
 	summary.Graph = 200 * time.Millisecond
@@ -47,6 +49,9 @@ func warmSummary(summary *runSummary) {
 	summary.Nodes = 4_100
 }
 
+// replaySummary is a run replayed whole from the run cache.
+//
+// Mutates: summary a case's summary func turns the clean summary it is handed into the run it names
 func replaySummary(summary *runSummary) {
 	*summary = runSummary{
 		Total: 50 * time.Millisecond, Cache: cacheUse{Replayed: true}, Rules: 480, FilesInScope: 3926, FilesCached: 3926,
@@ -64,7 +69,7 @@ func TestFooterGolden(test *testing.T) {
 	}{
 		{
 			name:    "cold: everything checked fresh",
-			summary: func(summary *runSummary) {},
+			summary: func(summary *runSummary) { /* The clean summary is this case as it stands. */ },
 			want:    "✓ 💎 2.4s (480 rules • 3,926 checked)",
 		},
 		{
@@ -116,7 +121,7 @@ func TestFooterGolden(test *testing.T) {
 		},
 		{
 			name:    "cold, with --phases",
-			summary: func(summary *runSummary) {},
+			summary: func(summary *runSummary) { /* The clean summary is this case as it stands. */ },
 			options: footerOptions{Phases: true},
 			want:    "✓ 💎 2.4s (🕸 0.9s • 🪄 0.4s • 💅 0.3s • 🔷 0.6s • 👑 1.1s • 480 rules • 3,926 checked)",
 		},
@@ -253,7 +258,9 @@ func TestCoheredIsTheListAboveTheFooter(test *testing.T) {
 		said := 0
 		if index := strings.Index(got, " cohered"); index >= 0 {
 			fields := strings.Fields(got[:index])
-			fmt.Sscanf(fields[len(fields)-1], "%d", &said)
+			if _, scanError := fmt.Sscanf(fields[len(fields)-1], "%d", &said); scanError != nil {
+				test.Errorf("the footer's cohered count is not a number (%v): %s", scanError, got)
+			}
 		}
 		if said != listed || said != count {
 			test.Errorf("%d files rewritten: the list accounts for %d and the footer says %d cohered (%s)", count, listed, said, got)

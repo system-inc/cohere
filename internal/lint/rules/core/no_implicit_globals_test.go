@@ -58,8 +58,8 @@ func implicitGlobalsOptions(test *testing.T, lexicalBindings bool) any {
 
 // Each half is decided by what the file is, so the fixtures build each kind of file on purpose.
 //
-// The declaration halves fire only in a SCRIPT, since a module has no global scope. The leak half
-// fires only in SLOPPY code, since in strict code an assignment to an undeclared name throws, and it
+// The declaration halves fire only in a script, since a module has no global scope. The leak half
+// fires only in sloppy code, since in strict code an assignment to an undeclared name throws, and it
 // needs the checker to ask whether a name was ever declared. Three harnesses give three kinds of file:
 //
 //	the untyped harness               a script, with no checker, so only the declaration halves
@@ -272,7 +272,7 @@ func TestNoImplicitGlobalsStaysSilent(test *testing.T) {
 // surface @typescript-eslint/no-redeclare's builtinGlobals reads since #e1zk9s0. This rule's two
 // messages were not revisited there.)
 //
-// The shape of the decline is an UPGRADE that does not happen, rather than a finding that goes
+// The shape of the decline is an upgrade that does not happen, rather than a finding that goes
 // missing, and that distinction is worth stating because it is much the smaller gap. Measured
 // against the installed rule:
 //
@@ -281,10 +281,10 @@ func TestNoImplicitGlobalsStaysSilent(test *testing.T) {
 //	var Array = 1; Array = 2;  upstream redeclarationOfReadonlyGlobal, here globalNonLexicalBinding
 //	var notABuiltin = 1        upstream globalNonLexicalBinding, here the same
 //
-// The two declaration rows still REPORT here, at the same place, under the message that would be
+// The two declaration rows still report here, at the same place, under the message that would be
 // correct if the name were not a builtin, so the gap there is only that the finding does not say the
 // stronger thing. The assignment row is the one genuinely lost finding: `Array` resolves to the
-// standard library's own declaration, so the leak check correctly answers that the name WAS declared
+// standard library's own declaration, so the leak check correctly answers that the name was declared
 // and stays silent. That is resolution working, and it is exactly why the readonly judgment needs a
 // configured-globals surface rather than the checker.
 //
@@ -418,7 +418,7 @@ func TestNoImplicitGlobalsIsSilentInStrictMode(test *testing.T) {
 
 // The decoder's own shapes, which no source fixture can reach.
 //
-// Upstream's default for lexicalBindings is FALSE, so the zero value happens to be right here and
+// Upstream's default for lexicalBindings is `false`, so the zero value happens to be right here and
 // the usual default-inversion hazard does not apply. It is decoded through a pointer anyway so an
 // explicit false stays distinguishable from an absent key, and this test is what would notice if the
 // default ever moved and the pointer were dropped as redundant.

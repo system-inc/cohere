@@ -93,14 +93,14 @@ var CorrectnessRequireOrmColumnNullableParity = rule.Rule{
 
 				// Only an explicit `nullable: true` is this rule's question.
 				//
-				// The `skip` test is SUBSUMED here and kept anyway, which a mutation sweep will
+				// The `skip` test is subsumed here and kept anyway, which a mutation sweep will
 				// report as a survivor. The shelf sets `skip` only on the non-boolean path, where it
 				// also returns `value=false`, so `!declaredNullable` already declines every input
 				// that would skip: no shape can reach this line with `skip` true and
 				// `declaredNullable` true. It is written because it states the rule's intent about
 				// `nullable: 'items'`, which is a list-nullability spelling rather than a false
 				// claim, and because that reasoning stops holding the moment the shelf's contract
-				// changes. The serializable sibling in this package tests `skip` where it is NOT
+				// changes. The serializable sibling in this package tests `skip` where it is not
 				// subsumed, and the two lines should keep reading the same way.
 				declaredNullable, skip, found := decorators.BooleanOption(node, "nullable")
 				if skip || !found || !declaredNullable {

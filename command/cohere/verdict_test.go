@@ -24,8 +24,9 @@ func TestTheVerdictDescriptorIsNotInheritedByAChild(test *testing.T) {
 	if err != nil {
 		test.Fatal(err)
 	}
+	// Ignored: a pipe made only so there is a descriptor to name, and nothing is written through it.
 	defer reader.Close()
-	defer writer.Close()
+	defer writer.Close() // Ignored: as the reader's, above.
 	descriptor, err := syscall.Dup(int(writer.Fd()))
 	if err != nil {
 		test.Fatal(err)
@@ -47,6 +48,7 @@ func TestTheVerdictDescriptorIsNotInheritedByAChild(test *testing.T) {
 	if file == nil {
 		test.Fatal("the verdict descriptor was not taken")
 	}
+	// Ignored: never written.
 	defer file.Close()
 	if after := probe(); after != "closed unset" {
 		test.Errorf("a child started after the verdict descriptor was taken sees %q, want the descriptor closed and the variable unset", after)
@@ -64,6 +66,7 @@ func TestAVerdictDescriptorThatIsNotAPipeIsLeftAlone(test *testing.T) {
 	if err != nil {
 		test.Fatal(err)
 	}
+	// Ignored: written unbuffered, and read back by name before this close.
 	defer log.Close()
 	test.Setenv(VerdictVariable, strconv.Itoa(int(log.Fd())))
 	verdictFile = takeVerdictFile()
@@ -76,7 +79,11 @@ func TestAVerdictDescriptorThatIsNotAPipeIsLeftAlone(test *testing.T) {
 	if _, writeError := log.Write([]byte("still open\n")); writeError != nil {
 		test.Fatalf("the regular file was closed: %v", writeError)
 	}
-	if contents, _ := os.ReadFile(logPath); string(contents) != "still open\n" {
+	contents, readError := os.ReadFile(logPath)
+	if readError != nil {
+		test.Fatal(readError)
+	}
+	if string(contents) != "still open\n" {
 		test.Errorf("the regular file holds %q, want only what its owner wrote", contents)
 	}
 
@@ -84,8 +91,9 @@ func TestAVerdictDescriptorThatIsNotAPipeIsLeftAlone(test *testing.T) {
 	if err != nil {
 		test.Fatal(err)
 	}
+	// Ignored: a pipe made only so there is a descriptor to name, and nothing is written through it.
 	defer reader.Close()
-	defer writer.Close()
+	defer writer.Close() // Ignored: as the reader's, above.
 	// A descriptor of its own for takeVerdictFile to own and close. Handed the writer's, it would make a
 	// second *os.File around one descriptor, whose finalizer closes that number again after the writer
 	// has, by then most likely another test's pipe: a command's output read end closed out from under the
@@ -97,8 +105,10 @@ func TestAVerdictDescriptorThatIsNotAPipeIsLeftAlone(test *testing.T) {
 	test.Setenv(VerdictVariable, strconv.Itoa(descriptor))
 	file := takeVerdictFile()
 	if file == nil {
-		syscall.Close(descriptor)
+		// Ignored: the test fails on the next line whatever the close does.
+		_ = syscall.Close(descriptor)
 		test.Fatal("a pipe was not taken as the verdict descriptor")
 	}
-	file.Close()
+	// Ignored: never written.
+	_ = file.Close()
 }

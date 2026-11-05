@@ -36,18 +36,18 @@ func buildNoUselessCallMessage(methodName string) rule.Message {
 // # Two shapes, and `.apply()` only in its non-variadic form
 //
 // `.call(thisArg, a, b)` is watched whenever it has at least one argument. `.apply(thisArg, arr)` is
-// watched only when it has exactly two arguments AND the second is an array LITERAL, because that is
+// watched only when it has exactly two arguments and the second is an array literal, because that is
 // the case where the argument list is known at the call site and the rewrite is mechanical.
 // `foo.apply(null, args)` is left alone here: the array is not a literal, so removing `.apply()`
 // would need spread syntax, and that is `prefer-spread`'s finding rather than this one. The two
 // rules deliberately partition the same syntax by whether the second argument is a literal, and each
 // rule's doc names the other.
 //
-// # `computed === false` is required, and it is NOT what the sibling helper does
+// # `computed === false` is required, and it is not what the sibling helper does
 //
 // Upstream requires the property access to be non-computed, so `foo["call"](undefined, 1, 2)` is
-// CLEAN. Measured on the installed rule, both for `call` and for `apply`. This package already has
-// `isApplyMemberAccess`, written for `prefer-spread`, and it deliberately ACCEPTS a string-literal
+// clean. Measured on the installed rule, both for `call` and for `apply`. This package already has
+// `isApplyMemberAccess`, written for `prefer-spread`, and it deliberately accepts a string-literal
 // subscript because `foo['apply'](null, args)` is the same call. Reusing it here unchanged would
 // report a whole class of input upstream passes, and no imported fixture would catch it because
 // upstream's own clean cases for the computed form use a variable key rather than a literal.
@@ -147,17 +147,17 @@ var NoUselessCall = rule.Rule{
 	},
 }
 
-// nonComputedMemberName returns the property name of a NON-computed member access.
+// nonComputedMemberName returns the property name of a non-computed member access.
 //
 // Upstream's predicate is `callee.property.type === "Identifier" && callee.computed === false`, and
 // the computed half is load-bearing rather than incidental: `foo["call"](undefined, 1, 2)` is clean
-// on the installed rule. That is the one place this rule must NOT reuse `isApplyMemberAccess` from
+// on the installed rule. That is the one place this rule must not reuse `isApplyMemberAccess` from
 // `prefer-spread`, which accepts a string-literal subscript on purpose.
 //
 // A private identifier answers false. `foo.#call(undefined, 1, 2)` is a different property that
 // merely spells the same word, and it is upstream's own clean case.
 //
-// That check is SUBSUMED rather than load-bearing, and this is a measurement rather than an
+// That check is subsumed rather than load-bearing, and this is a measurement rather than an
 // argument: typescript-go keeps the sigil in the identifier's text, so `#call` compares unequal to
 // both `call` and `apply` at the switch below and the access is declined there anyway. Probed
 // directly, `foo.#call(...)` yields `kind=KindPrivateIdentifier text="#call"` while `this.call(...)`

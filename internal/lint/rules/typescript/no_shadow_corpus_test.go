@@ -27,11 +27,15 @@ var noShadowShadowedPlace = regexp.MustCompile(`on line (\d+) column (\d+)\.$`)
 // noShadowTsconfigFor is the corpus tsconfig with include naming the row's file.
 func noShadowTsconfigFor(test *testing.T, fileName string) string {
 	test.Helper()
-	var configuration map[string]any
+	var configuration map[string]json.RawMessage
 	if decodeError := json.Unmarshal([]byte(noShadowCorpusTsconfig), &configuration); decodeError != nil {
 		test.Fatal(decodeError)
 	}
-	configuration["include"] = []string{fileName}
+	encodedInclude, includeEncodeError := json.Marshal([]string{fileName})
+	if includeEncodeError != nil {
+		test.Fatal(includeEncodeError)
+	}
+	configuration["include"] = encodedInclude
 	encoded, encodeError := json.Marshal(configuration)
 	if encodeError != nil {
 		test.Fatal(encodeError)

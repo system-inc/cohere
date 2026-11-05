@@ -224,7 +224,7 @@ func TestNoBeforeInteractiveScriptOutsideDocumentIsSilentOnCasesUpstreamDoesNotW
 			source:   "import Script from \"next/script\";\nconst properties = { strategy: \"beforeInteractive\" };\nexport default function Index() {\n  return <Script {...properties} />;\n}\n",
 		},
 		{
-			// Upstream's `find` stops at the FIRST attribute named strategy and reads its value,
+			// Upstream's `find` stops at the first attribute named strategy and reads its value,
 			// so a second one is never consulted and a non-matching first value ends the judgment.
 			// Added for a surviving mutant that continued the loop instead of returning: nothing in
 			// the corpus writes a duplicate attribute, so every fixture was blind to it. Measured on
@@ -286,14 +286,14 @@ func TestNoBeforeInteractiveScriptOutsideDocumentIsSilentOnCasesUpstreamDoesNotW
 			source:   "import Script from \"next/script\";\nexport default function Index() {\n  return <Script.Inner strategy=\"beforeInteractive\" />;\n}\n",
 		},
 		{
-			// Only the FIRST next/script entry binds, matching upstream's find_map, so the second
+			// Only the first next/script entry binds, matching upstream's find_map, so the second
 			// import's name is not a script name at all.
 			name:     "the second of two next/script imports, whose name never binds",
 			fileName: "pages/index.tsx",
 			source:   "import A from \"next/script\";\nimport B from \"next/script\";\nexport default function Index() {\n  return <B strategy=\"beforeInteractive\" />;\n}\n",
 		},
 		{
-			// The LOCAL name is compared. Reading the imported name instead would invert this and
+			// The local name is compared. Reading the imported name instead would invert this and
 			// the reporting case below it.
 			name:     "a renamed named import addressed by its imported name rather than its local one",
 			fileName: "pages/index.tsx",

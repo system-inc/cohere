@@ -88,7 +88,7 @@ func (fixture *landFixture) land(name string) *exec.Cmd {
 func (fixture *landFixture) waitForGate(line string) {
 	fixture.t.Helper()
 	for deadline := time.Now().Add(time.Minute); ; time.Sleep(20 * time.Millisecond) {
-		contents, _ := os.ReadFile(fixture.log)
+		contents := readMaybeMissing(fixture.t, fixture.log)
 		if strings.Contains(string(contents), line) {
 			return
 		}
@@ -99,7 +99,7 @@ func (fixture *landFixture) waitForGate(line string) {
 }
 
 func (fixture *landFixture) gates() []string {
-	contents, _ := os.ReadFile(fixture.log)
+	contents := readMaybeMissing(fixture.t, fixture.log)
 	return strings.Split(strings.TrimSpace(string(contents)), "\n")
 }
 
@@ -210,7 +210,9 @@ func TestLandChecksASymlinkedSubmoduleAgainstItsPin(test *testing.T) {
 	a := fixture.worktree("a")
 	fixture.git(a, "merge", "-q", "--no-edit", "main")
 	// The worktree's submodule, a symlink to the main checkout's, at the pin.
-	os.RemoveAll(filepath.Join(a, "library"))
+	if removeError := os.RemoveAll(filepath.Join(a, "library")); removeError != nil {
+		test.Fatal(removeError)
+	}
 	if symlinkError := os.Symlink(filepath.Join(fixture.repository, "library"), filepath.Join(a, "library")); symlinkError != nil {
 		test.Fatal(symlinkError)
 	}
@@ -236,7 +238,7 @@ func TestLandChecksASymlinkedSubmoduleAgainstItsPin(test *testing.T) {
 	}
 }
 
-// The gate runs the same for every landing, whatever the caller's shell sets: GOFLAGS carries only the pool's
+// The gate runs the same for every landing, whatever the caller's shell sets: `GOFLAGS` carries only the pool's
 // -p and -buildvcs=false. A caller's -trimpath once failed a land gate on tests that find their fixtures by
 // their source path.
 func TestTheLandGateIgnoresTheCallersGoFlags(test *testing.T) {
@@ -272,7 +274,9 @@ func TestTheGateBuildsGoInATreeWhoseSubmoduleIsASymlink(test *testing.T) {
 	fixture.git(fixture.repository, "commit", "-q", "-m", "a module, and library pinned")
 	a := fixture.worktree("a")
 	fixture.git(a, "merge", "-q", "--no-edit", "main")
-	os.RemoveAll(filepath.Join(a, "library"))
+	if removeError := os.RemoveAll(filepath.Join(a, "library")); removeError != nil {
+		test.Fatal(removeError)
+	}
 	if symlinkError := os.Symlink(filepath.Join(fixture.repository, "library"), filepath.Join(a, "library")); symlinkError != nil {
 		test.Fatal(symlinkError)
 	}
@@ -336,7 +340,9 @@ func TestTheGateCoversEveryWorkspaceModuleButASubmodules(test *testing.T) {
 	fixture.git(fixture.repository, "commit", "-q", "-m", "a workspace of three modules, one in a submodule")
 	a := fixture.worktree("a")
 	fixture.git(a, "merge", "-q", "--no-edit", "main")
-	os.RemoveAll(filepath.Join(a, "library"))
+	if removeError := os.RemoveAll(filepath.Join(a, "library")); removeError != nil {
+		test.Fatal(removeError)
+	}
 	if symlinkError := os.Symlink(filepath.Join(fixture.repository, "library"), filepath.Join(a, "library")); symlinkError != nil {
 		test.Fatal(symlinkError)
 	}

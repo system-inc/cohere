@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"strings"
 	"testing"
 	"time"
@@ -13,7 +14,10 @@ import (
 // was correct, and the sentence they composed was wrong. A fragment check cannot see that.
 func render(report *pipelineReport) string {
 	builder := &strings.Builder{}
-	report.Write(builder)
+	stream := bufio.NewWriter(builder)
+	report.Write(stream)
+	// Ignored: a stream over a strings.Builder cannot fail to flush, since the builder's writes never do.
+	_ = stream.Flush()
 	return builder.String()
 }
 
@@ -48,14 +52,14 @@ func TestABailNamesTheUnreachedPhasesAndWarns(test *testing.T) {
 	// takes nothing from an opt-in phase that was never requested, and saying it did would
 	// manufacture a gap out of an ordinary run.
 	want := "phases: fix ran in 4ms · types ran in 12ms · lint did not run (types bailed: 4 type diagnostics)" +
-		" · unused skipped (not requested — this is a report, ask for it with --unused)\n" +
-		"  this run did not check everything — the phases above say what was not checked\n"
+		" · unused skipped (not requested \u2014 this is a report, ask for it with --unused)\n" +
+		"  this run did not check everything: the phases above say what was not checked\n"
 	if got != want {
 		test.Fatalf("the bail line reads wrong:\n  want %q\n  got  %q", want, got)
 	}
 }
 
-// An opt-in phase the caller DID ask for and that a bail then cut off is a real gap, and must read
+// An opt-in phase the caller did ask for and that a bail then cut off is a real gap, and must read
 // as one.
 //
 // This is the other half of the distinction above, and it is the half that would be easy to lose:
@@ -78,7 +82,7 @@ func TestARequestedUnusedPhaseCutOffByABailIsAGap(test *testing.T) {
 }
 
 // A bare run must not warn merely because unused was not requested, or the warning appears on every
-// ordinary run and people stop reading it — which costs exactly the case it exists for.
+// ordinary run and people stop reading it, which costs exactly the case it exists for.
 func TestAnUnrequestedUnusedPhaseDoesNotWarn(test *testing.T) {
 	test.Parallel()
 	report := &pipelineReport{}
@@ -120,7 +124,7 @@ func warnsAboutCoverage(line string) bool {
 
 // `--no-fix` checks the fix phase rather than skipping it, and says how many files would change, zero
 // included. It must not warn: it withheld nothing. This is the continuous-integration path and a
-// warning that fires on every green run is one people stop reading — which costs exactly the case
+// warning that fires on every green run is one people stop reading, which costs exactly the case
 // the warning exists for.
 func TestNoFixChecksAndDoesNotWarn(test *testing.T) {
 	test.Parallel()
@@ -234,7 +238,7 @@ func TestMarkingDoesNotDuplicateAnAlreadyRecordedPhase(test *testing.T) {
 // `lint ran in 0s` was the first version of this line and it stated two false things at once: that
 // the walk happened in the lint phase, and that it was free. The walk happened in the fix phase and
 // cost about a second. The counts printed beside it were real, which is what made the zero hard to
-// see — everything around it checked out.
+// see: everything around it checked out.
 func TestAReusedPhaseNamesWhatItReused(test *testing.T) {
 	test.Parallel()
 	report := &pipelineReport{}
@@ -284,7 +288,7 @@ func TestAReusedPhaseIsNotDoubleCounted(test *testing.T) {
 	//
 	// Asserted on the exact phases figure rather than on the absence of a wrong one. The first
 	// version of this check looked for a string the buggy version would not have printed either, so
-	// it passed against the defect it was written to catch — a guard that could not fail, which is
+	// it passed against the defect it was written to catch: a guard that could not fail, which is
 	// the shape this tree keeps producing. The value is checked directly now: fix's 1.5s and nothing
 	// from the reused row.
 	got := render(withReuse)
@@ -298,7 +302,7 @@ func TestAReusedPhaseIsNotDoubleCounted(test *testing.T) {
 //
 // A run narrowed to one file runs every phase it was asked for, so the phase lines report a
 // complete run and the existing sentence points at them. On the ahra tree that reads as
-// `this run did not check everything — the phases above say what was not checked` for a run that
+// `this run did not check everything: the phases above say what was not checked` for a run that
 // visited 1 file of 3,542, and the phases say nothing about the other 3,541.
 //
 // The gap is the larger of the two: skipping a phase withholds one kind of finding, and skipping
@@ -325,7 +329,7 @@ func TestCoverageNamesTheFilesItDidNotLookAt(test *testing.T) {
 	silent := &pipelineReport{}
 	silent.record(phaseLint, outcomeRan, 8*time.Millisecond, "")
 
-	if rendered := render(silent); strings.Contains(rendered, "files — the rest") {
+	if rendered := render(silent); strings.Contains(rendered, "files: the rest") {
 		test.Errorf("a report with no scope numbers should not invent them:\n%s", rendered)
 	}
 }
@@ -345,13 +349,17 @@ func TestProvenanceWarningFiresOnlyOnAModifiedTree(test *testing.T) {
 	report := &pipelineReport{}
 
 	modified := &strings.Builder{}
-	report.writeProvenanceWarning(modified, true)
+	modifiedStream := bufio.NewWriter(modified)
+	report.writeProvenanceWarning(modifiedStream, true)
+	flushStream(test, modifiedStream)
 	if !strings.Contains(modified.String(), "no commit reproduces these findings") {
 		test.Errorf("a modified tree should disclose itself: %q", modified.String())
 	}
 
 	clean := &strings.Builder{}
-	report.writeProvenanceWarning(clean, false)
+	cleanStream := bufio.NewWriter(clean)
+	report.writeProvenanceWarning(cleanStream, false)
+	flushStream(test, cleanStream)
 	if clean.String() != "" {
 		test.Errorf("a clean build should say nothing: %q", clean.String())
 	}

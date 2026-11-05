@@ -3,7 +3,8 @@
 // The TypeScript rule nexus/consistency-no-shouting and the Go engine's cohere-go/consistency-no-shouting both read
 // it, so an acronym added to the safe list, or a mask taught a new shape of code, quiets both at once. It lives in
 // its own package, importing nothing heavier than the standard library, because the nexus rules package links the
-// TypeScript checker and the Go engine must not.
+// TypeScript checker and the Go engine must not. The Go engine's cohere-go/consistency-no-warning-comment reads its
+// indented code block mask too, so the two Go rules agree on which lines of a doc comment are code shown verbatim.
 package shouting
 
 import (
@@ -21,7 +22,7 @@ import (
 //
 // The discriminator is shape, and it was bought with a corpus survey rather than guessed. A naive
 // "is it uppercase" test cannot separate shouted English from an acronym, and real prose is full of
-// both: the measured corpus put NOT, THE, IS, AND, ONE right beside SDK, API, DB, and RPC. An
+// both: the measured corpus put `NOT`, `THE`, `IS`, `AND`, `ONE` right beside SDK, API, DB, and RPC. An
 // acronym is usually a consonant cluster, or carries digits or underscores; a shouted word almost
 // always has a vowel and is a real word. Vowel-plus-allowlist was right across the whole corpus.
 //
@@ -82,13 +83,13 @@ var allowedUppercaseTokens = map[string]bool{
 	"RIFF": true, "RLE": true, "RLI": true, "RLM": true, "RLO": true, "ROAS": true, "ROI": true,
 	"RPC": true, "RSA": true, "S3": true, "SAAS": true, "SAFE": true, "SDK": true, "SEO": true, "SES": true,
 	"SGR": true, "SHA": true, "SID": true, "SKU": true, "SLA": true, "SNS": true, "SOI": true, "SPA": true,
-	"SPKI": true, "SQL": true, "SRE": true, "SSD": true, "SSE": true, "SSH": true, "SSL": true, "SSN": true,
-	"SSO": true, "STS": true, "SVG": true, "TIFF": true, "TL": true, "TLS": true, "TODO": true,
+	"SPKI": true, "SQL": true, "SRE": true, "SSA": true, "SSD": true, "SSE": true, "SSH": true, "SSL": true,
+	"SSN": true, "SSO": true, "STS": true, "SVG": true, "TIFF": true, "TL": true, "TLS": true, "TODO": true,
 	"TOML": true, "TS": true, "TSX": true, "TTL": true, "TTY": true, "TUI": true, "UDID": true,
 	"UGC": true, "UI": true,
 	"UPC": true, "UPS": true, "URI": true, "URL": true, "URN": true, "US": true, "USPS": true, "UTC": true,
 	"UTF": true, "UTM": true, "UUID": true, "UX": true, "VINT": true, "WAL": true, "WASM": true,
-	"WCAG": true, "WEBM": true, "WEBP": true, "WEBVTT": true, "WIP": true, "XML": true, "YAML": true,
+	"WCAG": true, "WEBM": true, "WEBP": true, "WEBVTT": true, "WHATWG": true, "WIP": true, "XML": true, "YAML": true,
 	"YTD": true, "YUV": true, "YYYY": true,
 }
 
@@ -117,7 +118,7 @@ var currencyCodes = map[string]bool{
 
 // shoutedTwoLetterWords are two-letter words that are shouting when capitalized.
 //
-// At two characters the vowel test cannot help, since IS and IP have the same shape. So the short
+// At two characters the vowel test cannot help, since `IS` and `IP` have the same shape. So the short
 // words are named, and every other two-letter token is assumed to be an abbreviation.
 var shoutedTwoLetterWords = map[string]bool{
 	"AM": true, "AN": true, "AS": true, "AT": true, "BE": true, "BY": true, "DO": true, "GO": true,
@@ -200,7 +201,7 @@ var (
 // line after the fence then reports against the wrong source line.
 func MaskCodeAndCommands(text string) string {
 	masked := blankKeepingNewlines(fencedBlock, text)
-	masked = maskIndentedCodeBlocks(masked)
+	masked = MaskIndentedCodeBlocks(masked)
 	masked = blankKeepingNewlines(inlineBackticks, masked)
 	masked = blankAll(doubleQuoted, masked)
 	masked = maskWrappedDoubleQuotes(masked)
@@ -278,7 +279,7 @@ func maskWrappedDoubleQuotes(text string) string {
 //
 // A quote is only a quote at a word boundary: the opening one must not follow a letter or a digit,
 // and the closing one must not be followed by one. Without that, the plural possessive in "the
-// users' 'NOT NULL'" could open a pair, and a quote glued to a suffix ('RENAME COLUMN'd) would mask
+// users' 'NOT NULL'" could open a pair, and a quote glued to a suffix (`'RENAME COLUMN'd`) would mask
 // a phrase the writer never closed. RE2 has no lookaround, so the boundary is checked on the match
 // indices rather than in the pattern.
 func maskSingleQuotedCapitalPhrases(text string) string {
@@ -350,7 +351,7 @@ func maskJsDocExamples(text string) string {
 	return strings.Join(lines, "\n")
 }
 
-// maskIndentedCodeBlocks blanks an indented code block, the markdown form of a fence: lines indented
+// MaskIndentedCodeBlocks blanks an indented code block, the markdown form of a fence: lines indented
 // four spaces or a tab, opened after a blank line (or at the start of the text) and running until a
 // line that is not indented. Without it, a sandbox command posted as an indented block had its
 // $HOME and TMPDIR read as shouting, and the quieted draft lowercased them into a command that no
@@ -361,7 +362,11 @@ func maskJsDocExamples(text string) string {
 // before the indentation is measured, so a comment's own indentation is never mistaken for a code
 // block, while an indented block written inside a JSDoc comment still is one. Mirrors nexus's
 // Shouting.ts, so the quieter and this rule agree on what is code.
-func maskIndentedCodeBlocks(masked string) string {
+//
+// Exported for the Go engine's comment rules, which mask a comment group's GoCommentBody texts joined
+// by newlines with it, so the shouting rule and the warning-comment rule agree on which lines of a doc
+// comment are a code block shown verbatim.
+func MaskIndentedCodeBlocks(masked string) string {
 	// Nothing can be indented four deep without four spaces or a tab somewhere.
 	if !strings.Contains(masked, "    ") && !strings.ContainsRune(masked, '\t') {
 		return masked
@@ -384,6 +389,19 @@ func maskIndentedCodeBlocks(masked string) string {
 		}
 	}
 	return strings.Join(lines, "\n")
+}
+
+// GoCommentBody is the text of a Go comment that MaskIndentedCodeBlocks measures, given the comment's
+// text as go/ast holds it. A // comment loses its slashes and the one space after them, as go/ast's
+// CommentGroup.Text strips them, so a tab or the further spaces after them are the indentation of a
+// go/doc code block. A block comment is kept whole, delimiters included, since the mask already knows
+// its gutter. The body is always a suffix of text, so its offsets map back by the length cut.
+func GoCommentBody(text string) string {
+	body, isLineComment := strings.CutPrefix(text, "//")
+	if !isLineComment {
+		return text
+	}
+	return strings.TrimPrefix(body, " ")
 }
 
 // maskCommandLines blanks a line that is plainly a command the reader is meant to run.

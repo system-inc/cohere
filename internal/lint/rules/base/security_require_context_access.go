@@ -17,7 +17,7 @@ var securityRequireContextAccessText = policy.MessageOf("base/security-require-c
 
 // SecurityRequireContextAccessRequirement pairs a protected context key with the decorators that unlock it.
 type SecurityRequireContextAccessRequirement struct {
-	// ContextKey is the name of the injected key that needs protecting, as it is EXPORTED rather
+	// ContextKey is the name of the injected key that needs protecting, as it is exported rather
 	// than as it is spelled at the injection site. An aliased import is resolved back to this name.
 	ContextKey string `json:"contextKey"`
 
@@ -29,8 +29,8 @@ type SecurityRequireContextAccessRequirement struct {
 // SecurityRequireContextAccessOptions configures the rule.
 //
 // The shape is the source's own. The judgment is generic -- `@InjectRequestContext` and
-// `@GraphQlFieldResolver` are base concepts every consumer has -- while WHICH keys are protected and
-// WHICH decorators unlock them is project configuration, so the rule ships knowing neither.
+// `@GraphQlFieldResolver` are base concepts every consumer has -- while which keys are protected and
+// which decorators unlock them is project configuration, so the rule ships knowing neither.
 type SecurityRequireContextAccessOptions struct {
 	// Requirements is the list. Empty means the rule has nothing to enforce and registers nothing,
 	// which is the source's `if(requirementMap.size === 0) return {}`.
@@ -240,7 +240,7 @@ func checkContextRequiresAccess(
 
 // securityRequireContextAccessReportTarget returns the node a finding points at.
 //
-// The source reports on `node.key`, the method's NAME, rather than on the whole method. That keeps
+// The source reports on `node.key`, the method's name, rather than on the whole method. That keeps
 // the caret on the thing a reader searches for and off the decorators, and it matters here because
 // a method with a long parameter list would otherwise underline the whole signature.
 //
@@ -258,9 +258,9 @@ func securityRequireContextAccessReportTarget(node *ast.Node) *ast.Node {
 // `import { AccountRequestContextKey as AK }` then `@InjectRequestContext(AK)` has to be matched
 // against the configured key rather than silently bypassing it.
 //
-// The map is keyed by LOCAL name, which has a consequence worth stating because it looks like a
+// The map is keyed by local name, which has a consequence worth stating because it looks like a
 // bug and is the source's behaviour: `import { Something as AccountRequestContextKey }` maps the
-// configured name AWAY to `Something`, so injecting it is CLEAN. Measured against the source rule.
+// configured name away to `Something`, so injecting it is clean. Measured against the source rule.
 // That is right rather than unfortunate -- the local name is a different symbol that happens to
 // share a spelling, and protecting it would be protecting the wrong thing.
 func securityRequireContextAccessImportAliases(file *ast.Node) map[string]string {
@@ -276,7 +276,7 @@ func securityRequireContextAccessImportAliases(file *ast.Node) map[string]string
 		for _, element := range imports.BindingsOf(statement).Named {
 			specifier := element.AsImportSpecifier()
 			// `PropertyName` is set only when the import is aliased, and it holds the name the
-			// symbol was exported under. Without an alias the local name IS the exported name and
+			// symbol was exported under. Without an alias the local name is the exported name and
 			// no entry is needed.
 			if specifier.PropertyName == nil {
 				continue
@@ -296,7 +296,7 @@ func securityRequireContextAccessImportAliases(file *ast.Node) map[string]string
 // decorator.
 //
 // Two argument shapes resolve and everything else answers nothing. A bare identifier answers itself.
-// A non-computed member access answers its PROPERTY, so `@InjectRequestContext(Keys.AccountKey)`
+// A non-computed member access answers its property, so `@InjectRequestContext(Keys.AccountKey)`
 // matches a requirement configured for `AccountKey` -- without that arm a namespaced key silently
 // bypasses the requirement, which the source's own comment records as a defect it fixed.
 //
@@ -339,12 +339,12 @@ func securityRequireContextAccessInjectedKey(decorator *ast.Node) string {
 //
 // # Why this is not `decorators.CallName`
 //
-// The shelf helper accepts a bare identifier CALL only, which is exactly right for the
+// The shelf helper accepts a bare identifier call only, which is exactly right for the
 // `GraphQlFieldResolver` exemption above and wrong here. The source uses a different helper for this
-// question, one that also accepts a decorator written WITHOUT parentheses: measured against the
+// question, one that also accepts a decorator written without parentheses: measured against the
 // source rule, `@RequireSessionAccess` with no call protects just as `@RequireSessionAccess()` does.
 //
-// Both helpers agree on the other direction: a qualified `@Access.RequireSessionAccess()` does NOT
+// Both helpers agree on the other direction: a qualified `@Access.RequireSessionAccess()` does not
 // protect, because the configured name is a bare identifier and a namespaced one is a different
 // symbol that happens to end in the same word. Also measured.
 func securityRequireContextAccessDecoratorNames(node *ast.Node) map[string]struct{} {
@@ -393,7 +393,7 @@ func securityRequireContextAccessDecoratorName(decorator *ast.Node) string {
 
 // securityRequireContextAccessEnclosingClass walks up to the class a member belongs to.
 //
-// The source reaches it as `methodNode.parent.parent`, which is the class BODY then the class.
+// The source reaches it as `methodNode.parent.parent`, which is the class body then the class.
 // typescript-go hangs members directly off the class, so this is one step -- written as a walk
 // rather than a single parent read so it stays correct if the parser ever inserts a body node.
 func securityRequireContextAccessEnclosingClass(node *ast.Node) *ast.Node {
@@ -414,8 +414,8 @@ func securityRequireContextAccessEnclosingClass(node *ast.Node) *ast.Node {
 // absent. Either way the author has committed to handling the missing case, so the access
 // requirement is skipped.
 //
-// A parameter with NO annotation at all is not soft use, which is worth stating because it reads the
-// other way round: an unannotated parameter is implicitly `any`, and `any` IS soft use when written
+// A parameter with no annotation at all is not soft use, which is worth stating because it reads the
+// other way round: an unannotated parameter is implicitly `any`, and `any` is soft use when written
 // out. The source tests the annotation and answers false when there is none, so the implicit case
 // reports. Measured, and reproduced rather than tidied.
 func securityRequireContextAccessParameterIsSoftUse(parameter *ast.Node) bool {
@@ -429,7 +429,7 @@ func securityRequireContextAccessParameterIsSoftUse(parameter *ast.Node) bool {
 // securityRequireContextAccessTypeAdmitsMissing answers whether a type annotation can be absent.
 //
 // Syntactic rather than type-driven, matching the source, which reads AST type nodes rather than
-// asking the checker. So an alias for `string | undefined` does NOT count, because the annotation
+// asking the checker. So an alias for `string | undefined` does not count, because the annotation
 // this sees is an identifier.
 func securityRequireContextAccessTypeAdmitsMissing(node *ast.Node) bool {
 	if node == nil {

@@ -79,7 +79,7 @@ var paginationArgumentName = regexp.MustCompile(`Pagination$`)
 // its parent. This is fidelity to the decision rather than to the workaround; the original's walk
 // exists for a parser difference we do not have.
 //
-// The kind guard IS load bearing, and it is the one thing the simplification must keep. A decorator
+// The kind guard is load bearing, and it is the one thing the simplification must keep. A decorator
 // can sit on a class, a method, a property or an accessor, and all four were measured reaching this
 // listener with a parent of that kind rather than `KindParameter`.
 //

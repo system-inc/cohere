@@ -1,10 +1,10 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"slices"
 	"strconv"
 	"strings"
@@ -33,7 +33,7 @@ type printedDeparture struct {
 // writeResolvedConfig answers language questions from the same program the lint run builds.
 // Globals come from TypeScript declarations, including the selected standard libraries; naming the
 // declaration files explains their origin without pretending ESLint's writable/readonly knob exists.
-func writeResolvedConfig(out io.Writer, config *configuration.Config, resolved configuration.Resolved, location projectLocation, path string) error {
+func writeResolvedConfig(out *bufio.Writer, config *configuration.Config, resolved configuration.Resolved, location projectLocation, path string) error {
 	base := optionsBase(config, location.Root)
 	if checkSettingsError := registry.CheckSettings(base); checkSettingsError != nil {
 		return fmt.Errorf("validating the lint config: %w", checkSettingsError)

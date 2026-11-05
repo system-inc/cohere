@@ -66,7 +66,7 @@ func TestALoneRunBorrowsAllButOneFreeToken(test *testing.T) {
 		return command, &output
 	}
 	logged := func(name string) string {
-		contents, _ := os.ReadFile(log)
+		contents := readMaybeMissing(test, log)
 		for _, line := range strings.Split(string(contents), "\n") {
 			if strings.HasPrefix(line, name+" ") {
 				return line

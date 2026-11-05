@@ -86,7 +86,7 @@ func TestNoEqNullFiresOnCasesBeyondTheCorpus(test *testing.T) {
 }
 
 // The clean cases beyond the corpus are what pin the predicate as being about the literal's
-// SPELLING rather than about the value compared, which is the part of upstream that reads like an
+// spelling rather than about the value compared, which is the part of upstream that reads like an
 // oversight and is not. All four measured clean against the installed build.
 func TestNoEqNullStaysSilentOnCasesBeyondTheCorpus(test *testing.T) {
 	test.Parallel()
@@ -121,7 +121,7 @@ func TestNoEqNullStaysSilentOnCasesBeyondTheCorpus(test *testing.T) {
 //
 // `if (x == null) { }` asserts columns 5 through 14, one-based and end-exclusive, which is the
 // zero-based half-open range [4,13) and the text `x == null`. The parenthesized case is included
-// because upstream's columns 5 through 16 say the parentheses are INSIDE the reported span even
+// because upstream's columns 5 through 16 say the parentheses are inside the reported span even
 // though the null they wrap is what triggered the finding.
 func TestNoEqNullSpansTheWholeComparison(test *testing.T) {
 	test.Parallel()

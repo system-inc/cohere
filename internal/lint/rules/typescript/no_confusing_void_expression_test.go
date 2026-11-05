@@ -258,7 +258,7 @@ func TestNoConfusingVoidExpressionStaysSilent(test *testing.T) {
 // TestNoConfusingVoidExpressionJudgesVoidNotUndefined is where cohere is deliberately quieter than
 // ESLint.
 //
-// Upstream tests `TypeFlags.VoidLike`, which is void OR undefined, and its corpus writes no
+// Upstream tests `TypeFlags.VoidLike`, which is void or undefined, and its corpus writes no
 // undefined-typed expression anywhere, so all 110 imported cases agree either way. Measured against
 // the installed rule before this change: an undefined-returning call assigned or in an arrow
 // shorthand reports exactly as a void-returning one does. That is a false positive. `void` says
@@ -360,13 +360,13 @@ func TestNoConfusingVoidExpressionDeclinesToRepairOverAComment(test *testing.T) 
 // TestNoConfusingVoidExpressionVoidReturningIsVoidNotVoidLike pins the narrower predicate under
 // ignoreVoidReturningFunctions.
 //
-// The option asks whether a function's return type INCLUDES VOID, and upstream tests
+// The option asks whether a function's return type includes void, and upstream tests
 // `isIntrinsicVoidType` per union constituent rather than the VoidLike flag mask it uses for the
 // expression itself. The two differ on `undefined`, which is VoidLike and is not void.
 //
 // A mutation widening this to VoidLike survived all 110 imported cases, because upstream's corpus
 // writes no `undefined` annotation under this option. Measured against the installed rule: a
-// function annotated `undefined` is NOT exempt, while `void` and `void | undefined` are.
+// function annotated `undefined` is not exempt, while `void` and `void | undefined` are.
 func TestNoConfusingVoidExpressionVoidReturningIsVoidNotVoidLike(test *testing.T) {
 	test.Parallel()
 

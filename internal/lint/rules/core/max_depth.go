@@ -14,7 +14,7 @@ type MaxDepthSettings struct {
 	// Maximum is the deepest nesting allowed before a block reports. Upstream's default is 4.
 	Maximum int
 
-	// Disabled reproduces the one option shape under which upstream reports NOTHING at all.
+	// Disabled reproduces the one option shape under which upstream reports nothing at all.
 	//
 	// `{"maximum": 0}` makes upstream's `option.maximum || option.max` evaluate to `undefined`,
 	// and every `depth > undefined` comparison is false, so the rule goes silent rather than
@@ -40,7 +40,7 @@ func DefaultMaxDepthSettings() MaxDepthSettings {
 //	["error", { "maximum": 2 }]
 //	["error", { "max": 2 }]     an older alias upstream still honours
 //
-// # The object form has a JavaScript quirk in it, and the two zero spellings do OPPOSITE things
+// # The object form has a JavaScript quirk in it, and the two zero spellings do opposite things
 //
 // Upstream's handling is two statements:
 //
@@ -48,7 +48,7 @@ func DefaultMaxDepthSettings() MaxDepthSettings {
 //	    maxDepth = option.maximum || option.max;
 //
 // The `hasOwn` guard decides whether the branch is entered; the `||` inside decides the value, and
-// it is a TRUTHINESS pick rather than a presence one. Those two tests disagree exactly when a zero
+// it is a truthiness pick rather than a presence one. Those two tests disagree exactly when a zero
 // is written, and the result is not what either reading alone predicts. Measured against the
 // installed rule, reading the limit out of its own message rather than inferring it from a count:
 //
@@ -61,10 +61,10 @@ func DefaultMaxDepthSettings() MaxDepthSettings {
 //	{}                      limit 4      neither key present, so the branch is not entered
 //
 // Both zero spellings are in upstream's corpus. `{"maximum": 0}` silencing the rule entirely is a
-// defect rather than a design, but it is a VERDICT and this port reproduces it: a rule that
+// defect rather than a design, but it is a verdict and this port reproduces it: a rule that
 // disagreed with the tool it replaces on a configuration somebody wrote would be the worse outcome,
 // and the divergence is recorded here rather than silently improved. An earlier draft of this
-// decoder read the `||` as a plain truthiness fallback and got BOTH zero rows wrong, which the
+// decoder read the `||` as a plain truthiness fallback and got both zero rows wrong, which the
 // corpus caught.
 //
 // Empty input decodes to the default rather than failing, which is what a rule configured as a bare
@@ -135,11 +135,11 @@ var messageMaxDepthTooDeeply = rule.Message{
 //	valid:   function f() { if (a) {} } function g() { if (b) {} }  (each function counts alone)
 //	invalid: function f() { if (a) { if (b) { if (c) {} } } }       (limit 2)
 //
-// # The depth is per FUNCTION, not per file, and that is the whole shape of the rule
+// # The depth is per function, not per file, and that is the whole shape of the rule
 //
 // Upstream keeps a stack of counters, pushes one when it enters any function-like node, and counts
 // blocks against the top of that stack. So two sibling functions each nesting three deep are two
-// separate measurements rather than one of six, and a nested function RESETS the count rather than
+// separate measurements rather than one of six, and a nested function resets the count rather than
 // inheriting it. The corpus pins that: `function f() { if (a) { function g() { if (b) {} } } }`
 // is clean at limit 1, because `g` starts over.
 //
@@ -149,7 +149,7 @@ var messageMaxDepthTooDeeply = rule.Message{
 // an exit hook nor anything but a pre-order walk. So the whole rule runs inside one
 // `KindSourceFile` listener that recurses itself, incrementing on the way down and decrementing on
 // the way back up. That is the shape the standard names for a rule that has to know what it is
-// INSIDE, and it is why there are no per-kind listeners here.
+// inside, and it is why there are no per-kind listeners here.
 //
 // # `else if` is one construct wearing two nodes, and it is the rule's only real discrimination
 //
@@ -160,7 +160,7 @@ var messageMaxDepthTooDeeply = rule.Message{
 // parent IfStatement whose `ElseStatement` is that node, while `else { if (b) {} }` -- braces --
 // gives the inner one a Block parent and correctly counts as a new level.
 //
-// # The span is the KEYWORD, not the statement
+// # The span is the keyword, not the statement
 //
 // Upstream reports `loc: sourceCode.getFirstToken(node).loc`, so the finding covers `if`, `for`,
 // `switch` and nothing else. Measured against the installed rule: columns 43-45 for an `if`,
@@ -246,13 +246,13 @@ func (w *maxDepthWalker) walk(node *ast.Node) {
 	// the member. Our parser hangs the body directly off the member -- probed, there is no wrapping
 	// node at all -- so the frame has to be pushed here instead.
 	//
-	// The distinguishing shape is a class nested INSIDE an already-deep block, and finding it took
+	// The distinguishing shape is a class nested inside an already-deep block, and finding it took
 	// a correction worth recording. The obvious argument -- "without a frame, two sibling methods
-	// would accumulate depth" -- is WRONG, because the depth decrements on the way out, so siblings
+	// would accumulate depth" -- is wrong, because the depth decrements on the way out, so siblings
 	// never accumulate whether or not a frame is pushed. A mutation deleting this arm survived both
 	// the corpus and a first set of sibling-method fixtures written from that argument.
 	//
-	// What a frame actually does is RESET the count, so it only shows where there is a count to
+	// What a frame actually does is reset the count, so it only shows where there is a count to
 	// reset. Measured against the installed rule, which reports zero on every row:
 	//
 	//	function f() { if (a) { class C { m() { if (b) {} } } } }             limit 1, clean
@@ -284,7 +284,7 @@ func (w *maxDepthWalker) walk(node *ast.Node) {
 // pushBlock is upstream's `pushBlock`: increment the current function's depth and report if the new
 // depth exceeds the limit.
 //
-// Reporting on the way IN rather than on the way out is upstream's order and it matters for a file
+// Reporting on the way in rather than on the way out is upstream's order and it matters for a file
 // with several findings, since it decides the sequence they arrive in.
 func (w *maxDepthWalker) pushBlock(node *ast.Node) {
 	if len(w.depths) == 0 {

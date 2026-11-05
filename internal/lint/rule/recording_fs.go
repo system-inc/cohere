@@ -73,6 +73,8 @@ func (recording *RecordingFS) note(path string, present bool) {
 }
 
 func (recording *RecordingFS) refuse(method string, path string) {
+	// Invariant: a recording file system wraps only readers (module resolution and rule reads), which never
+	// write, so a write here is a reader bug, refused before it can change what the recording describes.
 	panic(fmt.Sprintf("a recording file system refuses %s(%s): its reader must not write", method, path))
 }
 

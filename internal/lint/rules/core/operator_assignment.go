@@ -49,7 +49,7 @@ const (
 
 // OperatorAssignmentOptions carries upstream's single positional option.
 //
-// A pointer, because upstream's `defaultOptions: ["always"]` means an ABSENT option requires the
+// A pointer, because upstream's `defaultOptions: ["always"]` means an absent option requires the
 // shorthand. The zero value of a plain setting is the empty string, which matches neither arm and
 // makes the rule silent on every file it is meant to catch, and a rule configured as a bare
 // severity in the live config is exactly that case.
@@ -66,7 +66,7 @@ func DefaultOperatorAssignmentSettings() OperatorAssignmentOptions {
 // DecodeOperatorAssignmentOptions turns the configured value into options.
 //
 // Hand-rolled rather than `rule.DecodeOptionsInto` for the same two reasons the other string-enum
-// rules in this package are: the wire value is a bare STRING rather than an object, since cohere's
+// rules in this package are: the wire value is a bare string rather than an object, since cohere's
 // config layer strips the severity tuple before dispatch, and the default is not the zero value.
 // An unrecognised string is an error rather than a quiet fallback, because falling back would
 // enforce a mode nobody asked for and say nothing.
@@ -99,7 +99,7 @@ var operatorAssignmentShorthand = map[ast.Kind]struct {
 	compound ast.Kind
 	text     string
 	// commutative marks the four operators for which `x = y OP x` is also the same computation, and
-	// therefore reportable. Upstream's list is exactly `* & ^ |`. Notably `+` is NOT here: string
+	// therefore reportable. Upstream's list is exactly `* & ^ |`. Notably `+` is not here: string
 	// concatenation does not commute, so `x = y + x` is a different program.
 	commutative bool
 }{
@@ -121,7 +121,7 @@ var operatorAssignmentShorthand = map[ast.Kind]struct {
 //
 // Built from the table above rather than written twice, so the two cannot drift. The logical
 // assignments `&&= ||= ??=` are deliberately absent from both: upstream's `prohibit` skips them by
-// name, because they short-circuit and `x = x && y` is NOT the same program as `x &&= y` when `x`
+// name, because they short-circuit and `x = x && y` is not the same program as `x &&= y` when `x`
 // has a setter.
 var operatorAssignmentLongForm = func() map[ast.Kind]struct {
 	binary ast.Kind
@@ -166,16 +166,16 @@ var operatorAssignmentLongForm = func() map[ast.Kind]struct {
 // `x = y + x` and `x += y` differ whenever either side is a string. Upstream's table says so and
 // the corpus pins it with `x = y + x` as a clean case.
 //
-// The reversed form is reported and NEVER fixed, which upstream explains at the line: `x = b * a`
+// The reversed form is reported and never fixed, which upstream explains at the line: `x = b * a`
 // evaluates `b` before `a`, and `a *= b` evaluates `a` first, so a custom `valueOf` on either side
 // would observe the change. That decline is reproduced.
 //
 // # Comparing the two references
 //
 // This is upstream's `astUtils.isSameReference(left, right, true)`, and the third argument matters.
-// With it set, `x.y` and `x["y"]` are NOT the same reference, which is why `x[y] = x['y'] + z` and
+// With it set, `x.y` and `x["y"]` are not the same reference, which is why `x[y] = x['y'] + z` and
 // `x.y = x['y'] / z` are both clean upstream. A shelf helper of the same name already exists in this
-// package, in `no_self_assign.go`, and it is wrong for this rule in BOTH directions, measured
+// package, in `no_self_assign.go`, and it is wrong for this rule in both directions, measured
 // against the installed build at 10.8.1:
 //
 //	x.y = x["y"] + 1    the shelf says same, upstream is CLEAN      would over-report
@@ -287,7 +287,7 @@ func operatorAssignmentProhibit(ruleContext rule.Context, node *ast.Node) {
 
 // operatorAssignmentIsSameReference asks whether two expressions name the same place.
 //
-// This is upstream's `isSameReference` with `disableStaticComputedKey` set to TRUE, which is how
+// This is upstream's `isSameReference` with `disableStaticComputedKey` set to `true`, which is how
 // this rule calls it, and the flag is the reason this is not the shelf's helper of the same name.
 // With the flag set there is no static-key equivalence at all: a dot access and a bracket access
 // are compared structurally like any other pair, so `x.y` and `x["y"]` differ because one is a
@@ -343,7 +343,7 @@ func operatorAssignmentIsSameReference(left *ast.Node, right *ast.Node) bool {
 // operatorAssignmentCanBeFixed is upstream's `canBeFixed`.
 //
 // The repair is only safe when writing the target once instead of twice cannot change which getters,
-// setters or `toString` calls run. An identifier is safe, and so is a member access whose OBJECT is
+// setters or `toString` calls run. An identifier is safe, and so is a member access whose object is
 // an identifier or `this` and whose key is static. Anything deeper, such as `a.b.c`, is refused
 // because evaluating `a.b` twice may not be the same as evaluating it once.
 func operatorAssignmentCanBeFixed(node *ast.Node) bool {
@@ -358,7 +358,7 @@ func operatorAssignmentCanBeFixed(node *ast.Node) bool {
 		// An optional access is a `ChainExpression` upstream, and `canBeFixed` names
 		// `MemberExpression` only, so upstream reports and declines. Measured against the installed
 		// build at 10.8.1: `obj.a = obj?.a + b` reports `replaced` and carries a null fix. The two
-		// spellings still compare as the SAME reference, which is why the finding fires at all, so
+		// spellings still compare as the same reference, which is why the finding fires at all, so
 		// this decline lives here rather than in the comparison.
 		if access.QuestionDotToken != nil {
 			return false
@@ -413,7 +413,7 @@ func operatorAssignmentCommentsExistBetween(ruleContext rule.Context, from int, 
 // Upstream writes the text before the `=` unchanged, then the compound operator, then the text
 // after the binary operator. Copying those two slices verbatim is what preserves everything living
 // inside the replaced span, which is the hazard this project has now been bitten by twice: a fixer
-// that RE-RENDERS a construct loses whatever it did not think to re-render. Nothing is re-rendered
+// that re-renders a construct loses whatever it did not think to re-render. Nothing is re-rendered
 // here, so a type annotation, a non-null assertion or a generic argument inside either slice
 // survives because it is copied as bytes.
 func operatorAssignmentContractFix(
@@ -443,7 +443,7 @@ func operatorAssignmentContractFix(
 	}
 
 	leftText := text[nodeRange.Pos():equalsRange.Pos()]
-	// The slice ends at the UNWRAPPED binary expression rather than at the assignment node. Those
+	// The slice ends at the unwrapped binary expression rather than at the assignment node. Those
 	// are the same offset upstream, whose parser folds parentheses away, and they differ here: for
 	// `x = (x + y)` the node ends after the closing paren while the binary ends before it, and
 	// slicing to the node carried a stray `)` into the replacement. Upstream's own fix for that
@@ -460,7 +460,7 @@ func operatorAssignmentContractFix(
 //
 // The right operand may need parentheses. `x *= y + 1` becomes `x = x * (y + 1)` rather than
 // `x = x * y + 1`, which is a different computation. Upstream compares the right operand's
-// precedence against the NEW binary operator's and wraps when it does not bind tighter.
+// precedence against the new binary operator's and wraps when it does not bind tighter.
 // `x <<= y + 1` is the case that shows the comparison is against the new operator rather than a
 // constant: `+` binds tighter than `<<`, so no parentheses are added.
 //
@@ -521,7 +521,7 @@ func operatorAssignmentNeedsParentheses(right *ast.Node, binaryOperator ast.Kind
 		return false
 	}
 	// Upstream's `!isParenthesised(right)` half, kept because it is upstream's own test and
-	// INERT here, which is worth saying rather than leaving for the next reader to rediscover.
+	// inert here, which is worth saying rather than leaving for the next reader to rediscover.
 	// A mutation deleting it survived the whole corpus, and the reason is not a fixture gap:
 	// `operatorAssignmentPrecedence` answers 20 for a parenthesized expression while the loosest
 	// binary operator scores 15, so the comparison below already declines every input this line
@@ -573,11 +573,11 @@ func operatorAssignmentPrecedence(node *ast.Node) int {
 	case ast.KindAsExpression, ast.KindSatisfiesExpression:
 		// TypeScript only, so upstream's table has no row for either and a port inheriting that
 		// table gives them the tightest precedence by default. Measured, that is backwards: both
-		// bind LOOSER than every arithmetic operator, so `x + 1 as number` parses as
+		// bind looser than every arithmetic operator, so `x + 1 as number` parses as
 		// `(x + 1) as number` rather than `x + (1 as number)`.
 		//
 		// That made the `never` expansion silently re-associate: `x += 1 as number` was rewritten
-		// to `x = x + 1 as number`, which asserts the type of the SUM rather than of the addend.
+		// to `x = x + 1 as number`, which asserts the type of the sum rather than of the addend.
 		// The two parses were compared directly and they differ, which is what turned this from a
 		// suspicion into a defect. Ranking them below the loosest binary operator makes the fixer
 		// parenthesize, and no upstream fixture could have caught it because the corpus is
@@ -636,7 +636,7 @@ func operatorAssignmentBinaryPrecedence(operator ast.Kind) int {
 // Upstream asks espree whether the two tokens can be adjacent. Rather than port a tokenizer, the
 // surface was enumerated against the installed build at 10.8.1: every one of the twelve compound
 // operators was expanded against fourteen right-operand shapes written flush against it, and
-// exactly FIVE pairs need a space.
+// exactly five pairs need a space.
 //
 //   - before  +y      would lex as `++`
 //   - before  ++y     would lex as `++` then `+`

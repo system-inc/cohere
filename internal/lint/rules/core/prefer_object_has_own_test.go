@@ -15,7 +15,7 @@ import (
 // One valid case is not here and its absence is deliberate. Upstream writes
 // `/* global Object: off */` above an otherwise-reporting input, which turns the global off in its
 // own configuration surface and makes the scope guard fail. Our configuration has no such
-// directive and the checker has nothing to answer it with, so that input REPORTS here. It is
+// directive and the checker has nothing to answer it with, so that input reports here. It is
 // carried below as a recorded divergence rather than dropped or quietly greened, because deleting
 // it would leave no trace that upstream calls it clean.
 //
@@ -308,7 +308,7 @@ func TestPreferObjectHasOwnRequiresTheNameObject(test *testing.T) {
 			"Object.hasOwnProperty.call(obj, prop);"), "useHasOwn")
 	})
 
-	// `globalThis` resolves to a symbol with ZERO declarations, which is the shape that crashed a
+	// `globalThis` resolves to a symbol with zero declarations, which is the shape that crashed a
 	// probe written for this measurement. The rule's length guard is what keeps that a decline
 	// rather than a panic, and no upstream case reaches it.
 	test.Run("globalThisHasNoDeclarationsAndDoesNotPanic", func(test *testing.T) {

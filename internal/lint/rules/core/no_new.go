@@ -33,7 +33,7 @@ var messageNoNewStatement = rule.Message{
 //
 // # Parentheses, which are a parser difference rather than a judgment
 //
-// The upstream selector demands a DIRECT child, and in ESTree it gets one however many parentheses
+// The upstream selector demands a direct child, and in ESTree it gets one however many parentheses
 // are written, because that tree discards them. Ours does not: `(new Date())` parses as a
 // parenthesized expression wrapping the `new`. So the direct-child reading, ported literally, goes
 // silent on a case upstream reports.

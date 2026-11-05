@@ -96,7 +96,8 @@ func TestARuleCrashFailsTheRunAndNamesItselfAsCohere(test *testing.T) {
 	if code != 1 {
 		test.Errorf("exit %d under --json, want 1", code)
 	}
-	var crashes, summaries int
+	var crashes int
+	var summaries int
 	for _, line := range strings.Split(strings.TrimRight(output, "\n"), "\n") {
 		var record struct {
 			Kind    string `json:"kind"`

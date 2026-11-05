@@ -285,7 +285,7 @@ func firstTemplateHeadRawText(ruleContext rule.Context, value *ast.Node) (string
 	// before the value, `` \u0020`abc` `` with one, and `   /*c*/ `abc`` with a comment, so the
 	// offset genuinely varies.
 	//
-	// Replacing this search with a constant zero is an EQUIVALENT mutation and survives the whole
+	// Replacing this search with a constant zero is an equivalent mutation and survives the whole
 	// suite, which is recorded here so the next reader does not chase it as a blind spot. Retaining
 	// trivia only prepends text in front of the body, and every marker is a plain URL substring
 	// containing no backtick, so no prefix can break a `Contains`. Shifting the offset the other way

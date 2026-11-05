@@ -14,13 +14,13 @@ import (
 //
 // `ShippedRules` maps an upstream rule name to the name cohere registers that rule under. Until
 // 2026-08-24 every value read `react/<name>`, and not one of those strings was a registered rule:
-// the react-compiler rules register BARE. The map's own doc comment asserted the opposite, claiming
+// the react-compiler rules register bare. The map's own doc comment asserted the opposite, claiming
 // a rename on either side would be "a visible edit rather than a silent unjoin".
 //
 // It was silent for a reason worth stating, because it generalises past this map. `Classify` reads
-// only the KEY — `_, found := ShippedRules[ruleName]` — so the value was never evaluated by
+// only the key — `_, found := ShippedRules[ruleName]` — so the value was never evaluated by
 // anything. A field that no code path reads cannot be wrong in a way any test can see, and its
-// presence makes the file LOOK checked. That is worse than omitting it, and it is the mechanism
+// presence makes the file look checked. That is worse than omitting it, and it is the mechanism
 // behind the open finding that the parity guard cannot tell a namespaced spelling from a bare one.
 //
 // This test is the fix: it evaluates every value against the live registry. It lives in the registry
@@ -29,7 +29,7 @@ import (
 // `react_conformance_score` because that was the only reason score's test binary linked the whole rule
 // set, so every rule edit relinked it and reran its 5s of tests (#6gct10n).
 //
-// Scored by mutation: setting `hooks` back to `react/rules-of-hooks` SURVIVED the entire suite
+// Scored by mutation: setting `hooks` back to `react/rules-of-hooks` survived the entire suite
 // before this test existed, and so did corrupting an unwired rule's value. Both are caught now.
 func TestShippedRuleNamesAreRegistered(test *testing.T) {
 	test.Parallel()

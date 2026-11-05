@@ -1,8 +1,8 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
-	"io"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -397,7 +397,7 @@ func (s coverageSummary) coverageFilesLine(details bool) string {
 //
 // Each per-rule fact prints exactly once in either mode. A rule that needs action prints as its own
 // line by default and under its category with details, never both.
-func writeCoverage(out io.Writer, summary coverageSummary, details bool) {
+func writeCoverage(out *bufio.Writer, summary coverageSummary, details bool) {
 	fmt.Fprintln(out, summary.coverageCountedLine())
 	fmt.Fprintln(out, summary.coverageFilesLine(details))
 	writeCoverageNotes(out, summary, details)
@@ -405,7 +405,7 @@ func writeCoverage(out io.Writer, summary coverageSummary, details bool) {
 
 // writeCoverageDetails names every rule once, under the one category that describes it, with the
 // category's meaning said once at its heading.
-func writeCoverageDetails(out io.Writer, summary coverageSummary) {
+func writeCoverageDetails(out *bufio.Writer, summary coverageSummary) {
 	fmt.Fprintln(out, "  coverage details, each rule once:")
 	for _, category := range coverageCategoryOrder {
 		count := summary.count(category)
@@ -518,7 +518,7 @@ func skipLines(skips map[string]map[string]int) []string {
 // writeRuleSkips lists the rules that declined files because a compiler option or a missing precondition
 // left them unable to judge, each with how many files and why. A rule that skips reads exactly like one
 // that found nothing unless it is named here (#pa7k7zv).
-func writeRuleSkips(out io.Writer, skips map[string]map[string]int) {
+func writeRuleSkips(out *bufio.Writer, skips map[string]map[string]int) {
 	lines := skipLines(skips)
 	fmt.Fprintf(out, "  skipped (%d): rules that declined files on a compiler option or a missing precondition, so they checked nothing there\n", len(lines))
 	for _, line := range lines {
@@ -568,7 +568,7 @@ func (summary *coverageSummary) excuseRulesThatSkippedEveryFile(coverage program
 // writeRuleNotes lists what each rule counted rather than reported, by rule and then by key, each with
 // its count over the run. A `@processState` tag lands here as the type and how many writes it exempted,
 // so a tag on a widely used type shows up as a number someone reads rather than as a silence.
-func writeRuleNotes(out io.Writer, notes map[string]map[string]int) {
+func writeRuleNotes(out *bufio.Writer, notes map[string]map[string]int) {
 	ruleNames := make([]string, 0, len(notes))
 	total := 0
 	for ruleName, counts := range notes {
@@ -595,7 +595,7 @@ func writeRuleNotes(out io.Writer, notes map[string]map[string]int) {
 // writeDeadSuppressions names each disable comment that silenced nothing while a rule it names ran,
 // one per line as file:line and the rules it names, so the count on the files line can be acted on
 // from a whole-program run rather than hunted for one file at a time.
-func writeDeadSuppressions(out io.Writer, sites []program.DeadSuppression) {
+func writeDeadSuppressions(out *bufio.Writer, sites []program.DeadSuppression) {
 	sorted := append([]program.DeadSuppression(nil), sites...)
 	sort.Slice(sorted, func(left, right int) bool {
 		if sorted[left].File != sorted[right].File {
@@ -616,8 +616,8 @@ func writeDeadSuppressions(out io.Writer, sites []program.DeadSuppression) {
 
 // writeCrashedNote names one file a rule could not finish. Printed in full in both modes and before the
 // details, because a file nothing checked needs action.
-func writeCrashedNote(out io.Writer, fileName string, cause any) {
-	fmt.Fprintf(out, "  crashed: %s: %s\n", fileName, runCrash{Path: fileName, Cause: fmt.Sprint(cause)}.message())
+func writeCrashedNote(out *bufio.Writer, fileName string, cause string) {
+	fmt.Fprintf(out, "  crashed: %s: %s\n", fileName, runCrash{Path: fileName, Cause: cause}.message())
 }
 
 // namedGapsSentence is what "this run did not check everything" says when every phase ran and a file
@@ -682,7 +682,7 @@ func wantedConfiguredRules(lintConfig *configuration.Config) int {
 // within weeks: the figures drift with every rule that lands, while the reason they matter does not.
 // The live numbers belong in the line this prints, which is derived, and not in a comment. This is
 // the same omission the differential harness carried until `7b590f6`.
-func writeParityCoverage(out io.Writer, rules []rule.Rule, lintConfig *configuration.Config) {
+func writeParityCoverage(out *bufio.Writer, rules []rule.Rule, lintConfig *configuration.Config) {
 	if lintConfig == nil {
 		return
 	}
@@ -713,7 +713,7 @@ type lintReport struct {
 // nothing must not be able to look like a run that found nothing, and the only way to guarantee that is
 // to make the population as visible as the findings. `--coverage` widens what is named; it never
 // decides whether the counts print.
-func writeLintReport(out io.Writer, report lintReport) {
+func writeLintReport(out *bufio.Writer, report lintReport) {
 	for _, diagnostic := range report.Result.Diagnostics {
 		printRuleDiagnostic(out, diagnostic, report.LintConfig)
 	}
@@ -723,8 +723,10 @@ func writeLintReport(out io.Writer, report lintReport) {
 	}
 	// The account below is `--verbose`'s; the footer carries what a reader needs of it in every view.
 	account := accountOutput(out)
-	fmt.Fprintf(accountOutput(invocationOutput(out)),
-		"lint: %d findings — %d rules over %d files, %d nodes visited%s, %s%s\n",
+	// The dash is escaped, not changed: internal/differential finds this line by it, and swift/Contract.md
+	// names it as the line both engines print.
+	printInvocation(accountOutput(out),
+		"lint: %d findings \u2014 %d rules over %d files, %d nodes visited%s, %s%s\n",
 		len(report.Result.Diagnostics), coverage.RulesRun, coverage.FilesWalked, coverage.NodesVisited, nodesReplayedClause(coverage),
 		report.WalkCost,
 		replayedFromCache(report.Result),
@@ -763,7 +765,7 @@ func writeLintReport(out io.Writer, report lintReport) {
 // --verbose. They are real rules, a core rule cohere hasn't ported or another plugin's, so a directive
 // naming one is a note rather than a finding (#v1ah2qq): it silences nothing here, and a repository
 // written for ESLint carries many. Most named first, each with how many comments named it.
-func writeUnrunRuleReferences(out io.Writer, references map[string]int) {
+func writeUnrunRuleReferences(out *bufio.Writer, references map[string]int) {
 	if len(references) == 0 {
 		return
 	}
@@ -794,7 +796,7 @@ func writeUnrunRuleReferences(out io.Writer, references map[string]int) {
 // one with no reason; printing it is what stops a reasoned one becoming a quiet allowance, because a
 // reader of any run can see each place the project and the house disagree and judge whether the reason
 // still holds.
-func writeDepartures(out io.Writer, lintConfig *configuration.Config) {
+func writeDepartures(out *bufio.Writer, lintConfig *configuration.Config) {
 	if lintConfig == nil || len(lintConfig.Departures) == 0 {
 		return
 	}
@@ -817,7 +819,7 @@ func writeDepartures(out io.Writer, lintConfig *configuration.Config) {
 // on every run and by default. A scoped override needs no reason, so one that gives a reason is usually
 // standing in for unfinished work, and printing it keeps that work in front of whoever reads a run until
 // the override can go.
-func writeOverrideReasons(out io.Writer, lintConfig *configuration.Config) {
+func writeOverrideReasons(out *bufio.Writer, lintConfig *configuration.Config) {
 	if lintConfig == nil {
 		return
 	}
@@ -852,7 +854,7 @@ func (s coverageSummary) offWithoutReasonCount() int {
 
 // writeCoverageNotes is the part of the coverage block after the two counted lines: crashed files in
 // full, then the rules that need action by default or every rule once with details.
-func writeCoverageNotes(out io.Writer, summary coverageSummary, details bool) {
+func writeCoverageNotes(out *bufio.Writer, summary coverageSummary, details bool) {
 	for _, crash := range summary.Crashes {
 		writeCrashedNote(out, crash.File, crash.Cause)
 	}

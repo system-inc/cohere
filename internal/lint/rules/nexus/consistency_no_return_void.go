@@ -113,8 +113,8 @@ func consistencyNoReturnVoidReplacement(ruleContext rule.Context, node *ast.Node
 	operandRange := rule.TokenRange(ruleContext.SourceFile, operand)
 	operandText := sourceText[operandRange.Pos():operandRange.End()]
 
-	canonical := regexp.MustCompile(`^return\s+void\s+` + regexp.QuoteMeta(operandText) + `\s*;$`)
-	if !canonical.MatchString(statementText) {
+	canonical, compileError := regexp.Compile(`^return\s+void\s+` + regexp.QuoteMeta(operandText) + `\s*;$`)
+	if compileError != nil || !canonical.MatchString(statementText) {
 		return "", false
 	}
 	first := operandText[0]

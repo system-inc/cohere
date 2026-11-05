@@ -455,7 +455,11 @@ func TestTheTransformFormatsARealNonIdempotentInputToItsFixpoint(test *testing.T
 	if formatted != twice {
 		test.Fatalf("the transform stopped short of the fixpoint:\n--- transform\n%s--- two passes\n%s", formatted, twice)
 	}
-	if again, _ := formatTransform(engine)("Report.ts", formatted, nil); again != formatted {
+	again, againError := formatTransform(engine)("Report.ts", formatted, nil)
+	if againError != nil {
+		test.Fatal(againError)
+	}
+	if again != formatted {
 		test.Fatalf("the transform's own output is rewritten by the next run:\n%s", again)
 	}
 }

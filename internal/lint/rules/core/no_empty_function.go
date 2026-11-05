@@ -14,28 +14,28 @@ import (
 // noEmptyFunctionAllowKinds is upstream's `ALLOW_OPTIONS`, in its order.
 //
 // Fourteen values, and four of them describe TypeScript rather than JavaScript. That is worth
-// stating because the typescript-eslint EXTENSION of this rule exists and reads as though it adds
+// stating because the typescript-eslint extension of this rule exists and reads as though it adds
 // them: measured against eslint 10.8.1, core already handles a private constructor, a protected
 // constructor, a constructor taking parameter properties, a decorated method and an override
-// method. The extension's only real difference is SPELLING, `private-constructors` against
+// method. The extension's only real difference is spelling, `private-constructors` against
 // `privateConstructors`, and core refuses the kebab form at config load.
 //
 // # That claim is now measured across the whole extension corpus rather than probed
 //
 // `@typescript-eslint/no-empty-function` is not ported here, and this is why. Driving upstream's
 // core and upstream's extension over identical inputs on the installed 8.67.0 build, across the
-// extension's own corpus of nine passing and seven failing cases: ZERO behavioural differences on
+// extension's own corpus of nine passing and seven failing cases: zero behavioural differences on
 // every case where both configurations load. The only two divergent rows are the ones spelling an
 // allow value in kebab, which eslint core rejects at config load rather than answering differently.
 //
 // `decoratedFunctions` and `overrideMethods` are spelled identically in both, and a parameter
-// property is exempt in both UNCONDITIONALLY rather than behind an allow value, which is the part
+// property is exempt in both unconditionally rather than behind an allow value, which is the part
 // most likely to be misread from the extension's source.
 //
 // This rule was then run against that same extension corpus with the two kebab spellings translated
 // and reproduced it exactly, nine of nine passing and seven of seven failing.
 //
-// So porting the extension would register a second NAME rather than a second check. A rule package
+// So porting the extension would register a second name rather than a second check. A rule package
 // may not import another rule package, so a wrapper would need this file's body lifted into
 // `internal/utilities`, and the captured rule inventory carried no entry for this rule under either
 // spelling, so nothing in the differential asks for the name. The audit lists the extension as an
@@ -59,7 +59,7 @@ var noEmptyFunctionAllowKinds = []string{
 
 // NoEmptyFunctionOptions carries upstream's one option.
 //
-// `Allow` defaults to an EMPTY LIST, so the zero value is the safe direction: an absent key and an
+// `Allow` defaults to an empty list, so the zero value is the safe direction: an absent key and an
 // explicit empty list mean the same thing, and nothing is silently exempted.
 type NoEmptyFunctionOptions struct {
 	Allow []string `json:"allow"`
@@ -120,7 +120,7 @@ var messageNoEmptyFunctionSuggestComment = rule.Message{
 //
 // Upstream listens on three function types and reads `node.parent` to decide what it is: a `Property`
 // with `kind: "get"` is a getter, a `MethodDefinition` with `kind: "constructor"` is a constructor,
-// and so on. Our parser produces those as their OWN node kinds, so there is no wrapper to read: a
+// and so on. Our parser produces those as their own node kinds, so there is no wrapper to read: a
 // class getter arrives as `KindGetAccessor` directly. This listens on seven kinds and reads the node
 // rather than its parent.
 //
@@ -179,7 +179,7 @@ var NoEmptyFunction = rule.Rule{
 					noEmptyFunctionNameWithKind(node)),
 			}, rule.Suggestion{
 				Message: messageNoEmptyFunctionSuggestComment,
-				// Upstream replaces the range BETWEEN the braces, which is why the output keeps the
+				// Upstream replaces the range between the braces, which is why the output keeps the
 				// braces the reported span includes: `{}` becomes `{ /* empty */ }`.
 				Fixes: []rule.Fix{
 					rule.ReplaceRange(
@@ -278,7 +278,7 @@ func noEmptyFunctionHasModifier(node *ast.Node, want ast.Kind) bool {
 //
 // Three tests, in upstream's order. The plain kind match is the common one. The constructor arm adds
 // accessibility and, unconditionally, a constructor taking parameter properties, because
-// `constructor(private x: number)` is not an empty constructor at all: the parameter list IS the
+// `constructor(private x: number)` is not an empty constructor at all: the parameter list is the
 // body, assigning the field. The accessor and method arm adds decorators and `override`.
 func noEmptyFunctionIsAllowed(node *ast.Node, allow []string) bool {
 	kind := noEmptyFunctionKind(node)
@@ -338,7 +338,7 @@ func noEmptyFunctionHasParameterProperties(node *ast.Node) bool {
 //
 // A neighbouring rule in this package has a version of the same helper and its doc comment says it
 // is "narrowed to the two kinds this rule can be handed", so it cannot serve here: this corpus
-// asserts TWENTY distinct renderings and that one produces three of them.
+// asserts twenty distinct renderings and that one produces three of them.
 //
 // The shape, read off those twenty rather than inferred:
 //
@@ -354,7 +354,7 @@ func noEmptyFunctionHasParameterProperties(node *ast.Node) bool {
 //
 // That last row is the one worth pausing on. The function there is anonymous, and upstream still
 // renders `foo`, because it reads the name from the enclosing property rather than from the
-// function. So the name and the KIND come from different places for the same node.
+// function. So the name and the kind come from different places for the same node.
 func noEmptyFunctionNameWithKind(node *ast.Node) string {
 	prefix := ""
 	if noEmptyFunctionHasModifier(node, ast.KindStaticKeyword) {
@@ -372,7 +372,7 @@ func noEmptyFunctionNameWithKind(node *ast.Node) string {
 		// `const foo = async () => {}`.
 		return prefix + "arrow function"
 	case ast.KindConstructor:
-		// Never named, and that is a property of the PARSER rather than a choice here. A mutation
+		// Never named, and that is a property of the parser rather than a choice here. A mutation
 		// passing `node.Name()` to the joining helper survives every fixture, because a
 		// `KindConstructor` carries no name on any input: probed across five shapes including a
 		// named class expression and a quoted `'constructor'` key, which parses as an ordinary
@@ -393,7 +393,7 @@ func noEmptyFunctionNameWithKind(node *ast.Node) string {
 		return noEmptyFunctionJoinName(prefix+"function", name)
 	}
 	if parent := node.Parent; parent != nil && parent.Kind == ast.KindPropertyAssignment {
-		// Upstream calls this a METHOD here rather than a function, because the property makes it
+		// Upstream calls this a method here rather than a function, because the property makes it
 		// one, while its `getKind` still classifies it as `functions` for the allow list. The two
 		// answers genuinely differ for the same node.
 		return noEmptyFunctionJoinName(prefix+"method", parent.Name())

@@ -152,11 +152,11 @@ func consistentTypeImportsSomeAreOnlyTypes(names []string) rule.Message {
 // not by position, which is the half a reading of the AST cannot supply. Measured on the release
 // binary, all four with the same import:
 //
-//	export { Type };        SILENT   — a value export
-//	export default Type;    SILENT   — a value export
-//	export = Type;          SILENT   — a value export
-//	export type { Type };   REPORTS  — a type-only export
-//	export { type Type };   REPORTS  — likewise, per specifier
+//	export { Type };        SILENT     a value export
+//	export default Type;    SILENT     a value export
+//	export = Type;          SILENT     a value export
+//	export type { Type };   REPORTS    a type-only export
+//	export { type Type };   REPORTS    likewise, per specifier
 //
 // Upstream reaches the same answers by a route worth recording, because it looks like it should
 // give different ones. Its semantic builder marks all of these `Read | Type`, genuinely ambiguous,
@@ -605,6 +605,8 @@ func isReferencedOnlyAsType(
 //
 // The walk asks only when the option is on, which is the whole gate: without metadata no type position
 // reaches run time.
+//
+// Mutates: roots the scan's walk gathers one set of roots across every node it visits
 func markDecoratorMetadataRoots(current *ast.Node, roots map[*ast.Node]bool, metadata decoratorMetadataSettings) {
 	if !ast.CanHaveDecorators(current) || !ast.HasDecorators(current) || current.Modifiers() == nil ||
 		!ast.NodeCanBeDecorated(metadata.legacyDecorators, current, current.Parent, current.Parent.Parent) {

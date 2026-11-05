@@ -29,3 +29,18 @@ var subject = 2
 
 // Code that writes the word is not a comment: the rule reads comments only.
 var marker = "TODO"
+
+// documented shows the rule's own cases the way a doc comment shows code, in a block indented by a tab, which go/doc
+// prints verbatim, so a task written there is an example of one and defers nothing:
+//
+//	invalid: // TODO: fix this
+//	invalid: /* FIXME */
+//	invalid: // XXX races
+//
+// The block holds until a line that is not indented.
+func documented() {}
+
+// A comment that is no doc comment keeps the spaces it is written with, and four after the slashes and their one
+// space indent a code block too.
+//
+//     legacy() // TODO in a block indented by spaces

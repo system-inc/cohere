@@ -20,7 +20,7 @@ func noConfusingNonNullAssertionCaseName(index int) string {
 //
 // Four of upstream's eight are parenthesized, which is not decoration: they are the whole of its
 // `tokenAfterLeft !== ')'` test, and they are what keeps this port from reporting a left operand
-// that merely CONTAINS an assertion.
+// that merely contains an assertion.
 func TestNoConfusingNonNullAssertionStaysSilent(test *testing.T) {
 	test.Parallel()
 
@@ -38,7 +38,7 @@ func TestNoConfusingNonNullAssertionStaysSilent(test *testing.T) {
 		// Measured silent on the installed build. Each would report under a plausible wrong port,
 		// and none is expressible from upstream's corpus.
 
-		// The operators NOT in the confusing set, which is the half of the set definition the
+		// The operators not in the confusing set, which is the half of the set definition the
 		// corpus never exercises. `a! != b` is the shape a naive reading flags first and it is
 		// silent, because the assertion and the operator are already spelled apart.
 		"a! != b;\n",
@@ -46,14 +46,14 @@ func TestNoConfusingNonNullAssertionStaysSilent(test *testing.T) {
 		"a! < b;\n",
 		"a! += b;\n",
 
-		// A bang that is the last CHARACTER of the left operand without being its last TOKEN.
+		// A bang that is the last character of the left operand without being its last token.
 		// This is the only way the text test could diverge from upstream's token test, and the
 		// parser does not produce it: the closing quote or bracket is the final character in each.
 		"'a!' == b;\n",
 		"`a!` == b;\n",
 		"x[`!`] == b;\n",
 
-		// `a!!== b` parses as `a!` with the operator `!==`, so the left text DOES end in a bang
+		// `a!!== b` parses as `a!` with the operator `!==`, so the left text does end in a bang
 		// and the operator test is what declines it. This is the one input where the two halves of
 		// the judgment could disagree, and it is pinned so a change to either is visible.
 		"a!!== b;\n",
@@ -74,7 +74,7 @@ func TestNoConfusingNonNullAssertionStaysSilent(test *testing.T) {
 // TestNoConfusingNonNullAssertionFires is upstream's eleven reporting cases verbatim, with their
 // message ids, their rendered message text, their spans, and every suggestion each one offers.
 //
-// The suggestions are asserted by APPLYING them and comparing the rewritten source against
+// The suggestions are asserted by applying them and comparing the rewritten source against
 // upstream's own `output` field, because rule_testing has no ExpectFixedSource equivalent for a
 // suggestion. A suggestion asserted only by its message id is a repair nothing checks, and this
 // rule's wrap suggestion writes two separate edits, so a single-edit applier would pass it while
@@ -297,7 +297,7 @@ func TestNoConfusingNonNullAssertionFires(test *testing.T) {
 
 // applySuggestionFixes replays every edit a suggestion carries, highest offset first.
 //
-// Hand-rolled because rule_testing.ExpectFixedSource applies FIXES and this rule ships only
+// Hand-rolled because rule_testing.ExpectFixedSource applies fixes and this rule ships only
 // suggestions, which the harness deliberately does not apply: a suggestion changes what the code
 // means and a human has to choose it. Descending order so an earlier edit does not move a later
 // one, which matters here because the wrap suggestion writes an opening and a closing paren as

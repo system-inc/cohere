@@ -73,9 +73,12 @@ func TestARecordingFileSystemNotesEveryPathAndRefusesWrites(test *testing.T) {
 	}
 
 	for name, write := range map[string]func(){
-		"WriteFile":  func() { recording.WriteFile(tspath.RootedFilePath(project+"/out.css"), "") },
+		// Ignored: the call panics before returning an error, which the deferred recover below checks.
+		"WriteFile": func() { recording.WriteFile(tspath.RootedFilePath(project+"/out.css"), "") },
+		// Ignored: the call panics before returning an error.
 		"AppendFile": func() { recording.AppendFile(tspath.RootedFilePath(project+"/out.css"), "") },
-		"Remove":     func() { recording.Remove(tspath.RootedPath(project + "/source/theme.css")) },
+		// Ignored: the call panics before returning an error.
+		"Remove": func() { recording.Remove(tspath.RootedPath(project + "/source/theme.css")) },
 	} {
 		func() {
 			defer func() {

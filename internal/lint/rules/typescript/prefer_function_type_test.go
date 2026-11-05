@@ -50,7 +50,7 @@ type preferFunctionTypeFinding struct {
 	wantId      string
 	wantMessage string
 
-	// wantPosition is the byte offset the finding starts at, asserted only where the span TEXT
+	// wantPosition is the byte offset the finding starts at, asserted only where the span text
 	// cannot separate two candidates. The `this` message points at one of several `this` tokens and
 	// every one of them slices to the same four characters, so a port reporting the last instead of
 	// the first satisfies every span assertion. Zero means "not asserted", which is safe because no
@@ -290,7 +290,7 @@ func TestPreferFunctionTypeFires(test *testing.T) {
 			wantOutput: "type Foo = () => string;\n",
 		},
 		{
-			// Measured, not imported. A comment ABOVE the interface is not a comment on the member and must not be moved. It survives
+			// Measured, not imported. A comment above the interface is not a comment on the member and must not be moved. It survives
 			// here because it sits outside the declaration's token range; an earlier version of this rule
 			// filtered on `node.Pos()`, which reaches back over leading trivia, and duplicated it.
 			sourceText: "/** docs */\ninterface Foo {\n  (): string;\n}\n",
@@ -304,7 +304,7 @@ func TestPreferFunctionTypeFires(test *testing.T) {
 			wantOutput: "/** docs */\ntype Foo = () => string;\n",
 		},
 		{
-			// Measured, not imported. Export, generics, and a moved comment at once. The comment goes ABOVE the `export` because it
+			// Measured, not imported. Export, generics, and a moved comment at once. The comment goes above the `export` because it
 			// cannot sit between `export` and `type`, and the type parameter list survives with its closing
 			// angle bracket, which sits one byte past what the parameter list's own End reports.
 			sourceText: "export interface Foo<T> {\n  // c\n  (a: T): T;\n}\n",
@@ -319,7 +319,7 @@ func TestPreferFunctionTypeFires(test *testing.T) {
 		},
 		{
 			// Measured, not imported. A construct signature alone is reported and rewritten to a constructor type. Upstream's corpus
-			// only writes a construct signature BESIDE a call signature, where it is a passing case, so
+			// only writes a construct signature beside a call signature, where it is a passing case, so
 			// nothing imported exercises the reporting half.
 			sourceText: "interface Foo {\n  new (): string;\n}\n",
 			wantFindings: []preferFunctionTypeFinding{
@@ -345,7 +345,7 @@ func TestPreferFunctionTypeFires(test *testing.T) {
 			wantOutput: "type X = (() => void)[];\n",
 		},
 		{
-			// Measured, not imported. The call signature carries its OWN type parameters while the interface has none, which is a
+			// Measured, not imported. The call signature carries its own type parameters while the interface has none, which is a
 			// different path through the alias rebuild than an interface with type parameters.
 			sourceText: "interface Foo {\n  <T>(a: T): T;\n}\n",
 			wantFindings: []preferFunctionTypeFinding{
@@ -419,7 +419,7 @@ func TestPreferFunctionTypeFires(test *testing.T) {
 		},
 
 		{
-			// Measured, and it exists because a mutant reporting the LAST `this` instead of the
+			// Measured, and it exists because a mutant reporting the last `this` instead of the
 			// first survived every fixture: both tokens slice to the same four characters, so the
 			// span text cannot tell them apart and only the offset can. Driven on the installed
 			// 8.67.0 build, which reports at line 2 column 9, the first one.

@@ -52,15 +52,15 @@ func buildNoUndefInitMessage(name string) rule.Message {
 // upstream because the listener is `VariableDeclarator` and a property declaration is not one. That
 // falls out of anchoring on the same node here rather than needing an arm.
 //
-// # The global `undefined` has NO declarations, which is the trap
+// # The global `undefined` has no declarations, which is the trap
 //
 // The shipped shadow test in this package, `resolvesToAGlobal` in `no_new_native_nonconstructor.go`,
 // asks whether the symbol's first declaration lives in a declaration file. That is right for
-// `Symbol` and `BigInt` and WRONG for this name: measured with a probe over five inputs, the real
+// `Symbol` and `BigInt` and wrong for this name: measured with a probe over five inputs, the real
 // global `undefined` resolves to a symbol with **zero declarations**, so the shipped predicate
 // answers false for it and a rule built on it would be silent on every reporting case. The question
 // here is therefore the complement, asked directly: does this identifier resolve to a symbol that
-// something in SOURCE declares. Zero declarations means the global, which reports.
+// something in source declares. Zero declarations means the global, which reports.
 //
 // # The fixer, and its four declines
 //
@@ -139,15 +139,15 @@ func undefinedIsShadowed(ruleContext rule.Context, identifier *ast.Node) bool {
 // the global of that name.
 //
 // The test is "does anything in a non-declaration file declare this", and a name nothing declares is
-// the global. That is the COMPLEMENT of `resolvesToAGlobal` in `no_new_native_nonconstructor.go`
+// the global. That is the complement of `resolvesToAGlobal` in `no_new_native_nonconstructor.go`
 // rather than its negation, and the difference is measured rather than stylistic: probed over five
-// inputs, the real global `undefined` resolves to a symbol with ZERO declarations, so asking
+// inputs, the real global `undefined` resolves to a symbol with zero declarations, so asking
 // "is the first declaration in a declaration file" answers false for it and any rule built on that
 // predicate is silent on every case it should report. `window` and `globalThis` do have declaration
 // file declarations, so both predicates agree for those two and only this one is right for all
 // three.
 //
-// A declaration living in a `.d.ts` is NOT a shadow. ESLint's scope analysis is per-file and cannot
+// A declaration living in a `.d.ts` is not a shadow. ESLint's scope analysis is per-file and cannot
 // see another file's ambient declaration at all, so upstream reports whatever a neighbouring
 // declaration file says; ours can see it, and fidelity is to the decision rather than to the
 // mechanism. Reachable rather than theoretical: with a real `.d.ts` in the program the symbol

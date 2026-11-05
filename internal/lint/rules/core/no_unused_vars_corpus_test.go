@@ -764,7 +764,7 @@ func TestNoUnusedVarsStaysSilentOnUpstreamCleanCases(test *testing.T) {
 
 // TestNoUnusedVarsFiresOnUpstreamReportingCases asserts the reporting half.
 //
-// A count rather than a whitelist, and it is deliberately an EXACT count rather than a floor. A
+// A count rather than a whitelist, and it is deliberately an exact count rather than a floor. A
 // floor would go green if the rule started reporting more, which is the direction a false positive
 // arrives from, and this rule's clean-case suite is the only other thing watching for that.
 //
@@ -798,10 +798,10 @@ func TestNoUnusedVarsFiresOnUpstreamReportingCases(test *testing.T) {
 // closed without giving something up that is worth more than the finding.
 var noUnusedVarsKnownGaps = []string{
 	// Upstream cannot report this one either, and says so in its own source. `tests/eslint.rs:744`
-	// ships this line in the FAIL list while the two neighbouring spellings sit COMMENTED OUT at
+	// ships this line in the fail list while the two neighbouring spellings sit commented out at
 	// `:743` and `:745` — oxc knows all three should report and can only manage one. The two it
 	// gives up on are `cb = function(a){ return cb(1+a); }()` and `cb = (0, function(a){ cb(1+a);
-	// })`, and both appear in its PASS list at `:16` and `:17`, so the same source text is
+	// })`, and both appear in its pass list at `:16` and `:17`, so the same source text is
 	// simultaneously a passing case and a known-unreportable failing case.
 	//
 	// This port reports the two spellings upstream reports and stays silent on the sequence form,

@@ -51,7 +51,8 @@ func TestALateEarlyFormatScopeFindsWhatAPromptOneDoes(test *testing.T) {
 			command.Env = append(command.Env, "COHERE_TEST_LATE_EARLY_FORMAT="+hold.String())
 		}
 		started := time.Now()
-		output, _ := command.CombinedOutput()
+		output, runError := command.CombinedOutput()
+		requireChildRan(test, runError)
 		if held && time.Since(started) < hold {
 			test.Fatalf("the held run took %s, under the %s hold, so the early pass was not held:\n%s", time.Since(started), hold, output)
 		}

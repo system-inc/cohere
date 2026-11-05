@@ -22,7 +22,7 @@ type blockScopedVarCase struct {
 // The corpus is ESLint's own, extracted mechanically rather than retyped.
 //
 // `tests/lib/rules/block-scoped-var.js` was loaded with its RuleTester stubbed so every case came
-// out as data, then each was replayed against the INSTALLED rule in `node_modules` to record how
+// out as data, then each was replayed against the installed rule in `node_modules` to record how
 // many findings it produces. All 106 reproduced, so the counts below are measurements. Four cases
 // were byte-identical duplicates of another row and are dropped, leaving 102.
 //
@@ -166,7 +166,7 @@ func TestBlockScopedVarStaysSilent(test *testing.T) {
 
 // Which identifier the finding points at, and which declaration it names.
 //
-// The message-id fixtures above see neither. This rule reports the USE, not the declaration, and
+// The message-id fixtures above see neither. This rule reports the use, not the declaration, and
 // the message names the declaration by line and column, so a port pointing at the declaration and
 // naming the use would satisfy every count above while inverting the whole finding.
 //
@@ -176,7 +176,7 @@ func TestBlockScopedVarPointsAtTheUseAndNamesTheDeclaration(test *testing.T) {
 
 	cases := []struct {
 		sourceText string
-		// The 1-based column each finding must POINT at. Columns rather than the spelled text,
+		// The 1-based column each finding must point at. Columns rather than the spelled text,
 		// because every identifier in these cases spells the same one or two letters: a test
 		// comparing text passes just as happily when the finding points at the declaration
 		// instead of the use, which is the exact inversion this test exists to refuse. A mutant

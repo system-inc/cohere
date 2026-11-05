@@ -22,7 +22,7 @@ type preferObjectSpreadCase struct {
 	// and the case is clean for that reason alone. Our program is ES2022 and the checker knows the
 	// name unconditionally, so those cases cannot be expressed here.
 	ecmaVersionGated bool
-	// repairNotExpressible marks a case whose FINDINGS are asserted but whose applied text cannot
+	// repairNotExpressible marks a case whose findings are asserted but whose applied text cannot
 	// be, and there are exactly two reasons, both structural rather than rule defects.
 	//
 	// A nested `Object.assign` produces two findings whose repairs overlap. Upstream applies
@@ -233,7 +233,7 @@ func TestPreferObjectSpreadAddedCases(test *testing.T) {
 		{
 			name: "a call inside a statement it does not start needs no semicolon",
 			// Upstream asks `isStartOfExpressionStatement`, and the corpus only ever writes calls
-			// that DO start one, so a mutation removing the start test survived every imported
+			// that do start one, so a mutation removing the start test survived every imported
 			// case. Here the call sits after an operator, so the leading paren cannot be misread
 			// and no semicolon is written. Measured: upstream produces `x + ({ ...bar})`.
 			source:      "foo\nx + Object.assign({}, bar)",
@@ -243,7 +243,7 @@ func TestPreferObjectSpreadAddedCases(test *testing.T) {
 		{
 			name: "a call that starts a deeper expression still needs the semicolon",
 			// The other half of the same test: the call is the leftmost part of a member access
-			// which is itself the statement, so the semicolon IS written. Together these two pin
+			// which is itself the statement, so the semicolon is written. Together these two pin
 			// the walk rather than just its existence.
 			source:      "foo\nObject.assign({}, bar).x",
 			fixedSource: "foo\n;({ ...bar}).x",
@@ -264,14 +264,14 @@ func TestPreferObjectSpreadAddedCases(test *testing.T) {
 // TestPreferObjectSpreadDeclinesOnARecoveredParse pins the bracket sanity check.
 //
 // The fixer replaces the call's last character with a closing brace, which is only correct when
-// that character IS the closing parenthesis. Error recovery breaks that: an HTML-like comment is a
+// that character is the closing parenthesis. Error recovery breaks that: an HTML-like comment is a
 // sloppy-script legacy production TypeScript does not parse, so the call's span ends on an
 // identifier instead. Measured: for the corpus's `<!--` case the span ends on the `d` of `weird`.
 //
 // Without the guard the repair writes a brace over that character and corrupts the file. A
 // mutation removing it survived every imported case, because the one case that reaches it is the
 // same case whose applied text cannot be compared, so the finding assertion alone could not see it.
-// This asserts what the finding OFFERS instead.
+// This asserts what the finding offers instead.
 func TestPreferObjectSpreadDeclinesOnARecoveredParse(test *testing.T) {
 	test.Parallel()
 

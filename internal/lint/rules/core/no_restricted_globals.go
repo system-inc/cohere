@@ -80,7 +80,7 @@ type noRestrictedGlobalsObjectWire struct {
 // DecodeNoRestrictedGlobalsOptions reads either of upstream's option shapes off the config.
 //
 // Hand rolled rather than routed through the generic helper because upstream's schema is an `anyOf`
-// of two LISTS: every element a restricted global (a string or a `{name, message}` object), as in
+// of two lists: every element a restricted global (a string or a `{name, message}` object), as in
 // `["error", "event", {"name": "fdescribe", "message": "..."}]`, or exactly one element that is an
 // object carrying that list plus two flags, `["error", {"globals": [...], "checkGlobalObject":
 // true}]`. The rule registers with `DecodeOptionList` and is handed that list whole.
@@ -177,7 +177,7 @@ var messageNoRestrictedGlobalsCustom = rule.Message{
 //
 // `create` returns an empty visitor when the list is empty, so an unconfigured rule registers no
 // listener and reports nothing. Unlike `no-restricted-syntax`, which is in the same family, the
-// configuration here is a list of plain NAMES rather than a selector language, so it is portable:
+// configuration here is a list of plain names rather than a selector language, so it is portable:
 // nothing about the option depends on a node vocabulary our tree does not have.
 //
 // # The predicate is "does this name resolve to a source declaration", and it is the inverse of the
@@ -188,9 +188,9 @@ var messageNoRestrictedGlobalsCustom = rule.Message{
 // resolve to nothing at all). We have no scope table, and the checker answers the union of both
 // questions directly, but only if the predicate is written the right way round.
 //
-// `resolvesToAGlobal`, the shipped helper for this shape, answers FALSE when the symbol carries
+// `resolvesToAGlobal`, the shipped helper for this shape, answers `false` when the symbol carries
 // zero declarations, and that is precisely one of the cases here: measured, `globalThis` resolves
-// to a symbol with no declarations, and `window` and `self` resolve to NO SYMBOL AT ALL under the
+// to a symbol with no declarations, and `window` and `self` resolve to no symbol at all under the
 // fixture harness's `lib: ["ES2022"]`, identically to a name nobody declared anywhere. Using that
 // helper would make this rule silent on most of what it must report.
 //
@@ -209,7 +209,7 @@ var messageNoRestrictedGlobalsCustom = rule.Message{
 //
 // Upstream carries a `TYPE_NODES` set of five ESTree kinds and declines any reference whose parent
 // is one of them. `const x: Promise<any> = Promise.resolve();` restricting `Promise` reports
-// exactly ONCE: the annotation is exempt and the value reference is not. A port ignoring type
+// exactly once: the annotation is exempt and the value reference is not. A port ignoring type
 // positions reports twice on that single case, and a port exempting too much reports zero.
 //
 // Measured, upstream's five ESTree kinds collapse to three of ours. `TSTypeReference`,
@@ -271,7 +271,7 @@ func checkNoRestrictedGlobalReference(ruleContext rule.Context, node *ast.Node,
 	if !isNoRestrictedGlobalsObjectName(node.Text(), settings) {
 		return
 	}
-	// The global object has to RESOLVE, and not merely be unshadowed. Upstream reads
+	// The global object has to resolve, and not merely be unshadowed. Upstream reads
 	// `getVariableByName(globalScope, name)` and returns early when it finds nothing, so a name
 	// nobody declared is not the global object even under this option.
 	//
@@ -283,7 +283,7 @@ func checkNoRestrictedGlobalReference(ruleContext rule.Context, node *ast.Node,
 	//
 	// `globalThis` differs because eslint always knows it. Measured, our checker draws the same
 	// line by itself: `globalThis` resolves to a symbol carrying zero declarations, while `window`
-	// and `self` resolve to NO SYMBOL under a program whose lib does not declare them, and to a
+	// and `self` resolve to no symbol under a program whose lib does not declare them, and to a
 	// declaration-file symbol under one that does. So "the symbol exists" reproduces upstream's
 	// "the scope knows this name" without a scope table, and it reproduces the environment
 	// sensitivity too: the same file answers differently under a DOM lib and a bare one, which is
@@ -305,7 +305,7 @@ func reportNoRestrictedGlobalThroughObject(ruleContext rule.Context, node *ast.N
 	if access == nil {
 		return
 	}
-	// The identifier has to be the OBJECT of the access rather than the property. Without this,
+	// The identifier has to be the object of the access rather than the property. Without this,
 	// `foo.window.bar()` reports, and upstream's four `foo.<globalObject>.bar()` cases are clean.
 	if !isNoRestrictedGlobalsAccessObject(access, node) {
 		return
@@ -380,7 +380,7 @@ func noRestrictedGlobalsAccessedNameNode(access *ast.Node) *ast.Node {
 // undefined. A nil symbol means nobody declared the name, in the standard library or anywhere else,
 // so it is not the global object and `checkGlobalObject` has nothing to walk.
 //
-// Deliberately NOT `identifierIsShadowed` inverted. That helper answers false for a nil symbol,
+// Deliberately not `identifierIsShadowed` inverted. That helper answers false for a nil symbol,
 // which is the right answer to "is this shadowed" and the wrong one to "does this exist", and the
 // two questions are both asked at this site for different reasons.
 func noRestrictedGlobalsObjectResolves(ruleContext rule.Context, node *ast.Node) bool {

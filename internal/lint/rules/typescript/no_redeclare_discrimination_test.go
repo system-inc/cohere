@@ -7,7 +7,7 @@ import (
 )
 
 // TestPartitionAndKindSeparatesAllTwentyThree runs the exact 23 cases from the earlier identity
-// probe through the SHIPPED rule, and ASSERTS rather than logging.
+// probe through the shipped rule, and asserts rather than logging.
 //
 // The earlier probe scored "distinct symbol identity" alone and disagreed with upstream on 7 of
 // these 23: five false negatives where duplicate var, function and enum declarations share one
@@ -17,7 +17,7 @@ import (
 //
 // The shipped rule does not use symbol identity at all, which is why those 7 are not its problem.
 // Grep it: no GetSymbolAtLocation, no symbol comparison, only prose in the doc comment. It groups
-// declaration NODES by their enclosing scope and then reads the declaration KINDS in the group. The
+// declaration nodes by their enclosing scope and then reads the declaration kinds in the group. The
 // two false positives are answered by the partition, and the five false negatives are answered by
 // the kind arithmetic, because a var beside a var is not a member of any merge set.
 //
@@ -33,7 +33,7 @@ func TestPartitionAndKindSeparatesAllTwentyThree(test *testing.T) {
 		// note records why the case is here when it is one of the seven identity got wrong.
 		note string
 	}{
-		// Identity AGREED on these. They are the merge family, and they stay correct.
+		// Identity agreed on these. They are the merge family, and they stay correct.
 		{"dup class", "class E {}\nclass E {}", 1, ""},
 		{"dup type alias", "type G = string;\ntype G = number;", 1, ""},
 		{"var and function", "var b = 1;\nfunction b() {}", 1, ""},
@@ -51,7 +51,7 @@ func TestPartitionAndKindSeparatesAllTwentyThree(test *testing.T) {
 		{"overloads", "declare function K(a: string): void;\ndeclare function K(a: number): void;", 0, ""},
 		{"class interface namespace", "class Z {}\ninterface Z {}\nnamespace Z {}", 0, ""},
 
-		// The five identity got WRONG in the silent direction. Each is a duplicate that shares one
+		// The five identity got wrong in the silent direction. Each is a duplicate that shares one
 		// symbol, so identity saw one binding and predicted clean while upstream reports. Kind
 		// arithmetic answers all five: none of these pairs is drawn from a merge set.
 		{"dup enum", "enum H {A}\nenum H {B}", 1, "identity predicted clean; two enums are not a merge set"},
@@ -60,7 +60,7 @@ func TestPartitionAndKindSeparatesAllTwentyThree(test *testing.T) {
 		{"var and type alias", "var d = 1;\ntype d = string;", 1, "identity predicted clean; a type alias merges with nothing"},
 		{"let and type alias", "let u = 1;\ntype u = string;", 1, "identity predicted clean; same, through a let"},
 
-		// The two identity got WRONG in the reporting direction. Each is one name in two scopes that
+		// The two identity got wrong in the reporting direction. Each is one name in two scopes that
 		// do not overlap, so identity saw two bindings and predicted a finding while upstream is
 		// silent. The scope partition answers both: two groups of one rather than one group of two.
 		{"separate function scopes", "function f1() { var x = 1; }\nfunction f2() { var x = 2; }", 0, "identity predicted a finding; the partition keeps these apart"},
@@ -92,7 +92,7 @@ func TestPartitionAndKindSeparatesAllTwentyThree(test *testing.T) {
 // pairing reports. Verified against the installed build case by case rather than read off the source.
 //
 // The property that makes this its own shape rather than a variant of the covered ones: it reports
-// under BOTH option values. `class A {} namespace A {}` is silent by default and reports with
+// under both option values. `class A {} namespace A {}` is silent by default and reports with
 // `ignoreDeclarationMerge` off, so its verdict moves with the option. A type alias has no exemption
 // to turn off, so both columns below are the same.
 func TestNoRedeclareTypeAliasBelongsToNoMergeSet(test *testing.T) {

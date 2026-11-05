@@ -589,8 +589,8 @@ var consistentTypeImportsMeasuredCases = []struct {
 	{
 		// A class `extends` clause parses to KindExpressionWithTypeArguments here while `implements`
 		// parses to KindTypeReference, so the two are separated by the parse shape rather than by a
-		// heritage-clause token. Measured on the release binary: this input is SILENT and the
-		// `implements` case below REPORTS. Upstream's corpus writes neither, so nothing imported can
+		// heritage-clause token. Measured on the release binary: this input is silent and the
+		// `implements` case below reports. Upstream's corpus writes neither, so nothing imported can
 		// see a port that treats a superclass as type-only and proposes erasing an import the emitted
 		// code needs.
 		name:    "classExtendsIsAValueUse",
@@ -628,7 +628,7 @@ var consistentTypeImportsMeasuredCases = []struct {
 	},
 	{
 		// Resolves through GetExportSpecifierLocalTargetSymbol rather than GetSymbolAtLocation, and is
-		// then a VALUE use because the export carries no `type` keyword.
+		// then a value use because the export carries no `type` keyword.
 		name:    "exportNamedIsAValueUse",
 		source:  "import Type from 'foo';\nexport { Type };\n",
 		options: "",
@@ -649,7 +649,7 @@ var consistentTypeImportsMeasuredCases = []struct {
 		ids:     []string{"typeOverValue"},
 	},
 	{
-		// IsPartOfTypeNode answers FALSE here, with a parent of KindTypeQuery. Probed directly against
+		// IsPartOfTypeNode answers false here, with a parent of KindTypeQuery. Probed directly against
 		// the parser. A port resting on that predicate alone goes silent on this and on the qualified
 		// name below.
 		name:    "typeofIsATypeUse",
@@ -701,7 +701,7 @@ var consistentTypeImportsMeasuredCases = []struct {
 	},
 	{
 		// The distinguishing input for the exemption: identical module, identical use, different local
-		// name, and it REPORTS on the release binary. Without this case the exemption could be written
+		// name, and it reports on the release binary. Without this case the exemption could be written
 		// as a module-specifier test and every imported fixture would still pass.
 		name:    "renamedReactLocalIsNotExempt",
 		source:  "import Renamed from 'react';\ntype T = Renamed.FC;\n",
@@ -743,7 +743,7 @@ var consistentTypeImportsMeasuredCases = []struct {
 	},
 	{
 		// Pins the default of the option most likely to be got wrong. Every other boolean option in this
-		// tree defaults to false; this one defaults to TRUE, so a Go zero value silently disables an arm
+		// tree defaults to false; this one defaults to true, so a Go zero value silently disables an arm
 		// worth three of the corpus's seventy-nine diagnostics. The empty options payload here is the
 		// bare `\"error\"` shape.
 		name:    "disallowTypeAnnotationsDefaultsOn",
@@ -858,7 +858,7 @@ func TestConsistentTypeImportsPointsAtTheRightNode(test *testing.T) {
 		},
 		{
 			// Under the inverted setting the two anchors differ: a declaration for the statement
-			// form and a SPECIFIER for the inline one. This is the case that separates them.
+			// form and a specifier for the inline one. This is the case that separates them.
 			name:    "declarationThenSpecifierUnderNoTypeImports",
 			source:  "import type { A } from 'foo';\nimport { type B } from 'foo';\ntype T = A | B;\n",
 			options: "{\"prefer\":\"no-type-imports\"}",

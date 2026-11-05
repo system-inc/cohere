@@ -221,7 +221,7 @@ func TestNoNewFuncReportsWhyItMatters(test *testing.T) {
 	}
 }
 
-// The shadow discrimination on the INDIRECT arm, which the imported corpus cannot see.
+// The shadow discrimination on the indirect arm, which the imported corpus cannot see.
 //
 // Upstream's corpus shadows `Function` in six cases and reaches it through `call`/`bind`/`apply` in
 // four, and no case does both. So a port that checks the global on the direct arm and forgets it on
@@ -300,14 +300,14 @@ func TestNoNewFuncDeclinesANumericMethodSubscript(test *testing.T) {
 	}
 }
 
-// The receiver kind guard is CRASH protection, not a behavioral filter, and no findings fixture can
+// The receiver kind guard is crash protection, not a behavioral filter, and no findings fixture can
 // see that.
 //
 // `Node.Text()` panics with "Unhandled case in Node.Text" on a `KindPropertyAccessExpression`, so
 // without the kind test `foo.Function.call(null)` takes the whole linter down rather than producing
 // a wrong finding. A mutation removing the guard therefore survives every `ExpectFindings` and
 // `ExpectClean` case in this file while being a crash, which is why these rows exist and why they
-// are described as what they PREVENT rather than what they decide.
+// are described as what they prevent rather than what they decide.
 //
 // All four are clean on eslint 10.8.1: upstream reaches the global through its scope analysis rather
 // than by reading a receiver's text, so a qualified name never enters its loop at all.

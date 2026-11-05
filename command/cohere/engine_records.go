@@ -1,9 +1,9 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
-	"io"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -11,6 +11,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/edit"
 	"github.com/system-inc/cohere/internal/release/packaging"
+	"github.com/system-inc/cohere/internal/streams"
 )
 
 // engineContractVersion is the version of swift/Contract.md this front door speaks.
@@ -192,8 +193,11 @@ var engineOutcomes = map[string]phaseOutcome{
 // record is a finding nobody sees. And every count the stream states twice is compared, because two
 // numbers that should agree and do not are a defect in one of them, and printing either would be
 // printing a number nobody can vouch for.
+//
+// out is shown after each finding and each phase's line, so a person sees what the engine found as it arrives,
+// and a slow phase's line before its wait rather than when the run ends.
 type engineRun struct {
-	out  io.Writer
+	out  *bufio.Writer
 	mode engineMode
 
 	// language is the words this run prints for its engine, so a sentence never names a language the run
@@ -256,7 +260,7 @@ type engineRun struct {
 // newEngineRun starts rendering one engine's run, naming the step nothing can skip by what the engine
 // describes first, its package, module or workspace.
 func newEngineRun(
-	out io.Writer,
+	out *bufio.Writer,
 	mode engineMode,
 	language engineLanguage,
 	rootNote string,
@@ -281,7 +285,7 @@ func (r *engineRun) accept(line []byte) error {
 		Kind string `json:"kind"`
 	}
 	if decodeError := json.Unmarshal(line, &envelope); decodeError != nil {
-		return fmt.Errorf("a line that is not a record: %q (%v)", truncateForError(line), decodeError)
+		return fmt.Errorf("a line that is not a record: %q (%w)", truncateForError(line), decodeError)
 	}
 
 	if r.summary != nil {
@@ -326,7 +330,7 @@ func (r *engineRun) accept(line []byte) error {
 // decodeRecord decodes a line into its record type and hands it on.
 func decodeRecord[Record any](line []byte, record *Record, accept func(*Record) error) error {
 	if decodeError := json.Unmarshal(line, record); decodeError != nil {
-		return fmt.Errorf("a record that does not decode: %q (%v)", truncateForError(line), decodeError)
+		return fmt.Errorf("a record that does not decode: %q (%w)", truncateForError(line), decodeError)
 	}
 	return accept(record)
 }
@@ -359,13 +363,14 @@ func (r *engineRun) acceptProject(record *engineProjectRecord) error {
 	r.project = record
 
 	elapsed := time.Duration(record.ElapsedMilliseconds) * time.Millisecond
-	line := fmt.Sprintf("%s described in %s — %d %s in the %s, %d of them ours",
+	line := fmt.Sprintf("%s described in %s: %d %s in the %s, %d of them ours",
 		r.language.Container, round(elapsed), record.FilesInPackage, r.language.FileNoun, r.language.Container,
 		record.FilesOurs)
 	if record.FilesInScope != record.FilesOurs || record.ScopeDescription != "" {
 		line += fmt.Sprintf(", %d in scope (%s)", record.FilesInScope, record.ScopeDescription)
 	}
 	fmt.Fprintln(accountOutput(r.out), line)
+	streams.Show(r.out)
 	activeSummary.FilesInScope, activeSummary.FilesChecked = record.FilesInScope, record.FilesInScope
 	activeSummary.Gaps.NothingToCheck = record.FilesInScope == 0
 
@@ -494,9 +499,11 @@ func (r *engineRun) acceptUnusedCoverage(record *engineUnusedCoverageRecord) err
 	r.unusedPending = nil
 	r.unusedCoverage++
 
+	// The dashes here and in the items below are escaped, not changed: the report is in the TypeScript unused
+	// report's shape (internal/unused_exports/report.go, swift/Contract.md), so the two print the same bytes.
 	if !r.unusedHeadingPrinted {
 		r.unusedHeadingPrinted = true
-		fmt.Fprintf(r.out, "\nunused: a report, not a gate — nothing here fails a build\n")
+		fmt.Fprintf(r.out, "\nunused: a report, not a gate \u2014 nothing here fails a build\n")
 	}
 	// File, line, then column, so two items on one line print in the same order on every run.
 	sort.SliceStable(items, func(first, second int) bool {
@@ -509,9 +516,9 @@ func (r *engineRun) acceptUnusedCoverage(record *engineUnusedCoverageRecord) err
 		return items[first].Column < items[second].Column
 	})
 	if len(items) > 0 {
-		fmt.Fprintf(r.out, "\n  %s — %d\n", swiftUnusedSection(record.Rule), len(items))
+		fmt.Fprintf(r.out, "\n  %s \u2014 %d\n", swiftUnusedSection(record.Rule), len(items))
 		for _, item := range items {
-			fmt.Fprintf(r.out, "    %s:%d:%d — %s\n", item.File, item.Line, item.Column, item.Subject)
+			fmt.Fprintf(r.out, "    %s:%d:%d \u2014 %s\n", item.File, item.Line, item.Column, item.Subject)
 		}
 	}
 	fmt.Fprintf(r.out, "  looked at %d files and %d %s (%s)\n", record.FilesChecked, record.Checked, swiftUnusedNoun(record.Rule), record.Rule)
@@ -580,6 +587,7 @@ func (r *engineRun) acceptFix(record *engineFixRecord) error {
 	// An engine from before the list sends none, and the run then states the counts alone: the footer
 	// leaves out a cohered count it was not given, rather than print a zero it does not know.
 	if record.ChangedFiles == nil {
+		streams.Show(r.out)
 		return nil
 	}
 	changed, changedFilesError := r.changedFiles(*record.ChangedFiles, record.FilesRewritten)
@@ -588,6 +596,7 @@ func (r *engineRun) acceptFix(record *engineFixRecord) error {
 	}
 	activeSummary.Changed = changed
 	printChangedFiles(r.out, changed)
+	streams.Show(r.out)
 	return nil
 }
 
@@ -646,6 +655,7 @@ func (r *engineRun) acceptTypes(record *engineTypesRecord) error {
 		fmt.Fprintf(accountOutput(r.out), "  types: no compiler record for %s, so its diagnostics are unknown\n", file)
 	}
 	r.filesWithoutRecord += len(record.FilesWithoutRecord)
+	streams.Show(r.out)
 	return nil
 }
 
@@ -661,7 +671,9 @@ func (r *engineRun) acceptLint(record *engineLintRecord) error {
 	if record.ReusedFrom != "" {
 		walkCost = fmt.Sprintf("walked by the %s phase (nothing was rewritten, so its findings still hold)", record.ReusedFrom)
 	}
-	fmt.Fprintf(accountOutput(r.out), "lint: %d findings — %d rules over %d files, %d nodes visited, %s\n",
+	// The dash is escaped, not changed: it is the TypeScript run's lint line, which internal/differential finds
+	// by it. See writeLintReport.
+	fmt.Fprintf(accountOutput(r.out), "lint: %d findings \u2014 %d rules over %d files, %d nodes visited, %s\n",
 		record.Findings, record.RulesRun, record.FilesWalked, record.NodesVisited, walkCost)
 	activeSummary.Rules = record.RulesRun
 	activeSummary.FilesInScope, activeSummary.FilesChecked = record.FilesWalked, record.FilesWalked
@@ -682,6 +694,7 @@ func (r *engineRun) acceptLint(record *engineLintRecord) error {
 		fmt.Fprintf(accountOutput(r.out), "  %s\n", record.ConfigNote)
 	}
 	r.writeExcluded()
+	streams.Show(r.out)
 	return nil
 }
 

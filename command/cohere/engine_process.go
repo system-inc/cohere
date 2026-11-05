@@ -10,6 +10,8 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/system-inc/cohere/internal/streams"
 )
 
 // engineWaitDelay bounds how long Wait may wait on the engine's pipes after the engine has ended. Killing
@@ -55,6 +57,10 @@ func runEngineBinaryUntil(
 	if stdoutPipeError != nil {
 		return 1, fmt.Errorf("connecting to %s's output: %w", run.language.theEngine(), stdoutPipeError)
 	}
+	// The engine's stderr is the terminal's, written by the engine itself, so what this run said first is
+	// delivered first.
+	streams.Show(streams.Output)
+	streams.Show(streams.Errors)
 	if startError := command.Start(); startError != nil {
 		return 1, fmt.Errorf("starting %s %s: %w", run.language.theEngine(), binaryPath, startError)
 	}
@@ -114,6 +120,8 @@ func killEngineGroup(engineGroup int, command *exec.Cmd) {
 	killProcessGroup(engineGroup)
 	waited := make(chan struct{})
 	go func() {
+		// Ignored: the engine was killed for breaking its contract, which is the error the run returns; this
+		// wait only reaps it, and how a killed engine ended says nothing more.
 		_ = command.Wait()
 		close(waited)
 	}()

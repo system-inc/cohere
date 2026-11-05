@@ -54,7 +54,7 @@ var messageUseLiteralAfterSemicolon = rule.Message{
 // is empty, and the engine should not be rewriting expressions unattended on the strength of that.
 //
 // The replacement text is `{}` or `({})` depending on position, and which one is not cosmetic. An
-// object literal at the start of an expression statement parses as a BLOCK, so `Object()` alone on a
+// object literal at the start of an expression statement parses as a block, so `Object()` alone on a
 // line has to become `({})` rather than `{}` or the meaning changes. The same is true directly after
 // an arrow, where `() => {}` is a function with an empty body. Measured on eslint 10.8.1:
 //
@@ -65,7 +65,7 @@ var messageUseLiteralAfterSemicolon = rule.Message{
 //
 // # One divergence, measured: a `with` body
 //
-// `with (obj) Object();` reports upstream and is SILENT here. The checker returns no symbol at all
+// `with (obj) Object();` reports upstream and is silent here. The checker returns no symbol at all
 // for `Object` inside a `with` block, so `resolvesToAGlobal` answers false and the call is declined.
 //
 // That is the predicate being right rather than wrong. Inside `with (obj)`, whether `Object` names
@@ -77,16 +77,16 @@ var messageUseLiteralAfterSemicolon = rule.Message{
 //
 // Measured with a probe reading `GetSymbolAtLocation` directly: `Object();` at the top level
 // resolves to a symbol carrying 2 declarations, and the same call inside a `with` resolves to none.
-// The case is kept in the fixture table as SILENT with this reasoning at the line, rather than
+// The case is kept in the fixture table as silent with this reasoning at the line, rather than
 // dropped, so the difference stays visible.
 
 // # The preceding semicolon, which is the expensive half
 //
-// When the literal needs parentheses AND the previous line ended without a semicolon, the `(` would
+// When the literal needs parentheses and the previous line ended without a semicolon, the `(` would
 // continue that previous expression instead of starting a new one, so upstream emits `;({})` under a
 // second message id. Twelve of the corpus's fifty cases take that arm.
 //
-// Upstream decides it with `needsPrecedingSemicolon`, which reads the previous TOKEN and then the
+// Upstream decides it with `needsPrecedingSemicolon`, which reads the previous token and then the
 // node that token belongs to. This answers the same question from the tree instead, because we have
 // the tree and no token-before helper: the question is what the previous statement is and how it
 // ended. See `previousStatementCanContinue` for the enumeration and for what each row was measured
@@ -120,7 +120,7 @@ var NoObjectConstructor = rule.Rule{
 
 			// No `ast.SkipParentheses` here, and that is upstream's reading rather than an omission:
 			// it tests `node.callee.type !== "Identifier"` directly, and a parenthesized callee is a
-			// different node in ESTree too. Measured on eslint 10.8.1, `(Object)()` is CLEAN.
+			// different node in ESTree too. Measured on eslint 10.8.1, `(Object)()` is clean.
 			if callee == nil || callee.Kind != ast.KindIdentifier || callee.Text() != "Object" {
 				return
 			}
@@ -164,7 +164,7 @@ var NoObjectConstructor = rule.Rule{
 // literalNeedsParentheses reports whether an object literal replacing this node would be misparsed
 // without them.
 //
-// Two positions need them, and upstream tests exactly these two. A literal at the START of an
+// Two positions need them, and upstream tests exactly these two. A literal at the start of an
 // expression statement parses as a block, so `Object();` alone must become `({});`. And a literal
 // directly after an arrow is the function's body, so `() => Object()` must become `() => ({})`.
 //
@@ -189,7 +189,7 @@ func literalNeedsParentheses(node *ast.Node) bool {
 // precedingTextCanContinue reports whether the source immediately before this node could swallow a
 // leading `(` as a continuation, so the suggestion has to open with a semicolon.
 //
-// Upstream answers this by reading the previous TOKEN and classifying it, and the corpus is built to
+// Upstream answers this by reading the previous token and classifying it, and the corpus is built to
 // separate that from any statement-level approximation. Three of its cases show why a
 // previous-statement reading is wrong:
 //
@@ -203,11 +203,11 @@ func literalNeedsParentheses(node *ast.Node) bool {
 // The punctuators that need no semicolon are upstream's own set, and each is there for its own
 // reason. `;` `{` `:` end a statement or a label outright. `=>` cannot be followed by an expression
 // statement at all. `++` and `--` are postfix operators, and a postfix operator is required to be on
-// the same line as its operand, so a newline after one has ALREADY triggered insertion.
+// the same line as its operand, so a newline after one has already triggered insertion.
 //
 // A closing brace is the ambiguous one and it is resolved by what the brace closes, which the tree
-// knows and the character does not: a block, a function or class DECLARATION, or an arrow body
-// closes the statement, while an object literal, a function or class EXPRESSION does not. That is
+// knows and the character does not: a block, a function or class declaration, or an arrow body
+// closes the statement, while an object literal, a function or class expression does not. That is
 // what `statementEndsOpen` answers, and it is consulted only when the character is `}`.
 func precedingTextCanContinue(ruleContext rule.Context, node *ast.Node) bool {
 	if ruleContext.SourceFile == nil {
@@ -241,7 +241,7 @@ func precedingTextCanContinue(ruleContext rule.Context, node *ast.Node) bool {
 	case '-':
 		return !(index > 0 && text[index-1] == '-')
 	case ')':
-		// Upstream: `return !STATEMENTS.has(prevNode.type)`, where prevNode is the node CONTAINING
+		// Upstream: `return !STATEMENTS.has(prevNode.type)`, where prevNode is the node containing
 		// the paren. A closing paren that ends a statement's header is followed by that statement's
 		// body, so nothing is left open; a paren ending a call or a parenthesized expression is.
 		return !closingParenBelongsToAStatementHeader(ruleContext, index)
@@ -253,7 +253,7 @@ func precedingTextCanContinue(ruleContext rule.Context, node *ast.Node) bool {
 		return !stringEndsAModuleDeclaration(ruleContext, index)
 	}
 
-	// An identifier or keyword. A keyword that ENDS its construct has already been closed by
+	// An identifier or keyword. A keyword that ends its construct has already been closed by
 	// automatic semicolon insertion; a plain identifier has not.
 	if word, wordStart := wordBefore(text, index); word != "" {
 		return !keywordClosesTheStatement(ruleContext, word, wordStart)
@@ -360,7 +360,7 @@ func closingBraceEndsAnExpression(ruleContext rule.Context, index int) bool {
 		case ast.KindObjectLiteralExpression, ast.KindFunctionExpression, ast.KindClassExpression:
 			return true
 		case ast.KindBlock:
-			// A block is open only when it is a function EXPRESSION's body. An arrow's body, a
+			// A block is open only when it is a function expression's body. An arrow's body, a
 			// method's, and a bare block all close the statement.
 			if parent := node.Parent; parent != nil && parent.Kind == ast.KindFunctionExpression {
 				return true
@@ -415,7 +415,7 @@ func wordBefore(text string, index int) (string, int) {
 	return text[start : index+1], start
 }
 
-// keywordClosesTheStatement reports whether the word ending at `index` is a KEYWORD that automatic
+// keywordClosesTheStatement reports whether the word ending at `index` is a keyword that automatic
 // semicolon insertion has already closed, rather than an identifier that merely spells one.
 //
 // Upstream maps each such keyword to the node type it produces and answers
@@ -426,21 +426,21 @@ func wordBefore(text string, index int) (string, int) {
 //	var yield = bar.yield \n Object()              useLiteralAfterSemicolon, this one is a property
 //
 // The tree answers it directly: the word closes the statement only when the node containing it is
-// the construct that keyword introduces AND that construct has no operand written after the keyword.
+// the construct that keyword introduces and that construct has no operand written after the keyword.
 func keywordClosesTheStatement(ruleContext rule.Context, word string, wordStart int) bool {
 	node := innermostNodeContaining(ruleContext.SourceFile.AsNode(), wordStart)
 	if node == nil {
 		return false
 	}
 	// `else` and `do` introduce a body rather than ending a statement, so nothing is left open after
-	// them and no construct ends AT them for the End() test below to find.
+	// them and no construct ends at them for the End() test below to find.
 	if word == "else" || word == "do" {
 		return true
 	}
 
-	// A property name or a string spelled like a keyword closes nothing. An IDENTIFIER is not
+	// A property name or a string spelled like a keyword closes nothing. An identifier is not
 	// excluded here, and that is the fix for `break foo` and `var foo`: those end at the label or
-	// the binding name, so the identifier is the innermost node and its ANCESTOR is the construct
+	// the binding name, so the identifier is the innermost node and its ancestor is the construct
 	// insertion closed. Returning early on the identifier missed both, and upstream reads the same
 	// shape through the identifier's parent.
 	if node.Kind == ast.KindStringLiteral || node.Kind == ast.KindPrivateIdentifier {
@@ -463,7 +463,7 @@ func keywordClosesTheStatement(ruleContext rule.Context, word string, wordStart 
 	}
 
 	for ancestor := node; ancestor != nil; ancestor = ancestor.Parent {
-		// The keyword must END the construct for insertion to have closed it. A `return x` or a
+		// The keyword must end the construct for insertion to have closed it. A `return x` or a
 		// `yield x` continues into its operand and is not this case.
 		if ancestor.End() != wordStart+len(word) {
 			continue

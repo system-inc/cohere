@@ -40,6 +40,8 @@ func OptionsAs[Options any](options any) (Options, bool) {
 	}
 	typed, matches := options.(Options)
 	if !matches {
+		// Invariant: a rule's registered decoder returns the type its OptionsAs names, and any fixture that
+		// configures the rule fails here when the two drift apart, as the comment above explains.
 		panic(fmt.Sprintf("the rule reads its options as %T, but its decoder handed it %T: the "+
 			"registration's Decode and the rule's OptionsAs must name the same type, or every "+
 			"configured option is ignored", zero, options))

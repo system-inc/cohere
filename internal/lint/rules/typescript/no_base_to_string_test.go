@@ -303,13 +303,13 @@ func TestNoBaseToStringStaysSilentOnUpstreamPassCases(test *testing.T) {
 }
 
 // TestNoBaseToStringFiresOnUpstreamFailCases is the imported failing corpus, verbatim, with the span
-// and the RENDERED message of every finding asserted.
+// and the rendered message of every finding asserted.
 //
 // The message is the reason this table asserts text rather than ids. Upstream interpolates two
 // values into it, the source text of the offending expression and a three-valued certainty, and the
 // corpus records both per case rather than recording line numbers. So the certainty is stated data
-// here, not something recovered: fifty-one findings say the value MAY stringify uselessly and
-// forty-three say it WILL, and no message id assertion can tell those apart.
+// here, not something recovered: fifty-one findings say the value may stringify uselessly and
+// forty-three say it will, and no message id assertion can tell those apart.
 //
 // Both ids are represented, seventy-seven for a plain stringification and seventeen for an array
 // join, because joining an array of objects has the same defect through a different door.

@@ -29,7 +29,7 @@ var messageUnexpectedLonelyIf = rule.Message{
 // # The shape being matched
 //
 // An `if` whose parent is a block, where that block holds exactly one statement, and where the
-// block is the ELSE branch of an enclosing `if`. The last test is identity against the enclosing
+// block is the `else` branch of an enclosing `if`. The last test is identity against the enclosing
 // statement's else branch rather than a kind test, because the then branch of an `if` is a block
 // holding one `if` just as often and is not this rule's subject.
 //
@@ -42,7 +42,7 @@ var messageUnexpectedLonelyIf = rule.Message{
 // `hasUnsafeIf(statement) && isFollowedByElseKeyword(node)`.
 //
 // The other half of that helper, `isLexicalDeclaration`, cannot fire from this rule at all: the
-// statement being tested is the block's only statement AND this listener already knows it is an
+// statement being tested is the block's only statement and this listener already knows it is an
 // `if`, so it is never a `let`, `const`, `using`, function or class declaration. It is left out
 // rather than transcribed, and the reasoning is here so the omission does not read as a gap.
 //
@@ -77,7 +77,7 @@ var messageUnexpectedLonelyIf = rule.Message{
 // The semicolon-insertion group is the subtle one, and each shape is in the corpus. An unbraced
 // consequent whose statement is not terminated joins the line after it: `baz()` followed by
 // `qux();` on the same line becomes one call, `baz()` followed by a line opening `[` becomes a
-// subscript, and `baz++` followed by anything becomes an operand. The same sources WITH a semicolon
+// subscript, and `baz++` followed by anything becomes an operand. The same sources with a semicolon
 // are fixed, and both spellings are in the corpus for the comparison.
 //
 // A wrong fix here is worse than no fix, because the engine's only guard is that the result parses
@@ -99,7 +99,7 @@ var NoLonelyIf = rule.Rule{
 				if enclosing == nil || enclosing.Kind != ast.KindIfStatement {
 					return
 				}
-				// Identity against the ELSE branch. A then branch is the same shape and is not the
+				// Identity against the `else` branch. A then branch is the same shape and is not the
 				// subject, so a kind test here would report every `if (a) { if (b) {} }`.
 				if enclosing.AsIfStatement().ElseStatement != block {
 					return
@@ -168,7 +168,7 @@ func noLonelyIfHasUnsafeIf(node *ast.Node) bool {
 // Upstream reads the next token and compares it to `else`. Here the same question is asked of the
 // enclosing statement rather than of the token stream: the block is some enclosing `if`'s else
 // branch, so the only way an `else` can follow it is if a further enclosing `if` holds that
-// statement as ITS then branch. Both spellings were compared against the installed build on the
+// statement as its then branch. Both spellings were compared against the installed build on the
 // four dangling-else shapes above and they agree.
 func noLonelyIfIsFollowedByElse(ruleContext rule.Context, block *ast.Node) bool {
 	text := ruleContext.SourceFile.Text()
@@ -249,7 +249,7 @@ func noLonelyIfElseKeywordEnd(ruleContext rule.Context, enclosing *ast.Node, blo
 
 // noLonelyIfFixWouldChangeMeaning reproduces upstream's automatic-semicolon-insertion refusal.
 //
-// The hazard exists only when the inner `if`'s consequent is NOT a block and does not already end
+// The hazard exists only when the inner `if`'s consequent is not a block and does not already end
 // in a semicolon, because then removing the braces lets the following line join it. Upstream then
 // declines on three signals, each of which has a corpus case:
 //

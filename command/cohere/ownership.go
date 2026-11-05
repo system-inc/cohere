@@ -81,6 +81,8 @@ func (found discovery) configPath(project discoveredProject) string {
 // resolveOwnership reads every TypeScript project's tsconfig, follows references, drops solution roots and
 // projects left with nothing, and decides what each remaining project yields. found.Projects is rewritten
 // to the projects that run.
+//
+// Mutates: found the caller runs the projects found holds, so its list becomes the ones that run here
 func resolveOwnership(found *discovery) (ownership, error) {
 	decided := ownership{Yields: map[string]projectYield{}, SharedDirectory: map[string]bool{}}
 	typeScript := 0
@@ -343,9 +345,14 @@ func writeProjectYield(yield projectYield, directory string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer file.Close()
 	if _, writeError := file.Write(encoded); writeError != nil {
+		_ = file.Close() // Ignored: the write's error is the one returned.
 		return "", writeError
+	}
+	// The close is the write's last chance to fail, and a yield file that did not land would leave the project's
+	// run reading less than it yields.
+	if closeError := file.Close(); closeError != nil {
+		return "", closeError
 	}
 	return file.Name(), nil
 }
@@ -429,6 +436,7 @@ func activeProjectYieldFingerprint() string {
 	if err != nil || (len(yield.Files) == 0 && len(yield.Directories) == 0) {
 		return ""
 	}
+	// Ignored: a projectYield is two lists of strings, which always encode.
 	encoded, _ := json.Marshal(yield)
 	digest := sha256.Sum256(encoded)
 	return hex.EncodeToString(digest[:])

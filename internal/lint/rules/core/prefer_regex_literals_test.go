@@ -28,7 +28,7 @@ const preferRegexLiteralsFile = "prefer_regex_literals.ts"
 // preferRegexLiteralsSuggestion is one offered repair: the message id, and the whole file as it
 // would read if a human accepted it.
 //
-// Asserting the resulting SOURCE rather than the fix text is the point. A fix writing the right
+// Asserting the resulting source rather than the fix text is the point. A fix writing the right
 // string over the wrong span passes a text comparison and is a real defect; only replaying the edit
 // into the file can see it. `rule_testing.ExpectFixedSource` does this for fixes and has no
 // suggestion equivalent, so the applier below is hand-rolled, which the brief says to budget for.
@@ -601,7 +601,7 @@ var preferRegexLiteralsReporting = []preferRegexLiteralsRow{
 // preferRegexLiteralsDecidedByGlobalsConfig holds the four upstream clean cases whose verdict is not
 // the rule's to make.
 //
-// Each is clean upstream ONLY because the ESLint configuration removes a name from the global scope,
+// Each is clean upstream only because the ESLint configuration removes a name from the global scope,
 // either through `languageOptions.globals` or through a `/* globals X:off */` directive comment.
 // With `RegExp` or `String` declared off, upstream's ReferenceTracker finds no global reference and
 // the rule never looks at the call.
@@ -644,7 +644,7 @@ func TestPreferRegexLiteralsReportsWhatTheGlobalsConfigWouldHaveSilenced(test *t
 // which edition of JavaScript the file claims to be.
 //
 // ESLint carries `languageOptions.ecmaVersion` per config, and this rule consults it twice: through
-// `getRegexppEcmaVersion`, which decides whether a pattern or a flag PARSES, and through the global
+// `getRegexppEcmaVersion`, which decides whether a pattern or a flag parses, and through the global
 // scope, which decides whether `globalThis` exists as a name at all. cohere has no equivalent. A
 // program is compiled once against one set of compiler options, and a rule cannot ask what language
 // edition an individual file claims, so validity here is judged at the latest edition.
@@ -652,14 +652,14 @@ func TestPreferRegexLiteralsReportsWhatTheGlobalsConfigWouldHaveSilenced(test *t
 // The rows below record what cohere does, with upstream's own gate in the note. They split three
 // ways and the directions are opposite, which is why they are one table rather than one sentence:
 //
-//   - `globalThis` did not exist before ES2020, so upstream is SILENT on the three cases pinned at
-//     ecmaVersion 5, 2015 and 2017 and cohere REPORTS them. Reporting is the safe direction: the
+//   - `globalThis` did not exist before ES2020, so upstream is silent on the three cases pinned at
+//     ecmaVersion 5, 2015 and 2017 and cohere reports them. Reporting is the safe direction: the
 //     code is a `RegExp` construction either way, and every file in this codebase targets an
 //     edition where `globalThis` is real.
-//   - The `d`, `u`, `v` and `uv` flags each arrived in a known year, so upstream WITHHOLDS the
-//     suggestion when a case is pinned before it and cohere OFFERS one. Also the safe direction: a
+//   - The `d`, `u`, `v` and `uv` flags each arrived in a known year, so upstream withholds the
+//     suggestion when a case is pinned before it and cohere offers one. Also the safe direction: a
 //     suggestion is never applied without a human, and the literal it proposes is valid today.
-//   - Inline modifiers, `(?i:foo)`, are an ES2025 addition, so this one runs the OTHER way. Cohere
+//   - Inline modifiers, `(?i:foo)`, are an ES2025 addition, so this one runs the other way. Cohere
 //     withholds where upstream at ecmaVersion 2025 offers. Measured directly against eslint 10.8.1:
 //     the same input yields no suggestion at 2024 and one at 2025, so cohere currently matches the
 //     2024 reading. This is the one row where closing the gap would mean teaching the pattern
@@ -750,7 +750,7 @@ func TestPreferRegexLiteralsFires(test *testing.T) {
 	}
 }
 
-// expectPreferRegexLiteralsSuggestions asserts what each finding OFFERS, not merely that it fired.
+// expectPreferRegexLiteralsSuggestions asserts what each finding offers, not merely that it fired.
 //
 // This runs inside the Fires loop rather than as its own pass over the same table, and that is a
 // cost decision rather than a stylistic one: the typed harness builds a whole program per call, so a
@@ -788,7 +788,7 @@ func expectPreferRegexLiteralsSuggestions(test *testing.T, row preferRegexLitera
 		// The rule saw `strings.TrimSpace(source)+"\n"`, so the applier's result carries the
 		// harness's trailing newline and has lost the fixture's leading indentation. Upstream's
 		// `output` is the untrimmed source with the repair applied. Trimming both is what compares
-		// the REPAIR rather than the whitespace two different writers happened to put around it.
+		// the repair rather than the whitespace two different writers happened to put around it.
 		//
 		// Getting this wrong in either direction is invisible in the right way and loud in the
 		// wrong one: comparing raw failed thirty-five indented cases and read as a broken fixer,
@@ -809,7 +809,7 @@ func expectPreferRegexLiteralsSuggestions(test *testing.T, row preferRegexLitera
 // one.
 func applyPreferRegexLiteralsSuggestion(test *testing.T, source string, suggestion rule.Suggestion) string {
 	test.Helper()
-	// Edits are offsets into the text the RULE saw, and that is not the literal in the table above:
+	// Edits are offsets into the text the rule saw, and that is not the literal in the table above:
 	// the typed harness writes each fixture as `strings.TrimSpace(contents)+"\n"`
 	// (internal/rule_testing/program.go:160). Replaying an edit into the untrimmed literal lands it
 	// several bytes early, which cost real time here and presented as a broken fixer rather than as
@@ -870,7 +870,7 @@ func TestPreferRegexLiteralsNeedsTheTypedHarness(test *testing.T) {
 		rule_testing.Run(test, PreferRegexLiterals, preferRegexLiteralsFile, source))
 }
 
-// TestPreferRegexLiteralsReportsTheWholeCall asserts WHERE the finding points.
+// TestPreferRegexLiteralsReportsTheWholeCall asserts where the finding points.
 //
 // `ExpectFindings` asserts ids and count and nothing else, so a rule anchored on the callee rather
 // than the call would pass every row above while pointing at the wrong span, and the suggestion it

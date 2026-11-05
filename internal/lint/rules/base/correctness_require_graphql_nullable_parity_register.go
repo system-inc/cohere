@@ -4,7 +4,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 
 // init registers base/correctness-require-graphql-nullable-parity.
 //
-// Registered and deliberately NOT enabled, like every base rule landing tonight: nothing in this
+// Registered and deliberately not enabled, like every base rule landing tonight: nothing in this
 // tree carries `base/` keys, because base is api-phi-health's own lint layer, so where these run is
 // a decision nobody has made.
 //

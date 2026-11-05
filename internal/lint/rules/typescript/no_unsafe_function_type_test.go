@@ -71,7 +71,7 @@ func TestNoUnsafeFunctionTypeStaysSilent(test *testing.T) {
 		{"a locally declared type alias", "type Function = (input: string) => void;\nexport let handler: Function;\n"},
 		{"a locally declared class", "class Function {\n    tag = 'x';\n}\nexport let handler: Function;\n"},
 		// An enum shadows too, measured with the checker rather than assumed: an enum declares a
-		// value and a TYPE of the same name, so the annotation resolves to the enum rather than to
+		// value and a type of the same name, so the annotation resolves to the enum rather than to
 		// the global. The shadow walk counted only interface, type alias and class until it was
 		// lifted onto the shelf, so this was a false positive on a name the author owns.
 		{"a locally declared enum", "enum Function {\n    A,\n}\nexport let handler: Function;\n"},

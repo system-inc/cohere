@@ -28,15 +28,15 @@ func idDenylistOf(names ...string) any {
 }
 
 // The corpus is ESLint's own, taken from
-// /tmp/lint-sources-fresh/eslint/tests/lib/rules/id-denylist.js by RUNNING that file with
+// /tmp/lint-sources-fresh/eslint/tests/lib/rules/id-denylist.js by running that file with
 // RuleTester intercepted, so upstream's own cases produced the fixtures rather than a parser of
 // mine. 145 cases were captured from the single RuleTester.run call, and they collapse to 143
 // distinct (source, options) pairs.
 //
-// Every expectation below is what the INSTALLED ESLint 10.8.1 core rule answered when driven over
+// Every expectation below is what the installed ESLint 10.8.1 core rule answered when driven over
 // that case through the Linter interface under `sourceType: module` with the typescript-eslint
 // parser, which is the only configuration cohere has. The 10.10.0 clone and the 10.8.1 installed
-// build are BYTE-IDENTICAL for this rule, so the version gap decides nothing here:
+// build are byte-identical for this rule, so the version gap decides nothing here:
 //
 //	diff /tmp/lint-sources-fresh/eslint/lib/rules/id-denylist.js \
 //	     /Users/kirkouimet/Projects/ahra/node_modules/eslint/lib/rules/id-denylist.js
@@ -48,9 +48,9 @@ func idDenylistOf(names ...string) any {
 // harness now refuses to print a result when that happens, and the refusal was proven by pointing
 // it at a glob matching nothing.
 //
-// Exactly ONE case changes verdict between upstream's own configuration and cohere's:
+// Exactly one case changes verdict between upstream's own configuration and cohere's:
 // `var foo = [Map];` denying "Map" reports at ecmaVersion 5 and is clean at 6, because es6 globals
-// are not declared at 5. Upstream's corpus carries that source TWICE with opposite verdicts and its
+// are not declared at 5. Upstream's corpus carries that source twice with opposite verdicts and its
 // own comment says why. Under cohere, where Map is always declared, the clean verdict is the one
 // that applies.
 //
@@ -230,7 +230,7 @@ func TestIdDenylistStaysSilent(test *testing.T) {
 	for _, testCase := range cases {
 		result := rule_testing.RunTypedWithOptions(test, IdDenylist, idDenylistFile, testCase.source, testCase.settings)
 		// `ExpectClean` rather than a length check, because the guard in internal/lint/registry
-		// matches the CALL NAME: a test that asserts the same property by hand reads to it as a
+		// matches the call name: a test that asserts the same property by hand reads to it as a
 		// rule nothing proves can stay quiet.
 		rule_testing.ExpectClean(test, result)
 	}
@@ -239,19 +239,19 @@ func TestIdDenylistStaysSilent(test *testing.T) {
 // TestIdDenylistDivergesOnTheEslintGlobalsSurface pins the eight cases whose upstream verdict is
 // decided by a surface cohere does not have.
 //
-// ESLint lets a configuration DECLARE a global the source never mentions, through
+// ESLint lets a configuration declare a global the source never mentions, through
 // `languageOptions.globals` or a `/* global */` comment directive. `CohereSettings.json` carries no
 // such key, and the checker's answer to "is this a global" comes from the lib and @types the file
 // is actually compiled against. So a name that is neither declared in source nor declared by any
 // lib cannot be told to this port that it is ambient.
 //
-// These are recorded at the verdict THIS port produces, MEASURED rather than predicted, with
+// These are recorded at the verdict this port produces, measured rather than predicted, with
 // upstream's beside each. An earlier draft of this table carried what the divergences were expected
 // to be and six of the eight rows were wrong, which is the standard's own warning about documenting
 // a limit you did not measure: a confident wrong expectation reads as a checked one.
 //
 // Five of the eight diverge. Every one of them runs in the same direction and has the same cause: a
-// name ESLint was TOLD is global resolves to nothing here and is therefore checked, and a name
+// name ESLint was told is global resolves to nothing here and is therefore checked, and a name
 // ESLint was told to switch off stays a lib global here and is therefore exempt. None is a defect in
 // the walk, and none is repairable without a globals surface in CohereSettings.json.
 //
@@ -268,19 +268,19 @@ func TestIdDenylistDivergesOnTheEslintGlobalsSurface(test *testing.T) {
 		upstream int
 		why      string
 	}{
-		// DIVERGES: upstream 0, here 1 -- myGlobal is declared only by the config, so here it resolves to nothing and is checked.
+		// Diverges: upstream 0, here 1 -- myGlobal is declared only by the config, so here it resolves to nothing and is checked.
 		{source: "foo = { [myGlobal]: 1 };", settings: idDenylistOf("myGlobal"), findings: 1, upstream: 0, why: "myGlobal is declared only by the config, so here it resolves to nothing and is checked"},
-		// DIVERGES: upstream 0, here 1 -- the shorthand target declares myGlobal in source here, so it is ours rather than the environment's.
+		// Diverges: upstream 0, here 1 -- the shorthand target declares myGlobal in source here, so it is ours rather than the environment's.
 		{source: "({ myGlobal } = foo);", settings: idDenylistOf("myGlobal"), findings: 1, upstream: 0, why: "the shorthand target declares myGlobal in source here, so it is ours rather than the environment's"},
-		// DIVERGES: upstream 0, here 1 -- the directive is a comment here, so myGlobal resolves to nothing and is checked.
+		// Diverges: upstream 0, here 1 -- the directive is a comment here, so myGlobal resolves to nothing and is checked.
 		{source: "/* global myGlobal: readonly */ myGlobal = 5;", settings: idDenylistOf("myGlobal"), findings: 1, upstream: 0, why: "the directive is a comment here, so myGlobal resolves to nothing and is checked"},
-		// DIVERGES: upstream 0, here 1 -- window is the member's OBJECT rather than its property, so the read exemption does not cover it, and nothing declares window under the fixture lib.
+		// Diverges: upstream 0, here 1 -- window is the member's object rather than its property, so the read exemption does not cover it, and nothing declares window under the fixture lib.
 		{source: "var foo = { bar: window.baz };", settings: idDenylistOf("window"), findings: 1, upstream: 0, why: "window is the member's OBJECT rather than its property, so the read exemption does not cover it, and nothing declares window under the fixture lib"},
 		// agrees: upstream 2, here 2 -- a label is never a global reference, so both instruments agree.
 		{source: "myGlobal: while(foo) { break myGlobal; } ", settings: idDenylistOf("myGlobal"), findings: 2, upstream: 2, why: "a label is never a global reference, so both instruments agree"},
-		// DIVERGES: upstream 1, here 2 -- the bare myGlobal reports under both, and the written property window.myGlobal additionally reports here because window is undeclared under the fixture lib rather than a config-declared global.
+		// Diverges: upstream 1, here 2 -- the bare myGlobal reports under both, and the written property window.myGlobal additionally reports here because window is undeclared under the fixture lib rather than a config-declared global.
 		{source: "/* globals myGlobal */ window.myGlobal = 5; foo = myGlobal;", settings: idDenylistOf("myGlobal"), findings: 2, upstream: 1, why: "the bare myGlobal reports under both, and the written property window.myGlobal additionally reports here because window is undeclared under the fixture lib rather than a config-declared global"},
-		// DIVERGES: upstream 1, here 0 -- the directive cannot switch Number off here, so it stays a lib-declared global and is exempt.
+		// Diverges: upstream 1, here 0 -- the directive cannot switch Number off here, so it stays a lib-declared global and is exempt.
 		{source: "/* globals Number: off */ Number.parseInt()", settings: idDenylistOf("Number"), findings: 0, upstream: 1, why: "the directive cannot switch Number off here, so it stays a lib-declared global and is exempt"},
 		// agrees: upstream 2, here 2 -- a source declaration shadows the global under both instruments.
 		{source: "function foo() { var myGlobal; x = myGlobal; }", settings: idDenylistOf("myGlobal"), findings: 2, upstream: 2, why: "a source declaration shadows the global under both instruments"},
@@ -295,7 +295,7 @@ func TestIdDenylistDivergesOnTheEslintGlobalsSurface(test *testing.T) {
 	}
 }
 
-// TestIdDenylistSpansAndMessages asserts where each finding POINTS and what it says, which
+// TestIdDenylistSpansAndMessages asserts where each finding points and what it says, which
 // TestIdDenylistFires cannot: that test compares message ids and counts, so a rule anchored on the
 // wrong node or rendering the wrong name passes it completely.
 //
@@ -323,7 +323,7 @@ func TestIdDenylistSpansAndMessages(test *testing.T) {
 			messages: []string{"Identifier 'foo' is restricted."},
 		},
 		{
-			// The write half of the member-access split, so the finding must land on the PROPERTY
+			// The write half of the member-access split, so the finding must land on the property
 			// rather than on the object it hangs off.
 			source:   "foo.bar = 1;",
 			settings: idDenylistOf("bar"),
@@ -424,11 +424,11 @@ func TestIdDenylistDecoderReadsTheNameArray(test *testing.T) {
 // Two of `shouldCheck`'s arms exempt a name in callee position, one for a call and one for a
 // construction. The construction arm survived a mutation sweep against all 143 imported fixtures,
 // and the reason is structural rather than an oversight in the corpus: every `new` case upstream
-// writes is `new Array()` or `new Date()`, whose callee is a LIB GLOBAL, so the global exemption
+// writes is `new Array()` or `new Date()`, whose callee is a lib global, so the global exemption
 // declines it several lines earlier and the construction arm is never consulted. Deleting the arm
 // changes nothing that any imported case can see.
 //
-// The distinguishing shape is a constructor declared in the SAME FILE, which upstream had no reason
+// The distinguishing shape is a constructor declared in the same file, which upstream had no reason
 // to write. Measured against the installed ESLint 10.8.1 rule, all three report exactly once, on
 // the declaration, never on the callee:
 //
@@ -468,7 +468,7 @@ func TestIdDenylistCalleeExclusionsNeedALocalDeclaration(test *testing.T) {
 		if reported != testCase.span {
 			test.Errorf("%q: expected the span to cover %q, got %q", testCase.source, testCase.span, reported)
 		}
-		// The finding must be the DECLARATION, which is the first occurrence in the file. A finding
+		// The finding must be the declaration, which is the first occurrence in the file. A finding
 		// on the callee would carry the same text and the same id, so the position is the only
 		// thing that separates them.
 		if diagnostic.Range.Pos() != strings.Index(source, testCase.span) {
@@ -484,7 +484,7 @@ func TestIdDenylistCalleeExclusionsNeedALocalDeclaration(test *testing.T) {
 // sits in the options object of an `import()` call, or in an object nested under a key that is
 // itself exempt. Two mutations of that recursion survived all 143 imported fixtures, because the
 // eight corpus cases all write the same well-formed `import(specifier, { with: { type } })` shape
-// and never probe where the exemption STOPS.
+// and never probe where the exemption stops.
 //
 // These four shapes probe exactly that, and every verdict is what the installed ESLint 10.8.1 rule
 // answered:
@@ -495,7 +495,7 @@ func TestIdDenylistCalleeExclusionsNeedALocalDeclaration(test *testing.T) {
 //	let x = { type: 1 }                     REPORTS -- an ordinary object literal is not exempt
 //
 // The third row is worth stating because it looks like it should report: upstream's recursion does
-// NOT require the nesting key to be spelled `with`, so a nested object under any key in the options
+// not require the nesting key to be spelled `with`, so a nested object under any key in the options
 // argument is exempt at any depth. Measured, not assumed, and reproduced deliberately.
 func TestIdDenylistImportAttributeKeysStopAtTheImportCall(test *testing.T) {
 	test.Parallel()
@@ -508,10 +508,10 @@ func TestIdDenylistImportAttributeKeysStopAtTheImportCall(test *testing.T) {
 		// The callee has to be the `import` keyword. Without that test, any call taking an object
 		// with a `with` key would exempt its contents.
 		{source: `notImport("m", { with: { type: 1 } });`, denied: "type", findings: 1},
-		// The object has to be the SECOND argument. Without that test, an object passed as the
+		// The object has to be the second argument. Without that test, an object passed as the
 		// specifier is treated as the options and its keys go silent.
 		//
-		// The one-argument form alone does NOT prove that test, because the earlier
+		// The one-argument form alone does not prove that test, because the earlier
 		// "fewer than two arguments" guard already declines it. The two-argument rows are the ones
 		// that reach the comparison, and a mutation replacing it with `true` survives every fixture
 		// without them.
@@ -519,7 +519,7 @@ func TestIdDenylistImportAttributeKeysStopAtTheImportCall(test *testing.T) {
 		{source: `import({ type: 1 }, { with: { a: 1 } });`, denied: "type", findings: 1},
 		{source: `import({ type: 1 }, other);`, denied: "type", findings: 1},
 		// A nested object under any key of the options argument is exempt, at any depth. Upstream's
-		// recursion tests that the enclosing KEY is itself an attribute key, and every key of the
+		// recursion tests that the enclosing key is itself an attribute key, and every key of the
 		// options object is one, so the name of the nesting key does not matter.
 		{source: `import("m", { other: { deep: 1 } });`, denied: "deep", findings: 0},
 		{source: `import("m", { with: { a: { b: 1 } } });`, denied: "b", findings: 0},
@@ -542,7 +542,7 @@ func TestIdDenylistImportAttributeKeysStopAtTheImportCall(test *testing.T) {
 // TestIdDenylistDecoderAcceptsTheConfigLayersShape pins the wire contract, which every other
 // fixture in this file bypasses.
 //
-// Fixtures reach the decoder with bytes the TEST built. The config layer hands a list rule every
+// Fixtures reach the decoder with bytes the test built. The config layer hands a list rule every
 // element after the severity as one list, which for upstream's variadic `["error", "data", "err",
 // "cb"]` is `["data", "err", "cb"]`. It used to hand over only `"data"`, which errored on the first
 // dry run and, once a bare string was accepted to stop the error, silently denied one name of three.

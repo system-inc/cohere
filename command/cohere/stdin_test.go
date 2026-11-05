@@ -16,7 +16,8 @@ func runCohereWithStdin(test *testing.T, binary string, directory string, stdin 
 	command := exec.Command(binary, arguments...)
 	command.Dir = directory
 	command.Stdin = strings.NewReader(stdin)
-	var stdout, stderr bytes.Buffer
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
 	command.Stdout = &stdout
 	command.Stderr = &stderr
 	runError := command.Run()

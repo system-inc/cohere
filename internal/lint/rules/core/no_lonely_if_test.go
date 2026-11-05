@@ -136,7 +136,7 @@ func TestNoLonelyIfInsertsASpaceWhenElseTouchesTheBrace(test *testing.T) {
 // exemption survived the whole suite: it declined fixes upstream performs, and a fix quietly not
 // offered is invisible to every assertion about which findings fired.
 //
-// Each case below has a braced consequent AND a following token that would be a hazard without the
+// Each case below has a braced consequent and a following token that would be a hazard without the
 // braces, so they separate the two readings. All three were measured against the installed build at
 // 10.8.1, which reports and fixes each one.
 func TestNoLonelyIfBracedConsequentIsExemptFromTheSemicolonInsertionTest(test *testing.T) {
@@ -199,7 +199,7 @@ func TestNoLonelyIfDanglingElse(test *testing.T) {
 // TestNoLonelyIfThenBranchIsNotTheSubject pins the identity test.
 //
 // A then branch is the same shape as an else branch: a block holding one `if`. Upstream compares
-// against the enclosing statement's ALTERNATE specifically, and a kind test in its place would
+// against the enclosing statement's alternate specifically, and a kind test in its place would
 // report every `if (a) { if (b) {} }` in the tree, which is ordinary code.
 func TestNoLonelyIfThenBranchIsNotTheSubject(test *testing.T) {
 	test.Parallel()

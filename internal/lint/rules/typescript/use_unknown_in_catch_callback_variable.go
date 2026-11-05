@@ -25,7 +25,7 @@ import (
 // # What decides a finding
 //
 // Two gates before the callback is even looked at. The callee must be a static member access naming
-// `catch` or `then`, and the RECEIVER's type must be thenable. The name alone is not enough: the
+// `catch` or `then`, and the receiver's type must be thenable. The name alone is not enough: the
 // corpus writes `declare const notAPromise: { catch: (f: Function) => void }` precisely so that a
 // port keying on the name reports it and fails.
 //
@@ -33,26 +33,26 @@ import (
 // second. Upstream carries that as a table of two rows and this reproduces it as one, because the
 // `append` column is the only other thing that varies and it is derivable from the method.
 //
-// The verdict on the callback itself comes from the CHECKER rather than from the annotation's text.
+// The verdict on the callback itself comes from the checker rather than from the annotation's text.
 // `isFlaggableHandlerType` walks the union parts of the argument's type, and for each call signature
 // asks whether the first parameter's type is intrinsic `unknown`. That is why `type U = unknown` is
 // clean while `any` reports: the alias resolves to the intrinsic and the flag test sees through it.
 // Measured on the installed rule, both directions.
 //
-// A signature with NO first parameter is skipped rather than reported, so `catch(() => {})` is
+// A signature with no first parameter is skipped rather than reported, so `catch(() => {})` is
 // clean. A union part with no call signatures is skipped too, which is what makes
 // `(() => void) | 2` clean.
 //
 // # Why this walks the argument instead of testing it
 //
-// The argument can be an expression that RESOLVES to several function literals, and upstream reports
+// The argument can be an expression that resolves to several function literals, and upstream reports
 // each one separately. `collectFlaggedNodes` recurses through a logical expression into both sides,
-// through a conditional into both branches, and through a sequence into its LAST element only.
+// through a conditional into both branches, and through a sequence into its last element only.
 // Measured: `catch((() => {}, (err: Error) => {}))` reports and `catch(((err: Error) => {}, () => {}))`
 // is clean, which pins the last-element rule rather than leaving it read off the source.
 //
 // Anything else terminates the walk, and that is a deliberate narrowness rather than an oversight.
-// A bare identifier bound to a badly-typed handler is CLEAN upstream, with a comment and an issue
+// A bare identifier bound to a badly-typed handler is clean upstream, with a comment and an issue
 // link in the corpus saying so: the rule only wants function literals written at the call site,
 // because those are the ones the author can fix here. A type assertion is likewise not a literal and
 // is clean.
@@ -66,7 +66,7 @@ import (
 // there: `catch((err => {}))`, `(p.catch)(err => {})`, and the corpus's own
 // `(condition && (err => {})) || (err => {})` all report.
 //
-// The skips are NOT free correctness. `ast.SkipParentheses` dereferences its argument, so each call
+// The skips are not free correctness. `ast.SkipParentheses` dereferences its argument, so each call
 // is guarded by the caller having a non-nil node, and `useUnknownSkipParentheses` exists to make
 // that a property of the helper rather than of every call site.
 //
@@ -74,7 +74,7 @@ import (
 //
 // Upstream reports `node: argument` and then unconditionally overrides it from
 // `refineReportIfPossible`, whose switch covers every shape a first parameter can take. So in
-// practice the span is always the FIRST PARAMETER, and the callback span is unreachable. Verified
+// practice the span is always the first parameter, and the callback span is unreachable. Verified
 // against the installed rule across identifier, annotated, optional, defaulted, rest, array-pattern
 // and object-pattern parameters: all seven report the parameter.
 //
@@ -84,9 +84,9 @@ import (
 //
 // # The `this` parameter, an upstream defect reproduced deliberately
 //
-// A `this` parameter is not a real parameter: the CHECKER's signature omits it, while both ESTree's
-// `params` and our `Parameters()` include it. Upstream reads the checker to DECIDE (so it judges the
-// first real parameter) and reads the syntax to REPORT (so it points at `this`). The two disagree,
+// A `this` parameter is not a real parameter: the checker's signature omits it, while both ESTree's
+// `params` and our `Parameters()` include it. Upstream reads the checker to decide (so it judges the
+// first real parameter) and reads the syntax to report (so it points at `this`). The two disagree,
 // and the suggestion it offers would write `function (this: unknown, err: Error)`, which is wrong
 // code.
 //
@@ -107,7 +107,7 @@ import (
 // body will usually stop compiling until the author narrows. The engine must not do that unattended.
 //
 // The annotation-replacement span is the one piece of arithmetic that is not a node. Our type node
-// starts AFTER the colon and carries leading trivia, so replacing it would produce `err:: unknown`
+// starts after the colon and carries leading trivia, so replacing it would produce `err:: unknown`
 // or eat a comment. The span upstream replaces is the colon through the type, which here is
 // "just past the name, or just past the `?` if there is one" to the type's end. Measured against the
 // installed rule's own byte ranges: `(err?: string)` replaces [29,37] and `(err: any /* c1 */ = 2)`
@@ -137,10 +137,10 @@ var UseUnknownInCatchCallbackVariable = rule.Rule{
 		// `(() => void) | 2` clean. A signature with no parameters cannot have a badly typed catch
 		// variable, which is what keeps `catch(() => {})` clean.
 		//
-		// The UNION WALK is inert here and is kept for fidelity rather than for effect. Mutating it
+		// The union walk is inert here and is kept for fidelity rather than for effect. Mutating it
 		// to read only the first part survives the whole corpus, and that verdict is correct rather
 		// than a fixture gap: this is only ever called on a node `collectFlaggedCallbacks` has
-		// already narrowed to an arrow or a function expression, and a function LITERAL's own type
+		// already narrowed to an arrow or a function expression, and a function literal's own type
 		// is its own signature. Probed over five shapes, printing the part count directly: a plain
 		// arrow, both arms of a conditional, an `as` assertion to a union of two signatures, an
 		// angle-bracket assertion to the same union, and a double assertion to an overloaded
@@ -172,7 +172,7 @@ var UseUnknownInCatchCallbackVariable = rule.Rule{
 					}
 
 					// A rest parameter holds the whole argument list, so the type to judge is its
-					// ELEMENT type rather than the container. A rest parameter that is neither an
+					// element type rather than the container. A rest parameter that is neither an
 					// array nor a tuple cannot be spread from a well-typed call at all, and
 					// upstream flags it outright rather than trying to look inside.
 					if declaration := firstParameter.ValueDeclaration; declaration != nil &&
@@ -228,7 +228,7 @@ var UseUnknownInCatchCallbackVariable = rule.Rule{
 					return collectFlaggedCallbacks(binary.Right, into)
 				case ast.KindCommaToken:
 					// ESTree's SequenceExpression, which our parser spells as a comma operator and
-					// nests to the LEFT, so the last element is the rightmost operand. Only that
+					// nests to the left, so the last element is the rightmost operand. Only that
 					// one is the value of the expression. Measured: a flaggable callback in the
 					// left operand is clean and in the right operand reports.
 					return collectFlaggedCallbacks(binary.Right, into)
@@ -312,14 +312,14 @@ var UseUnknownInCatchCallbackVariable = rule.Rule{
 
 // useUnknownSkipParentheses is ast.SkipParentheses with a nil answer for a nil argument.
 //
-// The bare helper DEREFERENCES its argument, so a nil reaching it is a panic, and a panic costs
+// The bare helper dereferences its argument, so a nil reaching it is a panic, and a panic costs
 // every rule its verdict on the whole file rather than costing this rule one finding.
 //
-// The honest status of this guard is DEFENSIVE rather than load-bearing, and it is written down that
+// The honest status of this guard is defensive rather than load-bearing, and it is written down that
 // way because the tempting sentence, that error recovery reaches it, is one I could not measure.
 // Probed over five malformed shapes including `p[](err => {})`, `p[]`, `p?.[](x)` and `()(err => {})`,
 // counting nils at both sites: zero nil callees and zero nil argument expressions. Our parser
-// SYNTHESIZES a missing element-access key as an identifier rather than leaving the field absent, so
+// synthesizes a missing element-access key as an identifier rather than leaving the field absent, so
 // `p[]` presents as `KindIdentifier` and not as nil.
 //
 // So no fixture in this package can prove this guard matters, and removing it leaves the malformed-
@@ -338,13 +338,13 @@ func useUnknownSkipParentheses(node *ast.Node) *ast.Node {
 // useUnknownStaticMemberAccess reads a property access, returning the receiver and the property
 // name, for both the dotted and the computed spellings.
 //
-// The computed form is not incidental. The corpus's second INVALID case is
-// `let method = 'catch'; Promise.resolve()[method]((error: Error) => {})` and its second VALID case
+// The computed form is not incidental. The corpus's second invalid case is
+// `let method = 'catch'; Promise.resolve()[method]((error: Error) => {})` and its second valid case
 // is `let x = Math.random() ? 'ca' + 'tch' : 'catch'; Promise.resolve()[x](...)`. Both are computed
 // accesses through a binding, and upstream separates them, so a port testing only for a string
 // literal is silent on the first and a port accepting any identifier reports the second.
 //
-// Upstream answers this with ESLint's `getStaticValue`, a constant folder over the SCOPE. We answer
+// Upstream answers this with ESLint's `getStaticValue`, a constant folder over the scope. We answer
 // it with the checker, through `getAccessedPropertyName`, which is the same question asked of the
 // type: a key whose type is a single string literal names one property.
 //
@@ -357,14 +357,14 @@ func useUnknownSkipParentheses(node *ast.Node) *ast.Node {
 //	let method = 'catch'; p[method](...)       reports upstream, UNRESOLVED here    DIVERGE
 //
 // The divergence is a property of `let` rather than of the approach: a `let` initialised with a
-// string literal WIDENS to `string`, so no literal type survives for the checker to read, while
+// string literal widens to `string`, so no literal type survives for the checker to read, while
 // ESLint's folder sees the single assignment in the scope and folds it. Reproducing it needs a
 // constant-folding pass over bindings, which is substantially larger than this whole rule.
 //
 // So upstream invalid case 1 is silent here, deliberately, and its fixture records that rather than
 // being deleted or quietly relaxed. This is the same divergence already recorded on
 // prefer-promise-reject-errors and only-throw-error, which share the upstream helper, but this rule
-// reaches FURTHER than those two do: they accept a string literal only, so they lose the `const`
+// reaches further than those two do: they accept a string literal only, so they lose the `const`
 // spelling as well, and the checker recovers it here at no cost.
 func useUnknownStaticMemberAccess(typeChecker *checker.Checker, callee *ast.Node) (receiver *ast.Node, propertyName string) {
 	switch {
@@ -402,7 +402,7 @@ func useUnknownReport(ruleContext rule.Context, callback *ast.Node, methodName s
 	parameters := callback.Parameters()
 	if len(parameters) == 0 {
 		// Unreachable through the rule: isFlaggableHandlerType only answers true for a signature
-		// that HAS a first parameter, and a callback with no syntactic parameters has none in its
+		// that has a first parameter, and a callback with no syntactic parameters has none in its
 		// signature either. Kept because it is the difference between declining and indexing past
 		// the end of a slice, and the callers that could reach it are enumerated in one place
 		// directly above rather than spread across the file.
@@ -430,7 +430,7 @@ func useUnknownReport(ruleContext rule.Context, callback *ast.Node, methodName s
 		return
 
 	case parameterDeclaration.DotDotDotToken != nil:
-		// A rest parameter's correct annotation is the one-element TUPLE `[unknown]` rather than
+		// A rest parameter's correct annotation is the one-element tuple `[unknown]` rather than
 		// `unknown`, because the parameter holds the argument list and not the error.
 		if parameterDeclaration.Type == nil {
 			ruleContext.ReportNodeWithSuggestions(parameter, message, rule.Suggestion{
@@ -482,7 +482,7 @@ func useUnknownReport(ruleContext rule.Context, callback *ast.Node, methodName s
 // write `err:: unknown`. Starting from the end of the name (or the end of the `?`, which sits
 // between the name and the colon) reaches back over the colon exactly once.
 //
-// The END is the type node's own end rather than the parameter's, which is what leaves a default and
+// The end is the type node's own end rather than the parameter's, which is what leaves a default and
 // any trailing comment untouched: upstream turns `(err: any /* c1 */ = 2)` into
 // `(err: unknown /* c1 */ = 2)`, and taking the parameter's end would swallow both.
 // useUnknownInsertAnnotation inserts a new annotation at the point where one would be written.

@@ -40,7 +40,7 @@ func runNoInferrableTypes(test *testing.T, testCase noInferrableTypesCase) rule_
 // The corpus is typescript-eslint's own, extracted mechanically rather than retyped.
 //
 // `tests/rules/no-inferrable-types.test.ts` (clone, 8.69.0) was loaded with its RuleTester stubbed,
-// then every case was replayed against the INSTALLED 8.67.0 rule through the ESLint Linter API. The
+// then every case was replayed against the installed 8.67.0 rule through the ESLint Linter API. The
 // expectations below are what the installed rule answered, and they agree with upstream's own
 // annotations exactly: 55 valid cases report nothing, 44 invalid cases report, zero disagree.
 //
@@ -237,7 +237,7 @@ func TestNoInferrableTypesExemptsReadonlyForACompilerReason(test *testing.T) {
 //
 // Each turns off one listener, so a rule that wired them to the wrong visitor -- or to neither --
 // passes every corpus row that configures only one of them. The source below carries a violation in
-// all three positions at once, so each flag's effect is visible as a change in COUNT rather than as
+// all three positions at once, so each flag's effect is visible as a change in count rather than as
 // a silence that could mean anything.
 func TestNoInferrableTypesOptionsSuppressEachVisitor(test *testing.T) {
 	test.Parallel()

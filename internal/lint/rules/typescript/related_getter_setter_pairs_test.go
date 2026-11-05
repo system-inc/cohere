@@ -56,7 +56,7 @@ func TestRelatedGetterSetterPairsStaysSilent(test *testing.T) {
 // Each reports exactly once. The last three are the interesting ones and they are about the checker
 // rather than about the traversal: an inline object type, an unused alias sitting beside the real
 // one, and a named alias all reach the same verdict, which is what pins that the comparison is on
-// TYPES and not on the spelling of the annotation.
+// types and not on the spelling of the annotation.
 func TestRelatedGetterSetterPairsFires(test *testing.T) {
 	test.Parallel()
 
@@ -81,7 +81,7 @@ func TestRelatedGetterSetterPairsFires(test *testing.T) {
 	}
 }
 
-// TestRelatedGetterSetterPairsSpans asserts WHERE each of upstream's seven findings points.
+// TestRelatedGetterSetterPairsSpans asserts where each of upstream's seven findings points.
 //
 // The corpus states a line, a column, an endLine and an endColumn for every one of them, and those
 // four numbers are the only thing separating a finding on the getter's return type from a
@@ -92,7 +92,7 @@ func TestRelatedGetterSetterPairsFires(test *testing.T) {
 // same script that imported the cases, so this asserts upstream's numbers rather than my reading of
 // them.
 //
-// The harness TRIMS the fixture before writing it, so the file on disk is one byte shorter at the
+// The harness trims the fixture before writing it, so the file on disk is one byte shorter at the
 // front than the Go literal here. That is why the expectation is compared against a slice of the
 // harness's own result rather than against a slice of the literal.
 func TestRelatedGetterSetterPairsSpans(test *testing.T) {
@@ -136,7 +136,7 @@ func TestRelatedGetterSetterPairsSpans(test *testing.T) {
 // so a static getter pairs with an instance setter that can never be the same property. A quoted key
 // that is a valid identifier keys bare, so `'value'` and `value` are one property. A numeric key
 // cooks and then quotes, so `12` and `'12'` are one property. And the map is written with `.set`, so
-// a second declaration under one name REPLACES the first rather than being ignored, which is why
+// a second declaration under one name replaces the first rather than being ignored, which is why
 // there is a fires case and a silent case for each of the two duplicate orderings.
 //
 // The rest are traversal: a class expression, a type literal nested in an interface and one in a
@@ -152,7 +152,7 @@ func TestRelatedGetterSetterPairsFiresOnMeasuredShapes(test *testing.T) {
 		{"a static getter pairs with an instance setter", "class C {\n  static get value(): number { return 1; }\n  set value(v: string) {}\n}"},
 		{"a private pair", "class C {\n  get #value(): number { return 1; }\n  set #value(v: string) {}\n}"},
 		{"a computed identifier key pairs with itself", "declare const k: string;\nclass C {\n  get [k](): number { return 1; }\n  set [k](v: string) {}\n}"},
-		// The two that pin that a computed key is keyed by what is INSIDE the brackets rather than
+		// The two that pin that a computed key is keyed by what is inside the brackets rather than
 		// by the bracketed source text. Both are needed and neither is redundant with the case
 		// above: a rule keying `[k]` by its whole text still pairs `[k]` with `[k]`, so that case
 		// alone cannot see the difference. These two cross the bracket boundary in both directions
@@ -161,7 +161,7 @@ func TestRelatedGetterSetterPairsFiresOnMeasuredShapes(test *testing.T) {
 			"class C {\n  get value(): number { return 1; }\n  set [\"value\"](v: string) {}\n}"},
 		{"a computed identifier getter pairs with a plain setter",
 			"declare const k: string;\nclass C {\n  get [k](): number { return 1; }\n  set k(v: string) {}\n}"},
-		// The raw-text arm keys by SOURCE TEXT, and `Pos()` in this tree includes leading trivia
+		// The raw-text arm keys by source text, and `Pos()` in this tree includes leading trivia
 		// while TSESTree's `range` starts at the token. So a key written after a newline would key
 		// with the whitespace attached and stop pairing with the same key written inline. Measured
 		// on the installed build: both spellings of this pair report, which is what makes the trim
@@ -225,10 +225,10 @@ func TestRelatedGetterSetterPairsStaysSilentOnMeasuredShapes(test *testing.T) {
 		{"two interface declarations merging do not share a container", "interface I { get value(): number; }\ninterface I { set value(v: string); }"},
 		{"a second getter replaces a mismatching first", "class C {\n  get value(): number { return 1; }\n  get value(): string { return \"\"; }\n  set value(v: string) {}\n}"},
 		{"a second setter replaces a mismatching first", "class C {\n  get value(): number { return 1; }\n  set value(v: string) {}\n  set value(v: number) {}\n}"},
-		// The getter's return-annotation filter is CRASH PROTECTION on this input, and it is the
-		// only input in this file that reaches that. Every OTHER unannotated getter is silent for a
+		// The getter's return-annotation filter is crash protection on this input, and it is the
+		// only input in this file that reaches that. Every other unannotated getter is silent for a
 		// reason that has nothing to do with the filter: TypeScript infers an unannotated getter's
-		// type FROM its setter, measured over seven shapes, so the two types are identical and
+		// type from its setter, measured over seven shapes, so the two types are identical and
 		// assignability is trivially true. So a mutant disabling the filter survives the corpus,
 		// survives every case above, and is not equivalent.
 		//
@@ -237,7 +237,7 @@ func TestRelatedGetterSetterPairsStaysSilentOnMeasuredShapes(test *testing.T) {
 		// inference links them: the getter is `string` and the setter takes `number`. The pair then
 		// records, assignability fails, and the report reaches for a return type node that is nil.
 		//
-		// Measured: with the filter removed, this input PANICS with a nil dereference inside
+		// Measured: with the filter removed, this input panics with a nil dereference inside
 		// SkipTypeParentheses. Upstream is clean, because its own filter declined the getter first.
 		// No ExpectFindings fixture can see a panic, which is why this case is written and why the
 		// sweep reported the mutant as survived rather than as caught.
@@ -291,7 +291,7 @@ func TestRelatedGetterSetterPairsSpansOnMeasuredShapes(test *testing.T) {
 	}
 }
 
-// TestRelatedGetterSetterPairsReportsInSourceOrder pins the ORDER of two findings in one pass.
+// TestRelatedGetterSetterPairsReportsInSourceOrder pins the order of two findings in one pass.
 //
 // The pairs are gathered into a map and a map iteration in Go is deliberately randomized, so a rule
 // reading the map directly reports two findings in an order that changes between runs. That is
@@ -334,7 +334,7 @@ func TestRelatedGetterSetterPairsReportsInSourceOrder(test *testing.T) {
 // TestRelatedGetterSetterPairsRequiresTheTypedHarness asserts the rule declines a nil checker.
 //
 // The plain harness hands a rule no program, and `GetSymbolAtLocation` and friends on a nil checker
-// return nil rather than crashing, so a typed rule that forgets its guard goes SILENT instead of
+// return nil rather than crashing, so a typed rule that forgets its guard goes silent instead of
 // panicking. Silence is the more dangerous of the two, because every StaysSilent case above would
 // then pass vacuously and the whole suite would prove nothing. This fails loudly if the guard is
 // ever removed and the shim's nil tolerance changes underneath it.

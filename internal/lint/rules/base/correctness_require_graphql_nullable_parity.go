@@ -60,7 +60,7 @@ var graphQlNullableParityInputClassDecorators = map[string]struct{}{
 // # An absent flag means false, and a non-boolean flag means skip
 //
 // Three outcomes rather than two, and the difference decides real cases. A decorator with no
-// `nullable` key is checked AS `nullable: false`, so `@GraphQlField() name?: string` reports: the
+// `nullable` key is checked as `nullable: false`, so `@GraphQlField() name?: string` reports: the
 // schema defaults to non-null and the type is optional. A decorator whose `nullable` is not a
 // boolean literal is skipped entirely, which is what makes `nullable: 'items'` and
 // `nullable: 'itemsAndList'` out of scope: those declare list-element nullability, a different
@@ -69,12 +69,12 @@ var graphQlNullableParityInputClassDecorators = map[string]struct{}{
 // # Where the type comes from differs by decorator, and the method arm is easy to miss
 //
 // An argument decorator reads its parameter's type. A field decorator on a property reads the
-// property's. A field decorator on a METHOD reads the method's call-signature return type, because
+// property's. A field decorator on a method reads the method's call-signature return type, because
 // the underlying field decorator is valid on a getter or a method as well as a property, and a port
 // handling only the property shape goes silent on every computed field. The three operation
 // decorators always read a return type.
 //
-// A GETTER is reached and then declines, in both implementations, because a getter has no call
+// A getter is reached and then declines, in both implementations, because a getter has no call
 // signature to read a return type from. That is measured rather than assumed and it is recorded at
 // the arm.
 //
@@ -191,9 +191,9 @@ var GraphQlNullableParity = rule.Rule{
 					if owner.Kind != ast.KindParameter {
 						return
 					}
-					// Read at the parameter NODE, which is where the original reads it and which
+					// Read at the parameter node, which is where the original reads it and which
 					// is also where the report points. Reading at the parameter's name instead is
-					// EQUIVALENT, measured across a plain, an optional and a defaulted parameter:
+					// equivalent, measured across a plain, an optional and a defaulted parameter:
 					// the checker answers the same type at both locations for all three, so a
 					// mutant swapping them survives every fixture and no input can separate them.
 					checkNullability(owner, declaredNullable,
@@ -221,7 +221,7 @@ var GraphQlNullableParity = rule.Rule{
 						// property, so a port handling only the property shape goes silent on
 						// every computed field.
 						//
-						// The get accessor arm is reached and then declines, which MATCHES the
+						// The get accessor arm is reached and then declines, which matches the
 						// original and is worth stating because it looks like a defect. A getter
 						// has no call signature: the type at the node is already the property
 						// type, so `returnTypeOf` finds no signature and answers nil, and

@@ -22,9 +22,9 @@ import (
 // undefined; `!` asserts it is neither. Writing both says "this cannot be nullish, and here is what
 // to do when it is", so one of the two is wrong and the reader cannot tell which.
 //
-// # The repair is a SUGGESTION, and upstream explains why in a comment worth preserving
+// # The repair is a suggestion, and upstream explains why in a comment worth preserving
 //
-// Removing `!` can change the resulting TYPE, so it is offered rather than applied:
+// Removing `!` can change the resulting type, so it is offered rather than applied:
 //
 //	function test(x?: string): string {
 //	  const bar = x! ?? false;   the analysis gives bar the type string
@@ -32,7 +32,7 @@ import (
 //	  return bar;
 //	}
 //
-// The nullish coalesce takes the right operand into its result only when the left CAN be nullish, so
+// The nullish coalesce takes the right operand into its result only when the left can be nullish, so
 // deleting the assertion can widen the type and break a return that used to compile. A fixer would
 // do that unattended. This ships the same single suggestion upstream ships.
 //
@@ -41,7 +41,7 @@ import (
 // For a non-identifier left side, the rule reports unconditionally: `foo.bazz!`, `foo()!` and
 // `foo!.bazz!` are always contradictions.
 //
-// For a bare identifier, upstream asks whether the variable has been ASSIGNED before this point,
+// For a bare identifier, upstream asks whether the variable has been assigned before this point,
 // and stays silent when it has not:
 //
 //	let x: string; x! ?? '';               silent, x has no value yet
@@ -70,7 +70,7 @@ import (
 //	                      shelf's `reference.WritesToBinding` whether each one is a write
 //
 // This is the technique `no-unassigned-vars` and `no-class-assign` already use for the same
-// question, and it is fidelity to what the rule DECIDES rather than to how upstream obtains it.
+// question, and it is fidelity to what the rule decides rather than to how upstream obtains it.
 //
 // Symbols are compared by identity rather than by indexing `Declarations[0]`. A symbol can carry
 // several declarations, and taking the first would answer about the wrong one for a merged name;
@@ -112,7 +112,7 @@ var NoNonNullAssertedNullishCoalescing = rule.Rule{
 				// `> TSNonNullExpression.left`, a direct child relation, and the reasoned
 				// conclusion was that a parenthesized left side cannot match it. estree has no
 				// parenthesized node at all, so the child relation sees straight through one and
-				// `(foo!) ?? bar` REPORTS. Measured against the installed build, after the same
+				// `(foo!) ?? bar` reports. Measured against the installed build, after the same
 				// mistake in a sibling rule in this batch produced a false negative no imported
 				// fixture could see, since the corpus writes no parenthesized left side.
 				//
@@ -164,11 +164,11 @@ var NoNonNullAssertedNullishCoalescing = rule.Rule{
 //	a WRITE to the binding whose identifier ends before this node ends
 //	a DECLARATION with an initializer or a definite-assignment mark, ending before this node ends
 //
-// The comparison is on END positions in both halves, which is upstream's `range[1] < node.range[1]`
-// rather than a start comparison. That distinction is visible in the corpus: a write BELOW the
+// The comparison is on end positions in both halves, which is upstream's `range[1] < node.range[1]`
+// rather than a start comparison. That distinction is visible in the corpus: a write below the
 // assertion leaves the case clean, so the direction is load-bearing.
 //
-// An identifier the checker cannot resolve answers TRUE, so the rule reports. That is upstream's
+// An identifier the checker cannot resolve answers true, so the rule reports. That is upstream's
 // behavior rather than a choice here: `findVariable` returns null for an unresolvable name, the
 // `variable && ...` guard fails, and the early return is skipped. Every one of upstream's failing
 // cases with a bare `foo!` relies on it, since `foo` is declared nowhere in them.

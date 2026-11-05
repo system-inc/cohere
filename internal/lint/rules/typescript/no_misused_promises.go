@@ -158,8 +158,8 @@ func (options *NoMisusedPromisesOptions) UnmarshalJSON(raw []byte) error {
 //
 //	valid:   const p = Promise.resolve(); if (await p) {}
 //	valid:   [1, 2].forEach(async () => {});          // forEach takes a void return AND a thenable
-//	invalid: const p = Promise.resolve(); if (p) {}   // conditional — always truthy
-//	invalid: [1, 2].filter(async n => n > 1);         // predicate — the array gets Promises, not booleans
+//	invalid: const p = Promise.resolve(); if (p) {}   // conditional, always truthy
+//	invalid: [1, 2].filter(async n => n > 1);         // predicate, the array gets Promises, not booleans
 //	invalid: declare function f(cb: () => void): void; f(async () => {});  // voidReturnArgument
 //	invalid: const obj = { ...Promise.resolve({ a: 1 }) };                 // spread
 //
@@ -191,12 +191,12 @@ func (options *NoMisusedPromisesOptions) UnmarshalJSON(raw []byte) error {
 // field for field rather than being re-declared.
 //
 // oxc declares this rule as a tsgolint delegate and carries no algorithm and no corpus, so the
-// behavior oxlint exhibits IS tsgolint's: the release binary shells out to a `tsgolint` executable
+// behavior oxlint exhibits is tsgolint's: the release binary shells out to a `tsgolint` executable
 // and refuses to run the rule when that binary is absent, which is what it does on this machine
 // (`Failed to find tsgolint executable`). That refusal is itself the proof, so oxlint cannot serve as
 // ground truth here and tsgolint's own test file is the corpus instead.
 //
-// # THREE independent checks, and one of them is an object of sub-flags
+// # three independent checks, and one of them is an object of sub-flags
 //
 // This is the most structurally complex rule in this family, and the shape is the thing to hold:
 //
@@ -211,7 +211,7 @@ func (options *NoMisusedPromisesOptions) UnmarshalJSON(raw []byte) error {
 // Checked against upstream's 34 checksConditionals rows and edge rows in
 // no_misused_promises_conditionals_corpus_test.go.
 //
-// `checksVoidReturn` is not one check. It gates SIX sub-flags, each of which is a distinct position
+// `checksVoidReturn` is not one check. It gates six sub-flags, each of which is a distinct position
 // in the syntax and a distinct message id, and each of which registers its own listeners:
 //
 //	arguments         voidReturnArgument         KindCallExpression, KindNewExpression
@@ -235,7 +235,7 @@ func (options *NoMisusedPromisesOptions) UnmarshalJSON(raw []byte) error {
 //
 // # The pointer fields are load-bearing and must not be flattened to plain bools
 //
-// EVERY option on this rule defaults to TRUE — all three top-level checks and all six void-return
+// Every option on this rule defaults to true: all three top-level checks and all six void-return
 // sub-flags. That is nine fields whose default is not the zero value, so a plain `bool` could not
 // tell "the user wrote false" from "the user wrote nothing", and the entire defaulting block at the
 // top of `Run` reads exactly that distinction. Flattening any of them would silently turn the whole
@@ -263,7 +263,7 @@ func (options *NoMisusedPromisesOptions) UnmarshalJSON(raw []byte) error {
 //	              `IsAssignmentExpression`; the plugin has a dedicated AssignmentExpression node.
 //	              Same rule, different grammar.
 //
-// The one genuine, user-visible disagreement is MESSAGE TEXT on the spread id: the plugin renders
+// The one genuine, user-visible disagreement is message text on the spread id: the plugin renders
 // "Expected a non-Promise value to be spread in an object" and tsgolint renders "…to be spreaded in
 // an object". Upstream's wording is an error of English and it is reproduced here unrepaired, because
 // oxlint runs tsgolint and the differential harness compares against oxlint, so correcting it would
@@ -276,8 +276,8 @@ func (options *NoMisusedPromisesOptions) UnmarshalJSON(raw []byte) error {
 // `rule_testing` to apply and nothing needing a hand-rolled suggestion applier. Upstream carries two
 // `TODO(port)` markers at report sites where `@typescript-eslint` narrows the reported range to a
 // function's head (`getFunctionHeadLoc`), and one at `getMemberIfExists` where it would escape leading
-// underscores. All three are carried across unchanged, so a member named `__proto__` resolves through
-// the un-escaped path exactly as it does upstream.
+// underscores. All three gaps are carried across and stated at their sites, so a member named
+// `__proto__` resolves through the un-escaped path exactly as it does upstream.
 //
 // # The checker, and the nil guard that is now reachable
 //
@@ -285,12 +285,12 @@ func (options *NoMisusedPromisesOptions) UnmarshalJSON(raw []byte) error {
 // `RunTyped`. While this family was adapted through `internal/rules/upstream`, the standing
 // `if ctx.TypeChecker == nil` could not be written, because the listener bodies were upstream's and
 // that adapter set `NeedsTypeChecker` unconditionally, which made the nil case unreachable. That
-// adapter is gone. Absorbing the rule makes the nil case REACHABLE, so the guard is written here.
+// adapter is gone. Absorbing the rule makes the nil case reachable, so the guard is written here.
 //
 // The direction matters more than usual. Under a checker-less Context this rule does not panic: our
 // shim's `GetTypeAtLocation` and `GetSymbolAtLocation` return nil rather than crashing, so the rule
-// would go SILENT, and silence makes every clean fixture pass having proven nothing — which for this
-// rule is ONE HUNDRED AND TWENTY-THREE of its two hundred and thirteen cases. The guard sits at the
+// would go silent, and silence makes every clean fixture pass having proven nothing, which for this
+// rule is one hundred and twenty-three of its two hundred and thirteen cases. The guard sits at the
 // top of `Run` rather than inside each of the fourteen listeners, which is strictly stronger: no
 // listener is even registered, so no arm can be added later that forgets it.
 // `TestNoMisusedPromisesRequiresTheTypedHarness` pins the declaration and the guard together so a
@@ -304,8 +304,8 @@ func (options *NoMisusedPromisesOptions) UnmarshalJSON(raw []byte) error {
 // can decline. Upstream's `checkArguments` resolves the callee's type and then walks every signature's
 // every parameter for every call in the file, and its JSX arm resolves every attribute's contextual
 // type; both now ask the cheap half of their conjunction first, which is the one departure from
-// upstream's order (#hekjpw3). The syntactic escape hatches upstream wrote — `isPossiblyFunctionType`
-// on return statements and variable declarations, the `Arguments() == nil` early exit — exist for
+// upstream's order (#hekjpw3). The syntactic escape hatches upstream wrote (`isPossiblyFunctionType`
+// on return statements and variable declarations, the `Arguments() == nil` early exit) exist for
 // exactly that reason and are carried across rather than being treated as optional.
 var NoMisusedPromises = rule.Rule{
 	Name: "@typescript-eslint/no-misused-promises",
@@ -322,8 +322,8 @@ var NoMisusedPromises = rule.Rule{
 	// honest answer here is no.
 	//
 	// Worth knowing for whoever writes the next one of these: the guard in `internal/dispatch` that
-	// enforces the flag is TEXTUAL, a grep for the selector over the rule's whole file, comments
-	// included. So a doc comment that merely NAMES the thing it is declining to use fails the guard
+	// enforces the flag is textual, a grep for the selector over the rule's whole file, comments
+	// included. So a doc comment that merely names the thing it is declining to use fails the guard
 	// with a message asserting the opposite of the truth. This paragraph is worded around the token
 	// for that reason, rather than because the phrasing reads better.
 
@@ -524,8 +524,8 @@ var NoMisusedPromises = rule.Rule{
 			t *checker.Type,
 			memberName string,
 		) *ast.Symbol {
-			// TODO(port)
-			// const escapedMemberName = ts.escapeLeadingUnderscores(memberName);
+			// Upstream escapes the name first, with `ts.escapeLeadingUnderscores`. This port does not, a gap
+			// carried from the Go port it came from (see the doc above).
 			symbol := checker.Type_symbol(t)
 			if symbol != nil {
 				symbol = symbol.Members[memberName]
@@ -742,7 +742,7 @@ var NoMisusedPromises = rule.Rule{
 			return voidReturnIndices
 		}
 
-		// An argument is reported when its position takes a void-returning function AND the argument
+		// An argument is reported when its position takes a void-returning function and the argument
 		// returns a thenable. Upstream resolves the positions first, which walks every parameter of
 		// every signature and asks each its contextual type, for every call in the file, including
 		// calls with no arguments at all. Asking each argument first is the same conjunction in the
@@ -791,8 +791,9 @@ var NoMisusedPromises = rule.Rule{
 				if nodeMember.Name() == nil {
 					// Call/construct/index signatures don't have names. TS allows call signatures to mismatch,
 					// and construct signatures can't be async.
-					// TODO - Once we're able to use `checker.isTypeAssignableTo` (v8), we can check an index
-					// signature here against its compatible index signatures in `heritageTypes`
+					// An index signature is not checked against its compatible index signatures in
+					// `heritageTypes`, because that needs `checker.isTypeAssignableTo`, which
+					// `@typescript-eslint` notes it cannot use before its v8.
 					continue
 				}
 				if !(ast.IsIdentifier(nodeMember.Name()) || ast.IsPrivateIdentifier(nodeMember.Name()) || ast.IsStringLiteral(nodeMember.Name()) || ast.IsNumericLiteral(nodeMember.Name()) || ast.IsBigIntLiteral(nodeMember.Name())) {
@@ -830,7 +831,8 @@ var NoMisusedPromises = rule.Rule{
 							ruleContext.ReportNode(returnType, buildVoidReturnPropertyMessage())
 						} else {
 							ruleContext.ReportNode(
-								// TODO(port): getFunctionHeadLoc(functionNode, context.sourceCode)
+								// Upstream narrows this to the function's head with `getFunctionHeadLoc`;
+								// this port reports the whole initializer, the same finding over a wider range.
 								property.Initializer,
 								buildVoidReturnPropertyMessage(),
 							)
@@ -887,7 +889,8 @@ var NoMisusedPromises = rule.Rule{
 						ruleContext.ReportNode(node.Type(), buildVoidReturnPropertyMessage())
 					} else {
 						ruleContext.ReportNode(
-							// TODO(port): getFunctionHeadLoc(functionNode, context.sourceCode)
+							// Upstream narrows this to the function's head with `getFunctionHeadLoc`;
+							// this port reports the whole node, the same finding over a wider range.
 							node,
 							buildVoidReturnPropertyMessage(),
 						)
@@ -969,11 +972,14 @@ var NoMisusedPromises = rule.Rule{
 				for current != nil && !ast.IsFunctionLike(current) {
 					current = current.Parent
 				}
-				if current == nil {
-					panic("missing parent function")
-				}
 				return current
 			})()
+			// A `return` outside any function parses, and only the checker rejects it. Upstream throws
+			// on the missing parent; passing over it keeps one file the compiler refuses from stopping
+			// the whole run.
+			if functionNode == nil {
+				return
+			}
 
 			if functionNode.Type() != nil && !isPossiblyFunctionType(functionNode.Type()) {
 				return
@@ -1104,7 +1110,8 @@ func isSometimesThenable(typeChecker *checker.Checker, node *ast.Node) bool {
 // is assignable to the other.
 func hasMatchingPromiseTypeArgument(typeChecker *checker.Checker, node *ast.Node) bool {
 	valueType := typeChecker.GetTypeAtLocation(node)
-	var thenables, others []*checker.Type
+	var thenables []*checker.Type
+	var others []*checker.Type
 	for part := range type_checking.UnionTypePartsSeq(checker.Checker_getApparentType(typeChecker, valueType)) {
 		if type_checking.IsThenableType(typeChecker, node, part) {
 			thenables = append(thenables, part)

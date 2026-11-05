@@ -21,6 +21,8 @@ func realCommentCorpus(test *testing.T) []string {
 	var comments []string
 	root := corpus.Structure.Path(test, "source")
 	fileCount := 0
+	// Ignored: the callback skips every path it cannot read and never returns an error, so the walk has none
+	// to return, and the count below catches a corpus that came back too small.
 	_ = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() || fileCount >= 400 {
 			return nil

@@ -19,6 +19,7 @@ func main() {
 	flag.Parse()
 
 	if runError := run(*check); runError != nil {
+		// Ignored: the exit code below says the run failed even when standard error cannot.
 		fmt.Fprintln(os.Stderr, runError)
 		os.Exit(1)
 	}
@@ -43,7 +44,9 @@ func run(check bool) error {
 			if writeError := os.WriteFile(file.Path, file.Contents, 0o644); writeError != nil {
 				return writeError
 			}
-			fmt.Println("wrote", file.Path)
+			if _, printError := fmt.Println("wrote", file.Path); printError != nil {
+				return fmt.Errorf("saying %s was written: %w", file.Path, printError)
+			}
 		}
 	}
 	if check && len(stale) > 0 {
