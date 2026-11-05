@@ -56,7 +56,11 @@ func decodeForTest(test *testing.T, raw string) DependenciesOptions {
 	if err != nil {
 		test.Fatalf("decoding the options: %v", err)
 	}
-	return decoded.(DependenciesOptions)
+	options, isOptions := decoded.(DependenciesOptions)
+	if !isOptions {
+		test.Fatalf("decoding the options gave a %T, want DependenciesOptions", decoded)
+	}
+	return options
 }
 
 // baseLayout is the slice of Base the package-boundary cases import across.
@@ -131,6 +135,7 @@ func runCases(test *testing.T, layout map[string]string, options DependenciesOpt
 	test.Helper()
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
+			test.Parallel()
 			result := runCase(test, layout, testCase.file, testCase.source, options)
 			if len(testCase.wantIds) == 0 {
 				if !strings.Contains(testCase.name, "does not exist") {
@@ -416,7 +421,11 @@ func TestDependenciesDecodesBasesOwnBlocksAndAnchorsTheRoot(test *testing.T) {
 		if err != nil {
 			test.Fatalf("Base's own block was refused: %v", err)
 		}
-		if root := decoded.(DependenciesOptions).Root; root != "/repo" {
+		options, isOptions := decoded.(DependenciesOptions)
+		if !isOptions {
+			test.Fatalf("Base's own block decoded to a %T, want DependenciesOptions", decoded)
+		}
+		if root := options.Root; root != "/repo" {
 			test.Fatalf("expected the root at the config's directory, got %q", root)
 		}
 	}
@@ -424,7 +433,11 @@ func TestDependenciesDecodesBasesOwnBlocksAndAnchorsTheRoot(test *testing.T) {
 	if err != nil {
 		test.Fatal(err)
 	}
-	if root := decoded.(DependenciesOptions).Root; root != "/project" {
+	options, isOptions := decoded.(DependenciesOptions)
+	if !isOptions {
+		test.Fatalf("the project module block decoded to a %T, want DependenciesOptions", decoded)
+	}
+	if root := options.Root; root != "/project" {
 		test.Fatalf("expected the project root when the config's directory is unknown, got %q", root)
 	}
 

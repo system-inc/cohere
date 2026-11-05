@@ -157,7 +157,10 @@ func crossEnumDeclaredTypes(tc *checker.Checker, node *ast.Node) []*checker.Type
 		access := node.AsElementAccessExpression()
 		typ := tc.GetTypeAtLocation(access.ArgumentExpression)
 		if typ != nil && typ.Flags()&checker.TypeFlagsStringLiteral != 0 {
-			receiver, key = access.Expression, typ.AsLiteralType().Value().(string)
+			// A string literal type's value is a string; on a miss the receiver stays nil and nothing is recovered
+			if value, isString := typ.AsLiteralType().Value().(string); isString {
+				receiver, key = access.Expression, value
+			}
 		}
 	}
 	if receiver != nil {

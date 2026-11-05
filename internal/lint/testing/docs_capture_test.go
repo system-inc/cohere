@@ -82,6 +82,9 @@ func TestDocsCaptureRecordsOnlyAssertedCases(test *testing.T) {
 				}
 				records = append(records, record)
 			}
+			if scanError := scanner.Err(); scanError != nil {
+				test.Fatalf("%s: %v", path, scanError)
+			}
 			file.Close()
 		}
 		if !captureOn && len(paths) > 0 {
