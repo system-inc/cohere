@@ -38,7 +38,7 @@ func TestEveryLandingGateOnlyEntryStillEarnsItsPlace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	packages, err := modulePackagesIn(root)
+	packages, err := modulePackagesIn(root, os.Environ())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,6 +139,30 @@ func TestAnInnerRunInheritsTheOuterDeadline(t *testing.T) {
 		if got := inheritedTimeout(sample.deadline, sample.hasDeadline, now); got != sample.want {
 			t.Errorf("a deadline %v ahead (has one: %v) gave -timeout=%s, want %s", sample.deadline.Sub(now), sample.hasDeadline, got, sample.want)
 		}
+	}
+}
+
+// The fast tier lists the module's packages in the environment its tests run in, not the caller's, and a
+// failed listing says go's own reason. A flag go does not know fails the listing only if the environment
+// given is the one go list reads.
+func TestTheFastTierListsPackagesInTheRunsEnvironment(t *testing.T) {
+	t.Parallel()
+	root, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	environment := []string{}
+	for _, variable := range os.Environ() {
+		if !strings.HasPrefix(variable, "GOFLAGS=") {
+			environment = append(environment, variable)
+		}
+	}
+	_, err = modulePackagesIn(root, append(environment, "GOFLAGS=-not-a-go-flag"))
+	if err == nil {
+		t.Fatal("go list succeeded with a go flag it does not know, so it did not run in the environment given")
+	}
+	if !strings.Contains(err.Error(), "not-a-go-flag") {
+		t.Errorf("the failed listing says %q, want go's own reason, which names the flag", err)
 	}
 }
 
