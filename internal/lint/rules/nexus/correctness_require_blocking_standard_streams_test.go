@@ -124,7 +124,7 @@ func correctnessRequireBlockingStandardStreamsExpect(test *testing.T, result rul
 			test.Fatalf("the message %q does not say %q", diagnostic.Message.Description, phrase)
 		}
 	}
-	if strings.Contains(diagnostic.Message.Description, "—") {
+	if strings.Contains(diagnostic.Message.Description, "\u2014") {
 		test.Fatalf("the message holds an em-dash: %q", diagnostic.Message.Description)
 	}
 }

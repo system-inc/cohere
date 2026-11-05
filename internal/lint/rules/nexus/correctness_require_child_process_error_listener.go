@@ -23,6 +23,18 @@ func correctnessRequireChildProcessErrorListenerMessage() rule.Message {
 	}
 }
 
+// correctnessRequireChildProcessErrorListenerFate is what one use does with a child.
+type correctnessRequireChildProcessErrorListenerFate uint8
+
+const (
+	// correctnessRequireChildProcessErrorListenerNeither reads the child and lets it go nowhere.
+	correctnessRequireChildProcessErrorListenerNeither correctnessRequireChildProcessErrorListenerFate = iota
+	correctnessRequireChildProcessErrorListenerHandled
+	correctnessRequireChildProcessErrorListenerEscaped
+	// correctnessRequireChildProcessErrorListenerBound stores the child in a plain identifier.
+	correctnessRequireChildProcessErrorListenerBound
+)
+
 // CorrectnessRequireChildProcessErrorListener reports a ChildProcess from `node:child_process`'s
 // `spawn` or `fork` that never gets an `'error'` listener and never leaves the file's hands.
 //
@@ -151,18 +163,6 @@ var CorrectnessRequireChildProcessErrorListener = rule.Rule{
 	},
 }
 
-// correctnessRequireChildProcessErrorListenerFate is what one use does with a child.
-type correctnessRequireChildProcessErrorListenerFate uint8
-
-const (
-	// correctnessRequireChildProcessErrorListenerNeither reads the child and lets it go nowhere.
-	correctnessRequireChildProcessErrorListenerNeither correctnessRequireChildProcessErrorListenerFate = iota
-	correctnessRequireChildProcessErrorListenerHandled
-	correctnessRequireChildProcessErrorListenerEscaped
-	// correctnessRequireChildProcessErrorListenerBound stores the child in a plain identifier.
-	correctnessRequireChildProcessErrorListenerBound
-)
-
 // correctnessRequireChildProcessErrorListenerRegistrations are the EventEmitter methods that attach
 // a listener. Each returns the emitter.
 var correctnessRequireChildProcessErrorListenerRegistrations = map[string]bool{
@@ -264,16 +264,17 @@ func correctnessRequireChildProcessErrorListenerFollow(ruleContext rule.Context,
 // correctnessRequireChildProcessErrorListenerOutermost climbs from an expression through the
 // wrappers that pass its value through unchanged.
 func correctnessRequireChildProcessErrorListenerOutermost(expression *ast.Node) *ast.Node {
-	for expression.Parent != nil {
-		switch expression.Parent.Kind {
+	current := expression
+	for current.Parent != nil {
+		switch current.Parent.Kind {
 		case ast.KindParenthesizedExpression, ast.KindNonNullExpression, ast.KindAsExpression,
 			ast.KindSatisfiesExpression, ast.KindTypeAssertionExpression:
-			expression = expression.Parent
+			current = current.Parent
 			continue
 		}
-		return expression
+		return current
 	}
-	return expression
+	return current
 }
 
 // correctnessRequireChildProcessErrorListenerNamesError says whether a listener registration may be

@@ -126,7 +126,7 @@ var messageUseAnArrayLiteral = rule.Message{
 // hold only comments, `Array(/*a*/ /*b*/)`, has an empty argument list because comments are trivia,
 // so it takes the no-arguments branch and becomes `[]`. And a comment between the callee and the
 // open paren, `Array/*a*/()`, sits outside any span anchored on the first argument. Upstream loses
-// both as well and carries the pairs commented out under "TODO: Preserve comments around callee".
+// both as well and carries the pairs commented out under `TODO: Preserve comments around callee`.
 // Acceptable only because this is a suggestion a human reads before accepting; it would be a defect
 // in a fix.
 var NoArrayConstructor = rule.Rule{
@@ -158,7 +158,7 @@ var NoArrayConstructor = rule.Rule{
 			}
 
 			// `Array?.(1, 2, 3)`. Upstream carries every optional form as a pass case and marks them
-			// "TODO: Catch optional chaining cases", so this is upstream declining to judge them,
+			// `TODO: Catch optional chaining cases`, so this is upstream declining to judge them,
 			// not upstream judging them safe. Reproduced rather than improved on, because the brief
 			// asks for upstream's behavior and a silent divergence here would be invisible.
 			if isOptionalCall {

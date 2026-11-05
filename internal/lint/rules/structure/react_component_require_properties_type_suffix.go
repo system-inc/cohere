@@ -221,6 +221,8 @@ var ReactComponentRequirePropertiesTypeSuffix = rule.Rule{
 //
 // A dependency's type is left out, so a declaration of ours that happens to share its name is not
 // renamed on its account.
+//
+// Mutates: into the walk adds each property type name it finds, so the listener's one set holds the whole file
 func collectComponentPropertyTypeNames(ruleContext rule.Context, sourceFile *ast.Node, into map[string]bool) {
 	var visit func(*ast.Node)
 	visit = func(node *ast.Node) {

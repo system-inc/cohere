@@ -30,7 +30,7 @@ type yodaCase struct {
 	findings    []yodaExpectation
 }
 
-func yodaStringPointer(value string) *string { return &value }
+func yodaStringPointer(value string) *string { return new(value) }
 
 // decodeYodaOptionsForTest routes a case's options through the shipped decoder.
 func decodeYodaOptionsForTest(test *testing.T, optionsJson string) any {
@@ -224,27 +224,27 @@ func TestYodaFires(test *testing.T) {
 				decodeYodaOptionsForTest(test, testCase.optionsJson))
 
 			wantIds := make([]string, len(testCase.findings))
-			for i := range wantIds {
-				wantIds[i] = "expected"
+			for index := range wantIds {
+				wantIds[index] = "expected"
 			}
 			rule_testing.ExpectFindings(test, result, wantIds...)
 
-			for i, finding := range testCase.findings {
+			for index, finding := range testCase.findings {
 				// Upstream's template is
 				// `Expected literal to be on the {{expectedSide}} side of {{operator}}.`
 				// Asserted as an exact prefix rather than with a substring test, because both
 				// values are interpolated and a `strings.Contains` cannot see a swapped pair.
 				want := "Expected literal to be on the " + finding.expectedSide +
 					" side of " + finding.operator + "."
-				if got := result.Diagnostics[i].Message.Description; !strings.HasPrefix(got, want) {
-					test.Errorf("finding %d: message should begin %q, got %q", i, want, got)
+				if got := result.Diagnostics[index].Message.Description; !strings.HasPrefix(got, want) {
+					test.Errorf("finding %d: message should begin %q, got %q", index, want, got)
 				}
 			}
 
 			if testCase.fixedSource == nil {
-				for i, diagnostic := range result.Diagnostics {
+				for index, diagnostic := range result.Diagnostics {
 					if len(diagnostic.Fixes) != 0 {
-						test.Errorf("finding %d proposes a fix; upstream declines this case", i)
+						test.Errorf("finding %d proposes a fix; upstream declines this case", index)
 					}
 				}
 				return

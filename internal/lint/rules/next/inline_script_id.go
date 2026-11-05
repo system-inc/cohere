@@ -263,6 +263,8 @@ func attributeNamesIncludingObjectSpreads(attributes *ast.Node) (map[string]bool
 // `ast.TryGetTextOfPropertyName` resolves the string and computed forms and is not used for exactly
 // that reason. Reaching for it would silence inputs upstream reports, which reads as a correctness
 // improvement and is a divergence.
+//
+// Mutates: names the keys of each object literal join one set, so every spread adds to the same answer
 func collectStaticIdentifierKeys(objectLiteral *ast.Node, names map[string]bool) {
 	properties := objectLiteral.AsObjectLiteralExpression().Properties
 	if properties == nil {

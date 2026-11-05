@@ -269,8 +269,8 @@ func independentAwaitLoopIndexedShape(statement *ast.ForStatement) (*ast.Node, *
 // stepping through a collection one element at a time.
 func independentAwaitLoopIncrementsByOne(incrementor *ast.Node, indexName string) bool {
 	isIndex := func(node *ast.Node) bool {
-		node = ast.SkipParentheses(node)
-		return node.Kind == ast.KindIdentifier && node.Text() == indexName
+		unwrapped := ast.SkipParentheses(node)
+		return unwrapped.Kind == ast.KindIdentifier && unwrapped.Text() == indexName
 	}
 	switch incrementor.Kind {
 	case ast.KindPostfixUnaryExpression:
@@ -375,13 +375,13 @@ func (analysis *independentAwaitLoopAnalysis) holdsItsOwnAwait() bool {
 // the spelling. Measured on ahra: four loops in PromiseGroup.test.ts collect already-running
 // promises this way and were the largest false-positive class before this test existed.
 func (analysis *independentAwaitLoopAnalysis) awaitsTheItemItself(operand *ast.Node) bool {
-	operand = independentAwaitLoopSkipWrappers(operand)
-	switch operand.Kind {
+	unwrapped := independentAwaitLoopSkipWrappers(operand)
+	switch unwrapped.Kind {
 	case ast.KindIdentifier:
 		if analysis.loop.Kind != ast.KindForOfStatement {
 			return false
 		}
-		symbol := analysis.symbolOf(operand)
+		symbol := analysis.symbolOf(unwrapped)
 		if symbol == nil {
 			return false
 		}
@@ -395,7 +395,7 @@ func (analysis *independentAwaitLoopAnalysis) awaitsTheItemItself(operand *ast.N
 		if analysis.indexSymbol == nil {
 			return false
 		}
-		access := operand.AsElementAccessExpression()
+		access := unwrapped.AsElementAccessExpression()
 		argument := independentAwaitLoopSkipWrappers(access.ArgumentExpression)
 		collection := independentAwaitLoopSegments(analysis.collection)
 		return argument.Kind == ast.KindIdentifier && analysis.symbolOf(argument) == analysis.indexSymbol &&
@@ -461,13 +461,13 @@ func (analysis *independentAwaitLoopAnalysis) hasOrderedSideEffect() bool {
 // callee is resolved through the checker, so an imported function is followed to its source; a
 // declaration file has no body and ends the walk.
 func (analysis *independentAwaitLoopAnalysis) calleeMakesOrderedCall(callee *ast.Node) bool {
-	callee = independentAwaitLoopSkipWrappers(callee)
+	unwrapped := independentAwaitLoopSkipWrappers(callee)
 	var name *ast.Node
-	switch callee.Kind {
+	switch unwrapped.Kind {
 	case ast.KindIdentifier:
-		name = callee
+		name = unwrapped
 	case ast.KindPropertyAccessExpression:
-		name = callee.AsPropertyAccessExpression().Name()
+		name = unwrapped.AsPropertyAccessExpression().Name()
 	default:
 		return false
 	}
@@ -563,14 +563,14 @@ var independentAwaitLoopCalleeQuietConsoleMethods = map[string]bool{
 // is almost always a request timeout rather than a sleep (`FrameTvApi.sendRequest` arms one per
 // request), so neither says the caller's loop must run in order.
 func independentAwaitLoopIsCalleeOrderedCall(callee *ast.Node) bool {
-	callee = independentAwaitLoopSkipWrappers(callee)
-	switch callee.Kind {
+	unwrapped := independentAwaitLoopSkipWrappers(callee)
+	switch unwrapped.Kind {
 	case ast.KindIdentifier:
-		if name := callee.Text(); name == "setTimeout" || name == "setInterval" || name == "setImmediate" {
+		if name := unwrapped.Text(); name == "setTimeout" || name == "setInterval" || name == "setImmediate" {
 			return false
 		}
 	case ast.KindPropertyAccessExpression:
-		access := callee.AsPropertyAccessExpression()
+		access := unwrapped.AsPropertyAccessExpression()
 		receiver := independentAwaitLoopSegments(access.Expression)
 		method := access.Name().Text()
 		if len(receiver) > 0 && receiver[0] == "console" && independentAwaitLoopCalleeQuietConsoleMethods[method] {
@@ -587,7 +587,7 @@ func independentAwaitLoopIsCalleeOrderedCall(callee *ast.Node) bool {
 			return false
 		}
 	}
-	return independentAwaitLoopIsOrderedCall(callee)
+	return independentAwaitLoopIsOrderedCall(unwrapped)
 }
 
 var independentAwaitLoopPacingPrefixes = []string{"sleep", "delay", "wait", "pause", "throttle", "backoff", "ratelimit", "print"}
@@ -603,14 +603,14 @@ var independentAwaitLoopLogMethods = map[string]bool{
 // independentAwaitLoopIsOrderedCall answers whether a call's callee names an effect whose order the
 // reader can see. Names only; the doc comment on the rule carries the whole list.
 func independentAwaitLoopIsOrderedCall(callee *ast.Node) bool {
-	callee = independentAwaitLoopSkipWrappers(callee)
+	unwrapped := independentAwaitLoopSkipWrappers(callee)
 	name := ""
 	var receiver []string
-	switch callee.Kind {
+	switch unwrapped.Kind {
 	case ast.KindIdentifier:
-		name = callee.Text()
+		name = unwrapped.Text()
 	case ast.KindPropertyAccessExpression:
-		access := callee.AsPropertyAccessExpression()
+		access := unwrapped.AsPropertyAccessExpression()
 		name = access.Name().Text()
 		receiver = independentAwaitLoopSegments(access.Expression)
 	default:
@@ -650,36 +650,37 @@ func independentAwaitLoopIsOrderedCall(callee *ast.Node) bool {
 	if independentAwaitLoopLogMethods[name] && strings.Contains(lastReceiver, "log") {
 		return true
 	}
-	return callee.Kind == ast.KindIdentifier && name == "log"
+	return unwrapped.Kind == ast.KindIdentifier && name == "log"
 }
 
 // independentAwaitLoopSkipWrappers removes parentheses and non-null assertions, which change
 // nothing about which value an expression names.
 func independentAwaitLoopSkipWrappers(node *ast.Node) *ast.Node {
-	for node != nil {
-		switch node.Kind {
+	current := node
+	for current != nil {
+		switch current.Kind {
 		case ast.KindParenthesizedExpression:
-			node = node.AsParenthesizedExpression().Expression
+			current = current.AsParenthesizedExpression().Expression
 		case ast.KindNonNullExpression:
-			node = node.AsNonNullExpression().Expression
+			current = current.AsNonNullExpression().Expression
 		default:
-			return node
+			return current
 		}
 	}
-	return node
+	return current
 }
 
 // independentAwaitLoopSegments spells a property chain as its names, `this.cache.entries` as
 // `this`, `cache`, `entries`, or nil when the expression is not a plain chain.
 func independentAwaitLoopSegments(node *ast.Node) []string {
-	node = independentAwaitLoopSkipWrappers(node)
-	switch node.Kind {
+	unwrapped := independentAwaitLoopSkipWrappers(node)
+	switch unwrapped.Kind {
 	case ast.KindIdentifier:
-		return []string{node.Text()}
+		return []string{unwrapped.Text()}
 	case ast.KindThisKeyword:
 		return []string{"this"}
 	case ast.KindPropertyAccessExpression:
-		access := node.AsPropertyAccessExpression()
+		access := unwrapped.AsPropertyAccessExpression()
 		base := independentAwaitLoopSegments(access.Expression)
 		if base == nil {
 			return nil
@@ -691,12 +692,12 @@ func independentAwaitLoopSegments(node *ast.Node) []string {
 
 // independentAwaitLoopRoot answers the identifier or `this` a property chain starts from.
 func independentAwaitLoopRoot(node *ast.Node) *ast.Node {
-	node = independentAwaitLoopSkipWrappers(node)
-	switch node.Kind {
+	unwrapped := independentAwaitLoopSkipWrappers(node)
+	switch unwrapped.Kind {
 	case ast.KindIdentifier, ast.KindThisKeyword:
-		return node
+		return unwrapped
 	case ast.KindPropertyAccessExpression:
-		return independentAwaitLoopRoot(node.AsPropertyAccessExpression().Expression)
+		return independentAwaitLoopRoot(unwrapped.AsPropertyAccessExpression().Expression)
 	}
 	return nil
 }
@@ -806,14 +807,14 @@ func (analysis *independentAwaitLoopAnalysis) carriesState() bool {
 	// outerPropertyTarget answers the outer chain a property or element write lands in: the whole
 	// chain for `a.b.c = x`, the object for `a.b[key] = x`. Nil when the target is not outer.
 	outerPropertyTarget := func(target *ast.Node) *ast.Node {
-		target = independentAwaitLoopSkipWrappers(target)
-		switch target.Kind {
+		unwrapped := independentAwaitLoopSkipWrappers(target)
+		switch unwrapped.Kind {
 		case ast.KindPropertyAccessExpression:
-			if analysis.rootIsOuter(independentAwaitLoopRoot(target)) {
-				return target
+			if analysis.rootIsOuter(independentAwaitLoopRoot(unwrapped)) {
+				return unwrapped
 			}
 		case ast.KindElementAccessExpression:
-			object := target.AsElementAccessExpression().Expression
+			object := unwrapped.AsElementAccessExpression().Expression
 			if analysis.rootIsOuter(independentAwaitLoopRoot(object)) {
 				return object
 			}

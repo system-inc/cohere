@@ -13,6 +13,8 @@ import (
 
 var ambientDeclarationText = policy.MessageOf("adamic/no-ambient-declarations", "ambientDeclaration")
 
+var ambientFieldText = policy.MessageOf("adamic/no-ambient-declarations", "ambientField")
+
 // NoAmbientDeclarations refuses runtime claims with no emitted definition. Each
 // form has a strict-accepted, Node-failing probe in testdata/ambient. References
 // alone are not runtime claims: only a value use from the referenced declarations
@@ -113,8 +115,6 @@ var NoAmbientDeclarations = rule.Rule{
 	},
 }
 
-var ambientFieldText = policy.MessageOf("adamic/no-ambient-declarations", "ambientField")
-
 func ambientFieldReason(ruleContext rule.Context, field *ast.Node) string {
 	class := field.Parent
 	if class.Symbol() == nil || field.Symbol() == nil {
@@ -185,13 +185,14 @@ func ambientCanonicalSymbol(ruleContext rule.Context, symbol *ast.Symbol) *ast.S
 	if symbol == nil {
 		return nil
 	}
+	resolved := symbol
 	if symbol.Flags&ast.SymbolFlagsAlias != 0 {
-		symbol = ruleContext.TypeChecker.GetAliasedSymbol(symbol)
+		resolved = ruleContext.TypeChecker.GetAliasedSymbol(symbol)
 	}
-	if symbol != nil && symbol.ExportSymbol != nil {
-		return symbol.ExportSymbol
+	if resolved != nil && resolved.ExportSymbol != nil {
+		return resolved.ExportSymbol
 	}
-	return symbol
+	return resolved
 }
 
 // Scan real expression uses across the program, including import aliases. Skip

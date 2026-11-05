@@ -145,11 +145,11 @@ func TestRequireDescriptionFiresOnUpstreamFailCases(test *testing.T) {
 	})
 }
 
-// TestRequireDescriptionReadsTheSeparatorAsESLintDoes is the reason grammar, every row measured on
+// TestRequireDescriptionReadsTheSeparatorAsEsLintDoes is the reason grammar, every row measured on
 // the cloned rule through ESLint 10.8.1 (scratchpad `clone-suppression/probe-cases.json`).
 //
 // The `--` followed only by whitespace is the row the task names: a separator is not a reason.
-func TestRequireDescriptionReadsTheSeparatorAsESLintDoes(test *testing.T) {
+func TestRequireDescriptionReadsTheSeparatorAsEsLintDoes(test *testing.T) {
 	test.Parallel()
 	runRequireDescriptionCases(test, []requireDescriptionCase{
 		// Reports: no reason.

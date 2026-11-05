@@ -22,35 +22,36 @@ import (
 // Calibration on 2026-10-20: 495 registered rules, seven files, 5,305
 // nodes. The slowest healthy row was 3.633ms of thread CPU; 600ms is 165x.
 // Keep the corpus small: increasing its union width is deliberately nonlinear.
-const ruleCPUBudget = 600 * time.Millisecond
+const ruleCpuBudget = 600 * time.Millisecond
 
 func enumBudgetSource(members, comparisons int, numeric bool) string {
-	var s strings.Builder
-	s.WriteString("export enum Kind {\n")
-	for i := range members {
+	var builder strings.Builder
+	builder.WriteString("export enum Kind {\n")
+	for index := range members {
 		if numeric {
-			fmt.Fprintf(&s, "M%d = %d,\n", i, i)
+			fmt.Fprintf(&builder, "M%d = %d,\n", index, index)
 		} else {
-			fmt.Fprintf(&s, "M%d = 'm%d',\n", i, i)
+			fmt.Fprintf(&builder, "M%d = 'm%d',\n", index, index)
 		}
 	}
-	s.WriteString("}\n")
-	for i := range members {
-		fmt.Fprintf(&s, "export interface N%d { type: Kind.M%d; parent: Node; value%d: number }\n", i, i, i)
+	builder.WriteString("}\n")
+	for index := range members {
+		fmt.Fprintf(&builder, "export interface N%d { type: Kind.M%d; parent: Node; value%d: number }\n",
+			index, index, index)
 	}
-	s.WriteString("export type Node = ")
-	for i := range members {
-		if i > 0 {
-			s.WriteString(" | ")
+	builder.WriteString("export type Node = ")
+	for index := range members {
+		if index > 0 {
+			builder.WriteString(" | ")
 		}
-		fmt.Fprintf(&s, "N%d", i)
+		fmt.Fprintf(&builder, "N%d", index)
 	}
-	s.WriteString(";\nexport function visit(node: Node): number { let count = 0;\n")
-	for i := range comparisons {
-		fmt.Fprintf(&s, "if (node.parent.parent.type === Kind.M%d) { count += 1; }\n", i%members)
+	builder.WriteString(";\nexport function visit(node: Node): number { let count = 0;\n")
+	for index := range comparisons {
+		fmt.Fprintf(&builder, "if (node.parent.parent.type === Kind.M%d) { count += 1; }\n", index%members)
 	}
-	s.WriteString("return count; }\n")
-	return s.String()
+	builder.WriteString("return count; }\n")
+	return builder.String()
 }
 
 // Generated here, never dependent on an external checkout or installed declarations.
@@ -61,54 +62,54 @@ func ruleBudgetCorpus() map[string]string {
 		"enum-string.ts": enumBudgetSource(64, 8, false),
 		"enum-number.ts": enumBudgetSource(64, 8, true),
 	}
-	var s strings.Builder
-	s.WriteString("interface Link { next: Link; value: number }\nexport function deep(node: Link) { return node")
+	var builder strings.Builder
+	builder.WriteString("interface Link { next: Link; value: number }\nexport function deep(node: Link) { return node")
 	for range 32 {
-		s.WriteString(".next")
+		builder.WriteString(".next")
 	}
-	s.WriteString(".value; }\n")
-	files["chain.ts"] = s.String()
-	s.Reset()
-	for i := range 60 {
-		fmt.Fprintf(&s, "export function f%d(x: number) { const y = x + 1; return y * y; }\n", i)
+	builder.WriteString(".value; }\n")
+	files["chain.ts"] = builder.String()
+	builder.Reset()
+	for index := range 60 {
+		fmt.Fprintf(&builder, "export function f%d(x: number) { const y = x + 1; return y * y; }\n", index)
 	}
-	files["functions.ts"] = s.String()
-	s.Reset()
-	s.WriteString("export function nested(x: number) {\n")
+	files["functions.ts"] = builder.String()
+	builder.Reset()
+	builder.WriteString("export function nested(x: number) {\n")
 	for range 24 {
-		s.WriteString("if (x > 0) {\n")
+		builder.WriteString("if (x > 0) {\n")
 	}
-	s.WriteString("x = ")
+	builder.WriteString("x = ")
 	for range 24 {
-		s.WriteString("(")
+		builder.WriteString("(")
 	}
-	s.WriteString("x + 1")
+	builder.WriteString("x + 1")
 	for range 24 {
-		s.WriteString(")")
+		builder.WriteString(")")
 	}
-	s.WriteString(";\n")
+	builder.WriteString(";\n")
 	for range 24 {
-		s.WriteString("}\n")
+		builder.WriteString("}\n")
 	}
-	s.WriteString("return x; }\n")
-	files["nested.ts"] = s.String()
-	s.Reset()
-	s.WriteString("export const wide = {\n")
-	for i := range 120 {
-		fmt.Fprintf(&s, "key%d: %d,\n", i, i)
+	builder.WriteString("return x; }\n")
+	files["nested.ts"] = builder.String()
+	builder.Reset()
+	builder.WriteString("export const wide = {\n")
+	for index := range 120 {
+		fmt.Fprintf(&builder, "key%d: %d,\n", index, index)
 	}
-	s.WriteString("};\n")
-	files["object.ts"] = s.String()
-	s.Reset()
-	s.WriteString("export type Tag = ")
-	for i := range 200 {
-		if i > 0 {
-			s.WriteString(" | ")
+	builder.WriteString("};\n")
+	files["object.ts"] = builder.String()
+	builder.Reset()
+	builder.WriteString("export type Tag = ")
+	for index := range 200 {
+		if index > 0 {
+			builder.WriteString(" | ")
 		}
-		fmt.Fprintf(&s, "'tag%d'", i)
+		fmt.Fprintf(&builder, "'tag%d'", index)
 	}
-	s.WriteString(";\nexport function tag(value: Tag) { return value === 'tag199'; }\n")
-	files["literals.ts"] = s.String()
+	builder.WriteString(";\nexport function tag(value: Tag) { return value === 'tag199'; }\n")
+	files["literals.ts"] = builder.String()
 	return files
 }
 
@@ -213,13 +214,13 @@ func TestRegisteredRuleCPUBudget(test *testing.T) {
 		test.Fatal("empty registry")
 	}
 	graph := buildBudgetGraph(test, ruleBudgetCorpus())
-	rows, checkRuleBudgetError := checkRuleBudget(test, graph, rules, ruleCPUBudget)
+	rows, checkRuleBudgetError := checkRuleBudget(test, graph, rules, ruleCpuBudget)
 	if checkRuleBudgetError != nil {
 		test.Fatal(checkRuleBudgetError)
 	}
-	sort.Slice(rows, func(i, j int) bool { return rows[i].TotalCPU() > rows[j].TotalCPU() })
-	for i, row := range rows {
-		if i == 10 {
+	sort.Slice(rows, func(left, right int) bool { return rows[left].TotalCPU() > rows[right].TotalCPU() })
+	for index, row := range rows {
+		if index == 10 {
 			break
 		}
 		test.Logf("rule CPU: %s %.3fms", row.Name, float64(row.TotalCPU())/float64(time.Millisecond))

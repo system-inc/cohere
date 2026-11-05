@@ -16,6 +16,24 @@ var messageNextScriptForGa = rule.Message{
 		"from `next/script`, which picks a strategy and injects the tag once.",
 }
 
+// googleAnalyticsSourceMarkers is oxc's SUPPORTED_SRCS, matched as plain substrings of a `src`.
+//
+// `gtag/js` appears here and not in the inline list. The two lists differ by one entry each and the
+// asymmetry is upstream's; see the rule's doc comment for the measurement.
+var googleAnalyticsSourceMarkers = []string{
+	"www.google-analytics.com/analytics.js",
+	"www.googletagmanager.com/gtag/js",
+}
+
+// googleAnalyticsInlineMarkers is oxc's SUPPORTED_HTML_CONTENT_URLS, matched as plain substrings of
+// an inline template literal's first chunk.
+//
+// `gtm.js` appears here and not in the source list.
+var googleAnalyticsInlineMarkers = []string{
+	"www.google-analytics.com/analytics.js",
+	"www.googletagmanager.com/gtm.js",
+}
+
 // NextScriptForGa flags a plain <script> that loads Google Analytics.
 //
 //	valid:   import Script from 'next/script'; <Script src="https://www.googletagmanager.com/gtag/js?id=X" />
@@ -155,24 +173,6 @@ var NextScriptForGa = rule.Rule{
 			ast.KindJsxSelfClosingElement: report,
 		}
 	},
-}
-
-// googleAnalyticsSourceMarkers is oxc's SUPPORTED_SRCS, matched as plain substrings of a `src`.
-//
-// `gtag/js` appears here and not in the inline list. The two lists differ by one entry each and the
-// asymmetry is upstream's; see the doc comment above for the measurement.
-var googleAnalyticsSourceMarkers = []string{
-	"www.google-analytics.com/analytics.js",
-	"www.googletagmanager.com/gtag/js",
-}
-
-// googleAnalyticsInlineMarkers is oxc's SUPPORTED_HTML_CONTENT_URLS, matched as plain substrings of
-// an inline template literal's first chunk.
-//
-// `gtm.js` appears here and not in the source list.
-var googleAnalyticsInlineMarkers = []string{
-	"www.google-analytics.com/analytics.js",
-	"www.googletagmanager.com/gtm.js",
 }
 
 // dangerouslySetInnerHtmlValue returns the expression assigned to a `__html` key inside the object

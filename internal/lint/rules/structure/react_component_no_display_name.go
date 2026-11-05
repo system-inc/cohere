@@ -179,12 +179,12 @@ func isAnonymousWrapperCall(initializer *ast.Node) bool {
 	if initializer == nil {
 		return false
 	}
-	initializer = ast.SkipParentheses(initializer)
-	if initializer == nil || initializer.Kind != ast.KindCallExpression {
+	unwrapped := ast.SkipParentheses(initializer)
+	if unwrapped == nil || unwrapped.Kind != ast.KindCallExpression {
 		return false
 	}
 
-	callee := ast.SkipParentheses(initializer.AsCallExpression().Expression)
+	callee := ast.SkipParentheses(unwrapped.AsCallExpression().Expression)
 	if callee == nil {
 		return false
 	}

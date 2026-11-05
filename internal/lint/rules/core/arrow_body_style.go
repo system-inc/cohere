@@ -577,22 +577,22 @@ func arrowBodyStyleIsParenthesized(node *ast.Node) bool {
 
 // arrowBodyStyleUnwrapParentheses returns the expression inside any parentheses around a node.
 func arrowBodyStyleUnwrapParentheses(node *ast.Node) *ast.Node {
-	for node != nil && node.Kind == ast.KindParenthesizedExpression {
-		inner := node.AsParenthesizedExpression().Expression
+	current := node
+	for current != nil && current.Kind == ast.KindParenthesizedExpression {
+		inner := current.AsParenthesizedExpression().Expression
 		if inner == nil {
-			return node
+			return current
 		}
-		node = inner
+		current = inner
 	}
-	return node
+	return current
 }
 
 // arrowBodyStyleSameLine reports whether two offsets sit on one line.
 func arrowBodyStyleSameLine(text string, from int, to int) bool {
-	if to > len(text) {
-		to = len(text)
-	}
-	return !strings.ContainsAny(text[from:to], "\n\r")
+	// The end is clamped to the text, since an offset past it has no line of its own.
+	end := min(to, len(text))
+	return !strings.ContainsAny(text[from:end], "\n\r")
 }
 
 // arrowBodyStyleSubtreeHasInOperator reports whether an `in` appears anywhere under a node.

@@ -19,6 +19,16 @@ type NoUnneededTernaryOptions struct {
 // noUnneededTernaryDefaultAssignment is upstream's default for the only option.
 const noUnneededTernaryDefaultAssignment = true
 
+// noUnneededTernaryOrPrecedence is the precedence of `||`, which the alternate is compared against.
+//
+// Named rather than written as 4 at the call site, because the number only means anything relative
+// to `operatorAssignmentPrecedence`'s table and a bare literal there reads as a magic constant.
+const noUnneededTernaryOrPrecedence = 4
+
+// noUnneededTernaryUnaryPrecedence is the precedence of a unary operator, which decides whether a
+// negated expression needs wrapping.
+const noUnneededTernaryUnaryPrecedence = 16
+
 // resolve applies the default, leaving an absent key alone.
 func (options NoUnneededTernaryOptions) resolve() bool {
 	if options.DefaultAssignment == nil {
@@ -213,12 +223,6 @@ func reportNoUnneededTernaryDefaultAssignment(
 		rule.ReplaceRange(nodeRange, replacement))
 }
 
-// noUnneededTernaryOrPrecedence is the precedence of `||`, which the alternate is compared against.
-//
-// Named rather than written as 4 at the call site, because the number only means anything relative
-// to `operatorAssignmentPrecedence`'s table and a bare literal there reads as a magic constant.
-const noUnneededTernaryOrPrecedence = 4
-
 // noUnneededTernaryBooleanLiteralValue reads a `true` or `false` literal branch.
 //
 // The second return separates "not a boolean literal" from the literal `false`, which a caller
@@ -376,10 +380,6 @@ func noUnneededTernaryPrecedence(expression *ast.Node) int {
 	}
 	return operatorAssignmentPrecedence(expression)
 }
-
-// noUnneededTernaryUnaryPrecedence is the precedence of a unary operator, which decides whether a
-// negated expression needs wrapping.
-const noUnneededTernaryUnaryPrecedence = 16
 
 // noUnneededTernaryInverseOperator returns the true inverse of a comparison, or "" when there is
 // none.

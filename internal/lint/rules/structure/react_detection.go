@@ -198,15 +198,15 @@ func returnArgumentLooksLikeJsx(expression *ast.Node) bool {
 	if expression == nil {
 		return false
 	}
-	expression = ast.SkipParentheses(expression)
-	if expression == nil {
+	unwrapped := ast.SkipParentheses(expression)
+	if unwrapped == nil {
 		return false
 	}
-	if isJsxValue(expression) {
+	if isJsxValue(unwrapped) {
 		return true
 	}
-	if expression.Kind == ast.KindConditionalExpression {
-		conditional := expression.AsConditionalExpression()
+	if unwrapped.Kind == ast.KindConditionalExpression {
+		conditional := unwrapped.AsConditionalExpression()
 		return jsxAfterParentheses(conditional.WhenTrue) || jsxAfterParentheses(conditional.WhenFalse)
 	}
 	return false

@@ -357,6 +357,8 @@ func securityRequireContextAccessDecoratorNames(node *ast.Node) map[string]struc
 }
 
 // securityRequireContextAccessCollectNames adds a node's decorator names to a set.
+//
+// Mutates: into a member's names and its class's names land in one set, so the caller reads both at once
 func securityRequireContextAccessCollectNames(node *ast.Node, into map[string]struct{}) {
 	for _, decorator := range decorators.Of(node) {
 		if name := securityRequireContextAccessDecoratorName(decorator); name != "" {

@@ -128,10 +128,11 @@ func IsResolvedSymbol(typeChecker *checker.Checker, symbol *ast.Symbol) bool {
 	if typeChecker == nil || symbol == nil {
 		return false
 	}
+	resolved := symbol
 	if symbol.Flags&ast.SymbolFlagsAlias != 0 {
-		symbol = checker.SkipAlias(symbol, typeChecker)
+		resolved = checker.SkipAlias(symbol, typeChecker)
 	}
-	return symbol != nil && !typeChecker.IsUnknownSymbol(symbol) && HasDeclarations(symbol)
+	return resolved != nil && !typeChecker.IsUnknownSymbol(resolved) && HasDeclarations(resolved)
 }
 
 // IsUnresolvedType recognizes the checker's error recovery type for a missing

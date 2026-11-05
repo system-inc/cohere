@@ -171,11 +171,11 @@ func arrayMethodNameForCall(call *ast.Node, argument *ast.Node, isAsync bool) (s
 // Both member forms are accepted because upstream's helper reads a static property name, which
 // covers `foo['every']` as well as `foo.every`.
 func targetMethodNameOf(callee *ast.Node) (string, bool) {
-	callee = skipParenthesesAndChain(callee)
-	if callee == nil {
+	unwrapped := skipParenthesesAndChain(callee)
+	if unwrapped == nil {
 		return "", false
 	}
-	name, hasName := staticMemberNameOf(callee)
+	name, hasName := staticMemberNameOf(unwrapped)
 	if !hasName || !arrayCallbackTargetMethods[name] {
 		return "", false
 	}
@@ -188,15 +188,15 @@ func targetMethodNameOf(callee *ast.Node) (string, bool) {
 // `Array.from` both match; the object it requires at the head is spelled `Array`. Reproduced at the
 // spelling upstream keys on, which is the identifier `Array`.
 func isArrayStaticMethod(callee *ast.Node, methodName string) bool {
-	callee = skipParenthesesAndChain(callee)
-	if callee == nil {
+	unwrapped := skipParenthesesAndChain(callee)
+	if unwrapped == nil {
 		return false
 	}
-	name, hasName := staticMemberNameOf(callee)
+	name, hasName := staticMemberNameOf(unwrapped)
 	if !hasName || name != methodName {
 		return false
 	}
-	object := skipParenthesesAndChain(memberObjectOf(callee))
+	object := skipParenthesesAndChain(memberObjectOf(unwrapped))
 	if object == nil || object.Kind != ast.KindIdentifier {
 		return false
 	}
@@ -217,14 +217,15 @@ func isArrayStaticMethod(callee *ast.Node, methodName string) bool {
 // `(foo?.filter)(cb)` and `(Array?.from)([], cb)` are both in the corpus and both reach a callee
 // wrapped this way.
 func skipParenthesesAndChain(node *ast.Node) *ast.Node {
-	for node != nil {
-		switch node.Kind {
+	current := node
+	for current != nil {
+		switch current.Kind {
 		case ast.KindParenthesizedExpression:
-			node = node.AsParenthesizedExpression().Expression
+			current = current.AsParenthesizedExpression().Expression
 		case ast.KindNonNullExpression:
-			node = node.AsNonNullExpression().Expression
+			current = current.AsNonNullExpression().Expression
 		default:
-			return node
+			return current
 		}
 	}
 	return nil
@@ -308,15 +309,16 @@ func enclosingFunctionOf(node *ast.Node) *ast.Node {
 // Parentheses around the callee are skipped on the way up, since `(function(){})()` and
 // `function(){}()` are the same call and only the first has a paren node in our tree.
 func callConsuming(node *ast.Node) *ast.Node {
+	current := node
 	parent := node.Parent
 	for parent != nil && parent.Kind == ast.KindParenthesizedExpression {
-		node = parent
+		current = parent
 		parent = parent.Parent
 	}
 	if parent == nil || parent.Kind != ast.KindCallExpression {
 		return nil
 	}
-	if parent.AsCallExpression().Expression != node {
+	if parent.AsCallExpression().Expression != current {
 		return nil
 	}
 	return parent

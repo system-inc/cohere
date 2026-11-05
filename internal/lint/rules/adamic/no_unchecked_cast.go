@@ -104,7 +104,8 @@ func checkedDowncast(typeChecker *checker.Checker, source *checker.Type, target 
 	if target.Flags()&checker.TypeFlagsUnion != 0 {
 		targetMembers = target.Types()
 	}
-	var kept, dropped []*checker.Type
+	var kept []*checker.Type
+	var dropped []*checker.Type
 	for _, member := range source.Types() {
 		if containsIdentical(typeChecker, targetMembers, member) {
 			kept = append(kept, member)
@@ -169,8 +170,8 @@ func distinguishable(typeChecker *checker.Checker, left *checker.Type, right *ch
 }
 
 // typeofClass is what `typeof` would say of a value of the type, with null told apart from object.
-func typeofClass(t *checker.Type) string {
-	flags := t.Flags()
+func typeofClass(valueType *checker.Type) string {
+	flags := valueType.Flags()
 	switch {
 	case flags&checker.TypeFlagsStringLike != 0:
 		return "string"
@@ -190,7 +191,8 @@ func typeofClass(t *checker.Type) string {
 	return "object"
 }
 
-func isUnitLiteral(t *checker.Type) bool {
-	return t.Flags()&(checker.TypeFlagsStringLiteral|checker.TypeFlagsNumberLiteral|checker.TypeFlagsBooleanLiteral|
-		checker.TypeFlagsEnumLiteral|checker.TypeFlagsUndefined|checker.TypeFlagsNull) != 0
+func isUnitLiteral(valueType *checker.Type) bool {
+	return valueType.Flags()&(checker.TypeFlagsStringLiteral|checker.TypeFlagsNumberLiteral|
+		checker.TypeFlagsBooleanLiteral|checker.TypeFlagsEnumLiteral|checker.TypeFlagsUndefined|
+		checker.TypeFlagsNull) != 0
 }

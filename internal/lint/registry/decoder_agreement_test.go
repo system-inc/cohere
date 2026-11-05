@@ -10,6 +10,36 @@ import (
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
+// optionsReadUnreachableOnProbe names the rules whose options read cannot be reached on the probe
+// source, each with why. Empty when it landed: all 172 exercised rules read their options at the top
+// of Run. A rule added here is one the agreement check does not cover, so it needs its own decoder
+// test that drives a real fixture through its registration's Decode.
+//
+// The fifteen React Compiler rules decode only `{}`, which ESLint writes into resolved configs and
+// which carries nothing, so their Run has no option to read (#d21war2). A non-empty object is
+// refused at decode; TestCompilerRulesAcceptOnlyTheEmptyObject drives each one's registered Decode.
+//
+// react-hooks/rules-of-hooks accepts `additionalHooks` and reads it nowhere, because upstream's rule
+// reads it nowhere either; TestRulesOfHooksAdditionalHooksChangesNothing pins that.
+var optionsReadUnreachableOnProbe = map[string]bool{
+	"react-hooks/rules-of-hooks":               true,
+	"react-hooks/config":                       true,
+	"react-hooks/error-boundaries":             true,
+	"react-hooks/globals":                      true,
+	"react-hooks/immutability":                 true,
+	"react-hooks/incompatible-library":         true,
+	"react-hooks/no-deriving-state-in-effects": true,
+	"react-hooks/preserve-manual-memoization":  true,
+	"react-hooks/purity":                       true,
+	"react-hooks/refs":                         true,
+	"react-hooks/set-state-in-effect":          true,
+	"react-hooks/set-state-in-render":          true,
+	"react-hooks/static-components":            true,
+	"react-hooks/unsupported-syntax":           true,
+	"react-hooks/use-memo":                     true,
+	"react-hooks/void-use-memo":                true,
+}
+
 // Every registration's decoder hands its rule the type the rule reads.
 //
 // Run takes `options any`, so nothing at compile time compares the type a Decode returns with the
@@ -109,36 +139,6 @@ func decodeEmptyOption(registration rule.Registration) (decoded any, decodeError
 		return decoded, decodeError, true
 	}
 	return nil, nil, false
-}
-
-// optionsReadUnreachableOnProbe names the rules whose options read cannot be reached on the probe
-// source, each with why. Empty when it landed: all 172 exercised rules read their options at the top
-// of Run. A rule added here is one the agreement check does not cover, so it needs its own decoder
-// test that drives a real fixture through its registration's Decode.
-//
-// The fifteen React Compiler rules decode only `{}`, which ESLint writes into resolved configs and
-// which carries nothing, so their Run has no option to read (#d21war2). A non-empty object is
-// refused at decode; TestCompilerRulesAcceptOnlyTheEmptyObject drives each one's registered Decode.
-//
-// react-hooks/rules-of-hooks accepts `additionalHooks` and reads it nowhere, because upstream's rule
-// reads it nowhere either; TestRulesOfHooksAdditionalHooksChangesNothing pins that.
-var optionsReadUnreachableOnProbe = map[string]bool{
-	"react-hooks/rules-of-hooks":               true,
-	"react-hooks/config":                       true,
-	"react-hooks/error-boundaries":             true,
-	"react-hooks/globals":                      true,
-	"react-hooks/immutability":                 true,
-	"react-hooks/incompatible-library":         true,
-	"react-hooks/no-deriving-state-in-effects": true,
-	"react-hooks/preserve-manual-memoization":  true,
-	"react-hooks/purity":                       true,
-	"react-hooks/refs":                         true,
-	"react-hooks/set-state-in-effect":          true,
-	"react-hooks/set-state-in-render":          true,
-	"react-hooks/static-components":            true,
-	"react-hooks/unsupported-syntax":           true,
-	"react-hooks/use-memo":                     true,
-	"react-hooks/void-use-memo":                true,
 }
 
 type optionsReachControlOptions struct {

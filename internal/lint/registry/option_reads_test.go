@@ -128,13 +128,15 @@ func findUnreadOptionFields(test *testing.T, moduleRoot string, rulesRoot string
 // pointers, lists, maps, nested structs and promoted embedded structs. A type with its own
 // UnmarshalJSON is still entered: its decoder sets its fields, and the rule must read them all the
 // same.
+//
+// Mutates: seen the walk marks each type it enters, so a recursive type is walked once
 func collectOptionFields(valueType types.Type, fileSet *token.FileSet, rulesRoot string, fields map[*types.Var]optionField, seen map[types.Type]bool) {
-	valueType = types.Unalias(valueType)
-	if seen[valueType] {
+	unaliased := types.Unalias(valueType)
+	if seen[unaliased] {
 		return
 	}
-	seen[valueType] = true
-	switch shape := valueType.(type) {
+	seen[unaliased] = true
+	switch shape := unaliased.(type) {
 	case *types.Pointer:
 		collectOptionFields(shape.Elem(), fileSet, rulesRoot, fields, seen)
 	case *types.Slice:
@@ -155,6 +157,10 @@ func collectOptionFields(valueType types.Type, fileSet *token.FileSet, rulesRoot
 	}
 }
 
+// collectOptionStructFields records each field of structure, owned by the type named owner, the way
+// collectOptionFields records a type's.
+//
+// Mutates: fields the walk records every exported field it reaches, so one map gathers a whole tree
 func collectOptionStructFields(structure *types.Struct, owner string, fileSet *token.FileSet, rulesRoot string, fields map[*types.Var]optionField, seen map[types.Type]bool) {
 	for index := range structure.NumFields() {
 		field := structure.Field(index)
@@ -186,6 +192,8 @@ func collectOptionStructFields(structure *types.Struct, owner string, fileSet *t
 }
 
 // markOptionReads walks one file and marks each option field it reads.
+//
+// Mutates: read each field the file reads is marked, so one set gathers the reads of every file
 func markOptionReads(file *ast.File, info *types.Info, fields map[*types.Var]optionField, read map[*types.Var]bool) {
 	// The selectors that are not reads: plain assignment targets, and the conditions of a defaulting if.
 	notReads := map[*ast.SelectorExpr]bool{}
@@ -250,6 +258,8 @@ func markOptionReads(file *ast.File, info *types.Info, fields map[*types.Var]opt
 // shape to the shape the rule reads. Only the operand's own fields need marking: a conversion needs
 // identical underlying types, so a nested or embedded named struct is the same type on both sides and
 // a read through the result is already a selector on the same field.
+//
+// Mutates: read each field the conversion copies is marked, into the set markOptionReads fills
 func markConversionReads(
 	call *ast.CallExpr, info *types.Info, fields map[*types.Var]optionField, read map[*types.Var]bool,
 ) {

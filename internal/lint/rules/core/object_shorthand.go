@@ -822,17 +822,15 @@ func objectShorthandParameterListStart(ruleContext rule.Context, value *ast.Node
 // drops the generics without changing any message id.
 func objectShorthandSignatureStart(ruleContext rule.Context, value *ast.Node, from int, to int) int {
 	text := ruleContext.SourceFile.Text()
-	if to > len(text) {
-		to = len(text)
-	}
+	end := min(to, len(text))
 	if typeParameters := value.TypeParameterList(); typeParameters != nil && len(typeParameters.Nodes) > 0 {
-		for index := from; index < to; index++ {
+		for index := from; index < end; index++ {
 			if text[index] == '<' {
 				return index
 			}
 		}
 	}
-	for index := from; index < to; index++ {
+	for index := from; index < end; index++ {
 		if text[index] == '(' {
 			return index
 		}

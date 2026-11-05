@@ -110,7 +110,7 @@ var NoHtmlLinkForPages = rule.Rule{
 
 			// An empty href normalizes to nothing, and an href that was only a query or a fragment
 			// to the empty path, and every route begins with `/`, so neither can match.
-			hrefPath, defined := normalizeURL(href)
+			hrefPath, defined := normalizeUrl(href)
 			if !defined || hrefPath == "" {
 				return
 			}

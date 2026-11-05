@@ -65,10 +65,10 @@ var UnionWrite = rule.Rule{
 			}
 		}
 		check := func(target *ast.Node, value *checker.Type) {
-			target = ast.SkipParentheses(target)
-			switch target.Kind {
+			unwrapped := ast.SkipParentheses(target)
+			switch unwrapped.Kind {
 			case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
-				checkSlot(target, target.Expression(), value, nil)
+				checkSlot(unwrapped, unwrapped.Expression(), value, nil)
 			}
 		}
 		// The compiler projects the actual source part through nested patterns,

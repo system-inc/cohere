@@ -77,6 +77,19 @@ func DecodeNoBitwiseOptions(raw []byte) (any, error) {
 	return options, nil
 }
 
+// noBitwiseSpellingOrder is upstream's `BITWISE_OPERATORS` order, used only to render the refusal
+// message in a familiar sequence. Membership is decided by the map, never by this.
+//
+// A mutation corrupting an entry here survives the fixture set, and the survival is genuine
+// equivalence rather than a blind spot. Corrupting `"^"` to `"^^"` makes the first loop skip it, and
+// the fallback loop then appends `"^"` from the map, so the same thirteen spellings are accepted and
+// only their order in the refusal message changes. The corresponding mutation on the map is caught
+// by six lines, which is the pair that shows where the decision actually lives. Recorded because a
+// later reader chasing the survivor deserves to know which of the two it is.
+var noBitwiseSpellingOrder = []string{
+	"^", "|", "&", "<<", ">>", ">>>", "^=", "|=", "&=", "<<=", ">>=", ">>>=", "~",
+}
+
 // noBitwiseAllowedSpellings is the operator list the decoder accepts, in upstream's own order.
 //
 // # Derived from the map rather than written beside it, and that was a defect before it was a design
@@ -107,19 +120,6 @@ func noBitwiseAllowedSpellings() []string {
 		}
 	}
 	return spellings
-}
-
-// noBitwiseSpellingOrder is upstream's `BITWISE_OPERATORS` order, used only to render the refusal
-// message in a familiar sequence. Membership is decided by the map, never by this.
-//
-// A mutation corrupting an entry here survives the fixture set, and the survival is genuine
-// equivalence rather than a blind spot. Corrupting `"^"` to `"^^"` makes the first loop skip it, and
-// the fallback loop then appends `"^"` from the map, so the same thirteen spellings are accepted and
-// only their order in the refusal message changes. The corresponding mutation on the map is caught
-// by six lines, which is the pair that shows where the decision actually lives. Recorded because a
-// later reader chasing the survivor deserves to know which of the two it is.
-var noBitwiseSpellingOrder = []string{
-	"^", "|", "&", "<<", ">>", ">>>", "^=", "|=", "&=", "<<=", ">>=", ">>>=", "~",
 }
 
 // noBitwiseMapContainsSpelling reports whether the rule can actually act on a spelling.

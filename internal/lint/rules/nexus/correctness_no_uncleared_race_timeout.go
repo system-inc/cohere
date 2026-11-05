@@ -145,6 +145,8 @@ func correctnessNoUnclearedRaceTimeoutIsLibraryMember(ruleContext rule.Context, 
 // correctnessNoUnclearedRaceTimeoutPromise is the `new Promise(executor)` a race element is, written
 // in place or named by a `const` of this file initialized to one, and nil for anything else.
 func correctnessNoUnclearedRaceTimeoutPromise(ruleContext rule.Context, element *ast.Node) *ast.Node {
+	// The element itself, or what the const it names was initialized to.
+	promise := element
 	if element.Kind == ast.KindIdentifier {
 		symbol := ruleContext.TypeChecker.GetSymbolAtLocation(element)
 		if symbol == nil || len(symbol.Declarations) != 1 {
@@ -162,17 +164,17 @@ func correctnessNoUnclearedRaceTimeoutPromise(ruleContext rule.Context, element 
 		if initializer == nil {
 			return nil
 		}
-		element = ast.SkipParentheses(initializer)
+		promise = ast.SkipParentheses(initializer)
 	}
-	if element.Kind != ast.KindNewExpression {
+	if promise.Kind != ast.KindNewExpression {
 		return nil
 	}
-	constructor := ast.SkipParentheses(element.AsNewExpression().Expression)
+	constructor := ast.SkipParentheses(promise.AsNewExpression().Expression)
 	if constructor.Kind != ast.KindIdentifier || constructor.Text() != "Promise" ||
 		!rule.IsSymbolFromDefaultLibrary(ruleContext.Program, ruleContext.TypeChecker.GetSymbolAtLocation(constructor)) {
 		return nil
 	}
-	return element
+	return promise
 }
 
 // correctnessNoUnclearedRaceTimeoutLostTimers returns the global `setTimeout` calls made directly in a

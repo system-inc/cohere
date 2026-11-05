@@ -10,7 +10,7 @@ import "github.com/system-inc/cohere/internal/lint/ecmascript/directives"
 //	<tool>-disable[-next-line|-line] [rule[, rule...]] [-- reason]
 //
 // Everything after the directive word is optional. No rules means blanket. No reason means the
-// author did not say why, which is recorded rather than rejected — see Index.WithoutReason.
+// author did not say why, which is recorded rather than rejected (see Index.WithoutReason).
 func parseDirective(commentText string) *Directive {
 	parsed, found := directives.ParseDisable(commentText)
 	if !found {

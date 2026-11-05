@@ -23,7 +23,7 @@ import (
  * on it: `window.RegExp('a')`, which ESLint reports only under browser globals, and which the tracker
  * follows, since an undeclared `window` is the runtime's global object here. Its own test says so.
  */
-func TestPreferRegexLiteralsAgreesWithESLint(test *testing.T) {
+func TestPreferRegexLiteralsAgreesWithEsLint(test *testing.T) {
 	test.Parallel()
 
 	decode := rule.DecodeOptionsInto[PreferRegexLiteralsOptions]()

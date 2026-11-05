@@ -182,19 +182,20 @@ func isAParseIntCallee(ruleContext rule.Context, callee *ast.Node) bool {
 	// here as the same node kinds, so nothing special is needed for them. A parenthesized callee
 	// does need unwrapping: `(Number?.parseInt)("10")` is one of upstream's failing cases, and our
 	// parser keeps the parentheses that upstream's folds away.
-	for callee != nil && callee.Kind == ast.KindParenthesizedExpression {
-		callee = callee.AsParenthesizedExpression().Expression
+	unwrapped := callee
+	for unwrapped != nil && unwrapped.Kind == ast.KindParenthesizedExpression {
+		unwrapped = unwrapped.AsParenthesizedExpression().Expression
 	}
-	if callee == nil {
+	if unwrapped == nil {
 		return false
 	}
 
-	switch callee.Kind {
+	switch unwrapped.Kind {
 	case ast.KindIdentifier:
-		return callee.Text() == "parseInt" && resolvesToAGlobal(ruleContext, callee)
+		return unwrapped.Text() == "parseInt" && resolvesToAGlobal(ruleContext, unwrapped)
 
 	case ast.KindPropertyAccessExpression:
-		access := callee.AsPropertyAccessExpression()
+		access := unwrapped.AsPropertyAccessExpression()
 		// A private name is not a property of `Number`, and `Number.#parseInt()` is one of
 		// upstream's passing cases.
 		//
@@ -211,7 +212,7 @@ func isAParseIntCallee(ruleContext rule.Context, callee *ast.Node) bool {
 		return access.Name().Text() == "parseInt" && isTheGlobalNumber(ruleContext, access.Expression)
 
 	case ast.KindElementAccessExpression:
-		access := callee.AsElementAccessExpression()
+		access := unwrapped.AsElementAccessExpression()
 		return isTheLiteralText(access.ArgumentExpression, "parseInt") &&
 			isTheGlobalNumber(ruleContext, access.Expression)
 	}
@@ -220,11 +221,12 @@ func isAParseIntCallee(ruleContext rule.Context, callee *ast.Node) bool {
 
 // isTheGlobalNumber says whether a receiver is the global `Number` rather than something shadowing.
 func isTheGlobalNumber(ruleContext rule.Context, receiver *ast.Node) bool {
-	for receiver != nil && receiver.Kind == ast.KindParenthesizedExpression {
-		receiver = receiver.AsParenthesizedExpression().Expression
+	unwrapped := receiver
+	for unwrapped != nil && unwrapped.Kind == ast.KindParenthesizedExpression {
+		unwrapped = unwrapped.AsParenthesizedExpression().Expression
 	}
-	return receiver != nil && receiver.Kind == ast.KindIdentifier &&
-		receiver.Text() == "Number" && resolvesToAGlobal(ruleContext, receiver)
+	return unwrapped != nil && unwrapped.Kind == ast.KindIdentifier &&
+		unwrapped.Text() == "Number" && resolvesToAGlobal(ruleContext, unwrapped)
 }
 
 // isTheLiteralText says whether a computed key is a string literal spelling the given name.

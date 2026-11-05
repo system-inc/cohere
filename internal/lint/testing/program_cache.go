@@ -59,6 +59,14 @@ type programCacheEntry struct {
 	recency *list.Element
 }
 
+// defaultProgramCacheCapacity is how many built programs a test binary keeps. Sixteen, chosen by
+// measurement before the shared lib parse (#7nx3z1n), when an entry still held its libs: every rule
+// package and registry peaked under 1 GB at sixteen and ran no slower than unbounded, while rules/nexus,
+// whose fixtures are the largest, reached 2.1 GB at sixty-four, and the corpus walkers ran no faster at
+// 128 than at sixteen. With the shared parse an entry is far smaller, rules/nexus peaking at 151 MB, so
+// sixteen now has room; it was not raised, because no package measured slower at it.
+const defaultProgramCacheCapacity = 16
+
 var (
 	// libraryParses is the bundled lib files, parsed once for every program this test binary builds,
 	// cached or not. Each fixture otherwise parsed its target's 58 lib files again, which was most of a
@@ -139,14 +147,6 @@ func buildCachedProgram(files map[string]string, subjectFileName string, verbati
 
 	return entry.graph, entry.directory, entry.buildErr
 }
-
-// defaultProgramCacheCapacity is how many built programs a test binary keeps. Sixteen, chosen by
-// measurement before the shared lib parse (#7nx3z1n), when an entry still held its libs: every rule
-// package and registry peaked under 1 GB at sixteen and ran no slower than unbounded, while rules/nexus,
-// whose fixtures are the largest, reached 2.1 GB at sixty-four, and the corpus walkers ran no faster at
-// 128 than at sixteen. With the shared parse an entry is far smaller, rules/nexus peaking at 151 MB, so
-// sixteen now has room; it was not raised, because no package measured slower at it.
-const defaultProgramCacheCapacity = 16
 
 // evictBeyondCapacity drops the least recently used entries until the cache is within its capacity.
 // The caller holds programCacheMutex. An evicted graph lives on in any test still holding it, and is

@@ -120,11 +120,11 @@ var NoOptionalWidening = rule.Rule{
 // isConstLiteralAlias is an identifier bound to a `const` with no annotation whose initializer is an
 // object literal: its type is exactly the literal's keys.
 func isConstLiteralAlias(typeChecker *checker.Checker, node *ast.Node) bool {
-	node = ast.SkipParentheses(node)
-	if node.Kind != ast.KindIdentifier {
+	unwrapped := ast.SkipParentheses(node)
+	if unwrapped.Kind != ast.KindIdentifier {
 		return false
 	}
-	symbol := typeChecker.GetSymbolAtLocation(node)
+	symbol := typeChecker.GetSymbolAtLocation(unwrapped)
 	if symbol == nil || len(symbol.Declarations) != 1 {
 		return false
 	}

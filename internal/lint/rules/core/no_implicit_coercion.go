@@ -275,15 +275,15 @@ func noImplicitCoercionOperandText(ruleContext rule.Context, node *ast.Node) str
 	// upstream's `getText(node)` on `!!(foo + bar)` yields `foo + bar` while ours yielded
 	// `(foo + bar)` and the recommendation came out as `Boolean((foo + bar))`. The loop rather
 	// than `ast.SkipParentheses` because `((x))` nests and that helper dereferences its argument.
-	node = noImplicitCoercionUnwrapParentheses(node)
-	if node == nil {
+	unwrapped := noImplicitCoercionUnwrapParentheses(node)
+	if unwrapped == nil {
 		return ""
 	}
 	text := ruleContext.SourceFile.Text()
-	span := rule.TokenRange(ruleContext.SourceFile, node)
-	source := text[span.Pos():node.End()]
-	if node.Kind == ast.KindBinaryExpression {
-		if operator := node.AsBinaryExpression().OperatorToken; operator != nil &&
+	span := rule.TokenRange(ruleContext.SourceFile, unwrapped)
+	source := text[span.Pos():unwrapped.End()]
+	if unwrapped.Kind == ast.KindBinaryExpression {
+		if operator := unwrapped.AsBinaryExpression().OperatorToken; operator != nil &&
 			operator.Kind == ast.KindCommaToken {
 			return "(" + source + ")"
 		}
@@ -417,18 +417,19 @@ func noImplicitCoercionNarrowingRewrite(ruleContext rule.Context, node *ast.Node
 // Anything else, a call above all, is evaluated fresh wherever it appears, so there is no narrowing
 // for `Boolean(x)` to lose and upstream's fix stands.
 func noImplicitCoercionIsNarrowableReference(node *ast.Node) bool {
-	for node != nil {
-		switch node.Kind {
+	current := node
+	for current != nil {
+		switch current.Kind {
 		case ast.KindIdentifier, ast.KindThisKeyword, ast.KindSuperKeyword:
 			return true
 		case ast.KindPropertyAccessExpression:
-			node = node.AsPropertyAccessExpression().Expression
+			current = current.AsPropertyAccessExpression().Expression
 		case ast.KindElementAccessExpression:
-			node = node.AsElementAccessExpression().Expression
+			current = current.AsElementAccessExpression().Expression
 		case ast.KindNonNullExpression:
-			node = node.AsNonNullExpression().Expression
+			current = current.AsNonNullExpression().Expression
 		case ast.KindParenthesizedExpression:
-			node = node.AsParenthesizedExpression().Expression
+			current = current.AsParenthesizedExpression().Expression
 		default:
 			return false
 		}
@@ -516,10 +517,11 @@ func noImplicitCoercionComparisonNeedsParentheses(node *ast.Node) bool {
 // Written as a loop with its own nil check rather than calling `ast.SkipParentheses`, which
 // dereferences its argument, and every operand reaching here can be nil from a recovered parse.
 func noImplicitCoercionUnwrapParentheses(node *ast.Node) *ast.Node {
-	for node != nil && node.Kind == ast.KindParenthesizedExpression {
-		node = node.AsParenthesizedExpression().Expression
+	current := node
+	for current != nil && current.Kind == ast.KindParenthesizedExpression {
+		current = current.AsParenthesizedExpression().Expression
 	}
-	return node
+	return current
 }
 
 // noImplicitCoercionCheckUnary handles the four prefix-operator arms.
@@ -657,17 +659,15 @@ func noImplicitCoercionCheckBinary(ruleContext rule.Context, node *ast.Node, set
 // object, and the static-key requirement is why `foo['indexOf'](x)` reports and `foo[indexOf](x)`
 // does not.
 func noImplicitCoercionIndexOfCall(node *ast.Node) (call *ast.Node, chained bool, ok bool) {
-	for node != nil && node.Kind == ast.KindParenthesizedExpression {
-		node = node.AsParenthesizedExpression().Expression
-	}
-	if node == nil || node.Kind != ast.KindCallExpression {
+	unwrapped := noImplicitCoercionUnwrapParentheses(node)
+	if unwrapped == nil || unwrapped.Kind != ast.KindCallExpression {
 		return nil, false, false
 	}
 	// The chain flag is read from the callee before unwrapping, and the name after. Parenthesizing
 	// a callee ends the optional chain, so `(foo?.indexOf)(1)` is not short-circuited and upstream
 	// recommends `!== -1` for it while recommending `>= 0` for `foo?.indexOf(1)`. Measured against
 	// the installed build; the two spellings differ only by those parentheses.
-	rawCallee := node.AsCallExpression().Expression
+	rawCallee := unwrapped.AsCallExpression().Expression
 	if rawCallee == nil {
 		return nil, false, false
 	}
@@ -706,7 +706,7 @@ func noImplicitCoercionIndexOfCall(node *ast.Node) (call *ast.Node, chained bool
 	if parenthesizedCallee {
 		chained = false
 	}
-	return node, chained, true
+	return unwrapped, chained, true
 }
 
 // noImplicitCoercionIsNumeric is upstream's `isNumeric`.

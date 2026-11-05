@@ -129,7 +129,8 @@ func consistencyNoIsoStringDateCutCheckRange(ruleContext rule.Context, call *ast
 	if !firstOk || !secondOk {
 		return
 	}
-	var start, end int
+	var start int
+	var end int
 	switch method {
 	case "slice":
 		start, end = first, second
@@ -212,11 +213,11 @@ func consistencyNoIsoStringDateCutIsSplitOnT(ruleContext rule.Context, node *ast
 
 // consistencyNoIsoStringDateCutIndex reads a non-negative integer literal.
 func consistencyNoIsoStringDateCutIndex(node *ast.Node) (int, bool) {
-	node = ast.SkipParentheses(node)
-	if node == nil || node.Kind != ast.KindNumericLiteral {
+	unwrapped := ast.SkipParentheses(node)
+	if unwrapped == nil || unwrapped.Kind != ast.KindNumericLiteral {
 		return 0, false
 	}
-	value, parseError := strconv.Atoi(node.Text())
+	value, parseError := strconv.Atoi(unwrapped.Text())
 	if parseError != nil || value < 0 {
 		return 0, false
 	}
@@ -226,18 +227,20 @@ func consistencyNoIsoStringDateCutIndex(node *ast.Node) (int, bool) {
 // consistencyNoIsoStringDateCutIsIsoString says whether an expression is the default library's
 // `<date>.toISOString()`, called directly or held in a `const` of this file.
 func consistencyNoIsoStringDateCutIsIsoString(ruleContext rule.Context, expression *ast.Node) bool {
+	// The call to judge: the expression itself, or the initializer of the `const` it names.
+	candidate := expression
 	if expression.Kind == ast.KindIdentifier {
 		initializer := consistencyNoIsoStringDateCutConstInitializer(ruleContext, expression)
 		if initializer == nil {
 			return false
 		}
-		expression = ast.SkipParentheses(initializer)
+		candidate = ast.SkipParentheses(initializer)
 	}
-	method, receiver, arguments := consistencyNoIsoStringDateCutMethodCall(expression)
+	method, receiver, arguments := consistencyNoIsoStringDateCutMethodCall(candidate)
 	if method != "toISOString" || receiver == nil || len(arguments) != 0 {
 		return false
 	}
-	name := ast.SkipParentheses(expression.AsCallExpression().Expression).AsPropertyAccessExpression().Name()
+	name := ast.SkipParentheses(candidate.AsCallExpression().Expression).AsPropertyAccessExpression().Name()
 	return consistencyNoIsoStringDateCutIsDateMember(ruleContext, name)
 }
 

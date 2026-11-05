@@ -128,14 +128,14 @@ var CorrectnessNoLeakedNumberRender = rule.Rule{
 // correctnessNoLeakedNumberRenderRendered walks an expression whose value is rendered as a JSX
 // child, and checks the falsy operand of every `&&` whose result is rendered.
 func correctnessNoLeakedNumberRenderRendered(ruleContext rule.Context, expression *ast.Node) {
-	expression = ast.SkipParentheses(expression)
-	switch expression.Kind {
+	unwrapped := ast.SkipParentheses(expression)
+	switch unwrapped.Kind {
 	case ast.KindConditionalExpression:
-		conditional := expression.AsConditionalExpression()
+		conditional := unwrapped.AsConditionalExpression()
 		correctnessNoLeakedNumberRenderRendered(ruleContext, conditional.WhenTrue)
 		correctnessNoLeakedNumberRenderRendered(ruleContext, conditional.WhenFalse)
 	case ast.KindBinaryExpression:
-		binary := expression.AsBinaryExpression()
+		binary := unwrapped.AsBinaryExpression()
 		switch binary.OperatorToken.Kind {
 		case ast.KindAmpersandAmpersandToken:
 			correctnessNoLeakedNumberRenderFalsy(ruleContext, binary.Left)
@@ -153,15 +153,15 @@ func correctnessNoLeakedNumberRenderRendered(ruleContext rule.Context, expressio
 // correctnessNoLeakedNumberRenderFalsy checks every leaf whose value an expression returns when it
 // is falsy, and reports a leaf whose type says that value can be a number.
 func correctnessNoLeakedNumberRenderFalsy(ruleContext rule.Context, expression *ast.Node) {
-	expression = ast.SkipParentheses(expression)
-	switch expression.Kind {
+	unwrapped := ast.SkipParentheses(expression)
+	switch unwrapped.Kind {
 	case ast.KindConditionalExpression:
-		conditional := expression.AsConditionalExpression()
+		conditional := unwrapped.AsConditionalExpression()
 		correctnessNoLeakedNumberRenderFalsy(ruleContext, conditional.WhenTrue)
 		correctnessNoLeakedNumberRenderFalsy(ruleContext, conditional.WhenFalse)
 		return
 	case ast.KindBinaryExpression:
-		binary := expression.AsBinaryExpression()
+		binary := unwrapped.AsBinaryExpression()
 		switch binary.OperatorToken.Kind {
 		case ast.KindAmpersandAmpersandToken, ast.KindQuestionQuestionToken:
 			correctnessNoLeakedNumberRenderFalsy(ruleContext, binary.Left)
@@ -173,8 +173,8 @@ func correctnessNoLeakedNumberRenderFalsy(ruleContext rule.Context, expression *
 			return
 		}
 	}
-	if correctnessNoLeakedNumberRenderCanLeak(ruleContext.TypeChecker, ruleContext.TypeChecker.GetTypeAtLocation(expression)) {
-		ruleContext.ReportNode(expression, correctnessNoLeakedNumberRenderMessage())
+	if correctnessNoLeakedNumberRenderCanLeak(ruleContext.TypeChecker, ruleContext.TypeChecker.GetTypeAtLocation(unwrapped)) {
+		ruleContext.ReportNode(unwrapped, correctnessNoLeakedNumberRenderMessage())
 	}
 }
 

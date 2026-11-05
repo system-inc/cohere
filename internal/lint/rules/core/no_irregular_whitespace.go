@@ -91,11 +91,11 @@ type NoIrregularWhitespaceOptions struct {
 	SkipTemplates *bool `json:"skipTemplates"`
 	SkipRegExps   *bool `json:"skipRegExps"`
 
-	// SkipJSXText's tag is worth a note because the option is spelled skipJSXText rather than
+	// SkipJsxText's tag is worth a note because the option is spelled skipJSXText rather than
 	// skipJsxText. Every option field is tagged, and rule.UnmarshalOptions matches a tagged key
 	// exactly, so `skipJsxText` is refused rather than resolved; the upstream Rust needs an explicit
 	// rename for the same reason.
-	SkipJSXText *bool `json:"skipJSXText"`
+	SkipJsxText *bool `json:"skipJSXText"`
 }
 
 // skippedRegion is one span of the file that an option has excused.
@@ -154,7 +154,7 @@ var NoIrregularWhitespace = rule.Rule{
 		// to on: irregular whitespace inside a string is usually data rather than a typo, and
 		// reporting it would flag every file that holds a no-break space on purpose.
 		skipComments, skipStrings, skipTemplates := false, true, false
-		skipRegExps, skipJSXText := false, false
+		skipRegExps, skipJsxText := false, false
 		if settings, hasSettings := rule.OptionsAs[NoIrregularWhitespaceOptions](options); hasSettings {
 			if settings.SkipComments != nil {
 				skipComments = *settings.SkipComments
@@ -168,8 +168,8 @@ var NoIrregularWhitespace = rule.Rule{
 			if settings.SkipRegExps != nil {
 				skipRegExps = *settings.SkipRegExps
 			}
-			if settings.SkipJSXText != nil {
-				skipJSXText = *settings.SkipJSXText
+			if settings.SkipJsxText != nil {
+				skipJsxText = *settings.SkipJsxText
 			}
 		}
 
@@ -217,7 +217,7 @@ var NoIrregularWhitespace = rule.Rule{
 				}
 
 				collectSkippedLiterals(ruleContext.SourceFile, node, &skipped,
-					skipStrings, skipTemplates, skipRegExps, skipJSXText)
+					skipStrings, skipTemplates, skipRegExps, skipJsxText)
 
 				// A run of irregular spaces is one finding and each irregular line terminator is
 				// its own, as ESLint reports them: its IRREGULAR_WHITESPACE pattern is a `+` run per
@@ -313,6 +313,8 @@ func containsIrregularWhitespace(text string) bool {
 // fires first in a pre-order traversal: a rule collecting these from listeners would run its scan
 // before any of them had fired and excuse nothing. One stated walk is the honest version of that
 // ordering rather than a coincidence waiting to be broken.
+//
+// Mutates: skipped the walk appends every excused span, so one slice gathers the whole file's regions
 func collectSkippedLiterals(
 	sourceFile *ast.SourceFile,
 	node *ast.Node,
@@ -320,7 +322,7 @@ func collectSkippedLiterals(
 	skipStrings bool,
 	skipTemplates bool,
 	skipRegExps bool,
-	skipJSXText bool,
+	skipJsxText bool,
 ) {
 	if node == nil {
 		return
@@ -376,14 +378,14 @@ func collectSkippedLiterals(
 			excuseToken()
 		}
 	case ast.KindJsxText:
-		if skipJSXText {
+		if skipJsxText {
 			excuseWholeNode()
 		}
 	}
 
 	node.ForEachChild(func(child *ast.Node) bool {
 		collectSkippedLiterals(sourceFile, child, skipped,
-			skipStrings, skipTemplates, skipRegExps, skipJSXText)
+			skipStrings, skipTemplates, skipRegExps, skipJsxText)
 		return false
 	})
 }

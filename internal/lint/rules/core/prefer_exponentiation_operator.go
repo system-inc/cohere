@@ -196,10 +196,11 @@ func preferExponentiationOperatorResolvesToAnAmbientName(ruleContext rule.Contex
 //
 // A loop with its own nil check rather than `ast.SkipParentheses`, which dereferences its argument.
 func preferExponentiationOperatorUnwrapParentheses(node *ast.Node) *ast.Node {
-	for node != nil && node.Kind == ast.KindParenthesizedExpression {
-		node = node.AsParenthesizedExpression().Expression
+	current := node
+	for current != nil && current.Kind == ast.KindParenthesizedExpression {
+		current = current.AsParenthesizedExpression().Expression
 	}
-	return node
+	return current
 }
 
 // preferExponentiationOperatorFix builds the rewrite, or declines.
@@ -584,16 +585,16 @@ func preferExponentiationOperatorContinuesIdentifier(character byte) bool {
 // a plain template, a template whose only substitution is a string literal, and a concatenation of
 // string literals all report, while a bare identifier key is clean.
 func preferExponentiationOperatorStaticStringValue(node *ast.Node) (string, bool) {
-	node = preferExponentiationOperatorUnwrapParentheses(node)
-	if node == nil {
+	unwrapped := preferExponentiationOperatorUnwrapParentheses(node)
+	if unwrapped == nil {
 		return "", false
 	}
-	switch node.Kind {
+	switch unwrapped.Kind {
 	case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral:
-		return node.Text(), true
+		return unwrapped.Text(), true
 	case ast.KindTemplateExpression:
 		// A template is static only when every span's expression is itself static.
-		template := node.AsTemplateExpression()
+		template := unwrapped.AsTemplateExpression()
 		if template.Head == nil {
 			return "", false
 		}
@@ -608,7 +609,7 @@ func preferExponentiationOperatorStaticStringValue(node *ast.Node) (string, bool
 		}
 		return value, true
 	case ast.KindBinaryExpression:
-		binary := node.AsBinaryExpression()
+		binary := unwrapped.AsBinaryExpression()
 		if binary.OperatorToken == nil || binary.OperatorToken.Kind != ast.KindPlusToken {
 			return "", false
 		}

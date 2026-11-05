@@ -56,7 +56,8 @@ var ForDirection = rule.Rule{
 					return
 				}
 
-				var wrongDirectionOnLeft, wrongDirectionOnRight int
+				var wrongDirectionOnLeft int
+				var wrongDirectionOnRight int
 				switch binary.OperatorToken.Kind {
 				case ast.KindLessThanToken, ast.KindLessThanEqualsToken:
 					wrongDirectionOnLeft, wrongDirectionOnRight = -1, 1
@@ -103,26 +104,26 @@ func counterModifications(node *ast.Node, counter string) []*ast.Node {
 	if node == nil {
 		return nil
 	}
-	node = ast.SkipParentheses(node)
-	if node == nil {
+	unwrapped := ast.SkipParentheses(node)
+	if unwrapped == nil {
 		return nil
 	}
 
-	switch node.Kind {
+	switch unwrapped.Kind {
 	case ast.KindPostfixUnaryExpression:
-		if isIdentifierNamed(node.AsPostfixUnaryExpression().Operand, counter) {
-			return []*ast.Node{node}
+		if isIdentifierNamed(unwrapped.AsPostfixUnaryExpression().Operand, counter) {
+			return []*ast.Node{unwrapped}
 		}
 
 	case ast.KindPrefixUnaryExpression:
-		operator := node.AsPrefixUnaryExpression().Operator
+		operator := unwrapped.AsPrefixUnaryExpression().Operator
 		if (operator == ast.KindPlusPlusToken || operator == ast.KindMinusMinusToken) &&
-			isIdentifierNamed(node.AsPrefixUnaryExpression().Operand, counter) {
-			return []*ast.Node{node}
+			isIdentifierNamed(unwrapped.AsPrefixUnaryExpression().Operand, counter) {
+			return []*ast.Node{unwrapped}
 		}
 
 	case ast.KindBinaryExpression:
-		binary := node.AsBinaryExpression()
+		binary := unwrapped.AsBinaryExpression()
 		if binary.OperatorToken == nil {
 			return nil
 		}
@@ -133,7 +134,7 @@ func counterModifications(node *ast.Node, counter string) []*ast.Node {
 			)
 		}
 		if ast.IsAssignmentOperator(binary.OperatorToken.Kind) && isIdentifierNamed(binary.Left, counter) {
-			return []*ast.Node{node}
+			return []*ast.Node{unwrapped}
 		}
 	}
 
@@ -207,17 +208,17 @@ func incrementDirection(operator ast.Kind) int {
 // answer differs from the gate's, and if the differential ever shows a for-direction disagreement
 // this comment is where to start.
 func staticSign(node *ast.Node) int {
-	node = ast.SkipParentheses(node)
-	if node == nil {
+	unwrapped := ast.SkipParentheses(node)
+	if unwrapped == nil {
 		return 0
 	}
 
-	switch node.Kind {
+	switch unwrapped.Kind {
 	case ast.KindNumericLiteral:
-		return numericLiteralSign(node.Text())
+		return numericLiteralSign(unwrapped.Text())
 
 	case ast.KindBigIntLiteral:
-		return numericLiteralSign(node.Text())
+		return numericLiteralSign(unwrapped.Text())
 
 	case ast.KindTrueKeyword:
 		// Number(true) is 1, and ESLint accepts booleans here. `i += true` is nobody's code, but
@@ -228,7 +229,7 @@ func staticSign(node *ast.Node) int {
 		return 0
 
 	case ast.KindPrefixUnaryExpression:
-		unary := node.AsPrefixUnaryExpression()
+		unary := unwrapped.AsPrefixUnaryExpression()
 		switch unary.Operator {
 		case ast.KindMinusToken:
 			return -staticSign(unary.Operand)
@@ -266,6 +267,6 @@ func numericLiteralSign(text string) int {
 
 // isIdentifierNamed reports an identifier with exactly this name, through any parentheses.
 func isIdentifierNamed(node *ast.Node, name string) bool {
-	node = ast.SkipParentheses(node)
-	return node != nil && node.Kind == ast.KindIdentifier && node.Text() == name
+	unwrapped := ast.SkipParentheses(node)
+	return unwrapped != nil && unwrapped.Kind == ast.KindIdentifier && unwrapped.Text() == name
 }

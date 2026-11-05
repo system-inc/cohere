@@ -509,22 +509,22 @@ func correctnessNoProcessExitAfterOutputAnalyzeRoot(
 	type builder = control_flow_graph.Builder[correctnessNoProcessExitAfterOutputEvent]
 	recorded := map[*ast.Node]bool{}
 	graph := control_flow_graph.Build(root.node, control_flow_graph.Hooks[correctnessNoProcessExitAfterOutputEvent]{
-		Expression: func(b *builder, node *ast.Node) {
+		Expression: func(graphBuilder *builder, node *ast.Node) {
 			if node.Kind != ast.KindCallExpression || correctnessNoProcessExitAfterOutputInCatchBinding(node, root.node) {
 				return
 			}
 			if correctnessNoProcessExitAfterOutputIsExit(ruleContext, node) {
 				recorded[node] = true
-				b.Emit(correctnessNoProcessExitAfterOutputEvent{kind: correctnessNoProcessExitAfterOutputExit, node: node})
+				graphBuilder.Emit(correctnessNoProcessExitAfterOutputEvent{kind: correctnessNoProcessExitAfterOutputExit, node: node})
 				return
 			}
 			if writers.writes(node) && !correctnessNoProcessExitAfterOutputHoldsExit(ruleContext, node) {
-				b.Emit(correctnessNoProcessExitAfterOutputEvent{kind: correctnessNoProcessExitAfterOutputWrite, node: node})
+				graphBuilder.Emit(correctnessNoProcessExitAfterOutputEvent{kind: correctnessNoProcessExitAfterOutputWrite, node: node})
 			}
 		},
-		Statement: func(b *builder, node *ast.Node) {
+		Statement: func(graphBuilder *builder, node *ast.Node) {
 			if node.Kind == ast.KindBlock && node.Parent != nil && node.Parent.Kind == ast.KindCatchClause {
-				b.Emit(correctnessNoProcessExitAfterOutputEvent{kind: correctnessNoProcessExitAfterOutputCatchEntered, node: node.Parent.Parent})
+				graphBuilder.Emit(correctnessNoProcessExitAfterOutputEvent{kind: correctnessNoProcessExitAfterOutputCatchEntered, node: node.Parent.Parent})
 			}
 		},
 	})

@@ -97,7 +97,7 @@ func fileNeedsRequestSuffix(fileName string) bool {
 	if stem, isTypeScript := strings.CutSuffix(sourcename.TreatedAs(base), ".ts"); isTypeScript {
 		return !strings.HasSuffix(stem, "Request")
 	}
-	if stem, isTSX := strings.CutSuffix(base, ".tsx"); isTSX {
+	if stem, isTsx := strings.CutSuffix(base, ".tsx"); isTsx {
 		return !strings.HasSuffix(stem, "Request")
 	}
 	return false

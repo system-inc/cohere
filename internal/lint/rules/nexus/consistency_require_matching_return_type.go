@@ -50,6 +50,18 @@ var consistencyRequireMatchingReturnTypeVoidReasons = map[consistencyRequireMatc
 	consistencyRequireMatchingReturnTypeInferred:       consistencyRequireMatchingReturnTypeUndefinedText.Option("voidReason", "inferredVoid"),
 }
 
+// consistencyRequireMatchingReturnTypeCanonicalUndefined is the only `return undefined` text the
+// fixer rewrites: whitespace between the two words and a closing semicolon, nothing else.
+var consistencyRequireMatchingReturnTypeCanonicalUndefined = regexp.MustCompile(`^return\s+undefined;$`)
+
+type consistencyRequireMatchingReturnTypeKind int
+
+const (
+	consistencyRequireMatchingReturnTypeKindUnknown consistencyRequireMatchingReturnTypeKind = iota
+	consistencyRequireMatchingReturnTypeKindVoid
+	consistencyRequireMatchingReturnTypeKindValue
+)
+
 // ConsistencyRequireMatchingReturnType makes every `return` spell what the function's return type
 // says it returns.
 //
@@ -210,18 +222,6 @@ var ConsistencyRequireMatchingReturnType = rule.Rule{
 		}
 	},
 }
-
-// consistencyRequireMatchingReturnTypeCanonicalUndefined is the only `return undefined` text the
-// fixer rewrites: whitespace between the two words and a closing semicolon, nothing else.
-var consistencyRequireMatchingReturnTypeCanonicalUndefined = regexp.MustCompile(`^return\s+undefined;$`)
-
-type consistencyRequireMatchingReturnTypeKind int
-
-const (
-	consistencyRequireMatchingReturnTypeKindUnknown consistencyRequireMatchingReturnTypeKind = iota
-	consistencyRequireMatchingReturnTypeKindVoid
-	consistencyRequireMatchingReturnTypeKindValue
-)
 
 // consistencyRequireMatchingReturnTypeVerdict is what one function's returns are judged against.
 type consistencyRequireMatchingReturnTypeVerdict struct {
@@ -408,20 +408,23 @@ func consistencyRequireMatchingReturnTypeClassify(
 		return unknown
 	}
 	written := returnType
+	// The type the verdict reads: the written one, unwrapped below to a generator's TReturn or an async
+	// function's awaited type.
+	judged := returnType
 
 	if isGenerator {
-		returnType = consistencyRequireMatchingReturnTypeGeneratorReturn(ruleContext, returnType)
-		if returnType == nil {
+		judged = consistencyRequireMatchingReturnTypeGeneratorReturn(ruleContext, judged)
+		if judged == nil {
 			return unknown
 		}
 	} else if isAsync {
-		returnType = checker.Checker_getAwaitedType(ruleContext.TypeChecker, returnType)
-		if returnType == nil {
+		judged = checker.Checker_getAwaitedType(ruleContext.TypeChecker, judged)
+		if judged == nil {
 			return unknown
 		}
 	}
 
-	flags := checker.Type_flags(returnType)
+	flags := checker.Type_flags(judged)
 	if flags&(checker.TypeFlagsAnyOrUnknown|checker.TypeFlagsNever) != 0 {
 		return unknown
 	}
@@ -429,7 +432,7 @@ func consistencyRequireMatchingReturnTypeClassify(
 	// The union's constituents `OR`'d, not the type's own flags: `string | void` is a union whose own
 	// flags carry no Void bit, and the shelf's `IsTypeFlagSet` would answer false for it.
 	var combined checker.TypeFlags
-	for part := range type_checking.UnionTypePartsSeq(returnType) {
+	for part := range type_checking.UnionTypePartsSeq(judged) {
 		if part != nil {
 			combined |= checker.Type_flags(part)
 		}
@@ -498,11 +501,11 @@ func consistencyRequireMatchingReturnTypeGeneratorReturn(ruleContext rule.Contex
 // `undefined`. Note the complement: asking "does it resolve to a global" through a declarations check
 // answers false for the real `undefined`, which is the trap the porting standard records.
 func consistencyRequireMatchingReturnTypeIsGlobalUndefined(ruleContext rule.Context, expression *ast.Node) bool {
-	expression = ast.SkipParentheses(expression)
-	if expression == nil || expression.Kind != ast.KindIdentifier || expression.Text() != "undefined" {
+	unwrapped := ast.SkipParentheses(expression)
+	if unwrapped == nil || unwrapped.Kind != ast.KindIdentifier || unwrapped.Text() != "undefined" {
 		return false
 	}
-	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(expression)
+	symbol := ruleContext.TypeChecker.GetSymbolAtLocation(unwrapped)
 	return symbol == nil || len(symbol.Declarations) == 0
 }
 

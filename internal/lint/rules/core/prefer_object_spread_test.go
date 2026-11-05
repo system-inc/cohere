@@ -40,7 +40,10 @@ type preferObjectSpreadCase struct {
 	messageIds           []string
 }
 
-func preferObjectSpreadStringPointer(value string) *string { return &value }
+func preferObjectSpreadStringPointer(value string) *string {
+	pointed := value
+	return &pointed
+}
 
 var preferObjectSpreadCleanCases = []preferObjectSpreadCase{
 	{source: "Object.assign()", typescript: false, ecmaVersionGated: false},
@@ -181,9 +184,9 @@ func TestPreferObjectSpreadFires(test *testing.T) {
 				return
 			}
 			if testCase.fixedSource == nil {
-				for i, diagnostic := range result.Diagnostics {
+				for index, diagnostic := range result.Diagnostics {
 					if len(diagnostic.Fixes) != 0 {
-						test.Errorf("finding %d proposes a fix; upstream declines this case", i)
+						test.Errorf("finding %d proposes a fix; upstream declines this case", index)
 					}
 				}
 				return
@@ -279,11 +282,11 @@ func TestPreferObjectSpreadDeclinesOnARecoveredParse(test *testing.T) {
 
 	result := rule_testing.RunTyped(test, PreferObjectSpread, preferObjectSpreadFile, source)
 	rule_testing.ExpectFindings(test, result, "useSpreadMessage")
-	for i, diagnostic := range result.Diagnostics {
+	for index, diagnostic := range result.Diagnostics {
 		if len(diagnostic.Fixes) != 0 {
 			test.Errorf("finding %d proposes %d fixes on a recovered parse whose span does not end "+
 				"at a parenthesis; the repair would write a brace over the wrong character",
-				i, len(diagnostic.Fixes))
+				index, len(diagnostic.Fixes))
 		}
 	}
 }

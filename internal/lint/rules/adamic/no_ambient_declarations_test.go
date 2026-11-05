@@ -32,13 +32,13 @@ func ambientFixture(test *testing.T, name string) map[string]string {
 		if entry.IsDir() {
 			return nil
 		}
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return err
+		data, readError := os.ReadFile(path)
+		if readError != nil {
+			return readError
 		}
-		relative, err := filepath.Rel(root, path)
-		if err != nil {
-			return err
+		relative, relativeError := filepath.Rel(root, path)
+		if relativeError != nil {
+			return relativeError
 		}
 		files[filepath.ToSlash(relative)] = string(data)
 		return nil

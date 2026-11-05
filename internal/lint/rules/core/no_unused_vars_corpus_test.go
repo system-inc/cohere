@@ -20,8 +20,8 @@ import (
 // producing a verdict. Its one clean case is
 // `export function promisify() { var fn; function fn() {} return fn; }`, which is clean ONLY as
 // JavaScript: there `var fn` and `function fn` are one merged binding that `return fn` reads. As
-// TypeScript the checker keeps them separate — measured, the read resolves to the function at
-// offset 37 while the `var` at offset 33 is genuinely unread — so the same source is a true
+// TypeScript the checker keeps them separate (measured, the read resolves to the function at
+// offset 37 while the `var` at offset 33 is genuinely unread), so the same source is a true
 // positive under `.ts` and reproducing it as clean would require making the rule wrong about
 // TypeScript to be right about a file it never sees.
 //
@@ -762,36 +762,8 @@ func TestNoUnusedVarsStaysSilentOnUpstreamCleanCases(test *testing.T) {
 	}
 }
 
-// TestNoUnusedVarsFiresOnUpstreamReportingCases asserts the reporting half.
-//
-// A count rather than a whitelist, and it is deliberately an exact count rather than a floor. A
-// floor would go green if the rule started reporting more, which is the direction a false positive
-// arrives from, and this rule's clean-case suite is the only other thing watching for that.
-//
-// The number is measured, not aspirational: 301 of upstream's 303 reporting cases report here. The
-// 2 that do not are a stated subset rather than an accident, and `noUnusedVarsKnownGaps` below
-// names both with its cause, so a change in either direction fails this test and has to be
-// explained rather than absorbed.
-//
-// One of the two is a case upstream cannot report either and documents as such in its own source.
-func TestNoUnusedVarsFiresOnUpstreamReportingCases(test *testing.T) {
-	test.Parallel()
-
-	silent := 0
-	for _, source := range noUnusedVarsUpstreamReports {
-		if len(rule_testing.RunTyped(test, NoUnusedVars, "a.ts", source).Diagnostics) == 0 {
-			silent++
-		}
-	}
-	if silent != len(noUnusedVarsKnownGaps) {
-		test.Errorf("want %d upstream reporting cases silent, got %d — a change here means the "+
-			"ported subset moved and the gap list needs updating with the reason",
-			len(noUnusedVarsKnownGaps), silent)
-	}
-}
-
 // noUnusedVarsKnownGaps names every upstream reporting case this port does not report, with the
-// cause. It exists so the count assertion above cannot be satisfied by a different set of cases: a
+// cause. It exists so the count assertion below cannot be satisfied by a different set of cases: a
 // fix in one place and a regression in another would net to zero and go green.
 //
 // It started at 35 and is now 2. Both survivors are stated rather than pending, and neither can be
@@ -799,7 +771,7 @@ func TestNoUnusedVarsFiresOnUpstreamReportingCases(test *testing.T) {
 var noUnusedVarsKnownGaps = []string{
 	// Upstream cannot report this one either, and says so in its own source. `tests/eslint.rs:744`
 	// ships this line in the fail list while the two neighbouring spellings sit commented out at
-	// `:743` and `:745` — oxc knows all three should report and can only manage one. The two it
+	// `:743` and `:745`: oxc knows all three should report and can only manage one. The two it
 	// gives up on are `cb = function(a){ return cb(1+a); }()` and `cb = (0, function(a){ cb(1+a);
 	// })`, and both appear in its pass list at `:16` and `:17`, so the same source text is
 	// simultaneously a passing case and a known-unreportable failing case.
@@ -820,6 +792,34 @@ var noUnusedVarsKnownGaps = []string{
 	// weakening that guard everywhere, and the second would cost clean cases to gain one finding on
 	// a construct our own tree uses zero times and TypeScript forbids in every module.
 	"with (a) var foo;",
+}
+
+// TestNoUnusedVarsFiresOnUpstreamReportingCases asserts the reporting half.
+//
+// A count rather than a whitelist, and it is deliberately an exact count rather than a floor. A
+// floor would go green if the rule started reporting more, which is the direction a false positive
+// arrives from, and this rule's clean-case suite is the only other thing watching for that.
+//
+// The number is measured, not aspirational: 301 of upstream's 303 reporting cases report here. The
+// 2 that do not are a stated subset rather than an accident, and `noUnusedVarsKnownGaps` above
+// names both with its cause, so a change in either direction fails this test and has to be
+// explained rather than absorbed.
+//
+// One of the two is a case upstream cannot report either and documents as such in its own source.
+func TestNoUnusedVarsFiresOnUpstreamReportingCases(test *testing.T) {
+	test.Parallel()
+
+	silent := 0
+	for _, source := range noUnusedVarsUpstreamReports {
+		if len(rule_testing.RunTyped(test, NoUnusedVars, "a.ts", source).Diagnostics) == 0 {
+			silent++
+		}
+	}
+	if silent != len(noUnusedVarsKnownGaps) {
+		test.Errorf("want %d upstream reporting cases silent, got %d; a change here means the "+
+			"ported subset moved and the gap list needs updating with the reason",
+			len(noUnusedVarsKnownGaps), silent)
+	}
 }
 
 // noUnusedVarsReportedOnlyWithoutTheUnderscoreDefault are the two oxc clean cases that were clean

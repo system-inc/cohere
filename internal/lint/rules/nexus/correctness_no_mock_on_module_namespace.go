@@ -22,6 +22,12 @@ func correctnessNoMockOnModuleNamespaceMessage() rule.Message {
 	}
 }
 
+// correctnessNoMockOnModuleNamespaceMockMethods are the MockTracker methods that redefine a property
+// of the object they are given.
+var correctnessNoMockOnModuleNamespaceMockMethods = map[string]bool{
+	"method": true, "getter": true, "setter": true, "property": true,
+}
+
 // CorrectnessNoMockOnModuleNamespace reports node:test's `mock.method`, `mock.getter`, `mock.setter`
 // or `mock.property` called with an `import * as` namespace object as the object to patch, in a file
 // that runs as an ES module.
@@ -137,12 +143,6 @@ var CorrectnessNoMockOnModuleNamespace = rule.Rule{
 	},
 }
 
-// correctnessNoMockOnModuleNamespaceMockMethods are the MockTracker methods that redefine a property
-// of the object they are given.
-var correctnessNoMockOnModuleNamespaceMockMethods = map[string]bool{
-	"method": true, "getter": true, "setter": true, "property": true,
-}
-
 // correctnessNoMockOnModuleNamespaceRunsAsModule says whether a file runs as an ES module: always for
 // `.mts` and `.mjs`, never for `.cts` and `.cjs`, and for the rest when the program emits ES modules.
 func correctnessNoMockOnModuleNamespaceRunsAsModule(fileName string, options *core.CompilerOptions) bool {
@@ -162,14 +162,15 @@ func correctnessNoMockOnModuleNamespaceRunsAsModule(fileName string, options *co
 // correctnessNoMockOnModuleNamespaceUnwrap looks through the wrappers that change an expression's type
 // and never its value.
 func correctnessNoMockOnModuleNamespaceUnwrap(expression *ast.Node) *ast.Node {
+	current := expression
 	for {
-		switch expression.Kind {
+		switch current.Kind {
 		case ast.KindParenthesizedExpression, ast.KindNonNullExpression, ast.KindAsExpression,
 			ast.KindSatisfiesExpression, ast.KindTypeAssertionExpression:
-			expression = expression.Expression()
+			current = current.Expression()
 			continue
 		}
-		return expression
+		return current
 	}
 }
 

@@ -82,10 +82,11 @@ func correctnessNoLoadTimeImportMetaPathAccessObject(node *ast.Node) *ast.Node {
 // correctnessNoLoadTimeImportMetaPathOuterParentheses climbs past parentheses wrapping node, so
 // `(import.meta).dirname` reaches its access.
 func correctnessNoLoadTimeImportMetaPathOuterParentheses(node *ast.Node) *ast.Node {
-	for node.Parent != nil && node.Parent.Kind == ast.KindParenthesizedExpression {
-		node = node.Parent
+	outermost := node
+	for outermost.Parent != nil && outermost.Parent.Kind == ast.KindParenthesizedExpression {
+		outermost = outermost.Parent
 	}
-	return node
+	return outermost
 }
 
 // correctnessNoLoadTimeImportMetaPathInnerParentheses is ast.SkipParentheses with a nil guard, since

@@ -229,6 +229,9 @@ func (c *compiler) compile(value any, pointer string) (*node, error) {
 	}
 }
 
+// keyword compiles one keyword of a schema object into the node that object compiles to.
+//
+// Mutates: compiled each keyword fills its own fields of the node compile is building, one call per key
 func (c *compiler) keyword(compiled *node, key string, value any, pointer string) error {
 	child := func(name string, value any) (*node, error) {
 		return c.compile(value, pointer+"/"+name)

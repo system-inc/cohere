@@ -27,7 +27,7 @@ import (
  * Each finding is its text and byte offset. The fixed column is the whole file after ESLint's fixes,
  * applied as its verifyAndFix applies them, or empty where ESLint offers none.
  */
-func TestPreferObjectSpreadAgreesWithESLint(test *testing.T) {
+func TestPreferObjectSpreadAgreesWithEsLint(test *testing.T) {
 	test.Parallel()
 
 	cases := []struct {
@@ -176,8 +176,9 @@ func TestPreferObjectSpreadAgreesWithESLint(test *testing.T) {
 // Nested calls fix outside in this way, as ESLint's own answer for them shows.
 func fixToConvergence(test *testing.T, code string) string {
 	test.Helper()
+	fixed := code
 	for pass := 0; pass < 10; pass++ {
-		result := rule_testing.RunTypedVerbatimWithOptions(test, PreferObjectSpread, "input.ts", code, nil)
+		result := rule_testing.RunTypedVerbatimWithOptions(test, PreferObjectSpread, "input.ts", fixed, nil)
 		type finding struct {
 			start, end int
 			fixes      []rule.Fix
@@ -195,7 +196,7 @@ func fixToConvergence(test *testing.T, code string) string {
 			findings = append(findings, current)
 		}
 		if len(findings) == 0 {
-			return code
+			return fixed
 		}
 		sort.Slice(findings, func(first, second int) bool { return findings[first].start < findings[second].start })
 		var applied []rule.Fix
@@ -209,8 +210,8 @@ func fixToConvergence(test *testing.T, code string) string {
 		}
 		sort.Slice(applied, func(first, second int) bool { return applied[first].Range.Pos() > applied[second].Range.Pos() })
 		for _, fix := range applied {
-			code = code[:fix.Range.Pos()] + fix.Text + code[fix.Range.End():]
+			fixed = fixed[:fix.Range.Pos()] + fix.Text + fixed[fix.Range.End():]
 		}
 	}
-	return code
+	return fixed
 }

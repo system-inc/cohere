@@ -360,15 +360,16 @@ func requireAwaitHeadStart(ruleContext rule.Context, node *ast.Node) int {
 // requireAwaitSkipSpaces advances past whitespace, so a skipped keyword does not leave its space.
 func requireAwaitSkipSpaces(ruleContext rule.Context, start int) int {
 	text := ruleContext.SourceFile.Text()
-	for start < len(text) {
-		switch text[start] {
+	offset := start
+	for offset < len(text) {
+		switch text[offset] {
 		case ' ', '\t', '\n', '\r':
-			start++
+			offset++
 			continue
 		}
 		break
 	}
-	return start
+	return offset
 }
 
 // requireAwaitParentOwnsTheHead answers whether the reported span starts at the function's parent.
@@ -688,8 +689,8 @@ func requireAwaitNameText(name *ast.Node) (string, bool) {
 // dependency whose real implementation awaits, a condition function matching its interface.
 //
 // Upstream already concedes the case in a narrower form. An empty body is exempt precisely because
-// reporting it "would fire on every unimplemented method in a codebase" — the same reasoning,
-// drawn by body shape rather than by contract. A stub with one `return emptyReport(...)` in it is
+// reporting it "would fire on every unimplemented method in a codebase", which is the same
+// reasoning drawn by body shape rather than by contract. A stub with one `return emptyReport(...)` in it is
 // the same animal and falls outside that line.
 //
 // We hold a resident type graph and a real checker, so we can ask the question upstream cannot:
@@ -699,7 +700,7 @@ func requireAwaitNameText(name *ast.Node) (string, bool) {
 //
 // The check is deliberately narrow. It fires only when a contextual type exists and every call
 // signature it offers returns a thenable. A position that accepts `T | Promise<T>` is not exempt,
-// because there the keyword really is optional and the finding is real — that union is exactly
+// because there the keyword really is optional and the finding is real: that union is exactly
 // what a widened interface looks like, and widening is the right repair when no implementation
 // awaits. Absent contextual type means absent exemption.
 func requireAwaitSatisfiesPromiseContract(ruleContext rule.Context, node *ast.Node) bool {
@@ -762,8 +763,8 @@ func requireAwaitTypesDemandPromise(ruleContext rule.Context, node *ast.Node, ty
 // parameter with the types standing in for it.
 func requireAwaitExpandTypes(types []*checker.Type, substitutions map[*checker.Type][]*checker.Type) []*checker.Type {
 	var expanded []*checker.Type
-	for _, t := range types {
-		for part := range type_checking.UnionTypePartsSeq(t) {
+	for _, listedType := range types {
+		for part := range type_checking.UnionTypePartsSeq(listedType) {
 			if standIns, substituted := substitutions[part]; substituted {
 				for _, standIn := range standIns {
 					expanded = append(expanded, type_checking.UnionTypeParts(standIn)...)
@@ -1029,9 +1030,9 @@ func requireAwaitParameterTypeAt(ruleContext rule.Context, signature *checker.Si
 func requireAwaitTypeParameterStandIns(ruleContext rule.Context, call *ast.Node, resolved *checker.Signature, declared *checker.Signature, argumentIndex int) map[*checker.Type][]*checker.Type {
 	substitutions := map[*checker.Type][]*checker.Type{}
 	typeParameters := declared.TypeParameters()
-	isTypeParameter := func(t *checker.Type) bool {
+	isTypeParameter := func(candidateType *checker.Type) bool {
 		for _, typeParameter := range typeParameters {
-			if t == typeParameter {
+			if candidateType == typeParameter {
 				return true
 			}
 		}

@@ -576,19 +576,19 @@ func (analysis *correctnessRequireBlockingStandardStreamsAnalysis) callMayBlock(
 // handsOnMayBlock says whether an argument is a function, or names one, that may block when the
 // callee runs it.
 func (analysis *correctnessRequireBlockingStandardStreamsAnalysis) handsOnMayBlock(argument *ast.Node) bool {
-	argument = ast.SkipParentheses(argument)
-	switch argument.Kind {
+	unwrapped := ast.SkipParentheses(argument)
+	switch unwrapped.Kind {
 	case ast.KindFunctionExpression, ast.KindArrowFunction:
-		return analysis.mayBlockWhenRun(argument)
+		return analysis.mayBlockWhenRun(unwrapped)
 	case ast.KindIdentifier:
-		symbol := analysis.ctx.TypeChecker.GetSymbolAtLocation(argument)
+		symbol := analysis.ctx.TypeChecker.GetSymbolAtLocation(unwrapped)
 		if symbol != nil && symbol.Flags&ast.SymbolFlagsAlias != 0 {
 			symbol = analysis.ctx.TypeChecker.GetAliasedSymbol(symbol)
 		}
 		if symbol == nil || symbol.Flags&ast.SymbolFlagsFunction == 0 {
 			return false
 		}
-		return analysis.symbolMayBlock(symbol, argument)
+		return analysis.symbolMayBlock(symbol, unwrapped)
 	}
 	return false
 }
@@ -596,13 +596,14 @@ func (analysis *correctnessRequireBlockingStandardStreamsAnalysis) handsOnMayBlo
 // symbolMayBlock says whether calling what a symbol names may block. Resolved through an import alias
 // to its declaration, it may when any declaration may.
 func (analysis *correctnessRequireBlockingStandardStreamsAnalysis) symbolMayBlock(symbol *ast.Symbol, name *ast.Node) bool {
-	if symbol != nil && symbol.Flags&ast.SymbolFlagsAlias != 0 {
-		symbol = analysis.ctx.TypeChecker.GetAliasedSymbol(symbol)
+	resolved := symbol
+	if resolved != nil && resolved.Flags&ast.SymbolFlagsAlias != 0 {
+		resolved = analysis.ctx.TypeChecker.GetAliasedSymbol(resolved)
 	}
-	if symbol == nil || len(symbol.Declarations) == 0 {
+	if resolved == nil || len(resolved.Declarations) == 0 {
 		return true
 	}
-	for _, declaration := range symbol.Declarations {
+	for _, declaration := range resolved.Declarations {
 		if analysis.declarationMayBlock(declaration, name) {
 			return true
 		}
@@ -696,15 +697,15 @@ func (analysis *correctnessRequireBlockingStandardStreamsAnalysis) mayBlockWhenR
 // localFunction is the function of this file an expression names: a function declaration, or a
 // `const` bound to a function expression or an arrow. Anything else answers nil.
 func (analysis *correctnessRequireBlockingStandardStreamsAnalysis) localFunction(expression *ast.Node) *ast.Node {
-	expression = ast.SkipParentheses(expression)
-	switch expression.Kind {
+	unwrapped := ast.SkipParentheses(expression)
+	switch unwrapped.Kind {
 	case ast.KindFunctionExpression, ast.KindArrowFunction:
-		return expression
+		return unwrapped
 	case ast.KindIdentifier:
 	default:
 		return nil
 	}
-	symbol := analysis.ctx.TypeChecker.GetSymbolAtLocation(expression)
+	symbol := analysis.ctx.TypeChecker.GetSymbolAtLocation(unwrapped)
 	if symbol == nil {
 		return nil
 	}
@@ -838,7 +839,7 @@ func (analysis *correctnessRequireBlockingStandardStreamsAnalysis) analyzeRoot(r
 	recorded := map[*ast.Node]bool{}
 	unrecordable := false
 	graph := control_flow_graph.Build(root, control_flow_graph.Hooks[event]{
-		Expression: func(b *builder, node *ast.Node) {
+		Expression: func(graphBuilder *builder, node *ast.Node) {
 			callLike := correctnessRequireBlockingStandardStreamsIsCallLike(node)
 			if !callLike && node.Kind != ast.KindAwaitExpression {
 				return
@@ -851,34 +852,36 @@ func (analysis *correctnessRequireBlockingStandardStreamsAnalysis) analyzeRoot(r
 			if node.Kind == ast.KindAwaitExpression {
 				if analysis.ordered {
 					recorded[node] = true
-					b.Emit(event{kind: correctnessRequireBlockingStandardStreamsBlock, node: node})
+					graphBuilder.Emit(event{kind: correctnessRequireBlockingStandardStreamsBlock, node: node})
 				}
 				return
 			}
 			if node.Kind == ast.KindCallExpression && correctnessNoProcessExitAfterOutputIsExit(ruleContext, node) {
 				recorded[node] = true
-				b.Emit(event{kind: correctnessRequireBlockingStandardStreamsExit, node: node})
+				graphBuilder.Emit(event{kind: correctnessRequireBlockingStandardStreamsExit, node: node})
 				return
 			}
 			if node.Kind == ast.KindCallExpression && correctnessNoProcessExitAfterOutputIsWrite(ruleContext, node) &&
 				!correctnessNoProcessExitAfterOutputHoldsExit(ruleContext, node) {
-				b.Emit(event{kind: correctnessRequireBlockingStandardStreamsWrite, node: node})
+				graphBuilder.Emit(event{kind: correctnessRequireBlockingStandardStreamsWrite, node: node})
 			}
 			runs, handsOn := analysis.startedFunctions(node)
 			if len(runs) > 0 || len(handsOn) > 0 {
-				b.Emit(event{
+				graphBuilder.Emit(event{
 					kind: correctnessRequireBlockingStandardStreamsCall, node: node, runs: runs, handsOn: handsOn,
 					argumentsMayBlock: analysis.ordered && len(runs) > 0 && analysis.argumentsMayBlock(node),
 				})
 			}
 			if analysis.ordered && analysis.callMayBlock(node) {
 				recorded[node] = true
-				b.Emit(event{kind: correctnessRequireBlockingStandardStreamsBlock, node: node})
+				graphBuilder.Emit(event{kind: correctnessRequireBlockingStandardStreamsBlock, node: node})
 			}
 		},
-		Statement: func(b *builder, node *ast.Node) {
+		Statement: func(graphBuilder *builder, node *ast.Node) {
 			if node.Kind == ast.KindBlock && node.Parent != nil && node.Parent.Kind == ast.KindCatchClause {
-				b.Emit(event{kind: correctnessRequireBlockingStandardStreamsCatchEntered, node: node.Parent.Parent})
+				graphBuilder.Emit(event{
+					kind: correctnessRequireBlockingStandardStreamsCatchEntered, node: node.Parent.Parent,
+				})
 			}
 			if !analysis.ordered {
 				return
@@ -886,7 +889,7 @@ func (analysis *correctnessRequireBlockingStandardStreamsAnalysis) analyzeRoot(r
 			awaits := (node.Kind == ast.KindForOfStatement && node.AsForInOrOfStatement().AwaitModifier != nil) ||
 				(node.Kind == ast.KindVariableStatement && node.AsVariableStatement().DeclarationList.Flags&ast.NodeFlagsAwaitUsing == ast.NodeFlagsAwaitUsing)
 			if awaits {
-				b.Emit(event{kind: correctnessRequireBlockingStandardStreamsBlock, node: node})
+				graphBuilder.Emit(event{kind: correctnessRequireBlockingStandardStreamsBlock, node: node})
 			}
 		},
 	})

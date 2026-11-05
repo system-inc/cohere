@@ -50,23 +50,25 @@ func checkKeyCase(value any, valueType reflect.Type, path string) error {
 	if valueType == nil {
 		return nil
 	}
-	for valueType.Kind() == reflect.Pointer {
-		if valueType.Implements(jsonUnmarshalerType) {
+	// baseType is valueType with its pointers walked off, so valueType still names what the caller passed.
+	baseType := valueType
+	for baseType.Kind() == reflect.Pointer {
+		if baseType.Implements(jsonUnmarshalerType) {
 			return nil
 		}
-		valueType = valueType.Elem()
+		baseType = baseType.Elem()
 	}
-	if valueType.Implements(jsonUnmarshalerType) || reflect.PointerTo(valueType).Implements(jsonUnmarshalerType) {
+	if baseType.Implements(jsonUnmarshalerType) || reflect.PointerTo(baseType).Implements(jsonUnmarshalerType) {
 		return nil
 	}
 
-	switch valueType.Kind() {
+	switch baseType.Kind() {
 	case reflect.Struct:
 		object, isObject := value.(map[string]any)
 		if !isObject {
 			return nil
 		}
-		fields := declaredFields(valueType)
+		fields := declaredFields(baseType)
 		for key, member := range object {
 			field, exact := fields[key]
 			if !exact {
@@ -94,7 +96,7 @@ func checkKeyCase(value any, valueType reflect.Type, path string) error {
 			return nil
 		}
 		for index, element := range list {
-			if checkKeyCaseError := checkKeyCase(element, valueType.Elem(), fmt.Sprintf("%s%d.", path, index)); checkKeyCaseError != nil {
+			if checkKeyCaseError := checkKeyCase(element, baseType.Elem(), fmt.Sprintf("%s%d.", path, index)); checkKeyCaseError != nil {
 				return checkKeyCaseError
 			}
 		}
@@ -104,7 +106,7 @@ func checkKeyCase(value any, valueType reflect.Type, path string) error {
 			return nil
 		}
 		for key, member := range object {
-			if checkKeyCaseError := checkKeyCase(member, valueType.Elem(), path+key+"."); checkKeyCaseError != nil {
+			if checkKeyCaseError := checkKeyCase(member, baseType.Elem(), path+key+"."); checkKeyCaseError != nil {
 				return checkKeyCaseError
 			}
 		}

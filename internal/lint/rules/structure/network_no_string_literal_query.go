@@ -85,25 +85,27 @@ func isGraphQlMethodCall(call *ast.CallExpression) bool {
 // The visited set breaks the cycle in `const a = b; const b = a`, which is not valid code but is
 // reachable while someone is mid-edit, and a linter that hangs on a half-written file is worse than
 // one that misses a finding on it.
+//
+// Mutates: visited the walk marks each node it reaches, so one set spans the whole chain of bindings
 func resolvesToStringLiteral(node *ast.Node, visited map[*ast.Node]bool) bool {
-	node = ast.SkipParentheses(node)
-	if node == nil || visited[node] {
+	unwrapped := ast.SkipParentheses(node)
+	if unwrapped == nil || visited[unwrapped] {
 		return false
 	}
-	visited[node] = true
+	visited[unwrapped] = true
 
-	switch node.Kind {
+	switch unwrapped.Kind {
 	case ast.KindStringLiteral, ast.KindTemplateExpression, ast.KindNoSubstitutionTemplateLiteral:
 		return true
 
 	case ast.KindAsExpression:
-		return resolvesToStringLiteral(node.AsAsExpression().Expression, visited)
+		return resolvesToStringLiteral(unwrapped.AsAsExpression().Expression, visited)
 
 	case ast.KindTypeAssertionExpression:
-		return resolvesToStringLiteral(node.AsTypeAssertion().Expression, visited)
+		return resolvesToStringLiteral(unwrapped.AsTypeAssertion().Expression, visited)
 
 	case ast.KindIdentifier:
-		initializer := variableInitializerInScope(node, node.Text())
+		initializer := variableInitializerInScope(unwrapped, unwrapped.Text())
 		if initializer == nil {
 			return false
 		}

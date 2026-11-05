@@ -417,13 +417,14 @@ func writeTarget(node *ast.Node) *ast.Node {
 // unwrapReach sees through what does not change which value an expression reaches: parentheses, a
 // non-null assertion, and a type assertion.
 func unwrapReach(node *ast.Node) *ast.Node {
-	for node != nil {
-		switch node.Kind {
+	current := node
+	for current != nil {
+		switch current.Kind {
 		case ast.KindParenthesizedExpression, ast.KindNonNullExpression, ast.KindAsExpression,
 			ast.KindSatisfiesExpression, ast.KindTypeAssertionExpression:
-			node = node.Expression()
+			current = current.Expression()
 		default:
-			return node
+			return current
 		}
 	}
 	return nil
@@ -432,19 +433,20 @@ func unwrapReach(node *ast.Node) *ast.Node {
 // sameReach reports whether two expressions name the same place by spelling: the same identifier,
 // `this`, or the same property of the same reach.
 func sameReach(first *ast.Node, second *ast.Node) bool {
-	first, second = unwrapReach(first), unwrapReach(second)
-	if first == nil || second == nil || first.Kind != second.Kind {
+	firstReach, secondReach := unwrapReach(first), unwrapReach(second)
+	if firstReach == nil || secondReach == nil || firstReach.Kind != secondReach.Kind {
 		return false
 	}
-	switch first.Kind {
+	switch firstReach.Kind {
 	case ast.KindIdentifier:
-		return first.Text() == second.Text()
+		return firstReach.Text() == secondReach.Text()
 	case ast.KindThisKeyword:
 		return true
 	case ast.KindPropertyAccessExpression:
-		firstName, secondName := first.AsPropertyAccessExpression().Name(), second.AsPropertyAccessExpression().Name()
+		firstAccess, secondAccess := firstReach.AsPropertyAccessExpression(), secondReach.AsPropertyAccessExpression()
+		firstName, secondName := firstAccess.Name(), secondAccess.Name()
 		return firstName != nil && secondName != nil && firstName.Text() == secondName.Text() &&
-			sameReach(first.AsPropertyAccessExpression().Expression, second.AsPropertyAccessExpression().Expression)
+			sameReach(firstAccess.Expression, secondAccess.Expression)
 	}
 	return false
 }

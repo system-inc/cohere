@@ -215,14 +215,14 @@ func consistencyNoHandRolledDelaySoleExpression(body *ast.Node) *ast.Node {
 // consistencyNoHandRolledDelayIsTimer says whether a callee is the global `setTimeout`, bare or reached
 // through `globalThis` or `window`.
 func consistencyNoHandRolledDelayIsTimer(callee *ast.Node) bool {
-	callee = ast.SkipParentheses(callee)
-	if consistencyNoHandRolledDelayIsIdentifier(callee, "setTimeout") {
+	unwrapped := ast.SkipParentheses(callee)
+	if consistencyNoHandRolledDelayIsIdentifier(unwrapped, "setTimeout") {
 		return true
 	}
-	if callee.Kind != ast.KindPropertyAccessExpression {
+	if unwrapped.Kind != ast.KindPropertyAccessExpression {
 		return false
 	}
-	access := callee.AsPropertyAccessExpression()
+	access := unwrapped.AsPropertyAccessExpression()
 	if access.QuestionDotToken != nil || access.Name().Text() != "setTimeout" {
 		return false
 	}
@@ -233,17 +233,17 @@ func consistencyNoHandRolledDelayIsTimer(callee *ast.Node) bool {
 // consistencyNoHandRolledDelayResolvesWithNothing says whether the timer's callback resolves the
 // promise with no value: `resolve` itself, or a parameterless function whose whole body is `resolve()`.
 func consistencyNoHandRolledDelayResolvesWithNothing(callback *ast.Node, resolveName string) bool {
-	callback = ast.SkipParentheses(callback)
-	if consistencyNoHandRolledDelayIsIdentifier(callback, resolveName) {
+	unwrapped := ast.SkipParentheses(callback)
+	if consistencyNoHandRolledDelayIsIdentifier(unwrapped, resolveName) {
 		return true
 	}
-	if callback.Kind != ast.KindArrowFunction && callback.Kind != ast.KindFunctionExpression {
+	if unwrapped.Kind != ast.KindArrowFunction && unwrapped.Kind != ast.KindFunctionExpression {
 		return false
 	}
-	if len(callback.Parameters()) != 0 {
+	if len(unwrapped.Parameters()) != 0 {
 		return false
 	}
-	call := consistencyNoHandRolledDelaySoleExpression(callback.Body())
+	call := consistencyNoHandRolledDelaySoleExpression(unwrapped.Body())
 	if call == nil || call.Kind != ast.KindCallExpression {
 		return false
 	}

@@ -66,21 +66,21 @@ class A { value: number = 1; }
 const object: { value: number } = { value: 2 };
 const weak: Weak<A> = object;
 object.value = 3;
-if (weak !== undefined) { console.log(` + "`${weak.value}`" + `); }`, "notAnInstance", "object"},
+if (weak !== undefined) { console.log(` + "`${weak.value}`); }", "notAnInstance", "object"},
 		"an object with a callback as Weak (weak_method)": {`import type { Weak } from 'adamic';
 class A { value: number = 1; read(): number { return this.value; } }
 const object: { value: number; read: () => number } = { value: 2, read: () => 9 };
 const weak: Weak<A> = object;
 object.value = 3;
 function read(value: Weak<A>): number { return value === undefined ? -1 : value.read(); }
-console.log(` + "`${read(weak)}`" + `);`, "notAnInstance", "object"},
+console.log(` + "`${read(weak)}`);", "notAnInstance", "object"},
 		"an object as a Weak property (weak_callback)": {`import type { Weak } from 'adamic';
 class A { value: number = 1; read(): number { return this.value; } }
 const object: { value: number; read: () => number } = { value: 2, read: () => 9 };
 const holder: { value: Weak<A> } = { value: object };
 object.read = () => 8;
 function read(value: Weak<A>): number { return value === undefined ? -1 : value.read(); }
-console.log(` + "`${read(holder.value)}`" + `);`, "notAnInstance", "object"},
+console.log(` + "`${read(holder.value)}`);", "notAnInstance", "object"},
 		"a literal as A or B (union_min)": {`class A { value(): number { return 1; } }
 class B { value(): number { return 2; } }
 const value: A | B = { value: () => 3 };
@@ -90,7 +90,7 @@ class B { value: number = 2; }
 const view: A | B = { value: 3 };
 const object: { value: number } = view;
 object.value = 4;
-console.log(` + "`${view.value}`" + `);`, "notAnInstance", "{ value: 3 }"},
+console.log(` + "`${view.value}`);", "notAnInstance", "{ value: 3 }"},
 		"a literal with a callback as A or B (union_method)": {`class A { value: number = 1; read(): number { return this.value; } }
 class B { value: number = 2; read(): number { return this.value; } }
 const view: A | B = { value: 3, read: () => 9 };
@@ -100,7 +100,7 @@ function read(value: A | B): number {
  if (value instanceof A) { return value.read(); }
  return value.read();
 }
-console.log(` + "`${read(view)}`" + `);`, "notAnInstance", "{ value: 3, read: () => 9 }"},
+console.log(` + "`${read(view)}`);", "notAnInstance", "{ value: 3, read: () => 9 }"},
 		"a literal replaced through an alias as A or B (union_callback)": {`class A { read(): number { return 1; } }
 class B { read(): number { return 2; } }
 const view: A | B = { read: () => 3 };
@@ -110,7 +110,7 @@ function read(value: A | B): number {
  if (value instanceof A) { return value.read(); }
  return value.read();
 }
-console.log(` + "`${read(view)}`" + `);`, "notAnInstance", "{ read: () => 3 }"},
+console.log(` + "`${read(view)}`);", "notAnInstance", "{ read: () => 3 }"},
 		// A literal-typed field: the union is the literal's contextual type, so `kind` stays 'a', widened or not.
 		"a literal with a literal-typed field as A or B": {`class A { readonly kind: 'a' = 'a'; }
 class B { readonly kind: 'b' = 'b'; }

@@ -15,7 +15,10 @@ const noUnneededTernaryFile = "/repository/source/NoUnneededTernary.ts"
 // The pointer is not decoration: `defaultAssignment` defaults to `true`, so a plain bool field cannot
 // tell an absent key from an explicit false, and the zero value would switch the second judgment on
 // for anyone configuring the rule as a bare severity.
-func noUnneededTernaryBoolean(value bool) *bool { return &value }
+func noUnneededTernaryBoolean(value bool) *bool {
+	pointed := value
+	return &pointed
+}
 
 // noUnneededTernaryCase is one imported corpus row.
 type noUnneededTernaryCase struct {

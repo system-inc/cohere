@@ -10,7 +10,7 @@ import (
 // written.
 func TestNoTypePredicateFiresOnEveryWrittenPredicate(test *testing.T) {
 	test.Parallel()
-	const pets = `type Pet = { readonly kind: 'Cat'; readonly meow: () => string } | { readonly kind: 'Dog'; readonly bark: () => string };` + "\n"
+	const pets = "type Pet = { readonly kind: 'Cat'; readonly meow: () => string } | { readonly kind: 'Dog'; readonly bark: () => string };\n"
 	for name, fixture := range map[string]struct {
 		source string
 		span   string

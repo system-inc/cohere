@@ -394,7 +394,7 @@ func thisIsDefaultBoundIn(ruleContext rule.Context, node *ast.Node, settings noI
 	if settings.CapIsConstructor && noInvalidThisStartsWithUpperCase(noInvalidThisFunctionOwnName(node)) {
 		return false
 	}
-	if noInvalidThisHasJSDocThisTag(ruleContext, node) {
+	if noInvalidThisHasJsDocThisTag(ruleContext, node) {
 		return false
 	}
 
@@ -573,7 +573,7 @@ func noInvalidThisStartsWithUpperCase(name string) bool {
 	return unicode.ToLower(first) != first
 }
 
-// noInvalidThisHasJSDocThisTag answers whether a `@this` tag documents this function.
+// noInvalidThisHasJsDocThisTag answers whether a `@this` tag documents this function.
 //
 // Upstream asks two questions and reports if either says yes, and both are reproduced because both
 // were measured to matter. This is the largest single piece of machinery behind a rule whose own
@@ -596,11 +596,11 @@ func noInvalidThisStartsWithUpperCase(name string) bool {
 // prefix, and with no closing word boundary, so `@thisx` satisfies it and `@nothis` does not. That
 // reads as a defect and is reproduced rather than corrected, because fidelity is to the authority
 // where upstream gives no reasoning.
-func noInvalidThisHasJSDocThisTag(ruleContext rule.Context, node *ast.Node) bool {
+func noInvalidThisHasJsDocThisTag(ruleContext rule.Context, node *ast.Node) bool {
 	if ruleContext.SourceFile == nil {
 		return false
 	}
-	if noInvalidThisCommentTextHasThisTag(noInvalidThisJSDocCommentFor(ruleContext, node)) {
+	if noInvalidThisCommentTextHasThisTag(noInvalidThisJsDocCommentFor(ruleContext, node)) {
 		return true
 	}
 	for _, comment := range noInvalidThisCommentsImmediatelyBefore(ruleContext, node) {
@@ -611,22 +611,22 @@ func noInvalidThisHasJSDocThisTag(ruleContext rule.Context, node *ast.Node) bool
 	return false
 }
 
-// noInvalidThisJSDocCommentFor is upstream's `getJSDocComment` for the function shapes this rule
+// noInvalidThisJsDocCommentFor is upstream's `getJSDocComment` for the function shapes this rule
 // reaches, which are a declaration and an expression. It returns the documenting comment's text, or
 // empty.
-func noInvalidThisJSDocCommentFor(ruleContext rule.Context, node *ast.Node) string {
+func noInvalidThisJsDocCommentFor(ruleContext rule.Context, node *ast.Node) string {
 	if node.Kind == ast.KindFunctionDeclaration {
-		return noInvalidThisJSDocBlockBefore(ruleContext, node)
+		return noInvalidThisJsDocBlockBefore(ruleContext, node)
 	}
 
 	parent := node.Parent
 	if parent == nil {
-		return noInvalidThisJSDocBlockBefore(ruleContext, node)
+		return noInvalidThisJsDocBlockBefore(ruleContext, node)
 	}
 	// A function handed straight to a call does not walk out. This is what separates
 	// `q(function () {...})` from `var q = function () {...}` and it is upstream's own guard.
 	if parent.Kind == ast.KindCallExpression || parent.Kind == ast.KindNewExpression {
-		return noInvalidThisJSDocBlockBefore(ruleContext, node)
+		return noInvalidThisJsDocBlockBefore(ruleContext, node)
 	}
 
 	for parent != nil {
@@ -638,15 +638,15 @@ func noInvalidThisJSDocCommentFor(ruleContext rule.Context, node *ast.Node) stri
 		parent = parent.Parent
 	}
 	if parent != nil && parent.Kind != ast.KindFunctionDeclaration && parent.Kind != ast.KindSourceFile {
-		return noInvalidThisJSDocBlockBefore(ruleContext, parent)
+		return noInvalidThisJsDocBlockBefore(ruleContext, parent)
 	}
-	return noInvalidThisJSDocBlockBefore(ruleContext, node)
+	return noInvalidThisJsDocBlockBefore(ruleContext, node)
 }
 
-// noInvalidThisJSDocBlockBefore is upstream's `findJSDocComment`: the token immediately before the
+// noInvalidThisJsDocBlockBefore is upstream's `findJSDocComment`: the token immediately before the
 // node has to be a block comment whose text opens with an asterisk, and it has to end no more than
 // one line above.
-func noInvalidThisJSDocBlockBefore(ruleContext rule.Context, node *ast.Node) string {
+func noInvalidThisJsDocBlockBefore(ruleContext rule.Context, node *ast.Node) string {
 	preceding := noInvalidThisCommentsImmediatelyBefore(ruleContext, node)
 	if len(preceding) == 0 {
 		return ""
@@ -860,17 +860,18 @@ func noInvalidThisCallHasNonNullishArgument(call *ast.Node, index int) bool {
 // noInvalidThisIsNullOrUndefined is upstream's `isNullOrUndefined`: the `null` literal, the
 // identifier `undefined`, or a `void` expression of any operand.
 func noInvalidThisIsNullOrUndefined(node *ast.Node) bool {
-	for node != nil && node.Kind == ast.KindParenthesizedExpression {
-		node = node.AsParenthesizedExpression().Expression
+	unwrapped := node
+	for unwrapped != nil && unwrapped.Kind == ast.KindParenthesizedExpression {
+		unwrapped = unwrapped.AsParenthesizedExpression().Expression
 	}
-	if node == nil {
+	if unwrapped == nil {
 		return false
 	}
-	switch node.Kind {
+	switch unwrapped.Kind {
 	case ast.KindNullKeyword:
 		return true
 	case ast.KindIdentifier:
-		return node.Text() == "undefined"
+		return unwrapped.Text() == "undefined"
 	case ast.KindVoidExpression:
 		return true
 	}
