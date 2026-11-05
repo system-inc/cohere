@@ -40,6 +40,7 @@ never something it silently ignores.
 | [`departures`](#departures) | object of reasons | any settings file |
 | [`extends`](#extends) | string or array of strings | any settings file |
 | [`format`](#format) | object | any settings file outside our tiers; in a chain extending a cohere:system-inc set, the Nexus tier only |
+| [`go`](#go) | object | the file beside go.work or go.mod, or the one --lint-config names |
 | [`ignorePatterns`](#ignorepatterns) | array of strings | any settings file |
 | [`jsPlugins`](#jsplugins) | array | any settings file |
 | [`output`](#output) | object | the file cohere reads first |
@@ -115,6 +116,14 @@ The formatter's options and the house ignore list. With no block anywhere in the
 
 ```json
 { "format": { "printWidth": 120, "tabWidth": 4, "singleQuote": true, "ignore": ["pnpm-lock.yaml", "*.sqlite"] } }
+```
+
+### `go`
+
+Which of the Go engine's rules run, and how strictly, read from the file beside go.work or go.mod, or the one --lint-config names. Its rules map each cohere-go/<rule> to a severity (error, warn, warning or off, exactly as written) or [severity, options] with one options object. With no go block, every Go rule runs at error and every run says so. A rule name the engine does not know, any key besides rules, and a format key are refused: gofmt is the house format for Go and is not configured. The TypeScript linter leaves this block alone.
+
+```json
+{ "go": { "rules": { "cohere-go/performance-require-parallel-test": ["warn", {}] } } }
 ```
 
 ### `ignorePatterns`
