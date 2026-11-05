@@ -515,7 +515,10 @@ func TestIdLengthDecoderReadsEveryOption(test *testing.T) {
 	}
 
 	// The defaults, which the zero value does not supply.
-	decoded, _ = DecodeIdLengthOptions(nil)
+	decoded, decodeError := DecodeIdLengthOptions(nil)
+	if decodeError != nil {
+		test.Fatalf("expected no options to decode to the defaults, got %v", decodeError)
+	}
 	settings, _ = decoded.(IdLengthSettings)
 	if settings.Minimum != 2 || !settings.CheckProperties || settings.HasMaximum {
 		test.Errorf("expected the documented defaults (min 2, properties on, no maximum), got %+v", settings)

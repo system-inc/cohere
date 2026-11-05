@@ -1,6 +1,7 @@
 package nexus
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -127,6 +128,8 @@ var vocabulary = mustLoadAbbreviationVocabulary(policy.AbbreviationsFile())
 func mustLoadAbbreviationVocabulary(data []byte) *abbreviationVocabulary {
 	loaded, loadAbbreviationVocabularyError := loadAbbreviationVocabulary(data)
 	if loadAbbreviationVocabularyError != nil {
+		// Invariant: the file is policy's own, embedded at build time and loaded by its tests, so a bad one
+		// fails a test before it ships, and stops the program at startup as the comment above explains.
 		panic(fmt.Sprintf("policy/Abbreviations.json: %v", loadAbbreviationVocabularyError))
 	}
 	return loaded
@@ -159,7 +162,11 @@ func loadAbbreviationVocabulary(data []byte) (*abbreviationVocabulary, error) {
 			loaded.wholeByName[entry.Abbreviation] = entry
 		}
 		if entry.Prefix != nil {
-			loaded.prefixPatterns[entry.Abbreviation] = regexp.MustCompile(`^` + entry.Abbreviation + `[A-Z]`)
+			prefixPattern, compileError := regexp.Compile(`^` + entry.Abbreviation + `[A-Z]`)
+			if compileError != nil {
+				return nil, fmt.Errorf("entry %q's prefix pattern: %w", entry.Abbreviation, compileError)
+			}
+			loaded.prefixPatterns[entry.Abbreviation] = prefixPattern
 			if entry.Prefix.Phase == "early" {
 				loaded.earlyPrefixes = append(loaded.earlyPrefixes, entry)
 			} else {
@@ -172,10 +179,16 @@ func loadAbbreviationVocabulary(data []byte) (*abbreviationVocabulary, error) {
 		if entry.Segment != nil {
 			word := capitalizeAbbreviation(entry.Abbreviation)
 			loaded.segments = append(loaded.segments, entry)
+			boundary, boundaryError := regexp.Compile(`(^|[^a-zA-Z])` + word + `($|[A-Z0-9])`)
+			camel, camelError := regexp.Compile(`[a-z0-9]` + word + `($|[A-Z0-9])`)
+			replace, replaceError := regexp.Compile(word + `($|[A-Z0-9])`)
+			if compileError := errors.Join(boundaryError, camelError, replaceError); compileError != nil {
+				return nil, fmt.Errorf("entry %q's segment patterns: %w", entry.Abbreviation, compileError)
+			}
 			loaded.segmentPatterns[entry.Abbreviation] = wordSegmentPatterns{
-				boundary: regexp.MustCompile(`(^|[^a-zA-Z])` + word + `($|[A-Z0-9])`),
-				camel:    regexp.MustCompile(`[a-z0-9]` + word + `($|[A-Z0-9])`),
-				replace:  regexp.MustCompile(word + `($|[A-Z0-9])`),
+				boundary: boundary,
+				camel:    camel,
+				replace:  replace,
 			}
 		}
 	}

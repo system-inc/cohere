@@ -53,7 +53,12 @@ func TestEverySkipSaysWhichKindItIs(test *testing.T) {
 				test.Errorf("%s: %s's reason is not a string literal", path, selector.Sel.Name)
 				return true
 			}
-			if reason, _ := strconv.Unquote(literal.Value); strings.TrimSpace(reason) == "" {
+			reason, unquoteError := strconv.Unquote(literal.Value)
+			if unquoteError != nil {
+				test.Errorf("%s: %s's reason does not unquote: %v", path, selector.Sel.Name, unquoteError)
+				return true
+			}
+			if strings.TrimSpace(reason) == "" {
 				test.Errorf("%s: %s's reason is empty", path, selector.Sel.Name)
 			}
 			return true

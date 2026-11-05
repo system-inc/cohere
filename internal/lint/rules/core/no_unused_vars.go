@@ -281,6 +281,7 @@ func analyzeUnusedBindings(ruleContext rule.Context, sourceFile *ast.Node, setti
 	// backreference its user wrote, and reads `\s` and `\b` differently (#7mztrdd).
 	var destructuredArrayIgnore *esregexp.RegExp
 	if settings.DestructuredArrayIgnorePattern != "" {
+		// Ignored: an unparseable pattern leaves this nil, which ignores nothing.
 		destructuredArrayIgnore, _ = esregexp.Compile(settings.DestructuredArrayIgnorePattern, "u")
 	}
 

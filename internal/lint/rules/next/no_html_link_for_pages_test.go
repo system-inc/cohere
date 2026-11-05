@@ -89,7 +89,10 @@ func runHtmlLinkTree(test *testing.T, rows []htmlLinkRow, paths ...string) {
 func runHtmlLinkTreeWithOption(test *testing.T, rows []htmlLinkRow, option string, paths ...string) {
 	test.Helper()
 	result := rule_testing.RunTypedFilesWithOptionsFor(test, NoHtmlLinkForPages, htmlLinkTree(rows, paths...), "foo.tsx", func(directory string) any {
-		quoted, _ := json.Marshal(directory)
+		quoted, quoteError := json.Marshal(directory)
+		if quoteError != nil {
+			test.Fatal(quoteError)
+		}
 		raw := strings.ReplaceAll(option, "{root}", strings.Trim(string(quoted), `"`))
 		decoded, decodeNoHtmlLinkForPagesOptionsError := decodeNoHtmlLinkForPagesOptions([]byte(raw), rule.OptionsBase{ConfigDirectory: directory, ProjectRoot: directory})
 		if decodeNoHtmlLinkForPagesOptionsError != nil {
@@ -584,7 +587,10 @@ func htmlLinkFingerprintOf(test *testing.T, files map[string]string, option stri
 		if option == "" {
 			return nil
 		}
-		quoted, _ := json.Marshal(directory)
+		quoted, quoteError := json.Marshal(directory)
+		if quoteError != nil {
+			test.Fatal(quoteError)
+		}
 		raw := strings.ReplaceAll(option, "{root}", strings.Trim(string(quoted), `"`))
 		decoded, decodeNoHtmlLinkForPagesOptionsError := decodeNoHtmlLinkForPagesOptions([]byte(raw), rule.OptionsBase{ConfigDirectory: directory, ProjectRoot: directory})
 		if decodeNoHtmlLinkForPagesOptionsError != nil {
