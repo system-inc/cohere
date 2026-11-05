@@ -43,7 +43,8 @@ var paginationArgumentName = regexp.MustCompile(`Pagination$`)
 //
 // # A base rule rather than an upstream port, so the source is the spec
 //
-// This comes from `api-phi-health/libraries/base/code-quality/lint/rules/ConsistencyRequirePaginationArgumentNameRule.ts`
+// This comes from
+// `api-phi-health/libraries/base/code-quality/lint/rules/ConsistencyRequirePaginationArgumentNameRule.ts`
 // and there is no upstream corpus to import. That inverts the usual fixture advice: the cases below
 // are written rather than imported, so they carry the same beliefs as this file and cannot catch a
 // wrong belief on their own. The mitigation is the source repository, which is a real oracle: this

@@ -79,7 +79,8 @@ var NoCrossEnumNarrowing = rule.Rule{
 					return
 				}
 				switch expression.OperatorToken.Kind {
-				case ast.KindEqualsEqualsEqualsToken, ast.KindExclamationEqualsEqualsToken, ast.KindEqualsEqualsToken, ast.KindExclamationEqualsToken:
+				case ast.KindEqualsEqualsEqualsToken, ast.KindExclamationEqualsEqualsToken,
+					ast.KindEqualsEqualsToken, ast.KindExclamationEqualsToken:
 					compare(node, expression.Left, expression.Right)
 				}
 			},

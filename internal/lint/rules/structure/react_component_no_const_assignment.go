@@ -96,7 +96,8 @@ var ReactComponentNoConstAssignment = rule.Rule{
 				// export status is read from the modifier list.
 				isExported := module.IsExportedByName(statement.Modifiers())
 
-				for _, declarationNode := range statement.DeclarationList.AsVariableDeclarationList().Declarations.Nodes {
+				declarationList := statement.DeclarationList.AsVariableDeclarationList()
+				for _, declarationNode := range declarationList.Declarations.Nodes {
 					declaration := declarationNode.AsVariableDeclaration()
 					name := declaration.Name()
 					if name == nil || name.Kind != ast.KindIdentifier {

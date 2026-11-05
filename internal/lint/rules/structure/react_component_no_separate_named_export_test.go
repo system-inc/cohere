@@ -37,7 +37,8 @@ func TestReactComponentNoSeparateNamedExportFires(test *testing.T) {
 		// A component detected by its hook calls rather than by JSX.
 		{
 			"a component that calls hooks and returns nothing",
-			"import React from 'react';\nfunction Button() {\n    React.useEffect(() => {}, []);\n    return null;\n}\n" +
+			"import React from 'react';\nfunction Button() {\n" +
+				"    React.useEffect(() => {}, []);\n    return null;\n}\n" +
 				"export { Button };\n",
 		},
 	}
@@ -153,7 +154,8 @@ func TestReactComponentNoSeparateNamedExportStaysSilent(test *testing.T) {
 		{
 			"a component-shaped export in a ts file",
 			"/repository/source/api/Thing.ts",
-			"import React from 'react';\nfunction Button() {\n    React.useEffect(() => {}, []);\n    return null;\n}\n" +
+			"import React from 'react';\nfunction Button() {\n" +
+				"    React.useEffect(() => {}, []);\n    return null;\n}\n" +
 				"export { Button };\n",
 		},
 		{

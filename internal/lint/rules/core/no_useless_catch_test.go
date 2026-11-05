@@ -82,8 +82,9 @@ func TestNoUselessCatchReportsTheNodeMatchingTheRepair(test *testing.T) {
 	const withoutFinally = `try { foo(); } catch (err) { throw err; }`
 	result := rule_testing.Run(test, NoUselessCatch, "file.ts", withoutFinally)
 	rule_testing.ExpectFindings(test, result, "unnecessaryCatch")
-	if got := withoutFinally[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]; got != withoutFinally {
-		test.Fatalf("reported range = %q, want the whole try statement", got)
+	reported := withoutFinally[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
+	if reported != withoutFinally {
+		test.Fatalf("reported range = %q, want the whole try statement", reported)
 	}
 
 	const withFinally = `try { foo(); } catch (err) { throw err; } finally { cleanUp(); }`

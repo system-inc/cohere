@@ -542,7 +542,8 @@ func TestNoFallthroughPointsAtTheClauseFallenInto(test *testing.T) {
 				test.Fatalf("wanted %d findings, got %d", len(testCase.wantTexts), len(result.Diagnostics))
 			}
 			for index, wantText := range testCase.wantTexts {
-				reported := testCase.sourceText[result.Diagnostics[index].Range.Pos():result.Diagnostics[index].Range.End()]
+				diagnostic := result.Diagnostics[index]
+				reported := testCase.sourceText[diagnostic.Range.Pos():diagnostic.Range.End()]
 				if reported != wantText {
 					test.Fatalf("finding %d pointed at %q, wanted %q", index, reported, wantText)
 				}
