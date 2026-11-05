@@ -150,7 +150,7 @@ func TestNoEmptyStaysSilentOnBlocksWithContent(test *testing.T) {
 func TestNoEmptyWithoutOptionsReportsEmptyCatch(test *testing.T) {
 	test.Parallel()
 
-	result := rule_testing.RunWithOptions(test, NoEmpty, "strict.ts", "try { work(); } catch (error) {}", nil)
+	result := rule_testing.Run(test, NoEmpty, "strict.ts", "try { work(); } catch (error) {}")
 	rule_testing.ExpectFindings(test, result, "unexpectedBlock")
 }
 

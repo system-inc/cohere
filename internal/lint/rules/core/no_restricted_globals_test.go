@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -41,16 +42,21 @@ type noRestrictedGlobalsCase struct {
 func noRestrictedGlobalsStringPointer(value string) *string { return new(value) }
 
 // decodeNoRestrictedGlobalsOptionsForTest routes a case's options through the shipped decoder.
-func decodeNoRestrictedGlobalsOptionsForTest(test *testing.T, optionsJson string) any {
+//
+// An empty string is a rule configured as a bare severity, which runs it unconfigured.
+func decodeNoRestrictedGlobalsOptionsForTest(
+	test *testing.T,
+	optionsJson string,
+) rule.Given[NoRestrictedGlobalsSettings] {
 	test.Helper()
 	if optionsJson == "" {
-		return nil
+		return rule.Given[NoRestrictedGlobalsSettings]{}
 	}
 	decoded, decodeNoRestrictedGlobalsOptionsError := DecodeNoRestrictedGlobalsOptions(json.RawMessage(optionsJson))
 	if decodeNoRestrictedGlobalsOptionsError != nil {
 		test.Fatalf("decoding options %q: %v", optionsJson, decodeNoRestrictedGlobalsOptionsError)
 	}
-	return decoded
+	return rule.Configured(decoded)
 }
 
 // Block 0, upstream's JavaScript RuleTester.
@@ -1026,7 +1032,7 @@ func runNoRestrictedGlobalsCase(test *testing.T, testCase noRestrictedGlobalsCas
 		files["EnvironmentGlobals.d.ts"] = declarations
 	}
 
-	result := rule_testing.RunTypedFilesWithOptions(test, NoRestrictedGlobals, files, "Probe.ts",
+	result := rule_testing.RunTypedFilesGiven(test, NoRestrictedGlobals, files, "Probe.ts",
 		decodeNoRestrictedGlobalsOptionsForTest(test, testCase.optionsJson))
 
 	wantIds := make([]string, len(testCase.findings))
@@ -1170,7 +1176,7 @@ func TestNoRestrictedGlobalsSpan(test *testing.T) {
 			if testCase.globals != "" {
 				files["EnvironmentGlobals.d.ts"] = "declare var " + testCase.globals + ": any;\n"
 			}
-			result := rule_testing.RunTypedFilesWithOptions(test, NoRestrictedGlobals, files, "Probe.ts",
+			result := rule_testing.RunTypedFilesGiven(test, NoRestrictedGlobals, files, "Probe.ts",
 				decodeNoRestrictedGlobalsOptionsForTest(test, testCase.optionsJson))
 			rule_testing.ExpectFindings(test, result, "defaultMessage")
 
@@ -1191,7 +1197,7 @@ func TestNoRestrictedGlobalsSpan(test *testing.T) {
 //
 // This rule reports nothing until somebody names a global, which is upstream's design: `create`
 // returns an empty visitor when the list is empty. A rule configured as a bare severity is handed
-// nil options rather than a struct, so this asserts the path no case in the corpus takes and the
+// no options rather than a struct, so this asserts the path no case in the corpus takes and the
 // one the live config will take if the rule is enabled without a list.
 //
 // The early return itself is an optimisation rather than a discrimination, and the mutation
@@ -1206,8 +1212,8 @@ func TestNoRestrictedGlobalsIsInertWithoutConfiguration(test *testing.T) {
 	for _, source := range []string{"foo;", "window.foo();", "event;"} {
 		test.Run(source, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoRestrictedGlobals,
-				noRestrictedGlobalsFile, source, nil))
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoRestrictedGlobals,
+				noRestrictedGlobalsFile, source))
 		})
 	}
 }
@@ -1222,12 +1228,12 @@ func TestNoRestrictedGlobalsRequiresTheTypedHarness(test *testing.T) {
 
 	decoded := decodeNoRestrictedGlobalsOptionsForTest(test, `["foo"]`)
 
-	rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoRestrictedGlobals,
+	rule_testing.ExpectClean(test, rule_testing.RunGiven(test, NoRestrictedGlobals,
 		noRestrictedGlobalsFile, "foo;", decoded))
 
 	// The control: the same input through the typed harness does report, so the silence above is
 	// the nil-checker guard rather than a rule that cannot fire.
-	rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, NoRestrictedGlobals,
+	rule_testing.ExpectFindings(test, rule_testing.RunTypedGiven(test, NoRestrictedGlobals,
 		noRestrictedGlobalsFile, "foo;", decoded), "defaultMessage")
 }
 
@@ -1317,7 +1323,7 @@ func TestNoRestrictedGlobalsJudgesOnlyValueReferences(test *testing.T) {
 	for _, testCase := range silent {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoRestrictedGlobals, file,
+			rule_testing.ExpectClean(test, rule_testing.RunTypedGiven(test, NoRestrictedGlobals, file,
 				testCase.source, decodeNoRestrictedGlobalsOptionsForTest(test, confusing)))
 		})
 	}
@@ -1342,7 +1348,7 @@ func TestNoRestrictedGlobalsJudgesOnlyValueReferences(test *testing.T) {
 	for _, testCase := range firing {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, NoRestrictedGlobals, file,
+			rule_testing.ExpectFindings(test, rule_testing.RunTypedGiven(test, NoRestrictedGlobals, file,
 				testCase.source, decodeNoRestrictedGlobalsOptionsForTest(test, confusing)), testCase.ids...)
 		})
 	}
@@ -1365,7 +1371,7 @@ func TestNoRestrictedGlobalsSkipsAnotherModulesExportName(test *testing.T) {
 	const graphql = "export declare function print(): string;\nexport declare const other: number;\n"
 	run := func(test *testing.T, source string) rule_testing.Result {
 		test.Helper()
-		return rule_testing.RunTypedFilesWithOptions(test, NoRestrictedGlobals, map[string]string{
+		return rule_testing.RunTypedFilesGiven(test, NoRestrictedGlobals, map[string]string{
 			"graphql.d.ts": graphql,
 			"a.ts":         source,
 		}, "a.ts", decodeNoRestrictedGlobalsOptionsForTest(test, `["print"]`))
@@ -1414,7 +1420,7 @@ func TestNoRestrictedGlobalsSkipsDeclarationNamesInADeclarationFile(test *testin
 
 	run := func(test *testing.T, source string) rule_testing.Result {
 		test.Helper()
-		return rule_testing.RunTypedFilesWithOptions(test, NoRestrictedGlobals, map[string]string{
+		return rule_testing.RunTypedFilesGiven(test, NoRestrictedGlobals, map[string]string{
 			"photon.d.ts": source,
 		}, "photon.d.ts", decodeNoRestrictedGlobalsOptionsForTest(test, `["top"]`))
 	}

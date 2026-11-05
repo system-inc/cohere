@@ -343,7 +343,7 @@ var noInlineCommentsSilentCases = []noInlineCommentsCase{
 }
 
 // decodedNoInlineComments routes a row's raw JSON through the rule's own exported decoder.
-func decodedNoInlineComments(test *testing.T, raw string) any {
+func decodedNoInlineComments(test *testing.T, raw string) NoInlineCommentsOptions {
 	test.Helper()
 	decoded, decodeNoInlineCommentsOptionsError := DecodeNoInlineCommentsOptions([]byte(raw))
 	if decodeNoInlineCommentsOptionsError != nil {

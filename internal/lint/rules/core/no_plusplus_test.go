@@ -166,7 +166,7 @@ var noPlusplusSilentCases = []noPlusplusCase{
 }
 
 // decodedNoPlusplus routes a row's raw JSON through the rule's own exported decoder.
-func decodedNoPlusplus(test *testing.T, raw string) any {
+func decodedNoPlusplus(test *testing.T, raw string) NoPlusplusOptions {
 	test.Helper()
 	decoded, decodeNoPlusplusOptionsError := DecodeNoPlusplusOptions([]byte(raw))
 	if decodeNoPlusplusOptionsError != nil {
@@ -242,15 +242,15 @@ func TestNoPlusplusNamesTheOperator(test *testing.T) {
 
 // TestNoPlusplusSurvivesNilOptions covers the path a bare `"error"` configuration takes.
 //
-// A rule configured without options is handed nil rather than the decoded default, and
-// `options.(T)` on nil yields the zero value silently. Every generated row above routes through
-// `DecodeNoPlusplusOptions`, which always returns a real `NoPlusplusOptions`, so the type assertion
-// always succeeds and the fallback beside it is never exercised by them.
+// A rule configured without options is handed none rather than the decoded default, and reading
+// them yields the zero value silently. Every generated row above routes through
+// `DecodeNoPlusplusOptions`, so the rule is always configured and the fallback beside the read is
+// never exercised by them.
 //
 // That is why flipping the fallback's default to `true` survives the whole 23-case corpus. The
 // survivor was read as equivalent and then checked against the code rather than inferred from the
-// mutation: the fallback is reachable only through nil options, which only the config layer
-// produces. This test is that path.
+// mutation: the fallback is reachable only with no options, which only the config layer produces.
+// This test is that path.
 //
 // For this rule the zero value happens to be the right answer, so the consequence of getting it
 // wrong is narrow. It is pinned anyway, because the failure it guards against is the inert-rule
@@ -263,6 +263,6 @@ func TestNoPlusplusSurvivesNilOptions(test *testing.T) {
 	// the default. So this input separates the two defaults rather than merely exercising the path.
 	const source = "for (i = 0; i < l; i++) { console.log(i); }\n"
 
-	result := rule_testing.RunWithOptions(test, NoPlusplus, noPlusplusFile, source, nil)
+	result := rule_testing.Run(test, NoPlusplus, noPlusplusFile, source)
 	rule_testing.ExpectFindings(test, result, "unexpectedUnaryOp")
 }

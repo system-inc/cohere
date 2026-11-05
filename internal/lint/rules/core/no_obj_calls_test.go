@@ -141,9 +141,9 @@ func TestNoObjCallsRequiresTheTypedHarness(test *testing.T) {
 func TestNoObjCallsIsRegistered(test *testing.T) {
 	test.Parallel()
 
-	for _, registration := range rule.Registered() {
-		if registration.Rule.Name == "no-obj-calls" {
-			if !registration.Rule.NeedsTypeChecker {
+	for _, entry := range rule.Registered() {
+		if entry.Name == "no-obj-calls" {
+			if !entry.NeedsTypeChecker {
 				test.Error("the registered copy does not declare NeedsTypeChecker")
 			}
 			return
