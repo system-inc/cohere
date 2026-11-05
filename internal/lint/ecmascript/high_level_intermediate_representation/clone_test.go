@@ -44,10 +44,10 @@ function useEverything(properties: { items: number[]; flag: boolean }) {
   return [value, x, doubled, properties.flag ? total : 0];
 }`
 	visited := 0
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name:             "clone",
 		NeedsTypeChecker: true,
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
 				forEachFunctionLike(node, func(node *ast.Node) {
 					original := Lower(node, ruleContext.TypeChecker)

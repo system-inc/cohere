@@ -58,10 +58,10 @@ func TestSSAOverRealCodebase(test *testing.T) {
 		if readError != nil {
 			continue
 		}
-		probe := rule.Rule{
+		probe := rule.Rule[rule.NoOptions]{
 			Name:             "ssa-corpus-harness",
 			NeedsTypeChecker: true,
-			Run: func(ruleContext rule.Context, options any) rule.Listeners {
+			Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 				return rule.Listeners{
 					ast.KindSourceFile: func(node *ast.Node) {
 						forEachFunctionLike(node, func(fnNode *ast.Node) {

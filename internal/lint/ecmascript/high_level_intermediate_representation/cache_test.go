@@ -58,10 +58,10 @@ func TestForFunctionLowersOncePerFunction(test *testing.T) {
 	var results []*Function
 	var directLowering *Function
 
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name:             "hir-cache-probe",
 		NeedsTypeChecker: true,
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
 					if ruleContext.TypeChecker == nil {
@@ -115,10 +115,10 @@ func TestForFunctionConstructsExactlyOnce(test *testing.T) {
 
 	var firstPhis, lastPhis int
 
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name:             "hir-cache-construct-probe",
 		NeedsTypeChecker: true,
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
 					done := false
@@ -162,10 +162,10 @@ func TestForFunctionWithoutCacheStillLowers(test *testing.T) {
 
 	var withoutCache *Function
 
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name:             "hir-cache-nil-probe",
 		NeedsTypeChecker: true,
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
 					bare := ruleContext
@@ -204,10 +204,10 @@ func TestForFunctionRecordsOneFillPerFunction(test *testing.T) {
 	var fillKeys []string
 	var askedKey string
 
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name:             "hir-cache-fill-probe",
 		NeedsTypeChecker: true,
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
 					done := false
@@ -300,10 +300,10 @@ func TestForFunctionWithoutManualMemoizationSeesEscapedSpellings(test *testing.T
 
 			var shared, erased *Function
 			recognised := 0
-			probe := rule.Rule{
+			probe := rule.Rule[rule.NoOptions]{
 				Name:             "hir-cache-escaped-memo-probe",
 				NeedsTypeChecker: true,
-				Run: func(ruleContext rule.Context, options any) rule.Listeners {
+				Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 					return rule.Listeners{
 						ast.KindSourceFile: func(node *ast.Node) {
 							done := false
@@ -400,10 +400,10 @@ func TestMayHoldComponentOrHookAnswersFromTheText(test *testing.T) {
 
 			answered := false
 			var got bool
-			probe := rule.Rule{
+			probe := rule.Rule[rule.NoOptions]{
 				Name:             "hir-may-hold-component-or-hook-probe",
 				NeedsTypeChecker: true,
-				Run: func(ruleContext rule.Context, options any) rule.Listeners {
+				Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 					return rule.Listeners{
 						ast.KindSourceFile: func(node *ast.Node) {
 							answered = true

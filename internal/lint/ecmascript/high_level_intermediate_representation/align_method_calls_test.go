@@ -110,10 +110,10 @@ func TestAlignMethodCallScopesReachesTheCorpus(test *testing.T) {
 // methodCallScopeStates counts method calls whose two sides disagree about scopes.
 func methodCallScopeStates(test *testing.T, source string) (before, after, calls int) {
 	test.Helper()
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name:             "method-call-scope-states",
 		NeedsTypeChecker: true,
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
 					if ruleContext.TypeChecker == nil {

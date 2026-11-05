@@ -13,10 +13,10 @@ func invokedFor(test *testing.T, source string) (*Function, AssumedInvokedFuncti
 	test.Helper()
 	var outer *Function
 	var invoked AssumedInvokedFunctions
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name:             "assumed-invoked",
 		NeedsTypeChecker: true,
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
 					if ruleContext.TypeChecker == nil {

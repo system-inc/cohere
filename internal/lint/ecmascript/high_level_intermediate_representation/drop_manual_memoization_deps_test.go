@@ -185,10 +185,10 @@ func memoDepsFor(test *testing.T, source string) ([]ManualMemoDependency, bool, 
 	var deps []ManualMemoDependency
 	isNil := true
 	var result ManualMemoization
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name:             "memo-deps",
 		NeedsTypeChecker: true,
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
 					if ruleContext.TypeChecker == nil {

@@ -24,10 +24,10 @@ func flattenHooksIn(test *testing.T, source string) hookFlattening {
 	test.Helper()
 	var result hookFlattening
 	visited := 0
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name:             "hook-flatten",
 		NeedsTypeChecker: true,
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
 				forEachFunctionLike(node, func(node *ast.Node) {
 					function := Lower(node, ruleContext.TypeChecker)
