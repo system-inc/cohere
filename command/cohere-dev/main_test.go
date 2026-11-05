@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -315,6 +316,12 @@ func TestABudgetHoldsGoToTheTokensThreads(t *testing.T) {
 	if strings.Join(environment, "|") != strings.Join(want, "|") {
 		t.Errorf("the budget environment is %q, want %q", environment, want)
 	}
+	// A caller with no GOFLAGS, the usual shell, still gets -trimpath: setting GOFLAGS overrides the
+	// machine's go env, which is how every run dropped it (#system_cohere_tools).
+	bare := budgetEnvironment([]string{"HOME=/home"}, 1, poolShape{tokens: 4, packages: 2, threads: 2})
+	if !slices.Contains(bare, "GOFLAGS=-trimpath -p=2") {
+		t.Errorf("a run from a shell with no GOFLAGS has %q, want -trimpath in it", bare)
+	}
 }
 
 // The pool runs as many commands at once as it has tokens, each held to its threads and named by its
@@ -387,10 +394,10 @@ func TestThePoolRunsAsManyAsItHasTokens(t *testing.T) {
 		t.Errorf("at most %d ran at once on a two-token pool, want 2:\n%s", most, contents)
 	}
 	for name, want := range map[string]string{
-		"test":  "flags=-p=4 threads=3 test -vet=all ./internal/edit",
-		"build": "flags=-p=4 threads=3 build ./command/cohere",
-		"vet":   "flags=-p=4 threads=3 vet ./...",
-		"exec":  "flags=-p=4 threads=3 --flag",
+		"test":  "flags=-trimpath -p=4 threads=3 test -vet=all ./internal/edit",
+		"build": "flags=-trimpath -p=4 threads=3 build ./command/cohere",
+		"vet":   "flags=-trimpath -p=4 threads=3 vet ./...",
+		"exec":  "flags=-trimpath -p=4 threads=3 --flag",
 	} {
 		if got := started[name]; !strings.HasSuffix(got, want) || (!strings.HasPrefix(got, "token=1 ") && !strings.HasPrefix(got, "token=2 ")) {
 			t.Errorf("%s ran with %q, want a token of the two and %q", name, got, want)

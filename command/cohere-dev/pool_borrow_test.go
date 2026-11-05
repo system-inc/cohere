@@ -87,7 +87,7 @@ func TestALoneRunBorrowsAllButOneFreeToken(t *testing.T) {
 	}
 
 	first, firstOutput := start("first")
-	if line := waitFor("first"); !strings.Contains(line, "flags=-p=4 threads=3 cores=12") {
+	if line := waitFor("first"); !strings.Contains(line, "flags=-trimpath -p=4 threads=3 cores=12") {
 		t.Errorf("a lone run on an idle four-token pool ran with %q, want three tokens' share: -p=4, 3 threads, 12 cores", line)
 	}
 	status := exec.Command(wrapper, "status")
@@ -102,7 +102,7 @@ func TestALoneRunBorrowsAllButOneFreeToken(t *testing.T) {
 
 	// The token left free: the next run starts while the first still runs, at the pool's own shape.
 	second, secondOutput := start("second")
-	if line := waitFor("second"); !strings.Contains(line, "flags=-p=2 threads=2 cores=4") {
+	if line := waitFor("second"); !strings.Contains(line, "flags=-trimpath -p=2 threads=2 cores=4") {
 		t.Errorf("the run after a borrower ran with %q, want one token's share", line)
 	}
 	if err := second.Wait(); err != nil {
