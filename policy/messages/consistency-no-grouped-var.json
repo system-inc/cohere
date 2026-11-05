@@ -1,0 +1,13 @@
+{
+  "rules": {
+    "Go": "cohere-go/consistency-no-grouped-var"
+  },
+  "messages": {
+    "groupedDeclaration": {
+      "text": "This `{{keyword}} ( ... )` block groups declarations inside a function. In a body, each name reads best as its own `{{keyword}}` statement, declared where it is first needed, so a reader meets one name, its type and its value together, and a change to one touches only its own line. Give each name its own `{{keyword}}`. A grouped block belongs at package level, and a `const ( ... )` whose values count with `iota` keeps its block, since `iota` counts only within one."
+    },
+    "severalNames": {
+      "text": "This `{{keyword}}` declares `{{names}}` in one statement, so a reader pairs each name with its value by counting across the commas, and a change to one of them touches the line of all. Give each name its own `{{keyword}}` statement, with its own type and value beside it. One value that yields every name, `var value, readError = read()`, stays as it is, since its names cannot be split."
+    }
+  }
+}

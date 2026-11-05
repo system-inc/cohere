@@ -1,0 +1,50 @@
+// Package flagged holds integers written in legacy octal, each of which the rule must report and rewrite.
+package flagged
+
+import "os"
+
+// A file mode, where legacy octal is written most.
+func writeConfiguration(path string, contents []byte) error {
+	return os.WriteFile(path, contents, 0644) // want "`0644`.*`0o644`"
+}
+
+// A constant, and a zero that is octal only for the zero before it.
+const (
+	executable = 0755 // want "`0755`.*`0o755`"
+	zeroZero   = 00   // want "`00`.*`0o0`"
+)
+
+// Separators stay where the writer put them, the one straight after the zero included.
+const (
+	separated = 0_600   // want "`0_600`.*`0o_600`"
+	grouped   = 0_7_5_5 // want "`0_7_5_5`.*`0o_7_5_5`"
+)
+
+// Inside an expression, negated, and two on one line.
+var (
+	offset  = 1 + 017                   // want "`017`.*`0o17`"
+	negated = -0777                     // want "`0777`.*`0o777`"
+	modes   = []os.FileMode{0600, 0640} // want "`0600`.*`0o600`" "`0640`.*`0o640`"
+)
+
+// An array length and a switch case are integer literals too.
+var buffer [010]byte // want "`010`.*`0o10`"
+
+func describe(mode os.FileMode) string {
+	switch mode {
+	case 0400: // want "`0400`.*`0o400`"
+		return "read only"
+	}
+	return "other"
+}
+
+// A literal inside a generic function.
+func mask[Value ~uint32](value Value) Value {
+	return value & 0777 // want "`0777`.*`0o777`"
+}
+
+// The largest octal a uint64 holds.
+const largest uint64 = 01777777777777777777777 // want "`0o1777777777777777777777`"
+
+// Multi-byte runes before the literal on its line, so the fix's offsets are bytes, not characters.
+var greeting, greetingMode = "héllo, 世界", 0640 // want "`0640`.*`0o640`"

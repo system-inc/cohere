@@ -1,0 +1,13 @@
+{
+  "rules": {
+    "Go": "cohere-go/testing-no-uncached-run"
+  },
+  "messages": {
+    "uncachedRun": {
+      "text": "This runs `go test` with `-count=1`, which throws away the test cache for every package it touches. Go keys that cache honestly, on the code, the environment and the files a test reads, so a cached pass is a real pass. Rerunning past it usually hides a flaky test instead of fixing it, and every rerun burns time on the shared pool that other work is waiting for. Drop the flag, and if a test only passes when it runs again, fix what makes it flaky. If this run must skip the cache, say why in a `// Uncached: <reason>` comment directly above its statement or at the end of it."
+    },
+    "uncachedWithoutReason": {
+      "text": "This run says it is uncached and gives no reason. Say what the cache cannot see after `Uncached:`, such as a service the test reaches outside its own files, because a marker with nothing after it tells the next reader nothing and excuses nothing."
+    }
+  }
+}

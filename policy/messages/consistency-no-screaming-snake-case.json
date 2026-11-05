@@ -1,7 +1,8 @@
 {
   "rules": {
     "TypeScript": "nexus/consistency-no-screaming-snake-case",
-    "Swift": "cohere-swift/always-use-lower-camel-case"
+    "Swift": "cohere-swift/always-use-lower-camel-case",
+    "Go": "cohere-go/consistency-no-screaming-snake-case"
   },
   "phrases": {
     "reasoning": "`const` already tells the reader and the compiler the value is immutable, so shouting adds no information. The casing is free to signal scope instead, the way Go does it: PascalCase means the value came from somewhere else, camelCase means it lives in this file. Reserve the shouting form for values that mirror an external system's grammar, where matching the upstream spelling keeps the value greppable across a boundary you do not control."
@@ -23,6 +24,18 @@
       "text": "{{swiftFormatFinding}}. Swift spells values in lowerCamelCase and types in UpperCamelCase, so a reader tells which is which at a glance, and an underscore inside a name is a word boundary camel case already marks.",
       "languages": [
         "Swift"
+      ]
+    },
+    "screamingSnakeCase": {
+      "text": "`{{name}}` is in screaming snake case; spell it `{{suggestion}}`. Go tells a reader whether a name is exported by the case of its first letter, so shouting adds no information and buries the one thing the casing says. Go spells every name in MixedCaps, constants too. The shouting form belongs only where a name mirrors an external system's grammar, as a constant taken from syscall does, and this rule leaves those alone.",
+      "languages": [
+        "Go"
+      ]
+    },
+    "underscoreInName": {
+      "text": "`{{name}}` has an underscore in it; spell it `{{suggestion}}`. Go spells every name in MixedCaps, so a capital letter already marks where one word ends and the next begins, and an underscore says it a second time and makes the name read as if it came from another language. A leading underscore hides nothing in Go either: only the case of the first letter decides whether a name is exported.",
+      "languages": [
+        "Go"
       ]
     },
     "incumbentFailed": {

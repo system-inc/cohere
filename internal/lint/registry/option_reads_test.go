@@ -55,12 +55,6 @@ var unreadOptionFields = map[string]string{
 	// Captures matter only to a selector or a message template that reads them, and this port refuses
 	// both, so no value of it can change a finding.
 	"elementDescriptor.Capture": "read only by selector and template features this port refuses",
-	// The abbreviation vocabulary is a data file both engines read. These fields are its prose for
-	// whoever edits it, the why behind an entry, and no finding is built from them.
-	"abbreviationVocabularyFile.About":  "the vocabulary file's own description, for its editors",
-	"abbreviationEntry.Reason":          "why an entry exists, for the vocabulary's editors",
-	"allowedAbbreviatedName.Reason":     "why a name is allowed, for the vocabulary's editors",
-	"allowedAbbreviationSegment.Reason": "why a segment is allowed, for the vocabulary's editors",
 }
 
 // optionField is one struct field reachable from an option decode.
