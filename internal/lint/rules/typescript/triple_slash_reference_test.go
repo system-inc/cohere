@@ -3,6 +3,7 @@ package typescript
 import (
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -14,7 +15,7 @@ const tripleSlashFile = "/repository/source/Thing.ts"
 // The decoder holds three defaults and a per-key value filter, so a fixture that constructed
 // `TripleSlashReferenceOptions` by hand would test the rule while leaving the half of the port that
 // reads the config unexercised. Every case below names its configuration the way a user writes it.
-func decodeTripleSlashOptions(test *testing.T, configuration string) any {
+func decodeTripleSlashOptions(test *testing.T, configuration string) TripleSlashReferenceOptions {
 	test.Helper()
 
 	options, decodeTripleSlashReferenceOptionsError := DecodeTripleSlashReferenceOptions([]byte(configuration))
@@ -579,31 +580,31 @@ func TestTripleSlashReferenceUsesDefaultsWhenTheConfigNamesNoOptions(test *testi
 
 	cases := []struct {
 		name    string
-		options any
+		options rule.Given[TripleSlashReferenceOptions]
 	}{
-		{"nil, which is what a bare severity in the config produces", nil},
+		{"nil, which is what a bare severity in the config produces", rule.Given[TripleSlashReferenceOptions]{}},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			// path defaults to never, so this must report.
 			rule_testing.ExpectFindings(test,
-				rule_testing.RunWithOptions(test, TripleSlashReference, tripleSlashFile,
+				rule_testing.RunGiven(test, TripleSlashReference, tripleSlashFile,
 					"/// <reference path=\"foo\" />\n", testCase.options),
 				"tripleSlashReference")
 
 			// lib defaults to always, so this must not. Both halves are needed: a fallback that
 			// set every key to never would pass the first assertion alone.
 			rule_testing.ExpectClean(test,
-				rule_testing.RunWithOptions(test, TripleSlashReference, tripleSlashFile,
+				rule_testing.RunGiven(test, TripleSlashReference, tripleSlashFile,
 					"/// <reference lib=\"foo\" />\n", testCase.options))
 
 			// types defaults to prefer-import, which is neither of the other two settings.
 			rule_testing.ExpectClean(test,
-				rule_testing.RunWithOptions(test, TripleSlashReference, tripleSlashFile,
+				rule_testing.RunGiven(test, TripleSlashReference, tripleSlashFile,
 					"/// <reference types=\"foo\" />\n", testCase.options))
 			rule_testing.ExpectFindings(test,
-				rule_testing.RunWithOptions(test, TripleSlashReference, tripleSlashFile,
+				rule_testing.RunGiven(test, TripleSlashReference, tripleSlashFile,
 					"/// <reference types=\"foo\" />\nimport * as foo from 'foo';\n", testCase.options),
 				"tripleSlashReference")
 		})
