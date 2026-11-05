@@ -10,7 +10,7 @@ type commentSpan struct {
 
 // scanComments finds every comment in a file, skipping the ones that are not comments.
 //
-// The naive version of this — search the text for the directive — is wrong in a way that is
+// The naive version of this (search the text for the directive) is wrong in a way that is
 // invisible when it fires. This codebase contains, in two build scripts, the literal string
 // `'/* eslint-disable */\n'`: source that *writes* a suppression into a generated file. A text
 // search reads that as a file-level suppression and silences every rule for the rest of the script.
@@ -18,7 +18,7 @@ type commentSpan struct {
 //
 // So the text is scanned as TypeScript lexes it: string literals, template literals, and regular
 // expressions are skipped rather than searched, and only real comments are returned. The two build
-// scripts, and the four prose sentences that mention `eslint-disable`, all fall out correctly —
+// scripts, and the four prose sentences that mention `eslint-disable`, all fall out correctly:
 // the strings because they are skipped here, the prose because a directive must begin its comment.
 //
 // This is a lexer for exactly the question "where are the comments", not a parser. It does not need
@@ -43,6 +43,9 @@ func scanComments(text string) []commentSpan {
 // template for the rest of the file. Base's SqliteAdapter.ts lost every directive after that line that
 // way: its block enable, so a disable for one rule ran to the end of the file, and two next-line
 // disables, so their findings were reported (#59rmvb5).
+//
+// Mutates: comments the scan appends every comment it passes, so one slice gathers a file's comments across
+// every nested interpolation
 func scanCode(text string, index int, inInterpolation bool, comments *[]commentSpan) int {
 	// previousToken is the last significant character seen, which is the only way to tell a regular
 	// expression from a division: `/` after a value divides, `/` after an operator opens a regex. An
@@ -53,45 +56,47 @@ func scanCode(text string, index int, inInterpolation bool, comments *[]commentS
 	// brace rather than the object literal's.
 	depth := 0
 
-	for index < len(text) {
-		character := text[index]
+	// position walks the text from index, the scan's own cursor.
+	position := index
+	for position < len(text) {
+		character := text[position]
 
 		switch {
-		case character == '/' && index+1 < len(text) && text[index+1] == '/':
-			start := index
-			index += 2
-			for index < len(text) && text[index] != '\n' {
-				index++
+		case character == '/' && position+1 < len(text) && text[position+1] == '/':
+			start := position
+			position += 2
+			for position < len(text) && text[position] != '\n' {
+				position++
 			}
-			*comments = append(*comments, commentSpan{pos: start, end: index})
+			*comments = append(*comments, commentSpan{pos: start, end: position})
 
-		case character == '/' && index+1 < len(text) && text[index+1] == '*':
-			start := index
-			index += 2
-			for index+1 < len(text) && !(text[index] == '*' && text[index+1] == '/') {
-				index++
+		case character == '/' && position+1 < len(text) && text[position+1] == '*':
+			start := position
+			position += 2
+			for position+1 < len(text) && !(text[position] == '*' && text[position+1] == '/') {
+				position++
 			}
-			if index+1 < len(text) {
-				index += 2
+			if position+1 < len(text) {
+				position += 2
 			} else {
-				index = len(text)
+				position = len(text)
 			}
-			*comments = append(*comments, commentSpan{pos: start, end: index})
+			*comments = append(*comments, commentSpan{pos: start, end: position})
 
 		case character == '"' || character == '\'':
-			index = skipQuoted(text, index, character)
+			position = skipQuoted(text, position, character)
 			previousToken = character
 
 		case character == '`':
-			index = skipTemplate(text, index, comments)
+			position = skipTemplate(text, position, comments)
 			previousToken = character
 
 		case character == '/' && opensRegularExpression(previousToken):
-			index = skipRegularExpression(text, index)
+			position = skipRegularExpression(text, position)
 			previousToken = '/'
 
 		case character == '}' && inInterpolation && depth == 0:
-			return index + 1
+			return position + 1
 
 		default:
 			switch character {
@@ -103,11 +108,11 @@ func scanCode(text string, index int, inInterpolation bool, comments *[]commentS
 			if !isSpace(character) {
 				previousToken = character
 			}
-			index++
+			position++
 		}
 	}
 
-	return index
+	return position
 }
 
 // enableSpan is one enable directive, resolved to the line it sits on and the rules it names.
@@ -165,54 +170,57 @@ func buildLineIndex(text string) func(offset int) int {
 
 // skipQuoted advances past a single- or double-quoted string, honoring backslash escapes.
 func skipQuoted(text string, index int, quote byte) int {
-	index++
-	for index < len(text) {
-		switch text[index] {
+	// position walks the string from just past its opening quote.
+	position := index + 1
+	for position < len(text) {
+		switch text[position] {
 		case '\\':
-			index += 2
+			position += 2
 			continue
 		case quote:
-			return index + 1
+			return position + 1
 		case '\n':
 			// An unterminated string literal. The file will not parse, but this scan must still
 			// terminate rather than swallowing the rest of the file as a string.
-			return index + 1
+			return position + 1
 		}
-		index++
+		position++
 	}
-	return index
+	return position
 }
 
 // skipTemplate advances past a template literal, lexing each `${...}` as code, because a comment,
 // a string or a regular expression can live inside an interpolation.
 func skipTemplate(text string, index int, comments *[]commentSpan) int {
-	index++
-	for index < len(text) {
+	// position walks the template from just past its opening backtick.
+	position := index + 1
+	for position < len(text) {
 		switch {
-		case text[index] == '\\':
-			index += 2
+		case text[position] == '\\':
+			position += 2
 			continue
-		case text[index] == '`':
-			return index + 1
-		case text[index] == '$' && index+1 < len(text) && text[index+1] == '{':
-			index = scanCode(text, index+2, true, comments)
+		case text[position] == '`':
+			return position + 1
+		case text[position] == '$' && position+1 < len(text) && text[position+1] == '{':
+			position = scanCode(text, position+2, true, comments)
 			continue
 		}
-		index++
+		position++
 	}
-	return index
+	return position
 }
 
 // skipRegularExpression advances past a regex literal, honoring escapes and character classes.
 //
 // A `/` inside `[...]` does not end the pattern, which is why the class has to be tracked.
 func skipRegularExpression(text string, index int) int {
-	index++
+	// position walks the pattern from just past its opening slash.
+	position := index + 1
 	inClass := false
-	for index < len(text) {
-		switch text[index] {
+	for position < len(text) {
+		switch text[position] {
 		case '\\':
-			index += 2
+			position += 2
 			continue
 		case '[':
 			inClass = true
@@ -220,21 +228,21 @@ func skipRegularExpression(text string, index int) int {
 			inClass = false
 		case '/':
 			if !inClass {
-				return index + 1
+				return position + 1
 			}
 		case '\n':
-			// Not a regex after all — a lone division that reached the end of its line. Back out
+			// Not a regex after all, but a lone division that reached the end of its line. Back out
 			// rather than consuming the rest of the file.
-			return index
+			return position
 		}
-		index++
+		position++
 	}
-	return index
+	return position
 }
 
 // opensRegularExpression decides whether a `/` starts a pattern or divides.
 //
-// After a value — an identifier, a literal, a closing bracket — a slash divides. After an operator,
+// After a value (an identifier, a literal, a closing bracket) a slash divides. After an operator,
 // a comma, or an opening bracket, it opens a pattern. This is the standard heuristic and it is
 // wrong in the same rare places every JavaScript lexer is wrong; getting it wrong here costs a
 // misread comment boundary in a file that contains both a regex and a suppression, which the

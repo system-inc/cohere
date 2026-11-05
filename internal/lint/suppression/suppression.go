@@ -3,7 +3,7 @@
 // A linter that cannot be told "not here, and here is why" gets its rules turned off globally
 // instead of locally. That is the failure this whole tool exists to prevent: the pressure on a rule
 // is always toward disabling it, and a narrow, local escape hatch is exactly what keeps that rule
-// enabled everywhere else. Seven findings in EnumLike.test.ts are the visible case — every one of
+// enabled everywhere else. Seven findings in EnumLike.test.ts are the visible case: every one of
 // those enums is deliberate, each carries a stated reason, and a tool that reports them anyway
 // teaches its reader to stop reading it.
 //
@@ -19,8 +19,8 @@
 // nobody chose.
 //
 // The index works on source text and byte offsets rather than on a parsed file. A suppression is a
-// fact about a line, not about a node — it may sit above a JSX attribute, inside an object literal,
-// or above a statement no rule listens to — so binding it to the AST would make it invisible
+// fact about a line, not about a node (it may sit above a JSX attribute, inside an object literal,
+// or above a statement no rule listens to), so binding it to the AST would make it invisible
 // exactly where the walk did not reach. Text in, offsets out, no parse required.
 package suppression
 
@@ -64,7 +64,7 @@ type Directive struct {
 	Kind Kind
 
 	// Rules are the rule names the comment named. Empty means it named none, which silences
-	// everything in its scope — a blanket, and the shape most worth being able to count.
+	// everything in its scope: a blanket, and the shape most worth being able to count.
 	Rules []string
 
 	// Reason is the text after ` -- `, trimmed. Empty means the author did not say why.
