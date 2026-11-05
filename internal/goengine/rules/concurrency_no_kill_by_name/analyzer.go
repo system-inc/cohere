@@ -29,7 +29,8 @@ var Analyzer = &analysis.Analyzer{
 	Name: "concurrency_no_kill_by_name",
 	Doc: "Flags exec.Command and exec.CommandContext running pkill or killall, kill with an operand that is not a " +
 		"pid, or sh, bash or zsh -c with a script that runs pkill or killall, since stopping by name takes every " +
-		"matching process on the machine with it. Only constant programs and arguments are judged.",
+		"matching process on the machine with it. Only constant programs and arguments are judged, and a script is " +
+		"read as words, not parsed as a shell would parse it, so a quoted or commented pkill is flagged too.",
 	Run: run,
 }
 
