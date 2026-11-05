@@ -233,6 +233,8 @@ func (p *ContentPack) viewEntry(entry contentPackEntry) (contents string, whole 
 	if crc32.Checksum(view, castagnoli) != entry.checksum {
 		return "", false
 	}
+	// Unsafe: the mapping is read-only and never unmapped, and its bytes are never written in place, so the
+	// string outlives nothing it points at and never changes. The package comment says why each holds.
 	return unsafe.String(&view[0], len(view)), true
 }
 
@@ -315,6 +317,7 @@ func (p *ContentPack) appendTo(dataName string, entries map[string]contentPackEn
 	}
 	information, err := file.Stat()
 	if err != nil {
+		// Ignored: nothing was written yet, and the stat's error is the one to report.
 		file.Close()
 		return err
 	}
@@ -324,6 +327,7 @@ func (p *ContentPack) appendTo(dataName string, entries map[string]contentPackEn
 		entries[path] = writer.add(added.identity, added.contents)
 	}
 	if finishError := writer.finish(); finishError != nil {
+		// Ignored: the write's error is the one to report, and the index never names what it left.
 		file.Close()
 		return finishError
 	}
@@ -357,22 +361,30 @@ func (p *ContentPack) rewrite() error {
 	for path, added := range p.added {
 		entries[path] = writer.add(added.identity, added.contents)
 	}
+	// A data file no index names is never read, so removing one on a failure below is tidying, and a removal that
+	// fails leaves only space behind and the failure that matters already in hand.
 	if finishError := writer.finish(); finishError != nil {
+		// Ignored: the write's error is the one to report.
 		file.Close()
+		// Ignored: no index names this file, as above.
 		os.Remove(file.Name())
 		return finishError
 	}
 	if closeError := file.Close(); closeError != nil {
+		// Ignored: no index names this file, as above.
 		os.Remove(file.Name())
 		return closeError
 	}
 	if writeContentPackIndexError := writeContentPackIndex(p.directory, dataName, entries); writeContentPackIndexError != nil {
+		// Ignored: no index names this file, as above.
 		os.Remove(file.Name())
 		return writeContentPackIndexError
 	}
 	if older, globError := filepath.Glob(filepath.Join(p.directory, "contents-*.pack")); globError == nil {
 		for _, path := range older {
 			if filepath.Base(path) != dataName {
+				// Ignored: the new index names only dataName, so an older data file is never read again, and one
+				// that will not go is retried by the next rewrite's sweep.
 				os.Remove(path)
 			}
 		}
@@ -392,6 +404,10 @@ func newPackWriter(file *os.File, offset int64) *packWriter {
 	return &packWriter{file: file, offset: offset, buffer: make([]byte, 0, 4<<20)}
 }
 
+// add appends contents to the data file and is the entry that says where they land.
+//
+// Unsafe: contents is viewed as bytes without a copy, and the checksum and the file's Write only read them, so
+// the string's bytes never change.
 func (w *packWriter) add(identity fileIdentity, contents string) contentPackEntry {
 	entry := contentPackEntry{
 		identity: identity,
@@ -451,16 +467,22 @@ func writeContentPackIndex(directory string, dataName string, entries map[string
 	if temporaryFileError != nil {
 		return temporaryFileError
 	}
+	// A temporary is never read as the index, so removing one on a failure below is tidying, and a removal that
+	// fails leaves only space behind and the failure that matters already in hand.
 	if _, writeError := temporary.Write(index); writeError != nil {
+		// Ignored: the write's error is the one to report.
 		temporary.Close()
+		// Ignored: a temporary is never read, as above.
 		os.Remove(temporary.Name())
 		return writeError
 	}
 	if closeError := temporary.Close(); closeError != nil {
+		// Ignored: a temporary is never read, as above.
 		os.Remove(temporary.Name())
 		return closeError
 	}
 	if renameError := os.Rename(temporary.Name(), filepath.Join(directory, contentPackIndexName)); renameError != nil {
+		// Ignored: a temporary is never read, as above.
 		os.Remove(temporary.Name())
 		return renameError
 	}

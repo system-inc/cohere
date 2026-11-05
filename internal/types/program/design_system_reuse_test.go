@@ -81,10 +81,10 @@ func TestDesignSystemRulesReplayUntilWhatTheDesignSystemReadChanges(test *testin
 		edit      func()
 		wantRerun bool
 	}{
-		{"nothing changed", func() {}, false},
+		{"nothing changed", func() { /* Edits nothing, so the run reuses. */ }, false},
 		{"a .ts file edited", write("a.ts", "export const a = 3;\n"), false},
 		{"the stylesheet edited", write("theme.css", "plain\n"), true},
-		{"nothing changed after the stylesheet edit", func() {}, false},
+		{"nothing changed after the stylesheet edit", func() { /* Edits nothing, so the run reuses. */ }, false},
 		{"a candidate it missed created", write("candidate.css", ""), true},
 		{"that candidate removed", func() {
 			if removeError := os.Remove(filepath.Join(root, "candidate.css")); removeError != nil {

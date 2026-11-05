@@ -83,6 +83,10 @@ func FileVersion(text string) string {
 	return hex.EncodeToString(sum[:])
 }
 
+// syntaxDefinition prefixes every syntax elidedBodiesVersion computes, and moves when what it covers does.
+// 2: whitespace and plain comments outside bodies are left out.
+const syntaxDefinition = "syntax2:"
+
 // Signatures returns every project file's signature, keyed by file name, and how many were computed rather
 // than carried forward from previous.
 func (g *Graph) Signatures(ctx context.Context, previous map[string]SignatureEntry) (map[string]SignatureEntry, int) {
@@ -286,10 +290,6 @@ func countContentKeyed(projectFiles []*ast.SourceFile, signatures map[string]Sig
 	}
 	return count
 }
-
-// syntaxDefinition prefixes every syntax elidedBodiesVersion computes, and moves when what it covers does.
-// 2: whitespace and plain comments outside bodies are left out.
-const syntaxDefinition = "syntax2:"
 
 // elidedBodiesVersion is the version of a file's text with the body of every function, method, accessor,
 // constructor and arrow function cut out, outermost first, and with the whitespace and
@@ -518,7 +518,7 @@ func writeSignatureDiagnostic(diagnostic *ast.Diagnostic, sourceFile *ast.Source
 }
 
 // SignatureFingerprints gives each project file a hash of everything its types can depend on, like
-// TypeFingerprints, except that what it hashes of every OTHER file in its import closure is that file's
+// TypeFingerprints, except that what it hashes of every other file in its import closure is that file's
 // signature rather than its bytes. A body edit to a file imported by half the tree changes its own
 // fingerprint and nobody else's.
 //

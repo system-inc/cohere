@@ -16,8 +16,9 @@ import (
 var internalTestIdentity = CacheTableIdentity{SelfCommit: "test", CompilerCommit: "test", GoToolchain: "go-test", Platform: "test/test"}
 
 // encodeRaw writes a header and a body exactly as given, so a test can produce what no current encoder
-// would: an old version, a wrong magic, another commit, a list index past its table.
-func encodeRaw(test *testing.T, header cacheTableHeader, body any) []byte {
+// would: an old version, a wrong magic, another commit, a list index past its table. The body is of whichever
+// section's type the test writes.
+func encodeRaw[Body any](test *testing.T, header cacheTableHeader, body Body) []byte {
 	test.Helper()
 	var buffer bytes.Buffer
 	encoder := gob.NewEncoder(&buffer)

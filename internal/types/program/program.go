@@ -38,7 +38,7 @@ import (
 // Graph is a built type graph: the program, and the checkers that answer questions about it.
 //
 // A Graph is never returned half-built. Build either hands back a Graph whose program resolved, or
-// an error — there is no state in between, because the failure this package exists to make
+// an error. There is no state in between, because the failure this package exists to make
 // impossible is a program that silently contains nothing. An empty file list is indistinguishable
 // from a clean tree, and that exact confusion let the gate this tool replaces print green over zero
 // files for days.
@@ -233,6 +233,34 @@ type Options struct {
 	Listings *DirectoryListings
 }
 
+// rootState is what the disk says about a file the config named, read now rather than from the build's
+// cache, which still remembers the tree as it was when the config was globbed.
+type rootState int
+
+const (
+	rootAbsent rootState = iota
+	rootUnreadable
+	rootReadable
+)
+
+// rootsVerdict is what a build's unloaded roots mean.
+type rootsVerdict int
+
+const (
+	// rootsComplete: every file the config named is in the program.
+	rootsComplete rootsVerdict = iota
+
+	// rootsMoved: every missing root is gone from disk, so the tree changed between the two reads.
+	rootsMoved
+
+	// rootsUnreadable: a missing root exists but cannot be read.
+	rootsUnreadable
+
+	// rootsUnmatched: a missing root exists and is readable, so the program loaded it under a path the
+	// config's name does not canonicalize to. This is the casing defect the original guard was for.
+	rootsUnmatched
+)
+
 // Build resolves a tsconfig and constructs the program and its checkers.
 //
 // Every failure here is loud. A tsconfig that does not exist, one that does not parse, one whose
@@ -316,34 +344,6 @@ func (g *Graph) timedVerify(options Options) (rootsVerdict, []string) {
 	return verdict, missing
 }
 
-// rootState is what the disk says about a file the config named, read now rather than from the build's
-// cache, which still remembers the tree as it was when the config was globbed.
-type rootState int
-
-const (
-	rootAbsent rootState = iota
-	rootUnreadable
-	rootReadable
-)
-
-// rootsVerdict is what a build's unloaded roots mean.
-type rootsVerdict int
-
-const (
-	// rootsComplete: every file the config named is in the program.
-	rootsComplete rootsVerdict = iota
-
-	// rootsMoved: every missing root is gone from disk, so the tree changed between the two reads.
-	rootsMoved
-
-	// rootsUnreadable: a missing root exists but cannot be read.
-	rootsUnreadable
-
-	// rootsUnmatched: a missing root exists and is readable, so the program loaded it under a path the
-	// config's name does not canonicalize to. This is the casing defect the original guard was for.
-	rootsUnmatched
-)
-
 // classifyMissingRoots decides what a set of named-but-unloaded roots means.
 //
 // A pure function of what the disk says, so every verdict is tested directly. The order is the order
@@ -402,6 +402,7 @@ func inspectRootOnDisk(fileName string) rootState {
 	if openError != nil {
 		return rootUnreadable
 	}
+	// Ignored: the file was opened read-only, only to learn whether it can be, so closing it loses nothing.
 	file.Close()
 	return rootReadable
 }
@@ -472,7 +473,8 @@ func buildOnce(options Options) (*Graph, error) {
 	// Timed just beneath the cache, so it counts the calls that reach the disk (or the pack), and what the
 	// recorder costs them, but not the ones the cache answered.
 	var timedDisk *timingFS
-	var configDisk, programDisk diskCounters
+	var configDisk diskCounters
+	var programDisk diskCounters
 	if options.Timing != nil {
 		options.Timing.Builds++
 		timedDisk = &timingFS{FS: disk}
@@ -501,8 +503,8 @@ func buildOnce(options Options) (*Graph, error) {
 
 	// A malformed option arrives on the config rather than in the returned error slice, and the two
 	// channels do not overlap: an invalid `target` produces zero returned errors and one
-	// GetConfigFileParsingDiagnostics entry. Checking only the slice — which is what reading the
-	// signature suggests — means a config with a typo builds a program against silently wrong options
+	// GetConfigFileParsingDiagnostics entry. Checking only the slice, which is what reading the
+	// signature suggests, means a config with a typo builds a program against silently wrong options
 	// and reports whatever that produces as truth.
 	//
 	// Except a diagnostic about one option's name or value, an option TypeScript 7 no longer knows above
@@ -563,8 +565,8 @@ func buildOnce(options Options) (*Graph, error) {
 	config.CompilerOptions().SkipDefaultLibCheck = core.TSTrue
 
 	// JSDocParsingMode used to be set here to parse JSDoc only where it can carry types. The option
-	// was removed from ProgramOptions in the move to `microsoft/TypeScript` — the compiler now decides
-	// per file rather than taking a program-wide mode — so there is nothing to pass and nothing to
+	// was removed from ProgramOptions in the move to `microsoft/TypeScript` (the compiler now decides
+	// per file rather than taking a program-wide mode), so there is nothing to pass and nothing to
 	// preserve.
 	// With shared lib parses, every load goes through the sharing host, the graph's included, so anything
 	// that loads a file later shares as the build did.
@@ -659,7 +661,7 @@ func (g *Graph) SourceFiles() []*ast.SourceFile {
 	return g.Program.GetSourceFiles()
 }
 
-// ProjectFiles is the subset of the program that the tsconfig actually named — our code, without
+// ProjectFiles is the subset of the program that the tsconfig actually named: our code, without
 // the declarations it pulled in.
 //
 // On the ahra tree that is roughly 3,400 files out of 9,530. The other 6,100 are `node_modules`
@@ -709,7 +711,7 @@ func (g *Graph) CheckerForFile(ctx context.Context, sourceFile *ast.SourceFile) 
 // error under fifty invented ones.
 //
 // Prefer AllDiagnostics for a whole-program check. Calling this in a loop over every file is more
-// than three times slower for a reason that is invisible at the call site — see the note there.
+// than three times slower for a reason that is invisible at the call site. See the note there.
 func (g *Graph) Diagnostics(ctx context.Context, sourceFile *ast.SourceFile) []*ast.Diagnostic {
 	syntactic := g.Program.GetSyntacticDiagnostics(ctx, sourceFile)
 	if len(syntactic) > 0 {
@@ -744,7 +746,7 @@ func (g *Graph) AllDiagnosticParts(ctx context.Context) TypeDiagnosticParts {
 	return TypeDiagnosticParts{Bind: g.Program.GetBindDiagnostics(ctx, nil), Semantic: g.Program.GetSemanticDiagnostics(ctx, nil)}
 }
 
-// ConfigDiagnostics returns findings about the configuration itself rather than about any file —
+// ConfigDiagnostics returns findings about the configuration itself rather than about any file:
 // contradictory options, an unreachable lib, a target that does not exist.
 func (g *Graph) ConfigDiagnostics(ctx context.Context) []*ast.Diagnostic {
 	// GetOptionsDiagnostics was folded into GetProgramDiagnostics upstream: an option that contradicts
@@ -801,10 +803,10 @@ func (g *Graph) Workers() int {
 //	      16   686ms      2,944MB
 //	      32   762ms      3,467MB
 //
-// The curve turns over after core count, so this tracks GOMAXPROCS rather than hardcoding 16: a
+// The curve turns over after core count, so this tracks `GOMAXPROCS` rather than hardcoding 16: a
 // fixed 16 would oversubscribe a 4-core machine for the same reason a fixed 4 undersubscribes this
 // one. The diagnostic count was 2 at every setting, which is the part that makes the speed
-// trustworthy — a checking phase that got faster by checking less reports fewer findings, and this
+// trustworthy: a checking phase that got faster by checking less reports fewer findings, and this
 // one does not.
 //
 // Memory is the trade and it is real: 37% more allocated between 4 and 16. That is affordable on a

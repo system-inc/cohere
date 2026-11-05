@@ -11,6 +11,16 @@ import (
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
+const layoutDriftAdvice = "\n" +
+	"The mirror in shim/checker/shim.go has drifted from upstream's layout, so this accessor is " +
+	"reading a different field.\n" +
+	"Two causes are worth separating. If `go run ./internal/types/tools/generate_shims` now refuses, a substitution in " +
+	"shim/checker/extra-shim.json no longer matches the size or alignment of the upstream type it " +
+	"replaces, and its message names which one.\n" +
+	"If the generator is happy and this still fails, the drift is one size alone cannot see: a " +
+	"stand-in of the right width in the wrong field order, or an upstream reordering that left the " +
+	"struct the same size. Compare the mirror against upstream's struct field by field."
+
 // TestShimFieldAccessorsReadTheFieldsTheyName guards every shim accessor that is reached through an
 // unsafe pointer cast rather than through a method.
 //
@@ -23,7 +33,7 @@ import (
 //
 // That is not hypothetical. The mirror substitutes stand-in types for upstream's unexported ones,
 // configured in `shim/checker/extra-shim.json`, and `checker.symbolArenaLinkStore` was substituted
-// with `core.PagedLinkStore`. Upstream's type is a PagedLinkStore of pointers PLUS an Arena of
+// with `core.PagedLinkStore`. Upstream's type is a PagedLinkStore of pointers and an Arena of
 // values, so the stand-in was 24 bytes short at field 99 of 319 and every field after it read at
 // the wrong offset. `Checker_numberType` returned the `null` type and `Checker_booleanType`
 // returned `false`.
@@ -35,18 +45,18 @@ import (
 // the exact failure this project exists to prevent, and it arrived from a layout drift two packages
 // away from any rule.
 //
-// Two properties of that defect set the standard every assertion here has to meet. The field NAMES
-// aligned at all 319 positions and only a TYPE was wrong, so a name-by-name comparison would have
+// Two properties of that defect set the standard every assertion here has to meet. The field names
+// aligned at all 319 positions and only a type was wrong, so a name-by-name comparison would have
 // called the mirror correct. And `numberType` returning the `null` type is non-nil, so a nil check
-// passes straight through it. Every case below therefore asserts what the value IS — the checker's
-// own name for a type, a specific flag set, the actual parameter names — never merely that it is
+// passes straight through it. Every case below therefore asserts what the value is (the checker's
+// own name for a type, a specific flag set, the actual parameter names), never merely that it is
 // present. Where a field's correct value cannot be pinned that way, this says so rather than
 // spending a weak assertion that reads as coverage.
 //
 // The generator refuses a substitution whose size or alignment does not match upstream, which is a
 // stronger and earlier check than this one: it fails before the wrong code exists, and it covers
 // substitutions no accessor reads today. This test covers what that check cannot see. A stand-in of
-// the RIGHT size in the WRONG order, or an upstream field reordering that keeps the struct the same
+// the right size in the wrong order, or an upstream field reordering that keeps the struct the same
 // size, moves these fields without changing any size the generator compares.
 func TestShimFieldAccessorsReadTheFieldsTheyName(test *testing.T) {
 	test.Parallel()
@@ -124,7 +134,7 @@ func TestShimFieldAccessorsReadTheFieldsTheyName(test *testing.T) {
 			"ObjectFlagsTuple.%s", boxObjectFlags, layoutDriftAdvice)
 	}
 
-	// `symbol` is asserted by NAME, which is the check the historical defect would have failed:
+	// `symbol` is asserted by its name, which is the check the historical defect would have failed:
 	// a shifted read yields some other valid *ast.Symbol, and only its name distinguishes them.
 	boxSymbol := checker.Type_symbol(boxInstance)
 	if boxSymbol == nil {
@@ -249,8 +259,8 @@ func TestShimFieldAccessorsReadTheFieldsTheyName(test *testing.T) {
 		}
 	}
 
-	// `declaration` is asserted by node kind AND by the name at that node, so a shifted read has to
-	// land on a function declaration that is also named `twoParams`.
+	// `declaration` is asserted by node kind and by the name at that node as well, so a shifted read
+	// has to land on a function declaration that is also named `twoParams`.
 	declaration := checker.Signature_declaration(signatures[0])
 	if declaration == nil {
 		test.Fatalf("Signature_declaration on a declared function returned nil.%s", layoutDriftAdvice)
@@ -264,16 +274,6 @@ func TestShimFieldAccessorsReadTheFieldsTheyName(test *testing.T) {
 			"\"twoParams\".%s", declarationName(declaration), layoutDriftAdvice)
 	}
 }
-
-const layoutDriftAdvice = "\n" +
-	"The mirror in shim/checker/shim.go has drifted from upstream's layout, so this accessor is " +
-	"reading a different field.\n" +
-	"Two causes are worth separating. If `go run ./internal/types/tools/generate_shims` now refuses, a substitution in " +
-	"shim/checker/extra-shim.json no longer matches the size or alignment of the upstream type it " +
-	"replaces, and its message names which one.\n" +
-	"If the generator is happy and this still fails, the drift is one size alone cannot see: a " +
-	"stand-in of the right width in the wrong field order, or an upstream reordering that left the " +
-	"struct the same size. Compare the mirror against upstream's struct field by field."
 
 func aliasSymbolName(alias *checker.TypeAlias) string {
 	if alias == nil {

@@ -348,7 +348,8 @@ func (stored StoredDiagnostic) diagnostic(sourceFile *ast.SourceFile) *ast.Diagn
 	if stored.NoFile {
 		file = nil
 	}
-	var chain, related []*ast.Diagnostic
+	var chain []*ast.Diagnostic
+	var related []*ast.Diagnostic
 	for _, part := range stored.Chain {
 		chain = append(chain, part.diagnostic(sourceFile))
 	}

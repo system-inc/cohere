@@ -29,7 +29,7 @@ import (
 // result this package returns carries what it covered, so a caller that prints a verdict without
 // also printing the population had to work at it.
 type Coverage struct {
-	// FilesInProgram is the whole type graph — our code plus every declaration it pulled in.
+	// FilesInProgram is the whole type graph: our code plus every declaration it pulled in.
 	FilesInProgram int
 
 	// FilesWalked is how many files the rules actually visited.
@@ -53,14 +53,14 @@ type Coverage struct {
 
 	// RulesOffered counts, per rule name, how many files the rule was actually handed. A rule that
 	// was never wired is offered zero; a rule that was offered files and declined all of them is
-	// offered many and listens to none. Those are opposite defects — nobody configured it, against
-	// it is configured and satisfied — and before this existed the coverage note described both with
+	// offered many and listens to none. Those are opposite defects (nobody configured it, against
+	// it is configured and satisfied), and before this existed the coverage note described both with
 	// one sentence, so a satisfied rule read exactly like a dead one.
 	RulesOffered map[string]int
 
 	// RulesListening counts, per rule name, how many files that rule chose to listen to. A rule that
 	// declined every file reads as zero here, which is the difference between "ran and found nothing"
-	// and "never actually looked" — the distinction a bare finding count erases.
+	// and "never actually looked": the distinction a bare finding count erases.
 	RulesListening map[string]int
 
 	// RulesReporting counts, per rule name, how many findings that rule produced.
@@ -85,7 +85,7 @@ type Coverage struct {
 	// that never said why.
 	//
 	// Measured rather than enforced, deliberately. Requiring a reason today would turn 281 working
-	// suppressions red for no defect, so the number is printed every run instead — which is what
+	// suppressions red for no defect, so the number is printed every run instead, which is what
 	// lets the convention be tightened later from evidence rather than from a guess.
 	SuppressedWithoutReason int
 
@@ -247,7 +247,8 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 	// The derived rules' program fingerprints depend on each rule's options, so they are made on first ask, once
 	// per rule and options for the whole walk, and every worker shares them. See programFingerprintMemo.
 	programFingerprints := &programFingerprintMemo{entries: map[programFingerprintKey]*programFingerprintEntry{}}
-	var fingerprints, shapeFingerprints map[tspath.PathKey][sha256.Size]byte
+	var fingerprints map[tspath.PathKey][sha256.Size]byte
+	var shapeFingerprints map[tspath.PathKey][sha256.Size]byte
 	if g.FindingsReuse != nil && !g.CollectTimings {
 		fingerprints = g.TypeFingerprints()
 		shapeFingerprints = fingerprints
@@ -499,10 +500,12 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 				//
 				// Declared rather than lazy on purpose. A getter that acquired on first use would work
 				// until two rules on one file both asked, and the second acquisition would happen inside
-				// the first's window — a deadlock whose shape is invisible at both call sites. The
+				// the first's window: a deadlock whose shape is invisible at both call sites. The
 				// declaration is legible at both ends and cannot deadlock by being used twice.
 				var fileChecker *checker.Checker
-				release := func() {}
+				release := func() {
+					// Nothing to release: no rule here asked for a checker, so none was acquired.
+				}
 				if anyRuleNeedsTypeChecker(walkRules) {
 					fileChecker, release = g.CheckerForFile(ctx, checkerFile)
 				}
@@ -515,7 +518,8 @@ func (g *Graph) Walk(ctx context.Context, files []*ast.SourceFile, rules []rule.
 				// worker's totals at once, before the crash check, exactly as passing the totals in did.
 				recording := reuse != nil && (replayed == nil || !hits.typed || !hits.shaped || !hits.design || !hits.derived)
 				listeningTarget, offeredTarget := localListening, localOffered
-				var fileListening, fileOffered map[string]int
+				var fileListening map[string]int
+				var fileOffered map[string]int
 				if recording {
 					fileListening = make(map[string]int, len(walkRules))
 					fileOffered = make(map[string]int, len(walkRules))
@@ -788,6 +792,10 @@ func (c *ruleNameCatalog) exists(name string) bool {
 	return false
 }
 
+// housePlugins are the plugins that are ours, whose every rule cohere runs, so a name under one that
+// cohere doesn't know is a typo or a stale prefix rather than a rule it hasn't ported.
+var housePlugins = map[string]bool{"adamic": true, "base": true, "nexus": true, "structure": true}
+
 // reportUnknownRuleReferences reports every rule name a disable or enable comment wrote that can only
 // be a mistake, the way ESLint does: rule id the unknown name, anchored on the whole comment, message
 // beginning with ESLint's own sentence so the two engines read alike (measured on 10.8.1). A name that is
@@ -1047,7 +1055,7 @@ func (d *fileDispatcher) slotFor(ruleName string) *ruleSlot {
 		}
 
 		// Filtering here rather than after the walk is what keeps a suppressed finding from
-		// ever existing as a finding. The alternative — collect everything, drop some later —
+		// ever existing as a finding. The alternative (collect everything, drop some later)
 		// leaves a window where a caller can read the unfiltered slice and report a number the
 		// user will never see explained.
 		if slot.timing != nil {
@@ -1093,6 +1101,8 @@ func (d *fileDispatcher) slotFor(ruleName string) *ruleSlot {
 // the file it was handed for was over. See fileDispatcher.
 func (d *fileDispatcher) requireFile(ruleName string, function string) {
 	if d.sourceFile == nil {
+		// Invariant: the walk calls a rule's Context only while that rule's file is dispatched, so only a rule
+		// that kept its Context past Run and its listeners gets here, a bug in that rule this names.
 		panic(fmt.Sprintf("rule %s called its Context's %s after its file's dispatch ended; a Context is good only "+
 			"during Run and the listeners Run returns", ruleName, function))
 	}
@@ -1439,10 +1449,6 @@ func bareRuleName(name string) string {
 	}
 	return name
 }
-
-// housePlugins are the plugins that are ours, whose every rule cohere runs, so a name under one that
-// cohere doesn't know is a typo or a stale prefix rather than a rule it hasn't ported.
-var housePlugins = map[string]bool{"adamic": true, "base": true, "nexus": true, "structure": true}
 
 // pluginOf is a rule name's plugin, everything before its last `/`, empty for a core rule:
 // `@typescript-eslint/no-x` is `@typescript-eslint`, `@next/next/no-x` is `@next/next`.

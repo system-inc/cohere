@@ -15,7 +15,7 @@ import (
 // LintCacheFinding stores MessageId and not the description. That is only safe if an id determines
 // its text, because printRuleDiagnostic (cmd/cohere/main.go) prints Message.Description directly and
 // nothing in the tree derives text from an id. Where an id does not determine its text, replaying a
-// cached finding prints an empty or wrong message beside a correct file, range and rule — a cache
+// cached finding prints an empty or wrong message beside a correct file, range and rule: a cache
 // serving a confidently wrong answer, which is the one failure mode here that looks like success.
 //
 // This test measures the property rather than asserting the conclusion, so it keeps being useful
@@ -85,7 +85,7 @@ func messageIdTexts(test *testing.T) (staticTexts map[string]map[string]struct{}
 //
 // This measures the property the format depends on rather than asserting a conclusion, so it keeps
 // earning its place: it names exactly which ids are ambiguous, and it fails if that population ever
-// becomes empty. An empty population would mean the scan broke, not that the tree got cleaner —
+// becomes empty. An empty population would mean the scan broke, not that the tree got cleaner, since
 // rules interpolating types into messages is normal and permanent.
 //
 // The stakes, restated because this is the comment a future reader checks before deciding the text
