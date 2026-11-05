@@ -57,8 +57,8 @@ func maybeWrapJsxElementInParens(path *Path, elem Doc, options *Options) Doc {
 
 // shouldBreakJsxElement is upstream's shouldBreakJsxElement.
 func shouldBreakJsxElement(path *Path) bool {
-	isCallArgument := func(value any, key any, _ int, _ bool) bool {
-		node, _ := value.(Node)
+	isCallArgument := func(value PathValue, key string, _ int, _ bool) bool {
+		node, _ := value.Node()
 		return key == "arguments" && isCallExpression(node)
 	}
 	return path.Match(
@@ -225,7 +225,7 @@ func printJsxOpeningElement(path *Path, options *Options, print PrintFunc) Doc {
 			} else {
 				separator = attributeLine
 			}
-			return concatIn(path, separator, print(nil, nil))
+			return concatIn(path, separator, print("", nil))
 		}, "attributes")),
 		),
 	}
@@ -358,7 +358,7 @@ func printJsxSpreadAttributeOrChild(path *Path, options *Options, print PrintFun
 	}
 	return concatIn(path, doc.Text("{"),
 		call(path, func(path *Path) Doc {
-			printed := concatIn(path, doc.Text("..."), print(nil, nil))
+			printed := concatIn(path, doc.Text("..."), print("", nil))
 			if !hasAnyComment(node(path)) {
 				return printed
 			}

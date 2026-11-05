@@ -107,16 +107,16 @@ func chooseLayout(path *Path, options *Options, print PrintFunc, leftDoc Doc, ri
 
 	isTail := !isAssignment(rightNode)
 	shouldUseChainFormatting := path.Match(
-		func(value any, _ any, _ int, _ bool) bool {
-			matched, _ := value.(Node)
+		func(value PathValue, _ string, _ int, _ bool) bool {
+			matched, _ := value.Node()
 			return isAssignment(matched)
 		},
-		func(value any, _ any, _ int, _ bool) bool {
-			matched, _ := value.(Node)
+		func(value PathValue, _ string, _ int, _ bool) bool {
+			matched, _ := value.Node()
 			return isAssignmentOrVariableDeclarator(matched)
 		},
-		func(value any, _ any, _ int, _ bool) bool {
-			matched, _ := value.(Node)
+		func(value PathValue, _ string, _ int, _ bool) bool {
+			matched, _ := value.Node()
 			return !isTail ||
 				(!matched.Is("ExpressionStatement") &&
 					!matched.Is("VariableDeclaration"))
@@ -214,7 +214,7 @@ func shouldBreakAfterOperator(path *Path, options *Options, print PrintFunc, has
 	}
 
 	current := rightNode
-	var propertiesForPath []any
+	var propertiesForPath []string
 	for {
 		if current.Is("UnaryExpression") ||
 			current.Is("AwaitExpression") ||

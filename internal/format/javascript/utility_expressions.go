@@ -44,30 +44,30 @@ func getLeftSide(node Node) Node {
 
 // getLeftSidePathName is upstream's getLeftSidePathName. Note its order differs from getLeftSide's:
 // object before callee, as upstream has it.
-func getLeftSidePathName(node Node) []any {
+func getLeftSidePathName(node Node) pathSelector {
 	if node.Truthy("expressions") {
-		return []any{"expressions", 0}
+		return pathSelector{property: "expressions", index: 0, endsInIndex: true}
 	}
 	if node.Truthy("left") {
-		return []any{"left"}
+		return pathSelector{property: "left"}
 	}
 	if node.Truthy("test") {
-		return []any{"test"}
+		return pathSelector{property: "test"}
 	}
 	if node.Truthy("object") {
-		return []any{"object"}
+		return pathSelector{property: "object"}
 	}
 	if node.Truthy("callee") {
-		return []any{"callee"}
+		return pathSelector{property: "callee"}
 	}
 	if node.Truthy("tag") {
-		return []any{"tag"}
+		return pathSelector{property: "tag"}
 	}
 	if node.Truthy("argument") {
-		return []any{"argument"}
+		return pathSelector{property: "argument"}
 	}
 	if node.Truthy("expression") {
-		return []any{"expression"}
+		return pathSelector{property: "expression"}
 	}
 	// Invariant: both callers first check hasNakedLeftSide, and every node type it accepts has one of these
 	// children, as upstream assumes.

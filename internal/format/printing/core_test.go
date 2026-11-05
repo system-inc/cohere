@@ -35,19 +35,19 @@ type toyNode struct {
 }
 
 func (node *toyNode) Type() string { return node.Kind }
-func (node *toyNode) Field(name string) any {
+func (node *toyNode) Field(name string) Value[*toyNode] {
 	switch name {
 	case "children":
-		return node.Children
+		return ListValue(node.Children)
 	case "label":
 		if node.Label == nil {
-			return nil
+			return Value[*toyNode]{}
 		}
-		return node.Label
+		return NodeValue(node.Label)
 	case "comments":
-		return node.Comments
+		return ListValue(node.Comments)
 	}
-	return nil
+	return Value[*toyNode]{}
 }
 func (node *toyNode) CommentData() *CommentFields[*toyNode] { return &node.CommentFields }
 
@@ -141,8 +141,11 @@ func toyProgram(random *rand.Rand) (*toyNode, []*toyNode, string) {
 	return program, source.comments, source.text.String()
 }
 
-func toyPrinter() *Printer[*toyNode] {
-	printer := &Printer[*toyNode]{}
+// toySettings is the toy language's per-print state, which it has none of.
+type toySettings struct{}
+
+func toyPrinter() *Printer[*toyNode, toySettings, NoArguments] {
+	printer := &Printer[*toyNode, toySettings, NoArguments]{}
 	printer.LocStart = func(node *toyNode) int { return node.From }
 	printer.LocEnd = func(node *toyNode) int { return node.To }
 	printer.VisitorKeys = func(node *toyNode) []string {
@@ -165,20 +168,28 @@ func toyPrinter() *Printer[*toyNode] {
 	// inside a list dangles on that list. Without one, a mutation that misclassified end-of-line comments
 	// survived, because default attachment sends both placements to the same node; the JavaScript
 	// handlers branch on placement, so the toy has to as well.
-	printer.HandleComments.EndOfLine = func(context *CommentContext[*toyNode]) bool {
+	printer.HandleComments.EndOfLine = func(context *CommentContext[*toyNode, toySettings, NoArguments]) bool {
 		if context.HasEnclosing && context.Enclosing.Kind == "List" && context.Comment.Kind == "Block" {
 			AddDanglingComment(context.Enclosing, context.Comment, "")
 			return true
 		}
 		return false
 	}
-	printer.PrintComment = func(path *AstPath[*toyNode], options *Options[*toyNode]) doc.Doc {
+	printer.PrintComment = func(
+		path *AstPath[*toyNode, toySettings],
+		options *Options[*toyNode, toySettings, NoArguments],
+	) doc.Doc {
 		comment, _ := path.Node()
 		return doc.Text(options.OriginalText[comment.From:comment.To])
 	}
-	printer.Print = func(path *AstPath[*toyNode], options *Options[*toyNode], print PrintFunc, _ any) doc.Doc {
+	printer.Print = func(
+		path *AstPath[*toyNode, toySettings],
+		options *Options[*toyNode, toySettings, NoArguments],
+		print PrintFunc[NoArguments],
+		_ *NoArguments,
+	) doc.Doc {
 		node, _ := path.Node()
-		children := Map(path, func(*AstPath[*toyNode], int, any) doc.Doc { return print(nil, nil) }, "children")
+		children := Map(path, func(*AstPath[*toyNode, toySettings], int) doc.Doc { return print("", nil) }, "children")
 		switch node.Kind {
 		case "Program":
 			return doc.Concat{
@@ -372,7 +383,7 @@ func TestCoreAgreesWithUpstream(test *testing.T) {
 			}
 			continue
 		}
-		options := &Options[*toyNode]{
+		options := &Options[*toyNode, toySettings, NoArguments]{
 			Printer:                    toyPrinter(),
 			OriginalText:               testCase.Text,
 			EmbeddedLanguageFormatting: "off",

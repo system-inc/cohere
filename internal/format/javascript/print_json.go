@@ -17,7 +17,7 @@ import (
 
 // estreeJSONPrinter is upstream's estree-json printer. The json-stringify parser refuses comments,
 // so none of the comment hooks are needed.
-var estreeJSONPrinter = &printing.Printer[*estree.Node]{
+var estreeJSONPrinter = &printing.Printer[*estree.Node, *settings, printArguments]{
 	Print:       printJSON,
 	LocStart:    estree.LocStart,
 	LocEnd:      estree.LocEnd,
@@ -44,7 +44,7 @@ func jsonVisitorKeys(node Node) []string {
 }
 
 // printJSON is upstream's printJson.
-func printJSON(path *Path, options *Options, print PrintFunc, _ any) Doc {
+func printJSON(path *Path, options *Options, print PrintFunc, _ *printArguments) Doc {
 	current := node(path)
 	switch current.Type() {
 	case "JsonRoot":
@@ -58,7 +58,7 @@ func printJSON(path *Path, options *Options, print PrintFunc, _ any) Doc {
 			if node(path) == nil {
 				return doc.Text("null")
 			}
-			return print(nil, nil)
+			return print("", nil)
 		}, "elements")
 		return concatIn(
 			path,
@@ -120,7 +120,7 @@ func printJSON(path *Path, options *Options, print PrintFunc, _ any) Doc {
 		return doc.Text(current.String("name"))
 	case "TemplateLiteral":
 		// There is only one `TemplateElement`
-		return print([]any{"quasis", 0}, nil)
+		return callElement(path, func(*Path) Doc { return print("", nil) }, 0, "quasis")
 	case "TemplateElement":
 		value, isTemplateValue := current.Get("value").(*estree.TemplateValue)
 		if !isTemplateValue || value == nil || value.Cooked == nil {

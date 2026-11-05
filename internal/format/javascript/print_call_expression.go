@@ -41,7 +41,7 @@ func printCallExpression(path *Path, options *Options, print PrintFunc) Doc {
 		isTestCall(current, parentOf(path)) {
 		var printed []Doc
 		iterateCallArgumentsPath(path, func(*Path, int) {
-			printed = append(printed, print(nil, nil))
+			printed = append(printed, print("", nil))
 		})
 		// Upstream skips this return when `printed[0].label?.embed`. The JavaScript printer has no embed
 		// hook (printer.go), so no printed argument carries that label and the condition always holds.
@@ -61,7 +61,7 @@ func printCallExpression(path *Path, options *Options, print PrintFunc) Doc {
 	if !isDynamicImportLike &&
 		!isNewExpression &&
 		isMemberish(current.Child("callee")) {
-		names := []any{"callee"}
+		names := []string{"callee"}
 		if current.Child("callee").Is("ChainExpression") {
 			names = append(names, "expression")
 		}

@@ -14,7 +14,7 @@ import (
 	ecmascripttext "github.com/system-inc/cohere/internal/lint/ecmascript/text"
 )
 
-func genericPrint(path *astPath, options *printerOptions, print printing.PrintFunc, _ any) doc.Doc {
+func genericPrint(path *astPath, options *printerOptions, print printFunc, _ *printing.NoArguments) doc.Doc {
 	node := currentNode(path)
 
 	switch node.Type() {

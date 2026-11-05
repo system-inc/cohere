@@ -9,10 +9,9 @@ import (
 
 	"github.com/system-inc/cohere/internal/format/doc"
 	"github.com/system-inc/cohere/internal/format/estree"
-	"github.com/system-inc/cohere/internal/format/printing"
 )
 
-func printCommaSeparatedValueGroup(path *astPath, options *printerOptions, print printing.PrintFunc) doc.Doc {
+func printCommaSeparatedValueGroup(path *astPath, options *printerOptions, print printFunc) doc.Doc {
 	node := currentNode(path)
 	parentNode, _ := path.Parent()
 	parentParentNode, _ := path.Grandparent()
@@ -109,10 +108,10 @@ func printCommaSeparatedValueGroup(path *astPath, options *printerOptions, print
 			iNextNode.String("value") == ";" &&
 			path.Match(
 				nil,
-				func(node any, key any, _ int, _ bool) bool {
+				func(node pathValue, key string, _ int, _ bool) bool {
 					return key == "groups" && asNode(node).Type() == "value-paren_group"
 				},
-				func(node any, key any, _ int, _ bool) bool {
+				func(node pathValue, key string, _ int, _ bool) bool {
 					return key == "group" && asNode(node).Type() == "value-func" && asNode(node).String("value") == "if"
 				},
 			) {

@@ -10,14 +10,14 @@ import (
 type CommentFilter[N Node[N]] func(comment N) bool
 
 // printComment is upstream's printComment, src/main/comments/print.js: mark it printed, then print it.
-func printComment[N Node[N]](path *AstPath[N], options *Options[N]) doc.Doc {
+func printComment[N Node[N], S any, A any](path *AstPath[N, S], options *Options[N, S, A]) doc.Doc {
 	comment, _ := path.Node()
 	comment.CommentData().Printed = true
 	return options.Printer.PrintComment(path, options)
 }
 
 // printLeadingComment is upstream's printLeadingComment.
-func printLeadingComment[N Node[N]](path *AstPath[N], options *Options[N]) doc.Doc {
+func printLeadingComment[N Node[N], S any, A any](path *AstPath[N, S], options *Options[N, S, A]) doc.Doc {
 	comment, _ := path.Node()
 	parts := doc.Concat{printComment(path, options)}
 	printer := options.Printer
@@ -53,7 +53,11 @@ type trailingPrinted struct {
 }
 
 // printTrailingComment is upstream's printTrailingComment.
-func printTrailingComment[N Node[N]](path *AstPath[N], options *Options[N], previous trailingPrinted) trailingPrinted {
+func printTrailingComment[N Node[N], S any, A any](
+	path *AstPath[N, S],
+	options *Options[N, S, A],
+	previous trailingPrinted,
+) trailingPrinted {
 	comment, _ := path.Node()
 	printed := printComment(path, options)
 	printer := options.Printer
@@ -104,13 +108,13 @@ type DanglingOptions[N Node[N]] struct {
 
 // PrintDanglingComments is upstream's printDanglingComments: the comments attached to the current node
 // that neither lead nor trail it, joined by hardlines.
-func PrintDanglingComments[N Node[N]](
-	path *AstPath[N],
-	options *Options[N],
+func PrintDanglingComments[N Node[N], S any, A any](
+	path *AstPath[N, S],
+	options *Options[N, S, A],
 	danglingOptions DanglingOptions[N],
 ) doc.Doc {
 	node, isNode := path.Node()
-	if !isNode || isNil(node) {
+	if !isNode || isNilNode(node) {
 		return doc.Text("")
 	}
 	dangling := map[N]bool{}
@@ -127,7 +131,7 @@ func PrintDanglingComments[N Node[N]](
 	}
 
 	var parts []doc.Doc
-	for _, printed := range Map(path, func(path *AstPath[N], _ int, _ any) doc.Doc {
+	for _, printed := range Map(path, func(path *AstPath[N, S], _ int) doc.Doc {
 		comment, _ := path.Node()
 		if dangling[comment] {
 			return printComment(path, options)
@@ -149,9 +153,13 @@ func PrintDanglingComments[N Node[N]](
 }
 
 // PrintLeadingComments is upstream's printLeadingComments. A nil filter includes every comment.
-func PrintLeadingComments[N Node[N]](path *AstPath[N], options *Options[N], filter CommentFilter[N]) doc.Doc {
+func PrintLeadingComments[N Node[N], S any, A any](
+	path *AstPath[N, S],
+	options *Options[N, S, A],
+	filter CommentFilter[N],
+) doc.Doc {
 	node, isNode := path.Node()
-	if !isNode || isNil(node) {
+	if !isNode || isNilNode(node) {
 		return doc.Text("")
 	}
 	leading := map[N]bool{}
@@ -165,7 +173,7 @@ func PrintLeadingComments[N Node[N]](path *AstPath[N], options *Options[N], filt
 	}
 
 	var parts doc.Concat
-	for _, printed := range Map(path, func(path *AstPath[N], _ int, _ any) doc.Doc {
+	for _, printed := range Map(path, func(path *AstPath[N, S], _ int) doc.Doc {
 		comment, _ := path.Node()
 		if leading[comment] {
 			return printLeadingComment(path, options)
@@ -182,9 +190,13 @@ func PrintLeadingComments[N Node[N]](path *AstPath[N], options *Options[N], filt
 // PrintTrailingComments is upstream's printTrailingComments. Each trailing comment is printed even when
 // filtered out, because the next one's layout depends on the previous one's; only the kept ones join the
 // result, exactly as upstream threads printedTrailingComment through every trailing comment.
-func PrintTrailingComments[N Node[N]](path *AstPath[N], options *Options[N], filter CommentFilter[N]) doc.Doc {
+func PrintTrailingComments[N Node[N], S any, A any](
+	path *AstPath[N, S],
+	options *Options[N, S, A],
+	filter CommentFilter[N],
+) doc.Doc {
 	node, isNode := path.Node()
-	if !isNode || isNil(node) {
+	if !isNode || isNilNode(node) {
 		return doc.Text("")
 	}
 	comments := node.CommentData().Comments
@@ -204,7 +216,7 @@ func PrintTrailingComments[N Node[N]](path *AstPath[N], options *Options[N], fil
 
 	var docs doc.Concat
 	var previous trailingPrinted
-	path.Each(func(path *AstPath[N], _ int, _ any) {
+	path.Each(func(path *AstPath[N, S], _ int) {
 		comment, _ := path.Node()
 		if !trailing[comment] {
 			return
@@ -218,9 +230,9 @@ func PrintTrailingComments[N Node[N]](path *AstPath[N], options *Options[N], fil
 }
 
 // PrintCommentsSeparately is upstream's printCommentsSeparately.
-func PrintCommentsSeparately[N Node[N]](
-	path *AstPath[N],
-	options *Options[N],
+func PrintCommentsSeparately[N Node[N], S any, A any](
+	path *AstPath[N, S],
+	options *Options[N, S, A],
 	filter CommentFilter[N],
 ) (leading doc.Doc, trailing doc.Doc) {
 	return PrintLeadingComments(path, options, filter), PrintTrailingComments(path, options, filter)
@@ -228,7 +240,12 @@ func PrintCommentsSeparately[N Node[N]](
 
 // PrintComments is upstream's printComments: the node's doc between its leading and trailing comments,
 // keeping its label.
-func PrintComments[N Node[N]](path *AstPath[N], printed doc.Doc, options *Options[N], filter CommentFilter[N]) doc.Doc {
+func PrintComments[N Node[N], S any, A any](
+	path *AstPath[N, S],
+	printed doc.Doc,
+	options *Options[N, S, A],
+	filter CommentFilter[N],
+) doc.Doc {
 	leading := PrintLeadingComments(path, options, filter)
 	trailing := PrintTrailingComments(path, options, filter)
 	if isEmptyText(leading) && isEmptyText(trailing) {
@@ -248,7 +265,7 @@ func isEmptyText(document doc.Doc) bool {
 
 // ensureAllCommentsPrinted is upstream's ensureAllCommentsPrinted: a comment no printer printed is lost
 // output, so it is an error rather than a silent deletion.
-func ensureAllCommentsPrinted[N Node[N]](options *Options[N]) error {
+func ensureAllCommentsPrinted[N Node[N], S any, A any](options *Options[N, S, A]) error {
 	for _, comment := range options.Comments {
 		if !comment.CommentData().Printed && !options.printedComments[comment] {
 			start := options.Printer.LocStart(comment)

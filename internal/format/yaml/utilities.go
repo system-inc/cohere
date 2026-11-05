@@ -85,13 +85,10 @@ func isLastDescendantNode(path *astPath) bool {
 
 	stack := path.Stack()
 	for index := 1; index < len(stack); index++ {
-		item := stack[index]
-		parentItem := stack[index-1]
-
-		// Every list a YAML node holds is a []*unist.Node (children and the comment lists), and an
-		// index on the stack is an int.
-		if list, isList := parentItem.([]*unist.Node); isList {
-			if position, isNumber := item.(int); isNumber && position != len(list)-1 {
+		// Every list a YAML node holds is a list of nodes (children and the comment lists), and the frame
+		// under one is reached by an index.
+		if list, isList := stack[index-1].Value.Nodes(); isList {
+			if stack[index].Name.IsIndex && stack[index].Name.Index != len(list)-1 {
 				return false
 			}
 		}

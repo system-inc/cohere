@@ -128,7 +128,7 @@ func printMemberChain(path *Path, options *Options, print PrintFunc) Doc {
 		} else {
 			unshift(printedNode{
 				node:    current,
-				printed: print(nil, nil),
+				printed: print("", nil),
 			})
 		}
 		return struct{}{}

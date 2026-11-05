@@ -127,11 +127,10 @@ func (memory *docMemory) release() {
 
 // docMemoryOf is the path's print's docMemory, or nil for the heap.
 func docMemoryOf(path *Path) *docMemory {
-	formatSettings, _ := path.Settings.(*settings)
-	if formatSettings == nil {
+	if path.Settings == nil {
 		return nil
 	}
-	return formatSettings.docs
+	return path.Settings.docs
 }
 
 // concatIn is concat from the format's docMemory, when the path's print has one: its parts from the slab

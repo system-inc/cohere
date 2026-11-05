@@ -19,8 +19,8 @@ func TestFindAncestorAgreesWithAncestors(test *testing.T) {
 	matched := map[string]int{}
 	checked := 0
 
-	var visit func(path *AstPath[*toyNode])
-	visit = func(path *AstPath[*toyNode]) {
+	var visit func(path *AstPath[*toyNode, toySettings])
+	visit = func(path *AstPath[*toyNode, toySettings]) {
 		for name, predicate := range predicates {
 			expected, expectedFound := searchAncestors(path, predicate)
 			actual, actualFound := path.FindAncestor(predicate)
@@ -40,16 +40,16 @@ func TestFindAncestorAgreesWithAncestors(test *testing.T) {
 		}
 		checked++
 		if node, _ := path.Node(); node.Label != nil {
-			Call(path, func(path *AstPath[*toyNode]) struct{} {
+			Call(path, func(path *AstPath[*toyNode, toySettings]) struct{} {
 				visit(path)
 				return struct{}{}
 			}, "label")
 		}
-		path.Each(func(path *AstPath[*toyNode], _ int, _ any) { visit(path) }, "children")
+		path.Each(func(path *AstPath[*toyNode, toySettings], _ int) { visit(path) }, "children")
 	}
 	for seed := int64(1); seed <= 40; seed++ {
 		root, _, _ := toyProgram(rand.New(rand.NewSource(seed)))
-		visit(NewAstPath(root))
+		visit(NewAstPath(root, toySettings{}))
 	}
 
 	if matched["list"] == 0 || matched["program"] == 0 || matched["none"] != 0 {
@@ -62,7 +62,7 @@ func TestFindAncestorAgreesWithAncestors(test *testing.T) {
 }
 
 // searchAncestors is FindAncestor as it was written before #vbjv3d6: a search of the Ancestors list.
-func searchAncestors(path *AstPath[*toyNode], predicate func(*toyNode) bool) (*toyNode, bool) {
+func searchAncestors(path *AstPath[*toyNode, toySettings], predicate func(*toyNode) bool) (*toyNode, bool) {
 	for _, ancestor := range path.Ancestors() {
 		if predicate(ancestor) {
 			return ancestor, true
@@ -82,7 +82,7 @@ func TestPathReadsItsFrames(test *testing.T) {
 	label := &toyNode{Kind: "Atom", Value: "#tag"}
 	list := &toyNode{Kind: "List", Label: label, Children: []*toyNode{first, second}}
 	program := &toyNode{Kind: "Program", Children: []*toyNode{list}}
-	path := NewAstPath(program)
+	path := NewAstPath(program, toySettings{})
 
 	if key, hasKey := path.Key(); hasKey || key != "" || !path.IsRoot() || path.IsInArray() {
 		test.Fatalf("at the root, Key is %q (%t), IsRoot %t, IsInArray %t",
@@ -90,8 +90,8 @@ func TestPathReadsItsFrames(test *testing.T) {
 	}
 
 	visited := 0
-	path.Each(func(path *AstPath[*toyNode], _ int, _ any) {
-		path.Each(func(path *AstPath[*toyNode], index int, _ any) {
+	path.Each(func(path *AstPath[*toyNode, toySettings], _ int) {
+		path.Each(func(path *AstPath[*toyNode, toySettings], index int) {
 			if index != 1 {
 				return
 			}
@@ -111,7 +111,7 @@ func TestPathReadsItsFrames(test *testing.T) {
 				test.Errorf("the second child's neighbours: previous %v (%t), next %t, IsLast %t, IsFirst %t",
 					previous, hasPrevious, hasNext, path.IsLast(), path.IsFirst())
 			}
-			if parent != list || grandparent != program || len(path.Siblings().([]*toyNode)) != 2 || path.Siblings().([]*toyNode)[0] != first {
+			if parent != list || grandparent != program || len(path.Siblings()) != 2 || path.Siblings()[0] != first {
 				test.Errorf("the second child's family: parent %v, grandparent %v, siblings %v",
 					parent, grandparent, path.Siblings())
 			}
@@ -126,9 +126,8 @@ func TestPathReadsItsFrames(test *testing.T) {
 				hasIndex bool
 			}
 			var steps []step
-			record := func(value any, nameValue any, index int, hasIndex bool) bool {
-				node, _ := value.(*toyNode)
-				name, _ := nameValue.(string)
+			record := func(value Value[*toyNode], name string, index int, hasIndex bool) bool {
+				node, _ := value.Node()
 				steps = append(steps, step{node: node, name: name, index: index, hasIndex: hasIndex})
 				return true
 			}
@@ -146,7 +145,7 @@ func TestPathReadsItsFrames(test *testing.T) {
 				test.Error("Match went past the root")
 			}
 
-			atParent := CallParent(path, func(path *AstPath[*toyNode]) *toyNode {
+			atParent := CallParent(path, func(path *AstPath[*toyNode, toySettings]) *toyNode {
 				node, _ := path.Node()
 				return node
 			}, 0)
@@ -155,20 +154,20 @@ func TestPathReadsItsFrames(test *testing.T) {
 			}
 		}, "children")
 
-		labelKey := Call(path, func(path *AstPath[*toyNode]) string {
+		labelKey := Call(path, func(path *AstPath[*toyNode, toySettings]) string {
 			key, _ := path.Key()
 			if path.IsInArray() || path.Siblings() != nil {
 				test.Error("the label is not in a list, but the path says it is")
 			}
 			return key
 		}, "label")
-		element := Call(path, func(path *AstPath[*toyNode]) *toyNode {
+		element := CallElement(path, func(path *AstPath[*toyNode, toySettings]) *toyNode {
 			node, _ := path.Node()
 			if key, _ := path.Key(); key != "children" {
 				test.Errorf("CallElement's element has Key %q", key)
 			}
 			return node
-		}, "children", 0)
+		}, 0, "children")
 		if back, _ := path.Node(); labelKey != "label" || element != first || back != list {
 			test.Errorf("Call reached key %q, CallElement %v, and the path is back at %v", labelKey, element, back)
 		}

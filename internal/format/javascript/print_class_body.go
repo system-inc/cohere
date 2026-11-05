@@ -39,7 +39,7 @@ func printClassBody(path *Path, options *Options, print PrintFunc) Doc {
 			firstMember = member
 		}
 		isEmpty = false
-		parts = append(parts, print(nil, nil))
+		parts = append(parts, print("", nil))
 
 		if !isObjectType &&
 			(shouldPrintSemicolonAfterClassProperty(member, next, options) ||
@@ -90,8 +90,8 @@ func printClassBody(path *Path, options *Options, print PrintFunc) Doc {
 		// type
 		if path.Match(
 			nil,
-			func(_ any, name any, _ int, _ bool) bool { return name == "typeAnnotation" },
-			func(_ any, name any, _ int, _ bool) bool { return name == "typeAnnotation" },
+			func(_ PathValue, name string, _ int, _ bool) bool { return name == "typeAnnotation" },
+			func(_ PathValue, name string, _ int, _ bool) bool { return name == "typeAnnotation" },
 			shouldHugTheOnlyParameterPredicate,
 		) {
 			return content

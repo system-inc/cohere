@@ -12,7 +12,7 @@ import (
 )
 
 // estreePrinter is upstream's printer, src/language-js/printers.js: the hooks the print core calls.
-var estreePrinter = &printing.Printer[*estree.Node]{
+var estreePrinter = &printing.Printer[*estree.Node, *settings, printArguments]{
 	Print:                printEstree,
 	LocStart:             estree.LocStart,
 	LocEnd:               estree.LocEnd,
@@ -24,7 +24,7 @@ var estreePrinter = &printing.Printer[*estree.Node]{
 	IsBlockComment:       isBlockComment,
 	PrintComment:         printComment,
 	GetCommentChildNodes: getCommentChildNodes,
-	HandleComments: printing.CommentHandlers[*estree.Node]{
+	HandleComments: printing.CommentHandlers[*estree.Node, *settings, printArguments]{
 		OwnLine:   handleOwnLineComment,
 		EndOfLine: handleEndOfLineComment,
 		Remaining: handleRemainingComment,

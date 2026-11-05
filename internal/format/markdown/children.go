@@ -10,14 +10,14 @@ import (
 // processor is upstream's events.processor: the doc for the child at path, or false to skip it.
 type processor func(path *astPath) (doc.Doc, bool)
 
-func printChildren(path *astPath, options *options, print printing.PrintFunc, process processor) doc.Doc {
+func printChildren(path *astPath, options *options, print printFunc, process processor) doc.Doc {
 	if process == nil {
-		process = func(*astPath) (doc.Doc, bool) { return print(nil, nil), true }
+		process = func(*astPath) (doc.Doc, bool) { return print("", nil), true }
 	}
 
 	parts := doc.Concat{}
 
-	path.Each(func(path *astPath, _ int, _ any) {
+	path.Each(func(path *astPath, _ int) {
 		result, keep := process(path)
 		if keep {
 			if len(parts) > 0 && shouldPrePrintHardline(path) {

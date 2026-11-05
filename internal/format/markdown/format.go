@@ -24,7 +24,7 @@ var visitorKeys = map[string][]string{
 }
 
 // mdastPrinter is src/language-markdown/printers.js.
-var mdastPrinter = &printing.Printer[*Node]{
+var mdastPrinter = &printing.Printer[*Node, *settings, printing.NoArguments]{
 	Print:       printMdast,
 	LocStart:    locStart,
 	LocEnd:      locEnd,

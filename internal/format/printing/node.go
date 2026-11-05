@@ -27,15 +27,15 @@ package printing
 //
 // It must be a pointer type. The print cache and comment identity are keyed on the node, the way
 // upstream keys on object identity, and a value type would copy a node and lose both.
-type Node[N any] interface {
+type Node[N comparable] interface {
 	comparable
 
 	// Type is the node's type name, upstream's node.type.
 	Type() string
 
-	// Field is upstream's node[name]: a node, a slice of nodes, nil, or a scalar. It must answer
-	// "comments" with the node's attached comments.
-	Field(name string) any
+	// Field is upstream's node[name]: a node, a list of nodes, a leaf the printer reads back, or missing.
+	// It must answer "comments" with the node's attached comments.
+	Field(name string) Value[N]
 
 	// CommentData is the node's comment bookkeeping, for the node and for a comment node alike.
 	CommentData() *CommentFields[N]

@@ -22,10 +22,9 @@ func printOptionalToken(path *Path) Doc {
 
 // printDefiniteToken is upstream's printDefiniteToken.
 func printDefiniteToken(path *Path) Doc {
-	if node(path).Bool("definite") || path.Match(nil, func(value any, name any, _ int, _ bool) bool {
-		parent, _ := value.(Node)
-		key, _ := name.(string)
-		return key == "id" && parent.Is("VariableDeclarator") && parent.Bool("definite")
+	if node(path).Bool("definite") || path.Match(nil, func(value PathValue, name string, _ int, _ bool) bool {
+		parent, _ := value.Node()
+		return name == "id" && parent.Is("VariableDeclarator") && parent.Bool("definite")
 	}) {
 		return concatIn(path, doc.Text("!"))
 	}

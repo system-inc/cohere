@@ -23,8 +23,9 @@ import (
 
 type (
 	unistNode = unist.Node
-	astPath   = printing.AstPath[*unist.Node]
-	options   = printing.Options[*unist.Node]
+	astPath   = printing.AstPath[*unist.Node, *settings]
+	options   = printing.Options[*unist.Node, *settings, printing.NoArguments]
+	printFunc = printing.PrintFunc[printing.NoArguments]
 )
 
 // settings are the Prettier options the YAML printer reads, carried on options.Settings, and the
@@ -44,7 +45,7 @@ type settings struct {
 	isNextEmptyLinePrinted map[int]bool
 }
 
-func settingsOf(options *options) *settings { return options.Settings.(*settings) }
+func settingsOf(options *options) *settings { return options.Settings }
 
 func currentNode(path *astPath) *unist.Node {
 	node, _ := path.Node()
@@ -61,10 +62,14 @@ func nextNode(path *astPath) *unist.Node {
 	return node
 }
 
-// mapPrint is upstream's path.map(print, name): print receives each element's index as its args, as
-// upstream's map passes (path, index, value) to print, so these prints are not cached.
-func mapPrint(path *astPath, print printing.PrintFunc, names ...any) []doc.Doc {
-	return printing.Map(path, func(_ *astPath, index int, _ any) doc.Doc { return print(nil, index) }, names...)
+// uncachedPrint is the args mapPrint gives print. Upstream's map passes (path, index, value) to print,
+// so print sees args and does not cache; the printer never reads them, so one shared non-nil value does
+// what the index did, without making one per element.
+var uncachedPrint = &printing.NoArguments{}
+
+// mapPrint is upstream's path.map(print, name), whose prints are not cached.
+func mapPrint(path *astPath, print printFunc, names ...string) []doc.Doc {
+	return printing.Map(path, func(*astPath, int) doc.Doc { return print("", uncachedPrint) }, names...)
 }
 
 // fillWords is fill(join(line, words)).
@@ -80,7 +85,7 @@ func fillWords(words []string) doc.Doc {
 }
 
 // yamlPrinter is the printer object printer-yaml.js exports.
-var yamlPrinter = &printing.Printer[*unist.Node]{
+var yamlPrinter = &printing.Printer[*unist.Node, *settings, printing.NoArguments]{
 	Print:            genericPrint,
 	LocStart:         locStart,
 	LocEnd:           locEnd,
@@ -209,7 +214,7 @@ func printDocFile(
 }
 
 // genericPrint is upstream's genericPrint: a node's comments, tag and anchor around printNode.
-func genericPrint(path *astPath, options *options, print printing.PrintFunc, _ any) doc.Doc {
+func genericPrint(path *astPath, options *options, print printFunc, _ *printing.NoArguments) doc.Doc {
 	node := currentNode(path)
 	settings := settingsOf(options)
 
@@ -293,12 +298,12 @@ func genericPrint(path *astPath, options *options, print printing.PrintFunc, _ a
 		if node.NodeType == "sequenceItem" {
 			width = 2
 		}
-		endComments := printing.Map(path, func(path *astPath, _ int, _ any) doc.Doc {
+		endComments := printing.Map(path, func(path *astPath, _ int) doc.Doc {
 			var emptyLine doc.Doc = doc.Text("")
 			if printing.IsPreviousLineEmpty(options.OriginalText, locStart(currentNode(path))) {
 				emptyLine = doc.Hardline
 			}
-			return doc.Concat{emptyLine, print(nil, nil)}
+			return doc.Concat{emptyLine, print("", nil)}
 		}, "endComments")
 		parts = append(parts, alignWithSpaces(width, doc.Concat{doc.Hardline, doc.Join(doc.Hardline, endComments)}))
 	}
@@ -307,7 +312,7 @@ func genericPrint(path *astPath, options *options, print printing.PrintFunc, _ a
 }
 
 // printNode is upstream's printNode: the node itself, by type.
-func printNode(path *astPath, options *options, print printing.PrintFunc) doc.Doc {
+func printNode(path *astPath, options *options, print printFunc) doc.Doc {
 	node := currentNode(path)
 	settings := settingsOf(options)
 	switch node.NodeType {
@@ -316,12 +321,12 @@ func printNode(path *astPath, options *options, print printing.PrintFunc) doc.Do
 		shouldPrintHardline := !(isNode(lastDescendantNode, "blockLiteral", "blockFolded") &&
 			lastDescendantNode.Chomping == "keep")
 		parts := doc.Concat{}
-		path.Each(func(path *astPath, _ int, _ any) {
+		path.Each(func(path *astPath, _ int) {
 			document := currentNode(path)
 			if !path.IsFirst() {
 				parts = append(parts, doc.Hardline)
 			}
-			parts = append(parts, print(nil, nil))
+			parts = append(parts, print("", nil))
 			if shouldPrintDocumentEndMarker(path) {
 				if shouldPrintHardline {
 					parts = append(parts, doc.Hardline)
@@ -350,7 +355,9 @@ func printNode(path *astPath, options *options, print printing.PrintFunc) doc.Do
 			if hasTrailingComment(head) {
 				parts = append(
 					parts,
-					doc.Concat{doc.Text("---"), doc.Text(" "), print([]string{"head", "trailingComment"}, nil)},
+					doc.Concat{doc.Text("---"), doc.Text(" "), printing.Call(path, func(*astPath) doc.Doc {
+						return print("", nil)
+					}, "head", "trailingComment")},
 				)
 			} else {
 				parts = append(parts, doc.Text("---"))
@@ -623,20 +630,20 @@ func preprocess(ast *unist.Node, _ *options) *unist.Node { return ast }
 var prettierRcPattern = regexp.MustCompile(`(?:[/\\]|^)\.(?:prettier|stylelint|lintstaged)rc$`)
 
 // embedPrint is what an embed returns: the function that prints the node as another language.
-type embedPrint = func(printing.TextToDoc, printing.PrintFunc, *astPath, *options) (doc.Doc, error)
+type embedPrint = func(printing.TextToDoc, printFunc, *astPath, *options) (doc.Doc, error)
 
 // embed is embed.js: try to format `.prettierrc`, `.stylelintrc` and `.lintstagedrc` as JSON first.
 // When that fails, the core drops the embed and the file prints as YAML.
 func embed(path *astPath, options *options) embedPrint {
 	node := currentNode(path)
-	settings := settingsOf(options)
 
-	if node.NodeType == "root" && settings.filePath != "" && prettierRcPattern.MatchString(settings.filePath) {
+	if node.NodeType == "root" && settingsOf(options).filePath != "" &&
+		prettierRcPattern.MatchString(settingsOf(options).filePath) {
 		return func(
 			textToDoc printing.TextToDoc,
-			_ printing.PrintFunc,
+			_ printFunc,
 			_ *astPath,
-			_ *printing.Options[*unist.Node],
+			_ *printing.Options[*unist.Node, *settings, printing.NoArguments],
 		) (doc.Doc, error) {
 			embedded, textToDocError := textToDoc(options.OriginalText, "json")
 			if textToDocError != nil {

@@ -13,8 +13,9 @@ import (
 // src/language-markdown/print/mdast.js, for the markdown parser.
 
 type (
-	astPath = printing.AstPath[*Node]
-	options = printing.Options[*Node]
+	astPath   = printing.AstPath[*Node, *settings]
+	options   = printing.Options[*Node, *settings, printing.NoArguments]
+	printFunc = printing.PrintFunc[printing.NoArguments]
 )
 
 // settings are the Prettier options the markdown printer reads, carried on options.Settings.
@@ -29,7 +30,7 @@ type settings struct {
 	nodes *arena.Arena[Node]
 }
 
-func settingsOf(options *options) *settings { return options.Settings.(*settings) }
+func settingsOf(options *options) *settings { return options.Settings }
 
 func currentNode(path *astPath) *Node {
 	node, _ := path.Node()
@@ -58,11 +59,10 @@ func pathIndex(path *astPath) int {
 
 // siblingAt is path.siblings[index], nil when out of range or not in a list.
 func siblingAt(path *astPath, index int) *Node {
-	siblings, isList := path.Siblings().([]*Node)
-	if !isList || index < 0 || index >= len(siblings) {
+	if index < 0 || index >= len(path.Siblings()) {
 		return nil
 	}
-	return siblings[index]
+	return path.Siblings()[index]
 }
 
 var spaceAtEndPattern = func(text string) bool {
@@ -94,7 +94,7 @@ func prevOrNextWord(path *astPath) bool {
 }
 
 func hasFakeWhitespaceAfterNextToken(path *astPath) bool {
-	if path.Siblings() == nil {
+	if !path.IsInArray() {
 		return false
 	}
 	if _, present := path.Index(); !present {
@@ -116,7 +116,7 @@ func isNextTokenFakeSetextH2Line(path *astPath) bool {
 
 var syntaxLeadingPattern = regexp.MustCompile(`^>|^(?:[*+-]|#{1,6}|\d+[).])$`)
 
-func printMdast(path *astPath, options *options, print printing.PrintFunc, _ any) doc.Doc {
+func printMdast(path *astPath, options *options, print printFunc, _ *printing.NoArguments) doc.Doc {
 	node := currentNode(path)
 	settings := settingsOf(options)
 
@@ -399,9 +399,9 @@ func printMdast(path *astPath, options *options, print printing.PrintFunc, _ any
 				// align(" ".repeat(4), ...): a string, not a width.
 				doc.AlignWithString("    ", printChildren(path, options, print, func(path *astPath) (doc.Doc, bool) {
 					if path.IsFirst() {
-						return doc.NewGroup(doc.Concat{doc.Softline, print(nil, nil)}, doc.GroupOptions{}), true
+						return doc.NewGroup(doc.Concat{doc.Softline, print("", nil)}, doc.GroupOptions{}), true
 					}
-					return print(nil, nil), true
+					return print("", nil), true
 				})),
 			}, doc.GroupOptions{}),
 		}
@@ -471,7 +471,7 @@ func replaceEndOfLine(text string, replacement doc.Doc) doc.Doc {
 	return doc.Join(replacement, parts)
 }
 
-func printRoot(path *astPath, options *options, print printing.PrintFunc) doc.Doc {
+func printRoot(path *astPath, options *options, print printFunc) doc.Doc {
 	type ignorePosition struct{ index, offset int }
 	type ignoreRange struct{ start, end ignorePosition }
 	var ignoreRanges []ignoreRange
@@ -519,7 +519,7 @@ func printRoot(path *astPath, options *options, print printing.PrintFunc) doc.Do
 			}
 		}
 
-		return print(nil, nil), true
+		return print("", nil), true
 	})
 }
 

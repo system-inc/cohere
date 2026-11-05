@@ -34,9 +34,9 @@ func printTemplateLiteral(path *Path, options *Options, print PrintFunc) Doc {
 	parts := mapPath(path, func(_ *Path, index int) Doc {
 		isLast := index == quasiCount-1
 		if isLast {
-			return concatIn(path, print(nil, nil), doc.Text(""))
+			return concatIn(path, print("", nil), doc.Text(""))
 		}
-		return concatIn(path, print(nil, nil), expressionDocs[index])
+		return concatIn(path, print("", nil), expressionDocs[index])
 	}, "quasis")
 
 	result := []Doc{lineSuffixBoundary, doc.Text("`")}
@@ -232,7 +232,7 @@ func getTemplateLiteralExpressionIndent(path *Path, options *Options) templateLi
 // printTemplateExpression is upstream's printTemplateExpression.
 func printTemplateExpression(path *Path, options *Options, print PrintFunc) Doc {
 	current, index := node(path), indexOf(path)
-	expressionDoc := print(nil, nil)
+	expressionDoc := print("", nil)
 
 	templateLiteral := parentOf(path)
 	quasis := templateLiteral.List("quasis")

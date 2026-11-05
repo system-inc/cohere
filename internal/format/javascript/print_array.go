@@ -177,7 +177,7 @@ func printArrayElements(path *Path, options *Options, print PrintFunc, elementsP
 	each(path, func(path *Path, _ int) {
 		current := node(path)
 		if current != nil {
-			parts = append(parts, groupIn(path, print(nil, nil)))
+			parts = append(parts, groupIn(path, print("", nil)))
 		} else {
 			parts = append(parts, emptyDoc)
 		}
@@ -204,7 +204,7 @@ func printArrayElementsConcisely(path *Path, options *Options, print PrintFunc, 
 		if isLast {
 			separator = trailingComma
 		}
-		parts = append(parts, concatIn(path, print(nil, nil), separator))
+		parts = append(parts, concatIn(path, print("", nil), separator))
 
 		if !isLast {
 			switch {
