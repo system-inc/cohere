@@ -3,7 +3,7 @@
 // This is a report someone runs on purpose, not a gate that fails a build. The distinction decides
 // every judgment call in here: a gate must not report live code, so it would have to stay silent
 // wherever it is unsure, and a report that stays silent wherever it is unsure finds nothing worth
-// reading. So the bias here is different — say what was found, say honestly how confident it is,
+// reading. So the bias here is different: say what was found, say honestly how confident it is,
 // and give the reader a way to record a decision so the second reading is shorter than the first.
 //
 // Two analyses live here and they answer different questions:
@@ -19,8 +19,8 @@
 //
 // This list is normative and it is written down because the next reader cannot recover it from the
 // code. `typescript/no-unused-vars` is being ported, and oxc spends roughly 990 lines in `usage.rs`
-// deciding this same question — self-references, a variable only reassigned to itself, aliases,
-// re-exports, type-position uses — with every answer measured against a large corpus. The answers
+// deciding this same question (self-references, a variable only reassigned to itself, aliases,
+// re-exports, type-position uses) with every answer measured against a large corpus. The answers
 // below are not measured against a corpus. They are measured against this substrate and this tree,
 // which establishes that they behave as described but not that they are the answers a corpus would
 // have chosen. So each one is marked measured or judgment, and the judgment entries are exactly
@@ -67,7 +67,7 @@
 //	          one most likely to look like a bug. A barrel that re-exports forty symbols and is
 //	          imported by nothing is not forty live symbols; it is a dead barrel. Counting the
 //	          re-export as a use would make any barrel an unconditional root and would silently
-//	          protect everything behind it — the failure mode where the report goes quiet and looks
+//	          protect everything behind it: the failure mode where the report goes quiet and looks
 //	          clean. Measured on this tree, this rule is what correctly reports four genuinely
 //	          abandoned payment icons whose ONLY mention anywhere is a barrel nothing imports.
 //
@@ -88,13 +88,13 @@
 //	          contents are reported, and probing the imported-barrel case on a live binary confirms
 //	          the alias chain spares them. The header's warning that this analysis and a future
 //	          no-unused-vars "could disagree forever without either noticing" is the thing to hold
-//	          onto — this is that disagreement, and it is the benign kind.
+//	          onto: this is that disagreement, and it is the benign kind.
 //
 //	          A barrel's own `export ... from` statements are additionally not examined AS exports:
 //	          `exportedDeclarations` handles declaration statements and an ExportDeclaration is not
 //	          one, so a pure barrel file contributes zero exports and never appears in the report
-//	          itself. That is a genuine gap — a dead barrel is invisible while its contents are
-//	          reported — and it is written down rather than fixed, because fixing it means deciding
+//	          itself. That is a genuine gap (a dead barrel is invisible while its contents are
+//	          reported), and it is written down rather than fixed, because fixing it means deciding
 //	          what a barrel's "own" liveness means and that decision belongs with the no-unused-vars
 //	          port rather than ahead of it.
 //	JUDGMENT  A type-only reference counts as a use. `import type { T }` and a `T` in a type
@@ -102,8 +102,8 @@
 //	          is still a type someone reads, and treating type positions as non-uses would report
 //	          every interface in a types file. oxc separates these behind an option; this does not.
 //	MEASURED  A reference from inside code that is ITSELF unreachable DOES count, in the flat set and
-//	          in the closure alike. This entry previously claimed the opposite — that the closure
-//	          discounts such a reference, and that discounting it was what the closure bought — and
+//	          in the closure alike. This entry previously claimed the opposite (that the closure
+//	          discounts such a reference, and that discounting it was what the closure bought), and
 //	          that was never true of the code.
 //
 //	          `closure.go` has no reachability input; the word does not appear in it. `Unreachable`
@@ -113,7 +113,7 @@
 //	          have been true: nothing joins them.
 //
 //	          Pinned by `TestDeadCodeReferenceStillCountsAsAUse`, on a fixture where reachability is
-//	          the only difference between two constants — same importer, one reference each, both
+//	          the only difference between two constants: same importer, one reference each, both
 //	          reached from a framework-spared page. Both are spared. The unreachable statement is
 //	          still reported, by the analysis that owns that question.
 //
@@ -125,7 +125,7 @@
 //
 //	          Whether it SHOULD discount unreachable references is open and is not a documentation
 //	          question. Doing so would mean the closure's answer depends on the CFG's, so a CFG bug
-//	          would silently delete live code from the report — the direction that costs trust. The
+//	          would silently delete live code from the report, the direction that costs trust. The
 //	          entry is recorded as measured behaviour rather than resolved policy.
 //	JUDGMENT  A default export is not examined as a finding, though references FROM inside one are
 //	          recorded normally. The name at the declaration site is not the name at the use site, so

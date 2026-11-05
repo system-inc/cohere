@@ -83,8 +83,8 @@ func describeEdits(plan *Plan, root string) string {
 // assertion, which is what makes it evidence rather than a count.
 //
 // The exported `err` has exactly four sites: its declaration, a plain import, the source half of an
-// aliased import, and one call. Everything else in the fixture that spells `err` must be declined —
-// the shadowed inner binding, the local alias `failure`, and the string key — and each of those is a
+// aliased import, and one call. Everything else in the fixture that spells `err` must be declined
+// (the shadowed inner binding, the local alias `failure`, and the string key), and each of those is a
 // different mechanism, so a rule that got any one wrong shows up here as a different count.
 func TestRenameFindsEveryReferenceAndNothingElse(test *testing.T) {
 	test.Parallel()
@@ -159,7 +159,8 @@ func TestRenameExpandsShorthandRatherThanReplacingIt(test *testing.T) {
 	}
 	if expansion.Text != "punned: renamedValue" {
 		test.Fatalf(
-			"the shorthand writes %q, want %q — the collapsed form silently rewrites the object's contract",
+			// The dash is written as its escape, the same bytes, so the message reads as it always has.
+			"the shorthand writes %q, want %q \u2014 the collapsed form silently rewrites the object's contract",
 			expansion.Text,
 			"punned: renamedValue",
 		)
@@ -236,7 +237,7 @@ func TestRenameRefusesADeclarationOutsideTheProject(test *testing.T) {
 
 // TestRenameRefusesACollision pins the case where the new name is already taken.
 //
-// A collision may still compile — a shadowing one does — so this cannot be deferred to the type
+// A collision may still compile (a shadowing one does), so this cannot be deferred to the type
 // phase. Refusing loudly beats writing and hoping something downstream complains.
 func TestRenameRefusesACollision(test *testing.T) {
 	test.Parallel()
@@ -314,7 +315,9 @@ func TestBareNameRefusesWhenAmbiguous(test *testing.T) {
 	}
 	if len(symbols) < 2 {
 		test.Fatalf(
-			"`err` resolved to %d symbols, want at least 2 — the fixture declares it more than once, so a single answer means the search is not seeing them all",
+			// The dash is written as its escape, the same bytes, so the message reads as it always has.
+			"`err` resolved to %d symbols, want at least 2 \u2014 the fixture declares it more than once, "+
+				"so a single answer means the search is not seeing them all",
 			len(symbols),
 		)
 	}
@@ -460,7 +463,7 @@ func TestApplyProducesATreeThatStillTypechecks(test *testing.T) {
 //
 // The first version of this test handed Apply a plan pointing at a nonexistent path and asserted
 // that some error came back. A mutant disabling the refusal guard entirely survived it, because
-// with the guard gone the call still failed — one line later, in `os.ReadFile`, for a completely
+// with the guard gone the call still failed: one line later, in `os.ReadFile`, for a completely
 // different reason. The test could not tell "refused before touching anything" from "tried to
 // apply and fell over", which are the two outcomes it exists to distinguish.
 //
@@ -513,7 +516,7 @@ func typeDiagnostics(test *testing.T, graph *program.Graph) []string {
 	for _, file := range graph.ProjectFiles() {
 		for _, diagnostic := range graph.Diagnostics(context.Background(), file) {
 			// `Localize` rather than `MessageText`, which returns the empty string for every
-			// diagnostic the checker produces — a failure here would otherwise print a file name and
+			// diagnostic the checker produces. A failure here would otherwise print a file name and
 			// nothing after the colon, telling the reader a rename broke the tree and not how.
 			messages = append(messages, fmt.Sprintf("%s: %s", file.FileName(), diagnostic.Localize(locale.Locale{})))
 		}
@@ -558,7 +561,7 @@ func copyTree(test *testing.T, source string, destination string) {
 //
 // It is still worth guarding and worth testing, because `Plan` is an exported type: a caller can
 // hand `Apply` a plan it built itself, and a range off by one token writes the right characters into
-// the wrong place — which is the failure `CONTRIBUTING.md` names as having removed an entire function with
+// the wrong place, which is the failure `CONTRIBUTING.md` names as having removed an entire function with
 // every existing assertion still passing. The test constructs that caller directly rather than
 // asserting the branch is unreachable, because "unreachable" is a verdict that expires the moment
 // someone adds a caller, and this package exports the type that makes one possible.
@@ -612,8 +615,8 @@ func TestApplyRefusesAPlanThatWouldNotParse(test *testing.T) {
 // It measures the outcome, which is the property that matters: a plan whose edits collide never
 // reaches disk. It does not isolate the explicit overlap guard, and that is stated here because a
 // later reader will otherwise assume it does. Disabling that guard leaves this test green, because
-// the bounds check inside the apply loop rejects the identical input one step later — enumerated
-// over 20,736 ordered range pairs with zero disagreements, recorded at the guard itself.
+// the bounds check inside the apply loop rejects the identical input one step later (enumerated
+// over 20,736 ordered range pairs with zero disagreements, recorded at the guard itself).
 //
 // So this is a subsumption receipt rather than a guard test. The assertion is deliberately on the
 // refusal and the unchanged bytes rather than on the message, since the message is the half that
@@ -696,8 +699,8 @@ func TestRenamingFromAnImportSiteRenamesTheExport(test *testing.T) {
 // new fixture too, which per the discipline means the hypothesis was wrong rather than the fixture
 // being insufficient.
 //
-// Probing the parse shape settled it: identifiers are leaf tokens and their spans never overlap —
-// 25 identifiers across the fixture, zero offsets contained by two spans. `value` and `toUpperCase`
+// Probing the parse shape settled it: identifiers are leaf tokens and their spans never overlap
+// (25 identifiers across the fixture, zero offsets contained by two spans). `value` and `toUpperCase`
 // are siblings, not nested, and the enclosing property-access expression is not an identifier so the
 // walk never sees it. First-match and last-match are therefore equivalent, recorded at the line in
 // `resolveAnchor`.
@@ -719,7 +722,8 @@ func TestPositionResolvesTheIdentifierUnderTheCursor(test *testing.T) {
 	}
 	if plan.OldName != "toUpperCase" {
 		test.Fatalf(
-			"the position resolved to %q, want `toUpperCase` — a column selects the identifier it points at",
+			// The dash is written as its escape, the same bytes, so the message reads as it always has.
+			"the position resolved to %q, want `toUpperCase` \u2014 a column selects the identifier it points at",
 			plan.OldName,
 		)
 	}

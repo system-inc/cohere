@@ -188,7 +188,7 @@ func TestClosureIsOptIn(test *testing.T) {
 //
 // This is pinned rather than left to the code because it is the single answer most likely to be
 // changed by someone who reads it as a bug, and changing it makes every barrel an unconditional
-// root — which protects everything behind it and makes the report go quiet. On the real tree this
+// root, which protects everything behind it and makes the report go quiet. On the real tree this
 // rule is what correctly reports four abandoned payment icons whose only mention anywhere is a
 // barrel nothing imports.
 func TestReExportIsAPassThrough(test *testing.T) {

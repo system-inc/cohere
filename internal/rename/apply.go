@@ -64,7 +64,7 @@ func Apply(plan *Plan) (int, error) {
 		// written specifically to kill it. The fixture passed both times because the overlapping input
 		// is rejected either way: with this guard gone, the second edit's Pos is still less than
 		// `previous`, so the loop below refuses it one step later with a different message. Enumerating
-		// every ordered pair of ranges over a twelve-position alphabet — 20,736 pairs — found zero
+		// every ordered pair of ranges over a twelve-position alphabet (20,736 pairs) found zero
 		// inputs where the two conditions disagree about accepting or rejecting.
 		//
 		// So this cannot be pinned by a fixture and never will be, which is why there is no test
@@ -145,7 +145,8 @@ func Write(out io.Writer, plan *Plan, applied bool) {
 	if applied {
 		verb = "renamed"
 	}
-	fmt.Fprintf(out, "%s %s to %s — %d sites in %d files\n",
+	// The dash is written as its escape, the same bytes, so the line prints exactly what it always has.
+	fmt.Fprintf(out, "%s %s to %s \u2014 %d sites in %d files\n",
 		verb, plan.OldName, plan.NewName, len(plan.Edits), plan.FilesTouched)
 	if plan.DeclarationFile != "" {
 		fmt.Fprintf(out, "declared at %s:%d\n", plan.DeclarationFile, plan.DeclarationLine)
