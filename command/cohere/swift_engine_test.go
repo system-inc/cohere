@@ -9,6 +9,7 @@ import (
 	"bufio"
 	"bytes"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -138,6 +139,7 @@ func TestRunEngineBinaryEndings(test *testing.T) {
 	// Not parallel: it drives a check run through engineRun, whose record acceptors set the package-level activeSummary
 	test.Run("a broken engine's children die with it", func(test *testing.T) {
 		childFile := filepath.Join(test.TempDir(), "child")
+		killChildAtCleanup(test, childFile)
 		_, _, exitCode, runFakeSwiftEngineError := runFakeSwiftEngine(test,
 			"sleep 100000 & echo $! > '"+
 				childFile+
@@ -159,6 +161,7 @@ func TestRunEngineBinaryEndings(test *testing.T) {
 	// Not parallel: it drives a check run through engineRun, whose record acceptors set the package-level activeSummary
 	test.Run("a signal cohere receives is passed to the engine and everything it started", func(test *testing.T) {
 		childFile := filepath.Join(test.TempDir(), "child")
+		killChildAtCleanup(test, childFile)
 		interrupts := make(chan os.Signal, 1)
 		var out bytes.Buffer
 		var standardError bytes.Buffer
@@ -220,4 +223,62 @@ func requireProcessEnded(test *testing.T, path string) {
 	// Ignored: a child gone by now is what the kill asks for, and the test fails below either way.
 	_ = syscall.Kill(child, syscall.SIGKILL)
 	test.Errorf("the engine's child %d outlived it", child)
+}
+
+// standInChild is the command a stand-in engine starts as its child, the one killChildAtCleanup may end.
+const standInChild = "sleep 100000"
+
+// killChildAtCleanup ends, when the test does, the stand-in engine's child whose id the engine wrote to path, if
+// it is still running. requireProcessEnded kills it too, but only a test that gets that far: one that fails
+// before it, or hangs until go test's -timeout, would leave the sleep on the machine for a day.
+//
+// It kills by id, never by name, and only a process still running standInChild, since an id is reused once its
+// process ends and a cleanup that killed whatever holds it now could end someone else's work.
+func killChildAtCleanup(test *testing.T, path string) {
+	test.Helper()
+	test.Cleanup(func() {
+		contents, readError := os.ReadFile(path)
+		if readError != nil {
+			// The engine never wrote the id, so it never started the child, and there is nothing to end.
+			return
+		}
+		child, parseError := strconv.Atoi(strings.TrimSpace(string(contents)))
+		if parseError != nil {
+			return
+		}
+		command, psError := exec.Command("ps", "-o", "command=", "-p", strconv.Itoa(child)).Output()
+		if psError != nil || strings.TrimSpace(string(command)) != standInChild {
+			// ps fails on an id no process holds, and a different command means the id was reused.
+			return
+		}
+		// Ignored: the child ending on its own between the look and the kill is the outcome the kill asks for.
+		_ = syscall.Kill(child, syscall.SIGKILL)
+	})
+}
+
+// TestAStandInEnginesChildIsKilledWhenItsTestEnds: a child a test leaves running is gone once the test's
+// cleanups have run, so a stand-in engine test that fails early or hangs leaves no sleep behind.
+func TestAStandInEnginesChildIsKilledWhenItsTestEnds(test *testing.T) {
+	test.Parallel()
+	sleeper := exec.Command("sleep", "100000")
+	if startError := sleeper.Start(); startError != nil {
+		test.Fatal(startError)
+	}
+	childFile := filepath.Join(test.TempDir(), "child")
+	if writeError := os.WriteFile(childFile, []byte(strconv.Itoa(sleeper.Process.Pid)+"\n"), 0o644); writeError != nil {
+		test.Fatal(writeError)
+	}
+	ended := make(chan struct{})
+	go func() {
+		// Ignored: the sleep ends by the kill, so its wait reports that signal; what matters is that it ends.
+		_ = sleeper.Wait()
+		close(ended)
+	}()
+	// The subtest stands for a stand-in engine test that leaves its child running; its cleanups run as it ends.
+	test.Run("a test that leaves its child running", func(test *testing.T) {
+		killChildAtCleanup(test, childFile)
+	})
+	// No deadline: a cleanup that did not kill the child leaves this waiting on a sleep that outlasts any run, a
+	// hang go test's -timeout fails.
+	<-ended
 }
