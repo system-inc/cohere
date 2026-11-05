@@ -157,7 +157,7 @@ func writeRunEnd(report *pipelineReport, out io.Writer) {
 		}
 		fmt.Fprintln(invocationOutput(out), footer(summary, activeOutput.Style, footerOptions{Phases: activeOutput.Phases, Verbose: true}))
 	case outputJSON:
-		writeJSONLine(invocationOutput(out), summaryAsJSON(summary))
+		writeSummaryLine(invocationOutput(out), summaryAsJSON(summary))
 	default:
 		fmt.Fprintln(invocationOutput(out), footer(summary, activeOutput.Style, footerOptions{Phases: activeOutput.Phases}))
 	}

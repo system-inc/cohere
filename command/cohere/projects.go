@@ -197,9 +197,13 @@ func (found discovery) notes() []string {
 
 // projectRun is one project's run, as its child reported it.
 type projectRun struct {
-	open     *openReport
-	project  discoveredProject
-	output   []byte
+	open    *openReport
+	project discoveredProject
+	output  []byte
+	// errors is what the child wrote to stderr under --json, kept apart so this run's stdout stays JSON
+	// lines alone (#9zqayzh); the child says the same in its summary's error. In the human views it is part
+	// of output, in the order the child wrote it.
+	errors   []byte
 	exitCode int
 	err      error
 	elapsed  time.Duration
@@ -221,12 +225,12 @@ type projectRun struct {
 func runProjects(found discovery, arguments []string, out io.Writer) int {
 	executable, err := os.Executable()
 	if err != nil {
-		fmt.Fprintf(out, "cohere: finding this binary to run each project: %v\n", err)
+		failRunProjects(out, fmt.Errorf("finding this binary to run each project: %w", err))
 		return 1
 	}
 	yieldDirectory, err := os.MkdirTemp("", "cohere-yield-")
 	if err != nil {
-		fmt.Fprintf(out, "cohere: making a place for what each project yields: %v\n", err)
+		failRunProjects(out, fmt.Errorf("making a place for what each project yields: %w", err))
 		return 1
 	}
 	defer os.RemoveAll(yieldDirectory)
@@ -294,8 +298,18 @@ func runProjects(found discovery, arguments []string, out io.Writer) int {
 		if len(checked.output) > 0 && checked.output[len(checked.output)-1] != '\n' {
 			fmt.Fprintln(out)
 		}
+		os.Stderr.Write(checked.errors)
 		if checked.err != nil {
-			fmt.Fprintf(out, "cohere: the %s run did not finish: %v\n", checked.project.Engine, checked.err)
+			unfinished := fmt.Errorf("the %s run did not finish: %w", checked.project.Engine, checked.err)
+			// Under --json the project's record says it, since a run that never finished printed none.
+			if activeOutput.Mode == outputJSON {
+				line := summaryAsJSON(runSummary{Label: projectLabel(checked.project), Total: checked.elapsed})
+				line.Verdict = "fail"
+				line.Error = unfinished.Error()
+				writeJSONLine(out, line)
+			} else {
+				fmt.Fprintf(out, "cohere: %v\n", unfinished)
+			}
 		}
 		fmt.Fprintln(account)
 		if checked.exitCode > worst {
@@ -329,6 +343,16 @@ func runProjects(found discovery, arguments []string, out io.Writer) int {
 		return 128 + received
 	}
 	return worst
+}
+
+// failRunProjects says why the projects could not be run at all: as a failed summary line under --json,
+// so the stream still ends on one, and as a line in the human views.
+func failRunProjects(out io.Writer, err error) {
+	if activeOutput.Mode == outputJSON {
+		writeFailedRunSummary(out, err)
+		return
+	}
+	fmt.Fprintf(out, "cohere: %v\n", err)
 }
 
 // swiftYield is what a Swift project's run leaves to others: the directories of the other running Swift
@@ -393,13 +417,16 @@ func runProject(executable string, root string, project discoveredProject, argum
 	if openPath != "" {
 		child.Env = append(withoutVariable(child.Env, openReportVariable), openReportVariable+"="+openPath)
 	}
-	var output bytes.Buffer
+	var output, errorOutput bytes.Buffer
 	child.Stdout = &output
 	child.Stderr = &output
+	if activeOutput.Mode == outputJSON {
+		child.Stderr = &errorOutput
+	}
 
 	started := time.Now()
 	err := children.run(child)
-	run := projectRun{project: project, output: output.Bytes(), elapsed: time.Since(started)}
+	run := projectRun{project: project, output: output.Bytes(), errors: errorOutput.Bytes(), elapsed: time.Since(started)}
 	if openPath != "" {
 		run.open = readOpenReport(openPath)
 	}
