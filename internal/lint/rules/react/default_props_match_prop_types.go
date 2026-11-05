@@ -322,8 +322,8 @@ func readPropDeclaration(declarations *componentPropDeclarations, name *ast.Node
 //
 // Mutates: declarations gains each declared prop in source order, or is marked unresolved by a spread
 func readPropTypesObject(declarations *componentPropDeclarations, value *ast.Node) {
-	value = resolveToObjectLiteral(value)
-	if value == nil {
+	object := resolveToObjectLiteral(value)
+	if object == nil {
 		// A propTypes assigned from anything we cannot resolve to an object is a partial view,
 		// which is the same situation a spread creates.
 		declarations.propTypesUnresolved = true
@@ -343,7 +343,7 @@ func readPropTypesObject(declarations *componentPropDeclarations, value *ast.Nod
 	//
 	// An earlier draft marked propTypes unresolved on a spread and went silent on that first input,
 	// which the whole imported corpus missed: no case there mixes a spread with a real prop.
-	for _, property := range value.AsObjectLiteralExpression().Properties.Nodes {
+	for _, property := range object.AsObjectLiteralExpression().Properties.Nodes {
 		if property.Kind != ast.KindPropertyAssignment &&
 			property.Kind != ast.KindShorthandPropertyAssignment {
 			continue
@@ -378,13 +378,13 @@ func propTypeIsRequired(property *ast.Node) bool {
 //
 // Mutates: declarations gains each default in source order, or is marked unresolved when one cannot be read
 func readDefaultPropsObject(declarations *componentPropDeclarations, value *ast.Node) {
-	value = resolveToObjectLiteral(value)
-	if value == nil {
+	object := resolveToObjectLiteral(value)
+	if object == nil {
 		declarations.defaultsUnresolved = true
 		return
 	}
 
-	for _, property := range value.AsObjectLiteralExpression().Properties.Nodes {
+	for _, property := range object.AsObjectLiteralExpression().Properties.Nodes {
 		if property.Kind != ast.KindPropertyAssignment &&
 			property.Kind != ast.KindShorthandPropertyAssignment &&
 			property.Kind != ast.KindMethodDeclaration {
@@ -442,15 +442,15 @@ func reportMismatchedDefaults(
 // path is rendered rather than resolved because the two arms have to agree on a key and one of them
 // starts from an identifier with no declaration to resolve.
 func ownerPathOf(expression *ast.Node) (string, bool) {
-	expression = skipParenthesesOptional(expression)
-	if expression == nil {
+	unwrapped := skipParenthesesOptional(expression)
+	if unwrapped == nil {
 		return "", false
 	}
-	switch expression.Kind {
+	switch unwrapped.Kind {
 	case ast.KindIdentifier:
-		return expression.Text(), true
+		return unwrapped.Text(), true
 	case ast.KindPropertyAccessExpression:
-		access := expression.AsPropertyAccessExpression()
+		access := unwrapped.AsPropertyAccessExpression()
 		name := access.Name()
 		if name == nil || name.Kind != ast.KindIdentifier {
 			return "", false
@@ -536,11 +536,11 @@ func addSingleDefaultProp(declarations *componentPropDeclarations, name string, 
 // The same test `propTypeIsRequired` applies to a property's value, lifted so the single-assignment
 // arm can reuse it rather than reconstruct a property node to ask about.
 func expressionIsRequired(value *ast.Node) bool {
-	value = skipParenthesesOptional(value)
-	if value == nil || value.Kind != ast.KindPropertyAccessExpression {
+	unwrapped := skipParenthesesOptional(value)
+	if unwrapped == nil || unwrapped.Kind != ast.KindPropertyAccessExpression {
 		return false
 	}
-	name := value.AsPropertyAccessExpression().Name()
+	name := unwrapped.AsPropertyAccessExpression().Name()
 	return name != nil && name.Kind == ast.KindIdentifier && name.Text() == "isRequired"
 }
 
@@ -561,26 +561,27 @@ const objectResolutionDepthLimit = 8
 // inner scope cannot be mistaken for the outer one. Returning nil is the unresolved answer, which
 // the callers turn into the same silence a spread produces.
 func resolveToObjectLiteral(value *ast.Node) *ast.Node {
+	current := value
 	for step := 0; step < objectResolutionDepthLimit; step++ {
-		value = skipParenthesesOptional(value)
-		if value == nil {
+		current = skipParenthesesOptional(current)
+		if current == nil {
 			return nil
 		}
-		if value.Kind == ast.KindObjectLiteralExpression {
-			return value
+		if current.Kind == ast.KindObjectLiteralExpression {
+			return current
 		}
-		if value.Kind != ast.KindIdentifier {
+		if current.Kind != ast.KindIdentifier {
 			return nil
 		}
-		declaration := declarationOfIdentifier(value)
+		declaration := declarationOfIdentifier(current)
 		if declaration == nil {
 			return nil
 		}
 		next := sortDefaultPropsInitializerOf(declaration)
-		if next == nil || next == value {
+		if next == nil || next == current {
 			return nil
 		}
-		value = next
+		current = next
 	}
 	return nil
 }

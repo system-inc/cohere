@@ -185,16 +185,17 @@ func Run(fixtures []Fixture, implementation Implementation, options Options) (Sc
 //
 // Mutates: target receives the *ErrUnsupported found, as errors.As fills its target
 func asUnsupported(err error, target **ErrUnsupported) bool {
-	for err != nil {
-		if unsupported, ok := err.(*ErrUnsupported); ok {
+	current := err
+	for current != nil {
+		if unsupported, ok := current.(*ErrUnsupported); ok {
 			*target = unsupported
 			return true
 		}
-		unwrapper, ok := err.(interface{ Unwrap() error })
+		unwrapper, ok := current.(interface{ Unwrap() error })
 		if !ok {
 			return false
 		}
-		err = unwrapper.Unwrap()
+		current = unwrapper.Unwrap()
 	}
 	return false
 }

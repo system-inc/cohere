@@ -221,10 +221,10 @@ func immutabilityAnalyzeCompilationUnit(
 	}
 	// A unit found nested in a function that is not one is analyzed as React Compiler compiles it,
 	// on its own; see AsCompilationUnit.
-	function = high_level_intermediate_representation.AsCompilationUnit(ruleContext, function,
+	unit := high_level_intermediate_representation.AsCompilationUnit(ruleContext, function,
 		high_level_intermediate_representation.ForFunction)
-	for _, finding := range immutabilitySweepFunction(ruleContext, function) {
-		immutabilityReport(ruleContext, function, finding)
+	for _, finding := range immutabilitySweepFunction(ruleContext, unit) {
+		immutabilityReport(ruleContext, unit, finding)
 	}
 }
 
@@ -873,28 +873,28 @@ func immutabilityCollectAliases(function *high_level_intermediate_representation
 			) {
 				state.noteDeclaration(function, place.Identifier)
 			})
-			switch value := instruction.Value.(type) {
+			switch instructionValue := instruction.Value.(type) {
 			case *high_level_intermediate_representation.LoadLocal:
-				state.alias(instruction.LValue.Identifier, value.Place.Identifier)
-				if name := immutabilityIdentifierName(function, value.Place.Identifier); name != "" {
+				state.alias(instruction.LValue.Identifier, instructionValue.Place.Identifier)
+				if name := immutabilityIdentifierName(function, instructionValue.Place.Identifier); name != "" {
 					state.names[instruction.LValue.Identifier] = name
 				}
 			case *high_level_intermediate_representation.LoadContext:
-				state.alias(instruction.LValue.Identifier, value.Place.Identifier)
-				if name := immutabilityIdentifierName(function, value.Place.Identifier); name != "" {
+				state.alias(instruction.LValue.Identifier, instructionValue.Place.Identifier)
+				if name := immutabilityIdentifierName(function, instructionValue.Place.Identifier); name != "" {
 					state.names[instruction.LValue.Identifier] = name
 				}
 			case *high_level_intermediate_representation.StoreLocal:
-				state.alias(instruction.LValue.Identifier, value.Value.Identifier)
-				state.alias(value.LValue.Identifier, value.Value.Identifier)
+				state.alias(instruction.LValue.Identifier, instructionValue.Value.Identifier)
+				state.alias(instructionValue.LValue.Identifier, instructionValue.Value.Identifier)
 			case *high_level_intermediate_representation.StoreContext:
-				state.alias(value.LValue.Identifier, value.Value.Identifier)
-				state.alias(instruction.LValue.Identifier, value.Value.Identifier)
+				state.alias(instructionValue.LValue.Identifier, instructionValue.Value.Identifier)
+				state.alias(instruction.LValue.Identifier, instructionValue.Value.Identifier)
 			case *high_level_intermediate_representation.TypeCastExpression:
 				// A cast is a no-op at runtime, so the cast value and its operand are one value.
-				state.alias(instruction.LValue.Identifier, value.Value.Identifier)
+				state.alias(instruction.LValue.Identifier, instructionValue.Value.Identifier)
 			case *high_level_intermediate_representation.LoadGlobal:
-				state.names[instruction.LValue.Identifier] = value.Name
+				state.names[instruction.LValue.Identifier] = instructionValue.Name
 			}
 		}
 	}
@@ -1059,8 +1059,9 @@ func immutabilityTransfer(
 	order *int,
 ) []immutabilityFinding {
 	target := instruction.LValue.Identifier
+	collected := findings
 
-	switch value := instruction.Value.(type) {
+	switch instructionValue := instruction.Value.(type) {
 
 	// --- Freezing ---------------------------------------------------------
 
@@ -1068,24 +1069,24 @@ func immutabilityTransfer(
 	// changes what the program sees and not what React saw. Measured: the same mutation before the
 	// JSX is clean and after it reports.
 	case *high_level_intermediate_representation.JsxExpression:
-		for _, attribute := range value.Props {
+		for _, attribute := range instructionValue.Props {
 			// A callback handed to JSX is held by React past the end of this render, exactly as one
 			// handed to a hook is, so the known-mutable-function check belongs here too. Measured:
 			// `let l = 0; const cb = () => { l = 1; }; return <div onClick={cb} />;` reports twice
 			// under React, once at the reassignment and once at the attribute. Checking only hook
 			// arguments left both findings missing and the rule silent on the single most common
 			// spelling of this mistake.
-			findings = immutabilityCheckFrozenFunction(
+			collected = immutabilityCheckFrozenFunction(
 				state,
 				attribute.Value.Identifier,
 				instruction.Node,
-				findings,
+				collected,
 				order,
 			)
 			state.freeze(attribute.Value.Identifier, immutabilityReasonJsxCaptured)
 		}
-		for _, child := range value.Children {
-			findings = immutabilityCheckFrozenFunction(state, child.Identifier, instruction.Node, findings, order)
+		for _, child := range instructionValue.Children {
+			collected = immutabilityCheckFrozenFunction(state, child.Identifier, instruction.Node, collected, order)
 			state.freeze(child.Identifier, immutabilityReasonJsxCaptured)
 		}
 		state.setKind(
@@ -1094,7 +1095,7 @@ func immutabilityTransfer(
 		)
 
 	case *high_level_intermediate_representation.JsxFragment:
-		for _, child := range value.Children {
+		for _, child := range instructionValue.Children {
 			state.freeze(child.Identifier, immutabilityReasonJsxCaptured)
 		}
 		state.setKind(
@@ -1105,46 +1106,46 @@ func immutabilityTransfer(
 	// --- Writing ----------------------------------------------------------
 
 	case *high_level_intermediate_representation.PropertyStore:
-		findings = immutabilityCheckWrite(
+		collected = immutabilityCheckWrite(
 			ruleContext,
 			function,
 			state,
-			value.Object.Identifier,
+			instructionValue.Object.Identifier,
 			instruction.Node,
-			findings,
+			collected,
 			order,
 		)
 
 	case *high_level_intermediate_representation.ComputedStore:
-		findings = immutabilityCheckWrite(
+		collected = immutabilityCheckWrite(
 			ruleContext,
 			function,
 			state,
-			value.Object.Identifier,
+			instructionValue.Object.Identifier,
 			instruction.Node,
-			findings,
+			collected,
 			order,
 		)
 
 	case *high_level_intermediate_representation.PropertyDelete:
-		findings = immutabilityCheckWrite(
+		collected = immutabilityCheckWrite(
 			ruleContext,
 			function,
 			state,
-			value.Object.Identifier,
+			instructionValue.Object.Identifier,
 			instruction.Node,
-			findings,
+			collected,
 			order,
 		)
 
 	case *high_level_intermediate_representation.ComputedDelete:
-		findings = immutabilityCheckWrite(
+		collected = immutabilityCheckWrite(
 			ruleContext,
 			function,
 			state,
-			value.Object.Identifier,
+			instructionValue.Object.Identifier,
 			instruction.Node,
-			findings,
+			collected,
 			order,
 		)
 
@@ -1175,20 +1176,20 @@ func immutabilityTransfer(
 	// A property load off a frozen value is itself frozen, which is what makes `props.a.q = 1`
 	// report: the intermediate `props.a` inherits the freeze from `props`.
 	case *high_level_intermediate_representation.PropertyLoad:
-		state.setKind(target, immutabilityPropagate(state, value.Object.Identifier))
-		if name := immutabilityIdentifierName(function, value.Object.Identifier); name != "" {
+		state.setKind(target, immutabilityPropagate(state, instructionValue.Object.Identifier))
+		if name := immutabilityIdentifierName(function, instructionValue.Object.Identifier); name != "" {
 			state.names[target] = name
-		} else if carried, ok := state.names[value.Object.Identifier]; ok {
+		} else if carried, ok := state.names[instructionValue.Object.Identifier]; ok {
 			state.names[target] = carried
 		}
 
 	case *high_level_intermediate_representation.ComputedLoad:
-		state.setKind(target, immutabilityPropagate(state, value.Object.Identifier))
+		state.setKind(target, immutabilityPropagate(state, instructionValue.Object.Identifier))
 
 	// Destructuring distributes the source's kind to every bound name, which is how a destructured
 	// parameter's members become frozen without a per-member rule.
 	case *high_level_intermediate_representation.Destructure:
-		carried := immutabilityPropagate(state, value.Value.Identifier)
+		carried := immutabilityPropagate(state, instructionValue.Value.Identifier)
 		high_level_intermediate_representation.EachPlace(instruction.Value, func(
 			place high_level_intermediate_representation.Place,
 			role high_level_intermediate_representation.PlaceRole,
@@ -1204,7 +1205,8 @@ func immutabilityTransfer(
 	// makes `useMemo(() => 1, [o]); o.a = 1;` report: the freeze lands on the dependency array and
 	// has to travel one hop inward to reach `o`. Without that hop the array froze and the value it
 	// named did not, and the fixture read as a missing hook rather than as a missing edge.
-	case *high_level_intermediate_representation.ObjectExpression, *high_level_intermediate_representation.ArrayExpression:
+	case *high_level_intermediate_representation.ObjectExpression,
+		*high_level_intermediate_representation.ArrayExpression:
 		elements := []static_single_assignment.IdentifierId{}
 		high_level_intermediate_representation.EachPlace(instruction.Value, func(
 			place high_level_intermediate_representation.Place,
@@ -1215,37 +1217,47 @@ func immutabilityTransfer(
 		state.aggregateElements[state.resolve(target)] = elements
 		state.setKind(target, immutabilityAbstractValue{Kind: immutabilityMutable})
 
-	case *high_level_intermediate_representation.Primitive, *high_level_intermediate_representation.BinaryExpression, *high_level_intermediate_representation.TemplateLiteral:
+	case *high_level_intermediate_representation.Primitive,
+		*high_level_intermediate_representation.BinaryExpression,
+		*high_level_intermediate_representation.TemplateLiteral:
 		state.setKind(target, immutabilityAbstractValue{Kind: immutabilityPrimitive})
 
 	// A nested function is analysed as an inner subject: which locals it reassigns is recorded on
 	// the value, so the finding lands where the function is handed to React rather than at the
 	// reassignment. That is what makes the two reassignment diagnostics point where they do.
 	case *high_level_intermediate_representation.FunctionExpression:
-		findings = immutabilityNestedFunctionTransfer(ruleContext, function, state, value, target, findings, order)
+		collected = immutabilityNestedFunctionTransfer(
+			ruleContext,
+			function,
+			state,
+			instructionValue,
+			target,
+			collected,
+			order,
+		)
 
 	case *high_level_intermediate_representation.CallExpression:
-		findings = immutabilityCallTransfer(
+		collected = immutabilityCallTransfer(
 			ruleContext,
 			function,
 			state,
 			instruction,
-			value.Callee.Identifier,
-			value.Args,
+			instructionValue.Callee.Identifier,
+			instructionValue.Args,
 			target,
-			findings,
+			collected,
 			order,
 		)
 
 	case *high_level_intermediate_representation.MethodCall:
-		findings = immutabilityMethodCallTransfer(
+		collected = immutabilityMethodCallTransfer(
 			ruleContext,
 			function,
 			state,
 			instruction,
-			value,
+			instructionValue,
 			target,
-			findings,
+			collected,
 			order,
 		)
 
@@ -1254,7 +1266,7 @@ func immutabilityTransfer(
 		// write.
 	}
 
-	return findings
+	return collected
 }
 
 // immutabilityPropagate is what a value loaded out of another value inherits.
@@ -1401,11 +1413,18 @@ func immutabilityCallTransfer(
 		return findings
 	}
 
+	collected := findings
 	for _, argument := range args {
 		// Handing a function that reassigns a local to a hook is the "known mutable function"
 		// finding: React will hold the function past render and calling it later writes to a
 		// variable whose value the next render has already forgotten.
-		findings = immutabilityCheckFrozenFunction(state, argument.Place.Identifier, instruction.Node, findings, order)
+		collected = immutabilityCheckFrozenFunction(
+			state,
+			argument.Place.Identifier,
+			instruction.Node,
+			collected,
+			order,
+		)
 		if immutabilityDependencyArrayIsExempt(name) &&
 			immutabilityIsDependencyArray(function, state, argument.Place.Identifier) {
 			continue
@@ -1414,7 +1433,7 @@ func immutabilityCallTransfer(
 	}
 
 	state.setKind(target, immutabilityHookResultKind(name))
-	return findings
+	return collected
 }
 
 // immutabilityDependencyArrayIsExempt reports whether this hook leaves its dependencies unread.
@@ -1538,8 +1557,15 @@ func immutabilityMethodCallTransfer(
 		state.setKind(target, immutabilityAbstractValue{Kind: immutabilityMutable})
 		return findings
 	}
+	collected := findings
 	for _, argument := range value.Args {
-		findings = immutabilityCheckFrozenFunction(state, argument.Place.Identifier, instruction.Node, findings, order)
+		collected = immutabilityCheckFrozenFunction(
+			state,
+			argument.Place.Identifier,
+			instruction.Node,
+			collected,
+			order,
+		)
 		if immutabilityDependencyArrayIsExempt(name) &&
 			immutabilityIsDependencyArray(function, state, argument.Place.Identifier) {
 			continue
@@ -1547,7 +1573,7 @@ func immutabilityMethodCallTransfer(
 		state.freeze(argument.Place.Identifier, immutabilityReasonHookCaptured)
 	}
 	state.setKind(target, immutabilityHookResultKind(name))
-	return findings
+	return collected
 }
 
 // immutabilityMethodName is the property being called, read from the syntax.
@@ -1604,7 +1630,7 @@ func immutabilityNestedFunctionTransfer(
 	// Measured: `const cb = () => { props.a = 1; };` reports on line 2, inside the callback, while
 	// `const cb = () => { local = 1; };` reports on the line that hands `cb` to JSX. The two look
 	// alike in source and are opposite in where they point.
-	findings = immutabilityCapturedWrites(ruleContext, state, inner, value, findings, order)
+	collected := immutabilityCapturedWrites(ruleContext, state, inner, value, findings, order)
 	// A reassignment only matters when the binding belongs to this function, which is the render
 	// whose end outlives it. `Function.Context` names what the closure captured from here, so a
 	// write to anything else is a write to a binding some intermediate scope owns and the render has
@@ -1655,7 +1681,7 @@ func immutabilityNestedFunctionTransfer(
 	}
 	state.functionCaptures[state.resolve(target)] = captured
 	state.setKind(target, immutabilityAbstractValue{Kind: immutabilityMutable})
-	return findings
+	return collected
 }
 
 // immutabilityWriteTargetIsRef asks the checker whether the thing being written to is a ref.
@@ -1762,15 +1788,17 @@ func immutabilityCapturedWrites(
 	// An alias built inside the closure carries the captured value's kind along with it.
 	aliases := map[static_single_assignment.IdentifierId]static_single_assignment.IdentifierId{}
 	resolve := func(id static_single_assignment.IdentifierId) static_single_assignment.IdentifierId {
+		current := id
 		for round := 0; round < 32; round++ {
-			next, found := aliases[id]
-			if !found || next == id {
-				return id
+			next, found := aliases[current]
+			if !found || next == current {
+				return current
 			}
-			id = next
+			current = next
 		}
-		return id
+		return current
 	}
+	collected := findings
 	for _, block := range inner.Blocks {
 		for _, instructionId := range block.Instructions {
 			instruction := immutabilityInstructionAt(inner, instructionId)
@@ -1789,53 +1817,53 @@ func immutabilityCapturedWrites(
 					innerKinds[instruction.LValue.Identifier] = carried
 				}
 			case *high_level_intermediate_representation.PropertyStore:
-				findings = immutabilityCapturedWriteFinding(
+				collected = immutabilityCapturedWriteFinding(
 					ruleContext,
 					inner,
 					innerKinds,
 					innerNames,
 					resolve(instructionValue.Object.Identifier),
 					instruction,
-					findings,
+					collected,
 					order,
 				)
 			case *high_level_intermediate_representation.ComputedStore:
-				findings = immutabilityCapturedWriteFinding(
+				collected = immutabilityCapturedWriteFinding(
 					ruleContext,
 					inner,
 					innerKinds,
 					innerNames,
 					resolve(instructionValue.Object.Identifier),
 					instruction,
-					findings,
+					collected,
 					order,
 				)
 			case *high_level_intermediate_representation.PropertyDelete:
-				findings = immutabilityCapturedWriteFinding(
+				collected = immutabilityCapturedWriteFinding(
 					ruleContext,
 					inner,
 					innerKinds,
 					innerNames,
 					resolve(instructionValue.Object.Identifier),
 					instruction,
-					findings,
+					collected,
 					order,
 				)
 			case *high_level_intermediate_representation.ComputedDelete:
-				findings = immutabilityCapturedWriteFinding(
+				collected = immutabilityCapturedWriteFinding(
 					ruleContext,
 					inner,
 					innerKinds,
 					innerNames,
 					resolve(instructionValue.Object.Identifier),
 					instruction,
-					findings,
+					collected,
 					order,
 				)
 			}
 		}
 	}
-	return findings
+	return collected
 }
 
 // immutabilityCapturedWriteFinding reports one write through a captured value when it is frozen.
@@ -1978,13 +2006,14 @@ func immutabilityCheckFrozenFunction(
 	if !found || len(reassignments) == 0 {
 		return findings
 	}
+	collected := findings
 	for _, reassignment := range reassignments {
 		kind := immutabilityFindingReassignedAfterRender
 		if reassignment.IsAsync {
 			kind = immutabilityFindingReassignedInAsync
 		}
 		*order++
-		findings = append(findings, immutabilityFinding{
+		collected = append(collected, immutabilityFinding{
 			Kind:     kind,
 			Variable: reassignment.Variable,
 			Node:     reassignment.Node,
@@ -1992,13 +2021,13 @@ func immutabilityCheckFrozenFunction(
 		})
 	}
 	*order++
-	findings = append(findings, immutabilityFinding{
+	collected = append(collected, immutabilityFinding{
 		Kind:     immutabilityFindingKnownMutableFunction,
 		Variable: reassignments[0].Variable,
 		Node:     node,
 		order:    *order,
 	})
-	return findings
+	return collected
 }
 
 // ---------------------------------------------------------------------------

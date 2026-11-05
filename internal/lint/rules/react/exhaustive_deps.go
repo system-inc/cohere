@@ -927,20 +927,20 @@ func assignmentTargetObject(node *ast.Node) *ast.Node {
 //
 // Mutates: optional records, for each prefix of the path, whether that step was written with `?.`
 func analyzePropertyChain(node *ast.Node, optional map[string]bool) (string, bool) {
-	node = unwrapExpression(node)
-	if node == nil {
+	unwrapped := unwrapExpression(node)
+	if unwrapped == nil {
 		return "", false
 	}
-	switch node.Kind {
+	switch unwrapped.Kind {
 	case ast.KindIdentifier:
-		name := node.Text()
+		name := unwrapped.Text()
 		if optional != nil {
 			optional[name] = false
 		}
 		return name, true
 
 	case ast.KindPropertyAccessExpression:
-		access := node.AsPropertyAccessExpression()
+		access := unwrapped.AsPropertyAccessExpression()
 		objectPath, readable := analyzePropertyChain(access.Expression, optional)
 		if !readable {
 			return "", false
@@ -984,21 +984,22 @@ func isTransparentWrapper(node *ast.Node) bool {
 
 // unwrapExpression strips every transparent wrapper off an expression.
 func unwrapExpression(node *ast.Node) *ast.Node {
-	for node != nil && isTransparentWrapper(node) {
-		switch node.Kind {
+	current := node
+	for current != nil && isTransparentWrapper(current) {
+		switch current.Kind {
 		case ast.KindParenthesizedExpression:
-			node = node.AsParenthesizedExpression().Expression
+			current = current.AsParenthesizedExpression().Expression
 		case ast.KindNonNullExpression:
-			node = node.AsNonNullExpression().Expression
+			current = current.AsNonNullExpression().Expression
 		case ast.KindAsExpression:
-			node = node.AsAsExpression().Expression
+			current = current.AsAsExpression().Expression
 		case ast.KindSatisfiesExpression:
-			node = node.AsSatisfiesExpression().Expression
+			current = current.AsSatisfiesExpression().Expression
 		case ast.KindTypeAssertionExpression:
-			node = node.AsTypeAssertion().Expression
+			current = current.AsTypeAssertion().Expression
 		}
 	}
-	return node
+	return current
 }
 
 // dependencyTreeNode is one segment of a property path, and the three facts the descent reads.
@@ -1720,11 +1721,11 @@ func isEveryRenderConstruction(declaration *ast.Node) bool {
 // assignment constructs if its right side does. That recursion is what makes this semantic rather
 // than a list of node kinds, and it is why `cond ? {} : x` is caught.
 func constructsANewValue(node *ast.Node) bool {
-	node = unwrapExpression(node)
-	if node == nil {
+	unwrapped := unwrapExpression(node)
+	if unwrapped == nil {
 		return false
 	}
-	switch node.Kind {
+	switch unwrapped.Kind {
 	case ast.KindObjectLiteralExpression, ast.KindArrayLiteralExpression,
 		ast.KindArrowFunction, ast.KindFunctionExpression, ast.KindClassExpression,
 		ast.KindNewExpression, ast.KindRegularExpressionLiteral,
@@ -1732,11 +1733,11 @@ func constructsANewValue(node *ast.Node) bool {
 		return true
 
 	case ast.KindConditionalExpression:
-		conditional := node.AsConditionalExpression()
+		conditional := unwrapped.AsConditionalExpression()
 		return constructsANewValue(conditional.WhenTrue) || constructsANewValue(conditional.WhenFalse)
 
 	case ast.KindBinaryExpression:
-		binary := node.AsBinaryExpression()
+		binary := unwrapped.AsBinaryExpression()
 		if binary.OperatorToken == nil {
 			return false
 		}
@@ -1838,16 +1839,16 @@ func isStateSetterName(ruleContext rule.Context, identifier *ast.Node, component
 // `React.useEffect(...)` and `useEffect(...)` are the same Hook and both implementations say so.
 // A deeper namespace is not: `a.b.useEffect` is nobody's React import.
 func hookNameWithoutReactNamespace(callee *ast.Node) string {
-	callee = unwrapExpression(callee)
-	if callee == nil {
+	unwrapped := unwrapExpression(callee)
+	if unwrapped == nil {
 		return ""
 	}
-	switch callee.Kind {
+	switch unwrapped.Kind {
 	case ast.KindIdentifier:
-		return callee.Text()
+		return unwrapped.Text()
 
 	case ast.KindPropertyAccessExpression:
-		access := callee.AsPropertyAccessExpression()
+		access := unwrapped.AsPropertyAccessExpression()
 		object := unwrapExpression(access.Expression)
 		if object == nil || object.Kind != ast.KindIdentifier || object.Text() != "React" {
 			return ""

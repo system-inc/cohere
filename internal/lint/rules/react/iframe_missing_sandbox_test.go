@@ -599,21 +599,26 @@ func TestIframeMissingSandboxIsSilentOnThePairOnlyOnACrossOriginFrame(test *test
 		// Silent: the frame provably loads another origin.
 		{
 			"HomePagePodcastSection.tsx:46, a template whose head fixes the origin",
-			"declare const featuredEpisodeYouTubeVideoId: string;\n<iframe src={`https://www.youtube-nocookie.com/embed/${featuredEpisodeYouTubeVideoId}?rel=0`} " +
+			"declare const featuredEpisodeYouTubeVideoId: string;\n" +
+				"<iframe src={`https://www.youtube-nocookie.com/embed/${featuredEpisodeYouTubeVideoId}?rel=0`} " +
 				pair +
 				" />;",
 			false,
 		},
 		{
 			"PodcastEpisodePlayer.tsx:71, the same template through a const typed string",
-			"declare const properties: { videoId: string };\nconst embedSource = `https://www.youtube-nocookie.com/embed/${properties.videoId}?rel=0&enablejsapi=1`;\n<iframe src={embedSource} " +
+			"declare const properties: { videoId: string };\n" +
+				"const embedSource = " +
+				"`https://www.youtube-nocookie.com/embed/${properties.videoId}?rel=0&enablejsapi=1`;\n" +
+				"<iframe src={embedSource} " +
 				pair +
 				" />;",
 			false,
 		},
 		{
 			"YouTubeEmbed.tsx:23, a template off a props member",
-			"declare const properties: { videoId: string };\n<iframe src={`https://www.youtube-nocookie.com/embed/${properties.videoId}?rel=0`} " +
+			"declare const properties: { videoId: string };\n" +
+				"<iframe src={`https://www.youtube-nocookie.com/embed/${properties.videoId}?rel=0`} " +
 				pair +
 				" />;",
 			false,
@@ -754,7 +759,10 @@ func TestIframeMissingSandboxIsSilentOnThePairOnlyOnACrossOriginFrame(test *test
 		},
 		{
 			"a let holding a cross-origin template, which a later write can change",
-			"declare const id: string;\nlet embedSource = `https://www.youtube-nocookie.com/embed/${id}`;\nembedSource = embedSource + '';\n<iframe src={embedSource} " +
+			"declare const id: string;\n" +
+				"let embedSource = `https://www.youtube-nocookie.com/embed/${id}`;\n" +
+				"embedSource = embedSource + '';\n" +
+				"<iframe src={embedSource} " +
 				pair +
 				" />;",
 			true,

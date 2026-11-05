@@ -245,25 +245,25 @@ var ButtonHasType = rule.Rule{
 			// reports invalidValue upstream and reported complexType here until this line existed.
 			// Skipping reproduces upstream rather than improving on it, and `SkipParentheses`
 			// dereferences its argument, which is why the nil check above it is not optional.
-			expression = ast.SkipParentheses(expression)
-			if expression == nil {
+			unwrapped := ast.SkipParentheses(expression)
+			if unwrapped == nil {
 				return
 			}
 
-			if value, static := buttonHasTypeLiteralValue(expression); static {
+			if value, static := buttonHasTypeLiteralValue(unwrapped); static {
 				checkValue(node, value)
 				return
 			}
 
-			switch expression.Kind {
+			switch unwrapped.Kind {
 			case ast.KindNoSubstitutionTemplateLiteral:
 				// A template with no interpolations is upstream's `expressions.length === 0` arm,
 				// which reads `quasis[0].value.raw`. Our parser gives this its own kind, so an
 				// interpolating template is a TemplateExpression and never reaches here.
-				checkValue(node, expression.Text())
+				checkValue(node, unwrapped.Text())
 
 			case ast.KindConditionalExpression:
-				conditional := expression.AsConditionalExpression()
+				conditional := unwrapped.AsConditionalExpression()
 				checkExpression(node, conditional.WhenTrue)
 				checkExpression(node, conditional.WhenFalse)
 
@@ -272,12 +272,12 @@ var ButtonHasType = rule.Rule{
 				// checker proves every value this expression can take is a written-out type the
 				// config permits, nothing is computed in the sense the message means, so there is
 				// nothing to report. See buttonHasTypeProvenPermitted.
-				if buttonHasTypeProvenPermitted(ruleContext, expression, settings) {
+				if buttonHasTypeProvenPermitted(ruleContext, unwrapped, settings) {
 					return
 				}
 				// The complex report anchors on the expression rather than on the element, which is
 				// upstream's `reportComplex(expression)` and is the one place these two nodes differ.
-				ruleContext.ReportNode(expression, messageButtonComplexType)
+				ruleContext.ReportNode(unwrapped, messageButtonComplexType)
 			}
 		}
 
