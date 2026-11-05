@@ -41,10 +41,10 @@ var unconfiguredRulePattern = regexp.MustCompile(`^\s*([a-z][a-z0-9-]*) did not 
 // ruleCountPattern reads the rule count from the coverage line, which is the total this parse must
 // account for:
 //
-//	lint: 128 findings — 33 rules over 3407 files, ...
+//	lint: 128 findings <em-dash> 33 rules over 3407 files, ...
 //
-// The dash is cohere's own output, so the pattern holds its exact bytes, spelled as an escape between the raw
-// pieces because a raw string cannot hold one.
+// where <em-dash> stands for the em-dash cohere prints there. The dash is cohere's own output, so the pattern holds
+// its exact bytes, spelled as an escape between the raw pieces because a raw string cannot hold one.
 var ruleCountPattern = regexp.MustCompile(`^lint: \d+ findings? ` + "\u2014" + ` (\d+) rules? over`)
 
 // CompiledRulesOf asks the binary which rules it has.
