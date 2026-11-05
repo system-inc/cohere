@@ -32,8 +32,8 @@ var compilerTemplate struct {
 }
 
 // TestMain removes the compiler template once every test is done with it.
-func TestMain(m *testing.M) {
-	code := m.Run()
+func TestMain(suite *testing.M) {
+	code := suite.Run()
 	if compilerTemplate.root != "" {
 		os.RemoveAll(compilerTemplate.root)
 	}

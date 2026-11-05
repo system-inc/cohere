@@ -145,11 +145,11 @@ type Graph[E any] struct {
 // Statement runs as each statement is reached, before it is laid out. Loop runs
 // where control flows back into a loop for another iteration of it.
 type Hooks[E any] struct {
-	Expression func(b *Builder[E], node *ast.Node)
-	Read       func(b *Builder[E], node *ast.Node)
-	Write      func(b *Builder[E], node *ast.Node)
-	Statement  func(b *Builder[E], node *ast.Node)
-	Loop       func(b *Builder[E], loop *ast.Node)
+	Expression func(builder *Builder[E], node *ast.Node)
+	Read       func(builder *Builder[E], node *ast.Node)
+	Write      func(builder *Builder[E], node *ast.Node)
+	Statement  func(builder *Builder[E], node *ast.Node)
+	Loop       func(builder *Builder[E], loop *ast.Node)
 }
 
 // tryPosition is where in a `try` statement construction currently is.
@@ -209,45 +209,45 @@ type Builder[E any] struct {
 
 // Build lays out the control-flow graph of one code path root.
 func Build[E any](root *ast.Node, hooks Hooks[E]) *Graph[E] {
-	b := &Builder[E]{hooks: hooks, blocks: make([]*Block[E], 0, blockChunkSize)}
-	b.cur = b.newBlock()
-	b.cur.hasIncoming = true
-	b.cur.Reachable = true
+	builder := &Builder[E]{hooks: hooks, blocks: make([]*Block[E], 0, blockChunkSize)}
+	builder.cur = builder.newBlock()
+	builder.cur.hasIncoming = true
+	builder.cur.Reachable = true
 
 	switch root.Kind {
 	case ast.KindSourceFile:
-		b.statements(root.AsSourceFile().Statements)
+		builder.statements(root.AsSourceFile().Statements)
 
 	case ast.KindClassStaticBlockDeclaration:
-		b.statement(root.AsClassStaticBlockDeclaration().Body)
+		builder.statement(root.AsClassStaticBlockDeclaration().Body)
 
 	case ast.KindPropertyDeclaration:
-		b.expr(root.AsPropertyDeclaration().Initializer)
+		builder.expr(root.AsPropertyDeclaration().Initializer)
 
 	default:
 		for _, parameter := range root.Parameters() {
-			b.parameter(parameter)
+			builder.parameter(parameter)
 		}
 		// A `typeof x` inside the signature's type annotations references the
 		// variable even though nothing in them runs.
-		b.expr(root.Type())
+		builder.expr(root.Type())
 		if body := root.Body(); body != nil {
 			if body.Kind == ast.KindBlock {
-				b.statement(body)
+				builder.statement(body)
 			} else {
-				b.expr(body)
+				builder.expr(body)
 			}
 		}
 	}
 
-	endReachable := b.cur.Reachable
+	endReachable := builder.cur.Reachable
 	if endReachable {
-		b.markFinal(b.cur)
+		builder.markFinal(builder.cur)
 	}
 	return &Graph[E]{
-		Blocks:       b.blocks,
-		FinalBlocks:  b.finals,
-		ThrownBlocks: b.thrown,
+		Blocks:       builder.blocks,
+		FinalBlocks:  builder.finals,
+		ThrownBlocks: builder.thrown,
 		EndReachable: endReachable,
 	}
 }
@@ -275,9 +275,9 @@ func (builder *Builder[E]) Current() *Block[E] {
 
 // Emit records one event in the current block and returns where it landed, so a
 // consumer can refer back to it.
-func (builder *Builder[E]) Emit(e E) (*Block[E], int) {
+func (builder *Builder[E]) Emit(element E) (*Block[E], int) {
 	index := len(builder.cur.Events)
-	builder.cur.Events = append(builder.cur.Events, e)
+	builder.cur.Events = append(builder.cur.Events, element)
 	return builder.cur, index
 }
 
@@ -436,28 +436,28 @@ func (builder *Builder[E]) loop(node *ast.Node) {
 // throwFrame returns the innermost `try` frame an exception raised at the
 // current position lands in, or -1 when it leaves the code path entirely.
 func (builder *Builder[E]) throwFrame() int {
-	for i := len(builder.tryStack) - 1; i >= 0; i-- {
-		f := builder.tryStack[i]
-		if f.position == posTry || (f.hasFinally && f.position == posCatch) {
-			return i
+	for index := len(builder.tryStack) - 1; index >= 0; index-- {
+		frame := builder.tryStack[index]
+		if frame.position == posTry || (frame.hasFinally && frame.position == posCatch) {
+			return index
 		}
 	}
 	return -1
 }
 
-func throwTarget[E any](f *tryFrame[E]) *Block[E] {
-	if f.position == posTry && f.catchEntry != nil {
-		return f.catchEntry
+func throwTarget[E any](frame *tryFrame[E]) *Block[E] {
+	if frame.position == posTry && frame.catchEntry != nil {
+		return frame.catchEntry
 	}
-	return f.finallyEntry
+	return frame.finallyEntry
 }
 
 // returnFrame returns the innermost `try` frame whose `finally` block runs
 // before a `return` leaves the code path, or -1 when none does.
 func (builder *Builder[E]) returnFrame() int {
-	for i := len(builder.tryStack) - 1; i >= 0; i-- {
-		if builder.tryStack[i].hasFinally {
-			return i
+	for index := len(builder.tryStack) - 1; index >= 0; index-- {
+		if builder.tryStack[index].hasFinally {
+			return index
 		}
 	}
 	return -1
@@ -471,17 +471,17 @@ func (builder *Builder[E]) firstThrowableFork() {
 	if !builder.cur.Reachable {
 		return
 	}
-	i := builder.throwFrame()
-	if i < 0 {
+	index := builder.throwFrame()
+	if index < 0 {
 		return
 	}
-	f := builder.tryStack[i]
-	if f.thrownForked {
+	frame := builder.tryStack[index]
+	if frame.thrownForked {
 		return
 	}
-	f.thrownForked = true
-	f.thrownAny = true
-	builder.link(builder.cur, throwTarget(f))
+	frame.thrownForked = true
+	frame.thrownAny = true
+	builder.link(builder.cur, throwTarget(frame))
 	next := builder.newBlock()
 	builder.link(builder.cur, next)
 	builder.enter(next)
@@ -491,16 +491,16 @@ func (builder *Builder[E]) firstThrowableFork() {
 // the second copy of a `finally` block forks at the same place the first did.
 func (builder *Builder[E]) snapshotForks() []bool {
 	snapshot := make([]bool, len(builder.tryStack))
-	for i, f := range builder.tryStack {
-		snapshot[i] = f.thrownForked
+	for index, frame := range builder.tryStack {
+		snapshot[index] = frame.thrownForked
 	}
 	return snapshot
 }
 
 func (builder *Builder[E]) restoreForks(snapshot []bool) {
-	for i, forked := range snapshot {
-		if i < len(builder.tryStack) {
-			builder.tryStack[i].thrownForked = forked
+	for index, forked := range snapshot {
+		if index < len(builder.tryStack) {
+			builder.tryStack[index].thrownForked = forked
 		}
 	}
 }

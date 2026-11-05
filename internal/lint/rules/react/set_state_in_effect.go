@@ -735,11 +735,11 @@ func translateAcrossCaptures(
 		return inner
 	}
 	limit := min(len(value.Captures), len(nested.Context))
-	for i := range limit {
-		if origin, known := outer[value.Captures[i].Identifier]; known {
+	for index := range limit {
+		if origin, known := outer[value.Captures[index].Identifier]; known {
 			// Keyed by the inner identifier, valued by the outer place, so the finding still points
 			// at a span in a file rather than at a value in a closure's private table.
-			inner[nested.Context[i].Identifier] = origin
+			inner[nested.Context[index].Identifier] = origin
 		}
 	}
 	return inner

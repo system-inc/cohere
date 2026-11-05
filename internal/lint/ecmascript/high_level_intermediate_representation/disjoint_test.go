@@ -192,13 +192,13 @@ func TestDisjointSetMatchesReact(test *testing.T) {
 			if len(got) != len(testCase.wantSets) {
 				test.Fatalf("got %d classes, want %d: %v", len(got), len(testCase.wantSets), got)
 			}
-			for i, want := range testCase.wantSets {
-				if len(got[i]) != len(want) {
-					test.Fatalf("class %d is %v, want %v", i, got[i], want)
+			for wantSetIndex, want := range testCase.wantSets {
+				if len(got[wantSetIndex]) != len(want) {
+					test.Fatalf("class %d is %v, want %v", wantSetIndex, got[wantSetIndex], want)
 				}
 				for j := range want {
-					if got[i][j] != want[j] {
-						test.Fatalf("class %d is %v, want %v", i, got[i], want)
+					if got[wantSetIndex][j] != want[j] {
+						test.Fatalf("class %d is %v, want %v", wantSetIndex, got[wantSetIndex], want)
 					}
 				}
 			}
@@ -294,8 +294,8 @@ func TestDisjointFindTerminatesOnALongChain(test *testing.T) {
 	// rather than through Union, because Union's own rewriting would flatten it and the point here
 	// is to hand Find the worst case.
 	set.parent[static_single_assignment.IdentifierId(length)] = static_single_assignment.IdentifierId(length)
-	for i := 1; i < length; i++ {
-		set.parent[static_single_assignment.IdentifierId(i)] = static_single_assignment.IdentifierId(i + 1)
+	for index := 1; index < length; index++ {
+		set.parent[static_single_assignment.IdentifierId(index)] = static_single_assignment.IdentifierId(index + 1)
 	}
 
 	root, ok := set.Find(1)
@@ -304,10 +304,10 @@ func TestDisjointFindTerminatesOnALongChain(test *testing.T) {
 	}
 
 	// Compression: every node on the walked path now points straight at the root.
-	for i := 1; i < length; i++ {
-		if set.parent[static_single_assignment.IdentifierId(i)] != static_single_assignment.IdentifierId(length) {
+	for index := 1; index < length; index++ {
+		if set.parent[static_single_assignment.IdentifierId(index)] != static_single_assignment.IdentifierId(length) {
 			test.Fatalf("path compression left %d pointing at %d rather than the root %d",
-				i, set.parent[static_single_assignment.IdentifierId(i)], length)
+				index, set.parent[static_single_assignment.IdentifierId(index)], length)
 		}
 	}
 }
@@ -1080,13 +1080,13 @@ export function repeat(seed: number) {
 	if len(firstSets) != len(secondSets) {
 		test.Fatalf("first run made %d classes, second made %d", len(firstSets), len(secondSets))
 	}
-	for i := range firstSets {
-		if len(firstSets[i]) != len(secondSets[i]) {
-			test.Fatalf("class %d: %v then %v", i, firstSets[i], secondSets[i])
+	for firstSetIndex := range firstSets {
+		if len(firstSets[firstSetIndex]) != len(secondSets[firstSetIndex]) {
+			test.Fatalf("class %d: %v then %v", firstSetIndex, firstSets[firstSetIndex], secondSets[firstSetIndex])
 		}
-		for j := range firstSets[i] {
-			if firstSets[i][j] != secondSets[i][j] {
-				test.Fatalf("class %d: %v then %v", i, firstSets[i], secondSets[i])
+		for j := range firstSets[firstSetIndex] {
+			if firstSets[firstSetIndex][j] != secondSets[firstSetIndex][j] {
+				test.Fatalf("class %d: %v then %v", firstSetIndex, firstSets[firstSetIndex], secondSets[firstSetIndex])
 			}
 		}
 	}

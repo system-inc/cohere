@@ -50,11 +50,11 @@ func yaml11IntResolve(value []uint16, offset int, radix int) float64 {
 		offset++
 	}
 	digits := removeUnderscores(substring(value, offset, len(value)))
-	n := parseInt(digits, radix)
+	number := parseInt(digits, radix)
 	if sign == '-' {
-		return -1 * n
+		return -1 * number
 	}
-	return n
+	return number
 }
 
 var yaml11IntBinTag = &Tag{
@@ -177,89 +177,94 @@ func nodeBase64Decode(text []uint16) Binary {
 	available := min(destinationLength, decodedSize)
 	maxK := available / 3 * 3
 	maxI := len(text) / 4 * 4
-	i := 0
-	for i < maxI && len(destination) < maxK {
-		quad := [4]byte{unbase64(text[i]), unbase64(text[i+1]), unbase64(text[i+2]), unbase64(text[i+3])}
+	index := 0
+	for index < maxI && len(destination) < maxK {
+		quad := [4]byte{
+			unbase64(text[index]),
+			unbase64(text[index+1]),
+			unbase64(text[index+2]),
+			unbase64(text[index+3]),
+		}
 		if binary.BigEndian.Uint32(quad[:])&0x80808080 != 0 {
 			var proceed bool
-			destination, i, proceed = base64DecodeGroupSlow(destination, destinationLength, text, i)
+			destination, index, proceed = base64DecodeGroupSlow(destination, destinationLength, text, index)
 			if !proceed {
 				return Binary(destination)
 			}
-			maxI = i + (len(text)-i)/4*4
+			maxI = index + (len(text)-index)/4*4
 		} else {
 			destination = append(destination,
 				quad[0]<<2|quad[1]>>4, quad[1]<<4|quad[2]>>2, quad[2]<<6|quad[3])
-			i += 4
+			index += 4
 		}
 	}
-	if i < len(text) && len(destination) < destinationLength {
-		destination, _, _ = base64DecodeGroupSlow(destination, destinationLength, text, i)
+	if index < len(text) && len(destination) < destinationLength {
+		destination, _, _ = base64DecodeGroupSlow(destination, destinationLength, text, index)
 	}
 	return Binary(destination)
 }
 
 // base64DecodeGroupSlow is nbytes' Base64DecodeGroupSlow: one group of four alphabet characters,
 // skipping others, writing as many bytes as fit. It returns false to stop decoding.
-func base64DecodeGroupSlow(destination []byte, destinationLength int, text []uint16, i int) ([]byte, int, bool) {
+func base64DecodeGroupSlow(destination []byte, destinationLength int, text []uint16, index int) ([]byte, int, bool) {
 	var hi, lo byte
 	// next is the V macro's loop: the next alphabet character, false at = or the end.
 	next := func() bool {
 		for {
-			c := byte(text[i])
-			lo = unbase64(text[i])
-			i++
+			character := byte(text[index])
+			lo = unbase64(text[index])
+			index++
 			if lo < 64 {
 				return true
 			}
-			if c == '=' || i >= len(text) {
+			if character == '=' || index >= len(text) {
 				return false
 			}
 		}
 	}
 	// after is the V macro's tail: false at the end of the input or of the buffer.
 	after := func() bool {
-		if i >= len(text) || len(destination) >= destinationLength {
+		if index >= len(text) || len(destination) >= destinationLength {
 			return false
 		}
 		hi = lo
 		return true
 	}
 	if !next() || !after() {
-		return destination, i, false
+		return destination, index, false
 	}
 	if !next() {
-		return destination, i, false
+		return destination, index, false
 	}
 	destination = append(destination, (hi&0x3F)<<2|(lo&0x30)>>4)
 	if !after() || !next() {
-		return destination, i, false
+		return destination, index, false
 	}
 	destination = append(destination, (hi&0x0F)<<4|(lo&0x3C)>>2)
 	if !after() || !next() {
-		return destination, i, false
+		return destination, index, false
 	}
 	destination = append(destination, (hi&0x03)<<6|lo&0x3F)
 	if !after() {
-		return destination, i, false
+		return destination, index, false
 	}
-	return destination, i, true
+	return destination, index, true
 }
 
 // unbase64 is nbytes' table lookup on a code unit's low byte: 0 to 63 for the standard and URL-safe
 // alphabets, 255 otherwise.
 func unbase64(unit uint16) byte {
-	c := byte(unit)
+	character := byte(unit)
 	switch {
-	case c >= 'A' && c <= 'Z':
-		return c - 'A'
-	case c >= 'a' && c <= 'z':
-		return c - 'a' + 26
-	case c >= '0' && c <= '9':
-		return c - '0' + 52
-	case c == '+' || c == '-':
+	case character >= 'A' && character <= 'Z':
+		return character - 'A'
+	case character >= 'a' && character <= 'z':
+		return character - 'a' + 26
+	case character >= '0' && character <= '9':
+		return character - '0' + 52
+	case character == '+' || character == '-':
 		return 62
-	case c == '/' || c == '_':
+	case character == '/' || character == '_':
 		return 63
 	}
 	return 255
@@ -281,8 +286,8 @@ var mergeTag = &Tag{
 
 func resolvePairs(seq *Node, onError func(message string)) *Node {
 	if IsSeq(seq) {
-		for i := 0; i < len(seq.Items); i++ {
-			item := seq.Items[i]
+		for index := 0; index < len(seq.Items); index++ {
+			item := seq.Items[index]
 			if IsPair(item) {
 				continue
 			} else if IsMap(item) {
@@ -318,9 +323,9 @@ func resolvePairs(seq *Node, onError func(message string)) *Node {
 				item = pair
 			}
 			if IsPair(item) {
-				seq.Items[i] = item
+				seq.Items[index] = item
 			} else {
-				seq.Items[i] = newPair(item, nil)
+				seq.Items[index] = newPair(item, nil)
 			}
 		}
 	} else {
@@ -480,11 +485,11 @@ func timestampResolve(value []uint16) (any, error) {
 }
 
 // orZero is `n || 0` for a number.
-func orZero(n float64) float64 {
-	if math.IsNaN(n) || n == 0 {
+func orZero(number float64) float64 {
+	if math.IsNaN(number) || number == 0 {
 		return 0
 	}
-	return n
+	return number
 }
 
 // dateUTC is `Date.UTC(year, month, day, hour, minute, second, millisecond)`: a year from 0 to 99 means

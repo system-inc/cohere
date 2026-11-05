@@ -168,17 +168,17 @@ func MustCompile(source string, flags string) *RegExp {
 	return re
 }
 
-// Test reports whether the regexp matches anywhere in s, as
+// Test reports whether the regexp matches anywhere in `text`, as
 // `RegExp.prototype.test` does.
 //
 // A match that overruns MatchTimeout counts as no match: the alternative is
 // making every caller handle an error that only ever means "this pattern is
 // pathological", and a lint rule has nothing better to do with that than skip.
-func (exp *RegExp) Test(s string) bool {
+func (exp *RegExp) Test(text string) bool {
 	if exp == nil || exp.re == nil {
 		return false
 	}
-	matched, matchStringError := exp.re.MatchString(s)
+	matched, matchStringError := exp.re.MatchString(text)
 	return matchStringError == nil && matched
 }
 
@@ -187,19 +187,19 @@ func (exp *RegExp) Test(s string) bool {
 // match. Reading a bound match as no match would turn a skipped report into a
 // false positive there, so a match that overruns MatchTimeout counts as a
 // match and the report is skipped.
-func (exp *RegExp) TestOrTimeout(s string) bool {
-	matched, testOrError := exp.TestOrError(s)
+func (exp *RegExp) TestOrTimeout(text string) bool {
+	matched, testOrError := exp.TestOrError(text)
 	return matched || testOrError != nil
 }
 
 // TestOrError is Test for a caller that has to tell "no match" apart from "the
 // match ran into MatchTimeout", and that has somewhere other than a match to
 // send the second answer.
-func (exp *RegExp) TestOrError(s string) (bool, error) {
+func (exp *RegExp) TestOrError(text string) (bool, error) {
 	if exp == nil || exp.re == nil {
 		return false, nil
 	}
-	return exp.re.MatchString(s)
+	return exp.re.MatchString(text)
 }
 
 // Source returns the pattern as it was written, the way `RegExp.prototype

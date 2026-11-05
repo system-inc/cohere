@@ -52,85 +52,85 @@ const (
 // Places inside a nested function are not visited. A FunctionExpression yields its captures, which
 // are places in THIS function, and the nested body is reached through Function.Functions.
 func EachPlace(value InstructionValue, visit func(place Place, role PlaceRole)) {
-	switch v := value.(type) {
+	switch typed := value.(type) {
 	case *LoadLocal:
-		visit(v.Place, PlaceRoleUse)
+		visit(typed.Place, PlaceRoleUse)
 	case *LoadContext:
-		visit(v.Place, PlaceRoleUse)
+		visit(typed.Place, PlaceRoleUse)
 	case *DeclareLocal:
-		visit(v.LValue, PlaceRoleDefine)
+		visit(typed.LValue, PlaceRoleDefine)
 	case *DeclareContext:
-		visit(v.LValue, PlaceRoleDefine)
+		visit(typed.LValue, PlaceRoleDefine)
 	case *StoreLocal:
-		visit(v.LValue, PlaceRoleDefine)
-		visit(v.Value, PlaceRoleUse)
+		visit(typed.LValue, PlaceRoleDefine)
+		visit(typed.Value, PlaceRoleUse)
 	case *StoreContext:
-		visit(v.LValue, PlaceRoleDefine)
-		visit(v.Value, PlaceRoleUse)
+		visit(typed.LValue, PlaceRoleDefine)
+		visit(typed.Value, PlaceRoleUse)
 	case *Destructure:
-		eachPatternPlace(v.LValue, visit)
-		visit(v.Value, PlaceRoleUse)
+		eachPatternPlace(typed.LValue, visit)
+		visit(typed.Value, PlaceRoleUse)
 	case *LoadGlobal:
 		// No places: the name is resolved statically.
 	case *StoreGlobal:
-		visit(v.Value, PlaceRoleUse)
+		visit(typed.Value, PlaceRoleUse)
 	case *PropertyLoad:
-		visit(v.Object, PlaceRoleReceiver)
+		visit(typed.Object, PlaceRoleReceiver)
 	case *PropertyStore:
-		visit(v.Object, PlaceRoleReceiver)
-		visit(v.Value, PlaceRoleUse)
+		visit(typed.Object, PlaceRoleReceiver)
+		visit(typed.Value, PlaceRoleUse)
 	case *PropertyDelete:
-		visit(v.Object, PlaceRoleReceiver)
+		visit(typed.Object, PlaceRoleReceiver)
 	case *ComputedLoad:
-		visit(v.Object, PlaceRoleReceiver)
-		visit(v.Property, PlaceRoleUse)
+		visit(typed.Object, PlaceRoleReceiver)
+		visit(typed.Property, PlaceRoleUse)
 	case *ComputedStore:
-		visit(v.Object, PlaceRoleReceiver)
-		visit(v.Property, PlaceRoleUse)
-		visit(v.Value, PlaceRoleUse)
+		visit(typed.Object, PlaceRoleReceiver)
+		visit(typed.Property, PlaceRoleUse)
+		visit(typed.Value, PlaceRoleUse)
 	case *ComputedDelete:
-		visit(v.Object, PlaceRoleReceiver)
-		visit(v.Property, PlaceRoleUse)
+		visit(typed.Object, PlaceRoleReceiver)
+		visit(typed.Property, PlaceRoleUse)
 	case *CallExpression:
-		visit(v.Callee, PlaceRoleUse)
-		eachArgumentPlace(v.Args, visit)
+		visit(typed.Callee, PlaceRoleUse)
+		eachArgumentPlace(typed.Args, visit)
 	case *MethodCall:
-		visit(v.Receiver, PlaceRoleReceiver)
-		visit(v.Property, PlaceRoleUse)
-		eachArgumentPlace(v.Args, visit)
+		visit(typed.Receiver, PlaceRoleReceiver)
+		visit(typed.Property, PlaceRoleUse)
+		eachArgumentPlace(typed.Args, visit)
 	case *NewExpression:
-		visit(v.Callee, PlaceRoleUse)
-		eachArgumentPlace(v.Args, visit)
+		visit(typed.Callee, PlaceRoleUse)
+		eachArgumentPlace(typed.Args, visit)
 	case *BinaryExpression:
-		visit(v.Left, PlaceRoleUse)
-		visit(v.Right, PlaceRoleUse)
+		visit(typed.Left, PlaceRoleUse)
+		visit(typed.Right, PlaceRoleUse)
 	case *UnaryExpression:
-		visit(v.Value, PlaceRoleUse)
+		visit(typed.Value, PlaceRoleUse)
 	case *PrefixUpdate:
-		visit(v.LValue, PlaceRoleDefine)
-		visit(v.Value, PlaceRoleUse)
+		visit(typed.LValue, PlaceRoleDefine)
+		visit(typed.Value, PlaceRoleUse)
 	case *PostfixUpdate:
-		visit(v.LValue, PlaceRoleDefine)
-		visit(v.Value, PlaceRoleUse)
+		visit(typed.LValue, PlaceRoleDefine)
+		visit(typed.Value, PlaceRoleUse)
 	case *Primitive:
 		// No places.
 	case *RegExpLiteral:
 		// No places.
 	case *TemplateLiteral:
-		for _, subexpr := range v.Subexprs {
+		for _, subexpr := range typed.Subexprs {
 			visit(subexpr, PlaceRoleUse)
 		}
 	case *TaggedTemplateExpression:
-		visit(v.Tag, PlaceRoleUse)
-		for _, subexpr := range v.Subexprs {
+		visit(typed.Tag, PlaceRoleUse)
+		for _, subexpr := range typed.Subexprs {
 			visit(subexpr, PlaceRoleUse)
 		}
 	case *TypeCastExpression:
-		visit(v.Value, PlaceRoleUse)
+		visit(typed.Value, PlaceRoleUse)
 	case *MetaProperty:
 		// No places.
 	case *ObjectExpression:
-		for _, property := range v.Properties {
+		for _, property := range typed.Properties {
 			if property.ComputedKey != nil {
 				visit(*property.ComputedKey, PlaceRoleUse)
 			}
@@ -139,43 +139,43 @@ func EachPlace(value InstructionValue, visit func(place Place, role PlaceRole)) 
 	case *ObjectMethod:
 		// The body is a nested function, reached through Function.Functions.
 	case *ArrayExpression:
-		for _, element := range v.Elements {
+		for _, element := range typed.Elements {
 			if element.Hole {
 				continue
 			}
 			visit(element.Place, PlaceRoleUse)
 		}
 	case *FunctionExpression:
-		for _, capture := range v.Captures {
+		for _, capture := range typed.Captures {
 			visit(capture, PlaceRoleUse)
 		}
 	case *Await:
-		visit(v.Value, PlaceRoleUse)
+		visit(typed.Value, PlaceRoleUse)
 	case *GetIterator:
-		visit(v.Value, PlaceRoleUse)
+		visit(typed.Value, PlaceRoleUse)
 	case *IteratorNext:
-		visit(v.Iterator, PlaceRoleReceiver)
-		visit(v.Collection, PlaceRoleUse)
+		visit(typed.Iterator, PlaceRoleReceiver)
+		visit(typed.Collection, PlaceRoleUse)
 	case *NextPropertyOf:
-		visit(v.Value, PlaceRoleUse)
+		visit(typed.Value, PlaceRoleUse)
 	case *JsxExpression:
-		if v.Tag.Place != nil {
-			visit(*v.Tag.Place, PlaceRoleUse)
+		if typed.Tag.Place != nil {
+			visit(*typed.Tag.Place, PlaceRoleUse)
 		}
-		for _, property := range v.Props {
+		for _, property := range typed.Props {
 			visit(property.Value, PlaceRoleUse)
 		}
-		for _, child := range v.Children {
+		for _, child := range typed.Children {
 			visit(child, PlaceRoleUse)
 		}
 	case *JsxFragment:
-		for _, child := range v.Children {
+		for _, child := range typed.Children {
 			visit(child, PlaceRoleUse)
 		}
 	case *JsxText:
 		// No places.
 	case *StartMemoize:
-		for _, dep := range v.Deps {
+		for _, dep := range typed.Deps {
 			// A global-rooted dependency carries a NAME rather than a place, so it holds a zero
 			// `Place` that names no identifier. Visiting it would hand every operand consumer an
 			// identifier id of zero, which single-assignment renaming would then treat as a real
@@ -186,7 +186,7 @@ func EachPlace(value InstructionValue, visit func(place Place, role PlaceRole)) 
 			visit(dep.Root.Place, PlaceRoleUse)
 		}
 	case *FinishMemoize:
-		visit(v.Value, PlaceRoleUse)
+		visit(typed.Value, PlaceRoleUse)
 	case *Debugger:
 		// No places.
 	case *UnsupportedNode:
@@ -207,11 +207,11 @@ func eachArgumentPlace(args []Argument, visit func(place Place, role PlaceRole))
 }
 
 func eachPatternPlace(pattern Pattern, visit func(place Place, role PlaceRole)) {
-	switch p := pattern.(type) {
+	switch typed := pattern.(type) {
 	case *PlacePattern:
-		visit(p.Place, PlaceRoleDefine)
+		visit(typed.Place, PlaceRoleDefine)
 	case *ObjectPattern:
-		for _, property := range p.Properties {
+		for _, property := range typed.Properties {
 			if property.ComputedKey != nil {
 				visit(*property.ComputedKey, PlaceRoleUse)
 			}
@@ -220,11 +220,11 @@ func eachPatternPlace(pattern Pattern, visit func(place Place, role PlaceRole)) 
 			}
 			eachPatternPlace(property.Value, visit)
 		}
-		if p.Rest != nil {
-			visit(*p.Rest, PlaceRoleDefine)
+		if typed.Rest != nil {
+			visit(*typed.Rest, PlaceRoleDefine)
 		}
 	case *ArrayPattern:
-		for _, element := range p.Elements {
+		for _, element := range typed.Elements {
 			if element.Value == nil {
 				continue
 			}
@@ -233,8 +233,8 @@ func eachPatternPlace(pattern Pattern, visit func(place Place, role PlaceRole)) 
 			}
 			eachPatternPlace(element.Value, visit)
 		}
-		if p.Rest != nil {
-			visit(*p.Rest, PlaceRoleDefine)
+		if typed.Rest != nil {
+			visit(*typed.Rest, PlaceRoleDefine)
 		}
 	}
 }
@@ -243,25 +243,25 @@ func eachPatternPlace(pattern Pattern, visit func(place Place, role PlaceRole)) 
 //
 // A terminal never defines a place, so every role here is a use.
 func EachTerminalPlace(terminal Terminal, visit func(place Place, role PlaceRole)) {
-	switch t := terminal.(type) {
+	switch typed := terminal.(type) {
 	case *Return:
-		visit(t.Value, PlaceRoleUse)
+		visit(typed.Value, PlaceRoleUse)
 	case *Throw:
-		visit(t.Value, PlaceRoleUse)
+		visit(typed.Value, PlaceRoleUse)
 	case *If:
-		visit(t.Test, PlaceRoleUse)
+		visit(typed.Test, PlaceRoleUse)
 	case *Branch:
-		visit(t.Test, PlaceRoleUse)
+		visit(typed.Test, PlaceRoleUse)
 	case *Switch:
-		visit(t.Test, PlaceRoleUse)
-		for _, kase := range t.Cases {
+		visit(typed.Test, PlaceRoleUse)
+		for _, kase := range typed.Cases {
 			if kase.Test != nil {
 				visit(*kase.Test, PlaceRoleUse)
 			}
 		}
 	case *Try:
-		if t.HandlerBinding != nil {
-			visit(*t.HandlerBinding, PlaceRoleDefine)
+		if typed.HandlerBinding != nil {
+			visit(*typed.HandlerBinding, PlaceRoleDefine)
 		}
 	}
 }
@@ -281,55 +281,55 @@ func EachSuccessor(terminal Terminal, visit func(block static_single_assignment.
 			visit(block)
 		}
 	}
-	switch t := terminal.(type) {
+	switch typed := terminal.(type) {
 	case *Return, *Throw, *Unreachable, *Unsupported:
 		// Control leaves the function.
 	case *Goto:
-		visitReal(t.Block)
+		visitReal(typed.Block)
 	case *If:
-		visitReal(t.Consequent)
-		visitReal(t.Alternate)
+		visitReal(typed.Consequent)
+		visitReal(typed.Alternate)
 	case *Branch:
-		visitReal(t.Consequent)
-		visitReal(t.Alternate)
+		visitReal(typed.Consequent)
+		visitReal(typed.Alternate)
 	case *Switch:
-		for _, kase := range t.Cases {
+		for _, kase := range typed.Cases {
 			visitReal(kase.Block)
 		}
 		// A switch with no default can fall past every case, so the fallthrough IS an edge here.
-		if !hasDefaultCase(t.Cases) {
-			visitReal(t.Fallthrough)
+		if !hasDefaultCase(typed.Cases) {
+			visitReal(typed.Fallthrough)
 		}
 	case *While:
-		visitReal(t.Test)
+		visitReal(typed.Test)
 	case *DoWhile:
-		visitReal(t.Loop)
+		visitReal(typed.Loop)
 	case *For:
-		visitReal(t.Init)
+		visitReal(typed.Init)
 	case *ForOf:
-		visitReal(t.Init)
+		visitReal(typed.Init)
 	case *ForIn:
-		visitReal(t.Init)
+		visitReal(typed.Init)
 	case *Logical:
-		visitReal(t.Test)
+		visitReal(typed.Test)
 	case *Ternary:
-		visitReal(t.Test)
+		visitReal(typed.Test)
 	case *Optional:
-		visitReal(t.Test)
+		visitReal(typed.Test)
 	case *Sequence:
-		visitReal(t.Block)
+		visitReal(typed.Block)
 	case *Label:
-		visitReal(t.Block)
+		visitReal(typed.Block)
 	case *Try:
-		visitReal(t.Block)
-		visitReal(t.Handler)
+		visitReal(typed.Block)
+		visitReal(typed.Handler)
 	case *MaybeThrow:
-		visitReal(t.Continuation)
-		visitReal(t.Handler)
+		visitReal(typed.Continuation)
+		visitReal(typed.Handler)
 	case *Scope:
 		// The scope body is a real edge. The fallthrough is not, exactly as for every other
 		// structured terminal: control reaches it by leaving the body, not from here.
-		visitReal(t.Block)
+		visitReal(typed.Block)
 	}
 }
 
@@ -345,37 +345,37 @@ func hasDefaultCase(cases []SwitchCase) bool {
 // Fallthrough returns the block where the construct this terminal begins completes, if it has one.
 func Fallthrough(terminal Terminal) (static_single_assignment.BlockId, bool) {
 	var block static_single_assignment.BlockId
-	switch t := terminal.(type) {
+	switch typed := terminal.(type) {
 	case *If:
-		block = t.Fallthrough
+		block = typed.Fallthrough
 	case *Branch:
-		block = t.Fallthrough
+		block = typed.Fallthrough
 	case *Switch:
-		block = t.Fallthrough
+		block = typed.Fallthrough
 	case *While:
-		block = t.Fallthrough
+		block = typed.Fallthrough
 	case *DoWhile:
-		block = t.Fallthrough
+		block = typed.Fallthrough
 	case *For:
-		block = t.Fallthrough
+		block = typed.Fallthrough
 	case *ForOf:
-		block = t.Fallthrough
+		block = typed.Fallthrough
 	case *ForIn:
-		block = t.Fallthrough
+		block = typed.Fallthrough
 	case *Logical:
-		block = t.Fallthrough
+		block = typed.Fallthrough
 	case *Ternary:
-		block = t.Fallthrough
+		block = typed.Fallthrough
 	case *Optional:
-		block = t.Fallthrough
+		block = typed.Fallthrough
 	case *Sequence:
-		block = t.Fallthrough
+		block = typed.Fallthrough
 	case *Label:
-		block = t.Fallthrough
+		block = typed.Fallthrough
 	case *Try:
-		block = t.Fallthrough
+		block = typed.Fallthrough
 	case *Scope:
-		block = t.Fallthrough
+		block = typed.Fallthrough
 	default:
 		return InvalidBlock, false
 	}
@@ -402,49 +402,49 @@ func EachSuccessorAndFallthrough(terminal Terminal, visit func(block static_sing
 
 // TerminalOrder returns the terminal's position in evaluation order.
 func TerminalOrder(terminal Terminal) static_single_assignment.EvaluationOrder {
-	switch t := terminal.(type) {
+	switch typed := terminal.(type) {
 	case *Return:
-		return t.Order
+		return typed.Order
 	case *Throw:
-		return t.Order
+		return typed.Order
 	case *Unreachable:
-		return t.Order
+		return typed.Order
 	case *Unsupported:
-		return t.Order
+		return typed.Order
 	case *Goto:
-		return t.Order
+		return typed.Order
 	case *If:
-		return t.Order
+		return typed.Order
 	case *Branch:
-		return t.Order
+		return typed.Order
 	case *Switch:
-		return t.Order
+		return typed.Order
 	case *While:
-		return t.Order
+		return typed.Order
 	case *DoWhile:
-		return t.Order
+		return typed.Order
 	case *For:
-		return t.Order
+		return typed.Order
 	case *ForOf:
-		return t.Order
+		return typed.Order
 	case *ForIn:
-		return t.Order
+		return typed.Order
 	case *Logical:
-		return t.Order
+		return typed.Order
 	case *Ternary:
-		return t.Order
+		return typed.Order
 	case *Optional:
-		return t.Order
+		return typed.Order
 	case *Sequence:
-		return t.Order
+		return typed.Order
 	case *Label:
-		return t.Order
+		return typed.Order
 	case *Try:
-		return t.Order
+		return typed.Order
 	case *MaybeThrow:
-		return t.Order
+		return typed.Order
 	case *Scope:
-		return t.Order
+		return typed.Order
 	}
 	return 0
 }

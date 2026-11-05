@@ -60,10 +60,10 @@ func parseWith(text string, construct func(in *input) *parser) (root *estree.Nod
 	}()
 
 	in := newInput(text)
-	p := construct(in)
-	p.parse()
+	parser := construct(in)
+	parser.parse()
 
-	return toEstree(p.root, in), nil
+	return toEstree(parser.root, in), nil
 }
 
 // toEstree hands a node out as an estree.Node, offsets crossing from UTF-16 units to bytes.

@@ -22,7 +22,7 @@ import (
 // binary would read and write the developer's real cache table. Each fixture is a fresh directory and
 // the table is keyed by the project root, so no two tests share a table; a test that needs a cold run
 // says `--no-cache`, and TestRunCacheEndToEnd sets a home of its own for its runs.
-func TestMain(m *testing.M) {
+func TestMain(suite *testing.M) {
 	// In-process, the tests read the verbose account, as the binary tests do through verboseArguments.
 	activeOutput = outputSettings{Mode: outputVerbose}
 	pinGoEnvironment()
@@ -36,7 +36,7 @@ func TestMain(m *testing.M) {
 	// See held_output_guard_test.go: a command whose output never closes fails the binary with its holder
 	// named, rather than at -timeout with nothing said.
 	stopWatching := watchForHeldOutput(heldOutputDeadline, 10*time.Second, failHeldOutput)
-	code := m.Run()
+	code := suite.Run()
 	stopWatching()
 	// Ignored: a temporary directory of this test binary's own, which costs only its space if it outlives the
 	// run, and the run's verdict is already decided. So for each removal below.

@@ -1549,7 +1549,7 @@ type programFingerprintEntry struct {
 // viewed under the rule's own reads. optionsKey names the options; see ruleSelection.optionsKeys. The second
 // return is false when the fingerprint panicked, every time it is asked.
 func (memo *programFingerprintMemo) fingerprint(
-	g *Graph,
+	graph *Graph,
 	subject rule.Rule,
 	options any,
 	optionsKey string,
@@ -1569,7 +1569,7 @@ func (memo *programFingerprintMemo) fingerprint(
 				entry.usable = false
 			}
 		}()
-		entry.fingerprint = subject.ProgramFingerprint(rule.ViewProgram(g.Program, nil, subject), options)
+		entry.fingerprint = subject.ProgramFingerprint(rule.ViewProgram(graph.Program, nil, subject), options)
 		entry.usable = true
 	})
 	return entry.fingerprint, entry.usable

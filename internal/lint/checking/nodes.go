@@ -64,26 +64,26 @@ func HasCommentsInRange(sourceFile *ast.SourceFile, inRange core.TextRange) bool
 	return false
 }
 
-func TypeRecurser(t *checker.Type, predicate func(t *checker.Type) /* should stop */ bool) bool {
-	if IsTypeFlagSet(t, checker.TypeFlagsUnionOrIntersection) {
-		for _, subtype := range t.Types() {
+func TypeRecurser(subjectType *checker.Type, predicate func(subjectType *checker.Type) /* should stop */ bool) bool {
+	if IsTypeFlagSet(subjectType, checker.TypeFlagsUnionOrIntersection) {
+		for _, subtype := range subjectType.Types() {
 			if TypeRecurser(subtype, predicate) {
 				return true
 			}
 		}
 		return false
 	} else {
-		return predicate(t)
+		return predicate(subjectType)
 	}
 }
 
 // SUPER DIRTY HACK FOR OPTIONAL FIELDS :(
-func Ref[T any](a T) *T {
-	return &a
+func Ref[T any](value T) *T {
+	return &value
 }
 
-func GetNumberIndexType(typeChecker *checker.Checker, t *checker.Type) *checker.Type {
-	return checker.Checker_getIndexTypeOfType(typeChecker, t, checker.Checker_numberType(typeChecker))
+func GetNumberIndexType(typeChecker *checker.Checker, subjectType *checker.Type) *checker.Type {
+	return checker.Checker_getIndexTypeOfType(typeChecker, subjectType, checker.Checker_numberType(typeChecker))
 }
 func GetHeritageClauses(node *ast.Node) *ast.NodeList {
 	switch node.Kind {
@@ -98,13 +98,13 @@ func GetHeritageClauses(node *ast.Node) *ast.NodeList {
 }
 
 // Source: TypeScript/tsc/internal/core/core.go
-func Filter[T any](slice []T, f func(T) bool) []T {
-	for i, value := range slice {
-		if !f(value) {
-			result := slices.Clone(slice[:i])
-			for i++; i < len(slice); i++ {
-				value = slice[i]
-				if f(value) {
+func Filter[T any](slice []T, predicate func(T) bool) []T {
+	for index, value := range slice {
+		if !predicate(value) {
+			result := slices.Clone(slice[:index])
+			for index++; index < len(slice); index++ {
+				value = slice[index]
+				if predicate(value) {
 					result = append(result, value)
 				}
 			}
@@ -115,13 +115,13 @@ func Filter[T any](slice []T, f func(T) bool) []T {
 }
 
 // Source: TypeScript/tsc/internal/core/core.go
-func FilterIndex[T any](slice []T, f func(T, int, []T) bool) []T {
-	for i, value := range slice {
-		if !f(value, i, slice) {
-			result := slices.Clone(slice[:i])
-			for i++; i < len(slice); i++ {
-				value = slice[i]
-				if f(value, i, slice) {
+func FilterIndex[T any](slice []T, predicate func(T, int, []T) bool) []T {
+	for index, value := range slice {
+		if !predicate(value, index, slice) {
+			result := slices.Clone(slice[:index])
+			for index++; index < len(slice); index++ {
+				value = slice[index]
+				if predicate(value, index, slice) {
 					result = append(result, value)
 				}
 			}
@@ -132,21 +132,21 @@ func FilterIndex[T any](slice []T, f func(T, int, []T) bool) []T {
 }
 
 // Source: TypeScript/tsc/internal/core/core.go
-func Map[T, U any](slice []T, f func(T) U) []U {
+func Map[T, U any](slice []T, transform func(T) U) []U {
 	if len(slice) == 0 {
 		return nil
 	}
 	result := make([]U, len(slice))
-	for i, value := range slice {
-		result[i] = f(value)
+	for index, value := range slice {
+		result[index] = transform(value)
 	}
 	return result
 }
 
 // Source: TypeScript/tsc/internal/core/core.go
-func Some[T any](slice []T, f func(T) bool) bool {
+func Some[T any](slice []T, predicate func(T) bool) bool {
 	for _, value := range slice {
-		if f(value) {
+		if predicate(value) {
 			return true
 		}
 	}
@@ -154,9 +154,9 @@ func Some[T any](slice []T, f func(T) bool) bool {
 }
 
 // Source: TypeScript/tsc/internal/core/core.go
-func Every[T any](slice []T, f func(T) bool) bool {
+func Every[T any](slice []T, predicate func(T) bool) bool {
 	for _, value := range slice {
-		if !f(value) {
+		if !predicate(value) {
 			return false
 		}
 	}
@@ -177,19 +177,19 @@ func IncludesModifier(node interface{ Modifiers() *ast.ModifierList }, modifier 
 	if modifiers == nil {
 		return false
 	}
-	return Some(modifiers.NodeList.Nodes, func(m *ast.Node) bool {
-		return m.Kind == modifier
+	return Some(modifiers.NodeList.Nodes, func(node *ast.Node) bool {
+		return node.Kind == modifier
 	})
 }
 
 // Source: https://github.com/microsoft/typescript-go/blob/5652e65d5ae944375676d3955f9755e554576d41/internal/jsnum/string.go#L99
-func IsStrWhiteSpace(r rune) bool {
+func IsStrWhiteSpace(character rune) bool {
 	// This is different than stringutil.IsWhiteSpaceLike.
 
 	// https://tc39.es/ecma262/2024/multipage/ecmascript-language-lexical-grammar.html#prod-LineTerminator
 	// https://tc39.es/ecma262/2024/multipage/ecmascript-language-lexical-grammar.html#prod-WhiteSpace
 
-	switch r {
+	switch character {
 	// LineTerminator
 	case '\n', '\r', 0x2028, 0x2029:
 		return true
@@ -199,5 +199,5 @@ func IsStrWhiteSpace(r rune) bool {
 	}
 
 	// WhiteSpace
-	return unicode.Is(unicode.Zs, r)
+	return unicode.Is(unicode.Zs, character)
 }

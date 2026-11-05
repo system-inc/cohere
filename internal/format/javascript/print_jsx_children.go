@@ -174,35 +174,35 @@ func printJsxElementInternal(path *Path, options *Options, print PrintFunc) Doc 
 	// content between them.
 	// We need to remove empty whitespace and softlines before JSX whitespace
 	// to get the correct output.
-	for i := len(children) - 2; i >= 0; i-- {
-		isPairOfEmptyStrings := isEmptyText(at(i)) && isEmptyText(at(i+1))
-		isPairOfHardlines := isSameDoc(at(i), hardline) &&
-			isEmptyText(at(i+1)) &&
-			isSameDoc(at(i+2), hardline)
-		isLineFollowedByJsxWhitespace := (isSameDoc(at(i), softline) || isSameDoc(at(i), hardline)) &&
-			isEmptyText(at(i+1)) &&
-			isSameDoc(at(i+2), whitespace)
-		isJsxWhitespaceFollowedByLine := isSameDoc(at(i), whitespace) &&
-			isEmptyText(at(i+1)) &&
-			(isSameDoc(at(i+2), softline) || isSameDoc(at(i+2), hardline))
-		isDoubleJsxWhitespace := isSameDoc(at(i), whitespace) &&
-			isEmptyText(at(i+1)) &&
-			isSameDoc(at(i+2), whitespace)
-		isPairOfHardOrSoftLines := (isSameDoc(at(i), softline) &&
-			isEmptyText(at(i+1)) &&
-			isSameDoc(at(i+2), hardline)) ||
-			(isSameDoc(at(i), hardline) &&
-				isEmptyText(at(i+1)) &&
-				isSameDoc(at(i+2), softline))
+	for index := len(children) - 2; index >= 0; index-- {
+		isPairOfEmptyStrings := isEmptyText(at(index)) && isEmptyText(at(index+1))
+		isPairOfHardlines := isSameDoc(at(index), hardline) &&
+			isEmptyText(at(index+1)) &&
+			isSameDoc(at(index+2), hardline)
+		isLineFollowedByJsxWhitespace := (isSameDoc(at(index), softline) || isSameDoc(at(index), hardline)) &&
+			isEmptyText(at(index+1)) &&
+			isSameDoc(at(index+2), whitespace)
+		isJsxWhitespaceFollowedByLine := isSameDoc(at(index), whitespace) &&
+			isEmptyText(at(index+1)) &&
+			(isSameDoc(at(index+2), softline) || isSameDoc(at(index+2), hardline))
+		isDoubleJsxWhitespace := isSameDoc(at(index), whitespace) &&
+			isEmptyText(at(index+1)) &&
+			isSameDoc(at(index+2), whitespace)
+		isPairOfHardOrSoftLines := (isSameDoc(at(index), softline) &&
+			isEmptyText(at(index+1)) &&
+			isSameDoc(at(index+2), hardline)) ||
+			(isSameDoc(at(index), hardline) &&
+				isEmptyText(at(index+1)) &&
+				isSameDoc(at(index+2), softline))
 
 		if (isPairOfHardlines && containsText) ||
 			isPairOfEmptyStrings ||
 			isLineFollowedByJsxWhitespace ||
 			isDoubleJsxWhitespace ||
 			isPairOfHardOrSoftLines {
-			splice(i, 2)
+			splice(index, 2)
 		} else if isJsxWhitespaceFollowedByLine {
-			splice(i+1, 2)
+			splice(index+1, 2)
 		}
 	}
 
@@ -233,11 +233,11 @@ func printJsxElementInternal(path *Path, options *Options, print PrintFunc) Doc 
 		last := len(multilineChildren) - 1
 		multilineChildren[last] = concatIn(path, multilineChildren[last], document)
 	}
-	for i, child := range children {
+	for index, child := range children {
 		// There are a number of situations where we need to ensure we display
 		// whitespace as `{" "}` when outputting this element over multiple lines.
 		if isSameDoc(child, whitespace) {
-			if i == 1 && doc.IsEmptyDoc(children[i-1]) {
+			if index == 1 && doc.IsEmptyDoc(children[index-1]) {
 				if len(children) == 2 {
 					// Solitary whitespace
 					pushOntoLast(rawJsxWhitespace)
@@ -248,13 +248,13 @@ func printJsxElementInternal(path *Path, options *Options, print PrintFunc) Doc 
 				continue
 			}
 
-			if i == len(children)-1 {
+			if index == len(children)-1 {
 				// Trailing whitespace
 				pushOntoLast(rawJsxWhitespace)
 				continue
 			}
 
-			if isEmptyText(at(i-1)) && isSameDoc(at(i-2), hardline) {
+			if isEmptyText(at(index-1)) && isSameDoc(at(index-2), hardline) {
 				// Whitespace after line break
 				pushOntoLast(rawJsxWhitespace)
 				continue
@@ -264,7 +264,7 @@ func printJsxElementInternal(path *Path, options *Options, print PrintFunc) Doc 
 		// Note that children always satisfy the rule of fill() content.
 		// - printJsxChildren always returns valid fill() content
 		// - we always remove even number (containing zero) of leading items from children.
-		if i%2 == 0 {
+		if index%2 == 0 {
 			// non-line-like
 			pushOntoLast(child)
 		} else {
@@ -397,8 +397,8 @@ func printJsxChildren(
 					return
 				}
 
-				for i, word := range words {
-					if i%2 == 1 {
+				for index, word := range words {
+					if index%2 == 1 {
 						pushLine(line)
 					} else {
 						push(doc.Text(word))

@@ -25,19 +25,19 @@ import (
 // character there.
 //
 // https://tc39.es/ecma262/2024/multipage/text-processing.html#sec-runtime-semantics-canonicalize-ch
-func Canonicalize(r rune, unicodeMode bool) rune {
+func Canonicalize(character rune, unicodeMode bool) rune {
 	if unicodeMode {
-		return simpleFold(r)
+		return simpleFold(character)
 	}
 	// Canonicalizing one UTF-16 code unit at a time is what makes this the
 	// answer for a regexp without the `u` flag, and it leaves a
 	// supplementary-plane character to stand for itself.
-	if r > 0xFFFF || expandsOnUppercase(r) {
-		return r
+	if character > 0xFFFF || expandsOnUppercase(character) {
+		return character
 	}
-	upper := unicode.ToUpper(r)
-	if r >= utf8.RuneSelf && upper < utf8.RuneSelf {
-		return r
+	upper := unicode.ToUpper(character)
+	if character >= utf8.RuneSelf && upper < utf8.RuneSelf {
+		return character
 	}
 	return upper
 }
@@ -46,9 +46,9 @@ func Canonicalize(r rune, unicodeMode bool) rune {
 // with, which serves as the canonical form under `u` and `v`. Simple case
 // folding carries no rule about ASCII and no rule about the supplementary
 // plane, so neither guard above applies here.
-func simpleFold(r rune) rune {
-	least := r
-	for folded := unicode.SimpleFold(r); folded != r; folded = unicode.SimpleFold(folded) {
+func simpleFold(character rune) rune {
+	least := character
+	for folded := unicode.SimpleFold(character); folded != character; folded = unicode.SimpleFold(folded) {
 		if folded < least {
 			least = folded
 		}
@@ -58,24 +58,24 @@ func simpleFold(r rune) rune {
 
 // expandsOnUppercase reports the characters whose simple uppercase is one
 // character but whose full uppercase is several.
-func expandsOnUppercase(r rune) bool {
-	return r >= 0x1F80 && r <= 0x1F87 ||
-		r >= 0x1F90 && r <= 0x1F97 ||
-		r >= 0x1FA0 && r <= 0x1FA7 ||
-		r == 0x1FB3 || r == 0x1FC3 || r == 0x1FF3
+func expandsOnUppercase(character rune) bool {
+	return character >= 0x1F80 && character <= 0x1F87 ||
+		character >= 0x1F90 && character <= 0x1F97 ||
+		character >= 0x1FA0 && character <= 0x1FA7 ||
+		character == 0x1FB3 || character == 0x1FC3 || character == 0x1FF3
 }
 
 // CaseEquivalents returns every character that Canonicalize maps onto the same
-// character as r, r included, or nil when r stands alone. The result is shared
+// character as `character`, `character` included, or nil when `character` stands alone. The result is shared
 // and must not be modified.
 //
 // A caller comparing one character against another can just canonicalize both.
 // This is for a caller that has to widen a set — the members of a regexp
 // character class, say — to cover everything a case-insensitive comparison
 // would accept.
-func CaseEquivalents(r rune, unicodeMode bool) []rune {
+func CaseEquivalents(character rune, unicodeMode bool) []rune {
 	byMember, _ := caseTables(unicodeMode)
-	return byMember[r]
+	return byMember[character]
 }
 
 // CaseEquivalenceGroups returns every group of two or more characters that
@@ -109,10 +109,10 @@ func caseTables(unicodeMode bool) (map[rune][]rune, [][]rune) {
 // and as a list to walk.
 func buildCaseTables(unicodeMode bool) (map[rune][]rune, [][]rune) {
 	grouped := map[rune][]rune{}
-	record := func(r rune) {
-		canonical := Canonicalize(r, unicodeMode)
-		if !slices.Contains(grouped[canonical], r) {
-			grouped[canonical] = append(grouped[canonical], r)
+	record := func(character rune) {
+		canonical := Canonicalize(character, unicodeMode)
+		if !slices.Contains(grouped[canonical], character) {
+			grouped[canonical] = append(grouped[canonical], character)
 		}
 	}
 	// Every character that canonicalizes onto another one has a case mapping,
@@ -121,11 +121,11 @@ func buildCaseTables(unicodeMode bool) (map[rune][]rune, [][]rune) {
 	// `K` without any of the three having the other as its uppercase — so each
 	// orbit is walked out rather than assumed to be a pair.
 	for _, caseRange := range unicode.CaseRanges {
-		for r := rune(caseRange.Lo); r <= rune(caseRange.Hi); r++ {
-			record(r)
-			record(Canonicalize(r, unicodeMode))
+		for character := rune(caseRange.Lo); character <= rune(caseRange.Hi); character++ {
+			record(character)
+			record(Canonicalize(character, unicodeMode))
 			if unicodeMode {
-				for folded := unicode.SimpleFold(r); folded != r; folded = unicode.SimpleFold(folded) {
+				for folded := unicode.SimpleFold(character); folded != character; folded = unicode.SimpleFold(folded) {
 					record(folded)
 				}
 			}

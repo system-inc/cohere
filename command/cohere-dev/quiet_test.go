@@ -156,9 +156,9 @@ func TestAQuietWindowSwitchesTheTrimOff(test *testing.T) {
 	if runtime.GOOS == "windows" {
 		test.Skip("the trim holds tokens, a Unix lock")
 	}
-	c := newQuietTrimCase(test)
+	trimCase := newQuietTrimCase(test)
 
-	if output := c.run(
+	if output := trimCase.run(
 		test,
 		"quiet",
 		"on",
@@ -168,29 +168,29 @@ func TestAQuietWindowSwitchesTheTrimOff(test *testing.T) {
 	); !strings.Contains(output, "quiet window open until") {
 		test.Errorf("quiet on does not say the window is open:\n%s", output)
 	}
-	if output := c.run(
+	if output := trimCase.run(
 		test,
 		"status",
 	); !strings.Contains(output, "quiet window: open") || !strings.Contains(output, "cache's cold runs") {
 		test.Errorf("cohere-dev status does not show the open window:\n%s", output)
 	}
-	c.run(test, trimCacheVerb)
-	if remaining := c.size(test); remaining != 10*1024 {
+	trimCase.run(test, trimCacheVerb)
+	if remaining := trimCase.size(test); remaining != 10*1024 {
 		test.Errorf("the trim removed entries inside a quiet window: %d bytes left of 10 KB", remaining)
 	}
-	if log := c.log(test); !strings.Contains(log, "not looked at: a quiet window holds until") ||
-		!strings.Contains(log, quietPath(c.slots)) || !strings.Contains(log, "cache's cold runs") {
+	if log := trimCase.log(test); !strings.Contains(log, "not looked at: a quiet window holds until") ||
+		!strings.Contains(log, quietPath(trimCase.slots)) || !strings.Contains(log, "cache's cold runs") {
 		test.Errorf("the trim's log does not name the window it held off for:\n%s", log)
 	}
 
-	if output := c.run(test, "quiet", "off"); !strings.Contains(output, "quiet window released") {
+	if output := trimCase.run(test, "quiet", "off"); !strings.Contains(output, "quiet window released") {
 		test.Errorf("quiet off does not say the window was released:\n%s", output)
 	}
-	c.run(test, trimCacheVerb)
-	if remaining := c.size(test); remaining > 6*1024/4*3 {
+	trimCase.run(test, trimCacheVerb)
+	if remaining := trimCase.size(test); remaining > 6*1024/4*3 {
 		test.Errorf("with the window released the trim left %d bytes, over three quarters of the 6 KB cap", remaining)
 	}
-	if log := c.log(test); !strings.Contains(log, "trimmed from") {
+	if log := trimCase.log(test); !strings.Contains(log, "trimmed from") {
 		test.Errorf("with the window released the trim did not trim:\n%s", log)
 	}
 }
@@ -202,29 +202,29 @@ func TestAQuietWindowOpenedWhileTheTrimWaitsHoldsToo(test *testing.T) {
 	if runtime.GOOS == "windows" {
 		test.Skip("the trim holds tokens, a Unix lock")
 	}
-	c := newQuietTrimCase(test)
+	trimCase := newQuietTrimCase(test)
 
-	held, takeSlotError := takeSlot(c.slots, 2, "a run that holds a token")
+	held, takeSlotError := takeSlot(trimCase.slots, 2, "a run that holds a token")
 	if takeSlotError != nil || held == nil {
 		test.Fatalf("taking a token for the test: %v", takeSlotError)
 	}
-	trim := exec.Command(c.wrapper, trimCacheVerb)
-	trim.Env = c.environment
+	trim := exec.Command(trimCase.wrapper, trimCacheVerb)
+	trim.Env = trimCase.environment
 	if startError := trim.Start(); startError != nil {
 		held.release()
 		test.Fatal(startError)
 	}
 	// Measuring 10 KB takes milliseconds; two seconds puts the trim well into its wait for the pool.
 	time.Sleep(2 * time.Second)
-	c.run(test, "quiet", "on", "--for", "10m", "lint_rules' pairs")
+	trimCase.run(test, "quiet", "on", "--for", "10m", "lint_rules' pairs")
 	held.release()
 	if waitError := trim.Wait(); waitError != nil {
 		test.Fatalf("the trim failed: %v", waitError)
 	}
-	if remaining := c.size(test); remaining != 10*1024 {
+	if remaining := trimCase.size(test); remaining != 10*1024 {
 		test.Errorf("a window opened while the trim waited did not hold it: %d bytes left of 10 KB", remaining)
 	}
-	log := c.log(test)
+	log := trimCase.log(test)
 	if strings.Contains(log, "not looked at") {
 		test.Fatalf(
 			"the trim had not reached its wait for the pool in two seconds, so this run tells nothing:\n%s",

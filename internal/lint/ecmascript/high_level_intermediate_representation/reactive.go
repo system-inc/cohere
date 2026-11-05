@@ -249,18 +249,18 @@ type reactivity struct {
 	rounds int
 }
 
-func (r *reactivity) run() {
+func (state *reactivity) run() {
 	// Parameters are the root source: a component's props and a hook's arguments both arrive here,
 	// and both can differ between renders. Upstream marks the place behind a spread parameter as
 	// well as a plain one, which `Function.Params` already flattens for us.
-	for index := range r.function.Params {
-		r.mark(r.function.Params[index].Identifier)
+	for index := range state.function.Params {
+		state.mark(state.function.Params[index].Identifier)
 	}
 
 	// The frontier depends only on the control-flow graph, which nothing here mutates, so it is
 	// computed once. Which of those frontier blocks branches on a REACTIVE test changes as the set
 	// grows, so `controlled` is refreshed every round from the frontier rather than cached.
-	frontiers := r.postDominatorFrontiers()
+	frontiers := state.postDominatorFrontiers()
 	controlled := make(map[static_single_assignment.BlockId]bool, len(frontiers))
 
 	// Bounded rather than unbounded, for the reason `control_flow_graph.Solve` states in its own header: a
@@ -274,32 +274,32 @@ func (r *reactivity) run() {
 	// sound. The bound is additive safety, not a behavioural difference: it is never reached, and
 	// `TestReactiveConvergesInFewRounds` records what real code actually costs.
 	for {
-		r.rounds++
-		if r.rounds > maximumReactiveRounds {
+		state.rounds++
+		if state.rounds > maximumReactiveRounds {
 			return
 		}
-		r.changed = false
+		state.changed = false
 		// Refreshed before the sweep so a test that became reactive in the previous round makes
 		// its dependent blocks controlled in this one. `controlled` only ever gains entries, which
 		// is what keeps the whole fixpoint monotone.
-		r.refreshControlled(frontiers, controlled)
-		for _, block := range r.function.Blocks {
-			r.visitBlock(block, controlled)
+		state.refreshControlled(frontiers, controlled)
+		for _, block := range state.function.Blocks {
+			state.visitBlock(block, controlled)
 		}
-		if !r.changed {
+		if !state.changed {
 			break
 		}
 	}
 
-	r.applyToPlaces(r.function, true)
+	state.applyToPlaces(state.function, true)
 }
 
 // visitBlock runs one block's phis and instructions against the current reactive set.
-func (r *reactivity) visitBlock(block *BasicBlock, controlled map[static_single_assignment.BlockId]bool) {
+func (state *reactivity) visitBlock(block *BasicBlock, controlled map[static_single_assignment.BlockId]bool) {
 	hasReactiveControl := controlled[block.Id]
 
 	for _, phi := range block.Phis {
-		if r.isReactive(phi.Place.Identifier) {
+		if state.isReactive(phi.Place.Identifier) {
 			continue
 		}
 
@@ -309,13 +309,13 @@ func (r *reactivity) visitBlock(block *BasicBlock, controlled map[static_single_
 
 		isPhiReactive := false
 		for _, predecessorId := range operandOrder {
-			if r.isReactive(phi.Operands.At(predecessorId).Identifier) {
+			if state.isReactive(phi.Operands.At(predecessorId).Identifier) {
 				isPhiReactive = true
 				break
 			}
 		}
 		if isPhiReactive {
-			r.mark(phi.Place.Identifier)
+			state.mark(phi.Place.Identifier)
 			continue
 		}
 
@@ -325,19 +325,19 @@ func (r *reactivity) visitBlock(block *BasicBlock, controlled map[static_single_
 		// `x` reactive with two constant operands.
 		for _, predecessorId := range operandOrder {
 			if controlled[predecessorId] {
-				r.mark(phi.Place.Identifier)
+				state.mark(phi.Place.Identifier)
 				break
 			}
 		}
 	}
 
 	for _, instructionId := range block.Instructions {
-		instruction := r.function.Instructions[instructionId]
+		instruction := state.function.Instructions[instructionId]
 		if instruction == nil {
 			continue
 		}
-		r.recordHookResult(instruction)
-		r.recordStablePositions(instruction)
+		state.recordHookResult(instruction)
+		state.recordStablePositions(instruction)
 
 		hasReactiveInput := false
 		EachPlace(instruction.Value, func(place Place, role PlaceRole) {
@@ -346,7 +346,7 @@ func (r *reactivity) visitBlock(block *BasicBlock, controlled map[static_single_
 			// stopping would leave later operands unflagged. This pass writes flags in a separate
 			// pass at the end, so the side effect is gone, but the traversal is kept identical so
 			// that a reader comparing the two files is not asked to re-derive why they differ.
-			if r.isReactive(place.Identifier) {
+			if state.isReactive(place.Identifier) {
 				hasReactiveInput = true
 			}
 		})
@@ -357,13 +357,13 @@ func (r *reactivity) visitBlock(block *BasicBlock, controlled map[static_single_
 		// return reactive, and it is why none of those is listed separately.
 		switch value := instruction.Value.(type) {
 		case *CallExpression:
-			if r.isHookCallee(value.Callee.Identifier) {
+			if state.isHookCallee(value.Callee.Identifier) {
 				hasReactiveInput = true
 			}
 		case *MethodCall:
 			// Upstream tests the PROPERTY rather than the receiver, so `React.useState(0)` is a
 			// hook call while `state.useState` as a receiver is not.
-			if r.isHookCallee(value.Property.Identifier) {
+			if state.isHookCallee(value.Property.Identifier) {
 				hasReactiveInput = true
 			}
 		}
@@ -372,10 +372,10 @@ func (r *reactivity) visitBlock(block *BasicBlock, controlled map[static_single_
 			eachInstructionLValue(instruction, func(place Place) {
 				// The stable exemption is what keeps a `useState` setter non-reactive even though
 				// it is destructured out of a hook call this pass has just marked reactive.
-				if r.isStable(place.Identifier) {
+				if state.isStable(place.Identifier) {
 					return
 				}
-				r.mark(place.Identifier)
+				state.mark(place.Identifier)
 			})
 		}
 
@@ -393,17 +393,19 @@ func (r *reactivity) visitBlock(block *BasicBlock, controlled map[static_single_
 // `place.reactive = true` as it goes, which is why its traversal is careful to visit operands it
 // does not otherwise need; this pass writes every flag once at the end from the settled set, in
 // `applyToPlaces`. The separation is what makes this idempotent where `Construct` is not.
-func (r *reactivity) isReactive(id static_single_assignment.IdentifierId) bool { return r.reactive[id] }
+func (state *reactivity) isReactive(id static_single_assignment.IdentifierId) bool {
+	return state.reactive[id]
+}
 
 // mark adds a value to the reactive set, recording a change only if it was not already there.
 //
 // The asymmetry is the termination condition and it is upstream's. See the package comment.
-func (r *reactivity) mark(id static_single_assignment.IdentifierId) {
-	if r.reactive[id] {
+func (state *reactivity) mark(id static_single_assignment.IdentifierId) {
+	if state.reactive[id] {
 		return
 	}
-	r.reactive[id] = true
-	r.changed = true
+	state.reactive[id] = true
+	state.changed = true
 }
 
 // The stable exemption covers values whose identity React guarantees is stable across renders.
@@ -452,12 +454,12 @@ var stableHookPositions = map[string][]int{
 }
 
 // recordHookResult notes that a value is the result of a named hook call.
-func (r *reactivity) recordHookResult(instruction *Instruction) {
+func (state *reactivity) recordHookResult(instruction *Instruction) {
 	call, isCall := instruction.Value.(*CallExpression)
 	if !isCall {
 		return
 	}
-	callee := r.function.Identifiers[call.Callee.Identifier]
+	callee := state.function.Identifiers[call.Callee.Identifier]
 	if callee == nil || callee.Node == nil || !ast.IsIdentifier(callee.Node) {
 		return
 	}
@@ -465,21 +467,21 @@ func (r *reactivity) recordHookResult(instruction *Instruction) {
 	if _, known := stableHookPositions[name]; !known {
 		return
 	}
-	if r.hookResults == nil {
-		r.hookResults = map[static_single_assignment.IdentifierId]string{}
+	if state.hookResults == nil {
+		state.hookResults = map[static_single_assignment.IdentifierId]string{}
 	}
-	r.hookResults[instruction.LValue.Identifier] = name
+	state.hookResults[instruction.LValue.Identifier] = name
 }
 
 // recordStablePositions exempts the positions of a destructured hook result React keeps stable.
 //
 // The positional route exists because the type route cannot reach these. See `hookResults`.
-func (r *reactivity) recordStablePositions(instruction *Instruction) {
+func (state *reactivity) recordStablePositions(instruction *Instruction) {
 	destructure, isDestructure := instruction.Value.(*Destructure)
 	if !isDestructure {
 		return
 	}
-	hook, fromHook := r.hookResults[destructure.Value.Identifier]
+	hook, fromHook := state.hookResults[destructure.Value.Identifier]
 	if !fromHook {
 		return
 	}
@@ -495,7 +497,7 @@ func (r *reactivity) recordStablePositions(instruction *Instruction) {
 		if !isPlace {
 			continue
 		}
-		r.stable[bound.Place.Identifier] = true
+		state.stable[bound.Place.Identifier] = true
 	}
 }
 
@@ -506,21 +508,21 @@ func (r *reactivity) recordStablePositions(instruction *Instruction) {
 // and the exemption is read nowhere else, so a value with no reactive input never needed the
 // answer (#1pmwkmv change 4). A destructured setter is bound by a Destructure whose pattern places
 // are lvalues, so this reaches them without the pattern being walked a second time.
-func (r *reactivity) isStable(id static_single_assignment.IdentifierId) bool {
-	if r.stable[id] {
+func (state *reactivity) isStable(id static_single_assignment.IdentifierId) bool {
+	if state.stable[id] {
 		return true
 	}
-	if r.notStable[id] {
+	if state.notStable[id] {
 		return false
 	}
-	if r.isStableType(id) {
-		r.stable[id] = true
+	if state.isStableType(id) {
+		state.stable[id] = true
 		return true
 	}
-	if r.notStable == nil {
-		r.notStable = map[static_single_assignment.IdentifierId]bool{}
+	if state.notStable == nil {
+		state.notStable = map[static_single_assignment.IdentifierId]bool{}
 	}
-	r.notStable[id] = true
+	state.notStable[id] = true
 	return false
 }
 
@@ -536,8 +538,8 @@ func (r *reactivity) isStable(id static_single_assignment.IdentifierId) bool {
 // field: `Dispatch` is a type ALIAS and lands in the alias, `RefObject` is an INTERFACE and lands
 // in the symbol. A predicate keyed on either one alone silently answers false for the other, which
 // has now happened to three separate agents in this tree.
-func (r *reactivity) isStableType(id static_single_assignment.IdentifierId) bool {
-	name := r.stableTypeName(id)
+func (state *reactivity) isStableType(id static_single_assignment.IdentifierId) bool {
+	name := state.stableTypeName(id)
 	switch name {
 	case "Dispatch", "ActionDispatch", "TransitionStartFunction":
 		return true
@@ -573,7 +575,7 @@ func (r *reactivity) isStableType(id static_single_assignment.IdentifierId) bool
 		// (`InferReactivePlaces.ts:283`) -- so the value is reactive, its dependency survives
 		// `PruneNonReactiveDependencies`, and the rule reports. Answering the name here marked it
 		// stable, and the dependency was pruned before the comparison saw it.
-		return r.useRefResults[id]
+		return state.useRefResults[id]
 	}
 	return false
 }
@@ -660,15 +662,15 @@ func useRefResultValues(function *Function) map[static_single_assignment.Identif
 // is unexported and takes a specifier rather than an identifier, so it cannot be called from here;
 // the ORDER is what matters and it is taken from there rather than re-derived, which is the point
 // of naming it. If that helper is ever exported in a form this can use, this should call it.
-func (r *reactivity) stableTypeName(id static_single_assignment.IdentifierId) string {
-	if r.typeChecker == nil {
+func (state *reactivity) stableTypeName(id static_single_assignment.IdentifierId) string {
+	if state.typeChecker == nil {
 		return ""
 	}
-	node := r.identifierNode(id)
+	node := state.identifierNode(id)
 	if node == nil {
 		return ""
 	}
-	valueType := r.typeChecker.GetTypeAtLocation(node)
+	valueType := state.typeChecker.GetTypeAtLocation(node)
 	if valueType == nil {
 		return ""
 	}
@@ -715,8 +717,8 @@ func (r *reactivity) stableTypeName(id static_single_assignment.IdentifierId) st
 // invisible here. That is one missing source, it under-approximates in the same safe direction as
 // the mutation gap, and inventing a bare-name match for `use` would report every function named
 // `use` in the tree as a reactive source.
-func (r *reactivity) isHookCallee(id static_single_assignment.IdentifierId) bool {
-	return IsHookCallee(r.function, id)
+func (state *reactivity) isHookCallee(id static_single_assignment.IdentifierId) bool {
+	return IsHookCallee(state.function, id)
 }
 
 // IsHookCallee reports whether a called value resolves to a React hook.
@@ -773,11 +775,11 @@ func isHookName(name string) bool {
 }
 
 // identifierNode returns the syntactic node a value came from, or nil for a pure temporary.
-func (r *reactivity) identifierNode(id static_single_assignment.IdentifierId) *ast.Node {
-	if int(id) >= len(r.function.Identifiers) {
+func (state *reactivity) identifierNode(id static_single_assignment.IdentifierId) *ast.Node {
+	if int(id) >= len(state.function.Identifiers) {
 		return nil
 	}
-	identifier := r.function.Identifiers[id]
+	identifier := state.function.Identifiers[id]
 	if identifier == nil {
 		return nil
 	}
@@ -833,7 +835,7 @@ func eachInstructionLValue(instruction *Instruction, visit func(Place)) {
 // refreshControlled recomputes which blocks are reactive-controlled from the current reactive set.
 //
 // Mutates: controlled the fixpoint keeps one set of controlled blocks across its rounds, and each round widens it
-func (r *reactivity) refreshControlled(
+func (state *reactivity) refreshControlled(
 	frontiers map[static_single_assignment.BlockId][]static_single_assignment.BlockId,
 	controlled map[static_single_assignment.BlockId]bool,
 ) {
@@ -842,11 +844,11 @@ func (r *reactivity) refreshControlled(
 			continue
 		}
 		for _, controllerId := range frontier {
-			controller, ok := r.function.Block(controllerId)
+			controller, ok := state.function.Block(controllerId)
 			if !ok {
 				continue
 			}
-			if r.terminalTestIsReactive(controller.Terminal) {
+			if state.terminalTestIsReactive(controller.Terminal) {
 				controlled[blockId] = true
 				break
 			}
@@ -861,18 +863,18 @@ func (r *reactivity) refreshControlled(
 // whose test is reactive does not make its body controlled by this rule. That reads like an
 // oversight and is reproduced rather than improved on, because the body's values pick up reactivity
 // through the loop's phis instead, which is the same answer by a different route.
-func (r *reactivity) terminalTestIsReactive(terminal Terminal) bool {
-	switch t := terminal.(type) {
+func (state *reactivity) terminalTestIsReactive(terminal Terminal) bool {
+	switch typed := terminal.(type) {
 	case *If:
-		return r.isReactive(t.Test.Identifier)
+		return state.isReactive(typed.Test.Identifier)
 	case *Branch:
-		return r.isReactive(t.Test.Identifier)
+		return state.isReactive(typed.Test.Identifier)
 	case *Switch:
-		if r.isReactive(t.Test.Identifier) {
+		if state.isReactive(typed.Test.Identifier) {
 			return true
 		}
-		for _, kase := range t.Cases {
-			if kase.Test != nil && r.isReactive(kase.Test.Identifier) {
+		for _, kase := range typed.Cases {
+			if kase.Test != nil && state.isReactive(kase.Test.Identifier) {
 				return true
 			}
 		}
@@ -896,10 +898,12 @@ func (r *reactivity) terminalTestIsReactive(terminal Terminal) bool {
 // That was about a quarter of preserve-manual-memoization's CPU on ahra, 736 to 536ms (#hekjpw3). The
 // answer is the same, order included, and TestPostDominatorFrontiersMatchTheChainWalk holds the old
 // walk beside it.
-func (r *reactivity) postDominatorFrontiers() map[static_single_assignment.BlockId][]static_single_assignment.BlockId {
-	tree := computePostDominance(r.function)
-	blocks := r.function.Blocks
-	frontiers := make(map[static_single_assignment.BlockId][]static_single_assignment.BlockId, len(blocks))
+func (state *reactivity) postDominatorFrontiers() (
+	frontiers map[static_single_assignment.BlockId][]static_single_assignment.BlockId,
+) {
+	tree := computePostDominance(state.function)
+	blocks := state.function.Blocks
+	frontiers = make(map[static_single_assignment.BlockId][]static_single_assignment.BlockId, len(blocks))
 
 	position := make(map[static_single_assignment.BlockId]int, len(blocks))
 	for index, block := range blocks {
@@ -1003,13 +1007,13 @@ func (r *reactivity) postDominatorFrontiers() map[static_single_assignment.Block
 // reactive in the parent makes the corresponding context value reactive in the child, which is what
 // this propagation is for. Values a nested function computes for itself are not marked, matching
 // upstream, whose inner walk marks nothing new either.
-func (r *reactivity) applyToPlaces(function *Function, isOutermost bool) {
+func (state *reactivity) applyToPlaces(function *Function, isOutermost bool) {
 	for _, block := range function.Blocks {
 		for _, phi := range block.Phis {
-			r.setPlace(&phi.Place)
+			state.setPlace(&phi.Place)
 			for _, predecessorId := range PhiOperandsInOrder(phi) {
 				operand := phi.Operands.At(predecessorId)
-				r.setPlace(&operand)
+				state.setPlace(&operand)
 				phi.Operands.Set(predecessorId, operand)
 			}
 		}
@@ -1019,26 +1023,26 @@ func (r *reactivity) applyToPlaces(function *Function, isOutermost bool) {
 				continue
 			}
 			EachInstructionPlacePointer(instruction, func(place *Place, role PlaceRole) {
-				r.setPlace(place)
+				state.setPlace(place)
 			})
 			switch value := instruction.Value.(type) {
 			case *FunctionExpression:
-				r.propagateToNested(function.Functions[value.Function], value.Captures)
+				state.propagateToNested(function.Functions[value.Function], value.Captures)
 			case *ObjectMethod:
-				r.propagateToNested(function.Functions[value.Function], nil)
+				state.propagateToNested(function.Functions[value.Function], nil)
 			}
 		}
 		EachTerminalPlacePointer(block.Terminal, func(place *Place, role PlaceRole) {
-			r.setPlace(place)
+			state.setPlace(place)
 		})
 	}
 	for index := range function.Params {
-		r.setPlace(&function.Params[index])
+		state.setPlace(&function.Params[index])
 	}
-	r.setPlace(&function.Returns)
+	state.setPlace(&function.Returns)
 
 	for index := range function.Context {
-		r.setPlace(&function.Context[index])
+		state.setPlace(&function.Context[index])
 	}
 }
 
@@ -1049,7 +1053,7 @@ func (r *reactivity) applyToPlaces(function *Function, isOutermost bool) {
 // The pairing that actually carries meaning across the boundary is positional, through
 // `Captures[i]` and `Context[i]`, and it is applied here before the walk so a context value inherits
 // its capture's reactivity.
-func (r *reactivity) propagateToNested(nested *Function, captures []Place) {
+func (state *reactivity) propagateToNested(nested *Function, captures []Place) {
 	if nested == nil {
 		return
 	}
@@ -1058,7 +1062,7 @@ func (r *reactivity) propagateToNested(nested *Function, captures []Place) {
 		reactive: map[static_single_assignment.IdentifierId]bool{},
 	}
 	for index, capture := range captures {
-		if index < len(nested.Context) && r.reactive[capture.Identifier] {
+		if index < len(nested.Context) && state.reactive[capture.Identifier] {
 			child.reactive[nested.Context[index].Identifier] = true
 		}
 	}
@@ -1068,9 +1072,9 @@ func (r *reactivity) propagateToNested(nested *Function, captures []Place) {
 // setPlace writes the settled flag onto one place.
 //
 // Mutates: place the settled flag belongs on the caller's place, which is the one the function itself holds
-func (r *reactivity) setPlace(place *Place) {
+func (state *reactivity) setPlace(place *Place) {
 	if place == nil {
 		return
 	}
-	place.Reactive = r.reactive[place.Identifier]
+	place.Reactive = state.reactive[place.Identifier]
 }

@@ -89,69 +89,89 @@ func printFunction(out *strings.Builder, function *Function, depth int) {
 
 func printValue(function *Function, value InstructionValue) string {
 	place := function.PlaceString
-	switch v := value.(type) {
+	switch typed := value.(type) {
 	case *LoadLocal:
-		return fmt.Sprintf("LoadLocal %s", place(v.Place))
+		return fmt.Sprintf("LoadLocal %s", place(typed.Place))
 	case *LoadContext:
-		return fmt.Sprintf("LoadContext %s", place(v.Place))
+		return fmt.Sprintf("LoadContext %s", place(typed.Place))
 	case *DeclareLocal:
-		return fmt.Sprintf("DeclareLocal %s %s", v.Kind, place(v.LValue))
+		return fmt.Sprintf("DeclareLocal %s %s", typed.Kind, place(typed.LValue))
 	case *DeclareContext:
-		return fmt.Sprintf("DeclareContext %s %s", v.Kind, place(v.LValue))
+		return fmt.Sprintf("DeclareContext %s %s", typed.Kind, place(typed.LValue))
 	case *StoreLocal:
-		return fmt.Sprintf("StoreLocal %s %s = %s", v.Kind, place(v.LValue), place(v.Value))
+		return fmt.Sprintf("StoreLocal %s %s = %s", typed.Kind, place(typed.LValue), place(typed.Value))
 	case *StoreContext:
-		return fmt.Sprintf("StoreContext %s %s = %s", v.Kind, place(v.LValue), place(v.Value))
+		return fmt.Sprintf("StoreContext %s %s = %s", typed.Kind, place(typed.LValue), place(typed.Value))
 	case *Destructure:
-		return fmt.Sprintf("Destructure %s %s = %s", v.Kind, printPattern(function, v.LValue), place(v.Value))
+		return fmt.Sprintf(
+			"Destructure %s %s = %s",
+			typed.Kind,
+			printPattern(function, typed.LValue),
+			place(typed.Value),
+		)
 	case *LoadGlobal:
-		if v.Source != "" {
-			return fmt.Sprintf("LoadGlobal %s from %q", v.Name, v.Source)
+		if typed.Source != "" {
+			return fmt.Sprintf("LoadGlobal %s from %q", typed.Name, typed.Source)
 		}
-		return fmt.Sprintf("LoadGlobal %s", v.Name)
+		return fmt.Sprintf("LoadGlobal %s", typed.Name)
 	case *StoreGlobal:
-		return fmt.Sprintf("StoreGlobal %s = %s", v.Name, place(v.Value))
+		return fmt.Sprintf("StoreGlobal %s = %s", typed.Name, place(typed.Value))
 	case *PropertyLoad:
-		return fmt.Sprintf("PropertyLoad %s%s.%s", place(v.Object), optionalMark(v.Optional), v.Property)
+		return fmt.Sprintf("PropertyLoad %s%s.%s", place(typed.Object), optionalMark(typed.Optional), typed.Property)
 	case *PropertyStore:
-		return fmt.Sprintf("PropertyStore %s.%s = %s", place(v.Object), v.Property, place(v.Value))
+		return fmt.Sprintf("PropertyStore %s.%s = %s", place(typed.Object), typed.Property, place(typed.Value))
 	case *PropertyDelete:
-		return fmt.Sprintf("PropertyDelete %s.%s", place(v.Object), v.Property)
+		return fmt.Sprintf("PropertyDelete %s.%s", place(typed.Object), typed.Property)
 	case *ComputedLoad:
-		return fmt.Sprintf("ComputedLoad %s%s[%s]", place(v.Object), optionalMark(v.Optional), place(v.Property))
+		return fmt.Sprintf(
+			"ComputedLoad %s%s[%s]",
+			place(typed.Object),
+			optionalMark(typed.Optional),
+			place(typed.Property),
+		)
 	case *ComputedStore:
-		return fmt.Sprintf("ComputedStore %s[%s] = %s", place(v.Object), place(v.Property), place(v.Value))
+		return fmt.Sprintf("ComputedStore %s[%s] = %s", place(typed.Object), place(typed.Property), place(typed.Value))
 	case *ComputedDelete:
-		return fmt.Sprintf("ComputedDelete %s[%s]", place(v.Object), place(v.Property))
+		return fmt.Sprintf("ComputedDelete %s[%s]", place(typed.Object), place(typed.Property))
 	case *CallExpression:
-		return fmt.Sprintf("Call %s%s(%s)", place(v.Callee), optionalMark(v.Optional), printArgs(function, v.Args))
+		return fmt.Sprintf(
+			"Call %s%s(%s)",
+			place(typed.Callee),
+			optionalMark(typed.Optional),
+			printArgs(function, typed.Args),
+		)
 	case *MethodCall:
-		return fmt.Sprintf("MethodCall %s.%s(%s)", place(v.Receiver), place(v.Property), printArgs(function, v.Args))
+		return fmt.Sprintf(
+			"MethodCall %s.%s(%s)",
+			place(typed.Receiver),
+			place(typed.Property),
+			printArgs(function, typed.Args),
+		)
 	case *NewExpression:
-		return fmt.Sprintf("New %s(%s)", place(v.Callee), printArgs(function, v.Args))
+		return fmt.Sprintf("New %s(%s)", place(typed.Callee), printArgs(function, typed.Args))
 	case *BinaryExpression:
-		return fmt.Sprintf("Binary %s %s %s", place(v.Left), v.Operator, place(v.Right))
+		return fmt.Sprintf("Binary %s %s %s", place(typed.Left), typed.Operator, place(typed.Right))
 	case *UnaryExpression:
-		return fmt.Sprintf("Unary %s%s", v.Operator, place(v.Value))
+		return fmt.Sprintf("Unary %s%s", typed.Operator, place(typed.Value))
 	case *PrefixUpdate:
-		return fmt.Sprintf("PrefixUpdate %s%s", v.Operation, place(v.Value))
+		return fmt.Sprintf("PrefixUpdate %s%s", typed.Operation, place(typed.Value))
 	case *PostfixUpdate:
-		return fmt.Sprintf("PostfixUpdate %s%s", place(v.Value), v.Operation)
+		return fmt.Sprintf("PostfixUpdate %s%s", place(typed.Value), typed.Operation)
 	case *Primitive:
-		return fmt.Sprintf("Primitive %v", v.Value)
+		return fmt.Sprintf("Primitive %v", typed.Value)
 	case *RegExpLiteral:
-		return fmt.Sprintf("RegExp /%s/%s", v.Pattern, v.Flags)
+		return fmt.Sprintf("RegExp /%s/%s", typed.Pattern, typed.Flags)
 	case *TemplateLiteral:
-		return fmt.Sprintf("Template %d quasis %d exprs", len(v.Quasis), len(v.Subexprs))
+		return fmt.Sprintf("Template %d quasis %d exprs", len(typed.Quasis), len(typed.Subexprs))
 	case *TaggedTemplateExpression:
-		return fmt.Sprintf("TaggedTemplate %s", place(v.Tag))
+		return fmt.Sprintf("TaggedTemplate %s", place(typed.Tag))
 	case *TypeCastExpression:
-		return fmt.Sprintf("TypeCast %s", place(v.Value))
+		return fmt.Sprintf("TypeCast %s", place(typed.Value))
 	case *MetaProperty:
-		return fmt.Sprintf("MetaProperty %s.%s", v.Meta, v.Property)
+		return fmt.Sprintf("MetaProperty %s.%s", typed.Meta, typed.Property)
 	case *ObjectExpression:
-		parts := make([]string, 0, len(v.Properties))
-		for _, property := range v.Properties {
+		parts := make([]string, 0, len(typed.Properties))
+		for _, property := range typed.Properties {
 			switch {
 			case property.Spread:
 				parts = append(parts, "..."+place(property.Value))
@@ -163,10 +183,10 @@ func printValue(function *Function, value InstructionValue) string {
 		}
 		return fmt.Sprintf("Object {%s}", strings.Join(parts, ", "))
 	case *ObjectMethod:
-		return fmt.Sprintf("ObjectMethod %s fn%d", v.Key, v.Function)
+		return fmt.Sprintf("ObjectMethod %s fn%d", typed.Key, typed.Function)
 	case *ArrayExpression:
-		parts := make([]string, 0, len(v.Elements))
-		for _, element := range v.Elements {
+		parts := make([]string, 0, len(typed.Elements))
+		for _, element := range typed.Elements {
 			switch {
 			case element.Hole:
 				parts = append(parts, "<hole>")
@@ -178,85 +198,85 @@ func printValue(function *Function, value InstructionValue) string {
 		}
 		return fmt.Sprintf("Array [%s]", strings.Join(parts, ", "))
 	case *FunctionExpression:
-		captures := make([]string, 0, len(v.Captures))
-		for _, capture := range v.Captures {
+		captures := make([]string, 0, len(typed.Captures))
+		for _, capture := range typed.Captures {
 			captures = append(captures, place(capture))
 		}
 		if len(captures) > 0 {
-			return fmt.Sprintf("Function fn%d captures=[%s]", v.Function, strings.Join(captures, " "))
+			return fmt.Sprintf("Function fn%d captures=[%s]", typed.Function, strings.Join(captures, " "))
 		}
-		return fmt.Sprintf("Function fn%d", v.Function)
+		return fmt.Sprintf("Function fn%d", typed.Function)
 	case *Await:
-		return fmt.Sprintf("Await %s", place(v.Value))
+		return fmt.Sprintf("Await %s", place(typed.Value))
 	case *GetIterator:
-		return fmt.Sprintf("GetIterator %s", place(v.Value))
+		return fmt.Sprintf("GetIterator %s", place(typed.Value))
 	case *IteratorNext:
-		return fmt.Sprintf("IteratorNext %s", place(v.Iterator))
+		return fmt.Sprintf("IteratorNext %s", place(typed.Iterator))
 	case *NextPropertyOf:
-		return fmt.Sprintf("NextPropertyOf %s", place(v.Value))
+		return fmt.Sprintf("NextPropertyOf %s", place(typed.Value))
 	case *JsxExpression:
-		tag := v.Tag.Name
-		if v.Tag.Place != nil {
-			tag = place(*v.Tag.Place)
+		tag := typed.Tag.Name
+		if typed.Tag.Place != nil {
+			tag = place(*typed.Tag.Place)
 		}
-		return fmt.Sprintf("Jsx <%s> props=%d children=%d", tag, len(v.Props), len(v.Children))
+		return fmt.Sprintf("Jsx <%s> props=%d children=%d", tag, len(typed.Props), len(typed.Children))
 	case *JsxFragment:
-		return fmt.Sprintf("JsxFragment children=%d", len(v.Children))
+		return fmt.Sprintf("JsxFragment children=%d", len(typed.Children))
 	case *JsxText:
-		return fmt.Sprintf("JsxText %q", v.Value)
+		return fmt.Sprintf("JsxText %q", typed.Value)
 	case *StartMemoize:
 		// `deps=none` and `deps=0` are different facts (no dependency array at all versus an empty
 		// one) and the printer distinguishes them, because a golden that spelled both `deps=0`
 		// would pass while the pass conflated them.
-		if v.Deps == nil {
-			return fmt.Sprintf("StartMemoize#%d deps=none", v.ManualMemoId)
+		if typed.Deps == nil {
+			return fmt.Sprintf("StartMemoize#%d deps=none", typed.ManualMemoId)
 		}
-		printed := make([]string, 0, len(v.Deps))
-		for _, dep := range v.Deps {
+		printed := make([]string, 0, len(typed.Deps))
+		for _, dep := range typed.Deps {
 			printed = append(printed, printManualMemoDependency(dep, place))
 		}
-		return fmt.Sprintf("StartMemoize#%d deps=[%s]", v.ManualMemoId, strings.Join(printed, ", "))
+		return fmt.Sprintf("StartMemoize#%d deps=[%s]", typed.ManualMemoId, strings.Join(printed, ", "))
 	case *FinishMemoize:
-		if v.Pruned {
-			return fmt.Sprintf("FinishMemoize#%d %s pruned", v.ManualMemoId, place(v.Value))
+		if typed.Pruned {
+			return fmt.Sprintf("FinishMemoize#%d %s pruned", typed.ManualMemoId, place(typed.Value))
 		}
-		return fmt.Sprintf("FinishMemoize#%d %s", v.ManualMemoId, place(v.Value))
+		return fmt.Sprintf("FinishMemoize#%d %s", typed.ManualMemoId, place(typed.Value))
 	case *Debugger:
 		return "Debugger"
 	case *UnsupportedNode:
-		return fmt.Sprintf("Unsupported %s", v.Reason)
+		return fmt.Sprintf("Unsupported %s", typed.Reason)
 	}
 	return "<unknown>"
 }
 
 func printPattern(function *Function, pattern Pattern) string {
-	switch p := pattern.(type) {
+	switch typed := pattern.(type) {
 	case *PlacePattern:
-		return function.PlaceString(p.Place)
+		return function.PlaceString(typed.Place)
 	case *ObjectPattern:
-		parts := make([]string, 0, len(p.Properties))
-		for _, property := range p.Properties {
+		parts := make([]string, 0, len(typed.Properties))
+		for _, property := range typed.Properties {
 			key := property.Key
 			if property.ComputedKey != nil {
 				key = "[" + function.PlaceString(*property.ComputedKey) + "]"
 			}
 			parts = append(parts, fmt.Sprintf("%s: %s", key, printPattern(function, property.Value)))
 		}
-		if p.Rest != nil {
-			parts = append(parts, "..."+function.PlaceString(*p.Rest))
+		if typed.Rest != nil {
+			parts = append(parts, "..."+function.PlaceString(*typed.Rest))
 		}
 		return "{" + strings.Join(parts, ", ") + "}"
 	case *ArrayPattern:
-		parts := make([]string, 0, len(p.Elements))
-		for _, element := range p.Elements {
+		parts := make([]string, 0, len(typed.Elements))
+		for _, element := range typed.Elements {
 			if element.Value == nil {
 				parts = append(parts, "<hole>")
 				continue
 			}
 			parts = append(parts, printPattern(function, element.Value))
 		}
-		if p.Rest != nil {
-			parts = append(parts, "..."+function.PlaceString(*p.Rest))
+		if typed.Rest != nil {
+			parts = append(parts, "..."+function.PlaceString(*typed.Rest))
 		}
 		return "[" + strings.Join(parts, ", ") + "]"
 	}
@@ -284,74 +304,84 @@ func optionalMark(optional bool) string {
 
 func printTerminal(function *Function, terminal Terminal) string {
 	place := function.PlaceString
-	switch t := terminal.(type) {
+	switch typed := terminal.(type) {
 	case *Return:
-		return fmt.Sprintf("Return %s", place(t.Value))
+		return fmt.Sprintf("Return %s", place(typed.Value))
 	case *Throw:
-		return fmt.Sprintf("Throw %s", place(t.Value))
+		return fmt.Sprintf("Throw %s", place(typed.Value))
 	case *Unreachable:
 		return "Unreachable"
 	case *Unsupported:
 		return "Unsupported"
 	case *Goto:
-		return fmt.Sprintf("Goto bb%d%s", t.Block, gotoVariantMark(t.Variant))
+		return fmt.Sprintf("Goto bb%d%s", typed.Block, gotoVariantMark(typed.Variant))
 	case *If:
 		return fmt.Sprintf("If %s then bb%d else bb%d fallthrough=bb%d",
-			place(t.Test), t.Consequent, t.Alternate, t.Fallthrough)
+			place(typed.Test), typed.Consequent, typed.Alternate, typed.Fallthrough)
 	case *Branch:
 		return fmt.Sprintf("Branch %s then bb%d else bb%d fallthrough=bb%d",
-			place(t.Test), t.Consequent, t.Alternate, t.Fallthrough)
+			place(typed.Test), typed.Consequent, typed.Alternate, typed.Fallthrough)
 	case *Switch:
-		parts := make([]string, 0, len(t.Cases))
-		for _, kase := range t.Cases {
+		parts := make([]string, 0, len(typed.Cases))
+		for _, kase := range typed.Cases {
 			if kase.Test == nil {
 				parts = append(parts, fmt.Sprintf("default -> bb%d", kase.Block))
 				continue
 			}
 			parts = append(parts, fmt.Sprintf("%s -> bb%d", place(*kase.Test), kase.Block))
 		}
-		return fmt.Sprintf("Switch %s [%s] fallthrough=bb%d", place(t.Test), strings.Join(parts, ", "), t.Fallthrough)
+		return fmt.Sprintf(
+			"Switch %s [%s] fallthrough=bb%d",
+			place(typed.Test),
+			strings.Join(parts, ", "),
+			typed.Fallthrough,
+		)
 	case *While:
-		return fmt.Sprintf("While test=bb%d loop=bb%d fallthrough=bb%d", t.Test, t.Loop, t.Fallthrough)
+		return fmt.Sprintf("While test=bb%d loop=bb%d fallthrough=bb%d", typed.Test, typed.Loop, typed.Fallthrough)
 	case *DoWhile:
-		return fmt.Sprintf("DoWhile loop=bb%d test=bb%d fallthrough=bb%d", t.Loop, t.Test, t.Fallthrough)
+		return fmt.Sprintf("DoWhile loop=bb%d test=bb%d fallthrough=bb%d", typed.Loop, typed.Test, typed.Fallthrough)
 	case *For:
 		update := "none"
-		if HasBlock(t.Update) {
-			update = fmt.Sprintf("bb%d", t.Update)
+		if HasBlock(typed.Update) {
+			update = fmt.Sprintf("bb%d", typed.Update)
 		}
 		return fmt.Sprintf("For init=bb%d test=bb%d update=%s loop=bb%d fallthrough=bb%d",
-			t.Init, t.Test, update, t.Loop, t.Fallthrough)
+			typed.Init, typed.Test, update, typed.Loop, typed.Fallthrough)
 	case *ForOf:
 		return fmt.Sprintf("ForOf init=bb%d test=bb%d loop=bb%d fallthrough=bb%d",
-			t.Init, t.Test, t.Loop, t.Fallthrough)
+			typed.Init, typed.Test, typed.Loop, typed.Fallthrough)
 	case *ForIn:
-		return fmt.Sprintf("ForIn init=bb%d loop=bb%d fallthrough=bb%d", t.Init, t.Loop, t.Fallthrough)
+		return fmt.Sprintf("ForIn init=bb%d loop=bb%d fallthrough=bb%d", typed.Init, typed.Loop, typed.Fallthrough)
 	case *Logical:
-		return fmt.Sprintf("Logical %s test=bb%d fallthrough=bb%d", t.Operator, t.Test, t.Fallthrough)
+		return fmt.Sprintf("Logical %s test=bb%d fallthrough=bb%d", typed.Operator, typed.Test, typed.Fallthrough)
 	case *Ternary:
-		return fmt.Sprintf("Ternary test=bb%d fallthrough=bb%d", t.Test, t.Fallthrough)
+		return fmt.Sprintf("Ternary test=bb%d fallthrough=bb%d", typed.Test, typed.Fallthrough)
 	case *Optional:
-		return fmt.Sprintf("Optional optional=%t test=bb%d fallthrough=bb%d", t.Optional, t.Test, t.Fallthrough)
+		return fmt.Sprintf(
+			"Optional optional=%t test=bb%d fallthrough=bb%d",
+			typed.Optional,
+			typed.Test,
+			typed.Fallthrough,
+		)
 	case *Sequence:
-		return fmt.Sprintf("Sequence block=bb%d fallthrough=bb%d", t.Block, t.Fallthrough)
+		return fmt.Sprintf("Sequence block=bb%d fallthrough=bb%d", typed.Block, typed.Fallthrough)
 	case *Label:
-		return fmt.Sprintf("Label block=bb%d fallthrough=bb%d", t.Block, t.Fallthrough)
+		return fmt.Sprintf("Label block=bb%d fallthrough=bb%d", typed.Block, typed.Fallthrough)
 	case *Try:
 		binding := "none"
-		if t.HandlerBinding != nil {
-			binding = place(*t.HandlerBinding)
+		if typed.HandlerBinding != nil {
+			binding = place(*typed.HandlerBinding)
 		}
 		return fmt.Sprintf("Try block=bb%d handler=bb%d binding=%s fallthrough=bb%d",
-			t.Block, t.Handler, binding, t.Fallthrough)
+			typed.Block, typed.Handler, binding, typed.Fallthrough)
 	case *MaybeThrow:
 		handler := "none"
-		if HasBlock(t.Handler) {
-			handler = fmt.Sprintf("bb%d", t.Handler)
+		if HasBlock(typed.Handler) {
+			handler = fmt.Sprintf("bb%d", typed.Handler)
 		}
-		return fmt.Sprintf("MaybeThrow continuation=bb%d handler=%s", t.Continuation, handler)
+		return fmt.Sprintf("MaybeThrow continuation=bb%d handler=%s", typed.Continuation, handler)
 	case *Scope:
-		return fmt.Sprintf("Scope @%d block=bb%d fallthrough=bb%d", t.Scope, t.Block, t.Fallthrough)
+		return fmt.Sprintf("Scope @%d block=bb%d fallthrough=bb%d", typed.Scope, typed.Block, typed.Fallthrough)
 	}
 	return "<unknown terminal>"
 }

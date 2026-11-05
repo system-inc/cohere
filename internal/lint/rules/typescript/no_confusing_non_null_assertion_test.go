@@ -361,8 +361,8 @@ func TestNoConfusingNonNullAssertionFires(test *testing.T) {
 func applySuggestionFixes(sourceText string, suggestion rule.Suggestion) string {
 	ordered := make([]rule.Fix, len(suggestion.Fixes))
 	copy(ordered, suggestion.Fixes)
-	sort.SliceStable(ordered, func(a int, b int) bool {
-		return ordered[a].Range.Pos() > ordered[b].Range.Pos()
+	sort.SliceStable(ordered, func(left int, right int) bool {
+		return ordered[left].Range.Pos() > ordered[right].Range.Pos()
 	})
 	for _, fix := range ordered {
 		sourceText = sourceText[:fix.Range.Pos()] + fix.Text + sourceText[fix.Range.End():]

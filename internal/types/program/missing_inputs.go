@@ -83,14 +83,14 @@ func (graph *Graph) MissingGeneratedInputs(generated func(target string) bool) [
 		}
 	}
 
-	sort.SliceStable(missing, func(i, j int) bool {
-		if missing[i].Importer != missing[j].Importer {
-			return missing[i].Importer < missing[j].Importer
+	sort.SliceStable(missing, func(left, right int) bool {
+		if missing[left].Importer != missing[right].Importer {
+			return missing[left].Importer < missing[right].Importer
 		}
-		if missing[i].Line != missing[j].Line {
-			return missing[i].Line < missing[j].Line
+		if missing[left].Line != missing[right].Line {
+			return missing[left].Line < missing[right].Line
 		}
-		return missing[i].Column < missing[j].Column
+		return missing[left].Column < missing[right].Column
 	})
 	return missing
 }

@@ -220,9 +220,9 @@ var SwitchExhaustivenessCheck = rule.Rule{
 			commentPattern, _ = esregexp.Compile(*settings.DefaultCaseCommentPattern, "u")
 		}
 
-		isLiteralLikeType := func(t *checker.Type) bool {
+		isLiteralLikeType := func(subjectType *checker.Type) bool {
 			return type_checking.IsTypeFlagSet(
-				t,
+				subjectType,
 				checker.TypeFlagsLiteral|checker.TypeFlagsUndefined|checker.TypeFlagsNull|checker.TypeFlagsUniqueESSymbol,
 			)
 		}
@@ -236,14 +236,14 @@ var SwitchExhaustivenessCheck = rule.Rule{
 		 *
 		 * Default cases are never superfluous in switches with non-literal types.
 		 */
-		doesTypeContainNonLiteralType := func(t *checker.Type) bool {
+		doesTypeContainNonLiteralType := func(subjectType *checker.Type) bool {
 			return type_checking.Some(
-				type_checking.UnionTypeParts(t),
-				func(t *checker.Type) bool {
+				type_checking.UnionTypeParts(subjectType),
+				func(part *checker.Type) bool {
 					return type_checking.Every(
-						type_checking.IntersectionTypeParts(t),
-						func(t *checker.Type) bool {
-							return !isLiteralLikeType(t)
+						type_checking.IntersectionTypeParts(part),
+						func(part *checker.Type) bool {
+							return !isLiteralLikeType(part)
 						},
 					)
 				},
@@ -263,34 +263,34 @@ var SwitchExhaustivenessCheck = rule.Rule{
 			discriminantType := type_checking.GetConstrainedTypeAtLocation(ruleContext.TypeChecker, node.Expression)
 
 			caseTypes := make([]*checker.Type, 0, len(cases))
-			for _, c := range cases {
-				if c.Kind == ast.KindDefaultClause {
+			for _, node := range cases {
+				if node.Kind == ast.KindDefaultClause {
 					continue
 				}
 
 				caseTypes = append(caseTypes, type_checking.GetConstrainedTypeAtLocation(
 					ruleContext.TypeChecker,
-					c.AsCaseOrDefaultClause().Expression,
+					node.AsCaseOrDefaultClause().Expression,
 				))
 			}
 
 			containsNonLiteralType := doesTypeContainNonLiteralType(discriminantType)
 
 			missingLiteralBranchTypes := make([]*checker.Type, 0, 10)
-			type_checking.TypeRecurser(discriminantType, func(t *checker.Type) bool {
-				if slices.Contains(caseTypes, t) || !isLiteralLikeType(t) {
+			type_checking.TypeRecurser(discriminantType, func(subjectType *checker.Type) bool {
+				if slices.Contains(caseTypes, subjectType) || !isLiteralLikeType(subjectType) {
 					return false
 				}
 
 				// "missing", "optional" and "undefined" types are different runtime objects,
 				// but all of them have TypeFlags.Undefined type flag
-				if slices.ContainsFunc(caseTypes, func(t *checker.Type) bool {
-					return type_checking.IsTypeFlagSet(t, checker.TypeFlagsUndefined)
-				}) && type_checking.IsTypeFlagSet(t, checker.TypeFlagsUndefined) {
+				if slices.ContainsFunc(caseTypes, func(caseType *checker.Type) bool {
+					return type_checking.IsTypeFlagSet(caseType, checker.TypeFlagsUndefined)
+				}) && type_checking.IsTypeFlagSet(subjectType, checker.TypeFlagsUndefined) {
 					return false
 				}
 
-				missingLiteralBranchTypes = append(missingLiteralBranchTypes, t)
+				missingLiteralBranchTypes = append(missingLiteralBranchTypes, subjectType)
 
 				return false
 			})

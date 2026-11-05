@@ -32,8 +32,8 @@ func (context *context) transformMap(mapNode *compose.Node, properties []*cst.To
 		mappingItems[index] = context.transformPair(pair, sourceItem, context.createMappingItem)
 	}
 	if len(mapNode.Items) < len(sourceToken.Items) {
-		for i := len(mapNode.Items); i < len(sourceToken.Items); i++ {
-			sourceItem := sourceToken.Items[i]
+		for index := len(mapNode.Items); index < len(sourceToken.Items); index++ {
+			sourceItem := sourceToken.Items[index]
 			for _, token := range context.extractComments(sourceItem.Start) {
 				throwError("Unexpected token type in collection item start: %s", token.Type)
 			}
@@ -96,8 +96,8 @@ func (context *context) transformSeq(seq *compose.Node, properties []*cst.Token)
 		sequenceItems[index] = context.createSequenceItem(context.createPosition(start, end), item)
 	}
 	if len(seq.Items) < len(sourceToken.Items) {
-		for i := len(seq.Items); i < len(sourceToken.Items); i++ {
-			sourceItem := sourceToken.Items[i]
+		for index := len(seq.Items); index < len(sourceToken.Items); index++ {
+			sourceItem := sourceToken.Items[index]
 			for _, token := range context.extractComments(sourceItem.Start) {
 				throwError("Unexpected token type in collection item start: %s", token.Type)
 			}
@@ -166,8 +166,8 @@ func (context *context) transformFlowMap(flowMap *compose.Node, properties []*cs
 // past the composed ones hold only comments and commas.
 func (context *context) extractTrailingItemComments(composed int, items []*cst.CollectionItem) {
 	if composed < len(items) {
-		for i := composed; i < len(items); i++ {
-			sourceItem := items[i]
+		for index := composed; index < len(items); index++ {
+			sourceItem := items[index]
 			for _, token := range context.extractComments(sourceItem.Start) {
 				if token.Type == "comma" {
 					continue
