@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -315,6 +316,32 @@ func TestABudgetHoldsGoToTheTokensThreads(t *testing.T) {
 	if strings.Join(environment, "|") != strings.Join(want, "|") {
 		t.Errorf("the budget environment is %q, want %q", environment, want)
 	}
+	// A caller with no GOFLAGS, the usual shell, still gets -trimpath: setting GOFLAGS overrides the
+	// machine's go env, which is how every run dropped it (#system_cohere_tools).
+	bare := budgetEnvironment([]string{"HOME=/home"}, 1, poolShape{tokens: 4, packages: 2, threads: 2})
+	if !slices.Contains(bare, "GOFLAGS=-trimpath -p=2") {
+		t.Errorf("a run from a shell with no GOFLAGS has %q, want -trimpath in it", bare)
+	}
+}
+
+// A test or vet run turns VCS stamping off, which a worktree with TypeScript a symlink needs for any go build
+// a test runs, adding GOFLAGS if there was none, and a caller's own -buildvcs stands.
+func TestATestRunStampsNoVCS(t *testing.T) {
+	t.Parallel()
+	for _, row := range []struct {
+		environment []string
+		want        string
+	}{
+		{[]string{"HOME=/home", "GOFLAGS=-trimpath -p=2"}, "HOME=/home|GOFLAGS=-trimpath -p=2 -buildvcs=false"},
+		{[]string{"HOME=/home"}, "HOME=/home|GOFLAGS=-buildvcs=false"},
+		{[]string{"GOFLAGS="}, "GOFLAGS=-buildvcs=false"},
+		{[]string{"GOFLAGS=-buildvcs=true -p=2"}, "GOFLAGS=-buildvcs=true -p=2"},
+		{[]string{"GOFLAGS=-p=2 -buildvcs"}, "GOFLAGS=-p=2 -buildvcs"},
+	} {
+		if got := strings.Join(withoutVCSStamping(row.environment), "|"); got != row.want {
+			t.Errorf("withoutVCSStamping(%q) is %q, want %q", row.environment, got, row.want)
+		}
+	}
 }
 
 // The pool runs as many commands at once as it has tokens, each held to its threads and named by its
@@ -386,17 +413,18 @@ func TestThePoolRunsAsManyAsItHasTokens(t *testing.T) {
 	if most != 2 {
 		t.Errorf("at most %d ran at once on a two-token pool, want 2:\n%s", most, contents)
 	}
+	// test and vet run without VCS stamping (withoutVCSStamping); build and exec keep it, for a binary kept.
 	for name, want := range map[string]string{
-		"test":  "flags=-p=4 threads=3 test -vet=all ./internal/edit",
-		"build": "flags=-p=4 threads=3 build ./command/cohere",
-		"vet":   "flags=-p=4 threads=3 vet ./...",
-		"exec":  "flags=-p=4 threads=3 --flag",
+		"test":  "flags=-trimpath -p=4 -buildvcs=false threads=3 test -vet=all ./internal/edit",
+		"build": "flags=-trimpath -p=4 threads=3 build ./command/cohere",
+		"vet":   "flags=-trimpath -p=4 -buildvcs=false threads=3 vet ./...",
+		"exec":  "flags=-trimpath -p=4 threads=3 --flag",
 	} {
 		if got := started[name]; !strings.HasSuffix(got, want) || (!strings.HasPrefix(got, "token=1 ") && !strings.HasPrefix(got, "token=2 ")) {
 			t.Errorf("%s ran with %q, want a token of the two and %q", name, got, want)
 		}
 	}
-	if !strings.Contains(string(contents), "start nested token=7 flags=-p=6 threads=5 test -vet=all ./internal/edit") {
+	if !strings.Contains(string(contents), "start nested token=7 flags=-p=6 -buildvcs=false threads=5 test -vet=all ./internal/edit") {
 		t.Errorf("a run already under a token did not run in its parent's share:\n%s", contents)
 	}
 }
