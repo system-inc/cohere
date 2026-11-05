@@ -137,7 +137,7 @@ var PreferNumericLiterals = rule.Rule{
 // preferNumericLiteralsStringValue reads the cooked value of a string literal or of an untagged
 // template with no substitutions, which are the two shapes upstream accepts.
 //
-// A template WITH a substitution is declined, and so is a tagged one: `parseInt(`+"`11${foo}`"+`, 2)`
+// A template with a substitution is declined, and so is a tagged one: `parseInt(`+"`11${foo}`"+`, 2)`
 // is a passing case because its value is not settled by the syntax.
 func preferNumericLiteralsStringValue(node *ast.Node) (string, bool) {
 	if node == nil {
@@ -274,7 +274,7 @@ func preferNumericLiteralsLiteralValue(literal string) (float64, bool) {
 	// rather than the guard deleted.
 	//
 	// A mutant removing this survived the whole corpus, and the reason is that ParseUint with an
-	// EXPLICIT base rejects a separator: measured, `ParseUint("1_0", 2)` is a syntax error while
+	// explicit base rejects a separator: measured, `ParseUint("1_0", 2)` is a syntax error while
 	// `ParseUint("0b1_0", 0)` is 2. So the four separator cases decline either way, through the
 	// invalid-literal path instead of through this one.
 	//
@@ -337,7 +337,7 @@ func preferNumericLiteralsParseInt(text string, radix int) float64 {
 	// A mutant reading the whole string instead survived the corpus, and an exhaustive check says
 	// why: over 75,777 strings of up to three characters drawn from digits, letters, a dot, an
 	// underscore, spaces and signs, crossed with all three radixes, the two versions never once
-	// disagree about whether a FIX IS OFFERED. They disagree about the value often, on six of the
+	// disagree about whether a fix is offered. They disagree about the value often, on six of the
 	// twelve shapes probed by hand, but only where the discarded suffix is also what makes the
 	// literal invalid, so both routes reach the same decline.
 	//

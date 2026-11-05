@@ -101,8 +101,8 @@ var messageNoUselessAssignment = rule.Message{
 // rather than ours: a closure's body is its own code path root with no edge to or from the
 // enclosing one, so no ordering between a write and a captured read is available on either side.
 // Upstream sets `has_captured_read` from any cross-scope read with no ordering condition and
-// suppresses every write to that binding, and three of its clean cases exist to pin it. What DID
-// separate cleanly is the other direction: a cross-root WRITE silences only itself rather than the
+// suppresses every write to that binding, and three of its clean cases exist to pin it. What did
+// separate cleanly is the other direction: a cross-root write silences only itself rather than the
 // whole binding, which is upstream's `has_same_parent_variable_scope` tested per write. Collapsing
 // the two into one flag costs upstream's failing case 19, where a closure writes the variable and
 // never reads it.

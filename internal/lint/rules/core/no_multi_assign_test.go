@@ -169,7 +169,7 @@ func TestNoMultiAssignFiresOnCasesBeyondTheCorpus(test *testing.T) {
 }
 
 // The clean cases beyond the corpus pin the two tests the corpus cannot reach: that the slot is
-// decided by which FIELD of the parent holds the node, and that the OUTER expression has to be
+// decided by which field of the parent holds the node, and that the outer expression has to be
 // an assignment too.
 //
 // `a, b = c` and `a || (b = c)` are both binary expressions holding an assignment, and a rule
@@ -234,8 +234,8 @@ func TestNoMultiAssignIgnoreNonDeclarationDropsOnlyTheBareChain(test *testing.T)
 // slice the finding names.
 //
 // The parenthesized rows are the reason this test is not optional. `var a = (b) = (((c)))` reports
-// at column 9, which is the `(` of `(b)`, so those parentheses are INSIDE the reported span; and
-// `var a = (b = c);` reports at column 10, which is the `b`, so THOSE parentheses are outside it.
+// at column 9, which is the `(` of `(b)`, so those parentheses are inside the reported span; and
+// `var a = (b = c);` reports at column 10, which is the `b`, so those parentheses are outside it.
 // One rule, two answers, decided by whether the parenthesis belongs to the assignment's operand or
 // wraps the assignment itself. Both fall out of reporting the assignment node, and neither is
 // visible to a message-id assertion.
@@ -340,7 +340,7 @@ func TestNoMultiAssignMessage(test *testing.T) {
 	}
 }
 
-// An assignment on the LEFT of another assignment, which espree cannot parse at all.
+// An assignment on the left of another assignment, which espree cannot parse at all.
 //
 // `(a = b) = c` is a fatal parse error upstream, invalid assignment target, so eslint reports
 // nothing and the input is not expressible in its corpus. typescript-go recovers and hands back the

@@ -450,7 +450,7 @@ func TestConsistentReturnDecoderRoundTrip(test *testing.T) {
 //
 // A mutation replacing the key span with the whole method node survived every fixture here,
 // including upstream's four method cases at columns 12, 10, 11 and 4. The reason is that
-// `TokenRange` trims leading trivia, so for `class A { foo() {} }` the method node's first token IS
+// `TokenRange` trims leading trivia, so for `class A { foo() {} }` the method node's first token is
 // the key and the two spans start at the same byte. The corpus writes no method carrying a
 // modifier, so nothing in it can separate them.
 //
@@ -490,7 +490,7 @@ func TestConsistentReturnSpanPointsAtTheKeyNotTheFirstToken(test *testing.T) {
 // variable declaration when the statement also has a `finally`, even though every path through it
 // returns or throws. Removing either the declaration or the `finally` gives the right answer.
 //
-// Pinned as REPORTING rather than as clean, because that is what the rule does today. It is written
+// Pinned as reporting rather than as clean, because that is what the rule does today. It is written
 // down so the divergence is visible in the suite rather than only in a dry run, and so that fixing
 // the shelf turns this test red and brings whoever fixes it straight here.
 //

@@ -59,7 +59,7 @@ func runContextRequiresAccess(
 		testCase.sourceText, testCase.options)
 }
 
-// These fixtures are MEASURED rather than imported, because this rule is ours and has no upstream
+// These fixtures are measured rather than imported, because this rule is ours and has no upstream
 // corpus.
 //
 // The brief warns that a fixture a porter invents encodes the same belief as the port, so it passes
@@ -155,7 +155,7 @@ func TestContextRequiresAccessStaysSilent(test *testing.T) {
 	}
 }
 
-// Which KEY each finding names, which the message-id assertions above cannot see.
+// Which key each finding names, which the message-id assertions above cannot see.
 //
 // A method injecting two protected keys reports twice, and the two findings must name different
 // keys. A rule that found the right methods through the wrong key would report the right count with
@@ -275,7 +275,7 @@ func TestContextRequiresAccessSurprises(test *testing.T) {
 	}
 }
 
-// Three shapes OUR parser accepts and the ESLint oracle rejects, so their verdicts are unmeasured.
+// Three shapes our parser accepts and the ESLint oracle rejects, so their verdicts are unmeasured.
 //
 // This is a parser difference rather than a rule difference, and it is the one thing about this port
 // that has no analogue in an upstream port: normally the oracle and the target parse the same
@@ -283,7 +283,7 @@ func TestContextRequiresAccessSurprises(test *testing.T) {
 // constructor, a decorated parameter on a plain function, and decorators inside a class expression,
 // while typescript-go parses all three without a diagnostic.
 //
-// So this rule WILL meet them and the oracle cannot say what should happen. Rather than invent a
+// So this rule will meet them and the oracle cannot say what should happen. Rather than invent a
 // verdict, the behaviour is asserted as whatever the ported logic does, with the reasoning recorded:
 //
 //	a decorated constructor    treated like any other member, which is what the source's own
@@ -351,7 +351,7 @@ func TestContextRequiresAccessUnmeasurableShapes(test *testing.T) {
 	}
 }
 
-// With no requirements configured the rule registers NO listener at all.
+// With no requirements configured the rule registers no listener at all.
 //
 // This is the source's `if(requirementMap.size === 0) return {}`, and it is the property that makes
 // the rule's finding count on an unwired project structurally zero rather than evidence of clean
@@ -434,7 +434,7 @@ func TestDecodeContextRequiresAccessOptions(test *testing.T) {
 //
 // A probe written while checking whether this rule needed the upstream `resolveDecoratedParameterNode`
 // helper panicked on the third of these: `Node.Text()` raises `Unhandled case in Node.Text:
-// *ast.BindingPattern` for a destructured parameter name. The walk recovers per FILE rather than per
+// *ast.BindingPattern` for a destructured parameter name. The walk recovers per file rather than per
 // rule, so one such panic costs every rule its verdict on that file.
 //
 // This rule is safe by construction rather than by guard -- it never reads a parameter's name, only

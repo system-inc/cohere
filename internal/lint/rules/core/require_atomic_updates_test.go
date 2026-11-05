@@ -25,7 +25,7 @@ import (
 //	  extracted JSON, which is what catches a cooked escape or a smart quote
 //
 // One case is imported with a stated difference. Upstream's case 26 declares
-// `globals: { process: "readonly" }`, and measured on the installed rule the SAME source with no
+// `globals: { process: "readonly" }`, and measured on the installed rule the same source with no
 // such declaration is completely silent. See `TestRequireAtomicUpdatesResolutionDivergence`.
 
 // TestRequireAtomicUpdatesStaysSilent runs every clean case upstream ships.
@@ -54,7 +54,7 @@ func TestRequireAtomicUpdatesFires(test *testing.T) {
 
 	for _, testCase := range requireAtomicUpdatesReportingCases {
 		if requireAtomicUpdatesNeedsDeclaredGlobals(testCase.source) {
-			// One case is decided ABOVE the rule, by whether its identifier resolves at all.
+			// One case is decided above the rule, by whether its identifier resolves at all.
 			// Upstream ships it with `globals: { process: "readonly" }`, and measured on the
 			// installed rule the same source with no such declaration is completely silent. Our
 			// resolution comes from the checker rather than from a globals list, and this fixture
@@ -81,7 +81,7 @@ func TestRequireAtomicUpdatesFires(test *testing.T) {
 	}
 }
 
-// TestRequireAtomicUpdatesSpan asserts WHERE each finding points, which no message-id fixture can
+// TestRequireAtomicUpdatesSpan asserts where each finding points, which no message-id fixture can
 // see.
 //
 // Upstream reports on `node.parent`, the whole assignment expression, for both message arms. A port
@@ -513,7 +513,7 @@ func TestRequireAtomicUpdatesFinallyReportsOnce(test *testing.T) {
 				return
 			}
 			rule_testing.ExpectFindings(test, result, testCase.want...)
-			// The span is asserted too, because the defect this pins was two findings over ONE
+			// The span is asserted too, because the defect this pins was two findings over one
 			// span, which a count assertion alone would pass once the count was fixed by any means.
 			written := result.SourceFile.Text()
 			got := written[result.Diagnostics[0].Range.Pos():result.Diagnostics[0].Range.End()]
@@ -525,7 +525,7 @@ func TestRequireAtomicUpdatesFinallyReportsOnce(test *testing.T) {
 }
 
 // TestRequireAtomicUpdatesCatchDoesNotInheritTryRefresh pins the one place this rule reaches a
-// different JUDGMENT from ESLint, rather than a different set of resolvable names.
+// different judgment from ESLint, rather than a different set of resolvable names.
 //
 // ESLint clears a variable's outdated mark at a read and carries that clearing into the `catch` of
 // an enclosing `try`, so a read at the end of a try block silences a write in the catch. The catch

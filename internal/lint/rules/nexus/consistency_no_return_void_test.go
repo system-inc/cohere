@@ -13,7 +13,7 @@ func consistencyNoReturnVoidSource(lines ...string) string {
 	return strings.Join(lines, "\n") + "\n"
 }
 
-// The real sites are the ten in `modules/phi/PhiSocialMediaCommandLineInterface.ts` at HEAD on
+// The real sites are the ten in `modules/phi/PhiSocialMediaCommandLineInterface.ts` at `HEAD` on
 // 2026-10-01, in its two shapes: the braceless `if` (eight of them) and the braced one (two). Each case
 // asserts the finding and the whole rewritten source.
 func TestConsistencyNoReturnVoidFixes(test *testing.T) {
@@ -222,7 +222,7 @@ func TestConsistencyNoReturnVoidStaysSilent(test *testing.T) {
 		name  string
 		lines []string
 	}{
-		// SeeClusterCard.tsx:254 at HEAD. The callback idiom: an arrow body, not a return statement.
+		// SeeClusterCard.tsx:254 at `HEAD`. The callback idiom: an arrow body, not a return statement.
 		{"the arrow-shorthand callback idiom", []string{
 			"const element = <Button onClick={() => void handleEnroll()} disabled={isEnrolling}>Enroll</Button>;",
 		}},
