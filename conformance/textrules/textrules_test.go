@@ -189,7 +189,74 @@ func TestTheLoaderRefusesAMalformedCorpus(t *testing.T) {
 		{
 			"a path that leaves the project",
 			with(valid, "testdata/words/w02/case.json", `{"why": "clean", "expect": [], "path": "../utils", "languages": ["typescript"]}`),
-			"not a clean project-relative directory",
+			"not a clean project-relative file name",
+		},
+		{
+			"an occurrence per language that leaves a language out",
+			with(valid, "testdata/words/w01/case.json", `{"why": "c", "control": true, "expect": [{"covers": "WORD", `+
+				`"occurrence": {"typescript": 1}}], "languages": ["typescript", "go"]}`),
+			"gives occurrences for 1 languages, and the case lists 2",
+		},
+		{
+			"an occurrence per language naming no language",
+			with(valid, "testdata/words/w01/case.json", `{"why": "c", "control": true, "expect": [{"covers": "WORD", `+
+				`"occurrence": {"typescript": 1, "rust": 1}}], "languages": ["typescript", "go"]}`),
+			`gives rust occurrence 1`,
+		},
+		{
+			"a root that is not absolute",
+			with(valid, "testdata/words/w02/case.json", `{"why": "clean", "expect": [], "root": "checkouts/utils", "languages": ["typescript"]}`),
+			"not a clean absolute directory",
+		},
+		{
+			"an unknown key beside missing",
+			with(valid, "families.json", `{"words": {"typescript": "no-words", "go": "go/no-words", `+
+				`"swift": {"missing": true, "task": "t"}}}`),
+			`unknown field "task"`,
+		},
+		{
+			"an engine both none and missing",
+			with(valid, "families.json", `{"words": {"typescript": "no-words", "go": "go/no-words", `+
+				`"swift": {"missing": true, "none": "r"}}}`),
+			"never both",
+		},
+		{
+			"a missing engine with no family-level row",
+			with(valid, "families.json", `{"words": {"typescript": "no-words", "go": "go/no-words", `+
+				`"swift": {"missing": true}}}`),
+			"has no family-level row",
+		},
+		{
+			"a family-level row where the engine names a rule",
+			with(valid, "ledger.json", `[{"engine": "typescript", "family": "words", "task": "t", "reason": "r"}]`),
+			"the row is stale",
+		},
+		{
+			"a family-level row where the language has no such idea",
+			with(valid, "ledger.json", `[{"engine": "swift", "family": "words", "task": "t", "reason": "r"}]`),
+			"no such idea",
+		},
+		{
+			"a family-level row with a kind",
+			withMissingSwift(`[{"engine": "swift", "family": "words", "kind": "verdict", "task": "t", "reason": "r"}]`),
+			"family-level row with a kind",
+		},
+		{
+			"a case-level row for a missing engine",
+			withMissingSwift(`[{"engine": "swift", "family": "words", "task": "t", "reason": "r"}, ` +
+				`{"engine": "swift", "family": "words", "case": "w01", "kind": "span", "task": "t", "reason": "r"}]`),
+			"case-level row where swift has no rule",
+		},
+		{
+			"two family-level rows for one engine",
+			withMissingSwift(`[{"engine": "swift", "family": "words", "task": "t", "reason": "r"}, ` +
+				`{"engine": "swift", "family": "words", "task": "u", "reason": "r"}]`),
+			"second family-level row",
+		},
+		{
+			"a family-level row naming a family that does not exist",
+			with(valid, "ledger.json", `[{"engine": "swift", "family": "letters", "task": "t", "reason": "r"}]`),
+			"names a family that does not exist",
 		},
 	}
 	for _, testCase := range cases {
@@ -203,6 +270,76 @@ func TestTheLoaderRefusesAMalformedCorpus(t *testing.T) {
 				t.Errorf("the refusal does not say %q: %v", testCase.mustName, err)
 			}
 		})
+	}
+}
+
+// withMissingSwift is the valid corpus with Swift missing from its family, a Swift form on the control, and
+// this ledger.
+func withMissingSwift(ledger string) fstest.MapFS {
+	files := with(validCorpus(), "families.json", `{"words": {"typescript": "no-words", "go": "go/no-words", `+
+		`"swift": {"missing": true}}}`)
+	files = with(files, "testdata/words/w01/case.json", `{"why": "the control", "control": true, `+
+		`"expect": [{"covers": "WORD", "occurrence": 1}], "languages": ["typescript", "go", "swift"]}`)
+	files = with(files, "testdata/words/w01/case.swift", "// WORD here\n")
+	return with(files, "ledger.json", ledger)
+}
+
+// A missing engine with its family-level row loads, and its cases there are not compared, though they are
+// written.
+func TestAMissingEngineWithItsRowLoadsAndRunsNothing(t *testing.T) {
+	t.Parallel()
+
+	corpus, err := LoadFrom(withMissingSwift(`[{"engine": "swift", "family": "words", "task": "t", "reason": "r"}]`))
+	if err != nil {
+		t.Fatalf("a missing engine with its row was refused: %v", err)
+	}
+	if got := len(corpus.CasesFor(EngineSwift)); got != 0 {
+		t.Errorf("%d Swift cases compared where Swift has no rule, want 0", got)
+	}
+	if got := len(corpus.CasesFor(EngineTypeScript)); got != 2 {
+		t.Errorf("%d TypeScript cases, want 2", got)
+	}
+	if !corpus.Families[0].Cases[0].Has(EngineSwift) {
+		t.Error("the control's Swift form was not read")
+	}
+}
+
+// An occurrence given per language names each language's own occurrence of the same text.
+func TestAnOccurrencePerLanguageResolvesInEach(t *testing.T) {
+	t.Parallel()
+
+	files := with(validCorpus(), "testdata/words/w01/case.json", `{"why": "c", "control": true, "expect": `+
+		`[{"covers": "WORD", "occurrence": {"typescript": 1, "go": 2}}], "languages": ["typescript", "go"]}`)
+	files = with(files, "testdata/words/w01/case.go", "package w01\n\n// WORD and WORD here\n")
+	corpus, err := LoadFrom(files)
+	if err != nil {
+		t.Fatal(err)
+	}
+	control := corpus.Families[0].Cases[0]
+	for engine, want := range map[Engine]Range{EngineTypeScript: {Start: 3, End: 7}, EngineGo: {Start: 25, End: 29}} {
+		got, err := Resolve(control.Expect[0], control.Sources[engine], engine)
+		if err != nil || got != want {
+			t.Errorf("%s resolved to %+v (%v), want %+v", engine, got, err, want)
+		}
+	}
+}
+
+// A case's path and root name its file in each language, and default to the project's `case`.
+func TestACaseNamesItsFileByPathAndRoot(t *testing.T) {
+	t.Parallel()
+
+	files := with(validCorpus(), "testdata/words/w02/case.json", `{"why": "clean", "expect": [], `+
+		`"path": "utils/lf02.generated", "root": "/checkouts/utils/probe", "languages": ["typescript"]}`)
+	corpus, err := LoadFrom(files)
+	if err != nil {
+		t.Fatal(err)
+	}
+	named, plain := corpus.Families[0].Cases[1], corpus.Families[0].Cases[0]
+	if got := named.AbsoluteFileName(EngineTypeScript); got != "/checkouts/utils/probe/utils/lf02.generated.ts" {
+		t.Errorf("named %s", got)
+	}
+	if got := plain.AbsoluteFileName(EngineGo); got != "/project/case.go" {
+		t.Errorf("named %s", got)
 	}
 }
 
@@ -301,6 +438,10 @@ func TestCompareNamesTheKindOfFailure(t *testing.T) {
 		{"the wrong end", twoWords, []Range{{Start: 7, End: 10}, {Start: 19, End: 23}}, KindSpan, true},
 		{"no end", twoWords, []Range{{Start: 7, NoEnd: true}, {Start: 19, End: 23}}, KindSpan, true},
 		{"the wrong line", twoWords, []Range{{Start: 7, End: 11}, {Start: 7, End: 11}}, KindSpan, false},
+		// A span over the whole file holds a control to its count alone: where the finding sits is placement.
+		{"a long file reported on its first line", probeCase(true, source, Span{LinesFrom: 2}), []Range{{Start: 0, End: 0}}, KindSpan, true},
+		{"a long file reported twice", probeCase(true, source, Span{LinesFrom: 2}), []Range{{Start: 0}, {Start: 12, End: 24}}, KindVerdict, false},
+		{"a folder reported off the file's start", probeCase(true, source, Span{FileStart: true}), []Range{{Start: 12, End: 12}}, KindSpan, true},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -344,6 +485,10 @@ func TestJudgeHoldsAResultToTheLedger(t *testing.T) {
 		{"a failure with a row of the other kind", plain, []LedgerRow{spanRow}, nil, "says span"},
 		{"a control's span failure with its row", control, []LedgerRow{spanRow}, wholeComment, ""},
 		{"a silent control", control, []LedgerRow{verdictRow}, nil, "no ledger row can excuse"},
+		{"a control covering text on the wrong line", probeCase(true, "// one\n// TODO\n", covers("TODO", 1)), []LedgerRow{spanRow}, []Range{{Start: 0, End: 6}}, "no ledger row can excuse"},
+		{"a long-file control at the wrong line, with its span row", probeCase(true, source, Span{LinesFrom: 1}), []LedgerRow{spanRow}, []Range{{Start: 3, End: 3}}, ""},
+		{"a long-file control at the wrong line, with no row", probeCase(true, source, Span{LinesFrom: 1}), nil, []Range{{Start: 3, End: 3}}, "no ledger row"},
+		{"a long-file control with the wrong count", probeCase(true, source, Span{LinesFrom: 1}), []LedgerRow{spanRow}, nil, "no ledger row can excuse"},
 	}
 	for _, testCase := range cases {
 		t.Run(testCase.name, func(t *testing.T) {

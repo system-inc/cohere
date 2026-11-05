@@ -16,21 +16,29 @@ import (
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
-// textRulesHouseSets are the sets the TypeScript adapter reads each rule's options from: the ones the
-// confirmation probe extended (textrules-confirmation.md, "How it was run"), so a rule runs with the options
-// the house gives it, read through the configuration layer rather than copied by hand.
+// textRulesHouseSets are the sets the TypeScript adapter reads each rule's status and options from: the ones
+// the confirmation probe extended (textrules-confirmation.md, "How it was run"), so a rule runs with what the
+// house gives it, read through the configuration layer rather than copied by hand.
 var textRulesHouseSets = []string{configuration.TypeScriptSetName, configuration.SetPrefix + "style"}
 
-// textRulesHouse is the house sets loaded once per test, for reading any rule's options from.
+// textRulesProbeRules are the rules the probe turned on in its own settings, beside the sets, because the
+// sets leave them off: `nexus/consistency-no-abbreviated-identifier` lives in `cohere:system-inc/base`. The
+// adapter turns them on the same way, with a bare severity.
+var textRulesProbeRules = map[string]string{"nexus/consistency-no-abbreviated-identifier": "error"}
+
+// textRulesHouse is the house configuration loaded once per test, which each case's own file resolves through.
 type textRulesHouse struct {
-	resolved configuration.Resolved
+	loaded *configuration.Config
+	// directory is where the settings file sits, which a case's project-relative file name resolves under, so
+	// the house's overrides (`**/*.generated.*` under max-lines) reach it as they reach a project's file.
+	directory string
 }
 
-// loadTextRulesHouse loads the house sets through a settings file that extends them.
+// loadTextRulesHouse loads the house sets, and the probe's rules, through a settings file that extends them.
 func loadTextRulesHouse(t *testing.T) textRulesHouse {
 	t.Helper()
 	directory := t.TempDir()
-	settings, err := json.Marshal(map[string][]string{"extends": textRulesHouseSets})
+	settings, err := json.Marshal(map[string]any{"extends": textRulesHouseSets, "rules": textRulesProbeRules})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,19 +50,24 @@ func loadTextRulesHouse(t *testing.T) textRulesHouse {
 	if err != nil {
 		t.Fatalf("loading the house sets %v: %v", textRulesHouseSets, err)
 	}
-	return textRulesHouse{resolved: loaded.Resolve(filepath.Join(directory, "case.ts"))}
+	return textRulesHouse{loaded: loaded, directory: directory}
 }
 
-// optionsFor decodes a rule's options as the house sets give them, with a case's own options laid over
-// them key by key, through the registry's decoder, exactly as a lint run decodes them.
-func (house textRulesHouse) optionsFor(t *testing.T, ruleName string, caseOptions map[string]json.RawMessage) any {
+// optionsFor resolves a rule for a case's own file, and decodes its options as the house gives them there,
+// with the case's own options laid over them key by key, through the registry's decoder, exactly as a lint
+// run decodes them. It reports false where the rule resolves off for the file, so the rule does not run.
+func (house textRulesHouse) optionsFor(t *testing.T, ruleName string, testCase textrules.Case) (any, bool) {
 	t.Helper()
-	if status, _ := house.resolved.StatusOf(ruleName); status == configuration.StatusUnconfigured {
-		t.Fatalf("the house sets %v never configure %s, so there are no house options to run it with",
-			textRulesHouseSets, ruleName)
+	resolved := house.loaded.Resolve(filepath.Join(house.directory, filepath.FromSlash(testCase.FileName(textrules.EngineTypeScript))))
+	switch status, _ := resolved.StatusOf(ruleName); status {
+	case configuration.StatusUnconfigured:
+		t.Fatalf("the house sets %v never configure %s, so there is nothing to run it with", textRulesHouseSets,
+			ruleName)
+	case configuration.StatusScopedOff, configuration.StatusFileIgnored:
+		return nil, false
 	}
-	elements := house.resolved.RawOptionsFor(ruleName)
-	if len(caseOptions) > 0 {
+	elements := resolved.RawOptionsFor(ruleName)
+	if len(testCase.Options) > 0 {
 		if len(elements) > 1 {
 			t.Fatalf("%s takes %d option elements, and a case's options are one object laid over one",
 				ruleName, len(elements))
@@ -65,7 +78,7 @@ func (house textRulesHouse) optionsFor(t *testing.T, ruleName string, caseOption
 				t.Fatalf("%s's house options are not an object a case's options can be laid over: %v", ruleName, err)
 			}
 		}
-		for key, value := range caseOptions {
+		for key, value := range testCase.Options {
 			merged[key] = value
 		}
 		element, err := json.Marshal(merged)
@@ -78,7 +91,7 @@ func (house textRulesHouse) optionsFor(t *testing.T, ruleName string, caseOption
 	if err != nil {
 		t.Fatalf("decoding %s's options: %v", ruleName, err)
 	}
-	return decoded
+	return decoded, true
 }
 
 // textRulesRule is the registered rule a family names for TypeScript.
@@ -100,12 +113,16 @@ func textRulesRule(t *testing.T, corpus *textrules.Corpus, family string) rule.R
 	return rule.Rule{}
 }
 
-// runTextRulesCase runs a case's rule over its TypeScript source, and returns each finding as a byte range.
+// runTextRulesCase runs a case's rule over its TypeScript source, and returns each finding as a byte range. A
+// rule the house turns off for the case's file does not run, and finds nothing, as in a lint run.
 func runTextRulesCase(t *testing.T, corpus *textrules.Corpus, house textRulesHouse, testCase textrules.Case) []textrules.Range {
 	t.Helper()
 	subject := textRulesRule(t, corpus, testCase.Family)
-	options := house.optionsFor(t, subject.Name, testCase.Options)
-	fileName := "/project/" + testCase.FileName(textrules.EngineTypeScript)
+	options, runs := house.optionsFor(t, subject.Name, testCase)
+	if !runs {
+		return nil
+	}
+	fileName := testCase.AbsoluteFileName(textrules.EngineTypeScript)
 	result := rule_testing.RunWithOptions(t, subject, fileName, testCase.Sources[textrules.EngineTypeScript], options)
 	found := make([]textrules.Range, 0, len(result.Diagnostics))
 	for _, diagnostic := range result.Diagnostics {
@@ -151,6 +168,9 @@ func TestTextRulesConformanceTypeScript(t *testing.T) {
 	}
 }
 
+// textRulesComparatorFamily is the family whose control the comparator's own test runs on.
+const textRulesComparatorFamily = "warning-comments"
+
 // The comparison can fail: the control's own findings, held to deliberately wrong expectations, fail with
 // the kind each is wrong in, and held to exactly what the rule reported, pass. So a green run above is the
 // comparator agreeing, not a comparator unable to disagree.
@@ -162,15 +182,16 @@ func TestTextRulesConformanceTypeScriptComparatorCanFail(t *testing.T) {
 		t.Fatal(err)
 	}
 	house := loadTextRulesHouse(t)
+	// The warning-comments control, whose comment holds the word `fix`, a misplacement every engine's
+	// finding there differs from.
 	var control textrules.Case
 	for _, testCase := range corpus.CasesFor(textrules.EngineTypeScript) {
-		if testCase.Control {
+		if testCase.Control && testCase.Family == textRulesComparatorFamily {
 			control = testCase
-			break
 		}
 	}
 	if control.Name == "" {
-		t.Fatal("the corpus has no TypeScript control")
+		t.Fatalf("the corpus has no TypeScript control in %s", textRulesComparatorFamily)
 	}
 	found := runTextRulesCase(t, corpus, house, control)
 	if len(found) == 0 {

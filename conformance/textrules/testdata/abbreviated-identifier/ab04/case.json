@@ -1,0 +1,32 @@
+{
+    "why": "ab04: an abbreviation inside a compound name is reported, once per name, at its declaration",
+    "expect": [
+        {
+            "covers": "userMsg",
+            "occurrence": 1
+        },
+        {
+            "covers": "msgCount",
+            "occurrence": 1
+        },
+        {
+            "covers": "ctxValue",
+            "occurrence": 1
+        },
+        {
+            "covers": "pageIdx",
+            "occurrence": 1
+        },
+        {
+            "covers": "errMsg",
+            "occurrence": 1
+        }
+    ],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

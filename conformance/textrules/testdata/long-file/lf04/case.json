@@ -1,0 +1,13 @@
+{
+    "why": "lf04: U+2028 ends a line in TypeScript, so 2,100 lines split by it are past the limit. TypeScript form only: Swift and Go do not end a line there, so their forms would be one line, another case",
+    "expect": [
+        {
+            "linesFrom": 2001
+        }
+    ],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript"
+    ]
+}

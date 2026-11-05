@@ -1,0 +1,20 @@
+{
+    "why": "am06: `e` bound by a catch is reported once, at its declaration, and its read is not",
+    "expect": [
+        {
+            "covers": "e",
+            "occurrence": {
+                "typescript": 4,
+                "go": 4,
+                "swift": 8
+            }
+        }
+    ],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

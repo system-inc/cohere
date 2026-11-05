@@ -1,0 +1,20 @@
+{
+    "why": "am07: `e` as a handler's parameter is reported once, at its declaration, and its read is not",
+    "expect": [
+        {
+            "covers": "e",
+            "occurrence": {
+                "typescript": 3,
+                "go": 5,
+                "swift": 6
+            }
+        }
+    ],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

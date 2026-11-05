@@ -1,0 +1,11 @@
+{
+    "why": "sh10: the generated-code marker's text is fixed by an external spec, so it is masked in every language",
+    "expect": [],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}

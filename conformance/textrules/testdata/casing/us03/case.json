@@ -1,0 +1,20 @@
+{
+    "why": "us03: types are UpperCamel and fields lowerCamel, so a type and a field with an underscore are each reported at their declaration",
+    "expect": [
+        {
+            "covers": "Order_Line",
+            "occurrence": 1
+        },
+        {
+            "covers": "unit_price",
+            "occurrence": 1
+        }
+    ],
+    "options": {},
+    "path": null,
+    "languages": [
+        "typescript",
+        "go",
+        "swift"
+    ]
+}
