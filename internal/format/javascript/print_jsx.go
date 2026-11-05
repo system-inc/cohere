@@ -41,7 +41,8 @@ func maybeWrapJsxElementInParens(path *Path, elem Doc, options *Options) Doc {
 	shouldBreak := shouldBreakJsxElement(path)
 	needsParens := needsParentheses(path, options)
 
-	var openParen, closeParen Doc = emptyDoc, emptyDoc
+	var openParen Doc = emptyDoc
+	var closeParen Doc = emptyDoc
 	if !needsParens {
 		openParen, closeParen = ifBreak("(", nil), ifBreak(")", nil)
 	}
@@ -408,9 +409,12 @@ func printJsx(path *Path, options *Options, print PrintFunc) Doc {
 		return printJsxEmptyExpression(path, options /* , print*/)
 	case "JSXText":
 		/* c8 ignore next */
+		// Invariant: the parser builds JSXText only as an element's or fragment's child, which printJsxElement
+		// prints itself, as upstream assumes.
 		panic("JSXText should be handled by JSXElement")
 	default:
 		/* c8 ignore next */
+		// Invariant: the parser builds no JSX node type this switch misses, as Prettier's printer assumes.
 		panic(fmt.Sprintf("unexpected node type %q in JSX", current.Type()))
 	}
 }

@@ -34,6 +34,8 @@ func printLiteral(path *Path, options *Options) Doc {
 	case nil:
 		return concatIn(path, "null")
 	}
+	// Invariant: estree builds a Literal's value as a number, string, boolean or null, or sets regex or bigint
+	// above, as upstream's printLiteral assumes.
 	panic("unknown literal value")
 }
 

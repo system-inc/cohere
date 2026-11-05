@@ -2,7 +2,7 @@ package javascript
 
 // parentheses/parent-needs-parentheses.js.
 
-// TODO[@fisker]: Remove `needsParentheses`
+// Upstream's note, from fisker, is that it means to remove the `needsParentheses` parameter.
 
 // parentNeedsParentheses answers (result, decided): upstream returns a boolean when the parent decides
 // and undefined when it does not, which is decided == false here.
@@ -153,14 +153,15 @@ func shouldWrapFunctionForExportDefault(
 // Based on babel implementation
 // https://github.com/nicolo-ribaudo/babel/blob/c4b88a4e5005364255f7e964fe324cf7bfdfb019/packages/babel-generator/src/node/index.ts#L111
 func canDecoratorExpressionUnparenthesized(node Node) bool {
-	if node.Is("ChainExpression") {
-		node = node.Child("expression")
+	expression := node
+	if expression.Is("ChainExpression") {
+		expression = expression.Child("expression")
 	}
 
-	return isDecoratorMemberExpression(node) ||
-		isCallExpression(node) &&
-			!node.Truthy("optional") &&
-			isDecoratorMemberExpression(node.Child("callee"))
+	return isDecoratorMemberExpression(expression) ||
+		isCallExpression(expression) &&
+			!expression.Truthy("optional") &&
+			isDecoratorMemberExpression(expression.Child("callee"))
 }
 
 func isDecoratorMemberExpression(node Node) bool {

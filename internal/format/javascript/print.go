@@ -290,6 +290,9 @@ func printEstreeNode(path *Path, options *Options, print PrintFunc, args any) Do
 			return doc.Text(";")
 		}
 	}
+	// Invariant: the parser builds no node type that this switch and the JSX and TypeScript printers miss, and
+	// statement sequences skip an EmptyStatement that is not meaningful, as Prettier's printer assumes where it
+	// throws UnexpectedNodeError.
 	panic(fmt.Sprintf("unknown ESTree node type %q", current.Type()))
 }
 
@@ -442,5 +445,7 @@ func printTypescript(path *Path, options *Options, print PrintFunc, args any) Do
 	case "TSEmptyBodyFunctionExpression":
 		return printMethodValue(path, options, print)
 	}
+	// Invariant: the parser builds no TS node type this switch misses, as Prettier's printer assumes where it
+	// throws UnexpectedNodeError.
 	panic(fmt.Sprintf("unknown TypeScript node type %q", nodeType))
 }

@@ -69,6 +69,8 @@ func getLeftSidePathName(node Node) []any {
 	if node.Truthy("expression") {
 		return []any{"expression"}
 	}
+	// Invariant: both callers first check hasNakedLeftSide, and every node type it accepts has one of these
+	// children, as upstream assumes.
 	panic("javascript: Unexpected node has no left side.")
 }
 
@@ -129,11 +131,12 @@ func startsWithNoLookaheadToken(node Node, predicate func(leftmostNode Node) boo
 
 // stripChainElementWrappers is upstream's stripChainElementWrappers.
 func stripChainElementWrappers(node Node) Node {
-	for isChainElementWrapper(node) {
-		node = node.Child("expression")
+	current := node
+	for isChainElementWrapper(current) {
+		current = current.Child("expression")
 	}
 
-	return node
+	return current
 }
 
 // isNullishCoalescing is upstream's isNullishCoalescing.

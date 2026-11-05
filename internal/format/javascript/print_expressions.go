@@ -256,7 +256,12 @@ func isKeySafeToUnquote(node Node, options *Options) bool {
 	// Note: It's also not safe for TypeScript as mentioned above
 	// https://github.com/prettier/prettier/pull/8508
 	if settingsOf(options).Parser == "babel" && !node.Is("ImportAttribute") && isSimpleNumber(value) {
-		number, _ := strconv.ParseFloat(value, 64)
+		number, parseError := strconv.ParseFloat(value, 64)
+		// isSimpleNumber leaves ParseFloat only a range error, a number past float64, where upstream's Number
+		// gives Infinity, which never equals value.
+		if parseError != nil {
+			return false
+		}
 		return javaScriptNumberString(number) == value
 	}
 	return false

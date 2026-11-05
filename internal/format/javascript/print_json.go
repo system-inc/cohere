@@ -128,6 +128,8 @@ func printJSON(path *Path, options *Options, print PrintFunc, _ any) Doc {
 		}
 		return doc.Text(jsonStringify(*value.Cooked))
 	}
+	// Invariant: estree.ParseJSON builds no node type this switch misses, as Prettier's JSON printer assumes
+	// where it throws.
 	panic(fmt.Sprintf("unknown JSON node type %q", current.Type()))
 }
 

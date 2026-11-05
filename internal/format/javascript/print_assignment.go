@@ -66,7 +66,8 @@ func printAssignment(
 	case "only-left":
 		return leftDoc
 	}
-	// Upstream falls off the switch and returns undefined; chooseLayout never returns another layout.
+	// Upstream falls off the switch and returns undefined.
+	// Invariant: chooseLayout returns only the layouts this switch handles.
 	panic("javascript: unknown assignment layout " + layout)
 }
 
@@ -388,10 +389,9 @@ func isObjectPropertyWithShortKey(current Node, keyDoc Doc, options *Options) bo
 	if !isObjectProperty(current) {
 		return false
 	}
-	// TODO: for performance, it might make sense to use a more lightweight
-	// version of cleanDoc, such that it would stop once it detects that
-	// the doc can't be reduced to a string.
-	keyDoc = doc.CleanDoc(keyDoc)
+	// Upstream notes that a lighter cleanDoc, one that stops once it sees the doc can't be reduced to a
+	// string, might be faster.
+	cleanedKeyDoc := doc.CleanDoc(keyDoc)
 	const minOverlapForBreak = 3
 	//   ↓↓ - insufficient overlap for a line break
 	// key1: longValue1,
@@ -400,7 +400,7 @@ func isObjectPropertyWithShortKey(current Node, keyDoc Doc, options *Options) bo
 	//   longValue2
 	//
 	// Upstream's `typeof keyDoc === "string"`; getStringWidth is doc.StringWidth.
-	text, isText := keyDoc.(doc.Text)
+	text, isText := cleanedKeyDoc.(doc.Text)
 	return isText &&
 		doc.StringWidth(string(text)) < settingsOf(options).TabWidth+minOverlapForBreak
 }
