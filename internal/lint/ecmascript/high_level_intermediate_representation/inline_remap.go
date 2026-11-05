@@ -266,14 +266,7 @@ func remapNestedFunctionIds(value InstructionValue, functionRemap map[FunctionId
 // So the copy follows pointers and slices to the bottom. `deepCopyValue` is the one implementation
 // and both terminals and instruction values go through it.
 func copyTerminal(terminal Terminal) Terminal {
-	if terminal == nil {
-		return nil
-	}
-	clone, ok := deepCopyAny(terminal).(Terminal)
-	if !ok {
-		return terminal
-	}
-	return clone
+	return deepCopyAny(terminal)
 }
 
 // copyInstructionValue returns an instruction value sharing no mutable storage with its argument.
@@ -282,14 +275,7 @@ func copyTerminal(terminal Terminal) Terminal {
 // pointers into the value, so a copied instruction that still holds the original's `*CallExpression`
 // has its operands renamed in the nested function rather than in the copy.
 func copyInstructionValue(value InstructionValue) InstructionValue {
-	if value == nil {
-		return nil
-	}
-	clone, ok := deepCopyAny(value).(InstructionValue)
-	if !ok {
-		return value
-	}
-	return clone
+	return deepCopyAny(value)
 }
 
 // deepCopyAny duplicates a value and everything reachable from it through pointers, slices, maps
@@ -306,12 +292,19 @@ func copyInstructionValue(value InstructionValue) InstructionValue {
 // syntax tree, shared by every consumer in the process and never rewritten by a remap. Following
 // them would copy the program. The stop condition is therefore structural rather than a type list:
 // a pointer to a struct declared outside this package is kept as-is.
-func deepCopyAny(value any) any {
-	if value == nil {
-		return nil
-	}
+func deepCopyAny[Value any](value Value) Value {
 	source := reflect.ValueOf(value)
-	return deepCopyValue(source).Interface()
+	// A nil interface holds nothing to copy.
+	if !source.IsValid() {
+		return value
+	}
+	// deepCopyValue returns a value of the type it was given, so the copy always converts back, and the
+	// original is kept should that ever stop being true.
+	clone, ok := deepCopyValue(source).Interface().(Value)
+	if !ok {
+		return value
+	}
+	return clone
 }
 
 func deepCopyValue(source reflect.Value) reflect.Value {
