@@ -434,7 +434,7 @@ func TestNoMisleadingCharacterClassPointsAtTheOffendingPair(test *testing.T) {
 		// Two classes, two spans, each pointing inside its own class.
 		{"var r = /[👩‍👦][👩‍👦]/u", []string{"👩‍👦", "👩‍👦"}},
 		// The joiner finding spans all three members, since the joiner alone means nothing.
-		{"var r = /[a‍b]/u", []string{"a‍b"}},
+		{"var r = /[a\u200db]/u", []string{"a\u200db"}},
 		// A constructor's string argument: the offset has to cross the quote.
 		{`var r = new RegExp("[á]")`, []string{"á"}},
 		// A legacy octal escape ahead of the class, so the offset has to cross a token whose raw
@@ -730,7 +730,7 @@ func TestNoMisleadingCharacterClassCoversOurOwnDecisions(test *testing.T) {
 			// Two joiners in a row join nothing, and upstream skips the pair explicitly. Its corpus
 			// never writes one.
 			"two joiners side by side",
-			"var r = /[‍‍]/u",
+			"var r = /[\u200d\u200d]/u",
 		},
 		{
 			// A high surrogate is only half of anything, so what follows it decides. Upstream's

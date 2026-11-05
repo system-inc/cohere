@@ -417,7 +417,11 @@ func TestDecodeYodaOptions(test *testing.T) {
 	if err != nil {
 		test.Fatalf("upstream's spelling was refused: %v", err)
 	}
-	if settings := decoded.(YodaSettings); !settings.Always || !settings.ExceptRange || !settings.OnlyEquality {
+	settings, ok := decoded.(YodaSettings)
+	if !ok {
+		test.Fatalf("decoded options are not YodaSettings: got %T", decoded)
+	}
+	if !settings.Always || !settings.ExceptRange || !settings.OnlyEquality {
 		test.Errorf("the second element was not read: %+v", settings)
 	}
 

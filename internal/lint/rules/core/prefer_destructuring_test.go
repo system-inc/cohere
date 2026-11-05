@@ -32,7 +32,6 @@ type preferDestructuringCase struct {
 	// reports and deliberately declines to repair.
 	output   string
 	findings []preferDestructuringExpectation
-	reason   string
 }
 
 // decodePreferDestructuringOptionsForTest routes a case's options through the SHIPPED decoder.

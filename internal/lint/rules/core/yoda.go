@@ -56,7 +56,7 @@ func DecodeYodaOptions(list []byte) (any, error) {
 	if err != nil {
 		return settings, err
 	}
-	settings = decoded.(YodaSettings)
+	settings = decoded
 	if len(elements) < 2 {
 		return settings, nil
 	}
@@ -70,7 +70,7 @@ func DecodeYodaOptions(list []byte) (any, error) {
 }
 
 // yodaSettingsFromWhen turns the enum into settings, refusing anything upstream's schema refuses.
-func yodaSettingsFromWhen(when string) (any, error) {
+func yodaSettingsFromWhen(when string) (YodaSettings, error) {
 	switch when {
 	case "never":
 		return YodaSettings{}, nil
@@ -613,14 +613,12 @@ func yodaFlippedString(ctx rule.Context, node *ast.Node,
 
 	source := ctx.SourceFile.Text()
 	span := rule.TokenRange(ctx.SourceFile, node)
-	operatorStart := binary.OperatorToken.Pos()
-	operatorEnd := binary.OperatorToken.End()
 
 	// The operator token's Pos includes leading trivia, so trim it to the token itself; otherwise
 	// the text before the operator is swallowed into the operator's own slice.
 	trimmedOperator := rule.TokenRange(ctx.SourceFile, binary.OperatorToken)
-	operatorStart = trimmedOperator.Pos()
-	operatorEnd = trimmedOperator.End()
+	operatorStart := trimmedOperator.Pos()
+	operatorEnd := trimmedOperator.End()
 
 	leftSpan := rule.TokenRange(ctx.SourceFile, binary.Left)
 	rightSpan := rule.TokenRange(ctx.SourceFile, binary.Right)

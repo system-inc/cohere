@@ -196,8 +196,12 @@ func noWarningCommentsMatchers(
 ) noWarningCommentsCompiled {
 	key := strings.Join(terms, "\x00") + "\x01" + string(location) + "\x01" +
 		strings.Join(decoration, "\x00")
+	// The cache only ever stores noWarningCommentsCompiled, so a miss on the type cannot happen; if it
+	// somehow did, compiling afresh and storing over it is the correct recovery.
 	if cached, found := noWarningCommentsCache.Load(key); found {
-		return cached.(noWarningCommentsCompiled)
+		if compiled, isCompiled := cached.(noWarningCommentsCompiled); isCompiled {
+			return compiled
+		}
 	}
 
 	skip, leadsAreExact := noWarningCommentsStartSkip(location, decoration)
