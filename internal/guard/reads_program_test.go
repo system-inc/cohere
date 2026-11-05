@@ -82,6 +82,18 @@ func TestRulesDeclareExactlyWhatTheyReadOfTheProgram(test *testing.T) {
 	}
 }
 
+// programRead mirrors rule.ProgramRead. This package reads rule sources as syntax and does not link
+// the rules, so it names the kinds the way the sources spell them.
+type programRead uint8
+
+const (
+	readsCompilerOptions programRead = 1 << iota
+	readsDefaultLibrary
+	readsModuleResolution
+	readsOtherFiles
+	readsDesignSystem
+)
+
 // The check sees code and not text, and counts reads by kind, in every direction it could be wrong.
 //
 // Each source is a shape this guard could misjudge, written to a file and read the way the guard
@@ -184,18 +196,6 @@ var Probe = rule.Rule{Run: func(ctx rule.Context, options any) rule.Listeners { 
 		})
 	}
 }
-
-// programRead mirrors rule.ProgramRead. This package reads rule sources as syntax and does not link
-// the rules, so it names the kinds the way the sources spell them.
-type programRead uint8
-
-const (
-	readsCompilerOptions programRead = 1 << iota
-	readsDefaultLibrary
-	readsModuleResolution
-	readsOtherFiles
-	readsDesignSystem
-)
 
 func (reads programRead) String() string {
 	names := []string{}

@@ -85,7 +85,10 @@ func TestEveryCohereTestRunsInParallel(test *testing.T) {
 	}
 	var lines []string
 	for _, violation := range violations {
-		relative, _ := filepath.Rel(root, violation.Position.Filename)
+		relative, relativeError := filepath.Rel(root, violation.Position.Filename)
+		if relativeError != nil {
+			test.Fatal(relativeError)
+		}
 		lines = append(lines, fmt.Sprintf("  %s:%d %s", relative, violation.Position.Line, violation.Name))
 	}
 	test.Errorf("%d tests of %d files neither call t.Parallel() nor say why above them with %q and a reason:\n%s",

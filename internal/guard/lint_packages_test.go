@@ -36,6 +36,11 @@ func TestProduct_LintTypes(test *testing.T) {
 // lintExports is lintTypes found once per test binary.
 var lintExports = sync.OnceValues(lintTypes.Find)
 
+var lintLoads = struct {
+	sync.Mutex
+	byOverlay map[string]*lintLoad
+}{byOverlay: map[string]*lintLoad{}}
+
 // lintPackages is ./internal/lint/... loaded with its syntax and types, read with overlay in place of the
 // files it names: cohere's own packages from source, and every other from lintTypes. The creating-getter
 // and TypeReach guards and their probes all read it, and each loaded it for itself: six loads of the whole
@@ -64,11 +69,6 @@ func lintPackages(test *testing.T, overlay map[string][]byte) []*gotypes.Package
 	}
 	return load.packages
 }
-
-var lintLoads = struct {
-	sync.Mutex
-	byOverlay map[string]*lintLoad
-}{byOverlay: map[string]*lintLoad{}}
 
 type lintLoad struct {
 	once     sync.Once

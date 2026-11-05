@@ -127,7 +127,8 @@ func describeDeclaration(symbol *ast.Symbol, inProject map[string]bool) (string,
 	for index, declaration := range symbol.Declarations {
 		sourceFile := ast.GetSourceFileOfNode(declaration)
 		if sourceFile == nil {
-			return "", 0, "a declaration of this symbol has no source file, so the rename cannot be shown to be complete"
+			return "", 0, "a declaration of this symbol has no source file, " +
+				"so the rename cannot be shown to be complete"
 		}
 		fileName := sourceFile.FileName()
 		line, _ := lineColumnOf(sourceFile.Text(), declaration.Pos())
@@ -151,6 +152,8 @@ func describeDeclaration(symbol *ast.Symbol, inProject map[string]bool) (string,
 // The walk is over identifier positions rather than over a list of reference forms, for the reason
 // `internal/unused` gives: a reference is a use wherever it appears, and enumerating the forms would
 // miss whichever one nobody thought of.
+//
+// Mutates: plan the caller's plan is the one being built, and every edit found is appended to its Edits
 func collectEdits(ctx context.Context, graph *program.Graph, files []*ast.SourceFile, anchor *ast.Symbol, plan *Plan) {
 	for _, file := range files {
 		fileChecker, release := graph.CheckerForFile(ctx, file)
@@ -405,6 +408,8 @@ func findCollision(
 // Scoped to files the rename touches plus files that mention the name at all, and reported with
 // position and text so a person can look at each one and decide. Over-reporting here is correct:
 // every entry is something a human reads, not something the tool acts on.
+//
+// Mutates: plan the caller's plan is the one being built, and every literal found is appended to its Blind
 func collectBlindness(files []*ast.SourceFile, plan *Plan) {
 	for _, file := range files {
 		text := file.Text()

@@ -133,10 +133,22 @@ func TestOnlyAFileTheFormatterCouldNotReadIsUnchecked(test *testing.T) {
 	test.Parallel()
 	summary := edit.Summary{
 		NotTransformed: []edit.NotTransformedFile{
-			{FileName: "/a/Broken.json", Reason: unparseableSkipReason},
-			{FileName: "/a/Crashed.ts", Reason: "the whole-text transform failed (boom)", Failed: true},
-			{FileName: "/a/Elsewhere.ts", Reason: "outside the format scope, 1 named path"},
-			{FileName: "/a/notes.txt", Reason: ".txt is not a file type the formatter handles"},
+			{FileName: "/a/Broken.json", Reason: unparseableSkipReason, Outcome: edit.NotTransformedSkipped},
+			{
+				FileName: "/a/Crashed.ts",
+				Reason:   "the whole-text transform failed (boom)",
+				Outcome:  edit.NotTransformedFailed,
+			},
+			{
+				FileName: "/a/Elsewhere.ts",
+				Reason:   "outside the format scope, 1 named path",
+				Outcome:  edit.NotTransformedSkipped,
+			},
+			{
+				FileName: "/a/notes.txt",
+				Reason:   ".txt is not a file type the formatter handles",
+				Outcome:  edit.NotTransformedSkipped,
+			},
 		},
 		FilesFailed:  []string{"/a/Unreadable.ts"},
 		FilesRefused: []edit.RefusedFile{{FileName: "/a/Reprinted.ts", Rules: []string{"format"}}},

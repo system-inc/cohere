@@ -587,14 +587,20 @@ func TestCheckFileComputesTheWriteAndLeavesTheFile(test *testing.T) {
 		test.Fatal(err)
 	}
 
-	if contents, _ := os.ReadFile(checked); string(contents) != original {
-		test.Fatalf("CheckFile wrote to disk:\n%s", contents)
+	checkedContents, readCheckedError := os.ReadFile(checked)
+	if readCheckedError != nil {
+		test.Fatal(readCheckedError)
 	}
-	if contents, _ := os.ReadFile(
-		written,
-	); checkResult.Text != string(contents) || !checkResult.Changed || !checkResult.Transformed {
+	if string(checkedContents) != original {
+		test.Fatalf("CheckFile wrote to disk:\n%s", checkedContents)
+	}
+	writtenContents, readWrittenError := os.ReadFile(written)
+	if readWrittenError != nil {
+		test.Fatal(readWrittenError)
+	}
+	if checkResult.Text != string(writtenContents) || !checkResult.Changed || !checkResult.Transformed {
 		test.Fatalf("the check and the write disagree:\n  checked %q (changed %v, transformed %v)\n  written %q",
-			checkResult.Text, checkResult.Changed, checkResult.Transformed, contents)
+			checkResult.Text, checkResult.Changed, checkResult.Transformed, writtenContents)
 	}
 
 	// The summary names the file and what changed it, the rule before the formatter, and a checked

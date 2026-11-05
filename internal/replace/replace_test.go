@@ -84,12 +84,17 @@ func TestFileReplacesAFileHeldOpenBriefly(test *testing.T) {
 	}
 	go func() {
 		time.Sleep(100 * time.Millisecond)
+		// Ignored: the file was only opened to hold it, never written, so a failed close loses nothing.
 		reader.Close()
 	}()
 	if fileError := File(source, destination); fileError != nil {
 		test.Fatalf("replacing a file held open for 100ms failed: %v", fileError)
 	}
-	if contents, _ := os.ReadFile(destination); string(contents) != "new" {
+	contents, readError := os.ReadFile(destination)
+	if readError != nil {
+		test.Fatal(readError)
+	}
+	if string(contents) != "new" {
 		test.Fatalf("the destination holds %q", contents)
 	}
 }
