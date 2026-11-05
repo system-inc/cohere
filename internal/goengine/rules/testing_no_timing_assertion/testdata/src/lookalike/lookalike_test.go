@@ -51,6 +51,24 @@ func TestFailureOnAnotherType(test *testing.T) {
 	}
 }
 
+// A Sub between two fixed times is date math, whose result a busy machine cannot change.
+func TestDateMath(test *testing.T) {
+	issued := time.Date(2026, time.November, 5, 0, 0, 0, 0, time.UTC)
+	expiry := issued.Add(24 * time.Hour)
+	if expiry.Sub(issued) != 24*time.Hour {
+		test.Fatal("a token lives a day")
+	}
+}
+
+func TestDateMathThroughALocal(test *testing.T) {
+	issued := time.Date(2026, time.November, 5, 0, 0, 0, 0, time.UTC)
+	expiry := issued.AddDate(0, 0, 1)
+	lifetime := expiry.Sub(issued)
+	if lifetime > 24*time.Hour {
+		test.Fatal("a token lives a day at most")
+	}
+}
+
 // A duration that was not measured, a configured timeout, is not the clock's verdict.
 func TestConfiguredDuration(test *testing.T) {
 	timeout := 2 * time.Second

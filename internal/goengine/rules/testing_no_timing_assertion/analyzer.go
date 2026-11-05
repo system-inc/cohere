@@ -29,10 +29,11 @@ const Name = "cohere-go/testing-no-timing-assertion"
 var Analyzer = &analysis.Analyzer{
 	Name: "testing_no_timing_assertion",
 	Doc: "Flags, in a test in a _test.go file, an if whose condition fails the test when a duration measured with " +
-		"time.Since or Time.Sub, directly or through a local assigned once, comes out too long, and whose body " +
-		"calls a *testing.T failure method directly, unless a // Timing assertion: <reason> comment directly above " +
-		"the if says why it holds under load. A busy machine makes such a test fail by chance. Context deadlines " +
-		"and benchmarks are not judged.",
+		"time.Since, or Time.Sub with a time.Now reading on one side, directly or through a local assigned once, " +
+		"comes out too long, and whose body calls a *testing.T failure method directly, unless a // Timing " +
+		"assertion: <reason> comment directly above the if says why it holds under load. A busy machine makes such " +
+		"a test fail by chance. Date math between times not read from the clock, context deadlines and benchmarks " +
+		"are not judged.",
 	Run: run,
 }
 
@@ -85,16 +86,33 @@ func run(pass *analysis.Pass) (any, error) {
 	return nil, nil
 }
 
+// clockLocals is what one test's body holds of the clock, each a variable declared once and never written again:
+// readings hold what time.Now returned, and measured hold a duration measured from the clock.
+type clockLocals struct {
+	readings map[*types.Var]bool
+	measured map[*types.Var]bool
+}
+
 // judgeTest reports every timing assertion in one test's body, its subtests' function literals included, since a
 // subtest's deadline is as much at the pool's mercy as its parent's.
 func judgeTest(pass *analysis.Pass, body *ast.BlockStmt, commentAbove map[int]*ast.CommentGroup) {
-	measured := measuredLocals(pass, body)
+	written := writtenVariables(pass, body)
+	// The readings are found first, since a Sub measures the clock only when one of its sides is a reading.
+	readings := localsDeclaredWith(pass, body, written, func(value ast.Expr) bool {
+		return isClockReading(pass, value, nil)
+	})
+	clock := clockLocals{
+		readings: readings,
+		measured: localsDeclaredWith(pass, body, written, func(value ast.Expr) bool {
+			return isMeasurement(pass, value, readings)
+		}),
+	}
 	ast.Inspect(body, func(node ast.Node) bool {
 		statement, isIf := node.(*ast.IfStmt)
 		if !isIf || !failsTestDirectly(pass, statement.Body) {
 			return true
 		}
-		comparisons := slowFailingComparisons(pass, statement.Cond, true, measured)
+		comparisons := slowFailingComparisons(pass, statement.Cond, true, clock)
 		if len(comparisons) == 0 {
 			return true
 		}
@@ -106,12 +124,15 @@ func judgeTest(pass *analysis.Pass, body *ast.BlockStmt, commentAbove map[int]*a
 	})
 }
 
-// measuredLocals is every variable body declares with a measured duration as its value, `elapsed :=
-// time.Since(start)` or `var elapsed = end.Sub(start)`, that nothing writes again, so reading it reads the
-// measurement.
-func measuredLocals(pass *analysis.Pass, body *ast.BlockStmt) map[*types.Var]bool {
-	written := writtenVariables(pass, body)
-	measured := map[*types.Var]bool{}
+// localsDeclaredWith is every variable body declares with a value holds accepts, `elapsed := time.Since(start)` or
+// `var finished = time.Now()`, that nothing writes again, so reading the variable reads that value.
+func localsDeclaredWith(
+	pass *analysis.Pass,
+	body *ast.BlockStmt,
+	written map[*types.Var]bool,
+	holds func(value ast.Expr) bool,
+) map[*types.Var]bool {
+	declared := map[*types.Var]bool{}
 	declare := func(names []*ast.Ident, values []ast.Expr) {
 		// Only one value per name pairs them; `first, second := pair()` assigns from one call's results.
 		if len(names) != len(values) {
@@ -119,8 +140,8 @@ func measuredLocals(pass *analysis.Pass, body *ast.BlockStmt) map[*types.Var]boo
 		}
 		for index, name := range names {
 			variable, isVariable := pass.TypesInfo.Defs[name].(*types.Var)
-			if isVariable && !written[variable] && isMeasurement(pass, values[index]) {
-				measured[variable] = true
+			if isVariable && !written[variable] && holds(values[index]) {
+				declared[variable] = true
 			}
 		}
 	}
@@ -143,7 +164,7 @@ func measuredLocals(pass *analysis.Pass, body *ast.BlockStmt) map[*types.Var]boo
 		}
 		return true
 	})
-	return measured
+	return declared
 }
 
 // writtenVariables is every variable body writes after declaring it: assigned, redeclared by a define, stepped,
@@ -183,9 +204,11 @@ func writtenVariables(pass *analysis.Pass, body *ast.BlockStmt) map[*types.Var]b
 	return written
 }
 
-// isMeasurement is whether expression is a call to time.Since or to time.Time's Sub, found by the function object,
-// so a Since or Sub of any other package or type is never mistaken for one.
-func isMeasurement(pass *analysis.Pass, expression ast.Expr) bool {
+// isMeasurement is whether expression measures the clock: a call to time.Since, or to time.Time's Sub with a reading
+// of the clock on one side, found by the function object, so a Since or Sub of any other package or type is never
+// mistaken for one. A Sub between two times that were not read from the clock, `expiry.Sub(issued)`, is date math,
+// whose result a busy machine cannot change.
+func isMeasurement(pass *analysis.Pass, expression ast.Expr, readings map[*types.Var]bool) bool {
 	call, isCall := ast.Unparen(expression).(*ast.CallExpr)
 	if !isCall {
 		return false
@@ -199,18 +222,49 @@ func isMeasurement(pass *analysis.Pass, expression ast.Expr) bool {
 	case "Since":
 		return receiver == nil
 	case "Sub":
-		return receiver != nil && isNamed(receiver.Type(), "time", "Time")
+		if receiver == nil || !isNamed(receiver.Type(), "time", "Time") {
+			return false
+		}
+		// A method value's receiver is the selector's left side; a method expression, time.Time.Sub(finished,
+		// start), passes it as the first argument, which the arguments already hold.
+		operands := call.Args
+		if selector, isSelector := ast.Unparen(call.Fun).(*ast.SelectorExpr); isSelector {
+			if selection, isSelection := pass.TypesInfo.Selections[selector]; isSelection &&
+				selection.Kind() == types.MethodVal {
+				operands = append([]ast.Expr{selector.X}, call.Args...)
+			}
+		}
+		for _, operand := range operands {
+			if isClockReading(pass, operand, readings) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// isClockReading is whether expression is what time.Now returned: the call itself, found by the function object, or
+// a local in readings holding one.
+func isClockReading(pass *analysis.Pass, expression ast.Expr, readings map[*types.Var]bool) bool {
+	switch value := ast.Unparen(expression).(type) {
+	case *ast.Ident:
+		variable, isVariable := pass.TypesInfo.Uses[value].(*types.Var)
+		return isVariable && readings[variable]
+	case *ast.CallExpr:
+		function, isFunc := typeutil.Callee(pass.TypesInfo, value).(*types.Func)
+		return isFunc && function.Pkg() != nil && function.Pkg().Path() == "time" && function.Name() == "Now" &&
+			function.Signature().Recv() == nil
 	}
 	return false
 }
 
 // isMeasured is whether operand is a measured duration: the measuring call itself, or a local holding one.
-func isMeasured(pass *analysis.Pass, operand ast.Expr, measured map[*types.Var]bool) bool {
+func isMeasured(pass *analysis.Pass, operand ast.Expr, clock clockLocals) bool {
 	if name, isIdentifier := ast.Unparen(operand).(*ast.Ident); isIdentifier {
 		variable, isVariable := pass.TypesInfo.Uses[name].(*types.Var)
-		return isVariable && measured[variable]
+		return isVariable && clock.measured[variable]
 	}
-	return isMeasurement(pass, operand)
+	return isMeasurement(pass, operand, clock.readings)
 }
 
 // slowFailingComparisons is every comparison in condition that makes it true when a measured duration is long, so
@@ -221,23 +275,23 @@ func slowFailingComparisons(
 	pass *analysis.Pass,
 	condition ast.Expr,
 	positive bool,
-	measured map[*types.Var]bool,
+	clock clockLocals,
 ) []*ast.BinaryExpr {
 	switch expression := ast.Unparen(condition).(type) {
 	case *ast.UnaryExpr:
 		if expression.Op == token.NOT {
-			return slowFailingComparisons(pass, expression.X, !positive, measured)
+			return slowFailingComparisons(pass, expression.X, !positive, clock)
 		}
 	case *ast.BinaryExpr:
 		switch expression.Op {
 		case token.LAND, token.LOR:
 			return append(
-				slowFailingComparisons(pass, expression.X, positive, measured),
-				slowFailingComparisons(pass, expression.Y, positive, measured)...,
+				slowFailingComparisons(pass, expression.X, positive, clock),
+				slowFailingComparisons(pass, expression.Y, positive, clock)...,
 			)
 		case token.LSS, token.GTR, token.LEQ, token.GEQ, token.EQL, token.NEQ:
-			leftFails := isMeasured(pass, expression.X, measured) && failsWhenLong(expression.Op, true, positive)
-			rightFails := isMeasured(pass, expression.Y, measured) && failsWhenLong(expression.Op, false, positive)
+			leftFails := isMeasured(pass, expression.X, clock) && failsWhenLong(expression.Op, true, positive)
+			rightFails := isMeasured(pass, expression.Y, clock) && failsWhenLong(expression.Op, false, positive)
 			if leftFails || rightFails {
 				return []*ast.BinaryExpr{expression}
 			}
