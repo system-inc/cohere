@@ -35,7 +35,7 @@ const renameVerbName = "rename"
 // intent, so the tool doing the obvious repair is a service rather than a surprise.
 //
 // A rename inverts every one of those. It is imperative rather than reactive, so the tool has no
-// independent judgment that the edit is correct — the user's assertion is the justification. It is
+// independent judgment that the edit is correct: the user's assertion is the justification. It is
 // unbounded, reaching every file that mentions the symbol. And its characteristic failure is silent:
 // `internal/rule/rule.go` records a shipped case where a rename updated a usage, missed its
 // declaration, and produced a file that parsed while failing to compile. A rename that is subtly
@@ -116,7 +116,7 @@ func runRenameVerb(arguments []string) error {
 		}
 		if len(symbols) == 0 {
 			return fmt.Errorf(
-				"no declaration named %q in this project — name a position instead if the symbol is declared elsewhere",
+				"no declaration named %q in this project, so name a position instead if the symbol is declared elsewhere",
 				target,
 			)
 		}

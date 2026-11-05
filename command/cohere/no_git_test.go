@@ -35,7 +35,8 @@ func TestCohereRunsNoGit(test *testing.T) {
 
 	// The two sequences share nothing, each with its own project and home, so they run at once: one after
 	// the other they were the longest test in the package (#nxgt2ca).
-	var withoutGit, withGit []string
+	var withoutGit []string
+	var withGit []string
 	// Not parallel: this group holds its two parallel sequences until both finish, so the comparison below
 	// reads both.
 	test.Run("sequences", func(test *testing.T) {
@@ -110,7 +111,8 @@ func runNoGitSequence(test *testing.T, binary string, path string) []string {
 		// The streams are read apart and joined after, not combined as they arrive. A run the run cache
 		// records tees both through pipes of their own, so the order their lines interleave in is the
 		// scheduler's, and two runs that printed the same things would compare as different.
-		var stdout, stderr bytes.Buffer
+		var stdout bytes.Buffer
+		var stderr bytes.Buffer
 		command.Stdout, command.Stderr = &stdout, &stderr
 		runError := command.Run()
 		output := stdout.String() + "\n--- stderr\n" + stderr.String()

@@ -44,6 +44,9 @@ var neverDescended = map[string]bool{
 	"testdata":     true,
 }
 
+// discoveryParallelism is how many directories discovery reads at once.
+const discoveryParallelism = 16
+
 // discoveredProject is one project discovery found.
 type discoveredProject struct {
 	// Directory is the project's root, relative to the discovery root and slash-separated: "." for the
@@ -162,6 +165,19 @@ func enclosingRepository(start string) string {
 	}
 }
 
+// nestedRepository is what kind of repository, if any, a directory is the root of.
+type nestedRepository int
+
+const (
+	noRepository nestedRepository = iota
+
+	// cloneRepository has a .git directory: an independent repository with its own gate.
+	cloneRepository
+
+	// linkedRepository has a .git file pointing elsewhere: a submodule, or a worktree.
+	linkedRepository
+)
+
 // nearestRepository is the nearest directory at or above start that is a repository's root of either kind,
 // a clone or a submodule, whose ignore files are the ones that govern start, or "" when there is none.
 func nearestRepository(start string) string {
@@ -177,19 +193,6 @@ func nearestRepository(start string) string {
 		directory = parent
 	}
 }
-
-// nestedRepository is what kind of repository, if any, a directory is the root of.
-type nestedRepository int
-
-const (
-	noRepository nestedRepository = iota
-
-	// cloneRepository has a .git directory: an independent repository with its own gate.
-	cloneRepository
-
-	// linkedRepository has a .git file pointing elsewhere: a submodule, or a worktree.
-	linkedRepository
-)
 
 func repositoryKind(directory string) nestedRepository {
 	information, statError := os.Lstat(filepath.Join(directory, ".git"))
@@ -235,13 +238,11 @@ func discoverProjects(root string, ignorePatterns []string) (discovery, error) {
 	// Directories are read in parallel, since the walk is reading directories and little else: on ahra,
 	// 3,138 of them cost 42ms one at a time. Each carries its own ignore scope, which is immutable, and the
 	// lock guards found.
-	var (
-		lock       sync.Mutex
-		group      sync.WaitGroup
-		reading    = make(chan struct{}, discoveryParallelism)
-		firstError error
-		workspaces []string
-	)
+	var lock sync.Mutex
+	var group sync.WaitGroup
+	reading := make(chan struct{}, discoveryParallelism)
+	var firstError error
+	var workspaces []string
 	fail := func(err error) {
 		lock.Lock()
 		defer lock.Unlock()
@@ -453,9 +454,6 @@ func engineRank(engine projectEngine) int {
 		return 3
 	}
 }
-
-// discoveryParallelism is how many directories discovery reads at once.
-const discoveryParallelism = 16
 
 // pathBefore orders slash paths segment by segment, so "." comes first and a directory comes before
 // everything inside it.

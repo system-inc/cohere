@@ -65,6 +65,16 @@ type treeFormatter interface {
 	FormatParsed(fileName string, text string, parsed *ast.SourceFile) (string, error)
 }
 
+// unparseableSkipReason is the skip a file that does not parse gets. A run whose verdict is formatting
+// alone counts it as a file it could not check (see formatOnlyUnchecked), where every other skip is a file
+// the formatter was never asked about.
+const unparseableSkipReason = "the file does not parse, so there is nothing to format"
+
+// formatPassLimit bounds how many times one file is formatted while its text keeps changing. Every
+// non-idempotent input measured on ahra settled on the second pass, so a third that still changes
+// something is a printer defect to report, not a file to keep formatting.
+const formatPassLimit = 3
+
 // formatTransform adapts a format engine to the edit engine's whole-text transform.
 //
 // The edit engine owns what lands on disk, so formatting arrives as a transform rather than writing
@@ -140,16 +150,6 @@ func formatTransform(engine formatEngine) edit.Transform {
 		return "", fmt.Errorf("%s is not idempotent under the formatter: pass %d still changed it", fileName, formatPassLimit)
 	}
 }
-
-// unparseableSkipReason is the skip a file that does not parse gets. A run whose verdict is formatting
-// alone counts it as a file it could not check (see formatOnlyUnchecked), where every other skip is a file
-// the formatter was never asked about.
-const unparseableSkipReason = "the file does not parse, so there is nothing to format"
-
-// formatPassLimit bounds how many times one file is formatted while its text keeps changing. Every
-// non-idempotent input measured on ahra settled on the second pass, so a third that still changes
-// something is a printer defect to report, not a file to keep formatting.
-const formatPassLimit = 3
 
 // isUnparseable reports whether a format error was caused by source that does not parse.
 //

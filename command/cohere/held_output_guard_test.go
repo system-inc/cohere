@@ -165,7 +165,8 @@ type lsofFile struct {
 // file, and t, d and n describe it.
 func lsofFiles(output []byte) []lsofFile {
 	var files []lsofFile
-	var pid, command string
+	var pid string
+	var command string
 	for _, line := range bytes.Split(output, []byte("\n")) {
 		if len(line) == 0 {
 			continue

@@ -28,11 +28,17 @@ import (
 	"github.com/system-inc/cohere/internal/types/sourcename"
 )
 
+// slowFixNotice is how long one file may spend in the fix phase before the run names it. A healthy file takes
+// milliseconds and the 2.8 MB bundle that found this takes about two seconds now; a file past this is a runaway
+// the run would otherwise sit in with nothing on screen, as angular/angular's deploy-docs-site bundle did for
+// 26 minutes and 19 GB (#xn1k1gz).
+const slowFixNotice = 30 * time.Second
+
 // applyProposedFixes rewrites every file whose rules proposed a repair, and reports what it did.
 //
 // Each file converges on its own rather than the tree converging as a whole. A fix is local to the
 // file it edits, so a per-file fixpoint reaches the same result as a whole-tree loop while re-linting
-// only the files that actually changed — and it means one pathological file cannot force every other
+// only the files that actually changed, and it means one pathological file cannot force every other
 // file through another pass.
 //
 // Only files with at least one proposal are considered. A file nobody proposed anything for is never
@@ -328,7 +334,7 @@ func applyProposedFixes(
 			// reader somewhere different: not-converged means the pass budget ran out with work still
 			// landing, which points at two rules arguing, while a failure means the file never entered
 			// the loop at all. A zero-value FileResult has Converged false, so leaving it alone would
-			// file this under the wrong heading — a real number reported as the wrong finding.
+			// file this under the wrong heading: a real number reported as the wrong finding.
 			fileResult.FileName = fileName
 			fileResult.Failed = true
 			fileResult.Changed = false
@@ -342,12 +348,6 @@ func applyProposedFixes(
 	summary.Checked = !write
 	return summary, result, lineEndings, nil
 }
-
-// slowFixNotice is how long one file may spend in the fix phase before the run names it. A healthy file takes
-// milliseconds and the 2.8 MB bundle that found this takes about two seconds now; a file past this is a runaway
-// the run would otherwise sit in with nothing on screen, as angular/angular's deploy-docs-site bundle did for
-// 26 minutes and 19 GB (#xn1k1gz).
-const slowFixNotice = 30 * time.Second
 
 // watchedFile runs one file's fix and format, and names the file on out if it is still running after after.
 // The run goes on: the notice says which file to report, or to leave out, while it is still happening rather
@@ -526,7 +526,7 @@ func reportInNestedRepositories(out io.Writer, fixesByRepository map[string]int)
 // than a member of the program, and building a whole new program per pass would cost seconds. A
 // type-aware rule that proposes a fix will therefore contribute on the first pass, where the real
 // checker was present, and not on later ones. That is a real limitation and it is stated rather than
-// hidden — the alternative is a fix run that rebuilds a 9,530-file program once per pass per file,
+// hidden. The alternative is a fix run that rebuilds a 9,530-file program once per pass per file,
 // which is precisely the cost this tool exists to remove.
 func proposalsForText(
 	fileName string,

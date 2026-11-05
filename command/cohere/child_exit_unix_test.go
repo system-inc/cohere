@@ -16,7 +16,9 @@ type errorRecorder struct {
 	messages []string
 }
 
-func (recorder *errorRecorder) Helper() {}
+func (recorder *errorRecorder) Helper() {
+	// The recorder reports no file and line of its own, so there is no frame to mark as a helper.
+}
 
 func (recorder *errorRecorder) Errorf(format string, arguments ...any) {
 	recorder.messages = append(recorder.messages, fmt.Sprintf(format, arguments...))

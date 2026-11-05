@@ -35,7 +35,7 @@ func printExplanation(out io.Writer, explanation *program.Explanation) {
 
 	listened, declinedBySelf, declinedByConfig := partitionAccounts(explanation.Accounts)
 
-	fmt.Fprintf(out, "  %d rules listened, %d declined the file, %d were off by config — %s total\n",
+	fmt.Fprintf(out, "  %d rules listened, %d declined the file, %d were off by config, %s total\n",
 		len(listened), len(declinedBySelf), len(declinedByConfig), formatMilliseconds(explanation.TotalDuration))
 
 	for _, account := range listened {

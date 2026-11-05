@@ -154,7 +154,7 @@ func printTimingNotes(out io.Writer, sorted []program.RuleTiming) {
 			perNode = fmt.Sprintf(", %.0fns per node", float64(timing.TotalCPU().Nanoseconds())/float64(timing.NodesOffered))
 		}
 		fmt.Fprintf(out,
-			"  note: %s saw the most nodes of any rule (%d%s) — compare a rule's cost against this one, not against its own node count\n",
+			"  note: %s saw the most nodes of any rule (%d%s), so compare a rule's cost against this one, not against its own node count\n",
 			timing.Name, timing.NodesOffered, perNode)
 	}
 
@@ -192,7 +192,7 @@ func printTimingNotes(out io.Writer, sorted []program.RuleTiming) {
 		}
 
 		fmt.Fprintf(out,
-			"  note: %s and %s were each offered %d nodes but differ %.0fx in cost (%s against %s) — if they share work, this table may be billing it to whichever ran first\n",
+			"  note: %s and %s were each offered %d nodes but differ %.0fx in cost (%s against %s), and if they share work, this table may be billing it to whichever ran first\n",
 			extremes.dearestName, extremes.cheapestName, offered,
 			float64(extremes.dearestCost)/float64(extremes.cheapestCost),
 			formatMilliseconds(extremes.dearestCost), formatMilliseconds(extremes.cheapestCost))

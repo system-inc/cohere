@@ -110,7 +110,8 @@ func TestPrintConfigExplainsAFile(test *testing.T) {
 	}
 	wantJSON := func(section string, want string) {
 		test.Helper()
-		var gotValue, wantValue any
+		var gotValue any
+		var wantValue any
 		if decodeError := json.Unmarshal(doc[section], &gotValue); decodeError != nil {
 			test.Errorf("%s: %v", section, decodeError)
 			return

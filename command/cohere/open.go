@@ -80,7 +80,7 @@ func finishOpen() {
 	if path := os.Getenv(openReportVariable); path != "" {
 		contents, err := json.Marshal(report)
 		if err == nil {
-			err = os.WriteFile(path, contents, 0600)
+			err = os.WriteFile(path, contents, 0o600)
 		}
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "cohere: %s\n", sentence.FromError(fmt.Errorf("returning files to open: %w", err)))

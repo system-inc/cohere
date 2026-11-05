@@ -198,7 +198,8 @@ func querySwiftCoverage(root string, projects []discoveredProject) map[string]co
 func queryCoveredPackages(binaryPath string, directory string) (coveredPackagesRecord, error) {
 	command := exec.Command(binaryPath, "--contract", fmt.Sprint(engineContractVersion), "--root", directory, "--covered-packages")
 	command.Dir = directory
-	var standardOutput, standardError bytes.Buffer
+	var standardOutput bytes.Buffer
+	var standardError bytes.Buffer
 	command.Stdout = &standardOutput
 	command.Stderr = &standardError
 	runError := command.Run()

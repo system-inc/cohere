@@ -64,7 +64,7 @@ func TestFooterGolden(test *testing.T) {
 	}{
 		{
 			name:    "cold: everything checked fresh",
-			summary: func(summary *runSummary) {},
+			summary: func(summary *runSummary) { /* The clean summary is this case as it stands. */ },
 			want:    "✓ 💎 2.4s (480 rules • 3,926 checked)",
 		},
 		{
@@ -116,7 +116,7 @@ func TestFooterGolden(test *testing.T) {
 		},
 		{
 			name:    "cold, with --phases",
-			summary: func(summary *runSummary) {},
+			summary: func(summary *runSummary) { /* The clean summary is this case as it stands. */ },
 			options: footerOptions{Phases: true},
 			want:    "✓ 💎 2.4s (🕸 0.9s • 🪄 0.4s • 💅 0.3s • 🔷 0.6s • 👑 1.1s • 480 rules • 3,926 checked)",
 		},
