@@ -11,7 +11,7 @@ const sortVarsFile = "/repository/source/SortVars.ts"
 
 // sortVarsOf builds the settings a config carrying this option would decode to.
 //
-// The argument is the option as JSON TEXT, exactly the bytes the config layer hands the decoder.
+// The argument is the option as JSON text, exactly the bytes the config layer hands the decoder.
 func sortVarsOf(optionJson string) any {
 	settings, decodeSortVariablesOptionsError := DecodeSortVarsOptions([]byte(optionJson))
 	if decodeSortVariablesOptionsError != nil {
@@ -28,12 +28,12 @@ func sortVarsOf(optionJson string) any {
 func pointerTo(value string) *string { return &value }
 
 // The corpus is ESLint's own, taken from
-// /tmp/lint-sources-fresh/eslint/tests/lib/rules/sort-vars.js by RUNNING that file with RuleTester
+// /tmp/lint-sources-fresh/eslint/tests/lib/rules/sort-vars.js by running that file with RuleTester
 // intercepted. 61 cases from one RuleTester.run call.
 //
-// Every expectation is what the INSTALLED ESLint 10.8.1 rule answered, driven through the Linter
+// Every expectation is what the installed ESLint 10.8.1 rule answered, driven through the Linter
 // interface under `sourceType: module` with the typescript-eslint parser. The oracle reproduced all
-// 61 declared verdicts AND all 25 declared outputs, which is the control saying the fixer half of
+// 61 declared verdicts and all 25 declared outputs, which is the control saying the fixer half of
 // the harness measures the fixer rather than nothing. Zero cases change verdict between upstream's
 // configuration and cohere's.
 //
@@ -41,7 +41,7 @@ func pointerTo(value string) *string { return &value }
 //
 // Section 3b of the standard is blunt about why: a fixer that reports in the right place and
 // repairs wrongly is indistinguishable, at the message-id layer, from a correct one. So a corpus
-// `output` is not optional coverage, it is the ONLY coverage the fixer has.
+// `output` is not optional coverage, it is the only coverage the fixer has.
 //
 // Upstream's corpus states three different things and they need three different assertions:
 //
@@ -50,7 +50,7 @@ func pointerTo(value string) *string { return &value }
 //	                      assertion is that this rule proposes no fix either
 //	output: "<source>"    ExpectFixedSource compares the whole rewritten file
 //
-// Collapsing the middle case into "the output equals the input" does NOT work and the harness is
+// Collapsing the middle case into "the output equals the input" does not work and the harness is
 // right to refuse it: `ExpectFixedSource` fatals when a rule proposed no fixes, because passing
 // there would make it agree with any expectation at all. A decline has to be asserted as an
 // absence of fixes, not as an unchanged string.
@@ -181,12 +181,12 @@ func TestSortVarsStaysSilent(test *testing.T) {
 //
 // The fixer declines the whole block when any identifier declarator has a non-literal initializer,
 // because reordering `var b = foo(), a = bar();` would change evaluation order. "Literal" is
-// upstream's ESTree node type, which is ONE type covering a string, a number, a boolean, `null` and
+// upstream's ESTree node type, which is one type covering a string, a number, a boolean, `null` and
 // a regular expression. Our parser gives each its own kind and models `true`/`false`/`null` as
-// KEYWORDS, so the set has to be written out by hand, and a hand-written set is a place to be wrong
+// keywords, so the set has to be written out by hand, and a hand-written set is a place to be wrong
 // in either direction.
 //
-// The corpus does not settle it: a mutation ADDING a template literal to the set survived all 61
+// The corpus does not settle it: a mutation adding a template literal to the set survived all 61
 // imported fixtures, because no corpus case pairs a template with an out-of-order name. Every row
 // below is what the installed ESLint 10.8.1 rule produced, read from whether it attached a fix:
 //
@@ -240,17 +240,17 @@ func TestSortVarsLiteralSetDecidesFixability(test *testing.T) {
 }
 
 // TestSortVarsRepairKeepsTheTextBetweenDeclarators covers the other half of the fixer that the
-// corpus under-tests: WHERE the moved text starts and what sits between the moved pieces.
+// corpus under-tests: where the moved text starts and what sits between the moved pieces.
 //
 // Upstream rebuilds the span from the first identifier declarator to the last and, for each sorted
-// declarator, appends the ORIGINAL separator that followed the declarator in that position. Two
+// declarator, appends the original separator that followed the declarator in that position. Two
 // ways to get that wrong produce valid-looking source:
 //
 //	joining with ", "        reflows the block and DELETES any comment inside it
 //	starting at Pos()        drags the leading whitespace into the moved text, so it is
 //	                         duplicated once per declarator
 //
-// `Pos()` is the trap specific to this tree: it starts at the previous token's END, so it includes
+// `Pos()` is the trap specific to this tree: it starts at the previous token's end, so it includes
 // leading trivia, where upstream's `range[0]` does not. Probed directly, a declarator's raw span is
 // `" a"` and its token span is `"a"`.
 //
@@ -262,7 +262,7 @@ func TestSortVarsRepairKeepsTheTextBetweenDeclarators(test *testing.T) {
 		source string
 		fixed  string
 	}{
-		// A comment between declarators has to survive in its POSITION, not travel with a name.
+		// A comment between declarators has to survive in its position, not travel with a name.
 		{
 			source: "var b /* first */, a /* second */;",
 			fixed:  "var a /* first */, b /* second */;",

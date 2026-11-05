@@ -20,7 +20,7 @@ type defaultCaseCase struct {
 	// source is upstream's `code`, byte for byte.
 	source string
 
-	// options is the RAW JSON of upstream's options object, routed through the rule's own
+	// options is the raw JSON of upstream's options object, routed through the rule's own
 	// exported decoder rather than built as a struct, so the decoder's defaults and its
 	// empty-input path are under test.
 	options string
@@ -230,7 +230,7 @@ func TestDefaultCaseStaysSilent(test *testing.T) {
 
 // TestDefaultCaseCommentPatternIsAnchored covers a discrimination upstream's corpus cannot see.
 //
-// The default pattern is `/^no default$/iu`, anchored at both ends. Removing the anchors SURVIVES
+// The default pattern is `/^no default$/iu`, anchored at both ends. Removing the anchors survives
 // the whole 23-case corpus: every case that exercises the default pattern writes the comment
 // exactly, and the two cases carrying a near-miss comment supply their own `commentPattern` option,
 // under which both spellings match either way.

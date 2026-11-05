@@ -150,7 +150,7 @@ func TestPreferPromiseRejectErrorsAllowEmptyReject(test *testing.T) {
 		rule_testing.ExpectFindings(test, result, "rejectAnError")
 	}
 
-	// The option exempts only the EMPTY call. An explicit `undefined` still reports under it, which
+	// The option exempts only the empty call. An explicit `undefined` still reports under it, which
 	// is upstream's own case and the reason the argument-count test comes before the option test.
 	result := rule_testing.RunTypedWithOptions(test, core.PreferPromiseRejectErrors, "input.ts",
 		"Promise.reject(undefined)", allowed)
@@ -181,7 +181,7 @@ func TestPreferPromiseRejectErrorsDefaultsWithoutADecoder(test *testing.T) {
 //	"/* global Promise:off */ Promise.reject('x')"
 //	{ code: "Promise.reject('x')", languageOptions: { globals: { Promise: "off" } } }
 //
-// cohere has no globals surface, so neither input can be expressed and both would REPORT here. That
+// cohere has no globals surface, so neither input can be expressed and both would report here. That
 // is a fact about the harness rather than about the rule: what those cases assert is that a
 // non-global Promise is exempt, and the five source-level shadowing cases in the silent list assert
 // exactly the same judgment through a mechanism this tree does have.
@@ -232,7 +232,7 @@ func TestPreferPromiseRejectErrorsSpanAndMessage(test *testing.T) {
 		}
 		diagnostic := result.Diagnostics[0]
 
-		// Sliced from the source the HARNESS wrote, not from the literal above: RunTyped trims the
+		// Sliced from the source the harness wrote, not from the literal above: RunTyped trims the
 		// fixture before writing it, so slicing the literal would be off by one on any case with
 		// leading whitespace.
 		written := strings.TrimSpace(row.source) + "\n"
@@ -323,7 +323,7 @@ func TestPreferPromiseRejectErrorsShapesUpstreamCannotWrite(test *testing.T) {
 	}
 }
 
-// The receiver's NAME is load bearing, and upstream's corpus structurally cannot show it.
+// The receiver's name is load bearing, and upstream's corpus structurally cannot show it.
 //
 // Both arms test the receiver twice: it must be spelled `Promise`, and it must resolve to a
 // declaration file. Removing the name test survived the whole imported corpus, because upstream's
@@ -354,10 +354,10 @@ func TestPreferPromiseRejectErrorsOtherAmbientGlobalsAreNotPromise(test *testing
 	rule_testing.ExpectFindings(test, control, "rejectAnError")
 }
 
-// The executor kind test is CRASH PROTECTION, not only fidelity.
+// The executor kind test is crash protection, not only fidelity.
 //
 // `Parameters()` nil-dereferences on a node with no parameter list, so a `new Promise(executor)`
-// with a non-function argument takes the walk down. The walk recovers per FILE rather than per
+// with a non-function argument takes the walk down. The walk recovers per file rather than per
 // rule, so one such expression would cost every rule in the package its verdict on that file, and
 // `new Promise(executor)` is ordinary code.
 //
@@ -399,11 +399,11 @@ func TestPreferPromiseRejectErrorsOperatorArmsUpstreamDoesNotWrite(test *testing
 	test.Parallel()
 
 	reports := []string{
-		// A sequence takes its LAST expression's value, so a trailing literal reports even when the
+		// A sequence takes its last expression's value, so a trailing literal reports even when the
 		// leading operand is opaque.
 		"Promise.reject((foo, 5));",
 		"Promise.reject((5, 6));",
-		// Nullish coalescing can yield either side, so it reports only when NEITHER could be an
+		// Nullish coalescing can yield either side, so it reports only when neither could be an
 		// Error.
 		"Promise.reject(5 ?? 6);",
 		// A conditional can yield either branch, same reasoning.
@@ -427,7 +427,7 @@ func TestPreferPromiseRejectErrorsOperatorArmsUpstreamDoesNotWrite(test *testing
 	}
 }
 
-// TypeScript's type-only wrappers are transparent, so the value INSIDE decides.
+// TypeScript's type-only wrappers are transparent, so the value inside decides.
 //
 // This is fidelity rather than an improvement. ESTree has no node for `as`, `satisfies`, a
 // bracket assertion or `!`, so upstream's switch never mentions them and never sees one. The
@@ -437,7 +437,7 @@ func TestPreferPromiseRejectErrorsOperatorArmsUpstreamDoesNotWrite(test *testing
 //
 // Found by the dry run rather than by the corpus, which structurally cannot contain any of these.
 // Before the unwrap covered them, `reject(error as Error)` in modules/kingdom/pentair/PentairApi.ts
-// was reported: source asserting the value IS an Error, flagged for not being one.
+// was reported: source asserting the value is an Error, flagged for not being one.
 func TestPreferPromiseRejectErrorsSeesThroughTypeOnlyWrappers(test *testing.T) {
 	test.Parallel()
 

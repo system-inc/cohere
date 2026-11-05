@@ -42,7 +42,7 @@ var messageNoUselessConstructorRemove = rule.Message{
 // of the same identifier. Anything else, including a reordering or a renamed argument, means the
 // constructor does something.
 //
-// Every parameter must also be SIMPLE, an identifier or a rest. A default or a destructuring pattern
+// Every parameter must also be simple, an identifier or a rest. A default or a destructuring pattern
 // can run arbitrary code while binding, so `constructor(x = f()) { super(x); }` is not useless even
 // though it forwards.
 //
@@ -78,12 +78,12 @@ var messageNoUselessConstructorRemove = rule.Message{
 // Sixty-five inputs, no divergence. This rule was then run against that same extension corpus and
 // reproduced it exactly, 32 of 32 passing and 9 of 9 failing.
 //
-// So porting the extension would register a second NAME rather than a second check, and the name is
+// So porting the extension would register a second name rather than a second check, and the name is
 // not free: a rule package may not import another rule package, so a wrapper would need this file's
 // body lifted into `internal/utilities` the way `no-dupe-class-members` was at `27c5ff0`. That is
 // 427 lines and sixteen helpers moved for no behavioural change.
 //
-// Nothing asks for the name either. `TestParityAgainstInventory` walks REGISTERED rules and asks
+// Nothing asks for the name either. `TestParityAgainstInventory` walks registered rules and asks
 // whether each appeared in the captured rule inventory, not the reverse, and it carried no entry for
 // this rule under either spelling, so a missing `@typescript-eslint/` registration costs nothing in
 // the differential. Checked with a control against a rule that does have an entry.
@@ -227,7 +227,7 @@ func uselessConstructorSiblings(node *ast.Node) (*ast.Node, *ast.Node) {
 //
 // Three conditions, and the middle one was measured rather than assumed. It must be a property
 // declaration, because a method's body ends in a brace and nothing continues that. It must have an
-// INITIALIZER, because a bare `foo` is only a name and there is no expression to continue; upstream
+// initializer, because a bare `foo` is only a name and there is no expression to continue; upstream
 // leaves no semicolon for `class A { foo <constructor> [0]() {} }` and a draft testing only for a
 // property inserted one. And it must not already end in a semicolon, which terminates it.
 func uselessConstructorCanBeContinued(member *ast.Node, ruleContext rule.Context) bool {
@@ -257,7 +257,7 @@ func uselessConstructorCanContinueExpression(ruleContext rule.Context, member *a
 	switch {
 	case strings.HasPrefix(text, "["), strings.HasPrefix(text, "*"):
 		return true
-	// `instanceof` is tested BEFORE `in`, because `in` is its prefix: testing `in` first answers
+	// `instanceof` is tested before `in`, because `in` is its prefix: testing `in` first answers
 	// false for `instanceof` on the whole-word check and never reaches the longer arm. A draft with
 	// the two the other way round failed upstream's own `instanceof` case.
 	case strings.HasPrefix(text, "instanceof"):
@@ -435,7 +435,7 @@ func uselessConstructorIsPassingThrough(parameters []*ast.Node, arguments []*ast
 // uselessConstructorIsValidPair reports whether one parameter forwards to one argument unchanged.
 //
 // Two accepted shapes: the same identifier on both sides, or a rest parameter matched by a spread of
-// the same identifier. A rest forwarded as a bare identifier is NOT a pass-through, because
+// the same identifier. A rest forwarded as a bare identifier is not a pass-through, because
 // `super(args)` passes the array itself where `super(...args)` passes its elements.
 func uselessConstructorIsValidPair(parameter *ast.Node, argument *ast.Node) bool {
 	declaration := parameter.AsParameterDeclaration()

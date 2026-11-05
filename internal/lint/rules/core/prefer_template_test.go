@@ -20,7 +20,7 @@ type preferTemplateCase struct {
 	// source is upstream's `code`, byte for byte.
 	source string
 
-	// options is the RAW JSON of upstream's options object, routed through the rule's own
+	// options is the raw JSON of upstream's options object, routed through the rule's own
 	// exported decoder rather than built as a struct, so the decoder's defaults and its
 	// empty-input path are under test.
 	options string
@@ -594,7 +594,7 @@ func TestPreferTemplateStaysSilent(test *testing.T) {
 
 // preferTemplateFixCase is one of upstream's `output` fixtures.
 //
-// `output` is the SPECIFICATION for the repair. This rule's repair is string surgery rather
+// `output` is the specification for the repair. This rule's repair is string surgery rather
 // than a token swap -- escaping `${` and backticks by backslash parity, unescaping the
 // original quote, carrying comments into curlies -- so a fixer that reports in the right
 // place and writes the wrong bytes is indistinguishable at the message-id layer from a
@@ -978,7 +978,7 @@ var preferTemplateRepairCases = []preferTemplateFixCase{
 	},
 }
 
-// preferTemplateDeclineCases are the rows upstream reports on and deliberately does NOT repair.
+// preferTemplateDeclineCases are the rows upstream reports on and deliberately does not repair.
 //
 // All five carry an octal or non-octal decimal escape. Those mean something different inside a
 // template literal than inside a quoted string, so converting one changes what the program

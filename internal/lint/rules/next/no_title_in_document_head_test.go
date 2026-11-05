@@ -63,7 +63,7 @@ func TestNoTitleInDocumentHeadReports(test *testing.T) {
 			want:   2,
 		},
 		{
-			// Only the FIRST named specifier of a declaration is watched, so two declarations each
+			// Only the first named specifier of a declaration is watched, so two declarations each
 			// contribute their own. Measured reporting.
 			name:   "a second declaration brings its own first specifier",
 			source: "import { Html } from \"next/document\";\nimport { Head } from \"next/document\";\nexport const C = () => <Head><title>x</title></Head>;",
@@ -72,7 +72,7 @@ func TestNoTitleInDocumentHeadReports(test *testing.T) {
 		{
 			// The first named specifier is the one watched even when a default precedes it in the
 			// same declaration, because the default is a different specifier arm and is skipped
-			// rather than counted. Measured reporting on `<Html>`, the first NAMED name.
+			// rather than counted. Measured reporting on `<Html>`, the first named name.
 			name:   "a default before the first named specifier does not consume the slot",
 			source: "import Document, { Html, Head } from \"next/document\";\nexport const C = () => <Html><title>x</title></Html>;",
 			want:   1,
@@ -119,7 +119,7 @@ func TestNoTitleInDocumentHeadIsSilent(test *testing.T) {
 			source: upstreamPassEmptyHead,
 		},
 		{
-			// The half of pass 1 that is about the specifier arm. A default import from the RIGHT
+			// The half of pass 1 that is about the specifier arm. A default import from the right
 			// module is still silent, because the rule matches only the named arm. This is the one
 			// fixture that separates the two reasons pass 1 is clean, and a port accepting the
 			// default arm passes all three upstream cases without it. Measured silent.
@@ -144,7 +144,7 @@ func TestNoTitleInDocumentHeadIsSilent(test *testing.T) {
 			source: "import { A, Head, C } from \"next/document\";\nexport const C2 = () => <Head><title>x</title></Head>;",
 		},
 		{
-			// Only DIRECT children are scanned. A title one level down is silent. Measured silent.
+			// Only direct children are scanned. A title one level down is silent. Measured silent.
 			name:   "a title nested below a direct child",
 			source: "import { Head } from \"next/document\";\nexport const C = () => <Head><div><title>x</title></div></Head>;",
 		},
@@ -161,7 +161,7 @@ func TestNoTitleInDocumentHeadIsSilent(test *testing.T) {
 			source: "import * as Doc from \"next/document\";\nexport const C = () => <Doc.Head><title>x</title></Doc.Head>;",
 		},
 		{
-			// The binding used as the OBJECT of a member-expression tag is not the tag itself, so
+			// The binding used as the object of a member-expression tag is not the tag itself, so
 			// the reference's parent is not a JSX opening element. Measured silent.
 			name:   "the binding as the object of a member expression tag",
 			source: "import { Head } from \"next/document\";\nexport const C = () => <Head.Sub><title>x</title></Head.Sub>;",
