@@ -1,0 +1,13 @@
+{
+  "rules": {
+    "Go": "cohere-go/testing-no-timing-assertion"
+  },
+  "messages": {
+    "timingAssertion": {
+      "text": "This test fails when its work takes longer than a deadline, so its verdict depends on who else is running: it passes on a quiet machine and fails under a loaded pool, where other tests and other agents share the cores. Assert on what the code did rather than how long it took, or wait on a signal instead of a clock. If the duration is what is under test and its margin survives a busy machine, say why in a `// Timing assertion: <reason>` comment directly above the `if`, so the next reader knows the risk was weighed."
+    },
+    "timingAssertionWithoutReason": {
+      "text": "This timing assertion is marked and gives no reason. Say after `Timing assertion:` why the deadline holds on a busy machine, such as the margin it leaves or the work it bounds, because a marker with nothing after it tells the next reader nothing and excuses nothing."
+    }
+  }
+}
