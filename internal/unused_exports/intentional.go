@@ -13,7 +13,7 @@ import (
 //
 // Some exports are unused on purpose: a public API surface, something held for an external consumer,
 // work parked deliberately. Without a way to record that decision, the report is re-derived from
-// scratch on every reading — the same twenty lines, the same four already-judged, and the reader has
+// scratch on every reading: the same twenty lines, the same four already-judged, and the reader has
 // to remember which four. A report that cannot be answered gets read twice and abandoned, so the
 // marker is not a convenience, it is what makes a second reading cheaper than the first.
 //
@@ -36,7 +36,7 @@ type intentionalReason struct {
 // declaration.
 //
 // It reads raw source text rather than the comment scanner because the range handed in is already
-// the declaration's leading trivia — the compiler puts every preceding comment there — and reaching
+// the declaration's leading trivia (the compiler puts every preceding comment there), and reaching
 // for a second scanner would answer the same question a second way.
 func findIntentionalMarker(text string) intentionalReason {
 	// Only the comment lines are searched. The declaration's own source can contain the marker as
