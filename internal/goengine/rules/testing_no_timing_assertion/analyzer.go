@@ -311,13 +311,14 @@ var negatedComparison = map[token.Token]token.Token{
 // run, and `elapsed < delay`, a check that the work did not return early, fails only a fast one, which load cannot
 // cause. An == fails only the one exact duration, which a slower run moves away from.
 func failsWhenLong(operator token.Token, measuredOnLeft bool, positive bool) bool {
+	effective := operator
 	if !measuredOnLeft {
-		operator = mirroredComparison[operator]
+		effective = mirroredComparison[effective]
 	}
 	if !positive {
-		operator = negatedComparison[operator]
+		effective = negatedComparison[effective]
 	}
-	return operator == token.GTR || operator == token.GEQ || operator == token.NEQ
+	return effective == token.GTR || effective == token.GEQ || effective == token.NEQ
 }
 
 // failsTestDirectly is whether body calls a failure method on a *testing.T, in it or in a block nested in it. A

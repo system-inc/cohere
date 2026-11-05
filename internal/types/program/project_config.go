@@ -27,13 +27,13 @@ type ProjectConfig struct {
 // ReadProjectConfig reads a tsconfig the way Build does, and fails where Build would refuse it, so a
 // config discovery cannot read is one the project's own run reports.
 func ReadProjectConfig(configurationFileName string) (ProjectConfig, error) {
-	configurationFileName = tspath.NormalizePath(configurationFileName)
+	normalizedFileName := tspath.NormalizePath(configurationFileName)
 	fileSystem := cachedvfs.From(bundled.WrapFS(osvfs.FS()))
-	if !fileSystem.FileExists(tspath.RootedFilePath(configurationFileName)) {
-		return ProjectConfig{}, fmt.Errorf("no tsconfig at %s", configurationFileName)
+	if !fileSystem.FileExists(tspath.RootedFilePath(normalizedFileName)) {
+		return ProjectConfig{}, fmt.Errorf("no tsconfig at %s", normalizedFileName)
 	}
 	configuration, configurationErrors := tsoptions.GetParsedCommandLineOfConfigFile(
-		tspath.RootedFilePath(configurationFileName),
+		tspath.RootedFilePath(normalizedFileName),
 		&core.CompilerOptions{},
 		nil,
 		fileSystem,
@@ -42,16 +42,16 @@ func ReadProjectConfig(configurationFileName string) (ProjectConfig, error) {
 	if len(configurationErrors) > 0 {
 		return ProjectConfig{}, fmt.Errorf(
 			"reading %s: %w",
-			configurationFileName,
+			normalizedFileName,
 			joinDiagnostics(configurationErrors),
 		)
 	}
 	if configuration == nil {
-		return ProjectConfig{}, fmt.Errorf("reading %s: the config parsed to nothing", configurationFileName)
+		return ProjectConfig{}, fmt.Errorf("reading %s: the config parsed to nothing", normalizedFileName)
 	}
 	if diagnostics := configuration.GetConfigFileParsingDiagnostics(); len(diagnostics) > 0 &&
 		!onlyOptionValueDiagnostics(diagnostics) {
-		return ProjectConfig{}, fmt.Errorf("reading %s: %w", configurationFileName, joinDiagnostics(diagnostics))
+		return ProjectConfig{}, fmt.Errorf("reading %s: %w", normalizedFileName, joinDiagnostics(diagnostics))
 	}
 	read := ProjectConfig{}
 	for _, fileName := range configuration.FileNames() {

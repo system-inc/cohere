@@ -61,10 +61,11 @@ func (tree *signatureTree) state(previous map[string]SignatureEntry) signatureSt
 	graph := tree.graph()
 	// A first state has its signatures computed, as a project with build info does: these tests are about
 	// what a computed signature holds. A first run with nothing recorded is its own test below.
-	if previous == nil {
-		previous = RecordedRealSignatures(graph)
+	baseline := previous
+	if baseline == nil {
+		baseline = RecordedRealSignatures(graph)
 	}
-	signatures, computed := graph.Signatures(context.Background(), previous)
+	signatures, computed := graph.Signatures(context.Background(), baseline)
 	state := signatureState{
 		signatures:  signatures,
 		computed:    computed,

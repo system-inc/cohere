@@ -109,11 +109,11 @@ func run(pass *analysis.Pass) (any, error) {
 // through the pointer the variable holds. Anything longer, holder.result.Result, is a member chain whose outer word
 // is a field rather than a placeholder, and gives nil.
 func baseName(expression ast.Expr) *ast.Ident {
-	expression = ast.Unparen(expression)
-	if star, isStar := expression.(*ast.StarExpr); isStar {
-		expression = ast.Unparen(star.X)
+	unwrapped := ast.Unparen(expression)
+	if star, isStar := unwrapped.(*ast.StarExpr); isStar {
+		unwrapped = ast.Unparen(star.X)
 	}
-	identifier, _ := expression.(*ast.Ident)
+	identifier, _ := unwrapped.(*ast.Ident)
 	return identifier
 }
 

@@ -110,7 +110,7 @@ func decodeLikeDisk(s string) string {
 		}
 	}
 	if len(s) >= 3 && s[0] == 0xEF && s[1] == 0xBB && s[2] == 0xBF {
-		s = s[3:]
+		return s[3:]
 	}
 	return s
 }
