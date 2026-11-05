@@ -249,6 +249,11 @@ type swiftRun struct {
 	unusedCoverage       int
 }
 
+// newSwiftRun is a renderer for one run of the Swift engine.
+//
+// The run's `--no-cache` is the front door's flag, passed to the engine through its arguments, so the report reads
+// it here: the summary's `cache.off` and the account's note say it, as a TypeScript run's do. Without it every
+// Swift summary said the cache was on under `--no-cache`, a report that lies about what ran.
 func newSwiftRun(out io.Writer, mode swiftMode, rootNote string, processStart time.Time) *swiftRun {
 	return &swiftRun{
 		out:  out,
@@ -258,6 +263,9 @@ func newSwiftRun(out io.Writer, mode swiftMode, rootNote string, processStart ti
 			rootNote:              rootNote,
 			graphLabel:            "package",
 			graphNotBuiltSentence: "no package was described and no phase ran",
+			cacheOff:              cacheOff,
+			cacheOffDetail: "nothing was read from or written to this package's cache, since the engine described " +
+				"and built it in a scratch of its own and removed it",
 		},
 	}
 }

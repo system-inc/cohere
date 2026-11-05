@@ -144,6 +144,10 @@ type pipelineReport struct {
 	// cacheOff is `--no-cache`, said on every such run so a cold number cannot pass for a warm one.
 	cacheOff bool
 
+	// cacheOffDetail is what `--no-cache` kept this run from, said after it; empty is the TypeScript pipeline's
+	// cache table and incremental build info. An engine run says what its engine keeps instead.
+	cacheOffDetail string
+
 	// contentKeyedShapes is how many files' shapes this run keyed on their content, for want of a recorded
 	// declaration signature. See program.Graph.Signatures.
 	contentKeyedShapes int
@@ -398,7 +402,11 @@ func (r *pipelineReport) Write(out io.Writer) {
 		fmt.Fprintf(out, "  %s\n", r.rootNote)
 	}
 	if r.cacheOff {
-		fmt.Fprintln(out, "  cache: off, by --no-cache: nothing was read from or written to this project's cache table or its incremental build info")
+		detail := r.cacheOffDetail
+		if detail == "" {
+			detail = "nothing was read from or written to this project's cache table or its incremental build info"
+		}
+		fmt.Fprintf(out, "  cache: off, by --no-cache: %s\n", detail)
 	}
 	// Said, because keying a shape on content is a choice with a cost: an edit to one of these files re-runs
 	// its importers' shape-keyed rules. The alternative, a declaration emit up front, has no ceiling (#5txm9gg).
