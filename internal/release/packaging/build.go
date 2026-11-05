@@ -32,7 +32,7 @@ var StripFlags = []string{"-s", "-w"}
 //
 // A size without its build is not a measurement. The same commit measures 43.1 MB stripped and
 // 61.9 MB from a plain `go build`, an 18 MB spread, so two people quoting sizes from different
-// builds can both be right and still disagree — which is exactly what happened here, and cost two
+// builds can both be right and still disagree, which is exactly what happened here, and cost two
 // messages to reconcile. The same trap has a sharper form for anyone attributing those bytes:
 // `go tool nm` reports every symbol as size zero on a stripped binary, so an attribution run
 // against a release build sums to zero rather than failing.
@@ -346,8 +346,8 @@ func buildPlatformPackage(options Options, target Target, pin compilerPin, goToo
 //
 // Nothing is compiled here, which is the point. The dispatcher is one package every machine
 // installs regardless of platform, so it cannot be a Go binary without becoming a seventh platform
-// package and defeating the single-install premise. It is a Node script instead — Node is present
-// by construction in an npm install — and it resolves the platform package through the package
+// package and defeating the single-install premise. It is a Node script instead (Node is present
+// by construction in an npm install), and it resolves the platform package through the package
 // manager rather than by guessing at directory layouts.
 //
 // It takes no compiler pin and no toolchain for that reason: there is nothing here to stamp them
@@ -610,7 +610,7 @@ func requireExecutableFormat(path string, target Target) error {
 	if !bytes.Equal(header, magic) {
 		// The observation and the likely cause are stated as separate claims, because they are: the
 		// bytes are measured and the cause is a guess. A message that asserts one explanation sends
-		// a reader hunting that bug, and several things produce these bytes — another target's
+		// a reader hunting that bug, and several things produce these bytes: another target's
 		// build staged here, a truncated write that kept the path, a file that was never a program.
 		// Naming the most likely one while marking it a guess costs nothing and misdirects nobody.
 		return fmt.Errorf(
@@ -798,8 +798,8 @@ func CompilerUpstreamFromGitmodules(contents string) string {
 // compiler's repository from the same kind of url, read from a committed `.gitmodules`, and two parsers
 // of one url would drift.
 //
-// The two url shapes git accepts — the ssh `git@github.com:owner/name.git` and the https
-// `https://github.com/owner/name.git` — have to produce the same label, because otherwise the same
+// The two url shapes git accepts (the ssh `git@github.com:owner/name.git` and the https
+// `https://github.com/owner/name.git`) have to produce the same label, because otherwise the same
 // pin reads differently depending on how the build machine happened to clone, and a reader
 // comparing two reports would see a difference that is not one.
 //
@@ -823,7 +823,7 @@ func NormalizeUpstream(remoteUrl string) string {
 
 	// Both halves have to be non-empty, not just present. A count alone passes for
 	// `https://github.com/`, whose segments are ["https:", "", "github.com", ""], and the last two
-	// join to "/github.com" — a label that is not a repository, printed by `--version` as though it
+	// join to "/github.com": a label that is not a repository, printed by `--version` as though it
 	// were one. A guard on position says the pieces exist; this says they mean something.
 	owner, name := segments[len(segments)-2], segments[len(segments)-1]
 	if owner == "" || name == "" {

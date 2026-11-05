@@ -3,7 +3,7 @@
 // Everything else in this package is pure: findings in, report out, easy to test and easy to trust.
 // This file is where the harness touches the world, and it is therefore where the interesting lies
 // live. A subprocess that fails to launch, a working directory that is not the tree, a config that
-// was never read, a regex that stopped matching after an output format moved — every one of them
+// was never read, a regex that stopped matching after an output format moved: every one of them
 // produces a smaller finding list, and a smaller finding list on both sides is indistinguishable
 // from agreement.
 //
@@ -57,7 +57,7 @@ type RunOptions struct {
 	ConfiguredRules map[string]bool
 	// Controls are the planted violations that prove the pipeline can carry a difference. Running
 	// with none is allowed and produces a report that says, in as many words, that it proved
-	// nothing — rather than a clean one.
+	// nothing, rather than a clean one.
 	Controls []Control
 	// ExtraCohereRuleSettings are rules to enable for cohere's run only, merged over the tree's own
 	// lint config and handed to cohere with `-lint-config`. The gate always runs against the
@@ -124,7 +124,7 @@ type Control struct {
 //
 // The order is deliberate: controls are planted first so that both gates see them in the same
 // single run. Running the gates twice, once clean and once planted, would double the cost and
-// introduce a window in which the tree changed underneath the two runs — and on a tree with several
+// introduce a window in which the tree changed underneath the two runs. And on a tree with several
 // authors in it, that window is not theoretical.
 func Run(ctx context.Context, options RunOptions) (Report, error) {
 	planted, cleanup, err := plantControls(options)
@@ -278,7 +278,7 @@ func checkControls(planted []Control, report Report, cohereFindings []Finding, g
 // It reads the raw per-side findings rather than the comparison's output, because the property
 // being tested is that the finding survived each side's parse and normalization and then matched.
 // Asking the difference list could only ever say the control was absent from it, which is true both
-// when both sides saw it and when neither did — the two outcomes this control exists to separate.
+// when both sides saw it and when neither did: the two outcomes this control exists to separate.
 func checkSharedControl(
 	control Control,
 	result ControlResult,
@@ -424,7 +424,7 @@ func plantControls(options RunOptions) ([]Control, func(), error) {
 // runGate executes one side and returns its stdout.
 //
 // A non-zero exit is expected and is not an error: both gates exit 1 when they find something, which
-// is the common case. Only a failure to run at all is an error — and it must be one, because a gate
+// is the common case. Only a failure to run at all is an error, and it must be one, because a gate
 // that never launched produces empty output that reads exactly like a clean result.
 func runGate(ctx context.Context, command GateCommand) (string, error) {
 	execution := exec.CommandContext(ctx, command.Program, command.Arguments...)
@@ -485,14 +485,19 @@ const maximumStderrLines = 5
 
 // cohereCoverageLinePattern reads the population out of cohere's own coverage line:
 //
-//	lint: 1 findings — 23 rules over 3407 files, 2098302 nodes visited, in 813ms
-var cohereCoverageLinePattern = regexp.MustCompile(`^lint: \d+ findings? — (\d+) rules? over (\d+) files?`)
+//	lint: 1 findings <em-dash> 23 rules over 3407 files, 2098302 nodes visited, in 813ms
+//
+// where <em-dash> stands for the em-dash cohere prints there. The dash is cohere's own output, so the pattern holds
+// its exact bytes, spelled as an escape between the raw pieces because a raw string cannot hold one.
+var cohereCoverageLinePattern = regexp.MustCompile(
+	`^lint: \d+ findings? ` + "\u2014" + ` (\d+) rules? over (\d+) files?`,
+)
 
 // cohereCoverageFrom reads files-walked and rules-run out of cohere's summary lines.
 //
 // Returning zeros when the line is absent is deliberate and is not a fallback. A missing coverage
 // line means cohere did not finish its lint phase, and zero is precisely the value that makes the
-// vacuity guard refuse the comparison — which is the correct outcome for a run that did not
+// vacuity guard refuse the comparison, which is the correct outcome for a run that did not
 // complete. Defaulting to a plausible number here would be the vacuous pass this package exists to
 // prevent, introduced by the file that reports the evidence.
 func cohereCoverageFrom(summaryLines []string) (int, int) {
@@ -700,7 +705,9 @@ func versionLineFrom(output string) string {
 	}
 	if commit != "" {
 		if note != "" {
-			return commit + " — " + note
+			// The em-dash joining the commit and its note is the report's provenance format, kept byte for byte and
+			// spelled as its escape.
+			return commit + " \u2014 " + note
 		}
 		return commit
 	}
