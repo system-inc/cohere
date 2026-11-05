@@ -1711,6 +1711,9 @@
                     "type": "object"
                 }
             },
+            "required": [
+                "rules"
+            ],
             "type": "object"
         },
         "ignorePatterns": {
