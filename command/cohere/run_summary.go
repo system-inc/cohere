@@ -204,6 +204,10 @@ type runGaps struct {
 	// RuleCrashes is each rule that crashed on a file, leaving its verdict there missing. Like a crashed
 	// file it fails the run: see runCrash.
 	RuleCrashes int `json:"ruleCrashes"`
+	// Crashes is each crash the two counts above count, named: the file, the rule for a rule crash, and the
+	// panic. A count with no reason is a gap nobody can act on, so the list is always as long as the two
+	// counts together, and it is the same record `--json` prints as a `crash` line.
+	Crashes []runCrash `json:"crashes,omitempty"`
 	// RulesSkippingEverything is the rules that declined every file they were offered.
 	RulesSkippingEverything int  `json:"rulesSkippingEverything"`
 	FormattingNotChecked    bool `json:"formattingNotChecked"`

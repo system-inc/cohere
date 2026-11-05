@@ -126,12 +126,6 @@ type ruleCoverageEntry struct {
 	OffWithoutReason bool
 }
 
-// coverageCrash is one file a rule could not finish, in either engine's terms.
-type coverageCrash struct {
-	File  string
-	Cause string
-}
-
 // coverageRuleCrash is one rule that panicked on one file while the file's other rules finished.
 type coverageRuleCrash struct {
 	Rule  string
@@ -167,7 +161,9 @@ type coverageSummary struct {
 	// PartialFacts are facts about rules the record counts and does not name, said once by name under
 	// `--coverage`: a Swift rule counted as quiet that the record also names as off for some files.
 	PartialFacts []string
-	Crashes      []coverageCrash
+	// Crashes is each file a rule could not finish, as the run names it in every view, so the coverage notes
+	// and the human view say the same words of it.
+	Crashes      []runCrash
 	RuleCrashes  []coverageRuleCrash
 	FilesIgnored int
 	Suppression  *suppressionCoverage
@@ -296,7 +292,7 @@ func classifyTypeScriptCoverage(
 	// A crashed file produced no findings, and a run that lost a file to a panic must not read as a run
 	// that found nothing in it. Named rather than counted, because the panic message is the defect.
 	for _, crash := range coverage.FilesCrashed {
-		summary.Crashes = append(summary.Crashes, coverageCrash{File: crash.FileName, Cause: fmt.Sprint(crash.Cause)})
+		summary.Crashes = append(summary.Crashes, runCrash{Path: crash.FileName, Cause: fmt.Sprint(crash.Cause)})
 	}
 	for _, crash := range coverage.RulesCrashed {
 		summary.RuleCrashes = append(summary.RuleCrashes, coverageRuleCrash{Rule: crash.RuleName, File: crash.FileName, Cause: fmt.Sprint(crash.Cause)})
@@ -614,10 +610,11 @@ func writeDeadSuppressions(out io.Writer, sites []program.DeadSuppression) {
 	}
 }
 
-// writeCrashedNote names one file a rule could not finish. Printed in full in both modes and before the
-// details, because a file nothing checked needs action.
-func writeCrashedNote(out io.Writer, fileName string, cause any) {
-	fmt.Fprintf(out, "  crashed: %s: %s\n", fileName, runCrash{Path: fileName, Cause: fmt.Sprint(cause)}.message())
+// writeCrashedNote names one file a rule could not finish, or one rule's verdict on it. Printed in full under
+// `--verbose` and before the details, because a file nothing checked needs action; the human view prints it
+// for a crash no other file shares (writeCrashGroups).
+func writeCrashedNote(out io.Writer, crash runCrash) {
+	fmt.Fprintf(out, "  crashed: %s: %s\n", crash.Path, crash.message())
 }
 
 // namedGapsSentence is what "this run did not check everything" says when every phase ran and a file
@@ -718,9 +715,11 @@ func writeLintReport(out io.Writer, report lintReport) {
 		printRuleDiagnostic(out, diagnostic, report.LintConfig)
 	}
 	coverage := report.Result.Coverage
-	for _, crash := range crashesFrom(coverage) {
+	crashes := crashesFrom(coverage)
+	for _, crash := range crashes {
 		printCrash(out, crash)
 	}
+	printCrashGroups(out, crashes)
 	// The account below is `--verbose`'s; the footer carries what a reader needs of it in every view.
 	account := accountOutput(out)
 	fmt.Fprintf(accountOutput(invocationOutput(out)),
@@ -756,6 +755,7 @@ func writeLintReport(out io.Writer, report lintReport) {
 	activeSummary.WarningFindings += lintWarningCount(report.Result.Diagnostics, report.LintConfig)
 	activeSummary.Gaps.CrashedFiles = len(summary.Crashes)
 	activeSummary.Gaps.RuleCrashes = len(summary.RuleCrashes)
+	activeSummary.Gaps.Crashes = crashes
 	activeSummary.Skips = rulesSkippingEveryFile(summary.Notes, coverage.RulesOffered)
 }
 
@@ -854,10 +854,10 @@ func (s coverageSummary) offWithoutReasonCount() int {
 // full, then the rules that need action by default or every rule once with details.
 func writeCoverageNotes(out io.Writer, summary coverageSummary, details bool) {
 	for _, crash := range summary.Crashes {
-		writeCrashedNote(out, crash.File, crash.Cause)
+		writeCrashedNote(out, crash)
 	}
 	for _, crash := range summary.RuleCrashes {
-		fmt.Fprintf(out, "  crashed: %s: %s\n", crash.File, runCrash{Path: crash.File, Rule: crash.Rule, Cause: crash.Cause}.message())
+		writeCrashedNote(out, runCrash{Path: crash.File, Rule: crash.Rule, Cause: crash.Cause})
 	}
 	if details {
 		writeCoverageDetails(out, summary)
