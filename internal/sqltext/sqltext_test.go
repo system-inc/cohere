@@ -42,6 +42,12 @@ func TestReadStatement(test *testing.T) {
 			certain:      true,
 		},
 		{
+			name:         "a table qualifying a column after a comparison is a name, not a value",
+			texts:        []string{"SELECT users.id FROM users JOIN t ON users.id = ", ".user_id"},
+			keywordCount: 4,
+			certain:      true,
+		},
+		{
 			name:         "a table, a placeholder list and a name in quotes are code, not values",
 			texts:        []string{"SELECT \"", "\" FROM ", " WHERE id IN (", ")"},
 			keywordCount: 4,

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -133,4 +134,16 @@ func formattedWithFlags(database *sql.DB, name string) {
 func multiByteText(database *sql.DB, name string) {
 	// want +1 "single quotes"
 	_, _ = database.Query(fmt.Sprintf("SELECT id FROM users WHERE name = '東京 %s' AND city = 'Zürich'", name))
+}
+
+func strconvThatQuotesText(database *sql.DB, name string) {
+	// strconv.Quote returns the text it was given, in Go's double quotes, so it is no number.
+	// want +1 "without quotes"
+	_, _ = database.Query("SELECT id FROM users WHERE name = " + strconv.Quote(name))
+}
+
+func valueBeforeADotOutsideAQualifier(database *sql.DB, name string) {
+	// A dot after a space is not a qualifier written onto the hole.
+	// want +1 "without quotes"
+	_, _ = database.Query("SELECT id FROM users WHERE name = " + name + " . ")
 }
