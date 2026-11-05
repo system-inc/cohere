@@ -122,9 +122,9 @@ var messageUnexpectedMultilineDivision = rule.Message{
 // That is the same answer upstream gives under the TypeScript parser, measured, where
 // `getTokenAfter` also returns the `<`. The agreement is worth stating because it is a coincidence
 // of two different routes rather than a shared implementation.
-var NoUnexpectedMultiline = rule.Rule{
+var NoUnexpectedMultiline = rule.Rule[rule.NoOptions]{
 	Name: "no-unexpected-multiline",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		text := ruleContext.SourceFile.Text()
 
 		// reportIfLineBreaks is upstream's checkForBreakAfter. The token that opens what follows

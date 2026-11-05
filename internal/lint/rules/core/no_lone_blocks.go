@@ -94,9 +94,9 @@ var messageRedundantNestedBlock = rule.Message{
 // No fix. Removing the braces is safe only when nothing inside them is block-scoped, which is the
 // rule's own predicate, but the repair still has to reindent the body and decide what to do with
 // comments attached to the braces. Upstream ships no fixer either.
-var NoLoneBlocks = rule.Rule{
+var NoLoneBlocks = rule.Rule[rule.NoOptions]{
 	Name: "no-lone-blocks",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
 				type finding struct {

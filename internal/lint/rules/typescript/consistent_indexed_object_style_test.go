@@ -30,7 +30,7 @@ type consistentIndexedObjectStyleFinding struct {
 	wantSuggestion string
 }
 
-func consistentIndexedObjectStyleOptionsFor(test *testing.T, optionsJson string) any {
+func consistentIndexedObjectStyleOptionsFor(test *testing.T, optionsJson string) ConsistentIndexedObjectStyleOptions {
 	test.Helper()
 	if optionsJson == "" {
 		return DefaultConsistentIndexedObjectStyleSettings()
@@ -1173,12 +1173,8 @@ func TestDecodeConsistentIndexedObjectStyleOptions(test *testing.T) {
 			if decodeConsistentIndexedObjectStyleOptionsError != nil {
 				test.Fatalf("decoding %q: %v", testCase.raw, decodeConsistentIndexedObjectStyleOptionsError)
 			}
-			options, isOptions := decoded.(ConsistentIndexedObjectStyleOptions)
-			if !isOptions {
-				test.Fatalf("the decoder returned %T rather than the options struct", decoded)
-			}
-			if options.Mode != testCase.want {
-				test.Fatalf("mode: expected %q, got %q", testCase.want, options.Mode)
+			if decoded.Mode != testCase.want {
+				test.Fatalf("mode: expected %q, got %q", testCase.want, decoded.Mode)
 			}
 		})
 	}
@@ -1194,8 +1190,8 @@ func TestConsistentIndexedObjectStyleFallsBackToTheDefaultOnNilOptions(test *tes
 
 	const record = "type T = Record<string, number>;"
 
-	rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, ConsistentIndexedObjectStyle,
-		consistentIndexedObjectStyleFile, record, nil))
+	rule_testing.ExpectClean(test, rule_testing.RunTyped(test, ConsistentIndexedObjectStyle,
+		consistentIndexedObjectStyleFile, record))
 
 	// The control: the same input under the other mode must report, so the silence above is the
 	// default being applied rather than the rule being inert.

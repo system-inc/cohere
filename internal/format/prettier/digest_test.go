@@ -86,12 +86,18 @@ func TestDigestKeysByName(test *testing.T) {
 
 	content := []byte("the same bytes under either name")
 
-	before, digestNamedBundlesError := digestNamedBundles([]string{"plugins/yaml.js"}, map[string][]byte{"plugins/yaml.js": content})
+	before, digestNamedBundlesError := digestNamedBundles(
+		[]string{"plugins/yaml.js"},
+		map[string][]byte{"plugins/yaml.js": content},
+	)
 	if digestNamedBundlesError != nil {
 		test.Fatalf("digesting under the first name: %v", digestNamedBundlesError)
 	}
 
-	after, digestNamedBundlesError := digestNamedBundles([]string{"plugins/yml.js"}, map[string][]byte{"plugins/yml.js": content})
+	after, digestNamedBundlesError := digestNamedBundles(
+		[]string{"plugins/yml.js"},
+		map[string][]byte{"plugins/yml.js": content},
+	)
 	if digestNamedBundlesError != nil {
 		test.Fatalf("digesting under the second name: %v", digestNamedBundlesError)
 	}

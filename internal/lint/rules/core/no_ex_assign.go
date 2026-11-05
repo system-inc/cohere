@@ -35,9 +35,9 @@ var messageUnexpectedExceptionAssignment = rule.Message{
 //
 // No fix. The repair is to introduce a new binding, which means choosing a name and rewriting every
 // later use, and the rule cannot know which later uses meant the original error.
-var NoExAssign = rule.Rule{
+var NoExAssign = rule.Rule[rule.NoOptions]{
 	Name: "no-ex-assign",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCatchClause: func(node *ast.Node) {
 				clause := node.AsCatchClause()

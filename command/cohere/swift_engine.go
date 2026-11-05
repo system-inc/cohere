@@ -42,7 +42,14 @@ func runSwiftEngine(location projectLocation, given map[string]bool, positionals
 			location.Root, swiftProjectMarker)
 	}
 
-	arguments, mode, engineArgumentsError := engineArguments(swiftLanguage, swiftFlags, location, given, flagValue, positionals)
+	arguments, mode, engineArgumentsError := engineArguments(
+		swiftLanguage,
+		swiftFlags,
+		location,
+		given,
+		flagValue,
+		positionals,
+	)
 	if engineArgumentsError != nil {
 		return 1, engineArgumentsError
 	}

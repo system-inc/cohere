@@ -15,7 +15,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // The decoder is hand-rolled rather than generic, because five of the seven flags default to true
 // and the `allow` default is a non-empty list. See its doc comment.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[RestrictTemplateExpressionsOptions]{
 		Rule:   RestrictTemplateExpressions,
 		Decode: DecodeRestrictTemplateExpressionsOptions,
 	})

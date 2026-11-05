@@ -139,15 +139,15 @@ var deprecations = []deprecation{
 // the fix, so `sm:hover:flex-grow-2!` becomes `sm:hover:grow-2!`. Measured against upstream rather
 // than assumed: the plugin dissects the class and matches the base, and a port that matched the raw
 // name would miss every prefixed use, which is most of them in real markup.
-var NoDeprecatedClasses = rule.Rule{
+var NoDeprecatedClasses = rule.Rule[NoDeprecatedClassesOptions]{
 	Name: "better-tailwindcss/no-deprecated-classes",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoDeprecatedClassesOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		surfaces := DefaultClassLiteralSurfaces()
-		if configured, isConfigured := rule.OptionsAs[NoDeprecatedClassesOptions](options); isConfigured {
+		if configured, isConfigured := options.Read(); isConfigured {
 			surfaces = configured.ClassLiteralSurfaces()
 		}
 

@@ -93,7 +93,7 @@ func (options EqeqeqOptions) resolve() eqeqeqSettings {
 // Every arm of this rule is selected by string equality, so a typo would silently pick a fourth
 // behaviour of reporting nothing. A second element beside anything but "always" is refused, which is
 // upstream's schema: its `anyOf` gives `smart` and `allow-null` a one-element list.
-func DecodeEqeqeqOptions(list []byte) (any, error) {
+func DecodeEqeqeqOptions(list []byte) (EqeqeqOptions, error) {
 	options := EqeqeqOptions{}
 	elements, optionElementsError := rule.OptionElements(list, 2)
 	if optionElementsError != nil || len(elements) == 0 {
@@ -192,11 +192,11 @@ func DecodeEqeqeqOptions(list []byte) (any, error) {
 // Measured against the installed build -- `(typeof a) == 'number'` and `(1) == (2)` both take the
 // fix arm, and `x == (null)` takes the null arm. Reading the operands directly would put all three
 // on the wrong arm while every unparenthesized case stayed green.
-var Eqeqeq = rule.Rule{
+var Eqeqeq = rule.Rule[EqeqeqOptions]{
 	Name: "eqeqeq",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[EqeqeqOptions]) rule.Listeners {
 		settings := EqeqeqOptions{}.resolve()
-		if decoded, configured := rule.OptionsAs[EqeqeqOptions](options); configured {
+		if decoded, configured := options.Read(); configured {
 			settings = decoded.resolve()
 		}
 		return rule.Listeners{

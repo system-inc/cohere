@@ -14,6 +14,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/lint/testing"
 	"golang.org/x/sys/unix"
 )
 
@@ -30,22 +31,42 @@ func budgetThreadCpu() time.Duration {
 func TestRuleBudgetRejectsCpuWorkAndDoesNotBillWaiting(test *testing.T) {
 	test.Parallel()
 	graph := buildBudgetGraph(test, map[string]string{"file.ts": "export const value = 1;\n"})
-	sleeper := rule.Rule{Name: "planted-waiter", Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) { time.Sleep(350 * time.Millisecond) }}
-	}}
-	rows, checkRuleBudgetError := checkRuleBudget(test, graph, []rule.Rule{sleeper}, 250*time.Millisecond)
-	if checkRuleBudgetError != nil || len(rows) != 1 || rows[0].NodesOffered != 1 || rows[0].TotalCPU() > 25*time.Millisecond {
+	sleeper := rule.Rule[rule.NoOptions]{
+		Name: "planted-waiter",
+		Run: func(rule.Context, rule.Given[rule.NoOptions]) rule.Listeners {
+			return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) { time.Sleep(350 * time.Millisecond) }}
+		},
+	}
+	rows, checkRuleBudgetError := checkRuleBudget(
+		test,
+		graph,
+		rule_testing.EntriesOf(test, sleeper),
+		250*time.Millisecond,
+	)
+	if checkRuleBudgetError != nil ||
+		len(rows) != 1 ||
+		rows[0].NodesOffered != 1 ||
+		rows[0].TotalCPU() > 25*time.Millisecond {
 		test.Fatalf("waiter was billed CPU or not run: %v %+v", checkRuleBudgetError, rows)
 	}
-	spinner := rule.Rule{Name: "planted-spinner", Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
-			start := budgetThreadCpu()
-			for budgetThreadCpu()-start < 350*time.Millisecond {
-			}
-		}}
-	}}
-	rows, checkRuleBudgetError = checkRuleBudget(test, graph, []rule.Rule{spinner}, 250*time.Millisecond)
-	if checkRuleBudgetError == nil || !strings.Contains(checkRuleBudgetError.Error(), "rule CPU budget exceeded: planted-spinner") {
+	spinner := rule.Rule[rule.NoOptions]{
+		Name: "planted-spinner",
+		Run: func(rule.Context, rule.Given[rule.NoOptions]) rule.Listeners {
+			return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
+				start := budgetThreadCpu()
+				for budgetThreadCpu()-start < 350*time.Millisecond {
+				}
+			}}
+		},
+	}
+	rows, checkRuleBudgetError = checkRuleBudget(
+		test,
+		graph,
+		rule_testing.EntriesOf(test, spinner),
+		250*time.Millisecond,
+	)
+	if checkRuleBudgetError == nil ||
+		!strings.Contains(checkRuleBudgetError.Error(), "rule CPU budget exceeded: planted-spinner") {
 		test.Fatalf("spinner was not refused: %v %+v", checkRuleBudgetError, rows)
 	}
 	test.Logf("waiter passed; spinner refused: %v", checkRuleBudgetError)
@@ -58,13 +79,18 @@ func TestRuleBudgetBoundsANonReturningListener(test *testing.T) {
 	const helper = "COHERE_BUDGET_DEADLINE_CONTROL"
 	if os.Getenv(helper) == "1" {
 		graph := buildBudgetGraph(test, map[string]string{"file.ts": "export const value = 1;\n"})
-		stuck := rule.Rule{
+		stuck := rule.Rule[rule.NoOptions]{
 			Name: "planted-nonreturning",
-			Run: func(ruleContext rule.Context, options any) rule.Listeners {
+			Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 				return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) { select {} }}
 			},
 		}
-		_, checkRuleBudgetError := checkRuleBudget(test, graph, []rule.Rule{stuck}, 20*time.Millisecond)
+		_, checkRuleBudgetError := checkRuleBudget(
+			test,
+			graph,
+			rule_testing.EntriesOf(test, stuck),
+			20*time.Millisecond,
+		)
 		if checkRuleBudgetError != nil {
 			test.Fatal(checkRuleBudgetError)
 		}
@@ -119,7 +145,7 @@ func TestRuleBudgetRefuses6911526cThroughGoOverlay(test *testing.T) {
 	if _, statError := os.Stat(filepath.Join(root, target)); os.IsNotExist(statError) {
 		add("internal/lint/rules/adamic/no_cross_enum_narrowing_register.go", []byte(`package adamic
 import "github.com/system-inc/cohere/internal/lint/rule"
-func init() { rule.Register(rule.Registration{Rule: NoCrossEnumNarrowing}) }
+func init() { rule.Register(rule.Registration[rule.NoOptions]{Rule: NoCrossEnumNarrowing}) }
 `))
 		add("policy/messages/no-cross-enum-narrowing.json", []byte(
 			`{"rules":{"TypeScript":"adamic/no-cross-enum-narrowing"},"messages":{"crossEnumNarrowing":{"text":"{{other}} collides with {{member}} at {{value}}"}}}`,

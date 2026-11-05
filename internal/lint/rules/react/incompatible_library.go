@@ -115,12 +115,12 @@ var messageIncompatibleLibrary = rule.Message{
 // information for this decision, and the module specifier is compared as a *string* at both
 // upstreams. Declaring the checker would make every fixture need the typed harness to answer a
 // question no type is consulted for.
-var IncompatibleLibrary = rule.Rule{
+var IncompatibleLibrary = rule.Rule[CompilerRuleOptions]{
 	// Bare name, no namespace prefix. The inventory writes `react/incompatible-library` and the
 	// parity guard tries an exact match before stripping the namespace, so the slash spelling would
 	// also match while being the wrong thing to write.
 	Name: "react-hooks/incompatible-library",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[CompilerRuleOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
 				// A source-file pre-pass rather than a call-expression listener, because the

@@ -51,7 +51,7 @@ func DefaultConsistentGenericConstructorsSettings() ConsistentGenericConstructor
 // turned it to a mode nobody wrote, and loaded clean while doing it. Upstream's schema is a string
 // enum and refuses all three at load, and the config layer now refuses a decoder's error by rule
 // name, so refusing is what tells the author (#p9s1131).
-func DecodeConsistentGenericConstructorsOptions(raw []byte) (any, error) {
+func DecodeConsistentGenericConstructorsOptions(raw []byte) (ConsistentGenericConstructorsOptions, error) {
 	options := DefaultConsistentGenericConstructorsSettings()
 	// Go whitespace: raw JSON bytes of a rule's options, whose whitespace is the same in both sets.
 	trimmed := strings.TrimSpace(string(raw))
@@ -149,7 +149,7 @@ func consistentGenericConstructorsOptionsFor(mode string) (ConsistentGenericCons
 // The parenthesis case is the other detail: `new Foo` is a legal construction with no argument list,
 // so after inserting type arguments the fixer has to add `()` as well, or it writes `new Foo<string>`
 // which parses as something else entirely.
-var ConsistentGenericConstructors = rule.Rule{
+var ConsistentGenericConstructors = rule.Rule[ConsistentGenericConstructorsOptions]{
 	Name: "@typescript-eslint/consistent-generic-constructors",
 
 	// The typed-array exemption asks whether a name resolves to the global rather than to a local
@@ -160,8 +160,8 @@ var ConsistentGenericConstructors = rule.Rule{
 	// Compiler options and the default library, through type_checking's builtin and specifier helpers.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, isSettings := rule.OptionsAs[ConsistentGenericConstructorsOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[ConsistentGenericConstructorsOptions]) rule.Listeners {
+		settings, isSettings := options.Read()
 		if !isSettings {
 			// A rule configured as a bare severity reaches here with nil options, so the assertion
 			// fails and the fallback is what `"error"` means.

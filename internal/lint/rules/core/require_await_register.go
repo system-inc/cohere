@@ -10,5 +10,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // No `Decode`, because the rule takes no options: upstream's `meta.schema` is the empty array, which
 // is checkable in one line and worth checking rather than inheriting from an inventory column.
 func init() {
-	rule.Register(rule.Registration{Rule: RequireAwait})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: RequireAwait})
 }

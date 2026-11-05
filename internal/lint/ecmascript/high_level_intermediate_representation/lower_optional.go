@@ -94,7 +94,7 @@ func (builder *builder) lowerOptionalChain(node *ast.Node, parentAlternate *Basi
 		alternate = builder.reserve(BlockKindValue)
 		saved := builder.currentBlock
 		builder.enter(alternate)
-		undefined := builder.emit(&Primitive{Value: nil}, node)
+		undefined := builder.emit(&Primitive{Value: PrimitiveUndefined{}}, node)
 		builder.emit(&StoreLocal{LValue: result, Value: undefined, Kind: InstructionKindConst}, node)
 		builder.gotoBlock(continuation.Id, GotoVariantBreak)
 		builder.enter(saved)

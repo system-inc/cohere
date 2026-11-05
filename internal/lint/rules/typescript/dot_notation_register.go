@@ -8,5 +8,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // conflict on a file neither is really changing. The decoder is hand-written because `allowKeywords`
 // defaults to true; see DecodeDotNotationOptions.
 func init() {
-	rule.Register(rule.Registration{Rule: DotNotation, Decode: DecodeDotNotationOptions})
+	rule.Register(rule.Registration[DotNotationOptions]{Rule: DotNotation, Decode: DecodeDotNotationOptions})
 }

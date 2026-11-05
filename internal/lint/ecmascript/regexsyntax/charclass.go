@@ -381,7 +381,10 @@ func parseRegexCharacterClass(
 			index = nestedEnd
 			pendingIndex = -1
 
-		case (character == '-' || character == '&') && flags.UnicodeSets && index+1 < len(pattern) && pattern[index+1] == character:
+		case (character == '-' || character == '&') &&
+			flags.UnicodeSets &&
+			index+1 < len(pattern) &&
+			pattern[index+1] == character:
 			// v-flag set operator `--` or `&&` — breaker
 			out = append(out, RegexCharElement{Kind: RegexCharBreaker, Start: index, End: index + 2})
 			index += 2

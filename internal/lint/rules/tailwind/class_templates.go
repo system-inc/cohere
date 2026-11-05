@@ -197,5 +197,10 @@ func startsWithWhitespace(text string) bool {
 }
 
 func isSpace(character rune) bool {
-	return character == ' ' || character == '\t' || character == '\n' || character == '\r' || character == '\v' || character == '\f'
+	return character == ' ' ||
+		character == '\t' ||
+		character == '\n' ||
+		character == '\r' ||
+		character == '\v' ||
+		character == '\f'
 }

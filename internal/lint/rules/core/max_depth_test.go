@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	rule_testing "github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -15,7 +16,7 @@ const maxDepthFile = "/repository/source/MaxDepth.ts"
 // The argument is the option as JSON text, exactly the bytes the config layer hands the decoder,
 // so a fixture cannot bypass the decoder or accidentally test a shape a config could not deliver.
 // That is section 7c of the standard applied at the fixture rather than only in a contract test.
-func maxDepthOf(optionJson string) any {
+func maxDepthOf(optionJson string) MaxDepthSettings {
 	settings, decodeMaximumDepthOptionsError := DecodeMaxDepthOptions([]byte(optionJson))
 	if decodeMaximumDepthOptionsError != nil {
 		panic(decodeMaximumDepthOptionsError)
@@ -40,70 +41,89 @@ func TestMaxDepthFires(test *testing.T) {
 
 	cases := []struct {
 		source   string
-		settings any
+		settings rule.Given[MaxDepthSettings]
 		findings int
 	}{
 		{
 			source:   "function foo() { if (true) { if (false) { if (true) { } } } }",
-			settings: maxDepthOf("2"),
+			settings: rule.Configured(maxDepthOf("2")),
 			findings: 1,
 		},
 		{
 			source:   "var foo = () => { if (true) { if (false) { if (true) { } } } }",
-			settings: maxDepthOf("2"),
+			settings: rule.Configured(maxDepthOf("2")),
 			findings: 1,
 		},
-		{source: "function foo() { if (true) {} else { for(;;) {} } }", settings: maxDepthOf("1"), findings: 1},
+		{
+			source:   "function foo() { if (true) {} else { for(;;) {} } }",
+			settings: rule.Configured(maxDepthOf("1")),
+			findings: 1,
+		},
 		{
 			source:   "function foo() { if (a) {} else if (b) {} if (c) { if (d) {} } }",
-			settings: maxDepthOf("1"),
+			settings: rule.Configured(maxDepthOf("1")),
 			findings: 1,
 		},
-		{source: "if (a) if (b) {}", settings: maxDepthOf("1"), findings: 1},
-		{source: "function foo() { while (true) { if (true) {} } }", settings: maxDepthOf("1"), findings: 1},
-		{source: "function foo() { if (a) { switch (b) { case 1: foo(); } } }", settings: maxDepthOf("1"), findings: 1},
-		{source: "function foo() { for (let x of foo) { if (true) {} } }", settings: maxDepthOf("1"), findings: 1},
+		{source: "if (a) if (b) {}", settings: rule.Configured(maxDepthOf("1")), findings: 1},
+		{
+			source:   "function foo() { while (true) { if (true) {} } }",
+			settings: rule.Configured(maxDepthOf("1")),
+			findings: 1,
+		},
+		{
+			source:   "function foo() { if (a) { switch (b) { case 1: foo(); } } }",
+			settings: rule.Configured(maxDepthOf("1")),
+			findings: 1,
+		},
+		{
+			source:   "function foo() { for (let x of foo) { if (true) {} } }",
+			settings: rule.Configured(maxDepthOf("1")),
+			findings: 1,
+		},
 		{
 			source:   "function foo() { while (true) { if (true) { if (false) { } } } }",
-			settings: maxDepthOf("1"),
+			settings: rule.Configured(maxDepthOf("1")),
 			findings: 2,
 		},
 		{
 			source:   "function foo() { if (true) { if (false) { if (true) { if (false) { if (true) { } } } } } }",
-			settings: nil,
 			findings: 1,
 		},
 		{
 			source:   "function foo() { if (true) { if (false) { if (true) { } } } }",
-			settings: maxDepthOf("{\"max\": 2}"),
+			settings: rule.Configured(maxDepthOf("{\"max\": 2}")),
 			findings: 1,
 		},
 		{
 			source:   "function foo() { if (a) { if (b) { if (c) { if (d) { if (e) {} } } } } }",
-			settings: maxDepthOf("{}"),
+			settings: rule.Configured(maxDepthOf("{}")),
 			findings: 1,
 		},
-		{source: "function foo() { if (true) {} }", settings: maxDepthOf("{\"max\": 0}"), findings: 1},
-		{source: "class C { static { if (1) { if (2) { if (3) {} } } } }", settings: maxDepthOf("2"), findings: 1},
+		{source: "function foo() { if (true) {} }", settings: rule.Configured(maxDepthOf("{\"max\": 0}")), findings: 1},
+		{
+			source:   "class C { static { if (1) { if (2) { if (3) {} } } } }",
+			settings: rule.Configured(maxDepthOf("2")),
+			findings: 1,
+		},
 		{
 			source:   "if (1) { class C { static { if (1) { if (2) { if (3) {} } } } } }",
-			settings: maxDepthOf("2"),
+			settings: rule.Configured(maxDepthOf("2")),
 			findings: 1,
 		},
 		{
 			source:   "function foo() { if (1) { class C { static { if (1) { if (2) { if (3) {} } } } } } }",
-			settings: maxDepthOf("2"),
+			settings: rule.Configured(maxDepthOf("2")),
 			findings: 1,
 		},
 		{
 			source:   "function foo() { if (1) { class C { static { if (1) { if (2) {} } } } if (2) { if (3) {} } } }",
-			settings: maxDepthOf("2"),
+			settings: rule.Configured(maxDepthOf("2")),
 			findings: 1,
 		},
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunWithOptions(test, MaxDepth, maxDepthFile, testCase.source, testCase.settings)
+		result := rule_testing.RunGiven(test, MaxDepth, maxDepthFile, testCase.source, testCase.settings)
 		if len(result.Diagnostics) != testCase.findings {
 			test.Errorf("%q with %+v: expected %d findings, got %d %v",
 				testCase.source, testCase.settings, testCase.findings,
@@ -125,35 +145,47 @@ func TestMaxDepthStaysSilent(test *testing.T) {
 
 	cases := []struct {
 		source   string
-		settings any
+		settings rule.Given[MaxDepthSettings]
 	}{
-		{source: "function foo() { if (true) { if (false) { if (true) { } } } }", settings: maxDepthOf("3")},
+		{
+			source:   "function foo() { if (true) { if (false) { if (true) { } } } }",
+			settings: rule.Configured(maxDepthOf("3")),
+		},
 		{
 			source:   "function foo() { if (true) { } else if (false) { } else if (true) { } else if (false) {} }",
-			settings: maxDepthOf("3"),
+			settings: rule.Configured(maxDepthOf("3")),
 		},
-		{source: "var foo = () => { if (true) { if (false) { if (true) { } } } }", settings: maxDepthOf("3")},
-		{source: "function foo() { if (true) { if (false) { if (true) { } } } }", settings: nil},
-		{source: "function foo() { if (true) { if (false) { if (true) { } } } }", settings: maxDepthOf("{\"max\": 3}")},
-		{source: "class C { static { if (1) { if (2) {} } } }", settings: maxDepthOf("2")},
-		{source: "class C { static { if (1) { if (2) {} } if (1) { if (2) {} } } }", settings: maxDepthOf("2")},
+		{
+			source:   "var foo = () => { if (true) { if (false) { if (true) { } } } }",
+			settings: rule.Configured(maxDepthOf("3")),
+		},
+		{source: "function foo() { if (true) { if (false) { if (true) { } } } }"},
+		{
+			source:   "function foo() { if (true) { if (false) { if (true) { } } } }",
+			settings: rule.Configured(maxDepthOf("{\"max\": 3}")),
+		},
+		{source: "class C { static { if (1) { if (2) {} } } }", settings: rule.Configured(maxDepthOf("2"))},
+		{
+			source:   "class C { static { if (1) { if (2) {} } if (1) { if (2) {} } } }",
+			settings: rule.Configured(maxDepthOf("2")),
+		},
 		{
 			source:   "class C { static { if (1) { if (2) {} } } static { if (1) { if (2) {} } } }",
-			settings: maxDepthOf("2"),
+			settings: rule.Configured(maxDepthOf("2")),
 		},
-		{source: "if (1) { class C { static { if (1) { if (2) {} } } } }", settings: maxDepthOf("2")},
+		{source: "if (1) { class C { static { if (1) { if (2) {} } } } }", settings: rule.Configured(maxDepthOf("2"))},
 		{
 			source:   "function foo() { if (1) { class C { static { if (1) { if (2) {} } } } } }",
-			settings: maxDepthOf("2"),
+			settings: rule.Configured(maxDepthOf("2")),
 		},
 		{
 			source:   "function foo() { if (1) { if (2) { class C { static { if (1) { if (2) {} } if (1) { if (2) {} } } } } } if (1) { if (2) {} } }",
-			settings: maxDepthOf("2"),
+			settings: rule.Configured(maxDepthOf("2")),
 		},
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunWithOptions(test, MaxDepth, maxDepthFile, testCase.source, testCase.settings)
+		result := rule_testing.RunGiven(test, MaxDepth, maxDepthFile, testCase.source, testCase.settings)
 		// `ExpectClean` rather than a length check, because the guard in internal/lint/registry
 		// matches the call name.
 		rule_testing.ExpectClean(test, result)
@@ -177,7 +209,7 @@ func TestMaxDepthSpansAndMessages(test *testing.T) {
 
 	cases := []struct {
 		source   string
-		settings any
+		settings MaxDepthSettings
 		spans    []string
 		messages []string
 	}{
@@ -287,19 +319,14 @@ func TestMaxDepthDecoderReadsEveryOptionShape(test *testing.T) {
 			test.Errorf("decoding %s: %v", testCase.optionJson, decodeMaximumDepthOptionsError)
 			continue
 		}
-		settings, ok := decoded.(MaxDepthSettings)
-		if !ok {
-			test.Errorf("decoding %s: expected MaxDepthSettings, got %T", testCase.optionJson, decoded)
-			continue
-		}
-		if settings.Disabled != testCase.disabled {
+		if decoded.Disabled != testCase.disabled {
 			test.Errorf("decoding %s: expected disabled=%v, got %v",
-				testCase.optionJson, testCase.disabled, settings.Disabled)
+				testCase.optionJson, testCase.disabled, decoded.Disabled)
 			continue
 		}
-		if !testCase.disabled && settings.Maximum != testCase.maximum {
+		if !testCase.disabled && decoded.Maximum != testCase.maximum {
 			test.Errorf("decoding %s: expected a limit of %d, got %d",
-				testCase.optionJson, testCase.maximum, settings.Maximum)
+				testCase.optionJson, testCase.maximum, decoded.Maximum)
 		}
 	}
 
@@ -318,7 +345,7 @@ func TestMaxDepthDecoderReadsEveryOptionShape(test *testing.T) {
 	}
 
 	// A rule handed nil options enforces upstream's default of 4 rather than doing nothing.
-	result = rule_testing.RunWithOptions(test, MaxDepth, maxDepthFile, nested, nil)
+	result = rule_testing.Run(test, MaxDepth, maxDepthFile, nested)
 	if len(result.Diagnostics) != 1 {
 		test.Errorf("expected the default limit of 4 to report once, got %d: %v",
 			len(result.Diagnostics), result.MessageIds())

@@ -20,7 +20,7 @@ func consistentGenericConstructorsCaseName(index int) string {
 // the two lines most likely to be wrong live: the bare-string wire shape cohere actually delivers,
 // and the fallback that keeps a bare `"error"` meaning upstream's default rather than meaning an
 // empty mode that matches no arm.
-func consistentGenericConstructorsSettingsFor(test *testing.T, wire string) any {
+func consistentGenericConstructorsSettingsFor(test *testing.T, wire string) ConsistentGenericConstructorsOptions {
 	test.Helper()
 	decoded, decodeConsistentGenericConstructorsOptionsError := DecodeConsistentGenericConstructorsOptions([]byte(wire))
 	if decodeConsistentGenericConstructorsOptionsError != nil {
@@ -538,22 +538,18 @@ func TestConsistentGenericConstructorsDecoderReadsEveryWireShape(test *testing.T
 			if decodeConsistentGenericConstructorsOptionsError != nil {
 				test.Fatalf("decoding %q: %v", testCase.wire, decodeConsistentGenericConstructorsOptionsError)
 			}
-			settings, isSettings := decoded.(ConsistentGenericConstructorsOptions)
-			if !isSettings {
-				test.Fatalf("decoding %q produced %T rather than the options struct", testCase.wire, decoded)
-			}
-			if settings.Mode != testCase.want {
+			if decoded.Mode != testCase.want {
 				test.Fatalf("decoding %q: expected mode %q, got %q", testCase.wire, testCase.want,
-					settings.Mode)
+					decoded.Mode)
 			}
 		})
 	}
 
 	// And the nil-options path the rule itself takes when the config layer hands it nothing, which
 	// is a different route than the decoder and has its own fallback.
-	rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test,
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test,
 		ConsistentGenericConstructors, consistentGenericConstructorsFile,
-		"const a: Map<string, number> = new Map();\n", nil), "preferConstructor")
+		"const a: Map<string, number> = new Map();\n"), "preferConstructor")
 }
 
 // TestConsistentGenericConstructorsDecoderRefusesAValueUpstreamRefuses pins the other half (#p9s1131).

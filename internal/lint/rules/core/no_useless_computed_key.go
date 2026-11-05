@@ -42,7 +42,7 @@ type noUselessComputedKeyWire struct {
 // The pointer field is what keeps an explicit `false` reachable. Without it an absent key and a
 // written `false` decode identically and the `void 0` case above cannot be told from the
 // `false` case below it.
-func DecodeNoUselessComputedKeyOptions(raw []byte) (any, error) {
+func DecodeNoUselessComputedKeyOptions(raw []byte) (NoUselessComputedKeySettings, error) {
 	if len(raw) == 0 {
 		return DefaultNoUselessComputedKeySettings(), nil
 	}
@@ -136,10 +136,10 @@ var messageUnnecessarilyComputedProperty = rule.Message{
 // decorator, a type annotation, type parameters, and a `satisfies` on the enclosing object all
 // survive the repair untouched. That is the load-bearing fact about this fixer and it is the reason
 // the repair is shipped rather than declined; see the fixer's own comment.
-var NoUselessComputedKey = rule.Rule{
+var NoUselessComputedKey = rule.Rule[NoUselessComputedKeySettings]{
 	Name: "no-useless-computed-key",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, ok := rule.OptionsAs[NoUselessComputedKeySettings](options)
+	Run: func(ruleContext rule.Context, options rule.Given[NoUselessComputedKeySettings]) rule.Listeners {
+		settings, ok := options.Read()
 		if !ok {
 			// A rule configured as a bare severity is handed nil options, and the zero value of
 			// this struct switches off class members rather than disabling the rule.

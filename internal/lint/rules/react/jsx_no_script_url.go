@@ -85,7 +85,7 @@ type jsxNoScriptUrlWireObject struct {
 //
 // A rule configured as a bare severity is handed nil options, and the empty body has to produce
 // upstream's default of the built-in pair alone rather than an error.
-func DecodeJsxNoScriptUrlOptions(list []byte) (any, error) {
+func DecodeJsxNoScriptUrlOptions(list []byte) (JsxNoScriptUrlOptions, error) {
 	options := JsxNoScriptUrlOptions{}
 	elements, optionElementsError := rule.OptionElements(list, 2)
 	if optionElementsError != nil || len(elements) == 0 {
@@ -291,11 +291,11 @@ func jsxNoScriptUrlLinkComponents(options JsxNoScriptUrlOptions) map[string][]st
 // The parent's name is read the same way, so a member tag and a namespaced tag are both clean,
 // since neither carries a plain name under its name. Both measured. A port reading source text for
 // the tag would report on inputs upstream ignores.
-var JsxNoScriptUrl = rule.Rule{
+var JsxNoScriptUrl = rule.Rule[JsxNoScriptUrlOptions]{
 	Name: "react/jsx-no-script-url",
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, _ := rule.OptionsAs[JsxNoScriptUrlOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[JsxNoScriptUrlOptions]) rule.Listeners {
+		settings, _ := options.Read()
 		components := jsxNoScriptUrlLinkComponents(settings)
 
 		return rule.Listeners{

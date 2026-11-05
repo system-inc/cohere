@@ -12,16 +12,17 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/registry"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/lint/testing"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
 // findingsReuseRules is a small rule set with both kinds in it: pure rules a cache may replay, and a
 // type-aware one it must always run.
-func findingsReuseRules(test *testing.T) []rule.Rule {
+func findingsReuseRules(test *testing.T) []rule.Entry {
 	test.Helper()
 	wanted := map[string]bool{"no-self-compare": true, "no-duplicate-case": true, "no-empty": true, "no-debugger": true}
-	var rules []rule.Rule
-	var typeAware *rule.Rule
+	var rules []rule.Entry
+	var typeAware *rule.Entry
 	for _, registered := range registry.All() {
 		if wanted[registered.Name] {
 			rules = append(rules, registered)
@@ -249,7 +250,7 @@ func TestAFileWithNothingLeftToWalkKeepsItsCoverage(test *testing.T) {
 	if buildError != nil {
 		test.Fatal(buildError)
 	}
-	var pure []rule.Rule
+	var pure []rule.Entry
 	for _, subject := range findingsReuseRules(test) {
 		if !subject.NeedsTypeChecker && subject.ProgramReads&(rule.ReadsModuleResolution|rule.ReadsOtherFiles) == 0 {
 			pure = append(pure, subject)
@@ -316,13 +317,13 @@ func TestAFileARuleCrashedOnIsWalkedAgainNotReplayed(test *testing.T) {
 		"tsconfig.json": minimalConfig,
 		"a.ts":          "export const a = 1;\n",
 	})
-	panicking := rule.Rule{
+	panicking := rule.Rule[rule.NoOptions]{
 		Name: "test-panics-on-every-declaration",
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) { panic("simulated") }}
 		},
 	}
-	rules := []rule.Rule{panicking}
+	rules := rule_testing.EntriesOf(test, panicking)
 
 	first, recorded := walkAndRecord(test, root, rules, nil)
 	if len(first.Coverage.RulesCrashed) != 1 {
@@ -343,7 +344,7 @@ func TestAFileARuleCrashedOnIsWalkedAgainNotReplayed(test *testing.T) {
 
 // typeAwareRule is a type-aware rule the findings cache now caches: it reads the checker and not the
 // program, and its finding on `-value` depends on value's type, which can come from another file.
-func typeAwareRule(test *testing.T) rule.Rule {
+func typeAwareRule(test *testing.T) rule.Entry {
 	test.Helper()
 	for _, registered := range registry.All() {
 		if registered.Name == "@typescript-eslint/no-unsafe-unary-minus" {
@@ -357,7 +358,7 @@ func typeAwareRule(test *testing.T) rule.Rule {
 		}
 	}
 	test.Fatal("no-unsafe-unary-minus is not registered, so this test proves nothing")
-	return rule.Rule{}
+	return rule.Entry{}
 }
 
 // walkAndRecord walks a freshly built graph with the given previous cache and returns the result and
@@ -365,7 +366,7 @@ func typeAwareRule(test *testing.T) rule.Rule {
 func walkAndRecord(
 	test *testing.T,
 	root string,
-	rules []rule.Rule,
+	rules []rule.Entry,
 	previous *program.LintCache,
 ) (program.Result, *program.LintCache) {
 	test.Helper()
@@ -382,7 +383,7 @@ func walkAndRecord(
 	return result, reuse.Recorded()
 }
 
-func plainWalk(test *testing.T, root string, rules []rule.Rule) program.Result {
+func plainWalk(test *testing.T, root string, rules []rule.Entry) program.Result {
 	test.Helper()
 	graph, buildError := program.Build(program.Options{ConfigFileName: filepath.Join(root, "tsconfig.json")})
 	if buildError != nil {
@@ -519,8 +520,8 @@ func TestAnEditToAGlobalDeclarationReachesEveryTypeAwareFinding(test *testing.T)
 // stays uncacheable.
 func TestCacheClassesSplitsFiveWays(test *testing.T) {
 	test.Parallel()
-	fingerprint := func(rule.Program, any) [sha256.Size]byte { return [sha256.Size]byte{1} }
-	pure, typeAware, design, derived, never := program.CacheClasses([]rule.Rule{
+	fingerprint := func(rule.Program, rule.Given[rule.NoOptions]) [sha256.Size]byte { return [sha256.Size]byte{1} }
+	classified := rule_testing.EntriesOf(test, []rule.Rule[rule.NoOptions]{
 		{Name: "pure"},
 		{Name: "options", ProgramReads: rule.ReadsCompilerOptions},
 		{Name: "typed", NeedsTypeChecker: true},
@@ -548,8 +549,9 @@ func TestCacheClassesSplitsFiveWays(test *testing.T) {
 			ProgramFingerprint: fingerprint,
 		},
 		{Name: "fingerprint-alone", ProgramFingerprint: fingerprint},
-	})
-	names := func(rules []rule.Rule) string {
+	}...)
+	pure, typeAware, design, derived, never := program.CacheClasses(classified)
+	names := func(rules []rule.Entry) string {
 		joined := ""
 		for _, subject := range rules {
 			joined += subject.Name + " "
@@ -585,12 +587,12 @@ func TestAReplayingWalkCountsTheNotesAPlainWalkCounts(test *testing.T) {
 		needsTypeChecker bool,
 		reads rule.ProgramRead,
 		key func(ruleContext rule.Context, declaration *ast.Node) string,
-	) rule.Rule {
-		return rule.Rule{
+	) rule.Rule[rule.NoOptions] {
+		return rule.Rule[rule.NoOptions]{
 			Name:             name,
 			NeedsTypeChecker: needsTypeChecker,
 			ProgramReads:     reads,
-			Run: func(ruleContext rule.Context, options any) rule.Listeners {
+			Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 				return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
 					if noted := key(ruleContext, node); noted != "" {
 						ruleContext.Note(noted)
@@ -601,7 +603,7 @@ func TestAReplayingWalkCountsTheNotesAPlainWalkCounts(test *testing.T) {
 	}
 	// The type-aware rule notes only strings, so after lib.ts turns its value into a number it notes nothing
 	// in consumer.ts, and a refresh that kept its old notes would show.
-	rules := []rule.Rule{
+	rules := rule_testing.EntriesOf(test,
 		noting(
 			"test-notes-pure",
 			false,
@@ -622,7 +624,7 @@ func TestAReplayingWalkCountsTheNotesAPlainWalkCounts(test *testing.T) {
 			rule.ReadsOtherFiles,
 			func(ruleContext rule.Context, declaration *ast.Node) string { return "walked" },
 		),
-	}
+	)
 	if pure, typeAware, _, _, uncacheable := program.CacheClasses(
 		rules,
 	); len(pure) != 1 || len(typeAware) != 1 || len(uncacheable) != 1 {

@@ -76,10 +76,10 @@ var messagePreferRegexpExecOverStringMatch = rule.Message{
 // Upstream's corpus contains no such case -- every one of its twelve reporting cases has a bare
 // identifier or literal receiver in statement position -- so this is measured from the installed
 // build directly and pinned in a fixture of its own.
-var PreferRegexpExec = rule.Rule{
+var PreferRegexpExec = rule.Rule[rule.NoOptions]{
 	Name:             "@typescript-eslint/prefer-regexp-exec",
 	NeedsTypeChecker: true,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.TypeChecker == nil {
 			return rule.Listeners{}
 		}

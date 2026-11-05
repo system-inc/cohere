@@ -532,9 +532,10 @@ func (walker *Walker) hasObjectPart(subjectType *checker.Type) bool {
 		// Only the members a walk pairs; see relate. An object member counts unless a primitive one makes it
 		// a brand (#b9a0wgy).
 		return slices.ContainsFunc(subjectType.Types(), walker.isSlotContainer) ||
-			(!hasPrimitiveMember(subjectType) && slices.ContainsFunc(subjectType.Types(), func(member *checker.Type) bool {
-				return member.Flags()&checker.TypeFlagsObject != 0
-			}))
+			(!hasPrimitiveMember(subjectType) &&
+				slices.ContainsFunc(subjectType.Types(), func(member *checker.Type) bool {
+					return member.Flags()&checker.TypeFlagsObject != 0
+				}))
 	case subjectType.Flags()&checker.TypeFlagsTypeParameter != 0:
 		constraint := checker.Checker_getBaseConstraintOfType(walker.typeChecker, subjectType)
 		return constraint != nil && constraint != subjectType && walker.hasObjectPart(constraint)

@@ -119,7 +119,11 @@ func Load(configuration Config, patterns ...string) (*Loaded, error) {
 				extended = append(extended, imported)
 			}
 			sort.Strings(extended[len(patterns):])
-			if listed, listError = list(configuration.Directory, configuration.Environment, extended); listError != nil {
+			if listed, listError = list(
+				configuration.Directory,
+				configuration.Environment,
+				extended,
+			); listError != nil {
 				return nil, listError
 			}
 		}

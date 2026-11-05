@@ -539,10 +539,10 @@ func TestJsxKeyStaysSilent(test *testing.T) {
 // decodeJsxKeyOptionsForTest routes a fixture's raw JSON through the rule's own decoder.
 //
 // The three options all default to false, so this changes no value today. It is here because the
-// decoder owns the nil path, which is what a bare `"error"` configuration produces, and because a
+// decoder owns the empty-input path, which is what a bare `"error"` configuration hands it, and because a
 // fixture building the struct directly would stop exercising the decoder the moment one of these
 // options grows a non-zero default.
-func decodeJsxKeyOptionsForTest(test *testing.T, raw string) any {
+func decodeJsxKeyOptionsForTest(test *testing.T, raw string) JsxKeyOptions {
 	test.Helper()
 	options, decodeJsxKeyOptionsError := DecodeJsxKeyOptions([]byte(raw))
 	if decodeJsxKeyOptionsError != nil {
@@ -667,24 +667,24 @@ func TestJsxKeyDuplicateOrderIsStable(test *testing.T) {
 
 // TestJsxKeyHandlesNilOptions pins the path that bypasses the decoder.
 //
-// A rule can reach `Run` with nil, and the comma-ok assertion then yields the zero struct, which is
-// upstream's defaults here because all three options are false. The test exists because that
+// A rule can reach `Run` with the zero `rule.Given`, whose `Read` then returns false and the zero struct,
+// which is upstream's defaults here because all three options are false. The test exists because that
 // coincidence is not obvious from the code and a later option with a true default would break it
 // silently.
 func TestJsxKeyHandlesNilOptions(test *testing.T) {
 	test.Parallel()
 
-	result := rule_testing.RunWithOptions(test, JsxKey, jsxKeyFile, "[<App />];", nil)
+	result := rule_testing.Run(test, JsxKey, jsxKeyFile, "[<App />];")
 	rule_testing.ExpectFindings(test, result, "missingArrayKey")
 
-	// And the three option-gated judgments stay off, which is the half a nil-options bug would
+	// And the three option-gated judgments stay off, which is the half an unconfigured-path bug would
 	// turn on rather than off.
 	for _, source := range []string{
 		"[1,2,3].map(x => <>{x}</>);",
 		"[<App {...obj} key=\"k\" />];",
 		"[<span key=\"a\"/>, <span key=\"a\"/>];",
 	} {
-		rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, JsxKey, jsxKeyFile, source, nil))
+		rule_testing.ExpectClean(test, rule_testing.Run(test, JsxKey, jsxKeyFile, source))
 	}
 }
 
@@ -704,7 +704,7 @@ func TestJsxKeyHasNoFileGate(test *testing.T) {
 	} {
 		test.Run(fileName, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, JsxKey, fileName, source, nil)
+			result := rule_testing.Run(test, JsxKey, fileName, source)
 			rule_testing.ExpectFindings(test, result, "missingArrayKey")
 		})
 	}

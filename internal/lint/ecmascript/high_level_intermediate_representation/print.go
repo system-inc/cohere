@@ -103,7 +103,12 @@ func printValue(function *Function, value InstructionValue) string {
 	case *StoreContext:
 		return fmt.Sprintf("StoreContext %s %s = %s", typed.Kind, place(typed.LValue), place(typed.Value))
 	case *Destructure:
-		return fmt.Sprintf("Destructure %s %s = %s", typed.Kind, printPattern(function, typed.LValue), place(typed.Value))
+		return fmt.Sprintf(
+			"Destructure %s %s = %s",
+			typed.Kind,
+			printPattern(function, typed.LValue),
+			place(typed.Value),
+		)
 	case *LoadGlobal:
 		if typed.Source != "" {
 			return fmt.Sprintf("LoadGlobal %s from %q", typed.Name, typed.Source)
@@ -118,15 +123,30 @@ func printValue(function *Function, value InstructionValue) string {
 	case *PropertyDelete:
 		return fmt.Sprintf("PropertyDelete %s.%s", place(typed.Object), typed.Property)
 	case *ComputedLoad:
-		return fmt.Sprintf("ComputedLoad %s%s[%s]", place(typed.Object), optionalMark(typed.Optional), place(typed.Property))
+		return fmt.Sprintf(
+			"ComputedLoad %s%s[%s]",
+			place(typed.Object),
+			optionalMark(typed.Optional),
+			place(typed.Property),
+		)
 	case *ComputedStore:
 		return fmt.Sprintf("ComputedStore %s[%s] = %s", place(typed.Object), place(typed.Property), place(typed.Value))
 	case *ComputedDelete:
 		return fmt.Sprintf("ComputedDelete %s[%s]", place(typed.Object), place(typed.Property))
 	case *CallExpression:
-		return fmt.Sprintf("Call %s%s(%s)", place(typed.Callee), optionalMark(typed.Optional), printArgs(function, typed.Args))
+		return fmt.Sprintf(
+			"Call %s%s(%s)",
+			place(typed.Callee),
+			optionalMark(typed.Optional),
+			printArgs(function, typed.Args),
+		)
 	case *MethodCall:
-		return fmt.Sprintf("MethodCall %s.%s(%s)", place(typed.Receiver), place(typed.Property), printArgs(function, typed.Args))
+		return fmt.Sprintf(
+			"MethodCall %s.%s(%s)",
+			place(typed.Receiver),
+			place(typed.Property),
+			printArgs(function, typed.Args),
+		)
 	case *NewExpression:
 		return fmt.Sprintf("New %s(%s)", place(typed.Callee), printArgs(function, typed.Args))
 	case *BinaryExpression:
@@ -138,7 +158,7 @@ func printValue(function *Function, value InstructionValue) string {
 	case *PostfixUpdate:
 		return fmt.Sprintf("PostfixUpdate %s%s", place(typed.Value), typed.Operation)
 	case *Primitive:
-		return fmt.Sprintf("Primitive %v", typed.Value)
+		return "Primitive " + printPrimitiveValue(typed.Value)
 	case *RegExpLiteral:
 		return fmt.Sprintf("RegExp /%s/%s", typed.Pattern, typed.Flags)
 	case *TemplateLiteral:
@@ -229,6 +249,27 @@ func printValue(function *Function, value InstructionValue) string {
 	return "<unknown>"
 }
 
+// printPrimitiveValue renders a literal as bare text: a number, a string and a bigint as the text
+// they hold, a boolean as `true` or `false`, and null and undefined by name so the two read apart.
+// A `Primitive` built with no value at all prints `<nil>`.
+func printPrimitiveValue(value PrimitiveValue) string {
+	switch typed := value.(type) {
+	case PrimitiveNull:
+		return "null"
+	case PrimitiveUndefined:
+		return "undefined"
+	case PrimitiveBoolean:
+		return fmt.Sprintf("%t", bool(typed))
+	case PrimitiveNumber:
+		return string(typed)
+	case PrimitiveString:
+		return string(typed)
+	case PrimitiveBigInt:
+		return string(typed)
+	}
+	return "<nil>"
+}
+
 func printPattern(function *Function, pattern Pattern) string {
 	switch typed := pattern.(type) {
 	case *PlacePattern:
@@ -310,7 +351,12 @@ func printTerminal(function *Function, terminal Terminal) string {
 			}
 			parts = append(parts, fmt.Sprintf("%s -> bb%d", place(*kase.Test), kase.Block))
 		}
-		return fmt.Sprintf("Switch %s [%s] fallthrough=bb%d", place(typed.Test), strings.Join(parts, ", "), typed.Fallthrough)
+		return fmt.Sprintf(
+			"Switch %s [%s] fallthrough=bb%d",
+			place(typed.Test),
+			strings.Join(parts, ", "),
+			typed.Fallthrough,
+		)
 	case *While:
 		return fmt.Sprintf("While test=bb%d loop=bb%d fallthrough=bb%d", typed.Test, typed.Loop, typed.Fallthrough)
 	case *DoWhile:
@@ -332,7 +378,12 @@ func printTerminal(function *Function, terminal Terminal) string {
 	case *Ternary:
 		return fmt.Sprintf("Ternary test=bb%d fallthrough=bb%d", typed.Test, typed.Fallthrough)
 	case *Optional:
-		return fmt.Sprintf("Optional optional=%t test=bb%d fallthrough=bb%d", typed.Optional, typed.Test, typed.Fallthrough)
+		return fmt.Sprintf(
+			"Optional optional=%t test=bb%d fallthrough=bb%d",
+			typed.Optional,
+			typed.Test,
+			typed.Fallthrough,
+		)
 	case *Sequence:
 		return fmt.Sprintf("Sequence block=bb%d fallthrough=bb%d", typed.Block, typed.Fallthrough)
 	case *Label:

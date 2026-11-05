@@ -172,12 +172,12 @@ type GatingOptions struct {
 // `directive.value.value`, which is Babel's cooked value, and interpolates the same cooked value
 // into the message. So the finding text prints the cooked form on both sides. This is the one place
 // where the port brief's warning about cooked-versus-raw text resolves in favor of cooked.
-var Gating = rule.Rule{
+var Gating = rule.Rule[GatingOptions]{
 	// No namespace prefix. The config writes `react/gating`; the parity guard strips the namespace
 	// on a `/` boundary, so `react-gating` would match no inventory entry and lint nothing.
 	Name: "react-hooks/gating",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		gatingOptions, _ := rule.OptionsAs[GatingOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[GatingOptions]) rule.Listeners {
+		gatingOptions, _ := options.Read()
 		if gatingOptions.RequireDynamicGatingOption {
 			return nil
 		}

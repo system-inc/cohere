@@ -162,11 +162,11 @@ func classOrderOptionsFrom(configured EnforceConsistentClassOrderOptions) classO
 // ` ` decodes to a space, so the decoded classes cannot be written back at the source's offsets
 // without rewriting the escape too, and a fix that silently decodes an author's escape is a change
 // they did not ask for. `reorderFixes` names the other two cases.
-var EnforceConsistentClassOrder = rule.Rule{
+var EnforceConsistentClassOrder = rule.Rule[EnforceConsistentClassOrderOptions]{
 	Name: "better-tailwindcss/enforce-consistent-class-order",
 	// The design system: its stylesheets, read through the recording file system (DesignSystemFS).
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDesignSystem,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[EnforceConsistentClassOrderOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}
@@ -174,7 +174,7 @@ var EnforceConsistentClassOrder = rule.Rule{
 		// Read before the design system is resolved: reading is pure, and a run that declines for want
 		// of a Tailwind entry point must still reach it, or the registry's decoder agreement check
 		// never looks at this rule (#zwd43jn).
-		configured, isConfigured := rule.OptionsAs[EnforceConsistentClassOrderOptions](options)
+		configured, isConfigured := options.Read()
 
 		// The design system is resolved once per file rather than once per literal, and before the
 		// listeners are built so a repository whose CSS will not parse costs one lookup rather than

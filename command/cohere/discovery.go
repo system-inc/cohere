@@ -536,7 +536,11 @@ type unclaimedSwiftDirectory struct {
 // The top directory of unclaimed files is a path's first segment: no marker is at or above them, so none is
 // at that directory, and it is the shallowest one holding them. So CapturePhone/Sources/App and
 // CapturePhone/Tests are both CapturePhone/.
-func claimSwiftFiles(swiftFiles map[string]int, projects []discoveredProject, xcodeCandidates map[string]bool) ([]discoveredProject, []unclaimedSwiftDirectory) {
+func claimSwiftFiles(
+	swiftFiles map[string]int,
+	projects []discoveredProject,
+	xcodeCandidates map[string]bool,
+) ([]discoveredProject, []unclaimedSwiftDirectory) {
 	packages := map[string]bool{}
 	for _, project := range projects {
 		if project.Engine == engineSwift {
@@ -565,7 +569,10 @@ func claimSwiftFiles(swiftFiles map[string]int, projects []discoveredProject, xc
 	}
 	// In path order, the root's first, so the report reads the same on every run.
 	sort.Slice(unclaimed, func(left, right int) bool {
-		return pathBefore(strings.TrimSuffix(unclaimed[left].Directory, "/"), strings.TrimSuffix(unclaimed[right].Directory, "/"))
+		return pathBefore(
+			strings.TrimSuffix(unclaimed[left].Directory, "/"),
+			strings.TrimSuffix(unclaimed[right].Directory, "/"),
+		)
 	})
 	xcodeProjects := make([]discoveredProject, 0, len(claiming))
 	for directory := range claiming {
@@ -577,7 +584,11 @@ func claimSwiftFiles(swiftFiles map[string]int, projects []discoveredProject, xc
 // nearestSwiftMarker is the nearest directory at or above a slash directory holding a Swift marker, whether it
 // is an Xcode candidate rather than a package, and whether there is one at all. No directory holds both, since
 // a Package.swift makes its directory no candidate.
-func nearestSwiftMarker(directory string, packages map[string]bool, xcodeCandidates map[string]bool) (string, bool, bool) {
+func nearestSwiftMarker(
+	directory string,
+	packages map[string]bool,
+	xcodeCandidates map[string]bool,
+) (string, bool, bool) {
 	for {
 		if packages[directory] {
 			return directory, false, true

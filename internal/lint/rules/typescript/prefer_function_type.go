@@ -69,10 +69,10 @@ import (
 // installed 8.67.0 build and then handed to the TypeScript parser, which rejects it with
 // "';' expected". The finding is reproduced and the repair is withheld, because a fix is applied
 // unattended and this one turns working code into a syntax error.
-var PreferFunctionType = rule.Rule{
+var PreferFunctionType = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/prefer-function-type",
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindInterfaceDeclaration: func(node *ast.Node) {
 				declaration := node.AsInterfaceDeclaration()

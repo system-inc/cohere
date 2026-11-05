@@ -41,7 +41,7 @@ type NoInferrableTypesOptions struct {
 // Empty input is legal and means both flags off, which is upstream's `defaultOptions`. The generic
 // decoder errors on empty input, which is the only reason this is hand written: the defaults here
 // really are the zero value.
-func DecodeNoInferrableTypesOptions(raw []byte) (any, error) {
+func DecodeNoInferrableTypesOptions(raw []byte) (NoInferrableTypesOptions, error) {
 	var options NoInferrableTypesOptions
 	if len(raw) == 0 {
 		return options, nil
@@ -93,10 +93,10 @@ func DecodeNoInferrableTypesOptions(raw []byte) (any, error) {
 // `function f(a? = 5)`, which does not parse. Upstream reaches them with `getTokenBefore`; here they
 // are their own nodes on the parameter and the property, measured, so each is removed by its own
 // range rather than by scanning.
-var NoInferrableTypes = rule.Rule{
+var NoInferrableTypes = rule.Rule[NoInferrableTypesOptions]{
 	Name: "@typescript-eslint/no-inferrable-types",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, configured := rule.OptionsAs[NoInferrableTypesOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[NoInferrableTypesOptions]) rule.Listeners {
+		settings, configured := options.Read()
 		if !configured {
 			settings = NoInferrableTypesOptions{}
 		}
@@ -267,7 +267,12 @@ func noInferrableTypesAnnotationSpan(ruleContext rule.Context, annotation *ast.N
 
 // noInferrableTypesIsSpaceByte answers whether a byte is ASCII whitespace.
 func noInferrableTypesIsSpaceByte(character byte) bool {
-	return character == ' ' || character == '\t' || character == '\n' || character == '\r' || character == '\v' || character == '\f'
+	return character == ' ' ||
+		character == '\t' ||
+		character == '\n' ||
+		character == '\r' ||
+		character == '\v' ||
+		character == '\f'
 }
 
 // noInferrableTypesAnnotationName answers upstream's `isInferrable`, and the type name to report.

@@ -30,9 +30,9 @@ var messageUnexpectedDebugger = rule.Message{
 // body of an unbraced `if`, a loop or a label, removing it leaves `if (foo)` with no statement, which
 // does not parse (ESLint's own corpus row, caught by the harness's fix-parses check, #kq9vtva), so
 // there the finding stands without a repair.
-var NoDebugger = rule.Rule{
+var NoDebugger = rule.Rule[rule.NoOptions]{
 	Name: "no-debugger",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindDebuggerStatement: func(node *ast.Node) {
 				if !noDebuggerSitsInAStatementList(node) {

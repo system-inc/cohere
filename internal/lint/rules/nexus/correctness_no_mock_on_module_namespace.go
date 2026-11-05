@@ -100,7 +100,7 @@ var correctnessNoMockOnModuleNamespaceMockMethods = map[string]bool{
 //
 // The repair depends on what the module is: a builtin's CommonJS exports through `createRequire`, a
 // seam the code under test takes as a parameter, or `mock.module`. A fixer would have to pick one.
-var CorrectnessNoMockOnModuleNamespace = rule.Rule{
+var CorrectnessNoMockOnModuleNamespace = rule.Rule[rule.NoOptions]{
 	Name: "nexus/correctness-no-mock-on-module-namespace",
 
 	// The mock call is told from any other `method` by its resolved declaration, and the namespace
@@ -114,7 +114,7 @@ var CorrectnessNoMockOnModuleNamespace = rule.Rule{
 	// it resolves the argument to is declared in the file itself.
 	TypeReach: rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.TypeChecker == nil || ruleContext.Program == nil {
 			// Telling node:test's MockTracker from any other `method`, and a namespace import from a
 			// value of the same type, are questions for the checker.

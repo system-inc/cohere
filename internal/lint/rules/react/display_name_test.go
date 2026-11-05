@@ -1137,17 +1137,13 @@ func TestDecodeDisplayNameOptions(test *testing.T) {
 			if decodeDisplayNameOptionsError != nil {
 				test.Fatalf("unexpected error: %v", decodeDisplayNameOptionsError)
 			}
-			options, isOptions := decoded.(DisplayNameOptions)
-			if !isOptions {
-				test.Fatalf("decoder returned %T, want DisplayNameOptions", decoded)
-			}
-			if options.IgnoreTranspilerName != testCase.wantIgnore {
+			if decoded.IgnoreTranspilerName != testCase.wantIgnore {
 				test.Errorf("IgnoreTranspilerName is %v, want %v",
-					options.IgnoreTranspilerName, testCase.wantIgnore)
+					decoded.IgnoreTranspilerName, testCase.wantIgnore)
 			}
-			if options.CheckContextObjects != testCase.wantCheckContext {
+			if decoded.CheckContextObjects != testCase.wantCheckContext {
 				test.Errorf("CheckContextObjects is %v, want %v",
-					options.CheckContextObjects, testCase.wantCheckContext)
+					decoded.CheckContextObjects, testCase.wantCheckContext)
 			}
 		})
 	}
@@ -1155,19 +1151,19 @@ func TestDecodeDisplayNameOptions(test *testing.T) {
 
 // TestDisplayNameNilOptionsFallsBackToTheDefault bypasses the decoder entirely.
 //
-// A rule configured as a bare `"error"` can reach `Run` with nil options, where `options.(T)` yields
-// the zero value. Both defaults are false so the zero value is right, and this pins that rather
-// than leaving it to luck.
+// A rule configured as a bare `"error"` can reach `Run` with the zero `rule.Given`, whose `Read` returns
+// false and the zero value. Both defaults are false so the zero value is right, and this pins that
+// rather than leaving it to luck.
 func TestDisplayNameNilOptionsFallsBackToTheDefault(test *testing.T) {
 	test.Parallel()
 
 	sourceText := "import {memo} from 'react';\nconst C = memo(() => <div/>);\n"
-	result := rule_testing.RunTypedWithOptions(test, DisplayName, displayNameFile, sourceText, nil)
+	result := rule_testing.RunTyped(test, DisplayName, displayNameFile, sourceText)
 	rule_testing.ExpectFindings(test, result, "noDisplayName")
 
 	// The control: with the context option defaulting to false, a bare createContext is silent.
 	contextText := "const C = React.createContext();\n"
-	contextResult := rule_testing.RunTypedWithOptions(test, DisplayName, displayNameFile, contextText, nil)
+	contextResult := rule_testing.RunTyped(test, DisplayName, displayNameFile, contextText)
 	rule_testing.ExpectClean(test, contextResult)
 }
 

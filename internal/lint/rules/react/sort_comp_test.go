@@ -432,7 +432,7 @@ var sortCompSilentCases = []sortCompCase{
 // is what the config layer calls and it carries two behaviours nothing else would test: the
 // empty-input path a bare `"error"` configuration takes, and the pointer fields that keep an
 // explicitly empty `order` distinct from an absent one.
-func decodedSortCompOptions(test *testing.T, raw string) any {
+func decodedSortCompOptions(test *testing.T, raw string) SortCompOptions {
 	test.Helper()
 	decoded, decodeSortCompOptionsError := DecodeSortCompOptions([]byte(raw))
 	if decodeSortCompOptionsError != nil {
@@ -504,8 +504,8 @@ func TestSortCompHasNoFileGate(test *testing.T) {
 
 // TestSortCompSurvivesNilOptions covers the path a bare `"error"` configuration takes.
 //
-// A rule configured without options is handed nil rather than the decoded default, and `options.(T)`
-// on nil yields the zero value silently. For this rule the zero value is an empty order, which
+// A rule configured without options is handed the zero `rule.Given` rather than the decoded default, and
+// its `Read` returns false and the zero value silently. For this rule the zero value is an empty order, which
 // matches nothing and reports nothing, so without the explicit fallback in `Run` this rule would
 // register on every file in the tree and judge none of them. That is the inert-rule shape that
 // reads exactly like a clean tree, so it is pinned here rather than trusted.
@@ -514,7 +514,7 @@ func TestSortCompSurvivesNilOptions(test *testing.T) {
 
 	const reporting = "class Hello extends React.Component {\n  render() { return <div>Hello</div>; }\n  componentDidMount() {}\n}\n"
 
-	result := rule_testing.RunWithOptions(test, SortComp, sortCompFile, reporting, nil)
+	result := rule_testing.Run(test, SortComp, sortCompFile, reporting)
 	rule_testing.ExpectFindings(test, result, "unsortedProps")
 }
 

@@ -137,7 +137,7 @@ import (
 // The anchor is `KindPrefixUnaryExpression` and the operator test is the first line, so every `+`,
 // `!`, `~`, `++` and `--` exits before the checker is touched. Only `-` pays for a type query, and
 // a negated numeric literal is the overwhelmingly common case in real source.
-var NoUnsafeUnaryMinus = rule.Rule{
+var NoUnsafeUnaryMinus = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/no-unsafe-unary-minus",
 
 	// The listener reads ctx.TypeChecker on every `-` operand, so the checker is required rather
@@ -145,7 +145,7 @@ var NoUnsafeUnaryMinus = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindPrefixUnaryExpression: func(node *ast.Node) {
 				if ruleContext.TypeChecker == nil {

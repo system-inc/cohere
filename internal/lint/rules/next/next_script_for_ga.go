@@ -129,12 +129,12 @@ var googleAnalyticsInlineMarkers = []string{
 // The finding points at the tag name, six characters of `script`, taken from the snapshot's caret.
 // No fix: the repair is an import plus a component plus a strategy choice, which upstream does not
 // attempt either.
-var NextScriptForGa = rule.Rule{
+var NextScriptForGa = rule.Rule[rule.NoOptions]{
 	// No namespace prefix. The config writes `nextjs/next-script-for-ga` and the parity guard strips
 	// the namespace on a `/` boundary, so a prefixed name would match no inventory entry and lint no
 	// files while every fixture in this package stayed green.
 	Name: "@next/next/next-script-for-ga",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		report := func(node *ast.Node) {
 			tagName, attributes := jsx.ElementParts(node)
 			// The tag is compared case-sensitively to the lowercase intrinsic, unlike the two

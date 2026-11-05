@@ -26,7 +26,7 @@ func initDeclarationsCaseName(index int) string {
 // store only the first element after the severity, so the first version of this decoder read a list,
 // every fixture passed, and it failed at run time on the first real configuration. The fixtures here
 // pass the list, which is now what the config layer delivers; the decoder test pins that it does.
-func decodeInitDeclarationsOptionsForTest(test *testing.T, raw string) any {
+func decodeInitDeclarationsOptionsForTest(test *testing.T, raw string) InitDeclarationsOptions {
 	test.Helper()
 	decoded, decodeInitDeclarationsOptionsError := DecodeInitDeclarationsOptions(json.RawMessage(raw))
 	if decodeInitDeclarationsOptionsError != nil {
@@ -612,12 +612,8 @@ func TestInitDeclarationsDecoderReadsThePositionalArray(test *testing.T) {
 		test.Run(testCase.raw, func(test *testing.T) {
 			test.Parallel()
 			decoded := decodeInitDeclarationsOptionsForTest(test, testCase.raw)
-			settings, isSettings := decoded.(InitDeclarationsOptions)
-			if !isSettings {
-				test.Fatalf("the decoder returned %T rather than the rule's own options type", decoded)
-			}
-			if settings != testCase.want {
-				test.Errorf("decoded to %+v, wanted %+v", settings, testCase.want)
+			if decoded != testCase.want {
+				test.Errorf("decoded to %+v, wanted %+v", decoded, testCase.want)
 			}
 		})
 	}
@@ -675,9 +671,8 @@ func TestInitDeclarationsIsInertWhenNamedWithoutAMode(test *testing.T) {
 
 	const sourceText = "var foo;\nvar bar = 1;\n"
 
-	// Handed nil, which is what the config layer passes for a rule named as a bare severity.
-	rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, InitDeclarations,
-		initDeclarationsFile, sourceText, nil))
+	// Handed no options, which is what the config layer passes for a rule named as a bare severity.
+	rule_testing.ExpectClean(test, rule_testing.Run(test, InitDeclarations, initDeclarationsFile, sourceText))
 
 	// Handed an empty array, which is the other spelling of the same configuration.
 	rule_testing.ExpectClean(test, runInitDeclarations(test, sourceText, `[]`))

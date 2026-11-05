@@ -59,11 +59,11 @@ func messageForbiddenTypeDefaultParam(propertyName string, forbiddenType string)
 //
 // The repair is to hoist the value to a module constant and name it, which means choosing that name
 // and a place to put it. Upstream ships no fixer either.
-var NoObjectTypeAsDefaultProp = rule.Rule{
+var NoObjectTypeAsDefaultProp = rule.Rule[rule.NoOptions]{
 	Name:             "react/no-object-type-as-default-prop",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}

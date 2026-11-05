@@ -27,36 +27,68 @@ func TestNoExtendNativeFires(test *testing.T) {
 
 	cases := []struct {
 		sourceText string
-		options    any
+		options    rule.Given[NoExtendNativeOptions]
 		builtins   []string
 	}{
-		{"Object.prototype.p = 0", nil, []string{"Object"}},
-		{"BigInt.prototype.p = 0", nil, []string{"BigInt"}},
-		{"WeakRef.prototype.p = 0", nil, []string{"WeakRef"}},
-		{"FinalizationRegistry.prototype.p = 0", nil, []string{"FinalizationRegistry"}},
-		{"AggregateError.prototype.p = 0", nil, []string{"AggregateError"}},
-		{"Function.prototype['p'] = 0", nil, []string{"Function"}},
-		{"String['prototype'].p = 0", nil, []string{"String"}},
-		{"Number['prototype']['p'] = 0", nil, []string{"Number"}},
-		{"Object.defineProperty(Array.prototype, 'p', {value: 0})", nil, []string{"Array"}},
-		{"Object.defineProperties(Array.prototype, {p: {value: 0}})", nil, []string{"Array"}},
-		{"Object.defineProperties(Array.prototype, {p: {value: 0}, q: {value: 0}})", nil, []string{"Array"}},
-		{"Number['prototype']['p'] = 0", NoExtendNativeOptions{Exceptions: []string{"Object"}}, []string{"Number"}},
-		{"Object.prototype.p = 0; Object.prototype.q = 0", nil, []string{"Object", "Object"}},
-		{"function foo() { Object.prototype.p = 0 }", nil, []string{"Object"}},
-		{"(Object?.prototype).p = 0", nil, []string{"Object"}},
-		{"Object.defineProperty(Object?.prototype, 'p', { value: 0 })", nil, []string{"Object"}},
-		{"Object?.defineProperty(Object.prototype, 'p', { value: 0 })", nil, []string{"Object"}},
-		{"(Object?.defineProperty)(Object.prototype, 'p', { value: 0 })", nil, []string{"Object"}},
-		{"Array.prototype.p &&= 0", nil, []string{"Array"}},
-		{"Array.prototype.p ||= 0", nil, []string{"Array"}},
-		{"Array.prototype.p ??= 0", nil, []string{"Array"}},
+		{"Object.prototype.p = 0", rule.Given[NoExtendNativeOptions]{}, []string{"Object"}},
+		{"BigInt.prototype.p = 0", rule.Given[NoExtendNativeOptions]{}, []string{"BigInt"}},
+		{"WeakRef.prototype.p = 0", rule.Given[NoExtendNativeOptions]{}, []string{"WeakRef"}},
+		{"FinalizationRegistry.prototype.p = 0", rule.Given[NoExtendNativeOptions]{}, []string{"FinalizationRegistry"}},
+		{"AggregateError.prototype.p = 0", rule.Given[NoExtendNativeOptions]{}, []string{"AggregateError"}},
+		{"Function.prototype['p'] = 0", rule.Given[NoExtendNativeOptions]{}, []string{"Function"}},
+		{"String['prototype'].p = 0", rule.Given[NoExtendNativeOptions]{}, []string{"String"}},
+		{"Number['prototype']['p'] = 0", rule.Given[NoExtendNativeOptions]{}, []string{"Number"}},
+		{
+			"Object.defineProperty(Array.prototype, 'p', {value: 0})",
+			rule.Given[NoExtendNativeOptions]{},
+			[]string{"Array"},
+		},
+		{
+			"Object.defineProperties(Array.prototype, {p: {value: 0}})",
+			rule.Given[NoExtendNativeOptions]{},
+			[]string{"Array"},
+		},
+		{
+			"Object.defineProperties(Array.prototype, {p: {value: 0}, q: {value: 0}})",
+			rule.Given[NoExtendNativeOptions]{},
+			[]string{"Array"},
+		},
+		{
+			"Number['prototype']['p'] = 0",
+			rule.Configured(NoExtendNativeOptions{Exceptions: []string{"Object"}}),
+			[]string{"Number"},
+		},
+		{
+			"Object.prototype.p = 0; Object.prototype.q = 0",
+			rule.Given[NoExtendNativeOptions]{},
+			[]string{"Object", "Object"},
+		},
+		{"function foo() { Object.prototype.p = 0 }", rule.Given[NoExtendNativeOptions]{}, []string{"Object"}},
+		{"(Object?.prototype).p = 0", rule.Given[NoExtendNativeOptions]{}, []string{"Object"}},
+		{
+			"Object.defineProperty(Object?.prototype, 'p', { value: 0 })",
+			rule.Given[NoExtendNativeOptions]{},
+			[]string{"Object"},
+		},
+		{
+			"Object?.defineProperty(Object.prototype, 'p', { value: 0 })",
+			rule.Given[NoExtendNativeOptions]{},
+			[]string{"Object"},
+		},
+		{
+			"(Object?.defineProperty)(Object.prototype, 'p', { value: 0 })",
+			rule.Given[NoExtendNativeOptions]{},
+			[]string{"Object"},
+		},
+		{"Array.prototype.p &&= 0", rule.Given[NoExtendNativeOptions]{}, []string{"Array"}},
+		{"Array.prototype.p ||= 0", rule.Given[NoExtendNativeOptions]{}, []string{"Array"}},
+		{"Array.prototype.p ??= 0", rule.Given[NoExtendNativeOptions]{}, []string{"Array"}},
 	}
 
 	for _, testCase := range cases {
 		test.Run(testCase.sourceText, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(test, NoExtendNative, extendNativeFile,
+			result := rule_testing.RunTypedGiven(test, NoExtendNative, extendNativeFile,
 				testCase.sourceText, testCase.options)
 			if len(result.Diagnostics) != len(testCase.builtins) {
 				test.Fatalf("wanted %d diagnostics, got %d", len(testCase.builtins), len(result.Diagnostics))
@@ -89,33 +121,33 @@ func TestNoExtendNativeStaysSilent(test *testing.T) {
 
 	cases := []struct {
 		sourceText string
-		options    any
+		options    rule.Given[NoExtendNativeOptions]
 	}{
-		{"x.prototype.p = 0", nil},
-		{"x.prototype['p'] = 0", nil},
-		{"Object.p = 0", nil},
-		{"Object.toString.bind = 0", nil},
-		{"Object['toString'].bind = 0", nil},
-		{"Object.defineProperty(x, 'p', {value: 0})", nil},
-		{"Object.defineProperties(x, {p: {value: 0}})", nil},
-		{"global.Object.prototype.toString = 0", nil},
-		{"this.Object.prototype.toString = 0", nil},
-		{"with(Object) { prototype.p = 0; }", nil},
-		{"o = Object; o.prototype.toString = 0", nil},
-		{"eval('Object.prototype.toString = 0')", nil},
-		{"parseFloat.prototype.x = 1", nil},
-		{"Object.prototype.g = 0", NoExtendNativeOptions{Exceptions: []string{"Object"}}},
-		{"obj[Object.prototype] = 0", nil},
-		{"Object.defineProperty()", nil},
-		{"Object.defineProperties()", nil},
-		{"function foo() { var Object = function() {}; Object.prototype.p = 0 }", nil},
-		{"{ let Object = function() {}; Object.prototype.p = 0 }", nil},
+		{"x.prototype.p = 0", rule.Given[NoExtendNativeOptions]{}},
+		{"x.prototype['p'] = 0", rule.Given[NoExtendNativeOptions]{}},
+		{"Object.p = 0", rule.Given[NoExtendNativeOptions]{}},
+		{"Object.toString.bind = 0", rule.Given[NoExtendNativeOptions]{}},
+		{"Object['toString'].bind = 0", rule.Given[NoExtendNativeOptions]{}},
+		{"Object.defineProperty(x, 'p', {value: 0})", rule.Given[NoExtendNativeOptions]{}},
+		{"Object.defineProperties(x, {p: {value: 0}})", rule.Given[NoExtendNativeOptions]{}},
+		{"global.Object.prototype.toString = 0", rule.Given[NoExtendNativeOptions]{}},
+		{"this.Object.prototype.toString = 0", rule.Given[NoExtendNativeOptions]{}},
+		{"with(Object) { prototype.p = 0; }", rule.Given[NoExtendNativeOptions]{}},
+		{"o = Object; o.prototype.toString = 0", rule.Given[NoExtendNativeOptions]{}},
+		{"eval('Object.prototype.toString = 0')", rule.Given[NoExtendNativeOptions]{}},
+		{"parseFloat.prototype.x = 1", rule.Given[NoExtendNativeOptions]{}},
+		{"Object.prototype.g = 0", rule.Configured(NoExtendNativeOptions{Exceptions: []string{"Object"}})},
+		{"obj[Object.prototype] = 0", rule.Given[NoExtendNativeOptions]{}},
+		{"Object.defineProperty()", rule.Given[NoExtendNativeOptions]{}},
+		{"Object.defineProperties()", rule.Given[NoExtendNativeOptions]{}},
+		{"function foo() { var Object = function() {}; Object.prototype.p = 0 }", rule.Given[NoExtendNativeOptions]{}},
+		{"{ let Object = function() {}; Object.prototype.p = 0 }", rule.Given[NoExtendNativeOptions]{}},
 	}
 
 	for _, testCase := range cases {
 		test.Run(testCase.sourceText, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoExtendNative,
+			rule_testing.ExpectClean(test, rule_testing.RunTypedGiven(test, NoExtendNative,
 				extendNativeFile, testCase.sourceText, testCase.options))
 		})
 	}
@@ -144,8 +176,8 @@ func TestNoExtendNativeReportsTheWholeExtension(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.sourceText, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(test, NoExtendNative, extendNativeFile,
-				testCase.sourceText, nil)
+			result := rule_testing.RunTyped(test, NoExtendNative, extendNativeFile,
+				testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				test.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 			}
@@ -184,8 +216,8 @@ func TestNoExtendNativeDeclinesShapesTheCorpusOmits(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoExtendNative,
-				extendNativeFile, testCase.sourceText, nil))
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoExtendNative,
+				extendNativeFile, testCase.sourceText))
 		})
 	}
 }
@@ -204,33 +236,29 @@ func TestNoExtendNativeDecodesItsOptions(test *testing.T) {
 	if decodeError != nil {
 		test.Fatalf("decoding failed: %v", decodeError)
 	}
-	settings, ok := decoded.(NoExtendNativeOptions)
-	if !ok {
-		test.Fatalf("decoded to %T", decoded)
-	}
-	if len(settings.Exceptions) != 1 || settings.Exceptions[0] != "Object" {
-		test.Fatalf("exceptions decoded as %#v", settings.Exceptions)
+	if len(decoded.Exceptions) != 1 || decoded.Exceptions[0] != "Object" {
+		test.Fatalf("exceptions decoded as %#v", decoded.Exceptions)
 	}
 
 	// And the decoded value reaches the rule: the same input reports without the exception.
 	rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoExtendNative, extendNativeFile,
 		"Object.prototype.p = 0", decoded))
-	if got := len(rule_testing.RunTypedWithOptions(test, NoExtendNative, extendNativeFile,
-		"Object.prototype.p = 0", nil).Diagnostics); got != 1 {
+	if got := len(rule_testing.RunTyped(test, NoExtendNative, extendNativeFile,
+		"Object.prototype.p = 0").Diagnostics); got != 1 {
 		test.Fatalf("without the exception the same input gave %d diagnostics", got)
 	}
 }
 
-// A rule configured as a bare "error" is handed nil, which must land on the strict default.
+// A rule configured as a bare "error" is handed no options, which must land on the strict default.
 //
 // This bypasses the decoder entirely, which is the path a bare `"error"` actually takes: the config
-// turns a decode error on empty input into nil, and a type assertion on nil yields the zero value.
-// The zero value being correct here is a coincidence worth pinning rather than relying on.
+// runs the rule unconfigured, and reading unconfigured options yields the zero value. The zero value
+// being correct here is a coincidence worth pinning rather than relying on.
 func TestNoExtendNativeDefaultsWithoutTheDecoder(test *testing.T) {
 	test.Parallel()
 
-	rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, NoExtendNative, extendNativeFile,
-		"Object.prototype.p = 0", nil), "unexpected")
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoExtendNative, extendNativeFile,
+		"Object.prototype.p = 0"), "unexpected")
 }
 
 // The typed harness is required, and a revert to the plain one must fail loudly.
@@ -242,11 +270,11 @@ func TestNoExtendNativeNeedsTheTypedHarness(test *testing.T) {
 
 	const source = "Object.prototype.p = 0"
 
-	rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, NoExtendNative, extendNativeFile,
-		source, nil), "unexpected")
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoExtendNative, extendNativeFile,
+		source), "unexpected")
 
-	if got := len(rule_testing.RunWithOptions(test, NoExtendNative, extendNativeFile,
-		source, nil).Diagnostics); got != 0 {
+	if got := len(rule_testing.Run(test, NoExtendNative, extendNativeFile,
+		source).Diagnostics); got != 0 {
 		test.Fatalf("the untyped harness produced %d diagnostics, so the nil-checker guard has moved "+
 			"and this test no longer measures what it claims", got)
 	}
@@ -279,8 +307,8 @@ func TestNoExtendNativeDeclinesReadingAPrototypeProperty(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoExtendNative,
-				extendNativeFile, testCase.sourceText, nil))
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoExtendNative,
+				extendNativeFile, testCase.sourceText))
 		})
 	}
 }
@@ -316,8 +344,8 @@ func TestNoExtendNativeDeclinesADefineCallOnAnotherReceiver(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoExtendNative,
-				extendNativeFile, testCase.sourceText, nil))
+			rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoExtendNative,
+				extendNativeFile, testCase.sourceText))
 		})
 	}
 }
@@ -356,8 +384,8 @@ func TestNoExtendNativeReadsATemplateSubscript(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(test, NoExtendNative, extendNativeFile,
-				testCase.sourceText, nil)
+			result := rule_testing.RunTyped(test, NoExtendNative, extendNativeFile,
+				testCase.sourceText)
 			if len(result.Diagnostics) != 1 {
 				test.Fatalf("wanted one diagnostic, got %d", len(result.Diagnostics))
 			}

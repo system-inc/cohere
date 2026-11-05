@@ -50,7 +50,7 @@ func DefaultStateInConstructorOptions() StateInConstructorOptions {
 //
 // A rule configured as bare `"error"` is handed no options at all, and the empty case has to return
 // the default rather than the zero value for the same reason: an empty Mode matches neither arm.
-func DecodeStateInConstructorOptions(raw []byte) (any, error) {
+func DecodeStateInConstructorOptions(raw []byte) (StateInConstructorOptions, error) {
 	options := DefaultStateInConstructorOptions()
 	if len(raw) == 0 {
 		return options, nil
@@ -203,12 +203,12 @@ var messageStateInConstructorClassProperty = rule.Message{
 //	this.state = { bar: 0 }             the Never span, right-hand side included
 //
 // A message-id assertion cannot see any of that, so every fixture below asserts the sliced text.
-var StateInConstructor = rule.Rule{
+var StateInConstructor = rule.Rule[StateInConstructorOptions]{
 	// No namespace prefix beyond the plugin's own. The config writes `react/state-in-constructor`
 	// and the parity guard strips the namespace on a `/` boundary.
 	Name: "react/state-in-constructor",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, ok := rule.OptionsAs[StateInConstructorOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[StateInConstructorOptions]) rule.Listeners {
+		settings, ok := options.Read()
 		if !ok {
 			// A rule configured as bare `"error"` reaches here with nil options, which type-asserts
 			// to the zero value whose Mode matches neither arm. Falling back to the default is what

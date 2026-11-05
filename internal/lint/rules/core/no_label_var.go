@@ -49,11 +49,11 @@ var messageNoLabelVar = rule.Message{
 // Nor does one inside the label's own body: `x: for(;;) { let x = 1; }` is clean, because the label
 // sits outside the block it labels. Both measured, and both would report for any rule that searched
 // the file for the name instead of asking what is in scope at this point.
-var NoLabelVar = rule.Rule{
+var NoLabelVar = rule.Rule[rule.NoOptions]{
 	Name:             "no-label-var",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindLabeledStatement: func(node *ast.Node) {
 				// Without this the rule goes completely silent under the plain harness rather than

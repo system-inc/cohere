@@ -126,9 +126,9 @@ type noThisAliasRawOptions struct {
 // asks for an identifier reference and a member expression yields none. That matters more than it
 // looks: `this.self = this` is the single most common hand-written form of this exact defect, and
 // upstream declines it. Measured on the release binary in both shapes.
-var NoThisAlias = rule.Rule{
+var NoThisAlias = rule.Rule[NoThisAliasOptions]{
 	Name: "@typescript-eslint/no-this-alias",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoThisAliasOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}
@@ -140,7 +140,7 @@ var NoThisAlias = rule.Rule{
 			return nil
 		}
 
-		parsed, _ := rule.OptionsAs[NoThisAliasOptions](options)
+		parsed, _ := options.Read()
 
 		allowed := make(map[string]bool, len(parsed.AllowedNames))
 		for _, name := range parsed.AllowedNames {
@@ -228,29 +228,27 @@ var NoThisAlias = rule.Rule{
 // It is a hand-written decoder rather than `rule.DecodeOptionsInto` because two of the three keys
 // need translating rather than binding: `allowDestructuring` is inverted, and `allowNames` is a
 // second spelling of `allowedNames`. Neither can be expressed as a struct tag.
-func DecodeNoThisAliasOptions(raw []byte) (any, error) {
+func DecodeNoThisAliasOptions(raw []byte) (NoThisAliasOptions, error) {
 	decoded, decodeOptionsError := rule.DecodeOptionsInto[noThisAliasRawOptions]()(raw)
 	if decodeOptionsError != nil {
 		return NoThisAliasOptions{}, decodeOptionsError
 	}
 
-	wire, _ := decoded.(noThisAliasRawOptions)
-
 	options := NoThisAliasOptions{}
 
 	// Absent means upstream's default of true, which is this field being false. Only an explicit
 	// `false` on the wire turns reporting on, which is why the wire field is a pointer.
-	if wire.AllowDestructuring != nil {
-		options.ReportDestructuring = !*wire.AllowDestructuring
+	if decoded.AllowDestructuring != nil {
+		options.ReportDestructuring = !*decoded.AllowDestructuring
 	}
 
 	// The two spellings are one field upstream, and supplying both is a configuration error there
 	// rather than a merge. There is no error channel for that distinction on this side of the
 	// config, so the correctly-spelled key wins when both appear and the typo'd one is read only
 	// when it is the only one present.
-	options.AllowedNames = wire.AllowedNames
+	options.AllowedNames = decoded.AllowedNames
 	if options.AllowedNames == nil {
-		options.AllowedNames = wire.AllowNames
+		options.AllowedNames = decoded.AllowNames
 	}
 
 	return options, nil

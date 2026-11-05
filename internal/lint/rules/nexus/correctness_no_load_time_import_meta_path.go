@@ -42,9 +42,9 @@ func messageLoadTimeImportMetaPath(name string) rule.Message {
 //
 // No fix. Moving a path into a function means choosing the function and updating every reader of the
 // constant, which is a judgment one expression cannot make.
-var CorrectnessNoLoadTimeImportMetaPath = rule.Rule{
+var CorrectnessNoLoadTimeImportMetaPath = rule.Rule[rule.NoOptions]{
 	Name: "nexus/correctness-no-load-time-import-meta-path",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindMetaProperty: func(node *ast.Node) {
 				// The cheap structural gate first: `import.meta`, read for one of the two names.

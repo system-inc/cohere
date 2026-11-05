@@ -52,10 +52,10 @@ func DefaultRestrictPlusOperandsSettings() restrictPlusOperandsSettings {
 	}
 }
 
-func restrictPlusOperandsSettingsFrom(options any) restrictPlusOperandsSettings {
+func restrictPlusOperandsSettingsFrom(options rule.Given[RestrictPlusOperandsOptions]) restrictPlusOperandsSettings {
 	settings := DefaultRestrictPlusOperandsSettings()
 
-	decoded, ok := rule.OptionsAs[RestrictPlusOperandsOptions](options)
+	decoded, ok := options.Read()
 	if !ok {
 		// A rule configured as a bare "error" is handed nil options, and `options.(T)` on nil yields
 		// the zero value rather than failing. Returning the defaults here rather than the zero
@@ -188,14 +188,14 @@ func restrictPlusOperandsSettingsFrom(options any) restrictPlusOperandsSettings 
 // corpus records the rendered text for 56 findings across four distinct renderings of that slot, and
 // the fixtures assert the rendered string rather than the message id, because no id assertion can
 // see a format built this way.
-var RestrictPlusOperands = rule.Rule{
+var RestrictPlusOperands = rule.Rule[RestrictPlusOperandsOptions]{
 	Name: "@typescript-eslint/restrict-plus-operands",
 
 	// Every operand is judged by its type. Nothing here is answerable from syntax.
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[RestrictPlusOperandsOptions]) rule.Listeners {
 		if ruleContext.TypeChecker == nil {
 			return nil
 		}

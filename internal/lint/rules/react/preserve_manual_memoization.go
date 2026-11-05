@@ -135,7 +135,7 @@ var messagePreserveManualMemoizationDependencyMutable = rule.Message{
 // Lowering is keyed on `*ast.Symbol` identity throughout, and `Lower` takes the checker directly.
 // Beyond that, the pipeline consults it for reactivity inference and for scope pruning. The
 // declaration is for binding and resolution rather than for any single type question.
-var PreserveManualMemoization = rule.Rule{
+var PreserveManualMemoization = rule.Rule[CompilerRuleOptions]{
 	// The upstream spelling. This rule ships in `eslint-plugin-react-hooks`, which was measured
 	// rather than inferred: the plugin's rule table contains it and `eslint-plugin-react`'s does
 	// not, and configuring it as `react/preserve-manual-memoization` makes ESLint refuse to lint
@@ -149,7 +149,7 @@ var PreserveManualMemoization = rule.Rule{
 	// Reads other files only through shape readers (rule.ExportNameIn), so its findings key on imports' shapes.
 	TypeReach: rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[CompilerRuleOptions]) rule.Listeners {
 		// Declined once per file rather than once per node. `NeedsTypeChecker` governs the
 		// registration path and says nothing about the harness path, where a context is built by
 		// hand with no checker at all, so the declaration is not the guard.

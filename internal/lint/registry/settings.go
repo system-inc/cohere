@@ -86,9 +86,11 @@ func checkNamespace(registration rule.SettingsRegistration, namespace string, ba
 	if splitError != nil {
 		return fmt.Errorf("settings[%q]: %w", namespace, splitError)
 	}
-	decoders := map[string]func(raw []byte, base rule.OptionsBase) (any, error){}
+	decoders := map[string]func(raw []byte, base rule.OptionsBase) (rule.Bound, error){}
 	for _, registered := range rule.Registered() {
-		decoders[registered.Rule.Name] = registered.DecodeAt
+		if registered.Arity == rule.OptionArityAt {
+			decoders[registered.Name] = registered.Bind
+		}
 	}
 	// Decoded against the anchors alone, so the decoder reads the part as it would an option element
 	// rather than merging the settings into it a second time.

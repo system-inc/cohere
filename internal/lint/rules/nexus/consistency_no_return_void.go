@@ -69,10 +69,10 @@ func consistencyNoReturnVoidMessage() rule.Message {
 // The fix always writes `return;`. In a function whose type says it returns a value, that is the bare
 // return `nexus/consistency-require-matching-return-type` then rewrites to `return undefined;`, so the
 // two fixes converge on the right spelling in one run rather than this rule repeating that judgment.
-var ConsistencyNoReturnVoid = rule.Rule{
+var ConsistencyNoReturnVoid = rule.Rule[rule.NoOptions]{
 	Name: "nexus/consistency-no-return-void",
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindReturnStatement: func(node *ast.Node) {
 				expression := node.AsReturnStatement().Expression

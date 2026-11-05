@@ -79,7 +79,12 @@ func Open(test testing.TB, name string) *Golden {
 	}
 	answers, readError := read(golden.path, digest)
 	if readError != nil {
-		test.Fatalf("%v: record them with %s=1 go test -run '^%s$' in this package", readError, UpdateVariable, test.Name())
+		test.Fatalf(
+			"%v: record them with %s=1 go test -run '^%s$' in this package",
+			readError,
+			UpdateVariable,
+			test.Name(),
+		)
 	}
 	golden.answers = answers
 	return golden

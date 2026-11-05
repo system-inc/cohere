@@ -80,16 +80,14 @@ func (specifier *noDeprecatedRawSpecifier) UnmarshalJSON(raw []byte) error {
 //
 // Hand-written rather than `rule.DecodeOptionsInto` because `allow` is one heterogeneous array whose
 // two forms land in two different fields, and because `from` is an enum rather than a string.
-func DecodeNoDeprecatedOptions(raw []byte) (any, error) {
+func DecodeNoDeprecatedOptions(raw []byte) (NoDeprecatedOptions, error) {
 	decoded, decodeOptionsError := rule.DecodeOptionsInto[noDeprecatedRawOptions]()(raw)
 	if decodeOptionsError != nil {
 		return NoDeprecatedOptions{}, decodeOptionsError
 	}
 
-	wire, _ := decoded.(noDeprecatedRawOptions)
-
 	options := NoDeprecatedOptions{}
-	for _, entry := range wire.Allow {
+	for _, entry := range decoded.Allow {
 		if entry.inline != "" {
 			options.AllowInline = append(options.AllowInline, entry.inline)
 			continue

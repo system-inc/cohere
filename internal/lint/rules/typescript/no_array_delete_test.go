@@ -662,7 +662,7 @@ func TestNoArrayDeleteRequiresTheTypedHarness(test *testing.T) {
 	// The guard the absorption made possible. Driving the listener with a checker-less Context must
 	// return rather than dereference nil, and this is the only path that reaches that branch, since
 	// registration always supplies a checker.
-	listeners := NoArrayDelete.Run(rule.Context{SourceFile: typed.SourceFile}, nil)
+	listeners := NoArrayDelete.Run(rule.Context{SourceFile: typed.SourceFile}, rule.Given[rule.NoOptions]{})
 	listener, hasListener := listeners[ast.KindDeleteExpression]
 	if !hasListener {
 		test.Fatal("the rule stopped listening on delete expressions")

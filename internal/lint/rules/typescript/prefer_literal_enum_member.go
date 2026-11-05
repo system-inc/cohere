@@ -31,16 +31,15 @@ type preferLiteralEnumMemberRawOptions struct {
 //
 // cohere's config layer strips ESLint's `[severity, options]` tuple before dispatch, so what arrives
 // is the bare object rather than upstream's one-element array.
-func DecodePreferLiteralEnumMemberOptions(raw []byte) (any, error) {
+func DecodePreferLiteralEnumMemberOptions(raw []byte) (PreferLiteralEnumMemberOptions, error) {
 	decoded, decodeOptionsError := rule.DecodeOptionsInto[preferLiteralEnumMemberRawOptions]()(raw)
 	if decodeOptionsError != nil {
 		return DefaultPreferLiteralEnumMemberSettings(), decodeOptionsError
 	}
 
-	wire, _ := decoded.(preferLiteralEnumMemberRawOptions)
 	options := DefaultPreferLiteralEnumMemberSettings()
-	if wire.AllowBitwiseExpressions != nil {
-		options.AllowBitwiseExpressions = *wire.AllowBitwiseExpressions
+	if decoded.AllowBitwiseExpressions != nil {
+		options.AllowBitwiseExpressions = *decoded.AllowBitwiseExpressions
 	}
 	return options, nil
 }
@@ -138,11 +137,11 @@ var preferLiteralEnumMemberNotLiteralOrBitwiseMessage = rule.Message{
 // own depth. The sibling-key scan walks the enclosing enum's member list and is reached only for an
 // identifier or member access inside a bitwise computation, which requires the option to be on.
 // No checker, no program, no per-file state.
-var PreferLiteralEnumMember = rule.Rule{
+var PreferLiteralEnumMember = rule.Rule[PreferLiteralEnumMemberOptions]{
 	Name: "@typescript-eslint/prefer-literal-enum-member",
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, isSettings := rule.OptionsAs[PreferLiteralEnumMemberOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[PreferLiteralEnumMemberOptions]) rule.Listeners {
+		settings, isSettings := options.Read()
 		if !isSettings {
 			settings = DefaultPreferLiteralEnumMemberSettings()
 		}

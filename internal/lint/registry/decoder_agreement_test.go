@@ -1,8 +1,6 @@
 package registry
 
 import (
-	"fmt"
-	"strings"
 	"testing"
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
@@ -40,87 +38,71 @@ var optionsReadUnreachableOnProbe = map[string]bool{
 	"react-hooks/void-use-memo":                true,
 }
 
-// Every registration's decoder hands its rule the type the rule reads.
+// Every registration's decoder hands its rule options the rule reads.
 //
-// Run takes `options any`, so nothing at compile time compares the type a Decode returns with the
-// type its rule passes to rule.OptionsAs. `unified-signatures` asserted a pointer over the value its
-// decoder returned, every configured option was ignored, and every fixture stayed green because the
-// fixtures handed Run options directly instead of decoding them (#qmvkf83). OptionsAs now panics on
-// such a disagreement, but only when a run reaches it with decoded options, so this test makes every
-// rule reach it: each decoder is fed the smallest option that means "configured" (an empty object,
-// or an empty option list), and whatever it decodes is handed to that rule's own Run.
+// Run used to take `options any`, so nothing at compile time compared the type a Decode returned with
+// the type its rule asserted. `unified-signatures` asserted a pointer over the value its decoder
+// returned, every configured option was ignored, and every fixture stayed green because the fixtures
+// handed Run options directly instead of decoding them (#qmvkf83). A Registration now pairs a rule and
+// its decoder over one Options type, so that disagreement is a compile error (#ymag4q6). What is left
+// to check at run time is that the decoded options reach the rule at all: each decoder is fed the
+// smallest option that means "configured" (an empty object, or an empty option list), and the rule
+// bound to whatever it decodes is run, as the walk would run it.
 //
 // A decoder that refuses the empty input (a required key, a strict schema) is skipped and counted,
 // and the count has a floor, so a harness that silently decoded nothing cannot pass.
 //
-// Running a rule is not reaching its options read: a rule that calls OptionsAs only inside a listener
+// Running a rule is not reaching its options read: a rule that reads its options only inside a listener
 // for a node kind the probe source lacks would run, pass, and check nothing (#zwd43jn). So each rule
-// must also move rule.OptionsAsReads, unless it is named in optionsReadUnreachableOnProbe. Measured
-// when this landed: 172 of 172 reach it. The counter is global, which is why this test is not
-// parallel: a parallel test calling OptionsAs at the same moment would make a rule look reached.
-// Not parallel: it reads the process-wide counter rule.OptionsAsReads before and after each rule's run to
-// tell whether the run reached its options, so a parallel test calling OptionsAs at the same moment would
+// must also move rule.OptionsReads, unless it is named in optionsReadUnreachableOnProbe. Measured
+// when this landed: 172 of 172 reach it.
+// Not parallel: it reads the process-wide counter rule.OptionsReads before and after each rule's run to
+// tell whether the run reached its options, so a parallel test reading options at the same moment would
 // make an unreached rule look reached.
-func TestEveryDecoderHandsItsRuleTheTypeTheRuleReads(test *testing.T) {
+func TestEveryDecoderHandsItsRuleTheOptionsTheRuleReads(test *testing.T) {
 	exercised := 0
 	refused := 0
 	var unreached []string
 	for _, registration := range rule.Registered() {
-		decoded, decodeError, decodes := decodeEmptyOption(registration)
+		bound, decodeError, decodes := bindEmptyOption(registration)
 		if !decodes {
 			continue
 		}
-		if decodeError != nil || decoded == nil {
+		if decodeError != nil {
 			refused++
 			continue
 		}
 		exercised++
-		subject := registration.Rule
-		readsBefore := rule.OptionsAsReads.Load()
-		// Not parallel: its parent reads rule.OptionsAsReads right after this subtest returns, so the run
+		readsBefore := rule.OptionsReads.Load()
+		// Not parallel: its parent reads rule.OptionsReads right after this subtest returns, so the run
 		// must have finished by then.
-		test.Run(subject.Name, func(test *testing.T) {
+		test.Run(registration.Name, func(test *testing.T) {
 			defer func() {
 				recovered := recover()
 				if recovered == nil {
 					return
 				}
-				message := fmt.Sprint(recovered)
-				if strings.Contains(message, "registration's Decode") {
-					test.Fatalf("%s: %s", subject.Name, message)
-				}
-				// Any other panic is the crash corpus's business, not this test's.
+				// A panic is the crash corpus's business, not this test's.
+				test.Logf("%s panicked on the probe: %v", registration.Name, recovered)
 			}()
-			if subject.NeedsTypeChecker {
-				rule_testing.RunTypedWithOptions(
-					test,
-					subject,
-					"/repository/source/Probe.tsx",
-					"export const value = 1;\n",
-					decoded,
-				)
+			if bound.NeedsTypeChecker {
+				rule_testing.RunTypedBound(test, bound, "/repository/source/Probe.tsx", "export const value = 1;\n")
 				return
 			}
-			rule_testing.RunWithOptions(
-				test,
-				subject,
-				"/repository/source/Probe.tsx",
-				"export const value = 1;\n",
-				decoded,
-			)
+			rule_testing.RunBound(test, bound, "/repository/source/Probe.tsx", "export const value = 1;\n")
 		})
-		if rule.OptionsAsReads.Load() == readsBefore && !optionsReadUnreachableOnProbe[subject.Name] {
-			unreached = append(unreached, subject.Name)
+		if rule.OptionsReads.Load() == readsBefore && !optionsReadUnreachableOnProbe[registration.Name] {
+			unreached = append(unreached, registration.Name)
 		}
 	}
 	if len(unreached) > 0 {
-		test.Errorf("%d rules ran with decoded options without reaching rule.OptionsAs on the probe source, "+
+		test.Errorf("%d rules ran with decoded options without reading them on the probe source, "+
 			"so the agreement check never looked at them: %v. Read options at the top of Run, or name the "+
 			"rule in optionsReadUnreachableOnProbe with why", len(unreached), unreached)
 	}
 	registered := map[string]bool{}
 	for _, registration := range rule.Registered() {
-		registered[registration.Rule.Name] = true
+		registered[registration.Name] = true
 	}
 	for name := range optionsReadUnreachableOnProbe {
 		if !registered[name] {
@@ -136,21 +118,23 @@ func TestEveryDecoderHandsItsRuleTheTypeTheRuleReads(test *testing.T) {
 	}
 }
 
-// decodeEmptyOption runs a registration's decoder on the smallest configured input it takes. decodes
-// is false for a rule that takes no options, or whose decoder needs to know where the config lives.
-func decodeEmptyOption(registration rule.Registration) (decoded any, decodeError error, decodes bool) {
-	switch {
-	case registration.Decode != nil:
-		decoded, decodeError = registration.Decode([]byte(`{}`))
-		return decoded, decodeError, true
-	case registration.DecodeOptionList != nil:
-		decoded, decodeError = registration.DecodeOptionList([]byte(`[{}]`))
+// bindEmptyOption binds a registration's rule to its decoder's reading of the smallest configured input it
+// takes. decodes is false for a rule that takes no options, or whose decoder needs to know where the config
+// lives.
+func bindEmptyOption(registration rule.Entry) (bound rule.Bound, decodeError error, decodes bool) {
+	switch registration.Arity {
+	case rule.OptionArityOne:
+		bound, decodeError = registration.Bind([]byte(`{}`), rule.OptionsBase{})
+		return bound, decodeError, true
+	case rule.OptionArityList:
+		bound, decodeError = registration.Bind([]byte(`[{}]`), rule.OptionsBase{})
 		if decodeError != nil {
-			decoded, decodeError = registration.DecodeOptionList([]byte(`[]`))
+			bound, decodeError = registration.Bind([]byte(`[]`), rule.OptionsBase{})
 		}
-		return decoded, decodeError, true
+		return bound, decodeError, true
+	case rule.OptionArityNone, rule.OptionArityAt:
 	}
-	return nil, nil, false
+	return rule.Bound{}, nil, false
 }
 
 type optionsReachControlOptions struct {
@@ -159,11 +143,11 @@ type optionsReachControlOptions struct {
 
 // optionsReachControl reads its options only inside a class listener, the shape the reach check
 // exists to catch.
-var optionsReachControl = rule.Rule{
+var optionsReachControl = rule.Rule[optionsReachControlOptions]{
 	Name: "control/options-read-inside-a-listener",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[optionsReachControlOptions]) rule.Listeners {
 		return rule.Listeners{ast.KindClassDeclaration: func(node *ast.Node) {
-			rule.OptionsAs[optionsReachControlOptions](options)
+			options.Read()
 		}}
 	},
 }
@@ -171,10 +155,10 @@ var optionsReachControl = rule.Rule{
 // The reach counter can fail: a rule reading its options only in a class listener does not move it
 // on the probe source, and does on a class. Without this the reach assertion above could be passing
 // because the counter moves on every run.
-// Not parallel: it asserts the process-wide counter rule.OptionsAsReads does not move across a run, which
-// a parallel test calling OptionsAs would break.
+// Not parallel: it asserts the process-wide counter rule.OptionsReads does not move across a run, which
+// a parallel test reading options would break.
 func TestTheOptionsReachCounterSeesARuleThatNeverReadsItsOptions(test *testing.T) {
-	before := rule.OptionsAsReads.Load()
+	before := rule.OptionsReads.Load()
 	rule_testing.RunWithOptions(
 		test,
 		optionsReachControl,
@@ -182,7 +166,7 @@ func TestTheOptionsReachCounterSeesARuleThatNeverReadsItsOptions(test *testing.T
 		"export const value = 1;\n",
 		optionsReachControlOptions{},
 	)
-	if rule.OptionsAsReads.Load() != before {
+	if rule.OptionsReads.Load() != before {
 		test.Fatal(
 			"the control moved the counter on a source with no class, so the counter cannot tell reached from run",
 		)
@@ -194,7 +178,7 @@ func TestTheOptionsReachCounterSeesARuleThatNeverReadsItsOptions(test *testing.T
 		"export class Probe {}\n",
 		optionsReachControlOptions{},
 	)
-	if rule.OptionsAsReads.Load() == before {
+	if rule.OptionsReads.Load() == before {
 		test.Fatal("the control did not move the counter on a class, so the counter is not counting")
 	}
 }

@@ -14,6 +14,9 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // distinguishable from an explicit false, and the settings resolver applies the defaults on nil.
 func init() {
 	rule.Register(
-		rule.Registration{Rule: RestrictPlusOperands, Decode: rule.DecodeOptionsInto[RestrictPlusOperandsOptions]()},
+		rule.Registration[RestrictPlusOperandsOptions]{
+			Rule:   RestrictPlusOperands,
+			Decode: rule.DecodeOptionsInto[RestrictPlusOperandsOptions](),
+		},
 	)
 }

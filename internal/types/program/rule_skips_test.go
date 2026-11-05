@@ -8,6 +8,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/rules/typescript"
+	"github.com/system-inc/cohere/internal/lint/testing"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -22,7 +23,7 @@ func TestARuleThatDeclinesOnACompilerOptionNotesASkipPerFile(test *testing.T) {
 		"defaults.ts":   "export function withDefault(value: string | undefined = undefined): string { return value ?? ''; }\n",
 		"other.ts":      "export const other = 1;\n",
 	})
-	rules := []rule.Rule{typescript.NoUselessDefaultAssignment}
+	rules := []rule.Entry{rule_testing.EntryOf(test, typescript.NoUselessDefaultAssignment)}
 	skip := rule.SkippedNotePrefix + "strictNullChecks is off"
 	want := map[string]program.RuleNotes{}
 	for _, name := range []string{"defaults.ts", "other.ts"} {
@@ -54,7 +55,7 @@ func TestTheSameRuleInAStrictProjectNotesNoSkip(test *testing.T) {
 		"tsconfig.json": minimalConfig,
 		"defaults.ts":   "export function withDefault(value: string | undefined = undefined): string { return value ?? ''; }\n",
 	})
-	result := plainWalk(test, root, []rule.Rule{typescript.NoUselessDefaultAssignment})
+	result := plainWalk(test, root, []rule.Entry{rule_testing.EntryOf(test, typescript.NoUselessDefaultAssignment)})
 	if len(result.Notes) != 0 {
 		test.Errorf("a strict project noted %v", result.Notes)
 	}

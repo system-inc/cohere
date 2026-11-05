@@ -16,7 +16,7 @@ const consistentThisFile = "/repository/source/ConsistentThis.ts"
 // where this rule's two most dangerous lines live: the default of ["that"] rather than the zero
 // value, and reading upstream's variadic list, one alias per element. A struct built by hand passes
 // every fixture while an inverted default ships.
-func consistentThisOptions(test *testing.T, aliases ...string) any {
+func consistentThisOptions(test *testing.T, aliases ...string) ConsistentThisSettings {
 	test.Helper()
 	raw, encodeError := json.Marshal(aliases)
 	if encodeError != nil {
@@ -271,24 +271,20 @@ func TestDecodeConsistentThisOptions(test *testing.T) {
 		if decodeConsistentThisOptionsError != nil {
 			test.Fatalf("the decoder refused an absent option: %v", decodeConsistentThisOptionsError)
 		}
-		settings, ok := decoded.(ConsistentThisSettings)
-		if !ok {
-			test.Fatalf("expected ConsistentThisSettings, got %T", decoded)
-		}
-		if len(settings.Aliases) != 1 || settings.Aliases[0] != "that" {
-			test.Errorf("expected the default alias list [that], got %v", settings.Aliases)
+		if len(decoded.Aliases) != 1 || decoded.Aliases[0] != "that" {
+			test.Errorf("expected the default alias list [that], got %v", decoded.Aliases)
 		}
 	})
 
 	test.Run("a bare severity leaves the rule on its default", func(test *testing.T) {
 		test.Parallel()
-		// A rule configured as "error" is handed nil options, which arrives at Run as an untyped
-		// nil rather than as settings. Asserting through the rule rather than the decoder is what
+		// A rule configured as "error" is handed no options, which arrives at Run unconfigured
+		// rather than as settings. Asserting through the rule rather than the decoder is what
 		// covers the fallback inside Run, which no decoder test can reach.
-		rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, ConsistentThis,
-			consistentThisFile, "var context = this", nil), "unexpectedAlias")
-		rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, ConsistentThis,
-			consistentThisFile, "var that = this", nil))
+		rule_testing.ExpectFindings(test, rule_testing.Run(test, ConsistentThis,
+			consistentThisFile, "var context = this"), "unexpectedAlias")
+		rule_testing.ExpectClean(test, rule_testing.Run(test, ConsistentThis,
+			consistentThisFile, "var that = this"))
 	})
 
 	test.Run("one element is one alias", func(test *testing.T) {
@@ -297,12 +293,8 @@ func TestDecodeConsistentThisOptions(test *testing.T) {
 		if decodeConsistentThisOptionsError != nil {
 			test.Fatalf("the decoder refused one alias: %v", decodeConsistentThisOptionsError)
 		}
-		settings, ok := decoded.(ConsistentThisSettings)
-		if !ok {
-			test.Fatalf("the decoder returned %T, not ConsistentThisSettings", decoded)
-		}
-		if len(settings.Aliases) != 1 || settings.Aliases[0] != "self" {
-			test.Errorf("expected [self], got %v", settings.Aliases)
+		if len(decoded.Aliases) != 1 || decoded.Aliases[0] != "self" {
+			test.Errorf("expected [self], got %v", decoded.Aliases)
 		}
 	})
 
@@ -312,12 +304,8 @@ func TestDecodeConsistentThisOptions(test *testing.T) {
 		if decodeConsistentThisOptionsError != nil {
 			test.Fatalf("the decoder refused two aliases: %v", decodeConsistentThisOptionsError)
 		}
-		settings, ok := decoded.(ConsistentThisSettings)
-		if !ok {
-			test.Fatalf("the decoder returned %T, not ConsistentThisSettings", decoded)
-		}
-		if len(settings.Aliases) != 2 || settings.Aliases[0] != "self" || settings.Aliases[1] != "vm" {
-			test.Errorf("expected [self vm], got %v", settings.Aliases)
+		if len(decoded.Aliases) != 2 || decoded.Aliases[0] != "self" || decoded.Aliases[1] != "vm" {
+			test.Errorf("expected [self vm], got %v", decoded.Aliases)
 		}
 	})
 
@@ -350,12 +338,8 @@ func TestDecodeConsistentThisOptions(test *testing.T) {
 		if decodeConsistentThisOptionsError != nil {
 			test.Fatalf("the decoder refused an empty list: %v", decodeConsistentThisOptionsError)
 		}
-		settings, ok := decoded.(ConsistentThisSettings)
-		if !ok {
-			test.Fatalf("the decoder returned %T, not ConsistentThisSettings", decoded)
-		}
-		if len(settings.Aliases) != 1 || settings.Aliases[0] != "that" {
-			test.Errorf("expected the default alias list [that], got %v", settings.Aliases)
+		if len(decoded.Aliases) != 1 || decoded.Aliases[0] != "that" {
+			test.Errorf("expected the default alias list [that], got %v", decoded.Aliases)
 		}
 	})
 }

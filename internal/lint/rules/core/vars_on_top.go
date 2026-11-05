@@ -62,9 +62,9 @@ var messageVarsOnTop = rule.Message{
 // its corpus pins: `class C { static { 'use strict'; var x; } }` reports. A static block has no
 // directive prologue and no import, so a string there is just an expression. This is the one place
 // the two container kinds behave differently and it is easy to unify them by accident.
-var VarsOnTop = rule.Rule{
+var VarsOnTop = rule.Rule[rule.NoOptions]{
 	Name: "vars-on-top",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// Anchored on the declaration list rather than on the variable statement, because a `var`
 		// in a loop header has no statement wrapping it.
 		//

@@ -104,9 +104,9 @@ var propertiesSourceNames = map[string]bool{
 // exposing an imperative handle is not the leaf-DOM passthrough this rule's rest-spread convention
 // was designed for, and React 19 makes `ref` an ordinary property that has to be taken out at the
 // boundary. Requiring a rest there would be asking for a shape that does not fit.
-var ReactComponentNoDestructuring = rule.Rule{
+var ReactComponentNoDestructuring = rule.Rule[rule.NoOptions]{
 	Name: "structure/react-component-no-destructuring",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if !FileContextFor(ruleContext.SourceFile.FileName().AsString()).IsReactFile {
 			return nil
 		}

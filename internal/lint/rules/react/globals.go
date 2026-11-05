@@ -232,7 +232,7 @@ const messageGlobalReassignmentReason = "Render has to be able to run at any tim
 //
 // No fix. The repair is a `useState` or an effect, which is a change of design rather than of text,
 // and upstream proposes none either.
-var Globals = rule.Rule{
+var Globals = rule.Rule[CompilerRuleOptions]{
 	// No namespace prefix. The config writes `react/globals`, and the parity guard strips the
 	// namespace on a `/` boundary, so `react-globals` would match no inventory entry while still
 	// passing every fixture in this package. Measured in both spellings; see the test.
@@ -246,7 +246,7 @@ var Globals = rule.Rule{
 	// for the reporting case and a `KindParameter` inside the component for the silent one.
 	NeedsTypeChecker: true,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[CompilerRuleOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindIdentifier: func(node *ast.Node) {
 				// The engine hands a rule a nil checker when the program could not be built. This

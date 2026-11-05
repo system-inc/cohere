@@ -76,19 +76,19 @@ type NoConstantBinaryExpressionOptions struct {
 //
 // The relational arm is off in this tree, so it cannot be validated against the differential. It is
 // implemented because a missing option and a disabled one look identical until someone enables it.
-var NoConstantBinaryExpression = rule.Rule{
+var NoConstantBinaryExpression = rule.Rule[NoConstantBinaryExpressionOptions]{
 	Name: "no-constant-binary-expression",
 
 	// Whether `undefined`, `Boolean` and the built-in constructors are the globals
 	NeedsTypeChecker: true,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoConstantBinaryExpressionOptions]) rule.Listeners {
 		judge := constantJudge{isGlobal: func(identifier *ast.Node) bool {
 			return ruleContext.TypeChecker == nil ||
 				!rule.IsDeclaredInASourceFile(ruleContext.TypeChecker.GetSymbolAtLocation(identifier))
 		}}
 		checkRelationalComparisons := false
-		if parsed, ok := rule.OptionsAs[NoConstantBinaryExpressionOptions](options); ok {
+		if parsed, ok := options.Read(); ok {
 			checkRelationalComparisons = parsed.CheckRelationalComparisons
 		}
 

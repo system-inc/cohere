@@ -115,7 +115,7 @@ var messageNoDerivingStateInEffects = rule.Message{
 // and it is a different rule with a different verdict on a third of the corpus. When the shipped
 // plugin switches to it this rule is a re-port rather than an adjustment, and the fixture file's
 // recorded per-case verdicts are what will make that visible.
-var NoDerivingStateInEffects = rule.Rule{
+var NoDerivingStateInEffects = rule.Rule[CompilerRuleOptions]{
 	Name:             "react-hooks/no-deriving-state-in-effects",
 	NeedsTypeChecker: true,
 	// Reads other files only through shape readers (rule.ExportNameIn), so its findings key on imports' shapes.
@@ -123,7 +123,7 @@ var NoDerivingStateInEffects = rule.Rule{
 	// Same predicate as `set-state-in-effect`: the setter is recognised by its type alias, so a hook
 	// returning `any` takes every finding in the file with it. Declared so the tripwire can name it.
 	ResolvesReactValueTypes: true,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[CompilerRuleOptions]) rule.Listeners {
 		return rule.Listeners{
 			// The whole file at once, matching `set-state-in-effect` and `static-components`.
 			// Lowering already descends into nested functions through the function arena, so

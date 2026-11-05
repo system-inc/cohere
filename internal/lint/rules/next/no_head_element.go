@@ -37,11 +37,11 @@ var messageNoHeadElement = rule.Message{
 // costs nothing here and being faithful costs nothing either.
 //
 // The exemption is checked once per file rather than per node, because it is a property of the file.
-var NoHeadElement = rule.Rule{
+var NoHeadElement = rule.Rule[rule.NoOptions]{
 	// No family prefix. The config writes `nextjs/no-head-element` and matching strips the
 	// namespace on a `/` boundary, so a prefixed name matches nothing and runs on no files.
 	Name: "@next/next/no-head-element",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// Answering here rather than inside the listener means a file under an app directory
 		// registers no listener at all, which is also how upstream spells it: `should_run` is asked
 		// before the walk rather than at every element.

@@ -194,10 +194,10 @@ func runTypedSource(test *testing.T, source string, visit func(*Function, *shimc
 	test.Helper()
 
 	ran := false
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name:             "prune-non-escaping-harness",
 		NeedsTypeChecker: true,
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
 					if ruleContext.TypeChecker == nil {
@@ -364,7 +364,7 @@ func TestPruneNonEscapingScopesVisitsASequenceNestedInALogical(test *testing.T) 
 		LValue: &result,
 		Value: &ReactiveLogicalValue{
 			Operator: "??",
-			Left:     &ReactiveInstructionValue{Value: &Primitive{}},
+			Left:     &ReactiveInstructionValue{Value: &Primitive{Value: PrimitiveUndefined{}}},
 			Right:    nested,
 		},
 	}
@@ -432,10 +432,10 @@ func TestMemoMarkersArePrunedOnlyWhenTheirScopeWas(test *testing.T) {
 // memoMarkerCountsForSource runs the pipeline through the pruning pass and counts markers.
 func memoMarkerCountsForSource(test *testing.T, source string) (pruned, reached int, ok bool) {
 	test.Helper()
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name:             "memo-marker-counts",
 		NeedsTypeChecker: true,
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
 					if ruleContext.TypeChecker == nil {

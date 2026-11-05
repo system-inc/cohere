@@ -11,7 +11,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // yields the zero value on an absent option, which here would silently narrow the rule to object
 // literals rather than disable it, and no fixture routed through a struct could see the difference.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[NoUselessComputedKeySettings]{
 		Rule:   NoUselessComputedKey,
 		Decode: DecodeNoUselessComputedKeyOptions,
 	})

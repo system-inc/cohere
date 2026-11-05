@@ -16,7 +16,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // the diff to show a decision was reversed at all. The port is complete and its eighty five
 // imported cases pass; turning it on is a decision for whoever wrote that line.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[NoUselessDefaultAssignmentOptions]{
 		Rule:   NoUselessDefaultAssignment,
 		Decode: DecodeNoUselessDefaultAssignmentOptions,
 	})

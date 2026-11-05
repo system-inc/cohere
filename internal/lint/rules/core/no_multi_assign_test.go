@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -16,17 +17,17 @@ const multiAssignFile = "/repository/source/MultiAssign.ts"
 //
 // The decoder is the line most likely to have no upstream counterpart, and handing
 // `RunWithOptions` a struct leaves it untested. An empty string means the rule is configured as
-// bare "error", which is what the live config does and what hands the rule nil.
-func decodedMultiAssignOptions(test *testing.T, raw string) any {
+// bare "error", which is what the live config does and what runs the rule unconfigured.
+func decodedMultiAssignOptions(test *testing.T, raw string) rule.Given[NoMultiAssignOptions] {
 	test.Helper()
 	if raw == "" {
-		return nil
+		return rule.Given[NoMultiAssignOptions]{}
 	}
 	options, decodeNoMultiAssignOptionsError := DecodeNoMultiAssignOptions(json.RawMessage(raw))
 	if decodeNoMultiAssignOptionsError != nil {
 		test.Fatalf("the decoder refused %s: %v", raw, decodeNoMultiAssignOptionsError)
 	}
-	return options
+	return rule.Configured(options)
 }
 
 // The corpus is ESLint's own, at `tests/lib/rules/no-multi-assign.js`, copied rather than
@@ -84,7 +85,7 @@ func TestNoMultiAssignFires(test *testing.T) {
 			for index := range wantIds {
 				wantIds[index] = "unexpectedChain"
 			}
-			rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoMultiAssign,
+			rule_testing.ExpectFindings(test, rule_testing.RunGiven(test, NoMultiAssign,
 				multiAssignFile, testCase.sourceText, decodedMultiAssignOptions(test, testCase.options)), wantIds...)
 		})
 	}
@@ -126,7 +127,7 @@ func TestNoMultiAssignStaysSilent(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoMultiAssign,
+			rule_testing.ExpectClean(test, rule_testing.RunGiven(test, NoMultiAssign,
 				multiAssignFile, testCase.sourceText, decodedMultiAssignOptions(test, testCase.options)))
 		})
 	}
@@ -176,8 +177,8 @@ func TestNoMultiAssignFiresOnCasesBeyondTheCorpus(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoMultiAssign,
-				multiAssignFile, testCase.sourceText, nil), "unexpectedChain")
+			rule_testing.ExpectFindings(test, rule_testing.Run(test, NoMultiAssign,
+				multiAssignFile, testCase.sourceText), "unexpectedChain")
 		})
 	}
 }
@@ -207,8 +208,8 @@ func TestNoMultiAssignStaysSilentOnCasesBeyondTheCorpus(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoMultiAssign,
-				multiAssignFile, testCase.sourceText, nil))
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoMultiAssign,
+				multiAssignFile, testCase.sourceText))
 		})
 	}
 }
@@ -237,11 +238,11 @@ func TestNoMultiAssignIgnoreNonDeclarationDropsOnlyTheBareChain(test *testing.T)
 			test.Parallel()
 			rule_testing.ExpectFindings(
 				test,
-				rule_testing.RunWithOptions(test, NoMultiAssign, multiAssignFile,
+				rule_testing.RunGiven(test, NoMultiAssign, multiAssignFile,
 					testCase.sourceText, decodedMultiAssignOptions(test, `{"ignoreNonDeclaration": false}`)),
 				"unexpectedChain",
 			)
-			rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoMultiAssign, multiAssignFile,
+			rule_testing.ExpectClean(test, rule_testing.RunGiven(test, NoMultiAssign, multiAssignFile,
 				testCase.sourceText, decodedMultiAssignOptions(test, `{"ignoreNonDeclaration": true}`)))
 		})
 	}
@@ -276,7 +277,7 @@ func TestNoMultiAssignSpansTheInnerAssignment(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, NoMultiAssign, multiAssignFile, testCase.sourceText, nil)
+			result := rule_testing.Run(test, NoMultiAssign, multiAssignFile, testCase.sourceText)
 			if len(result.Diagnostics) != len(testCase.wantReported) {
 				test.Fatalf("want %d findings, got %d", len(testCase.wantReported), len(result.Diagnostics))
 			}
@@ -294,8 +295,8 @@ func TestNoMultiAssignSpansTheInnerAssignment(test *testing.T) {
 // The decoder is the line with no upstream counterpart, so it is tested directly rather than only
 // through the fixtures that route past it.
 //
-// The nil row is the one that matters. A rule configured as bare "error" is handed nil options, so
-// the type assertion in the rule yields the zero value. For this rule that happens to be correct,
+// The empty-input row is the one that matters. A rule configured as bare "error" is handed no
+// options, so the rule reads the zero value. For this rule that happens to be correct,
 // because the option defaults to false; the assertion exists so that a later default change fails
 // here rather than silently switching the bare-chain arm off across the whole tree.
 func TestDecodeNoMultiAssignOptions(test *testing.T) {
@@ -319,11 +320,7 @@ func TestDecodeNoMultiAssignOptions(test *testing.T) {
 			if decodeNoMultiAssignOptionsError != nil {
 				test.Fatalf("the decoder refused %q: %v", testCase.raw, decodeNoMultiAssignOptionsError)
 			}
-			options, isOptions := decoded.(NoMultiAssignOptions)
-			if !isOptions {
-				test.Fatalf("the decoder returned %T rather than NoMultiAssignOptions", decoded)
-			}
-			got := options.IgnoreNonDeclaration != nil && *options.IgnoreNonDeclaration
+			got := decoded.IgnoreNonDeclaration != nil && *decoded.IgnoreNonDeclaration
 			if got != testCase.want {
 				test.Errorf("ignoreNonDeclaration decodes to %v, want %v", got, testCase.want)
 			}
@@ -331,14 +328,15 @@ func TestDecodeNoMultiAssignOptions(test *testing.T) {
 	}
 }
 
-// A rule configured as bare "error" reaches Run with nil rather than with an options struct, and
-// every fixture above that passes nil already exercises that path. This asserts it once explicitly,
-// so the reason is written down: nil must behave as the default rather than as "everything off".
+// A rule configured as bare "error" reaches Run with no options rather than with an options struct,
+// and every fixture above that runs it unconfigured already exercises that path. This asserts it once
+// explicitly, so the reason is written down: no options must behave as the default rather than as
+// "everything off".
 func TestNoMultiAssignWithNilOptionsUsesTheDefault(test *testing.T) {
 	test.Parallel()
 
 	rule_testing.ExpectFindings(test,
-		rule_testing.RunWithOptions(test, NoMultiAssign, multiAssignFile, "a = b = c", nil), "unexpectedChain")
+		rule_testing.Run(test, NoMultiAssign, multiAssignFile, "a = b = c"), "unexpectedChain")
 }
 
 // The message text is asserted against a literal typed here rather than against the rule's own
@@ -347,7 +345,7 @@ func TestNoMultiAssignWithNilOptionsUsesTheDefault(test *testing.T) {
 func TestNoMultiAssignMessage(test *testing.T) {
 	test.Parallel()
 
-	result := rule_testing.RunWithOptions(test, NoMultiAssign, multiAssignFile, "var a = b = c;", nil)
+	result := rule_testing.Run(test, NoMultiAssign, multiAssignFile, "var a = b = c;")
 	if len(result.Diagnostics) != 1 {
 		test.Fatalf("want one finding, got %d", len(result.Diagnostics))
 	}
@@ -387,8 +385,8 @@ func TestNoMultiAssignStaysSilentOnAnAssignmentTargetTheParserRecovered(test *te
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoMultiAssign,
-				multiAssignFile, testCase.sourceText, nil))
+			rule_testing.ExpectClean(test, rule_testing.Run(test, NoMultiAssign,
+				multiAssignFile, testCase.sourceText))
 		})
 	}
 }

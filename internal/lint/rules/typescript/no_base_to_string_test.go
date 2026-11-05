@@ -32,7 +32,7 @@ func asTheTypedNoBaseToStringHarnessWroteIt(text string) string {
 // ignoredTypeNames defaults to four builtin type names, so a decoder that returned an empty slice
 // for an absent key would silently start reporting on Error, RegExp, URL and URLSearchParams. Only
 // a fixture routed through the decoder can see that.
-func decodeNoBaseToStringOptionsForTest(test *testing.T, raw string) any {
+func decodeNoBaseToStringOptionsForTest(test *testing.T, raw string) NoBaseToStringOptions {
 	test.Helper()
 	decoded, decodeNoBaseToStringOptionsError := DecodeNoBaseToStringOptions(json.RawMessage(raw))
 	if decodeNoBaseToStringOptionsError != nil {
@@ -1438,22 +1438,18 @@ func TestNoBaseToStringDecoderKeepsTheBuiltinIgnoredNames(test *testing.T) {
 		test.Run(testCase.raw, func(test *testing.T) {
 			test.Parallel()
 			decoded := decodeNoBaseToStringOptionsForTest(test, testCase.raw)
-			settings, isSettings := decoded.(NoBaseToStringOptions)
-			if !isSettings {
-				test.Fatalf("the decoder returned %T rather than the rule's own options type", decoded)
-			}
-			if settings.CheckUnknown != testCase.wantCheckUnknown {
+			if decoded.CheckUnknown != testCase.wantCheckUnknown {
 				test.Errorf("checkUnknown decoded to %v, wanted %v",
-					settings.CheckUnknown, testCase.wantCheckUnknown)
+					decoded.CheckUnknown, testCase.wantCheckUnknown)
 			}
-			if len(settings.IgnoredTypeNames) != len(testCase.wantIgnored) {
+			if len(decoded.IgnoredTypeNames) != len(testCase.wantIgnored) {
 				test.Fatalf("ignoredTypeNames decoded to %v, wanted %v",
-					settings.IgnoredTypeNames, testCase.wantIgnored)
+					decoded.IgnoredTypeNames, testCase.wantIgnored)
 			}
 			for index, wanted := range testCase.wantIgnored {
-				if settings.IgnoredTypeNames[index] != wanted {
+				if decoded.IgnoredTypeNames[index] != wanted {
 					test.Errorf("ignoredTypeNames[%d] is %q, wanted %q",
-						index, settings.IgnoredTypeNames[index], wanted)
+						index, decoded.IgnoredTypeNames[index], wanted)
 				}
 			}
 		})
@@ -1470,9 +1466,9 @@ func TestNoBaseToStringFallsBackWhenHandedNilOptions(test *testing.T) {
 	test.Parallel()
 
 	// An Error is ignored by default, so a fallback that lost the builtin names would report here.
-	rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoBaseToString,
-		noBaseToStringFile, "declare const e: Error;\n`${e}`;\n", nil))
+	rule_testing.ExpectClean(test, rule_testing.RunTyped(test, NoBaseToString,
+		noBaseToStringFile, "declare const e: Error;\n`${e}`;\n"))
 	// And the control, so the silence above is a verdict rather than an inert rule.
-	rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, NoBaseToString,
-		noBaseToStringFile, "declare const o: {};\n`${o}`;\n", nil), "baseToString")
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoBaseToString,
+		noBaseToStringFile, "declare const o: {};\n`${o}`;\n"), "baseToString")
 }

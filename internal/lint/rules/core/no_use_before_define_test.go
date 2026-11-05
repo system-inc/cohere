@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -1372,7 +1373,7 @@ func TestNoUseBeforeDefineDecodesTheStringForm(test *testing.T) {
 		test.Fatalf("decoding the string form: %v", decodeNoUseBeforeDefineOptionsError)
 	}
 
-	settings := resolveNoUseBeforeDefineSettings(decoded)
+	settings := resolveNoUseBeforeDefineSettings(rule.Configured(decoded))
 	if settings.functions {
 		test.Error(`"nofunc" left the functions option on`)
 	}
@@ -1395,7 +1396,7 @@ func TestNoUseBeforeDefineDecodesTheStringForm(test *testing.T) {
 func TestNoUseBeforeDefineDefaultsSurviveAnAbsentConfiguration(test *testing.T) {
 	test.Parallel()
 
-	for _, options := range []any{nil, any(nil), NoUseBeforeDefineOptions{}} {
+	for _, options := range []rule.Given[NoUseBeforeDefineOptions]{{}, rule.Configured(NoUseBeforeDefineOptions{})} {
 		settings := resolveNoUseBeforeDefineSettings(options)
 
 		if !settings.functions || !settings.classes || !settings.variables ||
@@ -1408,7 +1409,7 @@ func TestNoUseBeforeDefineDefaultsSurviveAnAbsentConfiguration(test *testing.T) 
 	}
 
 	// And the rule must actually report through that path, not merely hold the right settings.
-	result := rule_testing.RunTypedWithOptions(test, NoUseBeforeDefine, "fixture.ts", "a++; var a=19;", nil)
+	result := rule_testing.RunTyped(test, NoUseBeforeDefine, "fixture.ts", "a++; var a=19;")
 	rule_testing.ExpectFindings(test, result, "usedBeforeDefined")
 }
 

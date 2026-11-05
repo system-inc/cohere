@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -23,18 +24,18 @@ type requireImportsCase struct {
 
 // decodeRequireImportsOptions routes a case's options through the rule's own exported decoder
 // rather than building the struct, so that the string-to-regexp compilation and the `allowAsImport`
-// default are themselves under test. A case with no options is handed nil, which is what a rule
+// default are themselves under test. A case with no options is handed none, which is what a rule
 // configured as a bare "error" actually receives.
-func decodeRequireImportsOptions(test *testing.T, optionsText string) any {
+func decodeRequireImportsOptions(test *testing.T, optionsText string) rule.Given[NoRequireImportsOptions] {
 	test.Helper()
 	if optionsText == "" {
-		return nil
+		return rule.Given[NoRequireImportsOptions]{}
 	}
 	decoded, decodeNoRequireImportsOptionsError := DecodeNoRequireImportsOptions(json.RawMessage(optionsText))
 	if decodeNoRequireImportsOptionsError != nil {
 		test.Fatalf("decoding the options %s: %v", optionsText, decodeNoRequireImportsOptionsError)
 	}
-	return decoded
+	return rule.Configured(decoded)
 }
 
 // The corpus is oxc's, copied rather than rewritten, from
@@ -127,7 +128,7 @@ func TestNoRequireImportsFires(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.sourceText, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(test, NoRequireImports, requireImportsFile,
+			result := rule_testing.RunTypedGiven(test, NoRequireImports, requireImportsFile,
 				testCase.sourceText, decodeRequireImportsOptions(test, testCase.options))
 			expected := make([]string, testCase.findings)
 			for index := range expected {
@@ -228,7 +229,7 @@ func TestNoRequireImportsStaysSilent(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.sourceText, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, NoRequireImports,
+			rule_testing.ExpectClean(test, rule_testing.RunTypedGiven(test, NoRequireImports,
 				requireImportsFile, testCase.sourceText,
 				decodeRequireImportsOptions(test, testCase.options)))
 		})
@@ -286,7 +287,7 @@ func TestNoRequireImportsSpans(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(test, NoRequireImports, requireImportsFile,
+			result := rule_testing.RunTypedGiven(test, NoRequireImports, requireImportsFile,
 				testCase.sourceText, decodeRequireImportsOptions(test, testCase.options))
 			if len(result.Diagnostics) != len(testCase.reported) {
 				test.Fatalf("got %d findings, want %d", len(result.Diagnostics), len(testCase.reported))
@@ -307,8 +308,8 @@ func TestNoRequireImportsSpans(test *testing.T) {
 func TestNoRequireImportsMessage(test *testing.T) {
 	test.Parallel()
 
-	result := rule_testing.RunTypedWithOptions(test, NoRequireImports, requireImportsFile,
-		"var lib = require('lib');", nil)
+	result := rule_testing.RunTyped(test, NoRequireImports, requireImportsFile,
+		"var lib = require('lib');")
 	if len(result.Diagnostics) != 1 {
 		test.Fatalf("got %d findings, want 1", len(result.Diagnostics))
 	}
@@ -454,7 +455,7 @@ func TestNoRequireImportsMeasuredAgainstTheReleaseBinary(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(test, NoRequireImports, requireImportsFile,
+			result := rule_testing.RunTypedGiven(test, NoRequireImports, requireImportsFile,
 				testCase.sourceText, decodeRequireImportsOptions(test, testCase.options))
 			if len(result.Diagnostics) != testCase.findings {
 				test.Fatalf("got %d findings, want %d (%s)",
@@ -473,8 +474,8 @@ func TestNoRequireImportsRequiresTheTypedHarness(test *testing.T) {
 	if !NoRequireImports.NeedsTypeChecker {
 		test.Fatal("the rule stopped declaring NeedsTypeChecker; the shadow test cannot work without it")
 	}
-	result := rule_testing.RunWithOptions(test, NoRequireImports, requireImportsFile,
-		"var lib = require('lib');", nil)
+	result := rule_testing.Run(test, NoRequireImports, requireImportsFile,
+		"var lib = require('lib');")
 	if len(result.Diagnostics) != 0 {
 		test.Errorf("the untyped harness produced %d findings; the nil-checker guard is missing",
 			len(result.Diagnostics))
@@ -492,12 +493,11 @@ func TestDecodeNoRequireImportsOptions(test *testing.T) {
 		if decodeNoRequireImportsOptionsError != nil {
 			test.Fatalf("decoding: %v", decodeNoRequireImportsOptionsError)
 		}
-		options, _ := decoded.(NoRequireImportsOptions)
-		if options.AllowAsImport {
+		if decoded.AllowAsImport {
 			test.Error("allowAsImport defaulted to true; both upstreams default it to false")
 		}
-		if len(options.Allow) != 0 {
-			test.Errorf("allow decoded %d patterns from an empty object", len(options.Allow))
+		if len(decoded.Allow) != 0 {
+			test.Errorf("allow decoded %d patterns from an empty object", len(decoded.Allow))
 		}
 	})
 
@@ -508,14 +508,13 @@ func TestDecodeNoRequireImportsOptions(test *testing.T) {
 		if decodeNoRequireImportsOptionsError != nil {
 			test.Fatalf("decoding: %v", decodeNoRequireImportsOptionsError)
 		}
-		options, _ := decoded.(NoRequireImportsOptions)
-		if len(options.Allow) != 2 {
-			test.Fatalf("compiled %d patterns, want 2", len(options.Allow))
+		if len(decoded.Allow) != 2 {
+			test.Fatalf("compiled %d patterns, want 2", len(decoded.Allow))
 		}
-		if !options.Allow[0].Test("../packages/package.json") {
+		if !decoded.Allow[0].Test("../packages/package.json") {
 			test.Error("the escaped-dot pattern did not match a path upstream permits")
 		}
-		if options.Allow[0].Test("./package.jsonc") {
+		if decoded.Allow[0].Test("./package.jsonc") {
 			test.Error("the anchored pattern matched a path upstream reports")
 		}
 	})
@@ -529,11 +528,10 @@ func TestDecodeNoRequireImportsOptions(test *testing.T) {
 		if decodeNoRequireImportsOptionsError != nil {
 			test.Fatalf("decoding: %v", decodeNoRequireImportsOptionsError)
 		}
-		options, _ := decoded.(NoRequireImportsOptions)
-		if len(options.Allow) != 1 {
-			test.Fatalf("kept %d patterns, want 1; JavaScript has lookbehind", len(options.Allow))
+		if len(decoded.Allow) != 1 {
+			test.Fatalf("kept %d patterns, want 1; JavaScript has lookbehind", len(decoded.Allow))
 		}
-		if !options.Allow[0].Test("xy") {
+		if !decoded.Allow[0].Test("xy") {
 			test.Error("the lookbehind did not match a path JavaScript matches")
 		}
 	})
@@ -547,11 +545,10 @@ func TestDecodeNoRequireImportsOptions(test *testing.T) {
 		if decodeNoRequireImportsOptionsError != nil {
 			test.Fatalf("decoding: %v", decodeNoRequireImportsOptionsError)
 		}
-		options, _ := decoded.(NoRequireImportsOptions)
-		if len(options.Allow) != 1 {
-			test.Fatalf("kept %d patterns, want 1; an unterminated group does not compile", len(options.Allow))
+		if len(decoded.Allow) != 1 {
+			test.Fatalf("kept %d patterns, want 1; an unterminated group does not compile", len(decoded.Allow))
 		}
-		if !options.Allow[0].Test("ok") {
+		if !decoded.Allow[0].Test("ok") {
 			test.Error("the surviving pattern is not the compilable one")
 		}
 	})
@@ -601,7 +598,7 @@ func TestNoRequireImportsSurvivesMalformedImportEquals(test *testing.T) {
 			test.Parallel()
 			// The assertion is that this returns at all. A panic here fails the test by crashing it,
 			// which is the only signal available for this class of guard.
-			rule_testing.RunTypedWithOptions(test, NoRequireImports, requireImportsFile,
+			rule_testing.RunTypedGiven(test, NoRequireImports, requireImportsFile,
 				testCase.sourceText, decodeRequireImportsOptions(test, testCase.options))
 		})
 	}

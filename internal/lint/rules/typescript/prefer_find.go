@@ -78,7 +78,7 @@ import (
 //
 // Two anchors, a call expression and a computed element access, both common. Each exits on a cheap
 // syntactic test before the checker is consulted.
-var PreferFind = rule.Rule{
+var PreferFind = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/prefer-find",
 
 	// The receiver's type decides whether a `filter` call is Array.prototype.filter, and the index
@@ -86,7 +86,7 @@ var PreferFind = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// isArrayish answers upstream's `isArrayish`: a possibly-nullable array or tuple, or a
 		// union of those, where an intersection must be arrayish in every part.
 		//

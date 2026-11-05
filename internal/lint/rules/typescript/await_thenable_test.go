@@ -595,7 +595,7 @@ func TestAwaitThenableRequiresTheTypedHarness(test *testing.T) {
 	// The decline the guard buys. A Context with no checker must yield no listeners rather than
 	// dereferencing nil, and asserting it here is the only way the guard is covered at all: the
 	// registration path always supplies a checker, so nothing else can reach this branch.
-	if listeners := AwaitThenable.Run(rule.Context{}, nil); listeners != nil {
+	if listeners := AwaitThenable.Run(rule.Context{}, rule.Given[rule.NoOptions]{}); listeners != nil {
 		test.Errorf("a nil checker produced %d listeners, want the rule to decline the file", len(listeners))
 	}
 }

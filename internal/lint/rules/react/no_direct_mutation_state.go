@@ -162,12 +162,12 @@ var messageNoDirectMutationState = rule.Message{
 // side. An update expression reports `update_expr.span`, the whole thing including `++`. The
 // upstream snapshot underlines `this.state.foo` for the first and `this.state.foo++` for the
 // second, and every fixture below asserts the sliced text rather than the id alone.
-var NoDirectMutationState = rule.Rule{
+var NoDirectMutationState = rule.Rule[rule.NoOptions]{
 	// No namespace prefix. The config writes `react/no-direct-mutation-state` and the parity guard
 	// strips the namespace on a `/` boundary, so `react-no-direct-mutation-state` would match no
 	// inventory entry, lint no files, and still pass every fixture in this package.
 	Name: "react/no-direct-mutation-state",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// No file gate. oxc gated this on `source_type().is_jsx()` and that gate came along with the
 		// port from oxc, but the authority here is eslint-plugin-react, which does not gate on the
 		// file name at all. React code in a `.ts` file is ordinary and legal, and the gate made this

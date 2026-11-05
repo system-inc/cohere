@@ -52,7 +52,7 @@ var nativeNonConstructors = map[string]bool{
 // rule that does. The lock is acquired once per file rather than per node, and this rule asks the
 // checker only for a `new` expression whose callee is one of two identifiers, so the question is
 // asked on almost no files in a normal tree.
-var NoNewNativeNonconstructor = rule.Rule{
+var NoNewNativeNonconstructor = rule.Rule[rule.NoOptions]{
 	Name: "no-new-native-nonconstructor",
 
 	// See the doc above: the rule's whole discrimination is whether a name is the global or a local
@@ -60,7 +60,7 @@ var NoNewNativeNonconstructor = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindNewExpression: func(node *ast.Node) {
 				callee := node.AsNewExpression().Expression

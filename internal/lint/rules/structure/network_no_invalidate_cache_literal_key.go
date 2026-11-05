@@ -70,9 +70,9 @@ func messageNoArrayWithStringLiteralInvalidateCache() rule.Message {
 //
 // No fix. The repair is to export a key from wherever the cache is created and import it, which
 // means creating a binding in another file.
-var NetworkNoInvalidateCacheLiteralKey = rule.Rule{
+var NetworkNoInvalidateCacheLiteralKey = rule.Rule[rule.NoOptions]{
 	Name: "structure/network-no-invalidate-cache-literal-key",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				call := node.AsCallExpression()

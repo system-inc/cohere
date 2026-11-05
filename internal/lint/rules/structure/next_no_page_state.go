@@ -51,9 +51,9 @@ var pageStateHookNames = map[string]bool{
 // Recorded rather than left implicit, because every other rule ported tonight had a real population
 // behind its zero and this one does not. The fixtures and a planted control through the real binary
 // are the whole of the evidence for it.
-var NextNoPageState = rule.Rule{
+var NextNoPageState = rule.Rule[rule.NoOptions]{
 	Name: "structure/next-no-page-state",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// IsReactFile is redundant here and kept for symmetry with the original, which tests both.
 		// IsPageFile already requires a .tsx or .jsx suffix, so no file can satisfy it and fail the
 		// React test. A mutation sweep cannot kill the first half, which is what a check subsumed

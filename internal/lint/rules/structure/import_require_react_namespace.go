@@ -87,9 +87,9 @@ func messageNoTypeReferenceWithoutPrefix() rule.Message {
 // it is not treated as a type either. Both arms therefore stay silent on it, which is the
 // conservative direction, and reproducing the two spellings keeps our findings equal to the gate's
 // rather than adding one it does not have.
-var ImportRequireReactNamespace = rule.Rule{
+var ImportRequireReactNamespace = rule.Rule[rule.NoOptions]{
 	Name: "structure/import-require-react-namespace",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// Local names brought in by a named import from react, which is what a later bare use has
 		// to be checked against.
 		importedFromReact := map[string]bool{}

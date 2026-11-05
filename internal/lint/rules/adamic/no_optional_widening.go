@@ -45,11 +45,11 @@ var noOptionalWideningText = policy.MessageOf("adamic/no-optional-widening", "op
  *
  * The repair is a type or a construction only the author can choose.
  */
-var NoOptionalWidening = rule.Rule{
+var NoOptionalWidening = rule.Rule[rule.NoOptions]{
 	Name:             "adamic/no-optional-widening",
 	NeedsTypeChecker: true,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.TypeChecker == nil || ruleContext.SourceFile == nil {
 			return nil
 		}

@@ -770,12 +770,8 @@ func TestDecodeStateInConstructorOptions(test *testing.T) {
 			if decodeStateInConstructorOptionsError != nil {
 				test.Fatalf("unexpected error: %v", decodeStateInConstructorOptionsError)
 			}
-			options, ok := decoded.(StateInConstructorOptions)
-			if !ok {
-				test.Fatalf("decoded to %T, want StateInConstructorOptions", decoded)
-			}
-			if options.Mode != testCase.want {
-				test.Errorf("mode = %q, wanted %q", options.Mode, testCase.want)
+			if decoded.Mode != testCase.want {
+				test.Errorf("mode = %q, wanted %q", decoded.Mode, testCase.want)
 			}
 		})
 	}

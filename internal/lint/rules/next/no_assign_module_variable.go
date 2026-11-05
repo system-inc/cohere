@@ -44,14 +44,14 @@ var messageNoAssignModuleVariable = rule.Message{
 // choice and is preserved: `let a, module = {}` reports once against the whole statement rather than
 // against the offending name. Reporting per declarator would be a narrower range and a different
 // rule, and choosing it here would be us overriding the upstream judgment on a rule we ported.
-var NoAssignModuleVariable = rule.Rule{
+var NoAssignModuleVariable = rule.Rule[rule.NoOptions]{
 	// The name carries no family prefix, and that is load-bearing rather than stylistic. The config
 	// writes `nextjs/no-assign-module-variable`, and matching strips the namespace on a `/` boundary,
 	// so a rule named `next-no-assign-module-variable` matches nothing and runs on no files while its
 	// own tests pass. That is not hypothetical: this rule shipped that way and was inert until a
 	// planted violation failed to fire.
 	Name: "@next/next/no-assign-module-variable",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindVariableStatement: func(node *ast.Node) {
 				statement := node.AsVariableStatement()

@@ -10,5 +10,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 //
 // No Decode entry: the original's `schema: []` means no option surface.
 func init() {
-	rule.Register(rule.Registration{Rule: GraphQlOperationContextMatchesReturn})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: GraphQlOperationContextMatchesReturn})
 }

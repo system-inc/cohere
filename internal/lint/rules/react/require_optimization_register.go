@@ -8,5 +8,8 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // shared edit. The decoder is hand-written rather than `rule.DecodeOptionsInto` because the generic
 // one errors on empty input, which is what a bare `"error"` configuration hands it.
 func init() {
-	rule.Register(rule.Registration{Rule: RequireOptimization, Decode: DecodeRequireOptimizationOptions})
+	rule.Register(rule.Registration[RequireOptimizationOptions]{
+		Rule:   RequireOptimization,
+		Decode: DecodeRequireOptimizationOptions,
+	})
 }

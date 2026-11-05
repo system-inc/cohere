@@ -14,7 +14,7 @@ func strictVoidReturnCaseName(index int) string {
 	return "case" + strconv.Itoa(index)
 }
 
-func strictVoidReturnOptionsFor(test *testing.T, optionsJson string) any {
+func strictVoidReturnOptionsFor(test *testing.T, optionsJson string) StrictVoidReturnOptions {
 	test.Helper()
 	if optionsJson == "" {
 		return DefaultStrictVoidReturnSettings()
@@ -1012,12 +1012,8 @@ func TestDecodeStrictVoidReturnOptions(test *testing.T) {
 			if decodeStrictVoidReturnOptionsError != nil {
 				test.Fatalf("decoding %s: %v", testCase.raw, decodeStrictVoidReturnOptionsError)
 			}
-			options, isOptions := decoded.(StrictVoidReturnOptions)
-			if !isOptions {
-				test.Fatalf("the decoder returned %T rather than the options struct", decoded)
-			}
-			if options.AllowReturnAny != testCase.want {
-				test.Fatalf("allowReturnAny: expected %v, got %v", testCase.want, options.AllowReturnAny)
+			if decoded.AllowReturnAny != testCase.want {
+				test.Fatalf("allowReturnAny: expected %v, got %v", testCase.want, decoded.AllowReturnAny)
 			}
 		})
 	}
@@ -1033,8 +1029,8 @@ func TestStrictVoidReturnFallsBackToTheDefaultOnNilOptions(test *testing.T) {
 
 	const anyReturning = "declare function takes(cb: () => void): void;\ndeclare function makeAny(): any;\ntakes(() => makeAny());"
 
-	rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, StrictVoidReturn,
-		strictVoidReturnFile, anyReturning, nil), "nonVoidReturn")
+	rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, StrictVoidReturn,
+		strictVoidReturnFile, anyReturning), "nonVoidReturn")
 
 	rule_testing.ExpectClean(test, rule_testing.RunTypedWithOptions(test, StrictVoidReturn,
 		strictVoidReturnFile, anyReturning,

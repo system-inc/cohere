@@ -444,10 +444,10 @@ func inferredDependencyStrings(test *testing.T, source string) ([]string, bool) 
 	test.Helper()
 	var rendered []string
 	ran := false
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name:             "inferred-dependency-strings",
 		NeedsTypeChecker: true,
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
 					if ruleContext.TypeChecker == nil {

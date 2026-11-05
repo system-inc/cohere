@@ -86,15 +86,15 @@ func messageBooleanOutcome(flagName string, declaration string, suggested string
 // third-party shape rather than an envelope. Generated output belongs to its generator.
 //
 // No fix. Naming the ways an operation can turn out is the judgment the pattern exists for.
-var ConsistencyNoBooleanOutcome = rule.Rule{
+var ConsistencyNoBooleanOutcome = rule.Rule[ConsistencyNoBooleanOutcomeOptions]{
 	Name: "nexus/consistency-no-boolean-outcome",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[ConsistencyNoBooleanOutcomeOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		allowedTypeNames := map[string]bool{}
-		if settings, hasSettings := rule.OptionsAs[ConsistencyNoBooleanOutcomeOptions](options); hasSettings {
+		if settings, hasSettings := options.Read(); hasSettings {
 			for _, name := range settings.AllowedTypeNames {
 				allowedTypeNames[name] = true
 			}

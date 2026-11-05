@@ -136,12 +136,12 @@ const noDeprecatedMessageId = "deprecated"
 // argument: the command was the same Linter drive every other line here cites, and it reported
 // nothing for either tag. If a later reader finds an arrangement where it does fire, this is the
 // note that says the absence here was measured on two shapes and not proved over all of them.
-var NoDeprecated = rule.Rule{
+var NoDeprecated = rule.Rule[rule.NoOptions]{
 	// No namespace prefix. The config writes `react/no-deprecated` and the parity guard strips the
 	// namespace on a `/` boundary, so `react-no-deprecated` would match no inventory entry and lint
 	// no files while passing every fixture in this package.
 	Name: "react/no-deprecated",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// The pragma is read once per file rather than per node, because it is a property of the
 		// file's comments and cannot change between two nodes in it. It also has to be read before
 		// the first node is judged, which is why the table is built here and not lazily.

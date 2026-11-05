@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -16,16 +17,16 @@ const operatorAssignmentFile = "/repository/source/OperatorAssignment.ts"
 // The default is `always`, so a struct built by hand would carry a non-nil setting and every case
 // would pass while the live config's bare "error" still handed the rule a nil it read as silence.
 // An empty string here means that bare configuration.
-func decodedOperatorAssignmentOptions(test *testing.T, raw string) any {
+func decodedOperatorAssignmentOptions(test *testing.T, raw string) rule.Given[OperatorAssignmentOptions] {
 	test.Helper()
 	if raw == "" {
-		return nil
+		return rule.Given[OperatorAssignmentOptions]{}
 	}
 	options, decodeOperatorAssignmentOptionsError := DecodeOperatorAssignmentOptions(json.RawMessage(raw))
 	if decodeOperatorAssignmentOptionsError != nil {
 		test.Fatalf("the decoder refused %s: %v", raw, decodeOperatorAssignmentOptionsError)
 	}
-	return options
+	return rule.Configured(options)
 }
 
 // The corpus is ESLint's own, at `tests/lib/rules/operator-assignment.js`, and it was not
@@ -153,7 +154,7 @@ func TestOperatorAssignmentFires(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name+" ["+testCase.options+"]", func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, OperatorAssignment, operatorAssignmentFile,
+			result := rule_testing.RunGiven(test, OperatorAssignment, operatorAssignmentFile,
 				testCase.name, decodedOperatorAssignmentOptions(test, testCase.options))
 			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 
@@ -253,7 +254,7 @@ func TestOperatorAssignmentStaysSilent(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name+" ["+testCase.options+"]", func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, OperatorAssignment, operatorAssignmentFile,
+			result := rule_testing.RunGiven(test, OperatorAssignment, operatorAssignmentFile,
 				testCase.name, decodedOperatorAssignmentOptions(test, testCase.options))
 			rule_testing.ExpectClean(test, result)
 		})
@@ -333,7 +334,7 @@ func TestOperatorAssignmentTypeScriptShapes(test *testing.T) {
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, OperatorAssignment, operatorAssignmentFile,
+			result := rule_testing.RunGiven(test, OperatorAssignment, operatorAssignmentFile,
 				testCase.sourceText, decodedOperatorAssignmentOptions(test, testCase.options))
 			rule_testing.ExpectFindings(test, result, testCase.wantId)
 

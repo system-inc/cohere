@@ -56,10 +56,10 @@ func TestStateEffectsFollowImportOrigin(test *testing.T) {
 				testCase.callee +
 				`({value: 0}); }`
 			visited := 0
-			probe := rule.Rule{
+			probe := rule.Rule[rule.NoOptions]{
 				Name:             "state-effects-origin",
 				NeedsTypeChecker: true,
-				Run: func(ruleContext rule.Context, options any) rule.Listeners {
+				Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 					return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
 						forEachFunctionLike(node, func(node *ast.Node) {
 							if node.Name() == nil || node.Name().Text() != "Component" {
@@ -157,10 +157,10 @@ return <div onClick={() => toggle('a')}>{canGo ? 'y' : 'n'}</div>;
 			test.Parallel()
 			var findings int
 			var markers int
-			probe := rule.Rule{
+			probe := rule.Rule[rule.NoOptions]{
 				Name:             "state-method-memoization",
 				NeedsTypeChecker: true,
-				Run: func(ruleContext rule.Context, options any) rule.Listeners {
+				Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 					return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
 						forEachFunctionLike(node, func(node *ast.Node) {
 							function := Lower(node, ruleContext.TypeChecker)
@@ -208,10 +208,10 @@ useEffect(() => { setState(someGlobal.value); }, [someGlobal]);
 return <div>{String(state)}</div>;
 }`
 	visited := 0
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name:             "state-setter-dependency-pruning",
 		NeedsTypeChecker: true,
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
 				forEachFunctionLike(node, func(node *ast.Node) {
 					function := Lower(node, ruleContext.TypeChecker)

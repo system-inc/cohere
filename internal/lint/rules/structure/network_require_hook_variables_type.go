@@ -63,10 +63,10 @@ func messageUnnecessaryVariablesDestructuring() rule.Message {
 // every property is a same-named read off the variables parameter. `{ identifier: variables.slug }`
 // is a rename rather than a rebuild and is left alone, because collapsing it to the parameter would
 // change what the call sends.
-var NetworkRequireHookVariablesType = rule.Rule{
+var NetworkRequireHookVariablesType = rule.Rule[rule.NoOptions]{
 	Name:       "structure/network-require-hook-variables-type",
 	NoListener: rule.NoListenerAnswersInRun,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		analysis := NetworkFileAnalysisFor(ruleContext)
 		if len(analysis.HookDeclarations) == 0 {
 			return nil

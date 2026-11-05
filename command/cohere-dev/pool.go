@@ -84,13 +84,22 @@ type poolShape struct {
 func readPoolShape() (poolShape, error) {
 	var shape poolShape
 	var positiveVariableError error
-	if shape.tokens, positiveVariableError = positiveVariable(tokensVariable, defaultTokens); positiveVariableError != nil {
+	if shape.tokens, positiveVariableError = positiveVariable(
+		tokensVariable,
+		defaultTokens,
+	); positiveVariableError != nil {
 		return shape, positiveVariableError
 	}
-	if shape.packages, positiveVariableError = positiveVariable(packagesVariable, defaultPackages); positiveVariableError != nil {
+	if shape.packages, positiveVariableError = positiveVariable(
+		packagesVariable,
+		defaultPackages,
+	); positiveVariableError != nil {
 		return shape, positiveVariableError
 	}
-	if shape.threads, positiveVariableError = positiveVariable(threadsVariable, defaultThreads); positiveVariableError != nil {
+	if shape.threads, positiveVariableError = positiveVariable(
+		threadsVariable,
+		defaultThreads,
+	); positiveVariableError != nil {
 		return shape, positiveVariableError
 	}
 	return shape, nil

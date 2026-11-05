@@ -86,14 +86,14 @@ import (
 // # Cost
 //
 // Two rare anchors, and the checker is consulted only for the single-interpolation case.
-var NoUnnecessaryTemplateExpression = rule.Rule{
+var NoUnnecessaryTemplateExpression = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/no-unnecessary-template-expression",
 
 	// Only the single-interpolation case asks a type question, but it is the one that decides
 	// whether `${s}` collapses, so the checker is required.
 	NeedsTypeChecker: true,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// NeedsTypeChecker governs registration; the harness builds a Context by hand and can hand
 		// this rule a nil checker. Declining the file once here is cheaper than a guard per node.
 		if ruleContext.TypeChecker == nil {

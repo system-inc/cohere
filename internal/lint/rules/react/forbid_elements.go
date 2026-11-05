@@ -91,7 +91,7 @@ type forbidElementsWireOptions struct {
 // upstream's default of an empty forbid list rather than an error. An empty list is the rule doing
 // nothing, which is upstream's behaviour with no options: `configuration.forbid || []`. That is the
 // safe direction for this particular rule, since the whole judgment is supplied by the config.
-func DecodeForbidElementsOptions(raw []byte) (any, error) {
+func DecodeForbidElementsOptions(raw []byte) (ForbidElementsOptions, error) {
 	options := ForbidElementsOptions{}
 	if len(raw) == 0 {
 		return options, nil
@@ -222,7 +222,7 @@ func DecodeForbidElementsOptions(raw []byte) (any, error) {
 // All measured. Reading `.Text()` off the tag node would answer only the last segment for a member
 // name, silently failing to match any dotted entry, and the corpus's one dotted case would still
 // pass because a one-level member's text happens to differ.
-var ForbidElements = rule.Rule{
+var ForbidElements = rule.Rule[ForbidElementsOptions]{
 	Name: "react/forbid-elements",
 
 	// Declared for the bare-call branch of `isPragmaCreateElementCall`, which asks the checker
@@ -231,8 +231,8 @@ var ForbidElements = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, _ := rule.OptionsAs[ForbidElementsOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[ForbidElementsOptions]) rule.Listeners {
+		settings, _ := options.Read()
 
 		// A rule with an empty list matches nothing, which is the unconfigured state. Building the
 		// lookup anyway costs one allocation and keeps the two paths identical.

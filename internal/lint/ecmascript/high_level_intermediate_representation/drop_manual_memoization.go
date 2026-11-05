@@ -527,7 +527,7 @@ func collectManualMemoTemporaries(function *Function, instruction *Instruction, 
 
 	case *Primitive:
 		// `React.useMemo` lowers the property name to a Primitive string; see the divergence note.
-		if name, ok := instructionValue.Value.(string); ok {
+		if name, ok := instructionValue.Value.(PrimitiveString); ok {
 			switch name {
 			case "useMemo":
 				sidemap.manualMemos[target] = ManualMemoKindUseMemo

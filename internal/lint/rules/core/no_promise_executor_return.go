@@ -42,7 +42,7 @@ type NoPromiseExecutorReturnOptions struct {
 //
 // The configured shape is the bare object rather than upstream's `[{...}]`: cohere's config layer
 // strips the severity-and-options tuple before dispatch.
-func DecodeNoPromiseExecutorReturnOptions(raw []byte) (any, error) {
+func DecodeNoPromiseExecutorReturnOptions(raw []byte) (NoPromiseExecutorReturnOptions, error) {
 	var options NoPromiseExecutorReturnOptions
 	if len(raw) == 0 {
 		return options, nil
@@ -116,15 +116,15 @@ func DecodeNoPromiseExecutorReturnOptions(raw []byte) (any, error) {
 // inputs, an unnamed function expression and an unnamed class expression as a concise body: upstream
 // considers `wrapBraces` and declines, because `{function () {}}` is a block containing a function
 // declaration with no name, which is a syntax error. A named one is fine and gets the suggestion.
-var NoPromiseExecutorReturn = rule.Rule{
+var NoPromiseExecutorReturn = rule.Rule[NoPromiseExecutorReturnOptions]{
 	TypeReach:        rule.TypeReachShapes,
 	Name:             "no-promise-executor-return",
 	NeedsTypeChecker: true,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoPromiseExecutorReturnOptions]) rule.Listeners {
 		// A rule configured as bare "error" is handed nil, so the type assertion yields the zero
 		// value. Correct here only because the option defaults to false; written out so a later
 		// default change cannot invert the rule silently.
-		settings, _ := rule.OptionsAs[NoPromiseExecutorReturnOptions](options)
+		settings, _ := options.Read()
 		allowVoid := settings.AllowVoid != nil && *settings.AllowVoid
 
 		reportArrowBody := func(node *ast.Node) {

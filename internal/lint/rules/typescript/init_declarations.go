@@ -73,7 +73,7 @@ func DefaultInitDeclarationsSettings() InitDeclarationsOptions {
 // schema refuses it before the rule runs, and resolving it to "never ran" was the same silence one
 // layer further in. So is a second element beside "always", a key the second element's schema does
 // not declare, and a third element.
-func DecodeInitDeclarationsOptions(list []byte) (any, error) {
+func DecodeInitDeclarationsOptions(list []byte) (InitDeclarationsOptions, error) {
 	options := DefaultInitDeclarationsSettings()
 	elements, optionElementsError := rule.OptionElements(list, 2)
 	if optionElementsError != nil || len(elements) == 0 {
@@ -201,11 +201,11 @@ func initDeclarationsModeOf(name string) InitDeclarationsMode {
 // # Cost
 //
 // One listener on the declaration list, no checker, no program, no per-file state.
-var InitDeclarations = rule.Rule{
+var InitDeclarations = rule.Rule[InitDeclarationsOptions]{
 	Name: "@typescript-eslint/init-declarations",
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, isSettings := rule.OptionsAs[InitDeclarationsOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[InitDeclarationsOptions]) rule.Listeners {
+		settings, isSettings := options.Read()
 		if !isSettings {
 			settings = DefaultInitDeclarationsSettings()
 		}

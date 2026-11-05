@@ -31,7 +31,12 @@ const implicitGlobalsScriptTsConfig = `{
 
 // runImplicitGlobalsAsAScript builds a typed program in which the fixture is a script: sloppy for a
 // .js file, and strict under alwaysStrict for a .ts one.
-func runImplicitGlobalsAsAScript(test *testing.T, fileName string, sourceText string, options any) rule_testing.Result {
+func runImplicitGlobalsAsAScript(
+	test *testing.T,
+	fileName string,
+	sourceText string,
+	options NoImplicitGlobalsSettings,
+) rule_testing.Result {
 	test.Helper()
 	return rule_testing.RunTypedFilesWithSetupAndOptions(test, NoImplicitGlobals,
 		map[string]string{fileName: sourceText}, fileName, options, func(directory string) {
@@ -43,7 +48,7 @@ func runImplicitGlobalsAsAScript(test *testing.T, fileName string, sourceText st
 }
 
 // implicitGlobalsOptions routes the option through the rule's own exported decoder.
-func implicitGlobalsOptions(test *testing.T, lexicalBindings bool) any {
+func implicitGlobalsOptions(test *testing.T, lexicalBindings bool) NoImplicitGlobalsSettings {
 	test.Helper()
 	raw, encodeError := json.Marshal(map[string]bool{"lexicalBindings": lexicalBindings})
 	if encodeError != nil {
@@ -470,11 +475,7 @@ func TestDecodeNoImplicitGlobalsOptions(test *testing.T) {
 		if decodeNoImplicitGlobalsOptionsError != nil {
 			test.Fatalf("the decoder refused an absent option: %v", decodeNoImplicitGlobalsOptionsError)
 		}
-		settings, ok := decoded.(NoImplicitGlobalsSettings)
-		if !ok {
-			test.Fatalf("the decoder returned %T, not NoImplicitGlobalsSettings", decoded)
-		}
-		if settings.LexicalBindings {
+		if decoded.LexicalBindings {
 			test.Error("expected lexicalBindings to default to false")
 		}
 	})
@@ -485,11 +486,7 @@ func TestDecodeNoImplicitGlobalsOptions(test *testing.T) {
 		if decodeNoImplicitGlobalsOptionsError != nil {
 			test.Fatalf("the decoder refused an empty object: %v", decodeNoImplicitGlobalsOptionsError)
 		}
-		settings, ok := decoded.(NoImplicitGlobalsSettings)
-		if !ok {
-			test.Fatalf("the decoder returned %T, not NoImplicitGlobalsSettings", decoded)
-		}
-		if settings.LexicalBindings {
+		if decoded.LexicalBindings {
 			test.Error("expected lexicalBindings to stay false")
 		}
 	})
@@ -502,24 +499,20 @@ func TestDecodeNoImplicitGlobalsOptions(test *testing.T) {
 		if decodeNoImplicitGlobalsOptionsError != nil {
 			test.Fatalf("the decoder refused an explicit true: %v", decodeNoImplicitGlobalsOptionsError)
 		}
-		settings, ok := decoded.(NoImplicitGlobalsSettings)
-		if !ok {
-			test.Fatalf("the decoder returned %T, not NoImplicitGlobalsSettings", decoded)
-		}
-		if !settings.LexicalBindings {
+		if !decoded.LexicalBindings {
 			test.Error("expected lexicalBindings to be true")
 		}
 	})
 
 	test.Run("a bare severity leaves the rule on its default", func(test *testing.T) {
 		test.Parallel()
-		// A rule configured as "error" is handed nil options, which arrives at Run as an untyped
-		// nil rather than as settings. Asserting through the rule covers the fallback inside Run,
+		// A rule configured as "error" is handed no options, which arrives at Run unconfigured
+		// rather than as settings. Asserting through the rule covers the fallback inside Run,
 		// which no decoder test can reach: a global const must stay clean.
-		rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoImplicitGlobals,
-			implicitGlobalsFile, "const a = 1;", nil))
-		rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoImplicitGlobals,
-			implicitGlobalsFile, "var a = 1;", nil), "globalNonLexicalBinding")
+		rule_testing.ExpectClean(test, rule_testing.Run(test, NoImplicitGlobals,
+			implicitGlobalsFile, "const a = 1;"))
+		rule_testing.ExpectFindings(test, rule_testing.Run(test, NoImplicitGlobals,
+			implicitGlobalsFile, "var a = 1;"), "globalNonLexicalBinding")
 	})
 }
 

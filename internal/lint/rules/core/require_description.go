@@ -98,17 +98,17 @@ type RequireDescriptionOptions struct {
 // # Not fixable
 //
 // `meta.fixable` is null upstream. Only the author knows the reason.
-var RequireDescription = rule.Rule{
+var RequireDescription = rule.Rule[RequireDescriptionOptions]{
 	// Upstream's plugin-qualified name, so the same config key means the same thing in ESLint and
 	// in cohere.
 	Name: "@eslint-community/eslint-comments/require-description",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[RequireDescriptionOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}
 		// A bare severity decodes to the zero options, and a harness that bypasses the decoder hands
 		// nil. Both mean upstream's defaults: ignore nothing, no additional directives.
-		configured, _ := rule.OptionsAs[RequireDescriptionOptions](options)
+		configured, _ := options.Read()
 
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
@@ -124,7 +124,7 @@ var RequireDescription = rule.Rule{
 // schema layer here, so each is checked by hand: a misspelled key or kind would otherwise decode
 // silently to "ignore nothing", which reports more than the author asked for and says nothing.
 // A bare severity hands this no bytes, which is the zero options and not an error.
-func DecodeRequireDescriptionOptions(raw []byte) (any, error) {
+func DecodeRequireDescriptionOptions(raw []byte) (RequireDescriptionOptions, error) {
 	options := RequireDescriptionOptions{}
 	if len(raw) == 0 {
 		return options, nil

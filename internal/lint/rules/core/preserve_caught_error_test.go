@@ -135,22 +135,20 @@ func TestPreserveCaughtErrorDecodesErrorClassNames(test *testing.T) {
 
 	decode := rule.DecodeOptionsInto[PreserveCaughtErrorOptions]()
 
-	decoded, decodeError := decode([]byte(`{"errorClassNames": ["AppError", {"name": "WideError", "argumentPosition": 3}]}`))
+	decoded, decodeError := decode(
+		[]byte(`{"errorClassNames": ["AppError", {"name": "WideError", "argumentPosition": 3}]}`),
+	)
 	if decodeError != nil {
 		test.Fatalf("decoding both spellings failed: %v", decodeError)
-	}
-	options, ok := decoded.(PreserveCaughtErrorOptions)
-	if !ok {
-		test.Fatalf("the decoder returned %T, not PreserveCaughtErrorOptions", decoded)
 	}
 	want := []PreserveCaughtErrorClassName{
 		{Name: "AppError", ArgumentPosition: 2},
 		{Name: "WideError", ArgumentPosition: 3},
 	}
-	if len(options.ErrorClassNames) != 2 ||
-		options.ErrorClassNames[0] != want[0] ||
-		options.ErrorClassNames[1] != want[1] {
-		test.Errorf("decoded %#v, want %#v", options.ErrorClassNames, want)
+	if len(decoded.ErrorClassNames) != 2 ||
+		decoded.ErrorClassNames[0] != want[0] ||
+		decoded.ErrorClassNames[1] != want[1] {
+		test.Errorf("decoded %#v, want %#v", decoded.ErrorClassNames, want)
 	}
 
 	// The same name twice takes the later position, as ESLint's Map does. Position 3 reads the third
@@ -189,7 +187,7 @@ func TestPreserveCaughtErrorRequireCatchParameterDefaultsOff(test *testing.T) {
 
 	rule_testing.ExpectClean(
 		test,
-		rule_testing.RunTypedWithOptions(test, PreserveCaughtError, "input.ts", bareCatch, nil),
+		rule_testing.RunTyped(test, PreserveCaughtError, "input.ts", bareCatch),
 	)
 
 	explicitFalse, decodeError := decode([]byte(`{"requireCatchParameter": false}`))

@@ -8,6 +8,12 @@ import Foundation
  A value is a severity (`error`, `warning`, `off`) or an array whose first element is one, the shape the
  TypeScript config uses. Severities and strictness only, never allow lists or ignore names.
 
+ An array's second element is the rule's options, an object, and only a rule that reads one may be given it
+ (`optionsRead`). Any other key, a value of the wrong type, or an option the engine does not read is refused by
+ name, never dropped: a setting that looks chosen and does nothing is worse than none (#4x9h976, after a
+ `file-length` `max` was silently ignored). An option may only make a rule stricter, so `file-length`'s `max`
+ is read at or below the house limit and refused above it, since a looser limit is an allowance.
+
  Formatting is not configured here. Swift has one house format built into the engine (`HouseSwiftFormat`),
  so a `format` key, at the top level or in the `swift` block, is refused by name rather than read or
  ignored: a setting that looks chosen and does nothing is worse than none.
@@ -34,13 +40,21 @@ public struct RuleConfiguration: Equatable, Sendable {
     }
 
     public var severities: [String: Severity]
+    /* Each rule's options as the config gives them, by rule and then by option, for the rules that read one. */
+    public var options: [String: [String: Int]]
     /* Empty when a config was read. Otherwise the sentence the lint line prints under itself. */
     public var note: String
 
-    public init(severities: [String: Severity], note: String) {
+    public init(severities: [String: Severity], options: [String: [String: Int]] = [:], note: String) {
         self.severities = severities
+        self.options = options
         self.note = note
     }
+
+    /* The options each rule reads, with the largest value each may take. A rule not named here reads none. */
+    static let optionsRead: [String: [String: Int]] = [
+        FileLength().name: ["max": FileLength.maximumLines]
+    ]
 
     /* The severity a rule runs at: what the config says, or `error` for a house rule the config does not mention. */
     public func severity(of ruleName: String) -> Severity {
@@ -93,7 +107,11 @@ public struct RuleConfiguration: Equatable, Sendable {
             throw ReadFailure(path: path, reason: "the swift block has no rules object")
         }
         var severities: [String: Severity] = [:]
+        var options: [String: [String: Int]] = [:]
         for (name, value) in rules {
+            if let array = value as? [Any], array.count > 1 {
+                options[name] = try ruleOptions(of: name, array: array, path: path)
+            }
             let spelled = (value as? String) ?? ((value as? [Any])?.first as? String)
             guard let spelled, let severity = Severity(rawValue: spelled) else {
                 throw ReadFailure(
@@ -103,7 +121,52 @@ public struct RuleConfiguration: Equatable, Sendable {
             }
             severities[name] = severity
         }
-        return RuleConfiguration(severities: severities, note: "")
+        return RuleConfiguration(severities: severities, options: options, note: "")
+    }
+
+    /* A rule's options, from the array after its severity, refused by name when the rule does not read them. */
+    static func ruleOptions(of name: String, array: [Any], path: String) throws -> [String: Int] {
+        guard array.count == 2, let given = array[1] as? [String: Any] else {
+            throw ReadFailure(
+                path: path,
+                reason:
+                    "\(name) is given \(array.count - 1) values after its severity, and a rule takes at most one, an object of options",
+            )
+        }
+        guard let read = optionsRead[name] else {
+            throw ReadFailure(
+                path: path,
+                reason:
+                    "\(name) is given options (\(given.keys.sorted().joined(separator: ", "))), and it reads none; remove them",
+            )
+        }
+        var options: [String: Int] = [:]
+        for (key, value) in given {
+            guard let largest = read[key] else {
+                throw ReadFailure(
+                    path: path,
+                    reason:
+                        "\(name) is given the option \(key), which it does not read (it reads \(read.keys.sorted().joined(separator: ", "))); remove it",
+                )
+            }
+            /* JSON's true and false arrive as numbers that also cast to Int, so a boolean is told apart by its type. */
+            guard let number = value as? Int, CFGetTypeID(value as CFTypeRef) != CFBooleanGetTypeID(), number >= 1
+            else {
+                throw ReadFailure(
+                    path: path,
+                    reason: "\(name)'s \(key) is \(value), and it must be a whole number of at least 1",
+                )
+            }
+            guard number <= largest else {
+                throw ReadFailure(
+                    path: path,
+                    reason:
+                        "\(name)'s \(key) is \(number), above the house's \(largest); an option may only make a rule stricter",
+                )
+            }
+            options[key] = number
+        }
+        return options
     }
 
     /* Why a format key is refused, and what to do instead. */

@@ -136,9 +136,9 @@ func messageRequireNamespaceStyle(source string, expected string) rule.Message {
 //
 // The repair is a rename, which an editor does correctly with the whole file in view. The rule's
 // job here is to say which name and which form, and to say why.
-var ImportRequireModuleAlias = rule.Rule{
+var ImportRequireModuleAlias = rule.Rule[ImportRequireModuleAliasOptions]{
 	Name: "nexus/import-require-module-alias",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[ImportRequireModuleAliasOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}
@@ -148,7 +148,7 @@ var ImportRequireModuleAlias = rule.Rule{
 		for source, alias := range defaultModuleAliases {
 			configuredModules[source] = alias
 		}
-		if settings, hasSettings := rule.OptionsAs[ImportRequireModuleAliasOptions](options); hasSettings {
+		if settings, hasSettings := options.Read(); hasSettings {
 			for source, alias := range settings.Modules {
 				if alias.Name == "" {
 					continue

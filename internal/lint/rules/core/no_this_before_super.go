@@ -104,9 +104,9 @@ import (
 // And `super()` in callee position is not itself a violation, which is why the check asks whether
 // the `super` keyword is the callee of its parent call rather than simply whether a `super` token
 // appeared.
-var NoThisBeforeSuper = rule.Rule{
+var NoThisBeforeSuper = rule.Rule[rule.NoOptions]{
 	Name: "no-this-before-super",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		check := func(constructor *ast.Node) {
 			if !isDerivedClassConstructor(constructor) {
 				return

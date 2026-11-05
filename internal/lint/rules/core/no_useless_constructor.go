@@ -95,9 +95,9 @@ var messageNoUselessConstructorRemove = rule.Message{
 //
 // Upstream sets `hasSuggestions` and no `fixable`. Deleting a constructor is a change to what the
 // class declares rather than to how it is spelled, so nothing may apply it unattended.
-var NoUselessConstructor = rule.Rule{
+var NoUselessConstructor = rule.Rule[rule.NoOptions]{
 	Name: "no-useless-constructor",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindConstructor: func(node *ast.Node) {
 				constructor := node.AsConstructorDeclaration()

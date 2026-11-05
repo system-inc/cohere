@@ -9,5 +9,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 //
 // No Decode entry: the base rule's schema is empty, so the extension has no option surface either.
 func init() {
-	rule.Register(rule.Registration{Rule: NoDupeClassMembers})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: NoDupeClassMembers})
 }

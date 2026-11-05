@@ -27,9 +27,9 @@ const jsx = <a.b a={a}>{a}</a.b>;
 `
 	var mismatches []string
 	compared := 0
-	rule_testing.Run(test, rule.Rule{
+	rule_testing.Run(test, rule.Rule[rule.NoOptions]{
 		Name: "identifiers-probe",
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
 					walked := map[string][]*ast.Node{}

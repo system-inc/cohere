@@ -91,7 +91,10 @@ func ignoreSource(root string, path string) string {
 		return ""
 	}
 	information, statError := os.Lstat(path)
-	ignored, source, ignoredPathError := matcher.IgnoredPath(filepath.ToSlash(relative), statError == nil && information.IsDir())
+	ignored, source, ignoredPathError := matcher.IgnoredPath(
+		filepath.ToSlash(relative),
+		statError == nil && information.IsDir(),
+	)
 	if ignoredPathError != nil || !ignored {
 		return ""
 	}

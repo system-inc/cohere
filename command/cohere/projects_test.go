@@ -384,7 +384,12 @@ func TestSwiftFilesNoPackageChecksAreSaidAndFailNothing(test *testing.T) {
 		output, exitCode := runWithEngine(test, binary, engine, with, "--no-fix")
 		_, exitCodeWithout := runWithEngine(test, binary, engine, without, "--no-fix")
 		if exitCode != exitCodeWithout {
-			test.Errorf("Swift no package checks moved the exit code to %d from %d:\n%s", exitCode, exitCodeWithout, output)
+			test.Errorf(
+				"Swift no package checks moved the exit code to %d from %d:\n%s",
+				exitCode,
+				exitCodeWithout,
+				output,
+			)
 		}
 		for _, want := range []string{
 			"  App/: 3 Swift files no Swift package checks",
@@ -402,7 +407,9 @@ func TestSwiftFilesNoPackageChecksAreSaidAndFailNothing(test *testing.T) {
 	// The verdict line is the run's last, the one every view prints.
 	output, _ := runWithEngine(test, binary, clean, with, "--no-fix")
 	lines := strings.Split(strings.TrimSpace(output), "\n")
-	if last := lines[len(lines)-1]; !strings.HasPrefix(last, "✓ 💎 ") || !strings.HasSuffix(last, " • ⚠ Swift files no package checks: App/") {
+	if last := lines[len(
+		lines,
+	)-1]; !strings.HasPrefix(last, "✓ 💎 ") || !strings.HasSuffix(last, " • ⚠ Swift files no package checks: App/") {
 		test.Errorf("the verdict line is %q, want it green and ending on the gap", last)
 	}
 }
@@ -456,7 +463,8 @@ func TestSwiftIgnoredOrInADependencyIsNoGap(test *testing.T) {
 	if exitCode != 0 {
 		test.Errorf("the run exited %d:\n%s", exitCode, output)
 	}
-	if !strings.Contains(output, "  App/: 1 Swift file no Swift package checks") || !strings.Contains(output, "⚠ Swift files no package checks: App/\n") {
+	if !strings.Contains(output, "  App/: 1 Swift file no Swift package checks") ||
+		!strings.Contains(output, "⚠ Swift files no package checks: App/\n") {
 		test.Errorf("the control, App/ with its one file .gitignore keeps, is not named alone:\n%s", output)
 	}
 	for _, passedOver := range []string{"Generated/", "node_modules/", "Scripts/", "Legacy/"} {
@@ -529,7 +537,9 @@ func TestTheOneProjectRunHereSaysTheSwiftNoPackageChecks(test *testing.T) {
 			test.Fatalf("the %s run replayed: %t, so this does not test both paths:\n%s", run, replayed, output)
 		}
 		lines := strings.Split(strings.TrimSpace(output), "\n")
-		if last := lines[len(lines)-1]; !strings.HasPrefix(last, "✓ 💎 ") || !strings.HasSuffix(last, " • ⚠ Swift files no package checks: App/") {
+		if last := lines[len(
+			lines,
+		)-1]; !strings.HasPrefix(last, "✓ 💎 ") || !strings.HasSuffix(last, " • ⚠ Swift files no package checks: App/") {
 			test.Errorf("the %s run's footer is %q, want it green and ending on the gap", run, last)
 		}
 		if !strings.Contains(output, "cohere: App/: 1 Swift file no Swift package checks") {
@@ -569,7 +579,10 @@ func TestAnXcodeProjectIsDiscoveredByTheNearestClaim(test *testing.T) {
 				"CapturePhone/project.yml":   "name: CapturePhone\n",
 				"CapturePhone/App/App.swift": "let app = 1\n",
 			},
-			projects: []discoveredProject{{Directory: ".", Engine: engineSwift}, {Directory: "CapturePhone", Engine: engineSwift}},
+			projects: []discoveredProject{
+				{Directory: ".", Engine: engineSwift},
+				{Directory: "CapturePhone", Engine: engineSwift},
+			},
 		},
 		{
 			name: "a project.yml with no Swift beneath is not a project",
@@ -658,13 +671,16 @@ func TestAnXcodeProjectIsDiscoveredByTheNearestClaim(test *testing.T) {
 			if discoverProjectsError != nil {
 				test.Fatal(discoverProjectsError)
 			}
-			if len(found.Projects) != len(testCase.projects) || len(found.Projects) > 0 && !reflect.DeepEqual(found.Projects, testCase.projects) {
+			if len(found.Projects) != len(testCase.projects) ||
+				len(found.Projects) > 0 && !reflect.DeepEqual(found.Projects, testCase.projects) {
 				test.Errorf("found the projects %+v, want %+v", found.Projects, testCase.projects)
 			}
-			if len(found.UnclaimedSwift) != len(testCase.unclaimed) || len(found.UnclaimedSwift) > 0 && !reflect.DeepEqual(found.UnclaimedSwift, testCase.unclaimed) {
+			if len(found.UnclaimedSwift) != len(testCase.unclaimed) ||
+				len(found.UnclaimedSwift) > 0 && !reflect.DeepEqual(found.UnclaimedSwift, testCase.unclaimed) {
 				test.Errorf("found the unclaimed Swift %+v, want %+v", found.UnclaimedSwift, testCase.unclaimed)
 			}
-			if len(found.Refused) != len(testCase.refused) || len(found.Refused) > 0 && !reflect.DeepEqual(found.Refused, testCase.refused) {
+			if len(found.Refused) != len(testCase.refused) ||
+				len(found.Refused) > 0 && !reflect.DeepEqual(found.Refused, testCase.refused) {
 				test.Errorf("refused %v, want %v", found.Refused, testCase.refused)
 			}
 		})
@@ -772,7 +788,12 @@ func TestASwiftRunYieldsTheSwiftProjectsBelowItAndCountsTheRestAsAGap(test *test
 			test.Errorf("the report lacks %q:\n%s", want, output)
 		}
 	}
-	for _, unwanted := range []string{"CapturePhone/App/App.swift", "Tools/Sim/Package.swift", "Tools/Sim/Sources/Toy/Toy.swift", "no package checks"} {
+	for _, unwanted := range []string{
+		"CapturePhone/App/App.swift",
+		"Tools/Sim/Package.swift",
+		"Tools/Sim/Sources/Toy/Toy.swift",
+		"no package checks",
+	} {
 		if strings.Contains(output, unwanted) {
 			test.Errorf("the report names %q, which a run of its own accounts for:\n%s", unwanted, output)
 		}
@@ -793,7 +814,10 @@ func TestASwiftRunYieldsTheSwiftProjectsBelowItAndCountsTheRestAsAGap(test *test
 		return strings.HasSuffix(footer, " • ⚠ 2 Swift files not checked")
 	}) ||
 		gapFooters != 1 {
-		test.Errorf("the footers are %q, want the root's Swift one alone to end on the gap of build.swift and odd.swift", footers)
+		test.Errorf(
+			"the footers are %q, want the root's Swift one alone to end on the gap of build.swift and odd.swift",
+			footers,
+		)
 	}
 	for _, label := range []string{"CapturePhone", "Tools/Sim"} {
 		if len(footers[label]) != 1 {
@@ -856,7 +880,11 @@ func TestASwiftRunYieldsTheSwiftProjectsBelowItAndCountsTheRestAsAGap(test *test
 		{"file": alias + "/Scripts/odd.swift", "reason": "a reason no engine has given yet"},
 	}
 	if !reflect.DeepEqual(gaps["."], wantGaps) || len(gaps["CapturePhone"]) != 0 || len(gaps["Tools/Sim"]) != 0 {
-		test.Errorf("under --json the gaps are %v, want build.swift and odd.swift for . and none for the others:\n%s", gaps, output)
+		test.Errorf(
+			"under --json the gaps are %v, want build.swift and odd.swift for . and none for the others:\n%s",
+			gaps,
+			output,
+		)
 	}
 }
 

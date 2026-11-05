@@ -109,9 +109,9 @@ var nearMissConfusableWords = map[string]bool{"params": true, "props": true, "pa
 //
 // Only value exports count. A type export cannot be a route contract, and `export type { Metadata }`
 // is the ordinary way a layout re-exports Next's own type, which a case-insensitive test would flag.
-var NextNoNearMissRouteExport = rule.Rule{
+var NextNoNearMissRouteExport = rule.Rule[rule.NoOptions]{
 	Name: "structure/next-no-near-miss-route-export",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		contract := nextjs.RouteContractExports(imports.NormalizedFileName(ruleContext.SourceFile))
 		if len(contract) == 0 {
 			return nil

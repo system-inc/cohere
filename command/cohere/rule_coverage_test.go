@@ -9,6 +9,7 @@ import (
 
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/lint/testing"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -62,7 +63,7 @@ func countedLineTerms(test *testing.T, output string) (int, map[string]int) {
 // line, because that line is what a reader checks.
 // Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 func TestCoverageCountsAddUpToTheRuleTotal(test *testing.T) {
-	rules := []rule.Rule{}
+	rules := []rule.Entry{}
 	coverage := program.Coverage{
 		RulesOffered:      map[string]int{},
 		RulesListening:    map[string]int{},
@@ -72,7 +73,7 @@ func TestCoverageCountsAddUpToTheRuleTotal(test *testing.T) {
 	}
 	for shape := range 32 {
 		name := fmt.Sprintf("rule-%02d", shape)
-		rules = append(rules, rule.Rule{Name: name})
+		rules = append(rules, rule_testing.EntryOf(test, rule.Rule[rule.NoOptions]{Name: name}))
 		for bit, counts := range []map[string]int{
 			coverage.RulesReporting, coverage.RulesListening, coverage.RulesOffered,
 			coverage.RulesScopedOff, coverage.RulesUnconfigured,
@@ -115,7 +116,12 @@ func TestCoverageCountsAddUpToTheRuleTotal(test *testing.T) {
 	}
 
 	output := renderLintReport(
-		lintReport{Result: program.Result{Coverage: coverage}, Rules: rules, LintConfig: lintConfiguration, WalkCost: "in 1s"},
+		lintReport{
+			Result:     program.Result{Coverage: coverage},
+			Rules:      rules,
+			LintConfig: lintConfiguration,
+			WalkCost:   "in 1s",
+		},
 	)
 	total, terms := countedLineTerms(test, output)
 	printedSum := 0
@@ -171,10 +177,10 @@ func TestSwiftCoverageRefusesPartsLargerThanTheWhole(test *testing.T) {
 // config happened to print for one of them, which is why this asserts the categories themselves.
 // Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 func TestCoverageSeparatesUnwiredFromOfferedAndSilent(test *testing.T) {
-	rules := []rule.Rule{
+	rules := rule_testing.EntriesOf(test, []rule.Rule[rule.NoOptions]{
 		{Name: "satisfied-rule", NoListener: rule.NoListenerDeclinesIrrelevantFiles},
 		{Name: "unwired-rule"},
-	}
+	}...)
 	coverage := program.Coverage{
 		RulesOffered:   map[string]int{"satisfied-rule": 3407},
 		RulesListening: map[string]int{},
@@ -199,12 +205,12 @@ func TestCoverageSeparatesUnwiredFromOfferedAndSilent(test *testing.T) {
 // away.
 // Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 func TestARuleThatRanIsCountedAndNotNamedByDefault(test *testing.T) {
-	rules := []rule.Rule{
+	rules := rule_testing.EntriesOf(test, []rule.Rule[rule.NoOptions]{
 		{Name: "quiet-rule"},
 		{Name: "working-rule"},
 		{Name: "eager-rule", NoListener: rule.NoListenerAnswersInRun},
 		{Name: "unconfigured-rule"},
-	}
+	}...)
 	coverage := program.Coverage{
 		RulesOffered:      map[string]int{"quiet-rule": 3407, "working-rule": 3407, "eager-rule": 3407},
 		RulesListening:    map[string]int{"quiet-rule": 3407, "working-rule": 412},
@@ -228,7 +234,7 @@ func TestARuleThatRanIsCountedAndNotNamedByDefault(test *testing.T) {
 // whose second fact now rides beside the name.
 // Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 func TestCoverageDetailsNameEachRuleOnce(test *testing.T) {
-	rules := []rule.Rule{
+	rules := rule_testing.EntriesOf(test, []rule.Rule[rule.NoOptions]{
 		{Name: "off-everywhere"},
 		{Name: "nobody-configured"},
 		{Name: "partly-off"},
@@ -236,7 +242,7 @@ func TestCoverageDetailsNameEachRuleOnce(test *testing.T) {
 		{Name: "off-and-unconfigured"},
 		{Name: "quiet"},
 		{Name: "eager", NoListener: rule.NoListenerAnswersInRun},
-	}
+	}...)
 	coverage := program.Coverage{
 		RulesOffered:   map[string]int{"partly-off": 3779, "override-only": 40, "quiet": 3785, "eager": 3785},
 		RulesListening: map[string]int{"partly-off": 3779, "override-only": 40, "quiet": 3785},
@@ -298,7 +304,12 @@ func TestCoverageDetailsNameEachRuleOnce(test *testing.T) {
 // stays where it was; a rule that found something keeps that category and says where it did not run.
 // Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 func TestARuleOffByAnOverrideForMostFilesIsCountedApart(test *testing.T) {
-	rules := []rule.Rule{{Name: "eqeqeq"}, {Name: "no-var"}, {Name: "everywhere"}, {Name: "override-only"}}
+	rules := rule_testing.EntriesOf(test, []rule.Rule[rule.NoOptions]{
+		{Name: "eqeqeq"},
+		{Name: "no-var"},
+		{Name: "everywhere"},
+		{Name: "override-only"},
+	}...)
 	coverage := program.Coverage{
 		RulesOffered:      map[string]int{"eqeqeq": 12, "no-var": 12, "everywhere": 3242, "override-only": 40},
 		RulesListening:    map[string]int{"eqeqeq": 12, "no-var": 9, "everywhere": 3242, "override-only": 40},
@@ -339,7 +350,7 @@ func TestActionableCoverageAlwaysPrintsByDefault(test *testing.T) {
 			RulesListening: map[string]int{"quiet-rule": 10},
 		}
 	}
-	rules := []rule.Rule{{Name: "quiet-rule"}}
+	rules := rule_testing.EntriesOf(test, []rule.Rule[rule.NoOptions]{{Name: "quiet-rule"}}...)
 
 	// Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 	test.Run("findings", func(test *testing.T) {
@@ -423,11 +434,11 @@ func TestActionableCoverageAlwaysPrintsByDefault(test *testing.T) {
 		for _, name := range []string{"inert-rule", "eager-rule", "declining-rule"} {
 			coverage.RulesOffered[name] = 40
 		}
-		silentRules := append([]rule.Rule{
+		silentRules := append(rule_testing.EntriesOf(test, []rule.Rule[rule.NoOptions]{
 			{Name: "inert-rule"},
 			{Name: "eager-rule", NoListener: rule.NoListenerAnswersInRun},
 			{Name: "declining-rule", NoListener: rule.NoListenerDeclinesIrrelevantFiles},
-		}, rules...)
+		}...), rules...)
 		output := renderLintReport(
 			lintReport{Result: program.Result{Coverage: coverage}, Rules: silentRules, WalkCost: "in 1s"},
 		)
@@ -571,12 +582,12 @@ func TestActionableCoverageAlwaysPrintsByDefault(test *testing.T) {
 // later printer that adds a per-rule line to every run has to change this test to do it.
 // Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 func TestACleanRunPrintsTwoCoverageLines(test *testing.T) {
-	rules := []rule.Rule{
+	rules := rule_testing.EntriesOf(test, []rule.Rule[rule.NoOptions]{
 		{Name: "quiet-rule"},
 		{Name: "off-rule"},
 		{Name: "unconfigured-rule"},
 		{Name: "eager-rule", NoListener: rule.NoListenerAnswersInRun},
-	}
+	}...)
 	coverage := program.Coverage{
 		RulesOffered:      map[string]int{"quiet-rule": 10, "eager-rule": 10},
 		RulesListening:    map[string]int{"quiet-rule": 10},
@@ -665,7 +676,10 @@ func TestAnOverrideWithAReasonPrintsByDefault(test *testing.T) {
 // Not parallel: it renders through writeLintReport, which sets the package-level activeSummary
 func TestAnOffPrintsItsReasonAndAnUnreasonedOffIsCountedByDefault(test *testing.T) {
 	root := "/repository"
-	rules := []rule.Rule{{Name: "prefer-arrow-callback"}, {Name: "no-continue"}}
+	rules := rule_testing.EntriesOf(test, []rule.Rule[rule.NoOptions]{
+		{Name: "prefer-arrow-callback"},
+		{Name: "no-continue"},
+	}...)
 	coverage := program.Coverage{
 		RulesOffered:      map[string]int{},
 		RulesListening:    map[string]int{},
@@ -725,7 +739,9 @@ func TestCoverageListsWhatRulesNoted(test *testing.T) {
 			}},
 		},
 	}
-	rules := []rule.Rule{{Name: "nexus/correctness-no-caller-data-mutation"}}
+	rules := rule_testing.EntriesOf(test, []rule.Rule[rule.NoOptions]{
+		{Name: "nexus/correctness-no-caller-data-mutation"},
+	}...)
 
 	detailed := renderLintReport(lintReport{Result: result, Rules: rules, WalkCost: "in 1s", Details: true})
 	requireLines(test, detailed,
@@ -762,7 +778,10 @@ func TestCoverageNamesWhatRulesSkipped(test *testing.T) {
 			},
 		},
 	}
-	rules := []rule.Rule{{Name: ruleName}, {Name: "nexus/correctness-no-caller-data-mutation"}}
+	rules := rule_testing.EntriesOf(test, []rule.Rule[rule.NoOptions]{
+		{Name: ruleName},
+		{Name: "nexus/correctness-no-caller-data-mutation"},
+	}...)
 
 	detailed := renderLintReport(lintReport{Result: result, Rules: rules, WalkCost: "in 1s", Details: true})
 	requireLines(test, detailed,
@@ -799,7 +818,7 @@ func TestARuleThatSkippedSomeFilesStillNeedsActionForTheRest(test *testing.T) {
 			"/project/a.ts": {ruleName: {rule.SkippedNotePrefix + "strictNullChecks is off": 1}},
 		},
 	}
-	rules := []rule.Rule{{Name: ruleName}}
+	rules := rule_testing.EntriesOf(test, []rule.Rule[rule.NoOptions]{{Name: ruleName}}...)
 
 	plain := renderLintReport(lintReport{Result: result, Rules: rules, WalkCost: "in 1s"})
 	requireLines(test, plain,

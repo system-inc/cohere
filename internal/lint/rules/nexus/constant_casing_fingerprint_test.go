@@ -12,7 +12,12 @@ import (
 // walk hands the rule, viewed under its own reads.
 func constantCasingFingerprintOf(test *testing.T, files map[string]string, subject string) [sha256.Size]byte {
 	test.Helper()
-	return constantCasingFingerprintWithOptions(test, files, subject, nil)
+	return constantCasingFingerprintWithOptions(
+		test,
+		files,
+		subject,
+		rule.Given[ConsistencyRequireConstantCasingOptions]{},
+	)
 }
 
 // constantCasingFingerprintWithOptions is constantCasingFingerprintOf under the rule's options.
@@ -20,16 +25,21 @@ func constantCasingFingerprintWithOptions(
 	test *testing.T,
 	files map[string]string,
 	subject string,
-	options any,
+	options rule.Given[ConsistencyRequireConstantCasingOptions],
 ) [sha256.Size]byte {
 	test.Helper()
 	var fingerprint [sha256.Size]byte
 	probe := ConsistencyRequireConstantCasing
-	probe.Run = func(ruleContext rule.Context, options any) rule.Listeners {
+	probe.Run = func(
+		ruleContext rule.Context,
+		options rule.Given[ConsistencyRequireConstantCasingOptions],
+	) rule.Listeners {
 		fingerprint = ConsistencyRequireConstantCasing.ProgramFingerprint(ruleContext.Program, options)
 		return nil
 	}
-	rule_testing.RunTypedFiles(test, probe, files, subject)
+	// Run under the options given, which the probe hands its fingerprint: the rule run unconfigured would compare
+	// a fingerprint with itself whatever the options were.
+	rule_testing.RunTypedFilesGiven(test, probe, files, subject, options)
 	if fingerprint == ([sha256.Size]byte{}) {
 		test.Fatal("the probe never ran, so no fingerprint was read")
 	}
@@ -124,8 +134,8 @@ func TestConsistencyRequireConstantCasingFingerprintDoesNotHashItsOptions(test *
 		test,
 		files,
 		source,
-		nil,
-	) != constantCasingFingerprintWithOptions(test, files, source, framework) {
+		rule.Given[ConsistencyRequireConstantCasingOptions]{},
+	) != constantCasingFingerprintWithOptions(test, files, source, rule.Configured(framework)) {
 		test.Fatal("the options moved the fingerprint, though nothing the index reads depends on them")
 	}
 

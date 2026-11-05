@@ -60,14 +60,14 @@ var correctnessRequireMatchingInjectTypeText = policy.MessageOf(
 //
 // One type question per decorator, and only decorators on parameters are asked. A file with no
 // decorated parameters costs one kind test per decorator.
-var CorrectnessRequireMatchingInjectType = rule.Rule{
+var CorrectnessRequireMatchingInjectType = rule.Rule[rule.NoOptions]{
 	Name: "base/correctness-require-matching-inject-type",
 
 	// Every judgment is an assignability question between two resolved types.
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.TypeChecker == nil {
 			return nil
 		}

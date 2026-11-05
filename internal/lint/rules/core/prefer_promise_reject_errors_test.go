@@ -115,7 +115,7 @@ func TestPreferPromiseRejectErrorsFires(test *testing.T) {
 // The wire shape is the bare object. Upstream writes `options: [{ allowEmptyReject: true }]`, and
 // cohere's config layer unwraps the severity tuple before dispatch, so the decoder receives what is
 // inside the array.
-func decodePreferPromiseRejectErrorsOptions(test *testing.T, wire string) any {
+func decodePreferPromiseRejectErrorsOptions(test *testing.T, wire string) core.PreferPromiseRejectErrorsOptions {
 	test.Helper()
 	decode := rule.DecodeOptionsInto[core.PreferPromiseRejectErrorsOptions]()
 	decoded, decodeError := decode(json.RawMessage(wire))
@@ -166,11 +166,7 @@ func TestPreferPromiseRejectErrorsDefaultsWithoutADecoder(test *testing.T) {
 	result := rule_testing.RunTyped(test, core.PreferPromiseRejectErrors, "input.ts", "Promise.reject()")
 	rule_testing.ExpectFindings(test, result, "rejectAnError")
 
-	decoded := decodePreferPromiseRejectErrorsOptions(test, `{}`)
-	settings, ok := decoded.(core.PreferPromiseRejectErrorsOptions)
-	if !ok {
-		test.Fatalf("the decoder returned %T rather than the options type", decoded)
-	}
+	settings := decodePreferPromiseRejectErrorsOptions(test, `{}`)
 	if settings.AllowEmptyReject {
 		test.Errorf("an empty options object decoded allowEmptyReject to true, inverting the default")
 	}

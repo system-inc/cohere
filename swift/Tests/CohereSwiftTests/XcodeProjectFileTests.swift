@@ -61,6 +61,8 @@ struct XcodeProjectFileTests {
                         ),
                         swiftVersion: nil,
                         sdkRoot: "macosx",
+                        identifier: "EECCF05A8AED383F33DCD2D1",
+                        configurations: ["Debug", "Release"],
                     )
                 ]
             )
@@ -95,6 +97,8 @@ struct XcodeProjectFileTests {
                         sources: Self.urls(["two/App/App.swift"], under: folder),
                         swiftVersion: "6.0",
                         sdkRoot: "xros",
+                        identifier: "DEE546A52094D09E75881F9A",
+                        configurations: ["Debug", "Release"],
                     ),
                     XcodeProjectFile.Target(
                         name: "AppTests",
@@ -102,6 +106,8 @@ struct XcodeProjectFileTests {
                         sources: Self.urls(["two/Tests/AppTests.swift"], under: folder),
                         swiftVersion: "5.0",
                         sdkRoot: "iphoneos",
+                        identifier: "E33CCCDDA1AFB51B0450CCB9",
+                        configurations: ["Debug", "Release"],
                     ),
                 ]
             )

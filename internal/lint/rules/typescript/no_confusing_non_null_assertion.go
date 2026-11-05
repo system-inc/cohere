@@ -82,14 +82,14 @@ import (
 // Upstream matches `BinaryExpression, AssignmentExpression` because estree splits them. Our parser
 // gives `a! = b` a KindBinaryExpression whose operator is KindEqualsToken, so a single listener
 // covers both and the `=` arm is reachable from it. Probed rather than assumed.
-var NoConfusingNonNullAssertion = rule.Rule{
+var NoConfusingNonNullAssertion = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/no-confusing-non-null-assertion",
 
 	// Purely syntactic. The judgment is which operator follows an assertion, and no part of it asks
 	// what anything's type is.
 	NeedsTypeChecker: false,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindBinaryExpression: func(node *ast.Node) {
 				binaryExpression := node.AsBinaryExpression()

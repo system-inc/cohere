@@ -14,23 +14,25 @@ import (
 	"github.com/system-inc/cohere/internal/lint/rules/next"
 	"github.com/system-inc/cohere/internal/lint/rules/react"
 	"github.com/system-inc/cohere/internal/lint/rules/typescript"
+	"github.com/system-inc/cohere/internal/lint/testing"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
 // countingRule wraps a rule so a test can see which files it actually ran on, which is the only way to
-// tell a replayed finding from a recomputed one that happens to be equal.
+// tell a replayed finding from a recomputed one that happens to be equal. It wraps the rule's Unconfigured,
+// which is what a walk with no configuration runs.
 type countingRule struct {
 	mutex sync.Mutex
 	ran   map[string]int
 }
 
-func (counter *countingRule) wrap(subject rule.Rule) rule.Rule {
-	run := subject.Run
-	subject.Run = func(ruleContext rule.Context, options any) rule.Listeners {
+func (counter *countingRule) wrap(subject rule.Entry) rule.Entry {
+	run := subject.Unconfigured.Run
+	subject.Unconfigured.Run = func(ruleContext rule.Context) rule.Listeners {
 		counter.mutex.Lock()
 		counter.ran[filepath.Base(ruleContext.SourceFile.FileName().AsString())]++
 		counter.mutex.Unlock()
-		return run(ruleContext, options)
+		return run(ruleContext)
 	}
 	return subject
 }
@@ -52,7 +54,7 @@ func (counter *countingRule) snapshot() map[string]int {
 func shapeWalk(
 	test *testing.T,
 	root string,
-	rules []rule.Rule,
+	rules []rule.Entry,
 	previous *program.LintCache,
 	previousShapes map[string]program.SignatureEntry,
 ) (program.Result, *program.LintCache, map[string]program.SignatureEntry) {
@@ -281,83 +283,102 @@ func TestACommentEditReplaysShapeKeyedFindingsOnImporters(test *testing.T) {
 // cached. Its withheld finding is replayed too, and an unsuppressed cold control below proves it fires.
 func TestGlobalBindingRulesReplayBodiesAndRefuseSignatureEdits(test *testing.T) {
 	test.Parallel()
-	// Enable the option that actually consults Boolean's default-library provenance.
-	nullish := typescript.PreferNullishCoalescing
-	nullishRun := nullish.Run
-	nullish.Run = func(ruleContext rule.Context, _ any) rule.Listeners {
-		return nullishRun(
-			ruleContext,
-			typescript.PreferNullishCoalescingOptions{IgnoreBooleanCoercion: true, IgnoreConditionalTests: true},
-		)
-	}
-	logical := core.LogicalAssignmentOperators
-	logicalRun := logical.Run
+	// Enable the option that actually consults Boolean's default-library provenance. The walk here has no
+	// configuration, so it runs each rule as its Unconfigured, and these two are bound to their options there.
+	nullish := rule_testing.EntryOf(test, typescript.PreferNullishCoalescing)
+	nullish.Unconfigured = rule.Bind(typescript.PreferNullishCoalescing, rule.Configured(
+		typescript.PreferNullishCoalescingOptions{IgnoreBooleanCoercion: true, IgnoreConditionalTests: true},
+	))
+	logical := rule_testing.EntryOf(test, core.LogicalAssignmentOperators)
 	logicalOptions := core.DefaultLogicalAssignmentOperatorsSettings()
 	logicalOptions.EnforceForIfStatements = true
-	logical.Run = func(
-		ruleContext rule.Context,
-		_ any,
-	) rule.Listeners {
-		return logicalRun(ruleContext, logicalOptions)
-	}
+	logical.Unconfigured = rule.Bind(core.LogicalAssignmentOperators, rule.Configured(logicalOptions))
 	for _, tc := range []struct {
-		subject    rule.Rule
+		subject    rule.Entry
 		source     string
 		suppressed int
 	}{
-		{core.AccessorPairs, `Object.defineProperty({}, "value", { set(value: number) {} });`, 0},
-		{core.NoObjectConstructor, "Object();", 1},
-		{core.NoPromiseExecutorReturn, `new Promise((resolve, reject) => { return 1; });`, 0},
-		{core.PreferRegexLiterals, "RegExp(String.raw`a`, \"gg\");", 0},
-		{core.PreferNumericLiterals, `parseInt("10", 2);`, 1},
-		{core.PreferExponentiationOperator, `globalThis.Math.pow(2, 3);`, 1},
-		{core.PreferObjectHasOwn, `Object.prototype.hasOwnProperty.call({}, "x");`, 1},
-		{core.PreferPromiseRejectErrors, `Promise.reject(undefined);`, 0},
-		{core.NoUndefInit, `let x = undefined;`, 1},
+		{
+			rule_testing.EntryOf(test, core.AccessorPairs),
+			`Object.defineProperty({}, "value", { set(value: number) {} });`,
+			0,
+		},
+		{rule_testing.EntryOf(test, core.NoObjectConstructor), "Object();", 1},
+		{
+			rule_testing.EntryOf(test, core.NoPromiseExecutorReturn),
+			`new Promise((resolve, reject) => { return 1; });`,
+			0,
+		},
+		{rule_testing.EntryOf(test, core.PreferRegexLiterals), "RegExp(String.raw`a`, \"gg\");", 0},
+		{rule_testing.EntryOf(test, core.PreferNumericLiterals), `parseInt("10", 2);`, 1},
+		{rule_testing.EntryOf(test, core.PreferExponentiationOperator), `globalThis.Math.pow(2, 3);`, 1},
+		{rule_testing.EntryOf(test, core.PreferObjectHasOwn), `Object.prototype.hasOwnProperty.call({}, "x");`, 1},
+		{rule_testing.EntryOf(test, core.PreferPromiseRejectErrors), `Promise.reject(undefined);`, 0},
+		{rule_testing.EntryOf(test, core.NoUndefInit), `let x = undefined;`, 1},
 		{
 			nullish,
 			`const Boolean = (v: unknown) => v; declare const x: string | undefined; Boolean(x || "fallback");`,
 			1,
 		},
 		{
-			typescript.ConsistentGenericConstructors,
+			rule_testing.EntryOf(test, typescript.ConsistentGenericConstructors),
 			`class Uint8Array<T> {} const x: Uint8Array<string> = new Uint8Array();`,
 			1,
 		},
-		{react.UnsupportedSyntax, `function useThing() { useState(); eval("1"); }`, 0},
-		{next.NoScriptComponentInHead, `import Head from "next/head"; const tree = <Head><Script /></Head>;`, 1},
-		{next.NoDuplicateHead, `import Head from "next/head"; const tree = <><Head/><Head/></>;`, 1},
+		{rule_testing.EntryOf(test, react.UnsupportedSyntax), `function useThing() { useState(); eval("1"); }`, 0},
 		{
-			next.NoTitleInDocumentHead,
+			rule_testing.EntryOf(test, next.NoScriptComponentInHead),
+			`import Head from "next/head"; const tree = <Head><Script /></Head>;`,
+			1,
+		},
+		{
+			rule_testing.EntryOf(test, next.NoDuplicateHead),
+			`import Head from "next/head"; const tree = <><Head/><Head/></>;`,
+			1,
+		},
+		{
+			rule_testing.EntryOf(test, next.NoTitleInDocumentHead),
 			`import {Head} from "next/document"; const tree = <Head><title>x</title></Head>;`,
 			1,
 		},
-		{typescript.PreferForOf, `const xs=[1,2]; for(let i=0;i<xs.length;i++){ void xs[i]; }`, 1},
 		{
-			typescript.NoUnusedPrivateClassMembers,
+			rule_testing.EntryOf(test, typescript.PreferForOf),
+			`const xs=[1,2]; for(let i=0;i<xs.length;i++){ void xs[i]; }`,
+			1,
+		},
+		{
+			rule_testing.EntryOf(test, typescript.NoUnusedPrivateClassMembers),
 			`class C { private unused=0; private used=1; method(){return this.used;} }`,
 			1,
 		},
-		{typescript.NoUnnecessaryQualifier, `namespace A { export const x=1; const y=A.x; }`, 1},
-		{logical, `let x; if (x === null || x === undefined) x = "a";`, 1},
-		{core.PreferArrowCallback, `foo(function(){ const arguments = 1; return arguments; });`, 1},
 		{
-			react.NoAdjacentInlineElements,
+			rule_testing.EntryOf(test, typescript.NoUnnecessaryQualifier),
+			`namespace A { export const x=1; const y=A.x; }`,
+			1,
+		},
+		{logical, `let x; if (x === null || x === undefined) x = "a";`, 1},
+		{
+			rule_testing.EntryOf(test, core.PreferArrowCallback),
+			`foo(function(){ const arguments = 1; return arguments; });`,
+			1,
+		},
+		{
+			rule_testing.EntryOf(test, react.NoAdjacentInlineElements),
 			`import {createElement} from "react"; createElement("div", undefined, [createElement("a"),createElement("span")]);`,
 			1,
 		},
 		{
-			react.NoMultiComp,
+			rule_testing.EntryOf(test, react.NoMultiComp),
 			`import {createElement} from "react"; function A(){return createElement("div");} function B(){return createElement("div");}`,
 			1,
 		},
 		{
-			react.NoObjectTypeAsDefaultProp,
+			rule_testing.EntryOf(test, react.NoObjectTypeAsDefaultProp),
 			`import {createElement} from "react"; function A({items=[]}) {return createElement("div");}`,
 			1,
 		},
 		{
-			react.NoUnstableNestedComponents,
+			rule_testing.EntryOf(test, react.NoUnstableNestedComponents),
 			`import {createElement} from "react"; function Parent(){function Child(){return createElement("div");} return createElement(Child);}`,
 			1,
 		},
@@ -374,7 +395,7 @@ func TestGlobalBindingRulesReplayBodiesAndRefuseSignatureEdits(test *testing.T) 
 				"consumer.tsx":  "import { value } from \"./lib\";\nvoid value;\n" + source + "\n",
 			})
 			counter := &countingRule{ran: map[string]int{}}
-			rules := []rule.Rule{counter.wrap(tc.subject)}
+			rules := []rule.Entry{counter.wrap(tc.subject)}
 			before, recorded, shapes := shapeWalk(test, root, rules, nil, nil)
 			if len(before.Diagnostics)+before.Coverage.Suppressed != 1 || before.Coverage.Suppressed != tc.suppressed {
 				test.Fatalf(
@@ -513,7 +534,7 @@ func TestPragmaInitializersRespectGlobalsAndInvalidateReadInputs(test *testing.T
 				map[string]string{"tsconfig.json": minimalConfig, "lib.ts": lib, "consumer.ts": tc.consumer},
 			)
 			counter := &countingRule{ran: map[string]int{}}
-			rules := []rule.Rule{counter.wrap(subject)}
+			rules := []rule.Entry{counter.wrap(rule_testing.EntryOf(test, subject))}
 			before, cache, shapes := shapeWalk(test, root, rules, nil, nil)
 			positive := tc.name == "script" || tc.name == "top-level-var-block" || tc.name == "merged-namespace"
 			want := 0

@@ -7,7 +7,9 @@ package regexsyntax
 
 // IsHexDigit reports whether `character` is a hexadecimal digit in either case.
 func IsHexDigit(character byte) bool {
-	return (character >= '0' && character <= '9') || (character >= 'a' && character <= 'f') || (character >= 'A' && character <= 'F')
+	return (character >= '0' && character <= '9') ||
+		(character >= 'a' && character <= 'f') ||
+		(character >= 'A' && character <= 'F')
 }
 
 // AllHexDigits reports whether `text` is non-empty and every byte in it is a hex digit.

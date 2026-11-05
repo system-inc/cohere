@@ -107,7 +107,7 @@ func correctnessNoDiscardedOutcomeMessage(typeName string) rule.Message {
 // # No fix
 //
 // What a failure should do is the author's call: warn, exit, retry, or return the outcome upward.
-var CorrectnessNoDiscardedOutcome = rule.Rule{
+var CorrectnessNoDiscardedOutcome = rule.Rule[rule.NoOptions]{
 	Name: "nexus/correctness-no-discarded-outcome",
 
 	// The type of the call is what makes it an outcome, and the declaration behind each arm is what
@@ -118,7 +118,7 @@ var CorrectnessNoDiscardedOutcome = rule.Rule{
 	// body, so its findings key on imports' shapes.
 	TypeReach: rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.TypeChecker == nil {
 			return nil
 		}

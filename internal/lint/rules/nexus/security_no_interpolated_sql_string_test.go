@@ -684,7 +684,10 @@ func TestSecurityNoInterpolatedSqlStringDeclinesWithoutAChecker(test *testing.T)
 	if !SecurityNoInterpolatedSqlString.NeedsTypeChecker {
 		test.Fatal("the rule must declare NeedsTypeChecker")
 	}
-	if listeners := SecurityNoInterpolatedSqlString.Run(rule.Context{}, nil); listeners != nil {
+	if listeners := SecurityNoInterpolatedSqlString.Run(
+		rule.Context{},
+		rule.Given[rule.NoOptions]{},
+	); listeners != nil {
 		test.Errorf("with no checker the rule must register no listeners, got %d", len(listeners))
 	}
 }

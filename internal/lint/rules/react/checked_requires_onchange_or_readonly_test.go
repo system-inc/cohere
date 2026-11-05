@@ -35,8 +35,8 @@ const checkedRequiresFile = "/repository/source/CheckedRequires.tsx"
 // the config layer calls. Handing `RunWithOptions` a struct built by hand would leave the decoder
 // untested, and the decoder is the one line with no upstream counterpart: it has to answer the
 // defaults on empty input where the generic helper would error. An empty string in that column
-// means the rule was configured as a bare severity, which is what hands a real rule nil options,
-// and 27 of the 35 cases take that path.
+// means the rule was configured as a bare severity, which is what hands a real rule's decoder empty
+// input, and 27 of the 35 cases take that path.
 //
 // The wire shape is the bare object, not upstream's `[{...}]` array. cohere's config layer unwraps
 // the `[severity, options]` tuple before dispatch, so the array wrapper the corpus writes is gone
@@ -545,9 +545,9 @@ func TestCheckedRequiresMessagesReadAsWritten(test *testing.T) {
 //
 // The empty-input row is the one with no upstream counterpart and the reason the decoder is
 // hand-written: `rule.DecodeOptionsInto` errors on empty input, and a rule configured as a bare
-// `"error"` is handed exactly that. A rule whose decoder errored there would be handed nil options,
-// `options.(T)` would yield the zero value, and because both defaults here happen to be the zero
-// value, the rule would still behave correctly while its decoder was broken. So this asserts the
+// `"error"` is handed exactly that. A rule whose decoder errored there would be handed the zero
+// `rule.Given`, its `Read` would return false and the zero value, and because both defaults here happen
+// to be the zero value, the rule would still behave correctly while its decoder was broken. So this asserts the
 // decoder rather than inferring it from a passing fixture.
 func TestCheckedRequiresDecodesItsOptions(test *testing.T) {
 	test.Parallel()
@@ -574,15 +574,11 @@ func TestCheckedRequiresDecodesItsOptions(test *testing.T) {
 			if decodeCheckedRequiresOnChangeOrReadOnlyOptionsError != nil {
 				test.Fatalf("decoding %q: %v", testCase.raw, decodeCheckedRequiresOnChangeOrReadOnlyOptionsError)
 			}
-			settings, ok := decoded.(CheckedRequiresOnChangeOrReadOnlyOptions)
-			if !ok {
-				test.Fatalf("decoded to %T", decoded)
+			if decoded.IgnoreMissingProperties != testCase.wantMissingIgnored {
+				test.Errorf("IgnoreMissingProperties is %v", decoded.IgnoreMissingProperties)
 			}
-			if settings.IgnoreMissingProperties != testCase.wantMissingIgnored {
-				test.Errorf("IgnoreMissingProperties is %v", settings.IgnoreMissingProperties)
-			}
-			if settings.IgnoreExclusiveCheckedAttribute != testCase.wantExclusiveIgnore {
-				test.Errorf("IgnoreExclusiveCheckedAttribute is %v", settings.IgnoreExclusiveCheckedAttribute)
+			if decoded.IgnoreExclusiveCheckedAttribute != testCase.wantExclusiveIgnore {
+				test.Errorf("IgnoreExclusiveCheckedAttribute is %v", decoded.IgnoreExclusiveCheckedAttribute)
 			}
 		})
 	}
@@ -636,16 +632,16 @@ func TestCheckedRequiresNeedsTheTypedHarness(test *testing.T) {
 // TestCheckedRequiresHandlesNilOptions covers the path the fixtures cannot reach.
 //
 // Every other test here routes through the decoder, which always produces a struct. A rule can still
-// be handed nil: `config.OptionsRegistry.Decode` turns a decoder error into nil for a non-required
-// rule, and `options.(T)` on nil yields the zero value. Both defaults are the zero value for this
-// rule, so nil must behave exactly like an absent option object, and this asserts it rather than
-// assuming it. A rule whose defaults were not zero would be silently inverted on this path, which is
-// a failure 21 of 21 imported cases could not see on a rule that hit it.
+// run unconfigured: `configuration.OptionsRegistry.Decode` binds a non-required rule whose decoder errors
+// to the zero `rule.Given`, whose `Read` returns false, so it reads the zero value. Both defaults are the
+// zero value for this rule, so unconfigured must behave exactly like an absent option object, and this
+// asserts it rather than assuming it. A rule whose defaults were not zero would be silently inverted on
+// this path, which is a failure 21 of 21 imported cases could not see on a rule that hit it.
 func TestCheckedRequiresHandlesNilOptions(test *testing.T) {
 	test.Parallel()
 
-	result := rule_testing.RunTypedWithOptions(test, CheckedRequiresOnChangeOrReadOnly,
-		checkedRequiresFile, "<input checked defaultChecked />", nil)
+	result := rule_testing.RunTyped(test, CheckedRequiresOnChangeOrReadOnly,
+		checkedRequiresFile, "<input checked defaultChecked />")
 	rule_testing.ExpectFindings(test, result, "exclusiveCheckedAttribute", "missingProperty")
 }
 

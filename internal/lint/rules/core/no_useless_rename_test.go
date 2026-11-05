@@ -13,7 +13,7 @@ const uselessRenameFile = "/repository/source/UselessRename.ts"
 
 // uselessRenameOptions routes the options through the rule's own exported decoder.
 func uselessRenameOptions(test *testing.T, ignoreDestructuring bool, ignoreImport bool,
-	ignoreExport bool) any {
+	ignoreExport bool) NoUselessRenameSettings {
 	test.Helper()
 	raw, encodeError := json.Marshal(map[string]bool{
 		"ignoreDestructuring": ignoreDestructuring,
@@ -687,12 +687,8 @@ func TestDecodeNoUselessRenameOptions(test *testing.T) {
 		if decodeNoUselessRenameOptionsError != nil {
 			test.Fatalf("the decoder refused an absent option: %v", decodeNoUselessRenameOptionsError)
 		}
-		settings, ok := decoded.(NoUselessRenameSettings)
-		if !ok {
-			test.Fatalf("the decoder returned %T, not NoUselessRenameSettings", decoded)
-		}
-		if settings.IgnoreDestructuring || settings.IgnoreImport || settings.IgnoreExport {
-			test.Errorf("expected every option to default to false, got %+v", settings)
+		if decoded.IgnoreDestructuring || decoded.IgnoreImport || decoded.IgnoreExport {
+			test.Errorf("expected every option to default to false, got %+v", decoded)
 		}
 	})
 
@@ -703,22 +699,18 @@ func TestDecodeNoUselessRenameOptions(test *testing.T) {
 		if decodeNoUselessRenameOptionsError != nil {
 			test.Fatalf("the decoder refused a partial object: %v", decodeNoUselessRenameOptionsError)
 		}
-		settings, ok := decoded.(NoUselessRenameSettings)
-		if !ok {
-			test.Fatalf("the decoder returned %T, not NoUselessRenameSettings", decoded)
-		}
-		if !settings.IgnoreImport || settings.IgnoreDestructuring || settings.IgnoreExport {
-			test.Errorf("expected only ignoreImport to be set, got %+v", settings)
+		if !decoded.IgnoreImport || decoded.IgnoreDestructuring || decoded.IgnoreExport {
+			test.Errorf("expected only ignoreImport to be set, got %+v", decoded)
 		}
 	})
 
 	test.Run("a bare severity leaves the rule on its defaults", func(test *testing.T) {
 		test.Parallel()
-		// A rule configured as "error" is handed nil options, which arrives at Run as an untyped
-		// nil rather than as settings. Asserting through the rule covers the fallback inside Run,
-		// which no decoder test can reach.
-		rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoUselessRename,
-			uselessRenameFile, "let {foo: foo} = obj;", nil), "unnecessarilyRenamed")
+		// A rule configured as "error" is handed no options, which arrives at Run unconfigured rather
+		// than as settings. Asserting through the rule covers the fallback inside Run, which no
+		// decoder test can reach.
+		rule_testing.ExpectFindings(test, rule_testing.Run(test, NoUselessRename,
+			uselessRenameFile, "let {foo: foo} = obj;"), "unnecessarilyRenamed")
 	})
 }
 

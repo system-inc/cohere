@@ -13,7 +13,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // both allowances off and the rule would report two families of comparison upstream is silent on.
 // Every fixture built from a struct rather than routed through the decoder would pass anyway.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[NoUnnecessaryBooleanLiteralCompareOptions]{
 		Rule:   NoUnnecessaryBooleanLiteralCompare,
 		Decode: DecodeNoUnnecessaryBooleanLiteralCompareOptions,
 	})

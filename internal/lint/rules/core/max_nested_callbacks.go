@@ -98,7 +98,7 @@ type maxNestedCallbacksObjectShape struct {
 // than corrected, because a port that quietly disagrees with the tool it is compared against turns
 // a shared defect into a divergence nobody can see. The intuitive reading is that an explicit 0
 // wins, and it is wrong.
-func DecodeMaxNestedCallbacksOptions(raw []byte) (any, error) {
+func DecodeMaxNestedCallbacksOptions(raw []byte) (MaxNestedCallbacksOptions, error) {
 	if len(raw) == 0 {
 		return DefaultMaxNestedCallbacksSettings(), nil
 	}
@@ -195,9 +195,9 @@ func DecodeMaxNestedCallbacksOptions(raw []byte) (any, error) {
 // clean at a limit of 1 while the same shape with a bare function argument reports. The callers
 // enumerated for that verdict are the two listeners upstream registers and nothing else; a future
 // change that counted method bodies would void it.
-var MaxNestedCallbacks = rule.Rule{
+var MaxNestedCallbacks = rule.Rule[MaxNestedCallbacksOptions]{
 	Name: "max-nested-callbacks",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[MaxNestedCallbacksOptions]) rule.Listeners {
 		// A rule configured as a bare severity is handed nil, and the zero value of the struct
 		// carries a nil Maximum, so the default has to be restored somewhere.
 		//
@@ -207,7 +207,7 @@ var MaxNestedCallbacks = rule.Rule{
 		// site at a time, so it is recorded here rather than left looking like two guards where one
 		// would do. The redundancy is cheap and the failure it prevents is a limit of zero, which
 		// reports every callback in the tree.
-		settings, isSettings := rule.OptionsAs[MaxNestedCallbacksOptions](options)
+		settings, isSettings := options.Read()
 		if !isSettings {
 			settings = DefaultMaxNestedCallbacksSettings()
 		}

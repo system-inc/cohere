@@ -52,7 +52,7 @@ func DefaultConsistentThisSettings() ConsistentThisSettings {
 // alone with `"vm"` dropped, and this decoder accepted a nested `["error", ["self", "vm"]]` to work
 // around it. The workaround is refused now: an element that is not a string is an error, because
 // upstream's schema says every element is a non-empty string.
-func DecodeConsistentThisOptions(list []byte) (any, error) {
+func DecodeConsistentThisOptions(list []byte) (ConsistentThisSettings, error) {
 	if len(list) == 0 {
 		return DefaultConsistentThisSettings(), nil
 	}
@@ -151,10 +151,10 @@ func DecodeConsistentThisOptions(list []byte) (any, error) {
 // the assignment that rescues a declaration may be written anywhere below it. The walk here is
 // pre-order, so a listener on the declaration cannot see what follows. Everything therefore happens
 // inside one source-file listener, which fires before its children.
-var ConsistentThis = rule.Rule{
+var ConsistentThis = rule.Rule[ConsistentThisSettings]{
 	Name: "consistent-this",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, ok := rule.OptionsAs[ConsistentThisSettings](options)
+	Run: func(ruleContext rule.Context, options rule.Given[ConsistentThisSettings]) rule.Listeners {
+		settings, ok := options.Read()
 		if !ok || len(settings.Aliases) == 0 {
 			// A rule configured as a bare severity is handed nil options, and the zero value of the
 			// struct is an empty alias list, which would invert the rule rather than disable it.

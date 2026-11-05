@@ -12,7 +12,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // judging an `else if` chain as a whole to judging each link, which reports chains upstream
 // deliberately allows.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[NoElseReturnSettings]{
 		Rule:   NoElseReturn,
 		Decode: DecodeNoElseReturnOptions,
 	})

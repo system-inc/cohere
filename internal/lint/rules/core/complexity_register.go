@@ -13,7 +13,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // `RequiresOptions` is deliberately not set: upstream's default threshold is 20, so an unconfigured
 // rule enforces that rather than doing nothing.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[ComplexitySettings]{
 		Rule:   Complexity,
 		Decode: DecodeComplexityOptions,
 	})

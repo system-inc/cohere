@@ -190,7 +190,7 @@ const (
 // when the return type does not admit `undefined` (`(): number` with a bare return, which only
 // compiles without `noImplicitReturns`): writing `return undefined;` there would surface a type
 // error, which is the right outcome but not an unattended one.
-var ConsistencyRequireMatchingReturnType = rule.Rule{
+var ConsistencyRequireMatchingReturnType = rule.Rule[rule.NoOptions]{
 	Name: "nexus/consistency-require-matching-return-type",
 
 	// The verdict is the function's return type, declared, contextual or inferred, and only the
@@ -198,7 +198,7 @@ var ConsistencyRequireMatchingReturnType = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.TypeChecker == nil {
 			return nil
 		}

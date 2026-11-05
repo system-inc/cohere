@@ -48,9 +48,9 @@ var messageDefaultCaseLastNotLast = rule.Message{
 // on all fourteen reporting cases rather than the column of `switch`. A port reporting the whole
 // statement satisfies every message-id assertion and points the reader at the wrong line in a long
 // switch, which is exactly the case where the finding is worth having.
-var DefaultCaseLast = rule.Rule{
+var DefaultCaseLast = rule.Rule[rule.NoOptions]{
 	Name: "default-case-last",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindSwitchStatement: func(node *ast.Node) {
 				clauses := node.AsSwitchStatement().CaseBlock.AsCaseBlock().Clauses.Nodes

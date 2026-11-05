@@ -144,7 +144,7 @@ func noUnusedVarsMessage(name string, assigned bool, underscoreSilences bool) ru
 // `bindingType` arm in `collectCandidateBindings` is what does it. A port of the namespaced rule
 // undertaken to recover type-declaration coverage would be recovering coverage that is already
 // here.
-var NoUnusedVars = rule.Rule{
+var NoUnusedVars = rule.Rule[NoUnusedVarsOptions]{
 	Name: "@typescript-eslint/no-unused-vars",
 
 	// Symbol identity, not name matching. Two bindings can share a name across scopes and a read of
@@ -155,7 +155,7 @@ var NoUnusedVars = rule.Rule{
 	// Reads only this file's declarations (rule.DeclarationsIn), so its findings key on imports' shapes.
 	TypeReach: rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoUnusedVarsOptions]) rule.Listeners {
 		settings := resolveNoUnusedVarsOptions(options)
 
 		return rule.Listeners{
@@ -1701,8 +1701,8 @@ func (options *NoUnusedVarsOptions) UnmarshalJSON(raw []byte) error {
 // rule's default state: it would set `args` and `caughtErrors` to the empty string, which is two
 // wrong answers. So the nil case is written explicitly rather than relying on the zero value, which
 // is the shape a shipped rule got wrong on 3,407 files.
-func resolveNoUnusedVarsOptions(options any) NoUnusedVarsOptions {
-	settings, _ := rule.OptionsAs[NoUnusedVarsOptions](options)
+func resolveNoUnusedVarsOptions(options rule.Given[NoUnusedVarsOptions]) NoUnusedVarsOptions {
+	settings, _ := options.Read()
 
 	if settings.Vars == "" {
 		settings.Vars = "all"
@@ -1724,10 +1724,10 @@ func resolveNoUnusedVarsOptions(options any) NoUnusedVarsOptions {
 func DecodeNoUnusedVarsOptions(raw json.RawMessage) (NoUnusedVarsOptions, error) {
 	var decoded NoUnusedVarsOptions
 	if len(raw) == 0 {
-		return resolveNoUnusedVarsOptions(nil), nil
+		return resolveNoUnusedVarsOptions(rule.Given[NoUnusedVarsOptions]{}), nil
 	}
 	if unmarshalOptionsError := rule.UnmarshalOptions(raw, &decoded); unmarshalOptionsError != nil {
-		return resolveNoUnusedVarsOptions(nil), unmarshalOptionsError
+		return resolveNoUnusedVarsOptions(rule.Given[NoUnusedVarsOptions]{}), unmarshalOptionsError
 	}
-	return resolveNoUnusedVarsOptions(decoded), nil
+	return resolveNoUnusedVarsOptions(rule.Configured(decoded)), nil
 }

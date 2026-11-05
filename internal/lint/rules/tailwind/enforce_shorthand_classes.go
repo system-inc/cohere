@@ -204,16 +204,16 @@ var shorthandGroups = [][]shorthandRule{
 // empty string. Measured on Kirk's tree, where its four findings are the same two sites. This rule
 // reports two, and the difference is entirely that second class of finding, which describes the
 // state upstream's fix passes through rather than anything in the source a reader wrote.
-var EnforceShorthandClasses = rule.Rule{
+var EnforceShorthandClasses = rule.Rule[EnforceShorthandClassesOptions]{
 	Name: "better-tailwindcss/enforce-shorthand-classes",
 	// The design system: its stylesheets, read through the recording file system (DesignSystemFS).
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDesignSystem,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[EnforceShorthandClassesOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
-		configured, isConfigured := rule.OptionsAs[EnforceShorthandClassesOptions](options)
+		configured, isConfigured := options.Read()
 
 		// nil when there is no design system to ask, and classExistsIn answers true for nil.
 		var system *tailwindengine.LoadedDesignSystem

@@ -22,7 +22,7 @@ func preferLiteralEnumMemberCaseName(index int) string {
 // Building the options struct directly would leave the decoder untested, and the decoder is where
 // the wire shape lives: cohere strips ESLint's [severity, options] tuple, so what arrives here is
 // the bare object rather than upstream's one-element array.
-func decodePreferLiteralEnumMemberOptionsForTest(test *testing.T, raw string) any {
+func decodePreferLiteralEnumMemberOptionsForTest(test *testing.T, raw string) PreferLiteralEnumMemberOptions {
 	test.Helper()
 	decoded, decodePreferLiteralEnumMemberOptionsError := DecodePreferLiteralEnumMemberOptions(json.RawMessage(raw))
 	if decodePreferLiteralEnumMemberOptionsError != nil {
@@ -567,13 +567,9 @@ func TestPreferLiteralEnumMemberDecoderKeepsAnAbsentKeyDistinctFromAnExplicitFal
 		test.Run(testCase.raw, func(test *testing.T) {
 			test.Parallel()
 			decoded := decodePreferLiteralEnumMemberOptionsForTest(test, testCase.raw)
-			settings, isSettings := decoded.(PreferLiteralEnumMemberOptions)
-			if !isSettings {
-				test.Fatalf("the decoder returned %T rather than the rule's own options type", decoded)
-			}
-			if settings.AllowBitwiseExpressions != testCase.want {
+			if decoded.AllowBitwiseExpressions != testCase.want {
 				test.Errorf("allowBitwiseExpressions decoded to %v, wanted %v",
-					settings.AllowBitwiseExpressions, testCase.want)
+					decoded.AllowBitwiseExpressions, testCase.want)
 			}
 		})
 	}
@@ -589,8 +585,8 @@ func TestPreferLiteralEnumMemberDecoderKeepsAnAbsentKeyDistinctFromAnExplicitFal
 func TestPreferLiteralEnumMemberFallsBackWhenHandedNilOptions(test *testing.T) {
 	test.Parallel()
 
-	result := rule_testing.RunWithOptions(test, PreferLiteralEnumMember,
-		preferLiteralEnumMemberFile, "enum Foo {\n  A = 1 << 0,\n}\n", nil)
+	result := rule_testing.Run(test, PreferLiteralEnumMember,
+		preferLiteralEnumMemberFile, "enum Foo {\n  A = 1 << 0,\n}\n")
 	rule_testing.ExpectFindings(test, result, "notLiteral")
 }
 

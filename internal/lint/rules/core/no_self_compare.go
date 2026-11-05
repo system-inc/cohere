@@ -65,9 +65,9 @@ var noSelfCompareOperators = map[ast.Kind]bool{
 // are identical tokens. That is upstream saying the shape is worth a look even when the two sides
 // could evaluate differently; it is a deliberate over-report rather than an oversight, and it is
 // reproduced rather than improved on.
-var NoSelfCompare = rule.Rule{
+var NoSelfCompare = rule.Rule[rule.NoOptions]{
 	Name: "no-self-compare",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindBinaryExpression: func(node *ast.Node) {
 				binaryExpression := node.AsBinaryExpression()

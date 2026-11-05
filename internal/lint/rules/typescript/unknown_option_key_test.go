@@ -11,21 +11,30 @@ import (
 // loads clean while an option does nothing is the silent drop #4n972g9 closed.
 func TestOptionDecodersRefuseAnUnknownKey(test *testing.T) {
 	test.Parallel()
-	decoders := map[string]func([]byte) (any, error){
-		"no-meaningless-void-operator": DecodeNoMeaninglessVoidOperatorOptions,
-		"require-array-sort-compare":   DecodeRequireArraySortCompareOptions,
-		"strict-void-return":           DecodeStrictVoidReturnOptions,
+	decoders := map[string]func([]byte) error{
+		"no-meaningless-void-operator": decodeErrorOf(DecodeNoMeaninglessVoidOperatorOptions),
+		"require-array-sort-compare":   decodeErrorOf(DecodeRequireArraySortCompareOptions),
+		"strict-void-return":           decodeErrorOf(DecodeStrictVoidReturnOptions),
 	}
 	for name, decode := range decoders {
 		test.Run(name, func(test *testing.T) {
 			test.Parallel()
-			if _, decodeError := decode([]byte(`{}`)); decodeError != nil {
+			if decodeError := decode([]byte(`{}`)); decodeError != nil {
 				test.Fatalf("baseline: an empty options object was refused: %v", decodeError)
 			}
-			_, decodeError := decode([]byte(`{"somethingElse": 1}`))
+			decodeError := decode([]byte(`{"somethingElse": 1}`))
 			if decodeError == nil || !strings.Contains(decodeError.Error(), "somethingElse") {
 				test.Fatalf("want a refusal naming the key, got %v", decodeError)
 			}
 		})
+	}
+}
+
+// decodeErrorOf is a decoder with its value dropped, so decoders of different options types sit in one
+// table: this test reads only whether each refused its input.
+func decodeErrorOf[Options any](decode func(raw []byte) (Options, error)) func(raw []byte) error {
+	return func(raw []byte) error {
+		_, decodeError := decode(raw)
+		return decodeError
 	}
 }

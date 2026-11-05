@@ -92,9 +92,9 @@ var messagePreferNamespaceKeyword = rule.Message{
 // typescript-go puts both modifiers inside the declaration, so matching that means starting the
 // span after an `export` modifier and before a `declare` one. The corpus contains no exported
 // declaration, so nothing upstream covers this and only the fixtures written here hold it.
-var PreferNamespaceKeyword = rule.Rule{
+var PreferNamespaceKeyword = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/prefer-namespace-keyword",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// Defensive at the boundary, and deliberately untested. Mutating this guard away survives
 		// the whole fixture set, and no fixture can change that: rule_testing.Run always builds a real
 		// program, so no input reachable through the harness produces a nil SourceFile. That makes

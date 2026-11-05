@@ -33,7 +33,9 @@ func runNoRestrictedImports(test *testing.T, testCase noRestrictedImportsCase) r
 	}
 	// The struct is upstream's `{paths, patterns}` object form, so the list the config layer hands a
 	// list rule is that object as its one element.
-	decoded, decodeNoRestrictedImportsOptionsError := DecodeNoRestrictedImportsOptions([]byte("[" + string(encoded) + "]"))
+	decoded, decodeNoRestrictedImportsOptionsError := DecodeNoRestrictedImportsOptions(
+		[]byte("[" + string(encoded) + "]"),
+	)
 	if decodeNoRestrictedImportsOptionsError != nil {
 		test.Fatalf("could not decode options for %q: %v", testCase.sourceText, decodeNoRestrictedImportsOptionsError)
 	}
@@ -198,21 +200,17 @@ func TestNoRestrictedImportsFoldsPatternsAsStringsIntoOneGroup(test *testing.T) 
 	if decodeNoRestrictedImportsOptionsError != nil {
 		test.Fatalf("could not decode: %v", decodeNoRestrictedImportsOptionsError)
 	}
-	options, ok := decoded.(NoRestrictedImportsOptions)
-	if !ok {
-		test.Fatalf("expected NoRestrictedImportsOptions, got %T", decoded)
-	}
-	if len(options.Patterns) != 1 {
-		test.Fatalf("expected the two strings folded into 1 entry, got %d", len(options.Patterns))
+	if len(decoded.Patterns) != 1 {
+		test.Fatalf("expected the two strings folded into 1 entry, got %d", len(decoded.Patterns))
 	}
 
 	// The control that the folding actually changes a verdict, rather than merely a shape.
 	excluded := rule_testing.RunWithOptions(test, NoRestrictedImports, noRestrictedImportsFile,
-		"import { a } from 'foo/bar';", options)
+		"import { a } from 'foo/bar';", decoded)
 	rule_testing.ExpectClean(test, excluded)
 
 	included := rule_testing.RunWithOptions(test, NoRestrictedImports, noRestrictedImportsFile,
-		"import { a } from 'foo/baz';", options)
+		"import { a } from 'foo/baz';", decoded)
 	rule_testing.ExpectFindings(test, included, "patterns")
 }
 

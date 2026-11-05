@@ -88,7 +88,7 @@ type NoRestrictedExportsOptions struct {
 // The pattern is compiled here rather than per file so a project that misspells it learns at
 // configuration time. Upstream compiles per report and would throw at lint time instead; failing
 // earlier is strictly better and changes no verdict.
-func DecodeNoRestrictedExportsOptions(raw []byte) (any, error) {
+func DecodeNoRestrictedExportsOptions(raw []byte) (NoRestrictedExportsOptions, error) {
 	var options NoRestrictedExportsOptions
 	if len(raw) == 0 {
 		return options, nil
@@ -195,10 +195,10 @@ func DecodeNoRestrictedExportsOptions(raw []byte) (any, error) {
 // `export = foo` is TypeScript's own construct and shares `KindExportAssignment` with the default
 // export, separated by `IsExportEquals`. It is not a default export and upstream, which has no such
 // syntax, has nothing to say about it.
-var NoRestrictedExports = rule.Rule{
+var NoRestrictedExports = rule.Rule[NoRestrictedExportsOptions]{
 	Name: "no-restricted-exports",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, configured := rule.OptionsAs[NoRestrictedExportsOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[NoRestrictedExportsOptions]) rule.Listeners {
+		settings, configured := options.Read()
 		if !configured {
 			return rule.Listeners{}
 		}

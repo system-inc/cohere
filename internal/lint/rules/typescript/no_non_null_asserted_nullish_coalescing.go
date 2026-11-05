@@ -90,7 +90,7 @@ import (
 // The anchor is a binary expression, which is common, and the operator test rejects everything but
 // `??` on the second line. The file walk runs only for a bare identifier under a non-null assertion
 // on the left of a nullish coalesce, which is rare enough that the corpus is most of its occurrences.
-var NoNonNullAssertedNullishCoalescing = rule.Rule{
+var NoNonNullAssertedNullishCoalescing = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/no-non-null-asserted-nullish-coalescing",
 
 	// Resolving the identifier to its binding is a checker question. Upstream asks its scope
@@ -98,7 +98,7 @@ var NoNonNullAssertedNullishCoalescing = rule.Rule{
 	// answered without types here.
 	NeedsTypeChecker: true,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindBinaryExpression: func(node *ast.Node) {
 				binary := node.AsBinaryExpression()

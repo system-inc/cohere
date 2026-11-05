@@ -79,10 +79,10 @@ func consistencyNoHandRolledDelayMessage() rule.Message {
 // itself imports it relatively), and the replacement is an expression that resolves `undefined`
 // where the original may be typed `Promise<unknown>` or used as a value. Both are easy for a person
 // and not certain for a rewrite, so the finding names the import and the author writes it.
-var ConsistencyNoHandRolledDelay = rule.Rule{
+var ConsistencyNoHandRolledDelay = rule.Rule[rule.NoOptions]{
 	Name: "nexus/consistency-no-hand-rolled-delay",
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindNewExpression: func(node *ast.Node) {
 				duration := consistencyNoHandRolledDelayDuration(node)

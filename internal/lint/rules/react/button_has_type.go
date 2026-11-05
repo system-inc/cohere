@@ -118,7 +118,7 @@ type buttonHasTypeWireOptions struct {
 // hands a rule. And its zero value is all-false, which for this rule means every written-out type is
 // forbidden, so a rule that fell back to the zero value would report `forbiddenValue` on correct
 // code rather than going quiet, which is the loud direction of a silent inversion but still wrong.
-func DecodeButtonHasTypeOptions(raw []byte) (any, error) {
+func DecodeButtonHasTypeOptions(raw []byte) (ButtonHasTypeOptions, error) {
 	options := DefaultButtonHasTypeOptions()
 	if len(raw) == 0 {
 		return options, nil
@@ -199,12 +199,12 @@ func DecodeButtonHasTypeOptions(raw []byte) (any, error) {
 // NumericLiteral is already `1.5`, `16`, `1000`, `10`, probed against all six forms. The one
 // difference is a BigIntLiteral, whose `.Text()` keeps the `n` suffix where upstream renders `1`, so
 // that suffix is stripped at the site.
-var ButtonHasType = rule.Rule{
+var ButtonHasType = rule.Rule[ButtonHasTypeOptions]{
 	Name:             "react/button-has-type",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, ok := rule.OptionsAs[ButtonHasTypeOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[ButtonHasTypeOptions]) rule.Listeners {
+		settings, ok := options.Read()
 		if !ok {
 			// Nil options reach here when the config layer turns a decoder error into nil for a
 			// non-required rule. The zero value would forbid all three types and report on correct

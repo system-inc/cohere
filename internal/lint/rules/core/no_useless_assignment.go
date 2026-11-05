@@ -112,7 +112,7 @@ var messageNoUselessAssignment = rule.Message{
 // repair is not meaning-preserving and cannot be applied unattended. Even as a suggestion it would
 // have to choose between deleting the statement and keeping the expression, and which one is right
 // depends on whether the call matters.
-var NoUselessAssignment = rule.Rule{
+var NoUselessAssignment = rule.Rule[rule.NoOptions]{
 	Name: "no-useless-assignment",
 
 	// Two separate needs. Symbol identity decides which occurrences name the same binding, so a
@@ -123,7 +123,7 @@ var NoUselessAssignment = rule.Rule{
 	// Reads only this file's declarations (rule.DeclarationsIn), so its findings key on imports' shapes.
 	TypeReach: rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindSourceFile: func(sourceFile *ast.Node) {
 				if ruleContext.TypeChecker == nil {

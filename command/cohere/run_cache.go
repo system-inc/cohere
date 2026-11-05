@@ -1217,7 +1217,7 @@ func (record *typesRecord) write() {
 }
 
 // anyRuleKeyedOnShapes reports whether any rule declares rule.TypeReachShapes.
-func anyRuleKeyedOnShapes(rules []rule.Rule) bool {
+func anyRuleKeyedOnShapes(rules []rule.Entry) bool {
 	for _, subject := range rules {
 		if subject.TypeReach == rule.TypeReachShapes {
 			return true

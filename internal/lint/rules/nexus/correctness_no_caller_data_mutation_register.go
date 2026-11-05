@@ -10,5 +10,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // No decoder: the rule takes no options, because the line it draws is where a type is declared, and an
 // option naming parameters to excuse is the allowance list the rule exists to replace.
 func init() {
-	rule.Register(rule.Registration{Rule: CorrectnessNoCallerDataMutation})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: CorrectnessNoCallerDataMutation})
 }

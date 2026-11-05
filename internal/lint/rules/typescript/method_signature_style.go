@@ -105,9 +105,9 @@ const (
 // property whose type is an intersection of function types and deletes the others. The finding still
 // fires once per signature, so a pair of overloads reports twice and the first repair does all the
 // work.
-var MethodSignatureStyle = rule.Rule{
+var MethodSignatureStyle = rule.Rule[MethodSignatureStyleOptions]{
 	Name: "@typescript-eslint/method-signature-style",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[MethodSignatureStyleOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}
@@ -117,7 +117,7 @@ var MethodSignatureStyle = rule.Rule{
 		// errors on empty input and the config layer turns that into nil. A bare type assertion
 		// would then yield the empty string, matching neither arm, and the rule would register on
 		// every file and report nothing while every decoder-routed fixture stayed green.
-		parsed, decoded := rule.OptionsAs[MethodSignatureStyleOptions](options)
+		parsed, decoded := options.Read()
 		if !decoded {
 			parsed = DefaultMethodSignatureStyleOptions()
 		}
@@ -596,14 +596,13 @@ func DefaultMethodSignatureStyleOptions() MethodSignatureStyleOptions {
 // wire value is a JSON string rather than an object, and the default is `property` rather than a Go
 // zero value, so a generic decode would hand the rule an empty style that silences it while every
 // fixture stayed green.
-func DecodeMethodSignatureStyleOptions(raw []byte) (any, error) {
+func DecodeMethodSignatureStyleOptions(raw []byte) (MethodSignatureStyleOptions, error) {
 	decoded, decodeOptionsError := rule.DecodeOptionsInto[string]()(raw)
 	if decodeOptionsError != nil {
 		return DefaultMethodSignatureStyleOptions(), decodeOptionsError
 	}
 
-	wire, _ := decoded.(string)
-	switch MethodSignatureStyleSetting(wire) {
+	switch MethodSignatureStyleSetting(decoded) {
 	case MethodSignatureStyleProperty:
 		return MethodSignatureStyleOptions{Style: MethodSignatureStyleProperty}, nil
 	case MethodSignatureStyleMethod:

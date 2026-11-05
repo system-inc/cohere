@@ -78,12 +78,12 @@ var (
  * Every repair changes a type (add `readonly`, or copy), so none preserves meaning, and the edit engine
  * applies only fixes that do.
  */
-var InvariantMutable = rule.Rule{
+var InvariantMutable = rule.Rule[rule.NoOptions]{
 	Name:             "adamic/invariant-mutable",
 	NeedsTypeChecker: true,
 	ProgramReads:     rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.TypeChecker == nil || ruleContext.SourceFile == nil {
 			return nil
 		}

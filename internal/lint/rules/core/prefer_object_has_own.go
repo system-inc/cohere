@@ -76,11 +76,11 @@ var messagePreferObjectHasOwn = rule.Message{
 // The second decline has a companion that is easy to get backwards. A comment before the callee
 // already separates the tokens, so `return/*comment*/{}.hasOwnProperty.call(a, b)` needs no space
 // and upstream does not add one. Four of its cases pair the two spellings for that comparison.
-var PreferObjectHasOwn = rule.Rule{
+var PreferObjectHasOwn = rule.Rule[rule.NoOptions]{
 	Name:             "prefer-object-has-own",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				if ruleContext.TypeChecker == nil {

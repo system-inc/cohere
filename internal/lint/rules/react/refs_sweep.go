@@ -950,7 +950,9 @@ func refsTransfer(
 		}
 
 	case *high_level_intermediate_representation.Primitive:
-		if instructionValue.Value == nil {
+		switch instructionValue.Value.(type) {
+		case high_level_intermediate_representation.PrimitiveNull,
+			high_level_intermediate_representation.PrimitiveUndefined:
 			env.set(target, &refsAccessType{Kind: refsNullable})
 		}
 

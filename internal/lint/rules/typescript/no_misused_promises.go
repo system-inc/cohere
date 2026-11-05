@@ -316,7 +316,7 @@ func (options *NoMisusedPromisesOptions) UnmarshalJSON(raw []byte) error {
 // upstream's order (#hekjpw3). The syntactic escape hatches upstream wrote (`isPossiblyFunctionType`
 // on return statements and variable declarations, the `Arguments() == nil` early exit) exist for
 // exactly that reason and are carried across rather than being treated as optional.
-var NoMisusedPromises = rule.Rule{
+var NoMisusedPromises = rule.Rule[NoMisusedPromisesOptions]{
 	Name: "@typescript-eslint/no-misused-promises",
 
 	// Every listener consults the checker; see the note above on why the guard lives in Run.
@@ -336,12 +336,12 @@ var NoMisusedPromises = rule.Rule{
 	// with a message asserting the opposite of the truth. This paragraph is worded around the token
 	// for that reason, rather than because the phrasing reads better.
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoMisusedPromisesOptions]) rule.Listeners {
 		if ruleContext.TypeChecker == nil {
 			return nil
 		}
 
-		settings, ok := rule.OptionsAs[NoMisusedPromisesOptions](options)
+		settings, ok := options.Read()
 		if !ok {
 			settings = NoMisusedPromisesOptions{}
 		}
@@ -815,7 +815,9 @@ var NoMisusedPromises = rule.Rule{
 
 			heritageTypes := type_checking.Flatten(
 				type_checking.Map(heritageClauses.Nodes, func(heritageClause *ast.Node) []*checker.Type {
-					return type_checking.Map(heritageClause.AsHeritageClause().Types.Nodes, func(node *ast.Node) *checker.Type {
+					return type_checking.Map(heritageClause.AsHeritageClause().Types.Nodes, func(
+						node *ast.Node,
+					) *checker.Type {
 						return ruleContext.TypeChecker.GetTypeAtLocation(node)
 					})
 				}),

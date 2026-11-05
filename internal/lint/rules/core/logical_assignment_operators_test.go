@@ -23,12 +23,12 @@ import (
 // through the intermediate representation and the shim before finding.
 func runLogicalAssignment(test *testing.T, testCase struct {
 	source  string
-	options any
+	options rule.Given[LogicalAssignmentOperatorsOptions]
 },
 ) rule_testing.Result {
 	test.Helper()
-	options := testCase.options
-	if options == nil {
+	options, configured := testCase.options.Read()
+	if !configured {
 		options = DefaultLogicalAssignmentOperatorsSettings()
 	}
 	if logicalAssignmentNeedsScriptSource(testCase.source) {
@@ -94,7 +94,7 @@ func TestLogicalAssignmentOperatorsStaysSilent(test *testing.T) {
 			test.Parallel()
 			result := runLogicalAssignment(test, struct {
 				source  string
-				options any
+				options rule.Given[LogicalAssignmentOperatorsOptions]
 			}{testCase.source, testCase.options})
 			rule_testing.ExpectClean(test, result)
 		})
@@ -111,7 +111,7 @@ func TestLogicalAssignmentOperatorsFires(test *testing.T) {
 			test.Parallel()
 			result := runLogicalAssignment(test, struct {
 				source  string
-				options any
+				options rule.Given[LogicalAssignmentOperatorsOptions]
 			}{testCase.source, testCase.options})
 			rule_testing.ExpectFindings(test, result, testCase.messageId)
 		})
@@ -136,7 +136,7 @@ func TestLogicalAssignmentOperatorsFixes(test *testing.T) {
 			test.Parallel()
 			result := runLogicalAssignment(test, struct {
 				source  string
-				options any
+				options rule.Given[LogicalAssignmentOperatorsOptions]
 			}{testCase.source, testCase.options})
 			rule_testing.ExpectFixedSource(test, result,
 				logicalAssignmentAsWritten(testCase.source, testCase.fixedSource))
@@ -171,7 +171,7 @@ func TestLogicalAssignmentOperatorsSuggestions(test *testing.T) {
 			test.Parallel()
 			result := runLogicalAssignment(test, struct {
 				source  string
-				options any
+				options rule.Given[LogicalAssignmentOperatorsOptions]
 			}{testCase.source, testCase.options})
 			if len(result.Diagnostics) != 1 {
 				test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
@@ -252,7 +252,7 @@ func TestLogicalAssignmentOperatorsDeclinesToRepair(test *testing.T) {
 			test.Parallel()
 			result := runLogicalAssignment(test, struct {
 				source  string
-				options any
+				options rule.Given[LogicalAssignmentOperatorsOptions]
 			}{testCase.source, testCase.options})
 			if len(result.Diagnostics) != 1 {
 				test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
@@ -284,26 +284,44 @@ func TestLogicalAssignmentOperatorsSplitsFixesFromSuggestions(test *testing.T) {
 	cases := []struct {
 		name        string
 		source      string
-		options     any
+		options     rule.Given[LogicalAssignmentOperatorsOptions]
 		wantFix     bool
 		wantSuggest bool
 	}{
-		{"a bare identifier is safe to read once", "a = a || b", nil, true, false},
-		{"a member access may be a getter", "a.b = a.b || c", nil, false, true},
+		{
+			"a bare identifier is safe to read once",
+			"a = a || b",
+			rule.Given[LogicalAssignmentOperatorsOptions]{},
+			true,
+			false,
+		},
+		{
+			"a member access may be a getter",
+			"a.b = a.b || c",
+			rule.Given[LogicalAssignmentOperatorsOptions]{},
+			false,
+			true,
+		},
 		{"a single property off an identifier is fixed in the logical shape",
-			"a.b || (a.b = c)", nil, true, false},
-		{"a deeper access is only suggested", "a.b.c || (a.b.c = d)", nil, false, true},
+			"a.b || (a.b = c)", rule.Given[LogicalAssignmentOperatorsOptions]{}, true, false},
+		{
+			"a deeper access is only suggested",
+			"a.b.c || (a.b.c = d)",
+			rule.Given[LogicalAssignmentOperatorsOptions]{},
+			false,
+			true,
+		},
 		{"an identifier in a with block may be a scrutinee property",
-			"with (object) a = a || b", nil, false, true},
+			"with (object) a = a || b", rule.Given[LogicalAssignmentOperatorsOptions]{}, false, true},
 		{"a strict file turns the with allowance back off",
-			"\"use strict\";\nwith (object) a = a || b", nil, true, false},
+			"\"use strict\";\nwith (object) a = a || b", rule.Given[LogicalAssignmentOperatorsOptions]{}, true, false},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			result := runLogicalAssignment(test, struct {
 				source  string
-				options any
+				options rule.Given[LogicalAssignmentOperatorsOptions]
 			}{testCase.source, testCase.options})
 			if len(result.Diagnostics) != 1 {
 				test.Fatalf("wanted one finding, got %d: %v", len(result.Diagnostics),
@@ -336,24 +354,38 @@ func TestLogicalAssignmentOperatorsSpans(test *testing.T) {
 	cases := []struct {
 		name     string
 		source   string
-		options  any
+		options  rule.Given[LogicalAssignmentOperatorsOptions]
 		wantSpan string
 	}{
-		{"the assignment shape points at the whole assignment", "a = a || b", nil, "a = a || b"},
-		{"the logical shape points at the whole logical expression", "a || (a = b)", nil,
-			"a || (a = b)"},
+		{
+			"the assignment shape points at the whole assignment",
+			"a = a || b",
+			rule.Given[LogicalAssignmentOperatorsOptions]{},
+			"a = a || b",
+		},
+		{
+			"the logical shape points at the whole logical expression",
+			"a || (a = b)",
+			rule.Given[LogicalAssignmentOperatorsOptions]{},
+			"a || (a = b)",
+		},
 		{"the if shape points at the whole if statement", "if (a) a = b",
-			logicalAssignmentAlwaysIfOptions(), "if (a) a = b"},
+			rule.Configured(logicalAssignmentAlwaysIfOptions()), "if (a) a = b"},
 		{"the never shape points at the whole assignment", "a ||= b",
-			logicalAssignmentNeverOptions(), "a ||= b"},
-		{"a nested assignment reports only its own span", "x = (a = a || b)", nil, "a = a || b"},
+			rule.Configured(logicalAssignmentNeverOptions()), "a ||= b"},
+		{
+			"a nested assignment reports only its own span",
+			"x = (a = a || b)",
+			rule.Given[LogicalAssignmentOperatorsOptions]{},
+			"a = a || b",
+		},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			result := runLogicalAssignment(test, struct {
 				source  string
-				options any
+				options rule.Given[LogicalAssignmentOperatorsOptions]
 			}{testCase.source, testCase.options})
 			if len(result.Diagnostics) != 1 {
 				test.Fatalf("wanted one finding, got %d: %v", len(result.Diagnostics),
@@ -383,21 +415,21 @@ func TestLogicalAssignmentOperatorsMessages(test *testing.T) {
 
 	cases := []struct {
 		source     string
-		options    any
+		options    rule.Given[LogicalAssignmentOperatorsOptions]
 		wantId     string
 		wantPrefix string
 	}{
-		{"a = a || b", nil, "assignment",
+		{"a = a || b", rule.Given[LogicalAssignmentOperatorsOptions]{}, "assignment",
 			"Assignment (=) can be replaced with operator assignment (||=)."},
-		{"a = a ?? b", nil, "assignment",
+		{"a = a ?? b", rule.Given[LogicalAssignmentOperatorsOptions]{}, "assignment",
 			"Assignment (=) can be replaced with operator assignment (??=)."},
-		{"a || (a = b)", nil, "logical",
+		{"a || (a = b)", rule.Given[LogicalAssignmentOperatorsOptions]{}, "logical",
 			"Logical expression can be replaced with an assignment (||=)."},
-		{"if (a) a = b", logicalAssignmentAlwaysIfOptions(), "if",
+		{"if (a) a = b", rule.Configured(logicalAssignmentAlwaysIfOptions()), "if",
 			"'if' statement can be replaced with a logical operator assignment with operator &&="},
-		{"if (a == null) a = b", logicalAssignmentAlwaysIfOptions(), "if",
+		{"if (a == null) a = b", rule.Configured(logicalAssignmentAlwaysIfOptions()), "if",
 			"'if' statement can be replaced with a logical operator assignment with operator ??="},
-		{"a &&= b", logicalAssignmentNeverOptions(), "unexpected",
+		{"a &&= b", rule.Configured(logicalAssignmentNeverOptions()), "unexpected",
 			"Unexpected logical operator assignment (&&=) shorthand."},
 	}
 	for _, testCase := range cases {
@@ -405,7 +437,7 @@ func TestLogicalAssignmentOperatorsMessages(test *testing.T) {
 			test.Parallel()
 			result := runLogicalAssignment(test, struct {
 				source  string
-				options any
+				options rule.Given[LogicalAssignmentOperatorsOptions]
 			}{testCase.source, testCase.options})
 			if len(result.Diagnostics) != 1 {
 				test.Fatalf("wanted one finding, got %d", len(result.Diagnostics))
@@ -432,17 +464,17 @@ func TestLogicalAssignmentOperatorsSuggestionMessages(test *testing.T) {
 
 	cases := []struct {
 		source  string
-		options any
+		options rule.Given[LogicalAssignmentOperatorsOptions]
 		wantId  string
 		want    string
 	}{
-		{"a.b = a.b || c", nil, "useLogicalOperator",
+		{"a.b = a.b || c", rule.Given[LogicalAssignmentOperatorsOptions]{}, "useLogicalOperator",
 			"Convert this assignment to use the operator ||=."},
-		{"a.b.c || (a.b.c = d)", nil, "convertLogical",
+		{"a.b.c || (a.b.c = d)", rule.Given[LogicalAssignmentOperatorsOptions]{}, "convertLogical",
 			"Replace this logical expression with an assignment with the operator ||=."},
-		{"if (a.b.c) a.b.c = d", logicalAssignmentAlwaysIfOptions(), "convertIf",
+		{"if (a.b.c) a.b.c = d", rule.Configured(logicalAssignmentAlwaysIfOptions()), "convertIf",
 			"Replace this 'if' statement with a logical assignment with operator &&=."},
-		{"a.b ||= c", logicalAssignmentNeverOptions(), "separate",
+		{"a.b ||= c", rule.Configured(logicalAssignmentNeverOptions()), "separate",
 			"Separate the logical assignment into an assignment with a logical operator."},
 	}
 	for _, testCase := range cases {
@@ -450,7 +482,7 @@ func TestLogicalAssignmentOperatorsSuggestionMessages(test *testing.T) {
 			test.Parallel()
 			result := runLogicalAssignment(test, struct {
 				source  string
-				options any
+				options rule.Given[LogicalAssignmentOperatorsOptions]
 			}{testCase.source, testCase.options})
 			if len(result.Diagnostics) != 1 || len(result.Diagnostics[0].Suggestions) != 1 {
 				test.Fatalf("wanted one finding with one suggestion, got %d findings",
@@ -523,16 +555,12 @@ func TestDecodeLogicalAssignmentOperatorsOptions(test *testing.T) {
 			if decodeLogicalAssignmentOperatorsOptionsError != nil {
 				test.Fatalf("unexpected error: %v", decodeLogicalAssignmentOperatorsOptionsError)
 			}
-			settings, ok := decoded.(LogicalAssignmentOperatorsOptions)
-			if !ok {
-				test.Fatalf("decoded options are not LogicalAssignmentOperatorsOptions: got %T", decoded)
+			if decoded.Require == nil || *decoded.Require != *testCase.wantMode {
+				test.Errorf("mode is %v, want %v", decoded.Require, *testCase.wantMode)
 			}
-			if settings.Require == nil || *settings.Require != *testCase.wantMode {
-				test.Errorf("mode is %v, want %v", settings.Require, *testCase.wantMode)
-			}
-			if settings.EnforceForIfStatements != testCase.wantIf {
+			if decoded.EnforceForIfStatements != testCase.wantIf {
 				test.Errorf("enforceForIfStatements is %v, want %v",
-					settings.EnforceForIfStatements, testCase.wantIf)
+					decoded.EnforceForIfStatements, testCase.wantIf)
 			}
 		})
 	}
@@ -597,7 +625,7 @@ func TestLogicalAssignmentOperatorsTypeScriptShapes(test *testing.T) {
 	cases := []struct {
 		name      string
 		source    string
-		options   any
+		options   rule.Given[LogicalAssignmentOperatorsOptions]
 		wantIds   []string
 		wantFixed string
 	}{
@@ -637,7 +665,7 @@ func TestLogicalAssignmentOperatorsTypeScriptShapes(test *testing.T) {
 		{
 			name:      "the never expansion copies an assertion on the target rather than rendering it",
 			source:    "a!.b ||= c",
-			options:   logicalAssignmentNeverOptions(),
+			options:   rule.Configured(logicalAssignmentNeverOptions()),
 			wantIds:   []string{"unexpected"},
 			wantFixed: "",
 		},
@@ -647,7 +675,7 @@ func TestLogicalAssignmentOperatorsTypeScriptShapes(test *testing.T) {
 			test.Parallel()
 			result := runLogicalAssignment(test, struct {
 				source  string
-				options any
+				options rule.Given[LogicalAssignmentOperatorsOptions]
 			}{testCase.source, testCase.options})
 			rule_testing.ExpectFindings(test, result, testCase.wantIds...)
 			if testCase.wantFixed != "" {
@@ -851,8 +879,8 @@ func TestLogicalAssignmentOperatorsWrapsWhereUpstreamWraps(test *testing.T) {
 			test.Parallel()
 			result := runLogicalAssignment(test, struct {
 				source  string
-				options any
-			}{testCase.source, nil})
+				options rule.Given[LogicalAssignmentOperatorsOptions]
+			}{testCase.source, rule.Given[LogicalAssignmentOperatorsOptions]{}})
 			rule_testing.ExpectFindings(test, result, "logical")
 			rule_testing.ExpectFixedSource(test, result,
 				logicalAssignmentAsWritten(testCase.source, testCase.want))
@@ -884,11 +912,7 @@ func TestLogicalAssignmentOperatorsIsSilentInsideReactCompiledFunctions(test *te
 		if decodeLogicalAssignmentOperatorsOptionsError != nil {
 			test.Fatalf("decoding %s: %v", raw, decodeLogicalAssignmentOperatorsOptionsError)
 		}
-		options, ok := decoded.(LogicalAssignmentOperatorsOptions)
-		if !ok {
-			test.Fatalf("decoding %s gave a %T, not LogicalAssignmentOperatorsOptions", raw, decoded)
-		}
-		return options
+		return decoded
 	}
 	compilerOn := decode(`["always", {"enforceForIfStatements": true}]`)
 	compilerOff := decode(`["always", {"enforceForIfStatements": true, "reactCompiler": false}]`)

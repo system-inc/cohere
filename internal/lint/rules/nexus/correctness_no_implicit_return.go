@@ -41,7 +41,7 @@ var correctnessNoImplicitReturnText = policy.MessageOf("nexus/correctness-no-imp
  * return type with no return at all, a declared type that excludes undefined) are type errors whatever
  * the flag says, so the rule leaves them to the type check, as TypeScript does.
  */
-var CorrectnessNoImplicitReturn = rule.Rule{
+var CorrectnessNoImplicitReturn = rule.Rule[rule.NoOptions]{
 	Name: "nexus/correctness-no-implicit-return",
 
 	// The reachability of a function's end and the type it returns are the checker's answers
@@ -49,7 +49,7 @@ var CorrectnessNoImplicitReturn = rule.Rule{
 	// Whether noImplicitReturns is already on, and whether strictNullChecks is
 	ProgramReads: rule.ReadsCompilerOptions,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.TypeChecker == nil || ruleContext.Program == nil {
 			return nil
 		}

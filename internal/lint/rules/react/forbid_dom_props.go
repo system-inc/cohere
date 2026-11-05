@@ -89,7 +89,7 @@ type forbidDomPropsWireOptions struct {
 // nothing, which is upstream's behaviour with no options: it reads the configured list or a shared
 // empty default. That is the safe direction for this rule, since the whole judgment is supplied by
 // the config.
-func DecodeForbidDomPropsOptions(raw []byte) (any, error) {
+func DecodeForbidDomPropsOptions(raw []byte) (ForbidDomPropsOptions, error) {
 	options := ForbidDomPropsOptions{}
 	if len(raw) == 0 {
 		return options, nil
@@ -219,11 +219,11 @@ func forbidDomPropsIsForbidden(entry ForbidDomPropsEntry, tagName string) bool {
 //
 // Three siblings in this package gate on `.tsx` and `.jsx`, which is oxc residue rather than
 // upstream behaviour. This rule is ported from the authority, which has no such gate.
-var ForbidDomProps = rule.Rule{
+var ForbidDomProps = rule.Rule[ForbidDomPropsOptions]{
 	Name: "react/forbid-dom-props",
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, _ := rule.OptionsAs[ForbidDomPropsOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[ForbidDomPropsOptions]) rule.Listeners {
+		settings, _ := options.Read()
 
 		// Assignment in list order reproduces upstream's map construction, so a repeated prop name
 		// keeps the last entry.

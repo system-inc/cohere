@@ -104,7 +104,7 @@ var messageNoEval = rule.Message{
 // The cost of that choice is a false positive on a local variable named `window` with an unrelated
 // `eval` property, which nothing in the corpus exercises and which the computed-subscript cases
 // already show the rule declining where the property is not statically `eval`.
-var NoEval = rule.Rule{
+var NoEval = rule.Rule[NoEvalOptions]{
 	Name: "no-eval",
 
 	// See the doc above: the bare-identifier arm's whole discrimination is whether `eval` names the
@@ -112,9 +112,9 @@ var NoEval = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoEvalOptions]) rule.Listeners {
 		allowIndirect := false
-		if typed, ok := rule.OptionsAs[NoEvalOptions](options); ok {
+		if typed, ok := options.Read(); ok {
 			allowIndirect = typed.AllowIndirect
 		}
 

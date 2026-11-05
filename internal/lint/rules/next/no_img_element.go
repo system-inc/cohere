@@ -39,13 +39,13 @@ var messageNoImgElement = rule.Message{
 // depths, so any hard-coded hop count is right for one form and wrong for the other. The rule walks
 // to the nearest enclosing JSX element instead and asks what it is, which is what the fixed hop was
 // approximating in a tree where the two forms happen to agree.
-var NoImgElement = rule.Rule{
+var NoImgElement = rule.Rule[rule.NoOptions]{
 	// No family prefix. The config writes `nextjs/no-img-element` and matching strips the namespace
 	// on a `/` boundary, so a rule named `next-no-img-element` matches nothing, runs on no files,
 	// and passes every one of its own tests. That is not hypothetical: the first rule in this
 	// package shipped that way and was inert.
 	Name: "@next/next/no-img-element",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		report := func(node *ast.Node, name *ast.Node) {
 			// An intrinsic element is a lowercase, unqualified identifier. A member-expression name
 			// (`<Foo.img />`) or a namespaced one is a component reference that never emits an

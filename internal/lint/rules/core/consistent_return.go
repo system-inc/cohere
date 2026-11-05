@@ -30,7 +30,7 @@ type consistentReturnWire struct {
 }
 
 // DecodeConsistentReturnOptions reads the option object off the config.
-func DecodeConsistentReturnOptions(raw []byte) (any, error) {
+func DecodeConsistentReturnOptions(raw []byte) (ConsistentReturnSettings, error) {
 	if len(raw) == 0 {
 		return DefaultConsistentReturnSettings(), nil
 	}
@@ -118,10 +118,10 @@ var messageConsistentReturnUnexpectedReturnValue = rule.Message{
 // `@typescript-eslint/consistent-return` wraps this one and filters on the declared return type.
 // Reproduced as-is rather than improved on, because narrowing here would silently change what the
 // extension rule is a wrapper around.
-var ConsistentReturn = rule.Rule{
+var ConsistentReturn = rule.Rule[ConsistentReturnSettings]{
 	Name: "consistent-return",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, ok := rule.OptionsAs[ConsistentReturnSettings](options)
+	Run: func(ruleContext rule.Context, options rule.Given[ConsistentReturnSettings]) rule.Listeners {
+		settings, ok := options.Read()
 		if !ok {
 			settings = DefaultConsistentReturnSettings()
 		}

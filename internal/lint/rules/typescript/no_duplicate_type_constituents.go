@@ -40,19 +40,18 @@ type noDuplicateTypeConstituentsRawOptions struct {
 //
 // cohere's config layer strips ESLint's `[severity, options]` tuple before dispatch, so what
 // arrives is the bare object rather than upstream's one-element array.
-func DecodeNoDuplicateTypeConstituentsOptions(raw []byte) (any, error) {
+func DecodeNoDuplicateTypeConstituentsOptions(raw []byte) (NoDuplicateTypeConstituentsOptions, error) {
 	decoded, decodeOptionsError := rule.DecodeOptionsInto[noDuplicateTypeConstituentsRawOptions]()(raw)
 	if decodeOptionsError != nil {
 		return DefaultNoDuplicateTypeConstituentsSettings(), decodeOptionsError
 	}
 
-	wire, _ := decoded.(noDuplicateTypeConstituentsRawOptions)
 	options := DefaultNoDuplicateTypeConstituentsSettings()
-	if wire.IgnoreIntersections != nil {
-		options.IgnoreIntersections = *wire.IgnoreIntersections
+	if decoded.IgnoreIntersections != nil {
+		options.IgnoreIntersections = *decoded.IgnoreIntersections
 	}
-	if wire.IgnoreUnions != nil {
-		options.IgnoreUnions = *wire.IgnoreUnions
+	if decoded.IgnoreUnions != nil {
+		options.IgnoreUnions = *decoded.IgnoreUnions
 	}
 	return options, nil
 }
@@ -133,15 +132,15 @@ func DecodeNoDuplicateTypeConstituentsOptions(raw []byte) (any, error) {
 //
 // The anchor is a union or intersection type node, and the checker is consulted once per
 // constituent only after the syntactic comparison has failed to find a duplicate.
-var NoDuplicateTypeConstituents = rule.Rule{
+var NoDuplicateTypeConstituents = rule.Rule[NoDuplicateTypeConstituentsOptions]{
 	Name: "@typescript-eslint/no-duplicate-type-constituents",
 
 	// Every constituent's type is resolved to compare identities.
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, isSettings := rule.OptionsAs[NoDuplicateTypeConstituentsOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[NoDuplicateTypeConstituentsOptions]) rule.Listeners {
+		settings, isSettings := options.Read()
 		if !isSettings {
 			settings = DefaultNoDuplicateTypeConstituentsSettings()
 		}

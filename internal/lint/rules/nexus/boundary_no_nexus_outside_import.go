@@ -33,9 +33,9 @@ func messageForbiddenOutsideImport() rule.Message {
 //
 // No fix, and there is no plausible one: the repair is either to move the imported code down into
 // nexus or to invert the dependency, and neither is a text edit.
-var BoundaryNoNexusOutsideImport = rule.Rule{
+var BoundaryNoNexusOutsideImport = rule.Rule[rule.NoOptions]{
 	Name: "nexus/boundary-no-nexus-outside-import",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// The whole rule is a question about where the file lives, so a file outside nexus declines
 		// before a single node is visited. This is the cheapest a rule gets.
 		if !strings.Contains(imports.NormalizedFileName(ruleContext.SourceFile), "/libraries/nexus/") {

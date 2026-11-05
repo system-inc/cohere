@@ -27,7 +27,7 @@ type consistentTypeImportsCase struct {
 // decodeConsistentTypeImportsFixtureOptions routes a case's option payload through the rule's
 // own exported decoder. An empty payload means the corpus case carried no options, which is
 // the bare `"error"` shape and must reach the rule as the documented defaults.
-func decodeConsistentTypeImportsFixtureOptions(test *testing.T, payload string) any {
+func decodeConsistentTypeImportsFixtureOptions(test *testing.T, payload string) ConsistentTypeImportsOptions {
 	test.Helper()
 	if payload == "" {
 		return DefaultConsistentTypeImportsOptions()
@@ -1069,7 +1069,7 @@ func TestConsistentTypeImportsDecoderDefaults(test *testing.T) {
 		if decodeConsistentTypeImportsOptionsError != nil {
 			test.Fatalf("decoding %s: %v", testCase.payload, decodeConsistentTypeImportsOptionsError)
 		}
-		if decoded != any(testCase.want) {
+		if decoded != testCase.want {
 			test.Errorf("decoding %s gave %+v, want %+v", testCase.payload, decoded, testCase.want)
 		}
 	}
@@ -1138,16 +1138,16 @@ func TestConsistentTypeImportsProposesOneEditPerFinding(test *testing.T) {
 func TestConsistentTypeImportsWithNilOptions(test *testing.T) {
 	test.Parallel()
 
-	annotations := rule_testing.RunTypedWithOptions(test, ConsistentTypeImports,
-		"consistent_type_imports.tsx", "type T = import('foo');\n", nil)
+	annotations := rule_testing.RunTyped(test, ConsistentTypeImports,
+		"consistent_type_imports.tsx", "type T = import('foo');\n")
 	rule_testing.ExpectFindings(test, annotations, "noImportTypeAnnotations")
 
-	imported := rule_testing.RunTypedWithOptions(test, ConsistentTypeImports,
-		"consistent_type_imports.tsx", "import Foo from 'foo';\nlet foo: Foo;\n", nil)
+	imported := rule_testing.RunTyped(test, ConsistentTypeImports,
+		"consistent_type_imports.tsx", "import Foo from 'foo';\nlet foo: Foo;\n")
 	rule_testing.ExpectFindings(test, imported, "typeOverValue")
 
-	clean := rule_testing.RunTypedWithOptions(test, ConsistentTypeImports,
-		"consistent_type_imports.tsx", "import type { Foo } from 'foo';\nlet foo: Foo;\n", nil)
+	clean := rule_testing.RunTyped(test, ConsistentTypeImports,
+		"consistent_type_imports.tsx", "import type { Foo } from 'foo';\nlet foo: Foo;\n")
 	rule_testing.ExpectClean(test, clean)
 }
 

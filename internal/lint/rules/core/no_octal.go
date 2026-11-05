@@ -85,9 +85,9 @@ var messageNoOctal = rule.Message{
 // therefore redundant with the type phase rather than inert, and it is kept for the reason a linter
 // keeps any such rule: it reports in the lint phase, which runs without the compiler and gives a
 // message about what to write instead rather than a grammar error.
-var NoOctal = rule.Rule{
+var NoOctal = rule.Rule[rule.NoOptions]{
 	Name: "no-octal",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			// `KindNumericLiteral` alone is upstream's `typeof node.value === "number"`. A string
 			// holding the same digits is a different kind and a comment is not a node, so both are

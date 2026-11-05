@@ -8,5 +8,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // shared edit. No `Decode`, because upstream's `schema: false` is the authoritative statement that
 // this rule takes no options.
 func init() {
-	rule.Register(rule.Registration{Rule: JsxNoConstructedContextValues})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: JsxNoConstructedContextValues})
 }

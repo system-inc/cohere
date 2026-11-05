@@ -16,7 +16,7 @@ const complexityFile = "/repository/source/Complexity.ts"
 //
 // The argument is the option as JSON text, exactly the bytes the config layer hands the decoder, so
 // a fixture cannot bypass the decoder or test a shape a config could not deliver.
-func complexityOf(optionJson string) any {
+func complexityOf(optionJson string) ComplexitySettings {
 	settings, decodeComplexityOptionsError := DecodeComplexityOptions([]byte(optionJson))
 	if decodeComplexityOptionsError != nil {
 		panic(decodeComplexityOptionsError)
@@ -39,233 +39,352 @@ func TestComplexityFires(test *testing.T) {
 
 	cases := []struct {
 		source   string
-		settings any
+		settings rule.Given[ComplexitySettings]
 		findings int
 	}{
-		{source: "function a(x) {}", settings: complexityOf("0"), findings: 1},
+		{source: "function a(x) {}", settings: rule.Configured(complexityOf("0")), findings: 1},
 		{
 			source:   "function foo(x) {if (x > 10) {return 'x is greater than 10';} else if (x > 5) {return 'x is greater than 5';} else {return 'x is less than 5';}}",
-			settings: complexityOf("2"),
+			settings: rule.Configured(complexityOf("2")),
 			findings: 1,
 		},
-		{source: "var func = function () {}", settings: complexityOf("0"), findings: 1},
-		{source: "var obj = { a(x) {} }", settings: complexityOf("0"), findings: 1},
-		{source: "class Test { a(x) {} }", settings: complexityOf("0"), findings: 1},
-		{source: "var a = (x) => {if (true) {return x;}}", settings: complexityOf("1"), findings: 1},
-		{source: "function a(x) {if (true) {return x;}}", settings: complexityOf("1"), findings: 1},
-		{source: "function a(x) {if (true) {return x;} else {return x+1;}}", settings: complexityOf("1"), findings: 1},
+		{source: "var func = function () {}", settings: rule.Configured(complexityOf("0")), findings: 1},
+		{source: "var obj = { a(x) {} }", settings: rule.Configured(complexityOf("0")), findings: 1},
+		{source: "class Test { a(x) {} }", settings: rule.Configured(complexityOf("0")), findings: 1},
+		{source: "var a = (x) => {if (true) {return x;}}", settings: rule.Configured(complexityOf("1")), findings: 1},
+		{source: "function a(x) {if (true) {return x;}}", settings: rule.Configured(complexityOf("1")), findings: 1},
+		{
+			source:   "function a(x) {if (true) {return x;} else {return x+1;}}",
+			settings: rule.Configured(complexityOf("1")),
+			findings: 1,
+		},
 		{
 			source:   "function a(x) {if (true) {return x;} else if (false) {return x+1;} else {return 4;}}",
-			settings: complexityOf("2"),
+			settings: rule.Configured(complexityOf("2")),
 			findings: 1,
 		},
 		{
 			source:   "function a(x) {for(var i = 0; i < 5; i ++) {x ++;} return x;}",
-			settings: complexityOf("1"),
+			settings: rule.Configured(complexityOf("1")),
 			findings: 1,
 		},
-		{source: "function a(obj) {for(var i in obj) {obj[i] = 3;}}", settings: complexityOf("1"), findings: 1},
-		{source: "function a(obj) {for(var i of obj) {obj[i] = 3;}}", settings: complexityOf("1"), findings: 1},
+		{
+			source:   "function a(obj) {for(var i in obj) {obj[i] = 3;}}",
+			settings: rule.Configured(complexityOf("1")),
+			findings: 1,
+		},
+		{
+			source:   "function a(obj) {for(var i of obj) {obj[i] = 3;}}",
+			settings: rule.Configured(complexityOf("1")),
+			findings: 1,
+		},
 		{
 			source:   "function a(x) {for(var i = 0; i < 5; i ++) {if(i % 2 === 0) {x ++;}} return x;}",
-			settings: complexityOf("2"),
+			settings: rule.Configured(complexityOf("2")),
 			findings: 1,
 		},
 		{
 			source:   "function a(obj) {if(obj){ for(var x in obj) {try {x.getThis();} catch (e) {x.getThat();}}} else {return false;}}",
-			settings: complexityOf("3"),
+			settings: rule.Configured(complexityOf("3")),
 			findings: 1,
 		},
 		{
 			source:   "function a(x) {try {x.getThis();} catch (e) {x.getThat();}}",
-			settings: complexityOf("1"),
+			settings: rule.Configured(complexityOf("1")),
 			findings: 1,
 		},
-		{source: "function a(x) {return x === 4 ? 3 : 5;}", settings: complexityOf("1"), findings: 1},
-		{source: "function a(x) {return x === 4 ? 3 : (x === 3 ? 2 : 1);}", settings: complexityOf("2"), findings: 1},
-		{source: "function a(x) {return x || 4;}", settings: complexityOf("1"), findings: 1},
-		{source: "function a(x) {x && 4;}", settings: complexityOf("1"), findings: 1},
-		{source: "function a(x) {x ?? 4;}", settings: complexityOf("1"), findings: 1},
-		{source: "function a(x) {x ||= 4;}", settings: complexityOf("1"), findings: 1},
-		{source: "function a(x) {x &&= 4;}", settings: complexityOf("1"), findings: 1},
-		{source: "function a(x) {x ??= 4;}", settings: complexityOf("1"), findings: 1},
+		{source: "function a(x) {return x === 4 ? 3 : 5;}", settings: rule.Configured(complexityOf("1")), findings: 1},
+		{
+			source:   "function a(x) {return x === 4 ? 3 : (x === 3 ? 2 : 1);}",
+			settings: rule.Configured(complexityOf("2")),
+			findings: 1,
+		},
+		{source: "function a(x) {return x || 4;}", settings: rule.Configured(complexityOf("1")), findings: 1},
+		{source: "function a(x) {x && 4;}", settings: rule.Configured(complexityOf("1")), findings: 1},
+		{source: "function a(x) {x ?? 4;}", settings: rule.Configured(complexityOf("1")), findings: 1},
+		{source: "function a(x) {x ||= 4;}", settings: rule.Configured(complexityOf("1")), findings: 1},
+		{source: "function a(x) {x &&= 4;}", settings: rule.Configured(complexityOf("1")), findings: 1},
+		{source: "function a(x) {x ??= 4;}", settings: rule.Configured(complexityOf("1")), findings: 1},
 		{
 			source:   "function a(x) {switch(x){case 1: 1; break; case 2: 2; break; default: 3;}}",
-			settings: complexityOf("2"),
+			settings: rule.Configured(complexityOf("2")),
 			findings: 1,
 		},
 		{
 			source:   "function a(x) {switch(x){case 1: 1; break; case 2: 2; break; default: if(x == 'foo') {5;};}}",
-			settings: complexityOf("3"),
+			settings: rule.Configured(complexityOf("3")),
 			findings: 1,
 		},
-		{source: "function a(x) {while(true) {'foo';}}", settings: complexityOf("1"), findings: 1},
-		{source: "function a(x) {do {'foo';} while (true)}", settings: complexityOf("1"), findings: 1},
+		{source: "function a(x) {while(true) {'foo';}}", settings: rule.Configured(complexityOf("1")), findings: 1},
+		{source: "function a(x) {do {'foo';} while (true)}", settings: rule.Configured(complexityOf("1")), findings: 1},
 		{
 			source:   "function a(x) {(function() {while(true){'foo';}})(); (function() {while(true){'bar';}})();}",
-			settings: complexityOf("1"),
+			settings: rule.Configured(complexityOf("1")),
 			findings: 2,
 		},
 		{
 			source:   "function a(x) {(function() {while(true){'foo';}})(); (function() {'bar';})();}",
-			settings: complexityOf("1"),
-			findings: 1,
-		},
-		{source: "var obj = { a(x) { return x ? 0 : 1; } };", settings: complexityOf("1"), findings: 1},
-		{source: "var obj = { a: function b(x) { return x ? 0 : 1; } };", settings: complexityOf("1"), findings: 1},
-		{
-			source:   "function test (a) { if (a === 1) {} else if (a === 2) {} else if (a === 3) {} else if (a === 4) {} else if (a === 5) {} else if (a === 6) {} else if (a === 7) {} else if (a === 8) {} else if (a === 9) {} else if (a === 10) {} else if (a === 11) {} else if (a === 12) {} else if (a === 13) {} else if (a === 14) {} else if (a === 15) {} else if (a === 16) {} else if (a === 17) {} else if (a === 18) {} else if (a === 19) {} else if (a === 20) {} };",
-			settings: nil,
+			settings: rule.Configured(complexityOf("1")),
 			findings: 1,
 		},
 		{
+			source:   "var obj = { a(x) { return x ? 0 : 1; } };",
+			settings: rule.Configured(complexityOf("1")),
+			findings: 1,
+		},
+		{
+			source:   "var obj = { a: function b(x) { return x ? 0 : 1; } };",
+			settings: rule.Configured(complexityOf("1")),
+			findings: 1,
+		},
+		{
 			source:   "function test (a) { if (a === 1) {} else if (a === 2) {} else if (a === 3) {} else if (a === 4) {} else if (a === 5) {} else if (a === 6) {} else if (a === 7) {} else if (a === 8) {} else if (a === 9) {} else if (a === 10) {} else if (a === 11) {} else if (a === 12) {} else if (a === 13) {} else if (a === 14) {} else if (a === 15) {} else if (a === 16) {} else if (a === 17) {} else if (a === 18) {} else if (a === 19) {} else if (a === 20) {} };",
-			settings: complexityOf("{}"),
+			findings: 1,
+		},
+		{
+			source:   "function test (a) { if (a === 1) {} else if (a === 2) {} else if (a === 3) {} else if (a === 4) {} else if (a === 5) {} else if (a === 6) {} else if (a === 7) {} else if (a === 8) {} else if (a === 9) {} else if (a === 10) {} else if (a === 11) {} else if (a === 12) {} else if (a === 13) {} else if (a === 14) {} else if (a === 15) {} else if (a === 16) {} else if (a === 17) {} else if (a === 18) {} else if (a === 19) {} else if (a === 20) {} };",
+			settings: rule.Configured(complexityOf("{}")),
 			findings: 1,
 		},
 		{
 			source:   "function a(x) {switch(x){case 1: 1; break; case 2: 2; break; default: 3;}}",
-			settings: complexityOf("{\"max\": 1, \"variant\": \"modified\"}"),
+			settings: rule.Configured(complexityOf("{\"max\": 1, \"variant\": \"modified\"}")),
 			findings: 1,
 		},
 		{
 			source:   "function a(x) {switch(x){case 1: 1; break; case 2: 2; break; default: if(x == 'foo') {5;};}}",
-			settings: complexityOf("{\"max\": 2, \"variant\": \"modified\"}"),
+			settings: rule.Configured(complexityOf("{\"max\": 2, \"variant\": \"modified\"}")),
 			findings: 1,
 		},
-		{source: "function foo () { a || b; class C { x; } c || d; }", settings: complexityOf("2"), findings: 1},
-		{source: "function foo () { a || b; class C { x = c; } d || e; }", settings: complexityOf("2"), findings: 1},
-		{source: "function foo () { a || b; class C { [x || y]; } }", settings: complexityOf("2"), findings: 1},
-		{source: "function foo () { a || b; class C { [x || y] = c; } }", settings: complexityOf("2"), findings: 1},
-		{source: "function foo () { class C { [x || y]; } a || b; }", settings: complexityOf("2"), findings: 1},
-		{source: "function foo () { class C { [x || y] = a; } b || c; }", settings: complexityOf("2"), findings: 1},
-		{source: "function foo () { class C { [x || y]; [z || q]; } }", settings: complexityOf("2"), findings: 1},
+		{
+			source:   "function foo () { a || b; class C { x; } c || d; }",
+			settings: rule.Configured(complexityOf("2")),
+			findings: 1,
+		},
+		{
+			source:   "function foo () { a || b; class C { x = c; } d || e; }",
+			settings: rule.Configured(complexityOf("2")),
+			findings: 1,
+		},
+		{
+			source:   "function foo () { a || b; class C { [x || y]; } }",
+			settings: rule.Configured(complexityOf("2")),
+			findings: 1,
+		},
+		{
+			source:   "function foo () { a || b; class C { [x || y] = c; } }",
+			settings: rule.Configured(complexityOf("2")),
+			findings: 1,
+		},
+		{
+			source:   "function foo () { class C { [x || y]; } a || b; }",
+			settings: rule.Configured(complexityOf("2")),
+			findings: 1,
+		},
+		{
+			source:   "function foo () { class C { [x || y] = a; } b || c; }",
+			settings: rule.Configured(complexityOf("2")),
+			findings: 1,
+		},
+		{
+			source:   "function foo () { class C { [x || y]; [z || q]; } }",
+			settings: rule.Configured(complexityOf("2")),
+			findings: 1,
+		},
 		{
 			source:   "function foo () { class C { [x || y] = a; [z || q] = b; } }",
-			settings: complexityOf("2"),
+			settings: rule.Configured(complexityOf("2")),
 			findings: 1,
 		},
 		{
 			source:   "function foo () { a || b; class C { x = c || d; } e || f; }",
-			settings: complexityOf("2"),
+			settings: rule.Configured(complexityOf("2")),
 			findings: 1,
 		},
 		{
 			source:   "class C { x(){ a || b; } y = c || d || e; z() { f || g; } }",
-			settings: complexityOf("2"),
+			settings: rule.Configured(complexityOf("2")),
 			findings: 1,
 		},
-		{source: "class C { x = a || b; y() { c || d || e; } z = f || g; }", settings: complexityOf("2"), findings: 1},
-		{source: "class C { x; y() { c || d || e; } z; }", settings: complexityOf("2"), findings: 1},
-		{source: "class C { x = a || b; }", settings: complexityOf("1"), findings: 1},
-		{source: "(class { x = a || b; })", settings: complexityOf("1"), findings: 1},
-		{source: "class C { static x = a || b; }", settings: complexityOf("1"), findings: 1},
-		{source: "(class { x = a ? b : c; })", settings: complexityOf("1"), findings: 1},
-		{source: "class C { x = a || b || c; }", settings: complexityOf("2"), findings: 1},
-		{source: "class C { x = a || b; y = b || c || d; z = e || f; }", settings: complexityOf("2"), findings: 1},
-		{source: "class C { x = a || b || c; y = d || e; z = f || g || h; }", settings: complexityOf("2"), findings: 2},
-		{source: "class C { x = () => a || b || c; }", settings: complexityOf("2"), findings: 1},
-		{source: "class C { x = (() => a || b || c) || d; }", settings: complexityOf("2"), findings: 1},
-		{source: "class C { x = () => a || b || c; y = d || e; }", settings: complexityOf("2"), findings: 1},
-		{source: "class C { x = () => a || b || c; y = d || e || f; }", settings: complexityOf("2"), findings: 2},
 		{
-			source:   "class C { x = function () { a || b }; y = function () { c || d }; }",
-			settings: complexityOf("1"),
+			source:   "class C { x = a || b; y() { c || d || e; } z = f || g; }",
+			settings: rule.Configured(complexityOf("2")),
+			findings: 1,
+		},
+		{source: "class C { x; y() { c || d || e; } z; }", settings: rule.Configured(complexityOf("2")), findings: 1},
+		{source: "class C { x = a || b; }", settings: rule.Configured(complexityOf("1")), findings: 1},
+		{source: "(class { x = a || b; })", settings: rule.Configured(complexityOf("1")), findings: 1},
+		{source: "class C { static x = a || b; }", settings: rule.Configured(complexityOf("1")), findings: 1},
+		{source: "(class { x = a ? b : c; })", settings: rule.Configured(complexityOf("1")), findings: 1},
+		{source: "class C { x = a || b || c; }", settings: rule.Configured(complexityOf("2")), findings: 1},
+		{
+			source:   "class C { x = a || b; y = b || c || d; z = e || f; }",
+			settings: rule.Configured(complexityOf("2")),
+			findings: 1,
+		},
+		{
+			source:   "class C { x = a || b || c; y = d || e; z = f || g || h; }",
+			settings: rule.Configured(complexityOf("2")),
 			findings: 2,
 		},
-		{source: "class C { x = class { [y || z]; }; }", settings: complexityOf("1"), findings: 1},
-		{source: "class C { x = class { [y || z] = a; }; }", settings: complexityOf("1"), findings: 1},
-		{source: "class C { x = class { y = a || b; }; }", settings: complexityOf("1"), findings: 1},
-		{source: "function foo () { a || b; class C { static {} } c || d; }", settings: complexityOf("2"), findings: 1},
+		{source: "class C { x = () => a || b || c; }", settings: rule.Configured(complexityOf("2")), findings: 1},
 		{
-			source:   "function foo () { a || b; class C { static { c || d; } } e || f; }",
-			settings: complexityOf("2"),
+			source:   "class C { x = (() => a || b || c) || d; }",
+			settings: rule.Configured(complexityOf("2")),
 			findings: 1,
 		},
-		{source: "class C { static { a || b; }  }", settings: complexityOf("1"), findings: 1},
-		{source: "class C { static { a || b || c; }  }", settings: complexityOf("2"), findings: 1},
-		{source: "class C { static { a || b; c || d; }  }", settings: complexityOf("2"), findings: 1},
-		{source: "class C { static { a || b; c || d; e || f; }  }", settings: complexityOf("3"), findings: 1},
-		{source: "class C { static { a || b; c || d; { e || f; } }  }", settings: complexityOf("3"), findings: 1},
-		{source: "class C { static { if (a || b) c = d || e; } }", settings: complexityOf("3"), findings: 1},
+		{
+			source:   "class C { x = () => a || b || c; y = d || e; }",
+			settings: rule.Configured(complexityOf("2")),
+			findings: 1,
+		},
+		{
+			source:   "class C { x = () => a || b || c; y = d || e || f; }",
+			settings: rule.Configured(complexityOf("2")),
+			findings: 2,
+		},
+		{
+			source:   "class C { x = function () { a || b }; y = function () { c || d }; }",
+			settings: rule.Configured(complexityOf("1")),
+			findings: 2,
+		},
+		{source: "class C { x = class { [y || z]; }; }", settings: rule.Configured(complexityOf("1")), findings: 1},
+		{source: "class C { x = class { [y || z] = a; }; }", settings: rule.Configured(complexityOf("1")), findings: 1},
+		{source: "class C { x = class { y = a || b; }; }", settings: rule.Configured(complexityOf("1")), findings: 1},
+		{
+			source:   "function foo () { a || b; class C { static {} } c || d; }",
+			settings: rule.Configured(complexityOf("2")),
+			findings: 1,
+		},
+		{
+			source:   "function foo () { a || b; class C { static { c || d; } } e || f; }",
+			settings: rule.Configured(complexityOf("2")),
+			findings: 1,
+		},
+		{source: "class C { static { a || b; }  }", settings: rule.Configured(complexityOf("1")), findings: 1},
+		{source: "class C { static { a || b || c; }  }", settings: rule.Configured(complexityOf("2")), findings: 1},
+		{source: "class C { static { a || b; c || d; }  }", settings: rule.Configured(complexityOf("2")), findings: 1},
+		{
+			source:   "class C { static { a || b; c || d; e || f; }  }",
+			settings: rule.Configured(complexityOf("3")),
+			findings: 1,
+		},
+		{
+			source:   "class C { static { a || b; c || d; { e || f; } }  }",
+			settings: rule.Configured(complexityOf("3")),
+			findings: 1,
+		},
+		{
+			source:   "class C { static { if (a || b) c = d || e; } }",
+			settings: rule.Configured(complexityOf("3")),
+			findings: 1,
+		},
 		{
 			source:   "class C { static { if (a || b) c = (d => e || f)() || (g => h || i)(); } }",
-			settings: complexityOf("3"),
+			settings: rule.Configured(complexityOf("3")),
 			findings: 1,
 		},
 		{
 			source:   "class C { x(){ a || b; } static { c || d || e; } z() { f || g; } }",
-			settings: complexityOf("2"),
+			settings: rule.Configured(complexityOf("2")),
 			findings: 1,
 		},
 		{
 			source:   "class C { x = a || b; static { c || d || e; } y = f || g; }",
-			settings: complexityOf("2"),
+			settings: rule.Configured(complexityOf("2")),
 			findings: 1,
 		},
 		{
 			source:   "class C { static x = a || b; static { c || d || e; } static y = f || g; }",
-			settings: complexityOf("2"),
+			settings: rule.Configured(complexityOf("2")),
 			findings: 1,
 		},
 		{
 			source:   "class C { static { a || b; } static(){ c || d || e; } static { f || g; } }",
-			settings: complexityOf("2"),
+			settings: rule.Configured(complexityOf("2")),
 			findings: 1,
 		},
 		{
 			source:   "class C { static { a || b; } static static(){ c || d || e; } static { f || g; } }",
-			settings: complexityOf("2"),
+			settings: rule.Configured(complexityOf("2")),
 			findings: 1,
 		},
 		{
 			source:   "class C { static { a || b; } static x = c || d || e; static { f || g; } }",
-			settings: complexityOf("2"),
+			settings: rule.Configured(complexityOf("2")),
 			findings: 1,
 		},
 		{
 			source:   "class C { static { a || b || c || d; } static { e || f || g; } }",
-			settings: complexityOf("3"),
+			settings: rule.Configured(complexityOf("3")),
 			findings: 1,
 		},
 		{
 			source:   "class C { static { a || b || c; } static { d || e || f || g; } }",
-			settings: complexityOf("3"),
+			settings: rule.Configured(complexityOf("3")),
 			findings: 1,
 		},
 		{
 			source:   "class C { static { a || b || c || d; } static { e || f || g || h; } }",
-			settings: complexityOf("3"),
+			settings: rule.Configured(complexityOf("3")),
 			findings: 2,
 		},
-		{source: "class C { x = () => a || b || c; y = f || g || h; }", settings: complexityOf("2"), findings: 2},
-		{source: "function a(x) {}", settings: complexityOf("{\"max\": 0}"), findings: 1},
+		{
+			source:   "class C { x = () => a || b || c; y = f || g || h; }",
+			settings: rule.Configured(complexityOf("2")),
+			findings: 2,
+		},
+		{source: "function a(x) {}", settings: rule.Configured(complexityOf("{\"max\": 0}")), findings: 1},
 		{
 			source:   "const obj = { b: (a) => a?.b?.c, c: function (a) { return a?.b?.c; } };",
-			settings: complexityOf("{\"max\": 2}"),
+			settings: rule.Configured(complexityOf("{\"max\": 2}")),
 			findings: 2,
 		},
-		{source: "function a(b) { b?.c; }", settings: complexityOf("{\"max\": 1}"), findings: 1},
-		{source: "function a(b) { b?.['c']; }", settings: complexityOf("{\"max\": 1}"), findings: 1},
-		{source: "function a(b) { b?.c; d || e; }", settings: complexityOf("{\"max\": 2}"), findings: 1},
-		{source: "function a(b) { b?.c?.d; }", settings: complexityOf("{\"max\": 2}"), findings: 1},
-		{source: "function a(b) { b?.['c']?.['d']; }", settings: complexityOf("{\"max\": 2}"), findings: 1},
-		{source: "function a(b) { b?.c?.['d']; }", settings: complexityOf("{\"max\": 2}"), findings: 1},
-		{source: "function a(b) { b?.c.d?.e; }", settings: complexityOf("{\"max\": 2}"), findings: 1},
-		{source: "function a(b) { b?.c?.(); }", settings: complexityOf("{\"max\": 2}"), findings: 1},
-		{source: "function a(b) { b?.c?.()?.(); }", settings: complexityOf("{\"max\": 3}"), findings: 1},
-		{source: "function a(b = '') {}", settings: complexityOf("{\"max\": 1}"), findings: 1},
-		{source: "function a(b) { const { c = '' } = b; }", settings: complexityOf("{\"max\": 1}"), findings: 1},
-		{source: "function a(b) { const [ c = '' ] = b; }", settings: complexityOf("{\"max\": 1}"), findings: 1},
+		{source: "function a(b) { b?.c; }", settings: rule.Configured(complexityOf("{\"max\": 1}")), findings: 1},
+		{source: "function a(b) { b?.['c']; }", settings: rule.Configured(complexityOf("{\"max\": 1}")), findings: 1},
+		{
+			source:   "function a(b) { b?.c; d || e; }",
+			settings: rule.Configured(complexityOf("{\"max\": 2}")),
+			findings: 1,
+		},
+		{source: "function a(b) { b?.c?.d; }", settings: rule.Configured(complexityOf("{\"max\": 2}")), findings: 1},
+		{
+			source:   "function a(b) { b?.['c']?.['d']; }",
+			settings: rule.Configured(complexityOf("{\"max\": 2}")),
+			findings: 1,
+		},
+		{
+			source:   "function a(b) { b?.c?.['d']; }",
+			settings: rule.Configured(complexityOf("{\"max\": 2}")),
+			findings: 1,
+		},
+		{source: "function a(b) { b?.c.d?.e; }", settings: rule.Configured(complexityOf("{\"max\": 2}")), findings: 1},
+		{source: "function a(b) { b?.c?.(); }", settings: rule.Configured(complexityOf("{\"max\": 2}")), findings: 1},
+		{
+			source:   "function a(b) { b?.c?.()?.(); }",
+			settings: rule.Configured(complexityOf("{\"max\": 3}")),
+			findings: 1,
+		},
+		{source: "function a(b = '') {}", settings: rule.Configured(complexityOf("{\"max\": 1}")), findings: 1},
+		{
+			source:   "function a(b) { const { c = '' } = b; }",
+			settings: rule.Configured(complexityOf("{\"max\": 1}")),
+			findings: 1,
+		},
+		{
+			source:   "function a(b) { const [ c = '' ] = b; }",
+			settings: rule.Configured(complexityOf("{\"max\": 1}")),
+			findings: 1,
+		},
 		{
 			source:   "function a(b) { const [ { c: d = '' } = {} ] = b; }",
-			settings: complexityOf("{\"max\": 1}"),
+			settings: rule.Configured(complexityOf("{\"max\": 1}")),
 			findings: 1,
 		},
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunWithOptions(test, Complexity, complexityFile, testCase.source, testCase.settings)
+		result := rule_testing.RunGiven(test, Complexity, complexityFile, testCase.source, testCase.settings)
 		if len(result.Diagnostics) != testCase.findings {
 			test.Errorf("%q with %+v: expected %d findings, got %d %v",
 				testCase.source, testCase.settings, testCase.findings,
@@ -287,105 +406,159 @@ func TestComplexityStaysSilent(test *testing.T) {
 
 	cases := []struct {
 		source   string
-		settings any
+		settings rule.Given[ComplexitySettings]
 	}{
-		{source: "function a(x) {}", settings: nil},
-		{source: "function b(x) {}", settings: complexityOf("1")},
-		{source: "function a(x) {if (true) {return x;}}", settings: complexityOf("2")},
-		{source: "function a(x) {if (true) {return x;} else {return x+1;}}", settings: complexityOf("2")},
+		{source: "function a(x) {}"},
+		{source: "function b(x) {}", settings: rule.Configured(complexityOf("1"))},
+		{source: "function a(x) {if (true) {return x;}}", settings: rule.Configured(complexityOf("2"))},
+		{
+			source:   "function a(x) {if (true) {return x;} else {return x+1;}}",
+			settings: rule.Configured(complexityOf("2")),
+		},
 		{
 			source:   "function a(x) {if (true) {return x;} else if (false) {return x+1;} else {return 4;}}",
-			settings: complexityOf("3"),
+			settings: rule.Configured(complexityOf("3")),
 		},
-		{source: "function a(x) {for(var i = 0; i < 5; i ++) {x ++;} return x;}", settings: complexityOf("2")},
-		{source: "function a(obj) {for(var i in obj) {obj[i] = 3;}}", settings: complexityOf("2")},
+		{
+			source:   "function a(x) {for(var i = 0; i < 5; i ++) {x ++;} return x;}",
+			settings: rule.Configured(complexityOf("2")),
+		},
+		{source: "function a(obj) {for(var i in obj) {obj[i] = 3;}}", settings: rule.Configured(complexityOf("2"))},
 		{
 			source:   "function a(x) {for(var i = 0; i < 5; i ++) {if(i % 2 === 0) {x ++;}} return x;}",
-			settings: complexityOf("3"),
+			settings: rule.Configured(complexityOf("3")),
 		},
 		{
 			source:   "function a(obj) {if(obj){ for(var x in obj) {try {x.getThis();} catch (e) {x.getThat();}}} else {return false;}}",
-			settings: complexityOf("4"),
+			settings: rule.Configured(complexityOf("4")),
 		},
-		{source: "function a(x) {try {x.getThis();} catch (e) {x.getThat();}}", settings: complexityOf("2")},
-		{source: "function a(x) {return x === 4 ? 3 : 5;}", settings: complexityOf("2")},
-		{source: "function a(x) {return x === 4 ? 3 : (x === 3 ? 2 : 1);}", settings: complexityOf("3")},
-		{source: "function a(x) {return x || 4;}", settings: complexityOf("2")},
-		{source: "function a(x) {x && 4;}", settings: complexityOf("2")},
-		{source: "function a(x) {x ?? 4;}", settings: complexityOf("2")},
-		{source: "function a(x) {x ||= 4;}", settings: complexityOf("2")},
-		{source: "function a(x) {x &&= 4;}", settings: complexityOf("2")},
-		{source: "function a(x) {x ??= 4;}", settings: complexityOf("2")},
-		{source: "function a(x) {x = 4;}", settings: complexityOf("1")},
-		{source: "function a(x) {x |= 4;}", settings: complexityOf("1")},
-		{source: "function a(x) {x &= 4;}", settings: complexityOf("1")},
-		{source: "function a(x) {x += 4;}", settings: complexityOf("1")},
-		{source: "function a(x) {x >>= 4;}", settings: complexityOf("1")},
-		{source: "function a(x) {x >>>= 4;}", settings: complexityOf("1")},
-		{source: "function a(x) {x == 4;}", settings: complexityOf("1")},
-		{source: "function a(x) {x === 4;}", settings: complexityOf("1")},
+		{
+			source:   "function a(x) {try {x.getThis();} catch (e) {x.getThat();}}",
+			settings: rule.Configured(complexityOf("2")),
+		},
+		{source: "function a(x) {return x === 4 ? 3 : 5;}", settings: rule.Configured(complexityOf("2"))},
+		{
+			source:   "function a(x) {return x === 4 ? 3 : (x === 3 ? 2 : 1);}",
+			settings: rule.Configured(complexityOf("3")),
+		},
+		{source: "function a(x) {return x || 4;}", settings: rule.Configured(complexityOf("2"))},
+		{source: "function a(x) {x && 4;}", settings: rule.Configured(complexityOf("2"))},
+		{source: "function a(x) {x ?? 4;}", settings: rule.Configured(complexityOf("2"))},
+		{source: "function a(x) {x ||= 4;}", settings: rule.Configured(complexityOf("2"))},
+		{source: "function a(x) {x &&= 4;}", settings: rule.Configured(complexityOf("2"))},
+		{source: "function a(x) {x ??= 4;}", settings: rule.Configured(complexityOf("2"))},
+		{source: "function a(x) {x = 4;}", settings: rule.Configured(complexityOf("1"))},
+		{source: "function a(x) {x |= 4;}", settings: rule.Configured(complexityOf("1"))},
+		{source: "function a(x) {x &= 4;}", settings: rule.Configured(complexityOf("1"))},
+		{source: "function a(x) {x += 4;}", settings: rule.Configured(complexityOf("1"))},
+		{source: "function a(x) {x >>= 4;}", settings: rule.Configured(complexityOf("1"))},
+		{source: "function a(x) {x >>>= 4;}", settings: rule.Configured(complexityOf("1"))},
+		{source: "function a(x) {x == 4;}", settings: rule.Configured(complexityOf("1"))},
+		{source: "function a(x) {x === 4;}", settings: rule.Configured(complexityOf("1"))},
 		{
 			source:   "function a(x) {switch(x){case 1: 1; break; case 2: 2; break; default: 3;}}",
-			settings: complexityOf("3"),
+			settings: rule.Configured(complexityOf("3")),
 		},
 		{
 			source:   "function a(x) {switch(x){case 1: 1; break; case 2: 2; break; default: if(x == 'foo') {5;};}}",
-			settings: complexityOf("4"),
+			settings: rule.Configured(complexityOf("4")),
 		},
-		{source: "function a(x) {while(true) {'foo';}}", settings: complexityOf("2")},
-		{source: "function a(x) {do {'foo';} while (true)}", settings: complexityOf("2")},
-		{source: "if (foo) { bar(); }", settings: complexityOf("3")},
-		{source: "var a = (x) => {do {'foo';} while (true)}", settings: complexityOf("2")},
+		{source: "function a(x) {while(true) {'foo';}}", settings: rule.Configured(complexityOf("2"))},
+		{source: "function a(x) {do {'foo';} while (true)}", settings: rule.Configured(complexityOf("2"))},
+		{source: "if (foo) { bar(); }", settings: rule.Configured(complexityOf("3"))},
+		{source: "var a = (x) => {do {'foo';} while (true)}", settings: rule.Configured(complexityOf("2"))},
 		{
 			source:   "function a(x) {switch(x){case 1: 1; break; case 2: 2; break; default: 3;}}",
-			settings: complexityOf("{\"max\": 2, \"variant\": \"modified\"}"),
+			settings: rule.Configured(complexityOf("{\"max\": 2, \"variant\": \"modified\"}")),
 		},
 		{
 			source:   "function a(x) {switch(x){case 1: 1; break; case 2: 2; break; default: if(x == 'foo') {5;};}}",
-			settings: complexityOf("{\"max\": 3, \"variant\": \"modified\"}"),
+			settings: rule.Configured(complexityOf("{\"max\": 3, \"variant\": \"modified\"}")),
 		},
-		{source: "function foo() { class C { x = a || b; y = c || d; } }", settings: complexityOf("2")},
-		{source: "function foo() { class C { static x = a || b; static y = c || d; } }", settings: complexityOf("2")},
-		{source: "function foo() { class C { x = a || b; y = c || d; } e || f; }", settings: complexityOf("2")},
-		{source: "function foo() { a || b; class C { x = c || d; y = e || f; } }", settings: complexityOf("2")},
-		{source: "function foo() { class C { [x || y] = a || b; } }", settings: complexityOf("2")},
-		{source: "class C { x = a || b; y() { c || d; } z = e || f; }", settings: complexityOf("2")},
-		{source: "class C { x() { a || b; } y = c || d; z() { e || f; } }", settings: complexityOf("2")},
-		{source: "class C { x = (() => { a || b }) || (() => { c || d }) }", settings: complexityOf("2")},
-		{source: "class C { x = () => { a || b }; y = () => { c || d } }", settings: complexityOf("2")},
-		{source: "class C { x = a || (() => { b || c }); }", settings: complexityOf("2")},
-		{source: "class C { x = class { y = a || b; z = c || d; }; }", settings: complexityOf("2")},
-		{source: "class C { x = a || class { y = b || c; z = d || e; }; }", settings: complexityOf("2")},
-		{source: "class C { x; y = a; static z; static q = b; }", settings: complexityOf("1")},
-		{source: "function foo() { class C { static { a || b; } static { c || d; } } }", settings: complexityOf("2")},
-		{source: "function foo() { a || b; class C { static { c || d; } } }", settings: complexityOf("2")},
-		{source: "function foo() { class C { static { a || b; } } c || d; }", settings: complexityOf("2")},
+		{
+			source:   "function foo() { class C { x = a || b; y = c || d; } }",
+			settings: rule.Configured(complexityOf("2")),
+		},
+		{
+			source:   "function foo() { class C { static x = a || b; static y = c || d; } }",
+			settings: rule.Configured(complexityOf("2")),
+		},
+		{
+			source:   "function foo() { class C { x = a || b; y = c || d; } e || f; }",
+			settings: rule.Configured(complexityOf("2")),
+		},
+		{
+			source:   "function foo() { a || b; class C { x = c || d; y = e || f; } }",
+			settings: rule.Configured(complexityOf("2")),
+		},
+		{source: "function foo() { class C { [x || y] = a || b; } }", settings: rule.Configured(complexityOf("2"))},
+		{source: "class C { x = a || b; y() { c || d; } z = e || f; }", settings: rule.Configured(complexityOf("2"))},
+		{
+			source:   "class C { x() { a || b; } y = c || d; z() { e || f; } }",
+			settings: rule.Configured(complexityOf("2")),
+		},
+		{
+			source:   "class C { x = (() => { a || b }) || (() => { c || d }) }",
+			settings: rule.Configured(complexityOf("2")),
+		},
+		{
+			source:   "class C { x = () => { a || b }; y = () => { c || d } }",
+			settings: rule.Configured(complexityOf("2")),
+		},
+		{source: "class C { x = a || (() => { b || c }); }", settings: rule.Configured(complexityOf("2"))},
+		{source: "class C { x = class { y = a || b; z = c || d; }; }", settings: rule.Configured(complexityOf("2"))},
+		{
+			source:   "class C { x = a || class { y = b || c; z = d || e; }; }",
+			settings: rule.Configured(complexityOf("2")),
+		},
+		{source: "class C { x; y = a; static z; static q = b; }", settings: rule.Configured(complexityOf("1"))},
+		{
+			source:   "function foo() { class C { static { a || b; } static { c || d; } } }",
+			settings: rule.Configured(complexityOf("2")),
+		},
+		{
+			source:   "function foo() { a || b; class C { static { c || d; } } }",
+			settings: rule.Configured(complexityOf("2")),
+		},
+		{
+			source:   "function foo() { class C { static { a || b; } } c || d; }",
+			settings: rule.Configured(complexityOf("2")),
+		},
 		{
 			source:   "function foo() { class C { static { a || b; } } class D { static { c || d; } } }",
-			settings: complexityOf("2"),
+			settings: rule.Configured(complexityOf("2")),
 		},
-		{source: "class C { static { a || b; } static { c || d; } }", settings: complexityOf("2")},
-		{source: "class C { static { a || b; } static { c || d; } static { e || f; } }", settings: complexityOf("2")},
-		{source: "class C { static { () => a || b; c || d; } }", settings: complexityOf("2")},
-		{source: "class C { static { a || b; () => c || d; } static { c || d; } }", settings: complexityOf("2")},
-		{source: "class C { static { a } }", settings: complexityOf("1")},
-		{source: "class C { static { a } static { b } }", settings: complexityOf("1")},
-		{source: "class C { static { a || b; } } class D { static { c || d; } }", settings: complexityOf("2")},
-		{source: "class C { static { a || b; } static c = d || e; }", settings: complexityOf("2")},
-		{source: "class C { static a = b || c; static { c || d; } }", settings: complexityOf("2")},
-		{source: "class C { static { a || b; } c = d || e; }", settings: complexityOf("2")},
-		{source: "class C { a = b || c; static { d || e; } }", settings: complexityOf("2")},
-		{source: "class C { static { a || b; c || d; } }", settings: complexityOf("3")},
-		{source: "class C { static { if (a || b) c = d || e; } }", settings: complexityOf("4")},
-		{source: "function b(x) {}", settings: complexityOf("{\"max\": 1}")},
-		{source: "function a(b) { b?.c; }", settings: complexityOf("{\"max\": 2}")},
-		{source: "function a(b = '') {}", settings: complexityOf("{\"max\": 2}")},
-		{source: "function a(b) { const { c = '' } = b; }", settings: complexityOf("{\"max\": 2}")},
-		{source: "function a(b) { const [ c = '' ] = b; }", settings: complexityOf("{\"max\": 2}")},
+		{source: "class C { static { a || b; } static { c || d; } }", settings: rule.Configured(complexityOf("2"))},
+		{
+			source:   "class C { static { a || b; } static { c || d; } static { e || f; } }",
+			settings: rule.Configured(complexityOf("2")),
+		},
+		{source: "class C { static { () => a || b; c || d; } }", settings: rule.Configured(complexityOf("2"))},
+		{
+			source:   "class C { static { a || b; () => c || d; } static { c || d; } }",
+			settings: rule.Configured(complexityOf("2")),
+		},
+		{source: "class C { static { a } }", settings: rule.Configured(complexityOf("1"))},
+		{source: "class C { static { a } static { b } }", settings: rule.Configured(complexityOf("1"))},
+		{
+			source:   "class C { static { a || b; } } class D { static { c || d; } }",
+			settings: rule.Configured(complexityOf("2")),
+		},
+		{source: "class C { static { a || b; } static c = d || e; }", settings: rule.Configured(complexityOf("2"))},
+		{source: "class C { static a = b || c; static { c || d; } }", settings: rule.Configured(complexityOf("2"))},
+		{source: "class C { static { a || b; } c = d || e; }", settings: rule.Configured(complexityOf("2"))},
+		{source: "class C { a = b || c; static { d || e; } }", settings: rule.Configured(complexityOf("2"))},
+		{source: "class C { static { a || b; c || d; } }", settings: rule.Configured(complexityOf("3"))},
+		{source: "class C { static { if (a || b) c = d || e; } }", settings: rule.Configured(complexityOf("4"))},
+		{source: "function b(x) {}", settings: rule.Configured(complexityOf("{\"max\": 1}"))},
+		{source: "function a(b) { b?.c; }", settings: rule.Configured(complexityOf("{\"max\": 2}"))},
+		{source: "function a(b = '') {}", settings: rule.Configured(complexityOf("{\"max\": 2}"))},
+		{source: "function a(b) { const { c = '' } = b; }", settings: rule.Configured(complexityOf("{\"max\": 2}"))},
+		{source: "function a(b) { const [ c = '' ] = b; }", settings: rule.Configured(complexityOf("{\"max\": 2}"))},
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunWithOptions(test, Complexity, complexityFile, testCase.source, testCase.settings)
+		result := rule_testing.RunGiven(test, Complexity, complexityFile, testCase.source, testCase.settings)
 		if len(result.Diagnostics) != 0 {
 			test.Errorf("%q with %+v: expected no findings, got %d: %v",
 				testCase.source, testCase.settings, len(result.Diagnostics), result.MessageIds())
@@ -418,7 +591,7 @@ func TestComplexityNamesAndSpans(test *testing.T) {
 
 	cases := []struct {
 		source   string
-		settings any
+		settings ComplexitySettings
 		// span is the text the finding must cover: the function head, never its body.
 		span string
 		// message is the whole computed sentence up to the threshold clause, so both the name and
@@ -666,25 +839,20 @@ func TestComplexityDecoderReadsEveryOptionShape(test *testing.T) {
 			test.Errorf("decoding %s: %v", testCase.optionJson, decodeComplexityOptionsError)
 			continue
 		}
-		settings, ok := decoded.(ComplexitySettings)
-		if !ok {
-			test.Errorf("decoding %s: expected ComplexitySettings, got %T", testCase.optionJson, decoded)
-			continue
-		}
-		if settings.Variant != testCase.variant {
+		if decoded.Variant != testCase.variant {
 			test.Errorf("decoding %s: expected variant %q, got %q",
-				testCase.optionJson, testCase.variant, settings.Variant)
+				testCase.optionJson, testCase.variant, decoded.Variant)
 		}
 		if testCase.silent {
-			if settings.Maximum != complexityNeverReports {
+			if decoded.Maximum != complexityNeverReports {
 				test.Errorf("decoding %s: expected the silencing threshold, got %d",
-					testCase.optionJson, settings.Maximum)
+					testCase.optionJson, decoded.Maximum)
 			}
 			continue
 		}
-		if settings.Maximum != testCase.maximum {
+		if decoded.Maximum != testCase.maximum {
 			test.Errorf("decoding %s: expected a threshold of %d, got %d",
-				testCase.optionJson, testCase.maximum, settings.Maximum)
+				testCase.optionJson, testCase.maximum, decoded.Maximum)
 		}
 	}
 
@@ -702,9 +870,9 @@ func TestComplexityDecoderReadsEveryOptionShape(test *testing.T) {
 			len(result.Diagnostics), result.MessageIds())
 	}
 
-	// A rule handed nil options enforces upstream's default of 20 rather than doing nothing, so a
+	// A rule run unconfigured enforces upstream's default of 20 rather than doing nothing, so a
 	// two-branch function is clean and a deliberately deep one is not.
-	result = rule_testing.RunWithOptions(test, Complexity, complexityFile, branchy, nil)
+	result = rule_testing.Run(test, Complexity, complexityFile, branchy)
 	rule_testing.ExpectClean(test, result)
 
 	// The variant, end to end: a switch with three cases is complexity 4 classic and 2 modified.
@@ -849,9 +1017,9 @@ func TestComplexityNameBuilderBranches(test *testing.T) {
 
 	for _, testCase := range cases {
 		var located *ast.Node
-		probe := rule.Rule{
+		probe := rule.Rule[rule.NoOptions]{
 			Name: "probe/complexity-name",
-			Run: func(ruleContext rule.Context, options any) rule.Listeners {
+			Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 				return rule.Listeners{
 					ast.KindSourceFile: func(file *ast.Node) {
 						var walk func(*ast.Node)

@@ -171,12 +171,12 @@ var messageJsxInTryStatement = rule.Message{
 // `try { const f = () => <div />; f(); } catch {}` is clean, while the `<Inner />` written in the
 // same try block does report. So the upward walk stops at the first enclosing function, and the
 // gate is asked of that function rather than of the outermost one.
-var ErrorBoundaries = rule.Rule{
+var ErrorBoundaries = rule.Rule[CompilerRuleOptions]{
 	// No namespace prefix. The config writes `react/error-boundaries`, and the parity guard strips
 	// the namespace on a `/` boundary, so a self-namespaced `react-error-boundaries` would match no
 	// inventory entry.
 	Name: "react-hooks/error-boundaries",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[CompilerRuleOptions]) rule.Listeners {
 		report := func(node *ast.Node) {
 			enclosing := enclosingFunctionOf(node)
 			if enclosing == nil || !isInsideTryBlockWithin(node, enclosing) {

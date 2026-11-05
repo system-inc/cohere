@@ -117,7 +117,7 @@ func DefaultSortCompOptions() SortCompOptions {
 // Hand-rolled rather than `rule.DecodeOptionsInto` so a bare `"error"` configuration, which arrives
 // as empty input, resolves to the documented default instead of erroring. The generic helper would
 // also flatten the absent/empty distinction the pointer fields exist to preserve.
-func DecodeSortCompOptions(raw []byte) (any, error) {
+func DecodeSortCompOptions(raw []byte) (SortCompOptions, error) {
 	options := DefaultSortCompOptions()
 	if len(raw) == 0 {
 		return options, nil
@@ -222,10 +222,10 @@ func sortCompUnsortedProps(propertyA string, position string, propertyB string) 
 // rather than a discriminant field, so they are matched on `ast.KindGetAccessor` and
 // `ast.KindSetAccessor`. An accessor in an object literal is the same two kinds, which is why the
 // factory-component arm reaches them too.
-var SortComp = rule.Rule{
+var SortComp = rule.Rule[SortCompOptions]{
 	Name: "react/sort-comp",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		resolved, isSortCompOptions := rule.OptionsAs[SortCompOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[SortCompOptions]) rule.Listeners {
+		resolved, isSortCompOptions := options.Read()
 		if !isSortCompOptions {
 			// A rule configured as a bare `"error"` is handed nil options rather than the decoded
 			// default, and `options.(T)` on nil yields the zero value silently. Falling back

@@ -79,9 +79,9 @@ func messageMultilineArrow() rule.Message {
 //
 // All three findings carry the original's fix, which rewrites the arrow in place as a function
 // expression; `arrowFunctionFix` holds the conversion and the places it declines.
-var ConsistencyNoMultilineArrowFunction = rule.Rule{
+var ConsistencyNoMultilineArrowFunction = rule.Rule[rule.NoOptions]{
 	Name: "nexus/consistency-no-multiline-arrow-function",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}

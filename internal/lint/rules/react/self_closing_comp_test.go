@@ -725,15 +725,11 @@ func TestDecodeSelfClosingCompOptions(test *testing.T) {
 			if decodeSelfClosingCompOptionsError != nil {
 				test.Fatalf("unexpected error: %v", decodeSelfClosingCompOptionsError)
 			}
-			options, isOptions := decoded.(SelfClosingCompOptions)
-			if !isOptions {
-				test.Fatalf("decoder returned %T, want SelfClosingCompOptions", decoded)
+			if decoded.Component != testCase.wantComponent {
+				test.Errorf("Component is %v, want %v", decoded.Component, testCase.wantComponent)
 			}
-			if options.Component != testCase.wantComponent {
-				test.Errorf("Component is %v, want %v", options.Component, testCase.wantComponent)
-			}
-			if options.Html != testCase.wantHtml {
-				test.Errorf("Html is %v, want %v", options.Html, testCase.wantHtml)
+			if decoded.Html != testCase.wantHtml {
+				test.Errorf("Html is %v, want %v", decoded.Html, testCase.wantHtml)
 			}
 		})
 	}
@@ -741,8 +737,8 @@ func TestDecodeSelfClosingCompOptions(test *testing.T) {
 
 // TestSelfClosingCompNilOptionsFallsBackToBothHalvesOn bypasses the decoder entirely.
 //
-// A rule configured as a bare `"error"` can reach `Run` with nil options rather than a decoded
-// struct, and `options.(T)` on nil yields the zero value, which for this rule means both halves off
+// A rule configured as a bare `"error"` can reach `Run` with the zero `rule.Given` rather than a decoded
+// struct, and its `Read` returns false and the zero value, which for this rule means both halves off
 // and a rule that reports nothing. The explicit fallback is what prevents that, and nothing else in
 // this file would notice if it were removed.
 func TestSelfClosingCompNilOptionsFallsBackToBothHalvesOn(test *testing.T) {
@@ -751,7 +747,7 @@ func TestSelfClosingCompNilOptionsFallsBackToBothHalvesOn(test *testing.T) {
 	for _, sourceText := range []string{"var a = <div></div>;", "var a = <Foo></Foo>;"} {
 		test.Run(sourceText, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, SelfClosingComp, selfClosingCompFile, sourceText, nil)
+			result := rule_testing.Run(test, SelfClosingComp, selfClosingCompFile, sourceText)
 			rule_testing.ExpectFindings(test, result, "notSelfClosing")
 		})
 	}

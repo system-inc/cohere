@@ -35,7 +35,7 @@ func asTheTypedUnboundMethodHarnessWroteIt(text string) string {
 // Only one upstream case carries options, so this is the single line in the file that can tell a
 // decoder reading its input from one returning a zero value. The key defaults to false, so a decoder
 // that dropped it entirely would still satisfy the other two hundred and ten rows.
-func decodeUnboundMethodOptionsForTest(test *testing.T, raw string) any {
+func decodeUnboundMethodOptionsForTest(test *testing.T, raw string) UnboundMethodOptions {
 	test.Helper()
 	decoded, decodeUnboundMethodOptionsError := DecodeUnboundMethodOptions(json.RawMessage(raw))
 	if decodeUnboundMethodOptionsError != nil {

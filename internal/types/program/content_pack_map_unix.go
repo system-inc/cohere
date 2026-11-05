@@ -22,7 +22,13 @@ func mapFile(path string) []byte {
 	if statError != nil || information.Size() == 0 {
 		return nil
 	}
-	mapped, memoryMapError := syscall.Mmap(int(file.Fd()), 0, int(information.Size()), syscall.PROT_READ, syscall.MAP_SHARED)
+	mapped, memoryMapError := syscall.Mmap(
+		int(file.Fd()),
+		0,
+		int(information.Size()),
+		syscall.PROT_READ,
+		syscall.MAP_SHARED,
+	)
 	if memoryMapError != nil {
 		return nil
 	}

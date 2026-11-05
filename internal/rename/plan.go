@@ -154,7 +154,13 @@ func describeDeclaration(symbol *ast.Symbol, inProject map[string]bool) (string,
 // miss whichever one nobody thought of.
 //
 // Mutates: plan the caller's plan is the one being built, and every edit found is appended to its Edits
-func collectEdits(callerContext context.Context, graph *program.Graph, files []*ast.SourceFile, anchor *ast.Symbol, plan *Plan) {
+func collectEdits(
+	callerContext context.Context,
+	graph *program.Graph,
+	files []*ast.SourceFile,
+	anchor *ast.Symbol,
+	plan *Plan,
+) {
 	for _, file := range files {
 		fileChecker, release := graph.CheckerForFile(callerContext, file)
 		if fileChecker == nil {

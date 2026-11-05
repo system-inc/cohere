@@ -7,13 +7,9 @@ import (
 )
 
 // surfacesOf is the compiled surfaces a rule reads from its decoded options, as its Run reads them.
-func surfacesOf(test *testing.T, decoded any) *ClassLiteralSurfaces {
+func surfacesOf(test *testing.T, decoded tailwindOptions) *ClassLiteralSurfaces {
 	test.Helper()
-	carrier, carries := decoded.(interface{ ClassLiteralSurfaces() *ClassLiteralSurfaces })
-	if !carries {
-		test.Fatalf("%T carries no class literal surfaces", decoded)
-	}
-	return carrier.ClassLiteralSurfaces()
+	return decoded.ClassLiteralSurfaces()
 }
 
 // TestClassLiteralSurfacesAreKeyedByTheMergedSettings pins that every decoder compiles its rule's
@@ -64,17 +60,18 @@ func TestClassLiteralSurfacesAreKeyedByTheMergedSettings(test *testing.T) {
 // file reads what its decoder compiled, configured or not. Building them on every ask cost an ahra
 // cold run 41 MB in 456K objects (#y2nj5ex).
 func TestClassLiteralSurfacesAreReadWithoutAllocating(test *testing.T) {
-	decoded, err := tailwindDecoders(test)[NoDuplicateClasses.Name](
+	decoded, decodeTailwindOptionsError := decodeTailwindOptionsAt[NoDuplicateClassesOptions]()(
 		[]byte(`{"attributes":["tw"]}`),
 		settingsBase(`{"callees":["merge"]}`),
 	)
-	if err != nil {
-		test.Fatal(err)
+	if decodeTailwindOptionsError != nil {
+		test.Fatal(decodeTailwindOptionsError)
 	}
-	var options any = decoded
+	// Handed and read as the rule's Run is handed and reads them.
+	options := rule.Configured(decoded)
 	allocations := testing.AllocsPerRun(100, func() {
 		surfaces := DefaultClassLiteralSurfaces()
-		if configured, isConfigured := rule.OptionsAs[NoDuplicateClassesOptions](options); isConfigured {
+		if configured, isConfigured := options.Read(); isConfigured {
 			surfaces = configured.ClassLiteralSurfaces()
 		}
 		_ = surfaces

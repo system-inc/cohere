@@ -10,16 +10,17 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/microsoft/TypeScript/tsc/shim/tspath"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/lint/testing"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
 // designSystemRule reads the design system the way the Tailwind rules do, through DesignSystemFS: it flags
 // every declaration when theme.css says "flag", or when a candidate stylesheet it looked for and missed exists.
-func designSystemRule(root string) rule.Rule {
-	return rule.Rule{
+func designSystemRule(root string) rule.Rule[rule.NoOptions] {
+	return rule.Rule[rule.NoOptions]{
 		Name:         "fixture/design-system",
 		ProgramReads: rule.ReadsDesignSystem,
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
 				fileSystem := ruleContext.Program.DesignSystemFS()
 				theme, _ := fileSystem.ReadFile(tspath.RootedFilePath(filepath.Join(root, "theme.css")))
@@ -52,7 +53,7 @@ func TestDesignSystemRulesReplayUntilWhatTheDesignSystemReadChanges(test *testin
 		"a.ts":          "export const a = 1;\n",
 		"b.ts":          "export const b = 2;\n",
 	})
-	rules := []rule.Rule{designSystemRule(root)}
+	rules := rule_testing.EntriesOf(test, designSystemRule(root))
 	write := func(name string, contents string) func() {
 		return func() {
 			if writeError := os.WriteFile(filepath.Join(root, name), []byte(contents), 0o644); writeError != nil {
@@ -145,20 +146,21 @@ func TestAnotherProgramsDesignSystemDoesNotHideThisWalks(test *testing.T) {
 		test.Fatal(buildError)
 	}
 	inner := designSystemRule(root)
+	innerTraits := rule_testing.EntryOf(test, inner).Traits
 	interleaved := inner
-	interleaved.Run = func(ruleContext rule.Context, options any) rule.Listeners {
+	interleaved.Run = func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// A concurrent graph asking for its own design system after each time this walk asks for its own, so
 		// the last program to ask before the walk ends is never this one.
 		listeners := rule.Listeners{}
 		for kind, listener := range inner.Run(ruleContext, options) {
 			listeners[kind] = func(node *ast.Node) {
 				listener(node)
-				rule.ViewProgram(other.Program, nil, inner).DesignSystemFS()
+				rule.ViewProgram(other.Program, nil, innerTraits).DesignSystemFS()
 			}
 		}
 		return listeners
 	}
-	rules := []rule.Rule{interleaved}
+	rules := rule_testing.EntriesOf(test, interleaved)
 
 	_, recorded := walkAndRecord(test, root, rules, nil)
 	if recorded.DesignSystem == nil || len(recorded.DesignSystem.Reads) == 0 {

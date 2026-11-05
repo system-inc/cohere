@@ -18,7 +18,7 @@ func correctnessRequireBlockingStandardStreamsFingerprintOf(
 	test.Helper()
 	var fingerprint [sha256.Size]byte
 	probe := CorrectnessRequireBlockingStandardStreams
-	probe.Run = func(ruleContext rule.Context, options any) rule.Listeners {
+	probe.Run = func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		fingerprint = CorrectnessRequireBlockingStandardStreams.ProgramFingerprint(ruleContext.Program, options)
 		return nil
 	}

@@ -202,7 +202,9 @@ func TestNoBareThrowRendersAnEditedEntry(test *testing.T) {
 	if edited == string(original) {
 		test.Fatal("the anchor is not in the entry, so the edit would not apply")
 	}
-	catalog, loadMessagesError := policy.LoadMessages(fstest.MapFS{"consistency-no-bare-throw.json": {Data: []byte(edited)}})
+	catalog, loadMessagesError := policy.LoadMessages(
+		fstest.MapFS{"consistency-no-bare-throw.json": {Data: []byte(edited)}},
+	)
 	if loadMessagesError != nil {
 		test.Fatal(loadMessagesError)
 	}

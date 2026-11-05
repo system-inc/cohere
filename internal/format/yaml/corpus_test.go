@@ -395,8 +395,14 @@ func TestCorpusFormatMatchesOracle(test *testing.T) {
 			engine, newEngineError := newEngine()
 			return frontMatterOracle{engine: engine}, newEngineError
 		}
-		frontMatterReport, compareError := differential.Compare(corpus.root, measuredFrontMatterFiles, newFrontMatterOracle,
-			func() (differential.Formatter, error) { return frontMatters, nil }, runtime.NumCPU(), frontMatterCache)
+		frontMatterReport, compareError := differential.Compare(
+			corpus.root,
+			measuredFrontMatterFiles,
+			newFrontMatterOracle,
+			func() (differential.Formatter, error) { return frontMatters, nil },
+			runtime.NumCPU(),
+			frontMatterCache,
+		)
 		if compareError != nil {
 			test.Fatalf("comparing %s: %v", corpus.root, compareError)
 		}

@@ -70,7 +70,7 @@ func TestPruneAlwaysInvalidatingSeedsFromAllocationsOnly(test *testing.T) {
 		{name: "jsx fragment allocates", value: &JsxFragment{}, wantPruned: true},
 		{name: "new allocates", value: &NewExpression{}, wantPruned: true},
 		{name: "a call may return a primitive", value: &CallExpression{}, wantPruned: false},
-		{name: "a primitive does not allocate", value: &Primitive{}, wantPruned: false},
+		{name: "a primitive does not allocate", value: &Primitive{Value: PrimitiveUndefined{}}, wantPruned: false},
 	} {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()

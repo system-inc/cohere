@@ -37,7 +37,7 @@ type stylePropObjectWireOptions struct {
 // error. An empty list is the fully-enforcing state here, which is the opposite direction from the
 // two sibling forbid rules where the empty list means the rule declines everything: upstream reads
 // `context.options[0].allow || []` and an empty set exempts nothing.
-func DecodeStylePropObjectOptions(raw []byte) (any, error) {
+func DecodeStylePropObjectOptions(raw []byte) (StylePropObjectOptions, error) {
 	options := StylePropObjectOptions{}
 	if len(raw) == 0 {
 		return options, nil
@@ -168,7 +168,7 @@ func stylePropObjectIsNonNullLiteral(expression *ast.Node) bool {
 // Three siblings in this package gate on `.tsx` and `.jsx`, which is oxc residue rather than
 // upstream behaviour. The createElement arm needs no JSX at all, which a fixture uses to pin the
 // absence of a gate on a plain `.ts` file.
-var StylePropObject = rule.Rule{
+var StylePropObject = rule.Rule[StylePropObjectOptions]{
 	Name: "react/style-prop-object",
 
 	// Declared for two reasons. The identifier arm resolves a name to its declaration through
@@ -177,8 +177,8 @@ var StylePropObject = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, _ := rule.OptionsAs[StylePropObjectOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[StylePropObjectOptions]) rule.Listeners {
+		settings, _ := options.Read()
 		allowed := make(map[string]bool, len(settings.Allow))
 		for _, name := range settings.Allow {
 			allowed[name] = true

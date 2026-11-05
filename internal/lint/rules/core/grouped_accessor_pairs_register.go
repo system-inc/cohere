@@ -14,7 +14,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // zero value is the empty string, which matches none of the three arms. DecodeOptionList rather than
 // Decode, because upstream's schema is a two-element list: `["error", "getBeforeSet", {...}]`.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[GroupedAccessorPairsOptions]{
 		Rule:             GroupedAccessorPairs,
 		DecodeOptionList: DecodeGroupedAccessorPairsOptions,
 	})

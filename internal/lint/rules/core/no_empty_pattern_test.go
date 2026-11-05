@@ -78,7 +78,7 @@ func TestNoEmptyPatternStaysSilentOnRealBindings(test *testing.T) {
 func TestNoEmptyPatternWithoutOptionsIsStrict(test *testing.T) {
 	test.Parallel()
 
-	result := rule_testing.RunWithOptions(test, NoEmptyPattern, "strict.ts", "function foo({}) {}", nil)
+	result := rule_testing.Run(test, NoEmptyPattern, "strict.ts", "function foo({}) {}")
 	rule_testing.ExpectFindings(test, result, "unexpectedObject")
 }
 

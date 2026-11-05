@@ -67,7 +67,7 @@ type noInnerDeclarationsSecondOption struct {
 // `DecodeOptionList`, so `["error", "both", {...}]` reaches this as `["both", {...}]` and
 // `["error", "both"]` as `["both"]`. A key the second element's schema does not declare is refused,
 // which is upstream's `additionalProperties: false`, and so is a third element.
-func DecodeNoInnerDeclarationsOptions(list []byte) (any, error) {
+func DecodeNoInnerDeclarationsOptions(list []byte) (NoInnerDeclarationsOptions, error) {
 	settings := DefaultNoInnerDeclarationsSettings()
 	positional, optionElementsError := rule.OptionElements(list, 2)
 	if optionElementsError != nil {
@@ -177,10 +177,10 @@ func noInnerDeclarationsApplyFirst(
 // analysis has already answered. The corpus varies `sourceType` and `ecmaVersion` case by case to
 // exercise it, and those cases are reproduced by writing the directive or the export into the
 // source rather than by configuring the harness, which cannot vary either.
-var NoInnerDeclarations = rule.Rule{
+var NoInnerDeclarations = rule.Rule[NoInnerDeclarationsOptions]{
 	Name: "no-inner-declarations",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, isSettings := rule.OptionsAs[NoInnerDeclarationsOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[NoInnerDeclarationsOptions]) rule.Listeners {
+		settings, isSettings := options.Read()
 		if !isSettings {
 			settings = DefaultNoInnerDeclarationsSettings()
 		}

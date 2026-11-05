@@ -15,7 +15,7 @@ import (
 // Query's own tests, panicked all six with "Unhandled case in Node.Text: *ast.ComputedPropertyName",
 // because the object-member arm read a method's name as text and a computed name has none
 // (#zx5xvtg). Nothing in this tree had written that shape, so no fixture could have seen it.
-var compilerRulesLoweringEverySyntax = []rule.Rule{
+var compilerRulesLoweringEverySyntax = []rule.Rule[CompilerRuleOptions]{
 	Immutability, Purity, Refs, SetStateInEffect, SetStateInRender, StaticComponents,
 }
 

@@ -91,7 +91,7 @@ var messageUseLiteralAfterSemicolon = rule.Message{
 // the tree and no token-before helper: the question is what the previous statement is and how it
 // ended. See `previousStatementCanContinue` for the enumeration and for what each row was measured
 // against.
-var NoObjectConstructor = rule.Rule{
+var NoObjectConstructor = rule.Rule[rule.NoOptions]{
 	TypeReach: rule.TypeReachShapes,
 	Name:      "no-object-constructor",
 
@@ -99,7 +99,7 @@ var NoObjectConstructor = rule.Rule{
 	// Object => new Object()` is whether `Object` is the global, and nothing structural answers it.
 	NeedsTypeChecker: true,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		check := func(node *ast.Node) {
 			if ruleContext.TypeChecker == nil {
 				return

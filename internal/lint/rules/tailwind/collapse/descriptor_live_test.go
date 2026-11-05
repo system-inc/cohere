@@ -345,7 +345,10 @@ func TestLiveTableDeclinesOnlyWhereTheEvaluatorAnswers(test *testing.T) {
 			"descriptor_table.json",
 		); tableName != "descriptor_table.json" {
 			var loadTestTableError error
-			measured, loadTestTableError = loadTestTable(tableName, oracleSibling(test, fixtureName, "descriptor_context.json"))
+			measured, loadTestTableError = loadTestTable(
+				tableName,
+				oracleSibling(test, fixtureName, "descriptor_context.json"),
+			)
 			if loadTestTableError != nil {
 				test.Fatalf("building the measured table from %s: %v", tableName, loadTestTableError)
 			}

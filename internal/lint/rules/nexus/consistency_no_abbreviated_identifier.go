@@ -92,11 +92,11 @@ var (
 // reference to a name an import binds and nothing else in the file declares, which agrees with the
 // scope walk everywhere but a file that shadows an import; there it keeps reporting, erring toward a
 // finding. The rule judges names the code declares, never names it reads from elsewhere.
-var ConsistencyNoAbbreviatedIdentifier = rule.Rule{
+var ConsistencyNoAbbreviatedIdentifier = rule.Rule[ConsistencyNoAbbreviatedIdentifierOptions]{
 	Name:             "nexus/consistency-no-abbreviated-identifier",
 	NeedsTypeChecker: true,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, _ := rule.OptionsAs[ConsistencyNoAbbreviatedIdentifierOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[ConsistencyNoAbbreviatedIdentifierOptions]) rule.Listeners {
+		settings, _ := options.Read()
 
 		fileName := imports.NormalizedFileName(ruleContext.SourceFile)
 		isFrameworkParameterFile := matchesAnyFilePattern(fileName, settings.FrameworkParameterFilePatterns)

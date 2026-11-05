@@ -52,10 +52,10 @@ import (
 //
 // One extra kind test per class member over the core rule, and only on members the core would
 // otherwise key.
-var NoDupeClassMembers = rule.Rule{
+var NoDupeClassMembers = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/no-dupe-class-members",
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// The core rule's own listeners, which is where every finding comes from. Wrapping rather
 		// than reimplementing is the point of an extension rule: re-deriving the collision logic
 		// would give the two rules two chances to disagree about the same question.

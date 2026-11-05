@@ -52,14 +52,18 @@ func runOnTranslations(test *testing.T, files map[string]string, subjectRelative
 	var diagnostics []rule.Diagnostic
 	context := rule.Context{
 		SourceFile: subject,
-		Program:    rule.ViewProgram(graph.Program, subject, LocalizationNoUntranslatedValue),
+		Program: rule.ViewProgram(
+			graph.Program,
+			subject,
+			rule_testing.EntryOf(test, LocalizationNoUntranslatedValue).Traits,
+		),
 		Report: func(diagnostic rule.Diagnostic) {
 			diagnostic.RuleName = LocalizationNoUntranslatedValue.Name
 			diagnostics = append(diagnostics, diagnostic)
 		},
 	}
 
-	listeners := LocalizationNoUntranslatedValue.Run(context, nil)
+	listeners := LocalizationNoUntranslatedValue.Run(context, rule.Given[rule.NoOptions]{})
 	if listeners != nil {
 		walkForTest(subject.AsNode(), listeners)
 	}

@@ -43,7 +43,9 @@ func TestRepositoryVariantsCannotMoveFrameworkRegistrations(test *testing.T) {
 	test.Parallel()
 	baseline, packageRoot := frameworkVariantStylesheet(test, `@import "tailwindcss";`)
 
-	baselineSystem, loadDesignSystemError := LoadDesignSystem(LoadOptions{EntryPoint: baseline, TailwindPackageRoot: packageRoot})
+	baselineSystem, loadDesignSystemError := LoadDesignSystem(
+		LoadOptions{EntryPoint: baseline, TailwindPackageRoot: packageRoot},
+	)
 	if loadDesignSystemError != nil {
 		test.Fatalf("loading the baseline: %v", loadDesignSystemError)
 	}
@@ -59,7 +61,9 @@ func TestRepositoryVariantsCannotMoveFrameworkRegistrations(test *testing.T) {
 		test.Fatalf("write: %v", writeError)
 	}
 
-	redefiningSystem, loadDesignSystemError := LoadDesignSystem(LoadOptions{EntryPoint: redefining, TailwindPackageRoot: packageRoot})
+	redefiningSystem, loadDesignSystemError := LoadDesignSystem(
+		LoadOptions{EntryPoint: redefining, TailwindPackageRoot: packageRoot},
+	)
 	if loadDesignSystemError != nil {
 		test.Fatalf("loading the redefining system: %v", loadDesignSystemError)
 	}

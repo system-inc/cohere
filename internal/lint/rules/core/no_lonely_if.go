@@ -83,9 +83,9 @@ var messageUnexpectedLonelyIf = rule.Message{
 // A wrong fix here is worse than no fix, because the engine's only guard is that the result parses
 // and every one of these parses. So the finding still fires in all five and only the repair is
 // withheld, which is upstream's own trade.
-var NoLonelyIf = rule.Rule{
+var NoLonelyIf = rule.Rule[rule.NoOptions]{
 	Name: "no-lonely-if",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindIfStatement: func(node *ast.Node) {
 				block := node.Parent

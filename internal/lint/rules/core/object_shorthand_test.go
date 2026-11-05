@@ -3,6 +3,7 @@ package core
 import (
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	rule_testing "github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -13,12 +14,12 @@ const objectShorthandFile = "/repository/source/ObjectShorthand.ts"
 //
 // The argument is the option list as JSON text, exactly the bytes the config layer hands the
 // decoder, so the fixtures exercise the three-shape `anyOf` decoder rather than bypassing it.
-func objectShorthandOf(optionJson string) any {
+func objectShorthandOf(optionJson string) rule.Given[ObjectShorthandSettings] {
 	settings, decodeObjectShorthandOptionsError := DecodeObjectShorthandOptions([]byte(optionJson))
 	if decodeObjectShorthandOptionsError != nil {
 		panic(decodeObjectShorthandOptionsError)
 	}
-	return settings
+	return rule.Configured(settings)
 }
 
 // The corpus is ESLint's own, taken from
@@ -38,281 +39,243 @@ func TestObjectShorthandFires(test *testing.T) {
 
 	cases := []struct {
 		source         string
-		settings       any
+		settings       rule.Given[ObjectShorthandSettings]
 		findings       []string
 		fixed          *string
 		declinesRepair bool
 	}{
 		{
 			source:         "var x = {x: x}",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedPropertyShorthand.Id},
 			fixed:          pointerTo("var x = {x}"),
 			declinesRepair: false,
 		},
 		{
 			source:         "var x = {'x': x}",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedPropertyShorthand.Id},
 			fixed:          pointerTo("var x = {x}"),
 			declinesRepair: false,
 		},
-		{source: "var x = {y: y, x: x}", settings: nil, findings: []string{
+		{source: "var x = {y: y, x: x}", findings: []string{
 			messageObjectShorthandExpectedPropertyShorthand.Id,
 			messageObjectShorthandExpectedPropertyShorthand.Id,
 		}, fixed: pointerTo("var x = {y, x}"), declinesRepair: false},
 		{
 			source:         "var x = {y: z, x: x, a: b}",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedPropertyShorthand.Id},
 			fixed:          pointerTo("var x = {y: z, x, a: b}"),
 			declinesRepair: false,
 		},
 		{
 			source:         "var x = {y: z,\n x: x,\n a: b\n // comment \n}",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedPropertyShorthand.Id},
 			fixed:          pointerTo("var x = {y: z,\n x,\n a: b\n // comment \n}"),
 			declinesRepair: false,
 		},
 		{
 			source:         "var x = {y: z,\n a: b,\n // comment \nf: function() {}}",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedMethodShorthand.Id},
 			fixed:          pointerTo("var x = {y: z,\n a: b,\n // comment \nf() {}}"),
 			declinesRepair: false,
 		},
 		{
 			source:         "var x = {a: b,\n/* comment */\ny: y\n }",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedPropertyShorthand.Id},
 			fixed:          pointerTo("var x = {a: b,\n/* comment */\ny\n }"),
 			declinesRepair: false,
 		},
 		{
 			source:         "var x = {\n  a: b,\n  /* comment */\n  y: y\n}",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedPropertyShorthand.Id},
 			fixed:          pointerTo("var x = {\n  a: b,\n  /* comment */\n  y\n}"),
 			declinesRepair: false,
 		},
 		{
 			source:         "var x = {\n  f: function() {\n    /* comment */\n    a(b);\n    }\n  }",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedMethodShorthand.Id},
 			fixed:          pointerTo("var x = {\n  f() {\n    /* comment */\n    a(b);\n    }\n  }"),
 			declinesRepair: false,
 		},
 		{
 			source:         "var x = {\n  [f]: function() {\n    /* comment */\n    a(b);\n    }\n  }",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedMethodShorthand.Id},
 			fixed:          pointerTo("var x = {\n  [f]() {\n    /* comment */\n    a(b);\n    }\n  }"),
 			declinesRepair: false,
 		},
 		{
 			source:         "var x = {\n  f: function*() {\n    /* comment */\n    a(b);\n    }\n  }",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedMethodShorthand.Id},
 			fixed:          pointerTo("var x = {\n  *f() {\n    /* comment */\n    a(b);\n    }\n  }"),
 			declinesRepair: false,
 		},
 		{
 			source:         "var x = {\n  f: /* comment */ function() {\n  }\n  }",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedMethodShorthand.Id},
 			fixed:          nil,
 			declinesRepair: true,
 		},
 		{
 			source:         "var x = {\n f /* comment */: function() {\n  }\n  }",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedMethodShorthand.Id},
 			fixed:          nil,
 			declinesRepair: true,
 		},
 		{
 			source:         "var x = {a: /* comment */ a}",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedPropertyShorthand.Id},
 			fixed:          nil,
 			declinesRepair: true,
 		},
 		{
 			source:         "var x = {a /* comment */: a}",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedPropertyShorthand.Id},
 			fixed:          nil,
 			declinesRepair: true,
 		},
 		{
 			source:         "var x = {a: (a /* comment */)}",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedPropertyShorthand.Id},
 			fixed:          nil,
 			declinesRepair: true,
 		},
 		{
 			source:         "var x = {'a': /* comment */ a}",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedPropertyShorthand.Id},
 			fixed:          nil,
 			declinesRepair: true,
 		},
 		{
 			source:         "var x = {'a': (a /* comment */)}",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedPropertyShorthand.Id},
 			fixed:          nil,
 			declinesRepair: true,
 		},
 		{
 			source:         "var x = {'a' /* comment */: a}",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedPropertyShorthand.Id},
 			fixed:          nil,
 			declinesRepair: true,
 		},
 		{
 			source:         "var x = {y: function() {}}",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedMethodShorthand.Id},
 			fixed:          pointerTo("var x = {y() {}}"),
 			declinesRepair: false,
 		},
 		{
 			source:         "var x = {y: function*() {}}",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedMethodShorthand.Id},
 			fixed:          pointerTo("var x = {*y() {}}"),
 			declinesRepair: false,
 		},
 		{
 			source:         "var x = {x: y, y: z, a: a}",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedPropertyShorthand.Id},
 			fixed:          pointerTo("var x = {x: y, y: z, a}"),
 			declinesRepair: false,
 		},
 		{
 			source:         "var x = {ConstructorFunction: function(){}, a: b}",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedMethodShorthand.Id},
 			fixed:          pointerTo("var x = {ConstructorFunction(){}, a: b}"),
 			declinesRepair: false,
 		},
 		{
 			source:         "var x = {x: y, y: z, a: function(){}, b() {}}",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedMethodShorthand.Id},
 			fixed:          pointerTo("var x = {x: y, y: z, a(){}, b() {}}"),
 			declinesRepair: false,
 		},
-		{source: "var x = {x: x, y: function() {}}", settings: nil, findings: []string{
+		{source: "var x = {x: x, y: function() {}}", findings: []string{
 			messageObjectShorthandExpectedPropertyShorthand.Id,
 			messageObjectShorthandExpectedMethodShorthand.Id,
 		}, fixed: pointerTo("var x = {x, y() {}}"), declinesRepair: false},
 		{
 			source:         "doSomething({x: x})",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedPropertyShorthand.Id},
 			fixed:          pointerTo("doSomething({x})"),
 			declinesRepair: false,
 		},
 		{
 			source:         "doSomething({'x': x})",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedPropertyShorthand.Id},
 			fixed:          pointerTo("doSomething({x})"),
 			declinesRepair: false,
 		},
 		{
 			source:         "doSomething({a: 'a', 'x': x})",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedPropertyShorthand.Id},
 			fixed:          pointerTo("doSomething({a: 'a', x})"),
 			declinesRepair: false,
 		},
 		{
 			source:         "doSomething({y: function() {}})",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedMethodShorthand.Id},
 			fixed:          pointerTo("doSomething({y() {}})"),
 			declinesRepair: false,
 		},
 		{
 			source:         "doSomething({[y]: function() {}})",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedMethodShorthand.Id},
 			fixed:          pointerTo("doSomething({[y]() {}})"),
 			declinesRepair: false,
 		},
 		{
 			source:         "doSomething({['y']: function() {}})",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedMethodShorthand.Id},
 			fixed:          pointerTo("doSomething({['y']() {}})"),
 			declinesRepair: false,
 		},
 		{
 			source:         "({ foo: async function () {} })",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedMethodShorthand.Id},
 			fixed:          pointerTo("({ async foo () {} })"),
 			declinesRepair: false,
 		},
 		{
 			source:         "({ 'foo': async function() {} })",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedMethodShorthand.Id},
 			fixed:          pointerTo("({ async 'foo'() {} })"),
 			declinesRepair: false,
 		},
 		{
 			source:         "({ [foo]: async function() {} })",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedMethodShorthand.Id},
 			fixed:          pointerTo("({ async [foo]() {} })"),
 			declinesRepair: false,
 		},
 		{
 			source:         "({ [foo.bar]: function*() {} })",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedMethodShorthand.Id},
 			fixed:          pointerTo("({ *[foo.bar]() {} })"),
 			declinesRepair: false,
 		},
 		{
 			source:         "({ [foo   ]: function() {} })",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedMethodShorthand.Id},
 			fixed:          pointerTo("({ [foo   ]() {} })"),
 			declinesRepair: false,
 		},
 		{
 			source:         "({ [ foo ]: async function() {} })",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedMethodShorthand.Id},
 			fixed:          pointerTo("({ async [ foo ]() {} })"),
 			declinesRepair: false,
 		},
 		{
 			source:         "({ foo: function *() {} })",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedMethodShorthand.Id},
 			fixed:          pointerTo("({ *foo() {} })"),
 			declinesRepair: false,
 		},
 		{
 			source:         "({ [  foo   ]: function() {} })",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedMethodShorthand.Id},
 			fixed:          pointerTo("({ [  foo   ]() {} })"),
 			declinesRepair: false,
 		},
 		{
 			source:         "({ [  foo]: function() {} })",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedMethodShorthand.Id},
 			fixed:          pointerTo("({ [  foo]() {} })"),
 			declinesRepair: false,
@@ -347,21 +310,18 @@ func TestObjectShorthandFires(test *testing.T) {
 		},
 		{
 			source:         "({ [(foo)]: function() { return; } })",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedMethodShorthand.Id},
 			fixed:          pointerTo("({ [(foo)]() { return; } })"),
 			declinesRepair: false,
 		},
 		{
 			source:         "({ [(foo)]: async function() { return; } })",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedMethodShorthand.Id},
 			fixed:          pointerTo("({ async [(foo)]() { return; } })"),
 			declinesRepair: false,
 		},
 		{
 			source:         "({ [(((((((foo)))))))]: function() { return; } })",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedMethodShorthand.Id},
 			fixed:          pointerTo("({ [(((((((foo)))))))]() { return; } })"),
 			declinesRepair: false,
@@ -840,7 +800,6 @@ func TestObjectShorthandFires(test *testing.T) {
 		},
 		{
 			source:         "({ a: (function(){ return foo; }) })",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedMethodShorthand.Id},
 			fixed:          pointerTo("({ a(){ return foo; } })"),
 			declinesRepair: false,
@@ -945,84 +904,72 @@ func TestObjectShorthandFires(test *testing.T) {
 		},
 		{
 			source:         "({ val: /** regular comment */ (val) })",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedPropertyShorthand.Id},
 			fixed:          nil,
 			declinesRepair: false,
 		},
 		{
 			source:         "({ val: /** @param {string} name */ (val) })",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedPropertyShorthand.Id},
 			fixed:          nil,
 			declinesRepair: false,
 		},
 		{
 			source:         "({ val: /** @returns {number} */ (val) })",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedPropertyShorthand.Id},
 			fixed:          nil,
 			declinesRepair: false,
 		},
 		{
 			source:         "({ val: /** @description some text */ (val) })",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedPropertyShorthand.Id},
 			fixed:          nil,
 			declinesRepair: false,
 		},
 		{
 			source:         "({ val: /**\n * @param {string} name\n */ (val) })",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedPropertyShorthand.Id},
 			fixed:          nil,
 			declinesRepair: false,
 		},
 		{
 			source:         "({ val: /**\n  * @returns {number}\n  */ (val) })",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedPropertyShorthand.Id},
 			fixed:          nil,
 			declinesRepair: false,
 		},
 		{
 			source:         "({ val: /**\n   * @description some text\n   */ (val) })",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedPropertyShorthand.Id},
 			fixed:          nil,
 			declinesRepair: false,
 		},
 		{
 			source:         "({ val: /**\n\t* @param {string} name\n\t*/ (val) })",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedPropertyShorthand.Id},
 			fixed:          nil,
 			declinesRepair: false,
 		},
 		{
 			source:         "({ val: /**\n\t * @returns {number}\n\t */ (val) })",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedPropertyShorthand.Id},
 			fixed:          nil,
 			declinesRepair: false,
 		},
 		{
 			source:         "({ val: /**\n  *  @param   {string}  name  \n  */ (val) })",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedPropertyShorthand.Id},
 			fixed:          nil,
 			declinesRepair: false,
 		},
 		{
 			source:         "({ val: /**\n *  @returns   {number} result\n */ (val) })",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedPropertyShorthand.Id},
 			fixed:          nil,
 			declinesRepair: false,
 		},
 		{
 			source:         "({ val: /**\n   *\n   * @param {string} name\n   * @returns {number}\n   */ (val) })",
-			settings:       nil,
 			findings:       []string{messageObjectShorthandExpectedPropertyShorthand.Id},
 			fixed:          nil,
 			declinesRepair: false,
@@ -1030,7 +977,7 @@ func TestObjectShorthandFires(test *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunWithOptions(
+		result := rule_testing.RunGiven(
 			test,
 			ObjectShorthand,
 			objectShorthandFile,
@@ -1070,47 +1017,47 @@ func TestObjectShorthandStaysSilent(test *testing.T) {
 
 	cases := []struct {
 		source   string
-		settings any
+		settings rule.Given[ObjectShorthandSettings]
 	}{
-		{source: "var x = {y() {}}", settings: nil},
-		{source: "var x = {y}", settings: nil},
-		{source: "var x = {a: b}", settings: nil},
-		{source: "var x = {a: 'a'}", settings: nil},
-		{source: "var x = {'a': 'a'}", settings: nil},
-		{source: "var x = {'a': b}", settings: nil},
-		{source: "var x = {y(x) {}}", settings: nil},
-		{source: "var {x,y,z} = x", settings: nil},
-		{source: "var {x: {y}} = z", settings: nil},
-		{source: "var x = {*x() {}}", settings: nil},
-		{source: "var x = {x: y}", settings: nil},
-		{source: "var x = {x: y, y: z}", settings: nil},
-		{source: "var x = {x: y, y: z, z: 'z'}", settings: nil},
-		{source: "var x = {x() {}, y: z, l(){}}", settings: nil},
-		{source: "var x = {x: y, y: z, a: b}", settings: nil},
-		{source: "var x = {x: y, y: z, 'a': b}", settings: nil},
-		{source: "var x = {x: y, y() {}, z: a}", settings: nil},
-		{source: "var x = {[y]: y}", settings: nil},
-		{source: "doSomething({x: y})", settings: nil},
-		{source: "doSomething({'x': y})", settings: nil},
-		{source: "doSomething({x: 'x'})", settings: nil},
-		{source: "doSomething({'x': 'x'})", settings: nil},
-		{source: "doSomething({y() {}})", settings: nil},
-		{source: "doSomething({x: y, y() {}})", settings: nil},
-		{source: "doSomething({y() {}, z: a})", settings: nil},
-		{source: "!{ a: function a(){} };", settings: nil},
-		{source: "var x = {y: (x)=>x}", settings: nil},
-		{source: "doSomething({y: (x)=>x})", settings: nil},
-		{source: "var x = {y: (x)=>x, y: a}", settings: nil},
-		{source: "doSomething({x, y: (x)=>x})", settings: nil},
-		{source: "({ foo: x => { return; }})", settings: nil},
-		{source: "({ foo: (x) => { return; }})", settings: nil},
-		{source: "({ foo: () => { return; }})", settings: nil},
-		{source: "var x = {get y() {}}", settings: nil},
-		{source: "var x = {set y(z) {}}", settings: nil},
-		{source: "var x = {get y() {}, set y(z) {}}", settings: nil},
-		{source: "doSomething({get y() {}})", settings: nil},
-		{source: "doSomething({set y(z) {}})", settings: nil},
-		{source: "doSomething({get y() {}, set y(z) {}})", settings: nil},
+		{source: "var x = {y() {}}"},
+		{source: "var x = {y}"},
+		{source: "var x = {a: b}"},
+		{source: "var x = {a: 'a'}"},
+		{source: "var x = {'a': 'a'}"},
+		{source: "var x = {'a': b}"},
+		{source: "var x = {y(x) {}}"},
+		{source: "var {x,y,z} = x"},
+		{source: "var {x: {y}} = z"},
+		{source: "var x = {*x() {}}"},
+		{source: "var x = {x: y}"},
+		{source: "var x = {x: y, y: z}"},
+		{source: "var x = {x: y, y: z, z: 'z'}"},
+		{source: "var x = {x() {}, y: z, l(){}}"},
+		{source: "var x = {x: y, y: z, a: b}"},
+		{source: "var x = {x: y, y: z, 'a': b}"},
+		{source: "var x = {x: y, y() {}, z: a}"},
+		{source: "var x = {[y]: y}"},
+		{source: "doSomething({x: y})"},
+		{source: "doSomething({'x': y})"},
+		{source: "doSomething({x: 'x'})"},
+		{source: "doSomething({'x': 'x'})"},
+		{source: "doSomething({y() {}})"},
+		{source: "doSomething({x: y, y() {}})"},
+		{source: "doSomething({y() {}, z: a})"},
+		{source: "!{ a: function a(){} };"},
+		{source: "var x = {y: (x)=>x}"},
+		{source: "doSomething({y: (x)=>x})"},
+		{source: "var x = {y: (x)=>x, y: a}"},
+		{source: "doSomething({x, y: (x)=>x})"},
+		{source: "({ foo: x => { return; }})"},
+		{source: "({ foo: (x) => { return; }})"},
+		{source: "({ foo: () => { return; }})"},
+		{source: "var x = {get y() {}}"},
+		{source: "var x = {set y(z) {}}"},
+		{source: "var x = {get y() {}, set y(z) {}}"},
+		{source: "doSomething({get y() {}})"},
+		{source: "doSomething({set y(z) {}})"},
+		{source: "doSomething({get y() {}, set y(z) {}})"},
 		{source: "var x = {[y]: y}", settings: objectShorthandOf("[\"properties\"]")},
 		{source: "var x = {['y']: 'y'}", settings: objectShorthandOf("[\"properties\"]")},
 		{source: "var x = {['y']: y}", settings: objectShorthandOf("[\"properties\"]")},
@@ -1322,22 +1269,22 @@ func TestObjectShorthandStaysSilent(test *testing.T) {
 			source:   "({ [foo.bar]: () => {} })",
 			settings: objectShorthandOf("[\"always\", {\"ignoreConstructors\": true}]"),
 		},
-		{source: "({ val: /** @type {number} */ (val) })", settings: nil},
-		{source: "({ 'prop': /** @type {string} */ (prop) })", settings: nil},
-		{source: "({ val: /**\n * @type {number}\n */ (val) })", settings: nil},
-		{source: "({ val: /**\n  * @type {number}\n  */ (val) })", settings: nil},
-		{source: "({ val: /**\n   * @type {number}\n   */ (val) })", settings: nil},
-		{source: "({ val: /**\n\t* @type {number}\n\t*/ (val) })", settings: nil},
-		{source: "({ val: /**\n\t * @type {number}\n\t */ (val) })", settings: nil},
-		{source: "({ val: /**\n  *  @type   {number}  \n  */ (val) })", settings: nil},
-		{source: "({ val: /**\n *  @type   {string} myParam\n */ (val) })", settings: nil},
-		{source: "({ val: /**\n  *  @type   {Object} options\n  */ (val) })", settings: nil},
-		{source: "({ val: /**\n\t *\t@type\t{Array}\n\t */ (val) })", settings: nil},
-		{source: "({ val: /**\n   *\n   * @type {Function}\n   * @param {string} name\n   */ (val) })", settings: nil},
+		{source: "({ val: /** @type {number} */ (val) })"},
+		{source: "({ 'prop': /** @type {string} */ (prop) })"},
+		{source: "({ val: /**\n * @type {number}\n */ (val) })"},
+		{source: "({ val: /**\n  * @type {number}\n  */ (val) })"},
+		{source: "({ val: /**\n   * @type {number}\n   */ (val) })"},
+		{source: "({ val: /**\n\t* @type {number}\n\t*/ (val) })"},
+		{source: "({ val: /**\n\t * @type {number}\n\t */ (val) })"},
+		{source: "({ val: /**\n  *  @type   {number}  \n  */ (val) })"},
+		{source: "({ val: /**\n *  @type   {string} myParam\n */ (val) })"},
+		{source: "({ val: /**\n  *  @type   {Object} options\n  */ (val) })"},
+		{source: "({ val: /**\n\t *\t@type\t{Array}\n\t */ (val) })"},
+		{source: "({ val: /**\n   *\n   * @type {Function}\n   * @param {string} name\n   */ (val) })"},
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunWithOptions(
+		result := rule_testing.RunGiven(
 			test,
 			ObjectShorthand,
 			objectShorthandFile,
@@ -1369,20 +1316,18 @@ func TestObjectShorthandRepairKeepsSignatureAndSpacing(test *testing.T) {
 
 	cases := []struct {
 		source   string
-		settings any
+		settings rule.Given[ObjectShorthandSettings]
 		fixed    string
 	}{
 		{
 			// A generic function expression. Upstream slices from just after `function`, so the
 			// type parameters and the space both survive.
-			source:   "({ key: function <T>(a: T): T { return a; } });",
-			settings: nil,
-			fixed:    "({ key <T>(a: T): T { return a; } });",
+			source: "({ key: function <T>(a: T): T { return a; } });",
+			fixed:  "({ key <T>(a: T): T { return a; } });",
 		},
 		{
-			source:   "({ key: async function <T>(a: T): Promise<T> { return a; } });",
-			settings: nil,
-			fixed:    "({ async key <T>(a: T): Promise<T> { return a; } });",
+			source: "({ key: async function <T>(a: T): Promise<T> { return a; } });",
+			fixed:  "({ async key <T>(a: T): Promise<T> { return a; } });",
 		},
 		{
 			// A generic arrow takes the other branch, where `<T>` sits before the parameter list
@@ -1401,14 +1346,13 @@ func TestObjectShorthandRepairKeepsSignatureAndSpacing(test *testing.T) {
 		{
 			// A parenthesised value is still the value, and the repair has to cover the
 			// parenthesis or it leaves a stray `)`.
-			source:   "({ a: (function(){ return foo; }) });",
-			settings: nil,
-			fixed:    "({ a(){ return foo; } });",
+			source: "({ a: (function(){ return foo; }) });",
+			fixed:  "({ a(){ return foo; } });",
 		},
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunWithOptions(test, ObjectShorthand, objectShorthandFile,
+		result := rule_testing.RunGiven(test, ObjectShorthand, objectShorthandFile,
 			testCase.source, testCase.settings)
 		if len(result.Diagnostics) == 0 {
 			test.Errorf("%q: expected a finding, got none", testCase.source)
@@ -1459,7 +1403,7 @@ func TestObjectShorthandIgnoresAccessors(test *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunWithOptions(test, ObjectShorthand, objectShorthandFile,
+		result := rule_testing.RunGiven(test, ObjectShorthand, objectShorthandFile,
 			testCase.source, objectShorthandOf(testCase.mode))
 		if len(result.Diagnostics) != len(testCase.findings) {
 			test.Errorf("%q under %s: expected %d findings, got %d %v",
@@ -1485,12 +1429,8 @@ func TestDecodeObjectShorthandOptions(test *testing.T) {
 	if decodeObjectShorthandOptionsError != nil {
 		test.Fatalf("a legal mode and flags were refused: %v", decodeObjectShorthandOptionsError)
 	}
-	settings, ok := decoded.(ObjectShorthandSettings)
-	if !ok {
-		test.Fatalf("the decoder returned %T, not ObjectShorthandSettings", decoded)
-	}
-	if settings.Mode != ObjectShorthandMethods || !settings.IgnoreConstructors || !settings.AvoidQuotes {
-		test.Errorf("the second element was not read: %+v", settings)
+	if decoded.Mode != ObjectShorthandMethods || !decoded.IgnoreConstructors || !decoded.AvoidQuotes {
+		test.Errorf("the second element was not read: %+v", decoded)
 	}
 
 	for _, raw := range []string{

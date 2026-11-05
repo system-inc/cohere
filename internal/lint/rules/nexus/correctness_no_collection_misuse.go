@@ -146,7 +146,7 @@ var correctnessNoCollectionMisuseAnyCollection = map[string]bool{
 //
 // Each repair changes what the code means (`.includes()` for `in`, `.get()` for brackets, which
 // comparison was intended), so each is the author's call.
-var CorrectnessNoCollectionMisuse = rule.Rule{
+var CorrectnessNoCollectionMisuse = rule.Rule[rule.NoOptions]{
 	Name: "nexus/correctness-no-collection-misuse",
 
 	// Every check rests on the type of an operand: an array, a string, a Map or Set.
@@ -158,7 +158,7 @@ var CorrectnessNoCollectionMisuse = rule.Rule{
 	// The rule reads types and the default library's declarations, never an imported body.
 	TypeReach: rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.TypeChecker == nil || ruleContext.Program == nil {
 			return nil
 		}

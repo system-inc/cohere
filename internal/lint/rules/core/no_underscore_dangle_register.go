@@ -11,7 +11,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // decoder a configured object reaches the rule as a raw value the type assertion rejects, leaving
 // every flag at its default while the config says otherwise.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[NoUnderscoreDangleOptions]{
 		Rule:   NoUnderscoreDangle,
 		Decode: DecodeNoUnderscoreDangleOptions,
 	})

@@ -291,7 +291,11 @@ func TestFixFileIsFixAndTransformWithNoTransform(test *testing.T) {
 		}
 	}
 
-	firstResult, fixFileError := FixFile(withFixFile, proposeWhileContains("'old'", "'new'", "renamer"), DefaultMaxPasses)
+	firstResult, fixFileError := FixFile(
+		withFixFile,
+		proposeWhileContains("'old'", "'new'", "renamer"),
+		DefaultMaxPasses,
+	)
 	if fixFileError != nil {
 		test.Fatal(fixFileError)
 	}

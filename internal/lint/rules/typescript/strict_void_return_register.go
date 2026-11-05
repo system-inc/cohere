@@ -8,7 +8,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // helper would be correct by coincidence; the hand-rolled one keeps an absent key distinguishable
 // from an explicit false.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[StrictVoidReturnOptions]{
 		Rule:   StrictVoidReturn,
 		Decode: DecodeStrictVoidReturnOptions,
 	})

@@ -47,16 +47,15 @@ type requireArraySortCompareRawOptions struct {
 // An absent key keeps the default rather than zeroing it, which is the entire point of the pointer
 // above. On a decode error the default is returned alongside the error, so a malformed option can
 // never leave the rule running inverted.
-func DecodeRequireArraySortCompareOptions(raw []byte) (any, error) {
+func DecodeRequireArraySortCompareOptions(raw []byte) (RequireArraySortCompareOptions, error) {
 	decoded, decodeOptionsError := rule.DecodeOptionsInto[requireArraySortCompareRawOptions]()(raw)
 	if decodeOptionsError != nil {
 		return DefaultRequireArraySortCompareSettings(), decodeOptionsError
 	}
 
-	wire, _ := decoded.(requireArraySortCompareRawOptions)
 	options := DefaultRequireArraySortCompareSettings()
-	if wire.IgnoreStringArrays != nil {
-		options.IgnoreStringArrays = *wire.IgnoreStringArrays
+	if decoded.IgnoreStringArrays != nil {
+		options.IgnoreStringArrays = *decoded.IgnoreStringArrays
 	}
 	return options, nil
 }
@@ -126,15 +125,15 @@ func DecodeRequireArraySortCompareOptions(raw []byte) (any, error) {
 // A call expression is a common anchor, so the body exits on the argument count before touching the
 // checker. The type is resolved only for a zero-argument call to something named `sort` or
 // `toSorted`, which is rare.
-var RequireArraySortCompare = rule.Rule{
+var RequireArraySortCompare = rule.Rule[RequireArraySortCompareOptions]{
 	Name: "@typescript-eslint/require-array-sort-compare",
 
 	// The receiver's type decides every finding, so the checker is required.
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, isSettings := rule.OptionsAs[RequireArraySortCompareOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[RequireArraySortCompareOptions]) rule.Listeners {
+		settings, isSettings := options.Read()
 		if !isSettings {
 			// A rule configured as a bare "error" is handed nil options, and `options.(T)` on nil
 			// yields the zero value, which for this rule is the inverse of upstream's default. The

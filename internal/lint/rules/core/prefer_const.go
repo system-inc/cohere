@@ -198,7 +198,7 @@ type PreferConstOptions struct {
 // Where either fails the finding is still reported and simply carries no fix, which is what
 // upstream does and is the honest answer: the diagnosis is right and the repair is a judgment call
 // about splitting the declaration.
-var PreferConst = rule.Rule{
+var PreferConst = rule.Rule[PreferConstOptions]{
 	Name: "prefer-const",
 
 	// See the doc above: upstream's shadow cases are textually identical to reporting ones and
@@ -207,9 +207,9 @@ var PreferConst = rule.Rule{
 	// Reads only this file's declarations (rule.DeclarationsIn), so its findings key on imports' shapes.
 	TypeReach: rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[PreferConstOptions]) rule.Listeners {
 		settings := PreferConstOptions{}
-		if configured, ok := rule.OptionsAs[PreferConstOptions](options); ok {
+		if configured, ok := options.Read(); ok {
 			settings = configured
 		}
 

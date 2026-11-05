@@ -73,12 +73,12 @@ var messageNoStyledJsxInDocument = rule.Message{
 // answer to a question the shelf already answers, and nothing would ever catch the two drifting,
 // since each rule's corpus was written against its own spelling and passes either way. A stated
 // divergence on one path is cheaper than a silent disagreement that no guard can see.
-var NoStyledJsxInDocument = rule.Rule{
+var NoStyledJsxInDocument = rule.Rule[rule.NoOptions]{
 	// No family prefix. The config writes `nextjs/no-styled-jsx-in-document` and matching strips
 	// the namespace on a `/` boundary, so a prefixed name matches nothing and runs on no files.
 	Name:       "@next/next/no-styled-jsx-in-document",
 	NoListener: rule.NoListenerDeclinesIrrelevantFiles,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// Asked once rather than per element, because it is a property of the file. Upstream asks
 		// it per node only because its listener has nowhere earlier to stand.
 		if !nextjs.IsDocumentFile(ruleContext.SourceFile.FileName().AsString()) {

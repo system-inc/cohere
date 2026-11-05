@@ -177,12 +177,12 @@ var messageUseMemoResultUnused = rule.Message{
 // real `useMemo` and neither authority reports it, because both test the written name rather than
 // resolving it. cohere has a whole-program checker and could resolve it. Deliberately not done: it
 // would report a class of finding neither authority produces, and a differential would show it.
-var VoidUseMemo = rule.Rule{
+var VoidUseMemo = rule.Rule[CompilerRuleOptions]{
 	// No namespace prefix. The config writes `react/void-use-memo`, and the parity guard strips the
 	// namespace on a `/` boundary, so a self-namespaced `react-void-use-memo` would match no
 	// inventory entry and lint nothing.
 	Name: "react-hooks/void-use-memo",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[CompilerRuleOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				call := node.AsCallExpression()

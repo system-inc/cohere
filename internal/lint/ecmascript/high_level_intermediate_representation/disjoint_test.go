@@ -196,8 +196,8 @@ func TestDisjointSetMatchesReact(test *testing.T) {
 				if len(got[wantSetIndex]) != len(want) {
 					test.Fatalf("class %d is %v, want %v", wantSetIndex, got[wantSetIndex], want)
 				}
-				for j := range want {
-					if got[wantSetIndex][j] != want[j] {
+				for index := range want {
+					if got[wantSetIndex][index] != want[index] {
 						test.Fatalf("class %d is %v, want %v", wantSetIndex, got[wantSetIndex], want)
 					}
 				}
@@ -500,7 +500,7 @@ func TestDisjointMayAllocateMatchesReact(test *testing.T) {
 		{"PropertyDelete", &PropertyDelete{}, false},
 		{"ComputedLoad", &ComputedLoad{}, false},
 		{"ComputedDelete", &ComputedDelete{}, false},
-		{"Primitive", &Primitive{}, false},
+		{"Primitive", &Primitive{Value: PrimitiveUndefined{}}, false},
 		{"TemplateLiteral", &TemplateLiteral{}, false},
 		{"JsxText", &JsxText{}, false},
 		{"UnaryExpression", &UnaryExpression{}, false},
@@ -1084,8 +1084,8 @@ export function repeat(seed: number) {
 		if len(firstSets[firstSetIndex]) != len(secondSets[firstSetIndex]) {
 			test.Fatalf("class %d: %v then %v", firstSetIndex, firstSets[firstSetIndex], secondSets[firstSetIndex])
 		}
-		for j := range firstSets[firstSetIndex] {
-			if firstSets[firstSetIndex][j] != secondSets[firstSetIndex][j] {
+		for index := range firstSets[firstSetIndex] {
+			if firstSets[firstSetIndex][index] != secondSets[firstSetIndex][index] {
 				test.Fatalf("class %d: %v then %v", firstSetIndex, firstSets[firstSetIndex], secondSets[firstSetIndex])
 			}
 		}
@@ -1227,10 +1227,10 @@ func TestDisjointClassSizesAreNotAllSingletons(test *testing.T) {
 			continue
 		}
 		fileName := "/corpus/" + filepath.Base(path)
-		probe := rule.Rule{
+		probe := rule.Rule[rule.NoOptions]{
 			Name:             "disjoint-corpus",
 			NeedsTypeChecker: true,
-			Run: func(ruleContext rule.Context, options any) rule.Listeners {
+			Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 				return rule.Listeners{
 					ast.KindSourceFile: func(node *ast.Node) {
 						if ruleContext.TypeChecker == nil {

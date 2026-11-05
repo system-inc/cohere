@@ -109,10 +109,10 @@ return <button onClick={callback}>{values.length}{busy}</button>;
 			var visited int
 			var findings int
 			var markers int
-			probe := rule.Rule{
+			probe := rule.Rule[rule.NoOptions]{
 				Name:             "namespace-ref-memoization",
 				NeedsTypeChecker: true,
-				Run: func(ruleContext rule.Context, options any) rule.Listeners {
+				Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 					return rule.Listeners{
 						ast.KindSourceFile: func(node *ast.Node) {
 							if ruleContext.TypeChecker == nil {

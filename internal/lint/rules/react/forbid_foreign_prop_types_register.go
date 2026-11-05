@@ -15,7 +15,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // because a default-true option decoded this way would silently invert the rule and every fixture
 // built from a struct would pass anyway.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[ForbidForeignPropTypesOptions]{
 		Rule:   ForbidForeignPropTypes,
 		Decode: rule.DecodeOptionsInto[ForbidForeignPropTypesOptions](),
 	})

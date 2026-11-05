@@ -31,7 +31,7 @@ const requireOptimizationFile = "/repository/source/RequireOptimization.tsx"
 //
 // Every case routes through `DecodeRequireOptimizationOptions`, the same function the config layer
 // calls, so the decoder's empty-input path is under test rather than bypassed. An empty string means
-// a bare severity, which is what hands a real rule nil options.
+// a bare severity, which is what hands a real rule's decoder empty input.
 
 // TestRequireOptimizationFires runs upstream's reporting cases.
 func TestRequireOptimizationFires(test *testing.T) {
@@ -609,16 +609,12 @@ func TestRequireOptimizationDecodesItsOptions(test *testing.T) {
 			if decodeRequireOptimizationOptionsError != nil {
 				test.Fatalf("decoding %q: %v", testCase.raw, decodeRequireOptimizationOptionsError)
 			}
-			settings, ok := decoded.(RequireOptimizationOptions)
-			if !ok {
-				test.Fatalf("decoded to %T", decoded)
-			}
-			if len(settings.AllowDecorators) != len(testCase.want) {
-				test.Fatalf("decoded %d decorators, want %d", len(settings.AllowDecorators), len(testCase.want))
+			if len(decoded.AllowDecorators) != len(testCase.want) {
+				test.Fatalf("decoded %d decorators, want %d", len(decoded.AllowDecorators), len(testCase.want))
 			}
 			for index, name := range testCase.want {
-				if settings.AllowDecorators[index] != name {
-					test.Errorf("decorator %d is %q, want %q", index, settings.AllowDecorators[index], name)
+				if decoded.AllowDecorators[index] != name {
+					test.Errorf("decorator %d is %q, want %q", index, decoded.AllowDecorators[index], name)
 				}
 			}
 		})
@@ -643,27 +639,27 @@ func TestRequireOptimizationRejectsMalformedOptions(test *testing.T) {
 
 // TestRequireOptimizationHandlesNilOptions covers the path the fixtures cannot reach.
 //
-// The config layer turns a decoder error into nil for a non-required rule, and `options.(T)` on nil
-// yields the zero value. Here that is the default, an empty allow list, so nil must behave exactly
-// like an absent option object. Asserted rather than assumed, because a rule whose default was not
-// the zero value would be silently inverted on this path.
+// The config layer binds a non-required rule whose decoder errors to the zero `rule.Given`, whose `Read`
+// returns false, so it reads the zero value. Here that is the default, an empty allow list, so the
+// unconfigured rule must behave exactly like an absent option object. Asserted rather than assumed,
+// because a rule whose default was not the zero value would be silently inverted on this path.
 func TestRequireOptimizationHandlesNilOptions(test *testing.T) {
 	test.Parallel()
 
-	reporting := rule_testing.RunWithOptions(test, RequireOptimization, requireOptimizationFile,
-		"declare const React: any;\nclass C extends React.Component {}\n", nil)
+	reporting := rule_testing.Run(test, RequireOptimization, requireOptimizationFile,
+		"declare const React: any;\nclass C extends React.Component {}\n")
 	rule_testing.ExpectFindings(test, reporting, "noShouldComponentUpdate")
 
-	clean := rule_testing.RunWithOptions(test, RequireOptimization, requireOptimizationFile,
-		"declare const React: any;\nclass C extends React.PureComponent {}\n", nil)
+	clean := rule_testing.Run(test, RequireOptimization, requireOptimizationFile,
+		"declare const React: any;\nclass C extends React.PureComponent {}\n")
 	rule_testing.ExpectClean(test, clean)
 
 	// The rows above cannot see the allow list at all, because neither carries a decorator, so a
-	// mutant giving the nil path a non-empty list survived them. This is the case that separates
-	// "nil means no decorators are allowed" from any other default: a bare decorator must still
+	// mutant giving the unconfigured path a non-empty list survived them. This is the case that separates
+	// "unconfigured means no decorators are allowed" from any other default: a bare decorator must still
 	// report when nothing configured it.
-	decorated := rule_testing.RunWithOptions(test, RequireOptimization, requireOptimizationFile,
-		"declare const pure: any;\ndeclare const Component: any;\n@pure\nclass C extends Component {}\n", nil)
+	decorated := rule_testing.Run(test, RequireOptimization, requireOptimizationFile,
+		"declare const pure: any;\ndeclare const Component: any;\n@pure\nclass C extends Component {}\n")
 	rule_testing.ExpectFindings(test, decorated, "noShouldComponentUpdate")
 }
 

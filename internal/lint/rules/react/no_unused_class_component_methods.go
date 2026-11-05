@@ -99,9 +99,9 @@ var noUnusedClassComponentMethodsEs5Lifecycle = map[string]bool{
 //
 // Upstream listens on `ClassDeclaration` only, so `var Foo = class extends React.Component { ... }`
 // reports nothing however unused its members are. Measured, and reproduced rather than widened.
-var NoUnusedClassComponentMethods = rule.Rule{
+var NoUnusedClassComponentMethods = rule.Rule[rule.NoOptions]{
 	Name: "react/no-unused-class-component-methods",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindSourceFile: func(sourceFile *ast.Node) {
 				var walk func(node *ast.Node)

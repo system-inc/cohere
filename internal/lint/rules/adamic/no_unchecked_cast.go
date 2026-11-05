@@ -47,11 +47,11 @@ const CheckedDowncastNote = "checked downcast"
  *
  * The repair is where the value comes from, which the cast hides.
  */
-var NoUncheckedCast = rule.Rule{
+var NoUncheckedCast = rule.Rule[rule.NoOptions]{
 	Name:             "adamic/no-unchecked-cast",
 	NeedsTypeChecker: true,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.TypeChecker == nil || ruleContext.SourceFile == nil {
 			return nil
 		}

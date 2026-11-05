@@ -80,9 +80,9 @@ var messageUnsafeFinallyContinue = rule.Message{
 // No fix. The repair is to hoist the value out of the finally block and act on it afterward, which
 // means deciding what should happen to the pending action the statement was discarding, and that is
 // the author's knowledge rather than the linter's.
-var NoUnsafeFinally = rule.Rule{
+var NoUnsafeFinally = rule.Rule[rule.NoOptions]{
 	Name: "no-unsafe-finally",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}

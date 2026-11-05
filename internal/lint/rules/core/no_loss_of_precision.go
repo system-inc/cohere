@@ -68,9 +68,9 @@ var messageNoLossOfPrecision = rule.Message{
 // rule sees never carries a sign. Upstream trims `+` and `-` anyway; that trim is unreachable here
 // and is therefore not reproduced, which is why the corpus's signed cases still report: they report
 // on the unsigned literal inside them.
-var NoLossOfPrecision = rule.Rule{
+var NoLossOfPrecision = rule.Rule[rule.NoOptions]{
 	Name: "no-loss-of-precision",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindNumericLiteral: func(node *ast.Node) {
 				literalRange := rule.TokenRange(ruleContext.SourceFile, node)

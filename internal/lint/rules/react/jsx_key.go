@@ -82,7 +82,7 @@ type JsxKeyOptions struct {
 // is a thin wrapper over `rule.UnmarshalOptions` plus a nil path: `rule.DecodeOptionsInto` errors on empty
 // input, and a rule configured as a bare `"error"` is handed exactly that, so the generic decoder
 // would refuse a configuration upstream accepts.
-func DecodeJsxKeyOptions(raw []byte) (any, error) {
+func DecodeJsxKeyOptions(raw []byte) (JsxKeyOptions, error) {
 	var options JsxKeyOptions
 	if len(raw) == 0 {
 		return options, nil
@@ -190,13 +190,13 @@ func DecodeJsxKeyOptions(raw []byte) (any, error) {
 // Measured: `Foo.Children.toArray(...)` does not suppress and a bare `toArray(...)` does not
 // either, so the `Children` segment is required in both spellings. The pragma is read from the
 // file's `@jsx` comment, the same mechanism `no-deprecated` in this package documents at length.
-var JsxKey = rule.Rule{
+var JsxKey = rule.Rule[JsxKeyOptions]{
 	// No namespace prefix. The config writes `react/jsx-key` and the parity guard strips the
 	// namespace on a `/` boundary, so `react-jsx-key` would match no inventory entry and lint no
 	// files while passing every fixture in this package.
 	Name: "react/jsx-key",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, _ := rule.OptionsAs[JsxKeyOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[JsxKeyOptions]) rule.Listeners {
+		settings, _ := options.Read()
 		pragma := reactPragmaFor(ruleContext)
 
 		// Upstream keeps a WeakSet so a key attribute reported once as a duplicate is not reported

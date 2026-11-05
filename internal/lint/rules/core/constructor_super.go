@@ -146,9 +146,9 @@ const (
 // The whitelist is used here. It is the stronger instrument, it costs nothing, and it agrees with
 // oxc everywhere oxc has an opinion the corpus records. Six invented fixtures pin the divergence so
 // a later reader can see it was a decision.
-var ConstructorSuper = rule.Rule{
+var ConstructorSuper = rule.Rule[rule.NoOptions]{
 	Name: "constructor-super",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindConstructor: func(constructor *ast.Node) {
 				checkConstructorSuper(ruleContext, constructor)

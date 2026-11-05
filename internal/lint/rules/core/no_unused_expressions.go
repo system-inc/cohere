@@ -77,11 +77,11 @@ type NoUnusedExpressionsOptions struct {
 // never reaches its listener at all and its `ignore_directives` option is unreachable. TypeScript's
 // parser leaves directives as ordinary expression statements, so without the exemption written here
 // every `'use client'` at the top of a component file would report.
-var NoUnusedExpressions = rule.Rule{
+var NoUnusedExpressions = rule.Rule[NoUnusedExpressionsOptions]{
 	Name: "@typescript-eslint/no-unused-expressions",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoUnusedExpressionsOptions]) rule.Listeners {
 		verdict := unusedExpressionVerdict{}
-		if parsed, ok := rule.OptionsAs[NoUnusedExpressionsOptions](options); ok {
+		if parsed, ok := options.Read(); ok {
 			verdict.options = parsed
 		}
 

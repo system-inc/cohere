@@ -11,5 +11,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // a number and nothing else that renders, and an option widening it to `string | number` or
 // `ReactNode` would bring back the findings the untyped rule was declined for.
 func init() {
-	rule.Register(rule.Registration{Rule: CorrectnessNoLeakedNumberRender})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: CorrectnessNoLeakedNumberRender})
 }

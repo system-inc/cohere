@@ -18,7 +18,7 @@ import (
 // What is shared and why: `*ast.Node` is the program, which no pass writes, and the reactive scopes
 // live in their own side table. Everything else is copied,
 // blocks, instructions, identifiers, phis and nested functions, and the instruction values and
-// terminals go through the same reflective copy the inliner uses, for the reason `deepCopyAny` gives.
+// terminals go through the same reflective copy the inliner uses, for the reason `deepCopy` gives.
 //
 // `blocksById` is rebuilt from the copied blocks rather than copied, because it aliases `Blocks`: a
 // copied map would point at the original's blocks, and the first block a pass rewrote would be

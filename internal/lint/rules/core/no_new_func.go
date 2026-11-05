@@ -78,7 +78,7 @@ var functionConstructorMethods = map[string]bool{
 // Upstream additionally requires `variable.defs.length === 0`, which excludes a global that source
 // redeclares. That is the same judgment from the other side and `resolvesToAGlobal` answers it
 // alike, since a redeclaration in source puts a non-declaration-file declaration on the symbol.
-var NoNewFunc = rule.Rule{
+var NoNewFunc = rule.Rule[rule.NoOptions]{
 	Name: "no-new-func",
 
 	// See the doc above: the whole discrimination is whether `Function` is the global or a local
@@ -86,7 +86,7 @@ var NoNewFunc = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		reportIfFunctionConstructor := func(node *ast.Node) {
 			if ruleContext.TypeChecker == nil {
 				return

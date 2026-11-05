@@ -167,10 +167,10 @@ func TestNoUnstableNestedComponentsRenderMethodGuard(test *testing.T) {
   }
 }`
 
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name:             "react/no-unstable-nested-components",
 		NeedsTypeChecker: true,
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(sourceFile *ast.Node) {
 					validated := 0
@@ -217,13 +217,9 @@ func TestDecodeNoUnstableNestedComponentsOptions(test *testing.T) {
 	test.Parallel()
 
 	// A bare "error" arrives as empty input and must land on the documented defaults.
-	decoded, decodeNoUnstableNestedComponentsOptionsError := DecodeNoUnstableNestedComponentsOptions(nil)
+	options, decodeNoUnstableNestedComponentsOptionsError := DecodeNoUnstableNestedComponentsOptions(nil)
 	if decodeNoUnstableNestedComponentsOptionsError != nil {
 		test.Fatalf("decoding empty input: %v", decodeNoUnstableNestedComponentsOptionsError)
-	}
-	options, ok := decoded.(NoUnstableNestedComponentsOptions)
-	if !ok {
-		test.Fatalf("decoder returned %T", decoded)
 	}
 	if options.PropNamePattern != "render*" {
 		test.Errorf("empty input gave pattern %q, want render*", options.PropNamePattern)
@@ -233,13 +229,11 @@ func TestDecodeNoUnstableNestedComponentsOptions(test *testing.T) {
 	}
 
 	// An explicit pattern replaces the default.
-	decoded, decodeNoUnstableNestedComponentsOptionsError = DecodeNoUnstableNestedComponentsOptions([]byte(`{"propNamePattern":"*Renderer"}`))
+	options, decodeNoUnstableNestedComponentsOptionsError = DecodeNoUnstableNestedComponentsOptions(
+		[]byte(`{"propNamePattern":"*Renderer"}`),
+	)
 	if decodeNoUnstableNestedComponentsOptionsError != nil {
 		test.Fatalf("decoding a pattern: %v", decodeNoUnstableNestedComponentsOptionsError)
-	}
-	options, ok = decoded.(NoUnstableNestedComponentsOptions)
-	if !ok {
-		test.Fatalf("decoder returned %T", decoded)
 	}
 	if options.PropNamePattern != "*Renderer" {
 		test.Errorf("pattern %q, want *Renderer", options.PropNamePattern)
@@ -247,13 +241,11 @@ func TestDecodeNoUnstableNestedComponentsOptions(test *testing.T) {
 
 	// An explicit empty pattern folds back onto the default, matching upstream's `|| 'render*'`,
 	// where the empty string is falsy.
-	decoded, decodeNoUnstableNestedComponentsOptionsError = DecodeNoUnstableNestedComponentsOptions([]byte(`{"propNamePattern":""}`))
+	options, decodeNoUnstableNestedComponentsOptionsError = DecodeNoUnstableNestedComponentsOptions(
+		[]byte(`{"propNamePattern":""}`),
+	)
 	if decodeNoUnstableNestedComponentsOptionsError != nil {
 		test.Fatalf("decoding an empty pattern: %v", decodeNoUnstableNestedComponentsOptionsError)
-	}
-	options, ok = decoded.(NoUnstableNestedComponentsOptions)
-	if !ok {
-		test.Fatalf("decoder returned %T", decoded)
 	}
 	if options.PropNamePattern != "render*" {
 		test.Errorf("empty pattern gave %q, want render*", options.PropNamePattern)
@@ -269,17 +261,17 @@ func TestDecodeNoUnstableNestedComponentsOptions(test *testing.T) {
 }
 
 // TestNoUnstableNestedComponentsNilOptions covers the path a bare "error" takes into Run, which
-// bypasses the decoder entirely: config.OptionsRegistry hands a non-required rule nil, and a type
-// assertion on nil yields the zero value. Without the fallback in Run the empty pattern would match
-// no prop name and every render prop would start reporting.
+// bypasses the decoder entirely: configuration.OptionsRegistry hands a non-required rule the zero
+// `rule.Given`, whose `Read` returns false and the zero value. Without the fallback in Run the empty
+// pattern would match no prop name and every render prop would start reporting.
 func TestNoUnstableNestedComponentsNilOptions(test *testing.T) {
 	test.Parallel()
 
 	source := `function ParentComponent() {
   return <SomeComponent renderFooter={() => <div />} />;
 }`
-	result := rule_testing.RunTypedWithOptions(test, NoUnstableNestedComponents,
-		"Component.tsx", source, nil)
+	result := rule_testing.RunTyped(test, NoUnstableNestedComponents,
+		"Component.tsx", source)
 	rule_testing.ExpectClean(test, result)
 }
 

@@ -649,7 +649,14 @@ func TestFormatSCSSIsNotFormat(test *testing.T) {
 		}
 		actualCSS, formatError := Format(source, formatoptions.Default())
 		if (formatError == nil) != (cssError == nil) || actualCSS != asCSS {
-			test.Errorf("%q as css:\n--- fork (%v)\n%s--- native (%v)\n%s", source, cssError, asCSS, formatError, actualCSS)
+			test.Errorf(
+				"%q as css:\n--- fork (%v)\n%s--- native (%v)\n%s",
+				source,
+				cssError,
+				asCSS,
+				formatError,
+				actualCSS,
+			)
 		}
 	}
 }
@@ -724,7 +731,12 @@ func TestPrettierSCSSFixturesMatchTheFork(test *testing.T) {
 			case oracleError != nil && nativeError != nil:
 				refusedByBoth++
 			case oracleError != nil:
-				test.Errorf("%s (%s): the fork refused it (%v) and FormatSCSS printed it", file, optionsName, oracleError)
+				test.Errorf(
+					"%s (%s): the fork refused it (%v) and FormatSCSS printed it",
+					file,
+					optionsName,
+					oracleError,
+				)
 			case nativeError != nil:
 				test.Errorf("%s (%s): %v", file, optionsName, nativeError)
 			default:

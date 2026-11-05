@@ -48,7 +48,7 @@ type noImplicitGlobalsWireShape struct {
 }
 
 // DecodeNoImplicitGlobalsOptions reads the option object off the config.
-func DecodeNoImplicitGlobalsOptions(raw []byte) (any, error) {
+func DecodeNoImplicitGlobalsOptions(raw []byte) (NoImplicitGlobalsSettings, error) {
 	if len(raw) == 0 {
 		return DefaultNoImplicitGlobalsSettings(), nil
 	}
@@ -116,7 +116,7 @@ func DecodeNoImplicitGlobalsOptions(raw []byte) (any, error) {
 // creating a global (see liesInStrictModeCode). A module is strict throughout, and so is every
 // TypeScript file under `alwaysStrict`, so in a TypeScript program the leak half fires only in a
 // sloppy JavaScript script.
-var NoImplicitGlobals = rule.Rule{
+var NoImplicitGlobals = rule.Rule[NoImplicitGlobalsSettings]{
 	Name: "no-implicit-globals",
 
 	// The leak half asks resolution whether an assignment target was ever declared, which is a
@@ -129,8 +129,8 @@ var NoImplicitGlobals = rule.Rule{
 	// follow the tsconfig.
 	ProgramReads: rule.ReadsCompilerOptions,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, ok := rule.OptionsAs[NoImplicitGlobalsSettings](options)
+	Run: func(ruleContext rule.Context, options rule.Given[NoImplicitGlobalsSettings]) rule.Listeners {
+		settings, ok := options.Read()
 		if !ok {
 			settings = DefaultNoImplicitGlobalsSettings()
 		}

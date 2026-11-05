@@ -57,11 +57,7 @@ func decodeForTest(test *testing.T, raw string) DependenciesOptions {
 	if decodeDependenciesOptionsError != nil {
 		test.Fatalf("decoding the options: %v", decodeDependenciesOptionsError)
 	}
-	options, isOptions := decoded.(DependenciesOptions)
-	if !isOptions {
-		test.Fatalf("decoding the options gave a %T, want DependenciesOptions", decoded)
-	}
-	return options
+	return decoded
 }
 
 // baseLayout is the slice of Base the package-boundary cases import across.
@@ -698,11 +694,7 @@ func TestDependenciesDecodesBasesOwnBlocksAndAnchorsTheRoot(test *testing.T) {
 		if decodeDependenciesOptionsError != nil {
 			test.Fatalf("Base's own block was refused: %v", decodeDependenciesOptionsError)
 		}
-		options, isOptions := decoded.(DependenciesOptions)
-		if !isOptions {
-			test.Fatalf("Base's own block decoded to a %T, want DependenciesOptions", decoded)
-		}
-		if root := options.Root; root != "/repo" {
+		if root := decoded.Root; root != "/repo" {
 			test.Fatalf("expected the root at the config's directory, got %q", root)
 		}
 	}
@@ -713,11 +705,7 @@ func TestDependenciesDecodesBasesOwnBlocksAndAnchorsTheRoot(test *testing.T) {
 	if decodeDependenciesOptionsError != nil {
 		test.Fatal(decodeDependenciesOptionsError)
 	}
-	options, isOptions := decoded.(DependenciesOptions)
-	if !isOptions {
-		test.Fatalf("the project module block decoded to a %T, want DependenciesOptions", decoded)
-	}
-	if root := options.Root; root != "/project" {
+	if root := decoded.Root; root != "/project" {
 		test.Fatalf("expected the project root when the config's directory is unknown, got %q", root)
 	}
 

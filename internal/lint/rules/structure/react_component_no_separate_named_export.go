@@ -63,9 +63,9 @@ func messageNoSeparateNamedExport() rule.Message {
 //	a variable statement with several declarators    `export` would export its siblings too
 //	a name declared more than once (overloads)       every signature would need the modifier
 //	a declaration already carrying a modifier list   that includes `export` or `default`
-var ReactComponentNoSeparateNamedExport = rule.Rule{
+var ReactComponentNoSeparateNamedExport = rule.Rule[rule.NoOptions]{
 	Name: "structure/react-component-no-separate-named-export",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if !FileContextFor(ruleContext.SourceFile.FileName().AsString()).IsReactFile {
 			return nil
 		}

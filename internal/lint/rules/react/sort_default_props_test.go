@@ -24,7 +24,7 @@ const sortDefaultPropsFile = "/repository/source/SortDefaultProps.tsx"
 // than an empty payload, so it is mapped to the empty payload the config layer would actually hand
 // a rule configured as a bare "error". Keeping the two distinguishable in the rows makes the
 // generated table readable; collapsing them here keeps the decoder receiving what it will see.
-func sortDefaultPropsDecode(test *testing.T, raw string) any {
+func sortDefaultPropsDecode(test *testing.T, raw string) SortDefaultPropsOptions {
 	test.Helper()
 	payload := raw
 	if raw == `""` {
@@ -537,12 +537,8 @@ func TestDecodeSortDefaultPropsOptions(test *testing.T) {
 			if decodeSortDefaultPropertiesOptionsError != nil {
 				test.Fatalf("decode returned %v", decodeSortDefaultPropertiesOptionsError)
 			}
-			options, isOptions := decoded.(SortDefaultPropsOptions)
-			if !isOptions {
-				test.Fatalf("decode returned %T", decoded)
-			}
-			if options.IgnoreCase != testCase.want {
-				test.Fatalf("ignoreCase is %v, wanted %v", options.IgnoreCase, testCase.want)
+			if decoded.IgnoreCase != testCase.want {
+				test.Fatalf("ignoreCase is %v, wanted %v", decoded.IgnoreCase, testCase.want)
 			}
 		})
 	}

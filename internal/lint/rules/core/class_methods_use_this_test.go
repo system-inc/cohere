@@ -295,7 +295,7 @@ var classMethodsUseThisSilentCases = []classMethodsUseThisCase{
 }
 
 // decodedClassMethodsUseThis routes a row's raw JSON through the rule's own exported decoder.
-func decodedClassMethodsUseThis(test *testing.T, raw string) any {
+func decodedClassMethodsUseThis(test *testing.T, raw string) ClassMethodsUseThisOptions {
 	test.Helper()
 	decoded, decodeClassMethodsUseThisOptionsError := DecodeClassMethodsUseThisOptions([]byte(raw))
 	if decodeClassMethodsUseThisOptionsError != nil {

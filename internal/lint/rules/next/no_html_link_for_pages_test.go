@@ -91,7 +91,7 @@ func runHtmlLinkTreeWithOption(test *testing.T, rows []htmlLinkRow, option strin
 	result := rule_testing.RunTypedFilesWithOptionsFor(test, NoHtmlLinkForPages, htmlLinkTree(
 		rows,
 		paths...,
-	), "foo.tsx", func(directory string) any {
+	), "foo.tsx", func(directory string) NoHtmlLinkForPagesOptions {
 		quoted, quoteError := json.Marshal(directory)
 		if quoteError != nil {
 			test.Fatal(quoteError)
@@ -580,7 +580,7 @@ func TestNoHtmlLinkForPagesAnchorsRelativeDirectoriesToTheConfig(test *testing.T
 	files := htmlLinkTree(rows, "sub/custom/sub-page.tsx", "custom/root-page.tsx")
 	result := rule_testing.RunTypedFilesWithOptionsFor(test, NoHtmlLinkForPages, files, "foo.tsx", func(
 		directory string,
-	) any {
+	) NoHtmlLinkForPagesOptions {
 		decoded, decodeNoHtmlLinkForPagesOptionsError := decodeNoHtmlLinkForPagesOptions(
 			[]byte(`"custom"`),
 			rule.OptionsBase{ConfigDirectory: filepath.Join(directory, "sub"), ProjectRoot: directory},
@@ -625,13 +625,9 @@ func TestNoHtmlLinkForPagesDecodesUpstreamsSchema(test *testing.T) {
 			if decodeNoHtmlLinkForPagesOptionsError != nil {
 				test.Fatalf("refused: %v", decodeNoHtmlLinkForPagesOptionsError)
 			}
-			got, isOptions := decoded.(NoHtmlLinkForPagesOptions)
-			if !isOptions {
-				test.Fatalf("decoded to a %T, want NoHtmlLinkForPagesOptions", decoded)
-			}
-			if got.Configured != testCase.want.Configured ||
-				!slices.Equal(got.PagesDirectories, testCase.want.PagesDirectories) {
-				test.Errorf("decoded %+v, want %+v", got, testCase.want)
+			if decoded.Configured != testCase.want.Configured ||
+				!slices.Equal(decoded.PagesDirectories, testCase.want.PagesDirectories) {
+				test.Errorf("decoded %+v, want %+v", decoded, testCase.want)
 			}
 		})
 	}
@@ -699,13 +695,15 @@ func htmlLinkFingerprintOf(test *testing.T, files map[string]string, option stri
 	test.Helper()
 	var fingerprint [sha256.Size]byte
 	probe := NoHtmlLinkForPages
-	probe.Run = func(ruleContext rule.Context, options any) rule.Listeners {
+	probe.Run = func(ruleContext rule.Context, options rule.Given[NoHtmlLinkForPagesOptions]) rule.Listeners {
 		fingerprint = NoHtmlLinkForPages.ProgramFingerprint(ruleContext.Program, options)
 		return nil
 	}
-	rule_testing.RunTypedFilesWithOptionsFor(test, probe, files, "foo.tsx", func(directory string) any {
+	rule_testing.RunTypedFilesGivenFor(test, probe, files, "foo.tsx", func(
+		directory string,
+	) rule.Given[NoHtmlLinkForPagesOptions] {
 		if option == "" {
-			return nil
+			return rule.Given[NoHtmlLinkForPagesOptions]{}
 		}
 		quoted, quoteError := json.Marshal(directory)
 		if quoteError != nil {
@@ -719,7 +717,7 @@ func htmlLinkFingerprintOf(test *testing.T, files map[string]string, option stri
 		if decodeNoHtmlLinkForPagesOptionsError != nil {
 			test.Fatalf("decoding %s: %v", raw, decodeNoHtmlLinkForPagesOptionsError)
 		}
-		return decoded
+		return rule.Configured(decoded)
 	})
 	if fingerprint == ([sha256.Size]byte{}) {
 		test.Fatal("the probe never ran, so no fingerprint was read")
@@ -892,7 +890,7 @@ func TestNoHtmlLinkForPagesFingerprintsOnSeveralWorkersFromOneBuild(test *testin
 	var fingerprints [workers][sha256.Size]byte
 	var fileSystem *countingFileSystem
 	probe := NoHtmlLinkForPages
-	probe.Run = func(ruleContext rule.Context, options any) rule.Listeners {
+	probe.Run = func(ruleContext rule.Context, options rule.Given[NoHtmlLinkForPagesOptions]) rule.Listeners {
 		fileSystem = &countingFileSystem{FS: ruleContext.Program.FS(), checks: map[string]int{}}
 		program := countingProgram{Program: ruleContext.Program, fileSystem: fileSystem}
 		var wait sync.WaitGroup
@@ -900,7 +898,10 @@ func TestNoHtmlLinkForPagesFingerprintsOnSeveralWorkersFromOneBuild(test *testin
 			wait.Add(1)
 			go func() {
 				defer wait.Done()
-				fingerprints[worker] = NoHtmlLinkForPages.ProgramFingerprint(program, nil)
+				fingerprints[worker] = NoHtmlLinkForPages.ProgramFingerprint(
+					program,
+					rule.Given[NoHtmlLinkForPagesOptions]{},
+				)
 			}()
 		}
 		wait.Wait()

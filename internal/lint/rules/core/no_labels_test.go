@@ -27,25 +27,28 @@ func TestNoLabelsStaysSilent(test *testing.T) {
 
 	cases := []struct {
 		sourceText string
-		options    any
+		options    rule.Given[NoLabelsOptions]
 	}{
-		{"var f = { label: foo ()}", nil},
-		{"while (true) {}", nil},
-		{"while (true) { break; }", nil},
-		{"while (true) { continue; }", nil},
-		{"A: while (a) { break A; }", NoLabelsOptions{AllowLoop: true, AllowSwitch: false}},
-		{"A: do { if (b) { break A; } } while (a);", NoLabelsOptions{AllowLoop: true, AllowSwitch: false}},
+		{"var f = { label: foo ()}", rule.Given[NoLabelsOptions]{}},
+		{"while (true) {}", rule.Given[NoLabelsOptions]{}},
+		{"while (true) { break; }", rule.Given[NoLabelsOptions]{}},
+		{"while (true) { continue; }", rule.Given[NoLabelsOptions]{}},
+		{"A: while (a) { break A; }", rule.Configured(NoLabelsOptions{AllowLoop: true, AllowSwitch: false})},
+		{
+			"A: do { if (b) { break A; } } while (a);",
+			rule.Configured(NoLabelsOptions{AllowLoop: true, AllowSwitch: false}),
+		},
 		{
 			"A: for (var a in obj) { for (;;) { switch (a) { case 0: continue A; } } }",
-			NoLabelsOptions{AllowLoop: true, AllowSwitch: false},
+			rule.Configured(NoLabelsOptions{AllowLoop: true, AllowSwitch: false}),
 		},
-		{"A: switch (a) { case 0: break A; }", NoLabelsOptions{AllowLoop: false, AllowSwitch: true}},
+		{"A: switch (a) { case 0: break A; }", rule.Configured(NoLabelsOptions{AllowLoop: false, AllowSwitch: true})},
 	}
 
 	for _, testCase := range cases {
 		test.Run(testCase.sourceText, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.RunWithOptions(
+			rule_testing.ExpectClean(test, rule_testing.RunGiven(
 				test, NoLabels, noLabelsFile, testCase.sourceText, testCase.options))
 		})
 	}
@@ -63,76 +66,100 @@ func TestNoLabelsFires(test *testing.T) {
 
 	cases := []struct {
 		sourceText string
-		options    any
+		options    rule.Given[NoLabelsOptions]
 		wantIds    []string
 	}{
-		{"label: while(true) {}", nil, []string{"unexpectedLabel"}},
-		{"label: while (true) { break label; }", nil, []string{"unexpectedLabel", "unexpectedLabelInBreak"}},
-		{"label: while (true) { continue label; }", nil, []string{"unexpectedLabel", "unexpectedLabelInContinue"}},
-		{"A: var foo = 0;", nil, []string{"unexpectedLabel"}},
-		{"A: break A;", nil, []string{"unexpectedLabel", "unexpectedLabelInBreak"}},
-		{"A: { if (foo()) { break A; } bar(); };", nil, []string{"unexpectedLabel", "unexpectedLabelInBreak"}},
-		{"A: if (a) { if (foo()) { break A; } bar(); };", nil, []string{"unexpectedLabel", "unexpectedLabelInBreak"}},
+		{"label: while(true) {}", rule.Given[NoLabelsOptions]{}, []string{"unexpectedLabel"}},
+		{
+			"label: while (true) { break label; }",
+			rule.Given[NoLabelsOptions]{},
+			[]string{"unexpectedLabel", "unexpectedLabelInBreak"},
+		},
+		{
+			"label: while (true) { continue label; }",
+			rule.Given[NoLabelsOptions]{},
+			[]string{"unexpectedLabel", "unexpectedLabelInContinue"},
+		},
+		{"A: var foo = 0;", rule.Given[NoLabelsOptions]{}, []string{"unexpectedLabel"}},
+		{"A: break A;", rule.Given[NoLabelsOptions]{}, []string{"unexpectedLabel", "unexpectedLabelInBreak"}},
+		{
+			"A: { if (foo()) { break A; } bar(); };",
+			rule.Given[NoLabelsOptions]{},
+			[]string{"unexpectedLabel", "unexpectedLabelInBreak"},
+		},
+		{
+			"A: if (a) { if (foo()) { break A; } bar(); };",
+			rule.Given[NoLabelsOptions]{},
+			[]string{"unexpectedLabel", "unexpectedLabelInBreak"},
+		},
 		{
 			"A: switch (a) { case 0: break A; default: break; };",
-			nil,
+			rule.Given[NoLabelsOptions]{},
 			[]string{"unexpectedLabel", "unexpectedLabelInBreak"},
 		},
 		{
 			"A: switch (a) { case 0: B: { break A; } default: break; };",
-			nil,
+			rule.Given[NoLabelsOptions]{},
 			[]string{"unexpectedLabel", "unexpectedLabel", "unexpectedLabelInBreak"},
 		},
-		{"A: var foo = 0;", NoLabelsOptions{AllowLoop: true, AllowSwitch: false}, []string{"unexpectedLabel"}},
+		{
+			"A: var foo = 0;",
+			rule.Configured(NoLabelsOptions{AllowLoop: true, AllowSwitch: false}),
+			[]string{"unexpectedLabel"},
+		},
 		{
 			"A: break A;",
-			NoLabelsOptions{AllowLoop: true, AllowSwitch: false},
+			rule.Configured(NoLabelsOptions{AllowLoop: true, AllowSwitch: false}),
 			[]string{"unexpectedLabel", "unexpectedLabelInBreak"},
 		},
 		{
 			"A: { if (foo()) { break A; } bar(); };",
-			NoLabelsOptions{AllowLoop: true, AllowSwitch: false},
+			rule.Configured(NoLabelsOptions{AllowLoop: true, AllowSwitch: false}),
 			[]string{"unexpectedLabel", "unexpectedLabelInBreak"},
 		},
 		{
 			"A: if (a) { if (foo()) { break A; } bar(); };",
-			NoLabelsOptions{AllowLoop: true, AllowSwitch: false},
+			rule.Configured(NoLabelsOptions{AllowLoop: true, AllowSwitch: false}),
 			[]string{"unexpectedLabel", "unexpectedLabelInBreak"},
 		},
 		{
 			"A: switch (a) { case 0: break A; default: break; };",
-			NoLabelsOptions{AllowLoop: true, AllowSwitch: false},
+			rule.Configured(NoLabelsOptions{AllowLoop: true, AllowSwitch: false}),
 			[]string{"unexpectedLabel", "unexpectedLabelInBreak"},
 		},
-		{"A: var foo = 0;", NoLabelsOptions{AllowLoop: false, AllowSwitch: true}, []string{"unexpectedLabel"}},
+		{
+			"A: var foo = 0;",
+			rule.Configured(NoLabelsOptions{AllowLoop: false, AllowSwitch: true}),
+			[]string{"unexpectedLabel"},
+		},
 		{
 			"A: break A;",
-			NoLabelsOptions{AllowLoop: false, AllowSwitch: true},
+			rule.Configured(NoLabelsOptions{AllowLoop: false, AllowSwitch: true}),
 			[]string{"unexpectedLabel", "unexpectedLabelInBreak"},
 		},
 		{
 			"A: { if (foo()) { break A; } bar(); };",
-			NoLabelsOptions{AllowLoop: false, AllowSwitch: true},
+			rule.Configured(NoLabelsOptions{AllowLoop: false, AllowSwitch: true}),
 			[]string{"unexpectedLabel", "unexpectedLabelInBreak"},
 		},
 		{
 			"A: if (a) { if (foo()) { break A; } bar(); };",
-			NoLabelsOptions{AllowLoop: false, AllowSwitch: true},
+			rule.Configured(NoLabelsOptions{AllowLoop: false, AllowSwitch: true}),
 			[]string{"unexpectedLabel", "unexpectedLabelInBreak"},
 		},
 		{
 			"A: while (a) { break A; }",
-			NoLabelsOptions{AllowLoop: false, AllowSwitch: true},
+			rule.Configured(NoLabelsOptions{AllowLoop: false, AllowSwitch: true}),
 			[]string{"unexpectedLabel", "unexpectedLabelInBreak"},
 		},
 		{
 			"A: do { if (b) { break A; } } while (a);",
-			NoLabelsOptions{AllowLoop: false, AllowSwitch: true},
+			rule.Configured(NoLabelsOptions{AllowLoop: false, AllowSwitch: true}),
 			[]string{"unexpectedLabel", "unexpectedLabelInBreak"},
 		},
 		{
 			"A: for (var a in obj) { for (;;) { switch (a) { case 0: break A; } } }",
-			NoLabelsOptions{AllowLoop: false, AllowSwitch: true},
+			rule.Configured(NoLabelsOptions{AllowLoop: false, AllowSwitch: true}),
 			[]string{"unexpectedLabel", "unexpectedLabelInBreak"},
 		},
 	}
@@ -140,7 +167,7 @@ func TestNoLabelsFires(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.sourceText, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(
+			rule_testing.ExpectFindings(test, rule_testing.RunGiven(
 				test, NoLabels, noLabelsFile, testCase.sourceText, testCase.options),
 				testCase.wantIds...)
 		})
@@ -208,19 +235,19 @@ func TestNoLabelsSpansAContinue(test *testing.T) {
 	}
 }
 
-// The nil-options path, which every fixture above reaches through the decoder and therefore cannot
+// The unconfigured path, which every fixture above reaches through the decoder and therefore cannot
 // see.
 //
-// A rule configured as a bare `"error"` is handed nil rather than a decoded struct: the decoder
-// errors on empty input and the config turns that into nil. The rule's fallback has to produce the
-// strict setting, because that is upstream's default. Passing nil directly bypasses the decoder the
-// way the live config does.
+// A rule configured as a bare `"error"` is handed no options rather than a decoded struct: the decoder
+// errors on empty input and the config runs the rule unconfigured. The rule's fallback has to produce
+// the strict setting, because that is upstream's default. Running it unconfigured directly bypasses the
+// decoder the way the live config does.
 func TestNoLabelsDefaultsWithoutTheDecoder(test *testing.T) {
 	test.Parallel()
 
 	// Under the default, a label wrapping a loop still reports, and so does the break naming it.
 	rule_testing.ExpectFindings(test,
-		rule_testing.RunWithOptions(test, NoLabels, noLabelsFile, "A: while (a) { break A; }", nil),
+		rule_testing.Run(test, NoLabels, noLabelsFile, "A: while (a) { break A; }"),
 		"unexpectedLabel", "unexpectedLabelInBreak")
 
 	// The control: the same input under allowLoop is clean, so the finding above is about the
@@ -255,7 +282,7 @@ func TestNoLabelsDecodesItsOptionNames(test *testing.T) {
 		if decodeError != nil {
 			test.Fatalf("decoding %s: %v", testCase.raw, decodeError)
 		}
-		if decoded != any(testCase.want) {
+		if decoded != testCase.want {
 			test.Fatalf("decoding %s gave %+v, wanted %+v", testCase.raw, decoded, testCase.want)
 		}
 	}
@@ -346,15 +373,15 @@ func TestNoLabelsAnswersShapesEslintRefusesToParse(test *testing.T) {
 
 	// A jump naming a label that does not exist reports, under every option setting, because no
 	// option can exempt a label nothing declared.
-	for _, settings := range []any{
-		nil,
-		NoLabelsOptions{AllowLoop: true},
-		NoLabelsOptions{AllowSwitch: true},
-		NoLabelsOptions{AllowLoop: true, AllowSwitch: true},
+	for _, settings := range []rule.Given[NoLabelsOptions]{
+		rule.Given[NoLabelsOptions]{},
+		rule.Configured(NoLabelsOptions{AllowLoop: true}),
+		rule.Configured(NoLabelsOptions{AllowSwitch: true}),
+		rule.Configured(NoLabelsOptions{AllowLoop: true, AllowSwitch: true}),
 	} {
-		rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoLabels, noLabelsFile,
+		rule_testing.ExpectFindings(test, rule_testing.RunGiven(test, NoLabels, noLabelsFile,
 			"while(a) { break A; }", settings), "unexpectedLabelInBreak")
-		rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoLabels, noLabelsFile,
+		rule_testing.ExpectFindings(test, rule_testing.RunGiven(test, NoLabels, noLabelsFile,
 			"while(a) { continue A; }", settings), "unexpectedLabelInContinue")
 	}
 }

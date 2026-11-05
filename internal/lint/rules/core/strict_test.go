@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -23,7 +24,7 @@ const strictTypeScriptFile = "/repository/source/Strict.ts"
 // strictCase is one imported corpus row.
 type strictCase struct {
 	sourceText string
-	options    any
+	options    rule.Given[StrictMode]
 	wantIds    []string
 	// wantFixedSource is "" when the case is reported and deliberately not repaired.
 	wantFixedSource string
@@ -38,10 +39,11 @@ func runStrict(test *testing.T, testCase strictCase) rule_testing.Result {
 // runStrictIn is runStrict at a chosen path, for the rows whose answer turns on the file kind.
 func runStrictIn(test *testing.T, fileName string, testCase strictCase) rule_testing.Result {
 	test.Helper()
-	if testCase.options == nil {
+	mode, configured := testCase.options.Read()
+	if !configured {
 		return rule_testing.Run(test, Strict, fileName, testCase.sourceText)
 	}
-	encoded, encodeError := json.Marshal(testCase.options)
+	encoded, encodeError := json.Marshal(mode)
 	if encodeError != nil {
 		test.Fatalf("could not encode options: %v", encodeError)
 	}
@@ -74,154 +76,224 @@ func runStrictIn(test *testing.T, fileName string, testCase strictCase) rule_tes
 // comment. Both are covered by their own tests below.
 func strictFiresCases() []strictCase {
 	return []strictCase{
-		{"\"use strict\"; foo();", StrictNever, []string{"never"}, ""},
-		{"function foo() { 'use strict'; return; }", StrictNever, []string{"never"}, ""},
-		{"var foo = function() { 'use strict'; return; };", StrictNever, []string{"never"}, ""},
-		{"function foo() { return function() { 'use strict'; return; }; }", StrictNever, []string{"never"}, ""},
-		{"'use strict'; function foo() { \"use strict\"; return; }", StrictNever, []string{"never", "never"}, ""},
-		{"foo();", StrictGlobal, []string{"global"}, ""},
-		{"/* license */\nfunction foo() {}\nfunction bar() {}\n/* end */", StrictGlobal, []string{"global"}, ""},
-		{"function foo() { 'use strict'; return; }", StrictGlobal, []string{"global", "global"}, ""},
-		{"var foo = function() { 'use strict'; return; }", StrictGlobal, []string{"global", "global"}, ""},
-		{"var foo = () => { 'use strict'; return () => 1; }", StrictGlobal, []string{"global", "global"}, ""},
-		{"'use strict'; function foo() { 'use strict'; return; }", StrictGlobal, []string{"global"}, ""},
-		{"'use strict'; var foo = function() { 'use strict'; return; };", StrictGlobal, []string{"global"}, ""},
-		{"'use strict'; 'use strict'; foo();", StrictGlobal, []string{"multiple"}, "'use strict';  foo();"},
-		{"'use strict'; foo();", StrictFunction, []string{"function"}, ""},
-		{"'use strict'; (function() { 'use strict'; return true; }());", StrictFunction, []string{"function"}, ""},
+		{"\"use strict\"; foo();", rule.Configured(StrictNever), []string{"never"}, ""},
+		{"function foo() { 'use strict'; return; }", rule.Configured(StrictNever), []string{"never"}, ""},
+		{"var foo = function() { 'use strict'; return; };", rule.Configured(StrictNever), []string{"never"}, ""},
+		{
+			"function foo() { return function() { 'use strict'; return; }; }",
+			rule.Configured(StrictNever),
+			[]string{"never"},
+			"",
+		},
+		{
+			"'use strict'; function foo() { \"use strict\"; return; }",
+			rule.Configured(StrictNever),
+			[]string{"never", "never"},
+			"",
+		},
+		{"foo();", rule.Configured(StrictGlobal), []string{"global"}, ""},
+		{
+			"/* license */\nfunction foo() {}\nfunction bar() {}\n/* end */",
+			rule.Configured(StrictGlobal),
+			[]string{"global"},
+			"",
+		},
+		{"function foo() { 'use strict'; return; }", rule.Configured(StrictGlobal), []string{"global", "global"}, ""},
+		{
+			"var foo = function() { 'use strict'; return; }",
+			rule.Configured(StrictGlobal),
+			[]string{"global", "global"},
+			"",
+		},
+		{
+			"var foo = () => { 'use strict'; return () => 1; }",
+			rule.Configured(StrictGlobal),
+			[]string{"global", "global"},
+			"",
+		},
+		{
+			"'use strict'; function foo() { 'use strict'; return; }",
+			rule.Configured(StrictGlobal),
+			[]string{"global"},
+			"",
+		},
+		{
+			"'use strict'; var foo = function() { 'use strict'; return; };",
+			rule.Configured(StrictGlobal),
+			[]string{"global"},
+			"",
+		},
+		{
+			"'use strict'; 'use strict'; foo();",
+			rule.Configured(StrictGlobal),
+			[]string{"multiple"},
+			"'use strict';  foo();",
+		},
+		{"'use strict'; foo();", rule.Configured(StrictFunction), []string{"function"}, ""},
+		{
+			"'use strict'; (function() { 'use strict'; return true; }());",
+			rule.Configured(StrictFunction),
+			[]string{"function"},
+			"",
+		},
 		{
 			"(function() { 'use strict'; function f() { 'use strict'; return } return true; }());",
-			StrictFunction,
+			rule.Configured(StrictFunction),
 			[]string{"unnecessary"},
 			"(function() { 'use strict'; function f() {  return } return true; }());",
 		},
-		{"(function() { return true; }());", StrictFunction, []string{"function"}, ""},
-		{"(() => { return true; })();", StrictFunction, []string{"function"}, ""},
-		{"(() => true)();", StrictFunction, []string{"function"}, ""},
+		{"(function() { return true; }());", rule.Configured(StrictFunction), []string{"function"}, ""},
+		{"(() => { return true; })();", rule.Configured(StrictFunction), []string{"function"}, ""},
+		{"(() => true)();", rule.Configured(StrictFunction), []string{"function"}, ""},
 		{
 			"var foo = function() { foo(); 'use strict'; return; }; function bar() { foo(); 'use strict'; }",
-			StrictFunction,
+			rule.Configured(StrictFunction),
 			[]string{"function", "function"},
 			"",
 		},
 		{
 			"function foo() { 'use strict'; 'use strict'; return; }",
-			StrictFunction,
+			rule.Configured(StrictFunction),
 			[]string{"multiple"},
 			"function foo() { 'use strict';  return; }",
 		},
 		{
 			"var foo = function() { 'use strict'; 'use strict'; return; }",
-			StrictFunction,
+			rule.Configured(StrictFunction),
 			[]string{"multiple"},
 			"var foo = function() { 'use strict';  return; }",
 		},
-		{"function foo() { return function() { 'use strict'; return; }; }", StrictFunction, []string{"function"}, ""},
+		{
+			"function foo() { return function() { 'use strict'; return; }; }",
+			rule.Configured(StrictFunction),
+			[]string{"function"},
+			"",
+		},
 		{
 			"var foo = function() { function bar() { 'use strict'; return; } return; }",
-			StrictFunction,
+			rule.Configured(StrictFunction),
 			[]string{"function"},
 			"",
 		},
 		{
 			"function foo() { 'use strict'; return; } var bar = function() { return; };",
-			StrictFunction,
+			rule.Configured(StrictFunction),
 			[]string{"function"},
 			"",
 		},
 		{
 			"var foo = function() { 'use strict'; return; }; function bar() { return; };",
-			StrictFunction,
+			rule.Configured(StrictFunction),
 			[]string{"function"},
 			"",
 		},
 		{
 			"function foo() { 'use strict'; return function() { 'use strict'; 'use strict'; return; }; }",
-			StrictFunction,
+			rule.Configured(StrictFunction),
 			[]string{"unnecessary", "multiple"},
 			"function foo() { 'use strict'; return function() {   return; }; }",
 		},
 		{
 			"var foo = function() { 'use strict'; function bar() { 'use strict'; 'use strict'; return; } }",
-			StrictFunction,
+			rule.Configured(StrictFunction),
 			[]string{"unnecessary", "multiple"},
 			"var foo = function() { 'use strict'; function bar() {   return; } }",
 		},
-		{"var foo = () => { return; };", StrictFunction, []string{"function"}, ""},
+		{"var foo = () => { return; };", rule.Configured(StrictFunction), []string{"function"}, ""},
 		{
 			"class A { constructor() { \"use strict\"; } }",
-			StrictFunction,
+			rule.Configured(StrictFunction),
 			[]string{"unnecessaryInClasses"},
 			"class A { constructor() {  } }",
 		},
 		{
 			"class A { foo() { \"use strict\"; } }",
-			StrictFunction,
+			rule.Configured(StrictFunction),
 			[]string{"unnecessaryInClasses"},
 			"class A { foo() {  } }",
 		},
 		{
 			"class A { foo() { function bar() { \"use strict\"; } } }",
-			StrictFunction,
+			rule.Configured(StrictFunction),
 			[]string{"unnecessaryInClasses"},
 			"class A { foo() { function bar() {  } } }",
 		},
 		{
 			"class A { field = () => { \"use strict\"; } }",
-			StrictFunction,
+			rule.Configured(StrictFunction),
 			[]string{"unnecessaryInClasses"},
 			"class A { field = () => {  } }",
 		},
 		{
 			"class A { field = function() { \"use strict\"; } }",
-			StrictFunction,
+			rule.Configured(StrictFunction),
 			[]string{"unnecessaryInClasses"},
 			"class A { field = function() {  } }",
 		},
-		{"'use strict'; function foo() { return; }", StrictSafe, []string{"function", "function"}, ""},
-		{"'use strict'; function foo() { return; }", nil, []string{"function", "function"}, ""},
-		{"function foo() { return; }", nil, []string{"function"}, ""},
-		{"function foo(a = 0) { 'use strict' }", nil, []string{"nonSimpleParameterList"}, ""},
+		{"'use strict'; function foo() { return; }", rule.Configured(StrictSafe), []string{"function", "function"}, ""},
+		{"'use strict'; function foo() { return; }", rule.Given[StrictMode]{}, []string{"function", "function"}, ""},
+		{"function foo() { return; }", rule.Given[StrictMode]{}, []string{"function"}, ""},
+		{"function foo(a = 0) { 'use strict' }", rule.Given[StrictMode]{}, []string{"nonSimpleParameterList"}, ""},
 		{
 			"(function() { 'use strict'; function foo(a = 0) { 'use strict' } }())",
-			nil,
+			rule.Given[StrictMode]{},
 			[]string{"nonSimpleParameterList"},
 			"",
 		},
-		{"function foo(a = 0) { 'use strict' }", StrictNever, []string{"nonSimpleParameterList"}, ""},
-		{"function foo(a = 0) { 'use strict' }", StrictGlobal, []string{"global", "nonSimpleParameterList"}, ""},
-		{"'use strict'; function foo(a = 0) { 'use strict' }", StrictGlobal, []string{"nonSimpleParameterList"}, ""},
-		{"function foo(a = 0) { 'use strict' }", StrictFunction, []string{"nonSimpleParameterList"}, ""},
+		{"function foo(a = 0) { 'use strict' }", rule.Configured(StrictNever), []string{"nonSimpleParameterList"}, ""},
 		{
-			"(function() { 'use strict'; function foo(a = 0) { 'use strict' } }())",
-			StrictFunction,
+			"function foo(a = 0) { 'use strict' }",
+			rule.Configured(StrictGlobal),
+			[]string{"global", "nonSimpleParameterList"},
+			"",
+		},
+		{
+			"'use strict'; function foo(a = 0) { 'use strict' }",
+			rule.Configured(StrictGlobal),
 			[]string{"nonSimpleParameterList"},
 			"",
 		},
-		{"function foo(a = 0) { }", StrictFunction, []string{"wrap"}, ""},
-		{"(function() { function foo(a = 0) { } }())", StrictFunction, []string{"function"}, ""},
+		{
+			"function foo(a = 0) { 'use strict' }",
+			rule.Configured(StrictFunction),
+			[]string{"nonSimpleParameterList"},
+			"",
+		},
+		{
+			"(function() { 'use strict'; function foo(a = 0) { 'use strict' } }())",
+			rule.Configured(StrictFunction),
+			[]string{"nonSimpleParameterList"},
+			"",
+		},
+		{"function foo(a = 0) { }", rule.Configured(StrictFunction), []string{"wrap"}, ""},
+		{"(function() { function foo(a = 0) { } }())", rule.Configured(StrictFunction), []string{"function"}, ""},
 		{
 			"'use strict'; class C { static { function foo() { \n'use strict'; } } }",
-			StrictGlobal,
+			rule.Configured(StrictGlobal),
 			[]string{"global"},
 			"",
 		},
-		{"class C { static { function foo() { \n'use strict'; } } }", StrictNever, []string{"never"}, ""},
+		{
+			"class C { static { function foo() { \n'use strict'; } } }",
+			rule.Configured(StrictNever),
+			[]string{"never"},
+			"",
+		},
 		{
 			"function foo() {'use strict'; class C { static { function foo() { \n'use strict'; } } } }",
-			StrictFunction,
+			rule.Configured(StrictFunction),
 			[]string{"unnecessary"},
 			"function foo() {'use strict'; class C { static { function foo() { \n } } } }",
 		},
 		{
 			"class C { static { function foo() { \n'use strict'; } } }",
-			StrictFunction,
+			rule.Configured(StrictFunction),
 			[]string{"unnecessaryInClasses"},
 			"class C { static { function foo() { \n } } }",
 		},
 		{
 			"class C { static { function foo() { \n'use strict';\n'use strict'; } } }",
-			StrictFunction,
+			rule.Configured(StrictFunction),
 			[]string{"unnecessaryInClasses", "multiple"},
 			"class C { static { function foo() { \n\n } } }",
 		},
@@ -230,48 +302,68 @@ func strictFiresCases() []strictCase {
 
 func strictSilentCases() []strictCase {
 	return []strictCase{
-		{"foo();", StrictNever, nil, ""},
-		{"function foo() { return; }", StrictNever, nil, ""},
-		{"var foo = function() { return; };", StrictNever, nil, ""},
-		{"foo(); 'use strict';", StrictNever, nil, ""},
-		{"function foo() { bar(); 'use strict'; return; }", StrictNever, nil, ""},
-		{"var foo = function() { { 'use strict'; } return; };", StrictNever, nil, ""},
-		{"(function() { bar('use strict'); return; }());", StrictNever, nil, ""},
-		{"var fn = x => 1;", StrictNever, nil, ""},
-		{"var fn = x => { return; };", StrictNever, nil, ""},
-		{"// Intentionally empty", StrictGlobal, nil, ""},
-		{"\"use strict\"; foo();", StrictGlobal, nil, ""},
-		{"'use strict'; function foo() { return; }", StrictGlobal, nil, ""},
-		{"'use strict'; var foo = function() { return; };", StrictGlobal, nil, ""},
-		{"'use strict'; function foo() { bar(); 'use strict'; return; }", StrictGlobal, nil, ""},
-		{"'use strict'; var foo = function() { bar(); 'use strict'; return; };", StrictGlobal, nil, ""},
-		{"'use strict'; function foo() { return function() { bar(); 'use strict'; return; }; }", StrictGlobal, nil, ""},
-		{"'use strict'; var foo = () => { return () => { bar(); 'use strict'; return; }; }", StrictGlobal, nil, ""},
-		{"function foo() { 'use strict'; return; }", StrictFunction, nil, ""},
-		{"var foo = function() { 'use strict'; return; }", StrictFunction, nil, ""},
+		{"foo();", rule.Configured(StrictNever), nil, ""},
+		{"function foo() { return; }", rule.Configured(StrictNever), nil, ""},
+		{"var foo = function() { return; };", rule.Configured(StrictNever), nil, ""},
+		{"foo(); 'use strict';", rule.Configured(StrictNever), nil, ""},
+		{"function foo() { bar(); 'use strict'; return; }", rule.Configured(StrictNever), nil, ""},
+		{"var foo = function() { { 'use strict'; } return; };", rule.Configured(StrictNever), nil, ""},
+		{"(function() { bar('use strict'); return; }());", rule.Configured(StrictNever), nil, ""},
+		{"var fn = x => 1;", rule.Configured(StrictNever), nil, ""},
+		{"var fn = x => { return; };", rule.Configured(StrictNever), nil, ""},
+		{"// Intentionally empty", rule.Configured(StrictGlobal), nil, ""},
+		{"\"use strict\"; foo();", rule.Configured(StrictGlobal), nil, ""},
+		{"'use strict'; function foo() { return; }", rule.Configured(StrictGlobal), nil, ""},
+		{"'use strict'; var foo = function() { return; };", rule.Configured(StrictGlobal), nil, ""},
+		{"'use strict'; function foo() { bar(); 'use strict'; return; }", rule.Configured(StrictGlobal), nil, ""},
 		{
-			"function foo() { 'use strict'; return; } var bar = function() { 'use strict'; bar(); };",
-			StrictFunction,
+			"'use strict'; var foo = function() { bar(); 'use strict'; return; };",
+			rule.Configured(StrictGlobal),
 			nil,
 			"",
 		},
-		{"var foo = function() { 'use strict'; function bar() { return; } bar(); };", StrictFunction, nil, ""},
-		{"var foo = () => { 'use strict'; var bar = () => 1; bar(); };", StrictFunction, nil, ""},
-		{"class A { constructor() { } }", StrictFunction, nil, ""},
-		{"class A { foo() { } }", StrictFunction, nil, ""},
-		{"class A { foo() { function bar() { } } }", StrictFunction, nil, ""},
-		{"(function() { 'use strict'; function foo(a = 0) { } }())", StrictFunction, nil, ""},
-		{"function foo() { 'use strict'; return; }", StrictSafe, nil, ""},
-		{"function foo() { 'use strict'; return; }", nil, nil, ""},
-		{"'use strict'; class C { static { foo; } }", StrictGlobal, nil, ""},
-		{"'use strict'; class C { static { 'use strict'; } }", StrictGlobal, nil, ""},
-		{"'use strict'; class C { static { 'use strict'; 'use strict'; } }", StrictGlobal, nil, ""},
-		{"class C { static { foo; } }", StrictFunction, nil, ""},
-		{"class C { static { 'use strict'; } }", StrictFunction, nil, ""},
-		{"class C { static { 'use strict'; 'use strict'; } }", StrictFunction, nil, ""},
-		{"class C { static { foo; } }", StrictNever, nil, ""},
-		{"class C { static { 'use strict'; } }", StrictNever, nil, ""},
-		{"class C { static { 'use strict'; 'use strict'; } }", StrictNever, nil, ""},
+		{
+			"'use strict'; function foo() { return function() { bar(); 'use strict'; return; }; }",
+			rule.Configured(StrictGlobal),
+			nil,
+			"",
+		},
+		{
+			"'use strict'; var foo = () => { return () => { bar(); 'use strict'; return; }; }",
+			rule.Configured(StrictGlobal),
+			nil,
+			"",
+		},
+		{"function foo() { 'use strict'; return; }", rule.Configured(StrictFunction), nil, ""},
+		{"var foo = function() { 'use strict'; return; }", rule.Configured(StrictFunction), nil, ""},
+		{
+			"function foo() { 'use strict'; return; } var bar = function() { 'use strict'; bar(); };",
+			rule.Configured(StrictFunction),
+			nil,
+			"",
+		},
+		{
+			"var foo = function() { 'use strict'; function bar() { return; } bar(); };",
+			rule.Configured(StrictFunction),
+			nil,
+			"",
+		},
+		{"var foo = () => { 'use strict'; var bar = () => 1; bar(); };", rule.Configured(StrictFunction), nil, ""},
+		{"class A { constructor() { } }", rule.Configured(StrictFunction), nil, ""},
+		{"class A { foo() { } }", rule.Configured(StrictFunction), nil, ""},
+		{"class A { foo() { function bar() { } } }", rule.Configured(StrictFunction), nil, ""},
+		{"(function() { 'use strict'; function foo(a = 0) { } }())", rule.Configured(StrictFunction), nil, ""},
+		{"function foo() { 'use strict'; return; }", rule.Configured(StrictSafe), nil, ""},
+		{"function foo() { 'use strict'; return; }", rule.Given[StrictMode]{}, nil, ""},
+		{"'use strict'; class C { static { foo; } }", rule.Configured(StrictGlobal), nil, ""},
+		{"'use strict'; class C { static { 'use strict'; } }", rule.Configured(StrictGlobal), nil, ""},
+		{"'use strict'; class C { static { 'use strict'; 'use strict'; } }", rule.Configured(StrictGlobal), nil, ""},
+		{"class C { static { foo; } }", rule.Configured(StrictFunction), nil, ""},
+		{"class C { static { 'use strict'; } }", rule.Configured(StrictFunction), nil, ""},
+		{"class C { static { 'use strict'; 'use strict'; } }", rule.Configured(StrictFunction), nil, ""},
+		{"class C { static { foo; } }", rule.Configured(StrictNever), nil, ""},
+		{"class C { static { 'use strict'; } }", rule.Configured(StrictNever), nil, ""},
+		{"class C { static { 'use strict'; 'use strict'; } }", rule.Configured(StrictNever), nil, ""},
 	}
 }
 
@@ -381,23 +473,23 @@ func TestStrictReadsTypeScriptParameterLists(test *testing.T) {
 	cases := []strictCase{
 		// An annotation and a return type leave the parameter simple, so the directive is merely
 		// redundant rather than a syntax error, and the repair deletes it.
-		{"function f(a: string): void { 'use strict'; }", StrictNever, []string{"implied"},
+		{"function f(a: string): void { 'use strict'; }", rule.Configured(StrictNever), []string{"implied"},
 			"function f(a: string): void {  }"},
-		{"function f<T>(a: T): T { 'use strict'; return a; }", StrictNever, []string{"implied"},
+		{"function f<T>(a: T): T { 'use strict'; return a; }", rule.Configured(StrictNever), []string{"implied"},
 			"function f<T>(a: T): T {  return a; }"},
 		// An optional marker likewise.
-		{"function f(a?: string) { 'use strict'; }", StrictNever, []string{"implied"},
+		{"function f(a?: string) { 'use strict'; }", rule.Configured(StrictNever), []string{"implied"},
 			"function f(a?: string) {  }"},
 		// A method with an annotated parameter, reached through the class arm.
-		{"class A { foo(a: string): void { 'use strict'; } }", StrictNever, []string{"implied"},
+		{"class A { foo(a: string): void { 'use strict'; } }", rule.Configured(StrictNever), []string{"implied"},
 			"class A { foo(a: string): void {  } }"},
 		// The three shapes that genuinely make the directive a syntax error, each carrying a type
 		// annotation as well so the annotation is not what decides it.
-		{"function f(a: string = 'x') { 'use strict'; }", StrictNever,
+		{"function f(a: string = 'x') { 'use strict'; }", rule.Configured(StrictNever),
 			[]string{"nonSimpleParameterList"}, ""},
-		{"function f(...rest: string[]) { 'use strict'; }", StrictNever,
+		{"function f(...rest: string[]) { 'use strict'; }", rule.Configured(StrictNever),
 			[]string{"nonSimpleParameterList"}, ""},
-		{"function f({a}: {a: number}) { 'use strict'; }", StrictNever,
+		{"function f({a}: {a: number}) { 'use strict'; }", rule.Configured(StrictNever),
 			[]string{"nonSimpleParameterList"}, ""},
 	}
 	for _, testCase := range cases {
@@ -430,7 +522,7 @@ func TestStrictReadsATypeScriptFileAsImpliedStrict(test *testing.T) {
 			test.Parallel()
 			testCase := strictCase{sourceText: script}
 			if mode != "" {
-				testCase.options = mode
+				testCase.options = rule.Configured(mode)
 			}
 			rule_testing.ExpectClean(test, runStrictIn(test, strictTypeScriptFile, testCase))
 		})
@@ -440,16 +532,21 @@ func TestStrictReadsATypeScriptFileAsImpliedStrict(test *testing.T) {
 	// here rather than the first as `implied` and the rest as `multiple`, because `implied` goes
 	// through the same reportAll as `never` and `module`.
 	cases := []strictCase{
-		{"'use strict';\nconst a: number = 1;", nil, []string{"implied"}, "\nconst a: number = 1;"},
-		{"'use strict';\nconst a: number = 1;", StrictGlobal,
+		{
+			"'use strict';\nconst a: number = 1;",
+			rule.Given[StrictMode]{},
+			[]string{"implied"},
+			"\nconst a: number = 1;",
+		},
+		{"'use strict';\nconst a: number = 1;", rule.Configured(StrictGlobal),
 			[]string{"implied"}, "\nconst a: number = 1;"},
-		{"'use strict'; 'use strict';\nconst a: number = 1;", StrictGlobal,
+		{"'use strict'; 'use strict';\nconst a: number = 1;", rule.Configured(StrictGlobal),
 			[]string{"implied", "implied"}, " \nconst a: number = 1;"},
-		{"function foo(): void { 'use strict'; 'use strict'; }", StrictFunction,
+		{"function foo(): void { 'use strict'; 'use strict'; }", rule.Configured(StrictFunction),
 			[]string{"implied", "implied"}, "function foo(): void {   }"},
 		// A module still wins, as upstream's Program listener has it: `module` is assigned after
 		// `implied`, so a TypeScript module says the more specific thing.
-		{"'use strict';\nexport const a: number = 1;", nil, []string{"module"},
+		{"'use strict';\nexport const a: number = 1;", rule.Given[StrictMode]{}, []string{"module"},
 			"\nexport const a: number = 1;"},
 	}
 	for _, testCase := range cases {
@@ -518,11 +615,11 @@ func TestStrictRepairPreservesTypeSyntax(test *testing.T) {
 
 	cases := []strictCase{
 		// The `never` mode does not repair, so these use the module collapse, which does.
-		{"'use strict'; export function f(a: string): void {}", nil, []string{"module"},
+		{"'use strict'; export function f(a: string): void {}", rule.Given[StrictMode]{}, []string{"module"},
 			" export function f(a: string): void {}"},
-		{"'use strict'; export function g<T>(a: T): T { return a; }", nil, []string{"module"},
+		{"'use strict'; export function g<T>(a: T): T { return a; }", rule.Given[StrictMode]{}, []string{"module"},
 			" export function g<T>(a: T): T { return a; }"},
-		{"'use strict'; export const h = (a?: number): string => String(a);", nil,
+		{"'use strict'; export const h = (a?: number): string => String(a);", rule.Given[StrictMode]{},
 			[]string{"module"}, " export const h = (a?: number): string => String(a);"},
 	}
 	for _, testCase := range cases {
@@ -551,7 +648,7 @@ func TestStrictCollapsesEveryModeInAModule(test *testing.T) {
 		test.Run(string(mode), func(test *testing.T) {
 			test.Parallel()
 			result := runStrict(test, strictCase{sourceText: source,
-				options: mode})
+				options: rule.Configured(mode)})
 			rule_testing.ExpectFindings(test, result, "module")
 			rule_testing.ExpectFixedSource(test, result, " export const a = 1;")
 		})
@@ -631,12 +728,8 @@ func TestDecodeStrictOptions(test *testing.T) {
 		if decodeStrictOptionsError != nil {
 			test.Fatalf("unexpected error: %v", decodeStrictOptionsError)
 		}
-		mode, ok := decoded.(StrictMode)
-		if !ok {
-			test.Fatalf("the decoder returned %T, not StrictMode", decoded)
-		}
-		if mode != StrictSafe {
-			test.Errorf("mode came back %q, wanted upstream's default %q", mode, StrictSafe)
+		if decoded != StrictSafe {
+			test.Errorf("mode came back %q, wanted upstream's default %q", decoded, StrictSafe)
 		}
 	})
 
@@ -646,12 +739,8 @@ func TestDecodeStrictOptions(test *testing.T) {
 		if decodeStrictOptionsError != nil {
 			test.Fatalf("upstream's own `[\"error\", \"never\"]` was refused: %v", decodeStrictOptionsError)
 		}
-		mode, ok := decoded.(StrictMode)
-		if !ok {
-			test.Fatalf("the decoder returned %T, not StrictMode", decoded)
-		}
-		if mode != StrictNever {
-			test.Errorf("mode came back %q, wanted %q", mode, StrictNever)
+		if decoded != StrictNever {
+			test.Errorf("mode came back %q, wanted %q", decoded, StrictNever)
 		}
 	})
 
@@ -705,16 +794,16 @@ func TestStrictStopsAtANonStrictDirective(test *testing.T) {
 	test.Parallel()
 
 	cases := []strictCase{
-		{"'use strict'; foo();", StrictNever, []string{"never"}, ""},
-		{"'use strict'; 'use asm'; foo();", StrictNever, []string{"never"}, ""},
+		{"'use strict'; foo();", rule.Configured(StrictNever), []string{"never"}, ""},
+		{"'use strict'; 'use asm'; foo();", rule.Configured(StrictNever), []string{"never"}, ""},
 		// The reproduced defect: silent because index 0 is a hole.
-		{"'use asm'; 'use strict'; foo();", StrictNever, nil, ""},
-		{"'a'; 'b'; 'use strict'; foo();", StrictNever, nil, ""},
+		{"'use asm'; 'use strict'; foo();", rule.Configured(StrictNever), nil, ""},
+		{"'a'; 'b'; 'use strict'; foo();", rule.Configured(StrictNever), nil, ""},
 		// A non-directive string does not open a prologue slot at all.
-		{"'use asm'; foo();", StrictNever, nil, ""},
+		{"'use asm'; foo();", rule.Configured(StrictNever), nil, ""},
 		// The control: two real directives in a row are both reported, so the silence above is
 		// the hole rather than a rule that only ever reports one.
-		{"'use strict'; 'use strict'; foo();", StrictNever, []string{"never", "never"}, ""},
+		{"'use strict'; 'use strict'; foo();", rule.Configured(StrictNever), []string{"never", "never"}, ""},
 	}
 	for _, testCase := range cases {
 		test.Run(testCase.sourceText, func(test *testing.T) {
@@ -751,8 +840,10 @@ func TestStrictSafeResolvesToFunctionForAScript(test *testing.T) {
 	// A script with a top-level function and no directive: Function mode reports, Global would
 	// have reported on the whole program instead, so the message id separates them.
 	rule_testing.ExpectFindings(test, runStrict(test, strictCase{
-		sourceText: "function foo() { return; }", options: StrictSafe}), "function")
+		sourceText: "function foo() { return; }", options: rule.Configured(StrictSafe)}), "function")
 	// And the CommonJS spelling resolves the same way here, which is the divergence itself.
 	rule_testing.ExpectFindings(test, runStrict(test, strictCase{
-		sourceText: "module.exports = function foo() { return; };", options: StrictSafe}), "function")
+		sourceText: "module.exports = function foo() { return; };",
+		options:    rule.Configured(StrictSafe),
+	}), "function")
 }

@@ -69,9 +69,9 @@ func messageNoDirectGraphqlImport() rule.Message {
 //
 // No fix. Each of the three wants a different replacement, and choosing it means knowing what the
 // call site was doing with the import.
-var NetworkNoForbiddenImport = rule.Rule{
+var NetworkNoForbiddenImport = rule.Rule[rule.NoOptions]{
 	Name: "structure/network-no-forbidden-import",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}

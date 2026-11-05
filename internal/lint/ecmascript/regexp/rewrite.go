@@ -56,7 +56,8 @@ func wordBoundary(negated bool, options rewriteOptions) string {
 // regexp2 parses both inside a character class and out.
 func literalRune(character rune) string {
 	switch {
-	case character >= '0' && character <= '9', character >= 'a' && character <= 'z', character >= 'A' && character <= 'Z':
+	case character >= '0' &&
+		character <= '9', character >= 'a' && character <= 'z', character >= 'A' && character <= 'Z':
 		return string(character)
 	case character > 0xFFFF:
 		// Past what `\uXXXX` names, and nothing up there carries a meaning of

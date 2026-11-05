@@ -100,11 +100,11 @@ type NoUselessEscapeOptions struct {
 // where a backslash is a literal backslash and the language never read it as an escape, so there is
 // nothing useless about it. The second is a real string literal that merely sits inside JSX. The
 // difference is visible as the literal's parent and nothing else.
-var NoUselessEscape = rule.Rule{
+var NoUselessEscape = rule.Rule[NoUselessEscapeOptions]{
 	Name: "no-useless-escape",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoUselessEscapeOptions]) rule.Listeners {
 		allowed := map[rune]bool{}
-		if configured, isConfigured := rule.OptionsAs[NoUselessEscapeOptions](options); isConfigured {
+		if configured, isConfigured := options.Read(); isConfigured {
 			for _, entry := range configured.AllowRegexCharacters {
 				// One character per entry. A longer string can never equal a single escaped
 				// character, so admitting it would widen nothing and hide a typo in the configuration.

@@ -62,7 +62,7 @@ func TestAProgramViewAdmitsExactlyTheDeclaredReads(test *testing.T) {
 	for _, method := range methods {
 		test.Run(method.name, func(test *testing.T) {
 			test.Parallel()
-			refused := refusalOf(func() { method.call(ViewProgram(program, nil, Rule{Name: "probe"})) })
+			refused := refusalOf(func() { method.call(ViewProgram(program, nil, Traits{Name: "probe"})) })
 			if !strings.Contains(refused, "rule probe called Program."+method.name) ||
 				!strings.Contains(refused, programReadNames[method.read]) {
 				test.Errorf("an undeclared %s was not refused by name and kind: %q", method.name, refused)
@@ -75,7 +75,7 @@ func TestAProgramViewAdmitsExactlyTheDeclaredReads(test *testing.T) {
 				ReadsDesignSystem,
 			} {
 				refused := refusalOf(
-					func() { method.call(ViewProgram(program, nil, Rule{Name: "probe", ProgramReads: other})) },
+					func() { method.call(ViewProgram(program, nil, Traits{Name: "probe", ProgramReads: other})) },
 				)
 				if admitted := refused == ""; admitted != (other == method.read) {
 					test.Errorf(
@@ -96,12 +96,12 @@ func TestAProgramViewAdmitsExactlyTheDeclaredReads(test *testing.T) {
 func TestResolvingAnotherFilesImportsIsAReadOfOtherFiles(test *testing.T) {
 	test.Parallel()
 	program := new(compiler.Program)
-	resolution := Rule{Name: "probe", ProgramReads: ReadsModuleResolution}
+	resolution := Traits{Name: "probe", ProgramReads: ReadsModuleResolution}
 	refused := refusalOf(func() { ViewProgram(program, nil, resolution).ResolveModule(fileNamed("other.ts"), nil) })
 	if !strings.Contains(refused, "ReadsOtherFiles") {
 		test.Errorf("resolving another file's imports under ReadsModuleResolution alone was not refused: %q", refused)
 	}
-	both := Rule{Name: "probe", ProgramReads: ReadsModuleResolution | ReadsOtherFiles}
+	both := Traits{Name: "probe", ProgramReads: ReadsModuleResolution | ReadsOtherFiles}
 	if refused := refusalOf(
 		func() { ViewProgram(program, nil, both).ResolveModule(fileNamed("other.ts"), nil) },
 	); refused != "" {
@@ -113,11 +113,11 @@ func TestResolvingAnotherFilesImportsIsAReadOfOtherFiles(test *testing.T) {
 // meaning what they meant.
 func TestANilProgramViewsAsNil(test *testing.T) {
 	test.Parallel()
-	if ViewProgram(nil, nil, Rule{Name: "probe", ProgramReads: ReadsOtherFiles}) != nil {
+	if ViewProgram(nil, nil, Traits{Name: "probe", ProgramReads: ReadsOtherFiles}) != nil {
 		test.Error("a nil program gave a non-nil view")
 	}
 	var slot ProgramViewSlot
-	if slot.Point(nil, nil, Rule{Name: "probe", ProgramReads: ReadsOtherFiles}) != nil {
+	if slot.Point(nil, nil, Traits{Name: "probe", ProgramReads: ReadsOtherFiles}) != nil {
 		test.Error("a nil program gave a non-nil view from a slot")
 	}
 	slot.Release()
@@ -143,7 +143,7 @@ func endedOf(call func()) (ended string) {
 func TestASlotViewKeptPastItsFileFailsOnEveryRead(test *testing.T) {
 	test.Parallel()
 	program := new(compiler.Program)
-	everything := Rule{
+	everything := Traits{
 		Name: "keeps-its-program",
 		ProgramReads: ReadsCompilerOptions | ReadsDefaultLibrary | ReadsModuleResolution | ReadsOtherFiles |
 			ReadsDesignSystem,

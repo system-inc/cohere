@@ -876,7 +876,7 @@ func TestNoMultiCompHasNoFileSuffixGate(test *testing.T) {
 //
 // Building the options struct directly would leave the decoder untested, and the decoder is where a
 // default inversion would live. The empty-input row is the one that matters: a rule configured as a
-// bare `"error"` is handed nil, and this asserts that resolves to the documented default rather
+// bare `"error"` hands its decoder empty input, and this asserts that resolves to the documented default rather
 // than to an error or a surprise.
 func TestDecodeNoMultiCompOptions(test *testing.T) {
 	test.Parallel()
@@ -907,12 +907,8 @@ func TestDecodeNoMultiCompOptions(test *testing.T) {
 			if decodeNoMultiCompOptionsError != nil {
 				test.Fatalf("unexpected error: %v", decodeNoMultiCompOptionsError)
 			}
-			options, isOptions := decoded.(NoMultiCompOptions)
-			if !isOptions {
-				test.Fatalf("decoder returned %T, want NoMultiCompOptions", decoded)
-			}
-			if options.IgnoreStateless != testCase.want {
-				test.Errorf("IgnoreStateless is %v, want %v", options.IgnoreStateless, testCase.want)
+			if decoded.IgnoreStateless != testCase.want {
+				test.Errorf("IgnoreStateless is %v, want %v", decoded.IgnoreStateless, testCase.want)
 			}
 		})
 	}
@@ -920,15 +916,15 @@ func TestDecodeNoMultiCompOptions(test *testing.T) {
 
 // TestNoMultiCompNilOptionsFallsBackToTheDefault bypasses the decoder entirely.
 //
-// A rule configured as a bare `"error"` can reach `Run` with nil options rather than with a decoded
-// struct, and `options.(T)` on nil yields the zero value. The zero value happens to be correct here,
+// A rule configured as a bare `"error"` can reach `Run` with the zero `rule.Given` rather than a decoded
+// struct, and its `Read` returns false and the zero value. The zero value happens to be correct here,
 // which is exactly why this is pinned: nothing else in the suite would notice if the fallback were
 // removed and a later option defaulted the other way.
 func TestNoMultiCompNilOptionsFallsBackToTheDefault(test *testing.T) {
 	test.Parallel()
 
 	sourceText := "function A(){ return <div/>; }\nfunction B(){ return <div/>; }\n"
-	result := rule_testing.RunTypedWithOptions(test, NoMultiComp, noMultiCompFile, sourceText, nil)
+	result := rule_testing.RunTyped(test, NoMultiComp, noMultiCompFile, sourceText)
 	rule_testing.ExpectFindings(test, result, "onlyOneComponent")
 }
 

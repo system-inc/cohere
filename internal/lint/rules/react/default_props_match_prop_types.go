@@ -30,7 +30,7 @@ func DefaultDefaultPropsMatchPropTypesOptions() DefaultPropsMatchPropTypesOption
 // Our config layer unwraps the severity tuple before dispatch, so this receives upstream's option
 // object rather than upstream's one-element array. Empty input is a bare `"error"` and resolves to
 // the default, which is the correct behaviour here precisely because the rule works without options.
-func DecodeDefaultPropsMatchPropTypesOptions(raw []byte) (any, error) {
+func DecodeDefaultPropsMatchPropTypesOptions(raw []byte) (DefaultPropsMatchPropTypesOptions, error) {
 	options := DefaultDefaultPropsMatchPropTypesOptions()
 	if len(raw) == 0 {
 		return options, nil
@@ -100,15 +100,15 @@ func messageDefaultHasNoType(name string) rule.Message {
 // So the trade is a checker lock on 3,516 files against five corpus cases and no real input. The
 // five are recorded in the test file rather than expressed, and if `defaultProps` ever returns to
 // this tree the annotation arm is the piece to add.
-var DefaultPropsMatchPropTypes = rule.Rule{
+var DefaultPropsMatchPropTypes = rule.Rule[DefaultPropsMatchPropTypesOptions]{
 	Name: "react/default-props-match-prop-types",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[DefaultPropsMatchPropTypesOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		settings := DefaultDefaultPropsMatchPropTypesOptions()
-		if configured, isConfigured := rule.OptionsAs[DefaultPropsMatchPropTypesOptions](options); isConfigured {
+		if configured, isConfigured := options.Read(); isConfigured {
 			settings = configured
 		}
 

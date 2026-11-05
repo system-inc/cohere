@@ -69,9 +69,9 @@ var anonymousComponentWrapperNames = map[string]bool{
 // is the right one, because `Field.displayName = 'x'` above `const Field = memo(...)` is a
 // temporal dead zone error at runtime anyway. A rule that exempted it would be excusing code that
 // cannot run.
-var ReactComponentNoDisplayName = rule.Rule{
+var ReactComponentNoDisplayName = rule.Rule[rule.NoOptions]{
 	Name: "structure/react-component-no-display-name",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// Scoped to this file's walk, which is the whole lifetime that matters: the original keys
 		// the same set on one `create` call per file.
 		wrappedAsAnonymous := map[string]bool{}

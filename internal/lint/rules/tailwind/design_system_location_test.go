@@ -104,11 +104,11 @@ func TestDesignSystemIsCachedPerLocation(test *testing.T) {
 		test.Skip("no installed tailwindcss on this machine, so there is no design system to read")
 	}
 	var entryPoints []string
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name:         "probe/design-system-per-location",
 		ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDesignSystem,
 		NoListener:   rule.NoListenerAnswersInRun,
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			for _, location := range []DesignSystemLocation{{}, {ConfigPath: "packages/web/design/brand.css"}, {}} {
 				entryPoints = append(
 					entryPoints,

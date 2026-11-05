@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/system-inc/cohere/internal/lint/checking"
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -36,179 +37,244 @@ func TestNoMisusedSpreadStaysSilent(test *testing.T) {
 		name       string
 		fileName   string
 		sourceText string
-		options    any
+		options    rule.Given[NoMisusedSpreadOptions]
 	}{
-		{"upstream valid 0", "file.ts", "const a = [...[1, 2, 3]];", nil},
-		{"upstream valid 1", "file.ts", "const a = [...([1, 2, 3] as const)];", nil},
-		{"upstream valid 2", "file.ts", "\ndeclare const data: any;\nconst a = [...data];\n    ", nil},
-		{"upstream valid 3", "file.ts", "\ndeclare const data: unknown;\nconst a = [...data];\n    ", nil},
-		{"upstream valid 4", "file.ts", "\nconst a = [1, 2, 3];\nconst b = [...a];\n    ", nil},
-		{"upstream valid 5", "file.ts", "\nconst a = [1, 2, 3] as const;\nconst b = [...a];\n    ", nil},
+		{"upstream valid 0", "file.ts", "const a = [...[1, 2, 3]];", rule.Given[NoMisusedSpreadOptions]{}},
+		{"upstream valid 1", "file.ts", "const a = [...([1, 2, 3] as const)];", rule.Given[NoMisusedSpreadOptions]{}},
+		{
+			"upstream valid 2",
+			"file.ts",
+			"\ndeclare const data: any;\nconst a = [...data];\n    ",
+			rule.Given[NoMisusedSpreadOptions]{},
+		},
+		{
+			"upstream valid 3",
+			"file.ts",
+			"\ndeclare const data: unknown;\nconst a = [...data];\n    ",
+			rule.Given[NoMisusedSpreadOptions]{},
+		},
+		{
+			"upstream valid 4",
+			"file.ts",
+			"\nconst a = [1, 2, 3];\nconst b = [...a];\n    ",
+			rule.Given[NoMisusedSpreadOptions]{},
+		},
+		{
+			"upstream valid 5",
+			"file.ts",
+			"\nconst a = [1, 2, 3] as const;\nconst b = [...a];\n    ",
+			rule.Given[NoMisusedSpreadOptions]{},
+		},
 		{
 			"upstream valid 6",
 			"file.ts",
 			"\ndeclare function getArray(): number[];\nconst a = [...getArray()];\n    ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 		},
 		{
 			"upstream valid 7",
 			"file.ts",
 			"\ndeclare function getTuple(): readonly number[];\nconst a = [...getTuple()];\n    ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 		},
 		{
 			"upstream valid 8",
 			"file.ts",
 			"\nconst iterator = {\n  *[Symbol.iterator]() {\n    yield 1;\n    yield 2;\n    yield 3;\n  },\n};\n\nconst a = [...iterator];\n    ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 		},
 		{
 			"upstream valid 9",
 			"file.ts",
 			"\ndeclare const data: Iterable<number> | number[];\n\nconst a = [...data];\n    ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 		},
 		{
 			"upstream valid 10",
 			"file.ts",
 			"\ndeclare const data: Iterable<number> & number[];\n\nconst a = [...data];\n    ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 		},
 		{
 			"upstream valid 11",
 			"file.ts",
 			"\ndeclare function getIterable(): Iterable<number>;\n\nconst a = [...getIterable()];\n    ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 		},
-		{"upstream valid 12", "file.ts", "\ndeclare const data: Uint8Array;\n\nconst a = [...data];\n    ", nil},
-		{"upstream valid 13", "file.ts", "\ndeclare const data: TypedArray;\n\nconst a = [...data];\n    ", nil},
-		{"upstream valid 14", "file.ts", "const o = { ...{ a: 1, b: 2 } };", nil},
-		{"upstream valid 15", "file.ts", "const o = { ...({ a: 1, b: 2 } as const) };", nil},
-		{"upstream valid 16", "file.ts", "\ndeclare const obj: any;\n\nconst o = { ...obj };\n    ", nil},
+		{
+			"upstream valid 12",
+			"file.ts",
+			"\ndeclare const data: Uint8Array;\n\nconst a = [...data];\n    ",
+			rule.Given[NoMisusedSpreadOptions]{},
+		},
+		{
+			"upstream valid 13",
+			"file.ts",
+			"\ndeclare const data: TypedArray;\n\nconst a = [...data];\n    ",
+			rule.Given[NoMisusedSpreadOptions]{},
+		},
+		{"upstream valid 14", "file.ts", "const o = { ...{ a: 1, b: 2 } };", rule.Given[NoMisusedSpreadOptions]{}},
+		{
+			"upstream valid 15",
+			"file.ts",
+			"const o = { ...({ a: 1, b: 2 } as const) };",
+			rule.Given[NoMisusedSpreadOptions]{},
+		},
+		{
+			"upstream valid 16",
+			"file.ts",
+			"\ndeclare const obj: any;\n\nconst o = { ...obj };\n    ",
+			rule.Given[NoMisusedSpreadOptions]{},
+		},
 		{
 			"upstream valid 17",
 			"file.ts",
 			"\ndeclare const obj: { a: number; b: number } | any;\n\nconst o = { ...obj };\n    ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 		},
 		{
 			"upstream valid 18",
 			"file.ts",
 			"\ndeclare const obj: { a: number; b: number } & any;\n\nconst o = { ...obj };\n    ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 		},
-		{"upstream valid 19", "file.ts", "\nconst obj = { a: 1, b: 2 };\nconst o = { ...obj };\n    ", nil},
+		{
+			"upstream valid 19",
+			"file.ts",
+			"\nconst obj = { a: 1, b: 2 };\nconst o = { ...obj };\n    ",
+			rule.Given[NoMisusedSpreadOptions]{},
+		},
 		{
 			"upstream valid 20",
 			"file.ts",
 			"\ndeclare const obj: { a: number; b: number };\nconst o = { ...obj };\n    ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 		},
 		{
 			"upstream valid 21",
 			"file.ts",
 			"\ndeclare function getObject(): { a: number; b: number };\nconst o = { ...getObject() };\n    ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 		},
-		{"upstream valid 22", "file.ts", "\nfunction f() {}\n\nf.prop = 1;\n\nconst o = { ...f };\n    ", nil},
-		{"upstream valid 23", "file.ts", "\nconst f = () => {};\n\nf.prop = 1;\n\nconst o = { ...f };\n    ", nil},
+		{
+			"upstream valid 22",
+			"file.ts",
+			"\nfunction f() {}\n\nf.prop = 1;\n\nconst o = { ...f };\n    ",
+			rule.Given[NoMisusedSpreadOptions]{},
+		},
+		{
+			"upstream valid 23",
+			"file.ts",
+			"\nconst f = () => {};\n\nf.prop = 1;\n\nconst o = { ...f };\n    ",
+			rule.Given[NoMisusedSpreadOptions]{},
+		},
 		{
 			"upstream valid 24",
 			"file.ts",
 			"\nfunction* generator() {}\n\ngenerator.prop = 1;\n\nconst o = { ...generator };\n    ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 		},
 		{
 			"upstream valid 25",
 			"file.ts",
 			"\ndeclare const promiseLike: PromiseLike<number>;\n\nconst o = { ...promiseLike };\n    ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 		},
-		{"upstream valid 26", "file.tsx", "\nconst obj = { a: 1, b: 2 };\nconst o = <div {...x} />;\n      ", nil},
+		{
+			"upstream valid 26",
+			"file.tsx",
+			"\nconst obj = { a: 1, b: 2 };\nconst o = <div {...x} />;\n      ",
+			rule.Given[NoMisusedSpreadOptions]{},
+		},
 		{
 			"upstream valid 27",
 			"file.tsx",
 			"\ndeclare const obj: { a: number; b: number } | any;\nconst o = <div {...x} />;\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 		},
 		{
 			"upstream valid 28",
 			"file.ts",
 			"\nconst promise = new Promise(() => {});\nconst o = { ...promise };\n      ",
-			NoMisusedSpreadOptions{AllowInline: []string{"Promise"}},
+			rule.Configured(NoMisusedSpreadOptions{AllowInline: []string{"Promise"}}),
 		},
-		{"upstream valid 29", "file.ts", "\ninterface A {}\n\ndeclare const a: A;\n\nconst o = { ...a };\n    ", nil},
-		{"upstream valid 30", "file.ts", "\nconst o = { ...'test' };\n    ", nil},
+		{
+			"upstream valid 29",
+			"file.ts",
+			"\ninterface A {}\n\ndeclare const a: A;\n\nconst o = { ...a };\n    ",
+			rule.Given[NoMisusedSpreadOptions]{},
+		},
+		{"upstream valid 30", "file.ts", "\nconst o = { ...'test' };\n    ", rule.Given[NoMisusedSpreadOptions]{}},
 		{
 			"upstream valid 31",
 			"file.ts",
 			"\nconst str: string = 'test';\nconst a = [...str];\n      ",
-			NoMisusedSpreadOptions{AllowInline: []string{"string"}},
+			rule.Configured(NoMisusedSpreadOptions{AllowInline: []string{"string"}}),
 		},
 		{
 			"upstream valid 32",
 			"file.ts",
 			"\nfunction f() {}\n\nconst a = { ...f };\n      ",
-			NoMisusedSpreadOptions{AllowInline: []string{"f"}},
+			rule.Configured(NoMisusedSpreadOptions{AllowInline: []string{"f"}}),
 		},
 		{
 			"upstream valid 33",
 			"file.ts",
 			"\ndeclare const iterator: Iterable<string>;\n\nconst a = { ...iterator };\n      ",
-			NoMisusedSpreadOptions{
+			rule.Configured(NoMisusedSpreadOptions{
 				Allow: []type_checking.TypeOrValueSpecifier{
 					{From: type_checking.TypeOrValueSpecifierFromLib, Name: []string{"Iterable"}},
 				},
-			},
+			}),
 		},
 		{
 			"upstream valid 34",
 			"file.ts",
 			"\ntype BrandedString = string & { __brand: 'safe' };\n\ndeclare const brandedString: BrandedString;\n\nconst spreadBrandedString = [...brandedString];\n      ",
-			NoMisusedSpreadOptions{Allow: []type_checking.TypeOrValueSpecifier{
+			rule.Configured(NoMisusedSpreadOptions{Allow: []type_checking.TypeOrValueSpecifier{
 				{From: type_checking.TypeOrValueSpecifierFromFile, Name: []string{"BrandedString"}},
-			}},
+			}}),
 		},
 		{
 			"upstream valid 35",
 			"file.ts",
 			"\ntype CustomIterable = {\n  [Symbol.iterator]: () => Generator<string>;\n};\n\ndeclare const iterator: CustomIterable;\n\nconst a = { ...iterator };\n      ",
-			NoMisusedSpreadOptions{AllowInline: []string{"CustomIterable"}},
+			rule.Configured(NoMisusedSpreadOptions{AllowInline: []string{"CustomIterable"}}),
 		},
 		{
 			"upstream valid 36",
 			"file.ts",
 			"\ntype CustomIterable = {\n  [Symbol.iterator]: () => string;\n};\n\ndeclare const iterator: CustomIterable;\n\nconst a = { ...iterator };\n      ",
-			NoMisusedSpreadOptions{Allow: []type_checking.TypeOrValueSpecifier{
+			rule.Configured(NoMisusedSpreadOptions{Allow: []type_checking.TypeOrValueSpecifier{
 				{From: type_checking.TypeOrValueSpecifierFromFile, Name: []string{"CustomIterable"}},
-			}},
+			}}),
 		},
 		{
 			"upstream valid 37",
 			"file.ts",
 			"\ndeclare module 'module' {\n  export type CustomIterable = {\n    [Symbol.iterator]: () => string;\n  };\n}\n\nimport { CustomIterable } from 'module';\n\ndeclare const iterator: CustomIterable;\n\nconst a = { ...iterator };\n      ",
-			NoMisusedSpreadOptions{Allow: []type_checking.TypeOrValueSpecifier{{
+			rule.Configured(NoMisusedSpreadOptions{Allow: []type_checking.TypeOrValueSpecifier{{
 				From:    type_checking.TypeOrValueSpecifierFromPackage,
 				Name:    []string{"CustomIterable"},
 				Package: "module",
-			}}},
+			}}}),
 		},
 		{
 			"upstream valid 38",
 			"file.ts",
 			"\nclass A {\n  a = 1;\n}\n\nconst a = new A();\n\nconst o = { ...a };\n      ",
-			NoMisusedSpreadOptions{AllowInline: []string{"A"}},
+			rule.Configured(NoMisusedSpreadOptions{AllowInline: []string{"A"}}),
 		},
 		{
 			"upstream valid 39",
 			"file.ts",
 			"\nconst a = {\n  ...class A {\n    static value = 1;\n  },\n};\n      ",
-			NoMisusedSpreadOptions{AllowInline: []string{"A"}},
+			rule.Configured(NoMisusedSpreadOptions{AllowInline: []string{"A"}}),
 		}}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(
+			result := rule_testing.RunTypedGiven(
 				test,
 				NoMisusedSpread,
 				testCase.fileName,
@@ -238,476 +304,482 @@ func TestNoMisusedSpreadFires(test *testing.T) {
 		name       string
 		fileName   string
 		sourceText string
-		options    any
+		options    rule.Given[NoMisusedSpreadOptions]
 		wantIds    []string
 	}{
-		{"upstream invalid 14", "file.ts", "const o = { ...[1, 2, 3] };", nil, []string{"noArraySpreadInObject"}},
+		{
+			"upstream invalid 14",
+			"file.ts",
+			"const o = { ...[1, 2, 3] };",
+			rule.Given[NoMisusedSpreadOptions]{},
+			[]string{"noArraySpreadInObject"},
+		},
 		{
 			"upstream invalid 15",
 			"file.ts",
 			"\nconst arr = [1, 2, 3];\nconst o = { ...arr };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noArraySpreadInObject"},
 		},
 		{
 			"upstream invalid 16",
 			"file.ts",
 			"\nconst arr = [1, 2, 3] as const;\nconst o = { ...arr };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noArraySpreadInObject"},
 		},
 		{
 			"upstream invalid 17",
 			"file.ts",
 			"\ndeclare const arr: number[];\nconst o = { ...arr };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noArraySpreadInObject"},
 		},
 		{
 			"upstream invalid 18",
 			"file.ts",
 			"\ndeclare const arr: readonly number[];\nconst o = { ...arr };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noArraySpreadInObject"},
 		},
 		{
 			"upstream invalid 19",
 			"file.ts",
 			"\ndeclare const arr: number[] | string[];\nconst o = { ...arr };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noArraySpreadInObject"},
 		},
 		{
 			"upstream invalid 20",
 			"file.ts",
 			"\ndeclare const arr: number[] & string[];\nconst o = { ...arr };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noArraySpreadInObject"},
 		},
 		{
 			"upstream invalid 21",
 			"file.ts",
 			"\ndeclare function getArray(): number[];\nconst o = { ...getArray() };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noArraySpreadInObject"},
 		},
 		{
 			"upstream invalid 22",
 			"file.ts",
 			"\ndeclare function getArray(): readonly number[];\nconst o = { ...getArray() };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noArraySpreadInObject"},
 		},
 		{
 			"upstream invalid 23",
 			"file.ts",
 			"const o = { ...new Set([1, 2, 3]) };",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noIterableSpreadInObject"},
 		},
 		{
 			"upstream invalid 24",
 			"file.ts",
 			"\nconst set = new Set([1, 2, 3]);\nconst o = { ...set };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noIterableSpreadInObject"},
 		},
 		{
 			"upstream invalid 25",
 			"file.ts",
 			"\ndeclare const set: Set<number>;\nconst o = { ...set };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noIterableSpreadInObject"},
 		},
 		{
 			"upstream invalid 26",
 			"file.ts",
 			"\ndeclare const set: WeakSet<object>;\nconst o = { ...set };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noClassInstanceSpreadInObject"},
 		},
 		{
 			"upstream invalid 27",
 			"file.ts",
 			"\ndeclare const set: ReadonlySet<number>;\nconst o = { ...set };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noIterableSpreadInObject"},
 		},
 		{
 			"upstream invalid 28",
 			"file.ts",
 			"\ndeclare const set: Set<number> | { a: number };\nconst o = { ...set };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noIterableSpreadInObject"},
 		},
 		{
 			"upstream invalid 29",
 			"file.ts",
 			"\ndeclare function getSet(): Set<number>;\nconst o = { ...getSet() };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noIterableSpreadInObject"},
 		},
 		{
 			"upstream invalid 30",
 			"file.ts",
 			"\nconst o = {\n  ...new Map([\n    ['test-1', 1],\n    ['test-2', 2],\n  ]),\n};\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noMapSpreadInObject"},
 		},
 		{
 			"upstream invalid 31",
 			"file.ts",
 			"\nconst map = new Map([\n  ['test-1', 1],\n  ['test-2', 2],\n]);\n\nconst o = { ...map };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noMapSpreadInObject"},
 		},
 		{
 			"upstream invalid 32",
 			"file.ts",
 			"\ndeclare const map: Map<string, number>;\nconst o = { ...map };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noMapSpreadInObject"},
 		},
 		{
 			"upstream invalid 33",
 			"file.ts",
 			"\n        declare const map: Map<string, number>;\n        const o = { ...(map) };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noMapSpreadInObject"},
 		},
 		{
 			"upstream invalid 34",
 			"file.ts",
 			"\ndeclare const map: Map<string, number>;\nconst o = { ...(map, map) };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noMapSpreadInObject"},
 		},
 		{
 			"upstream invalid 35",
 			"file.ts",
 			"\ndeclare const map: Map<string, number>;\nconst others = { a: 1 };\nconst o = { ...map, ...others };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noMapSpreadInObject"},
 		},
 		{
 			"upstream invalid 36",
 			"file.ts",
 			"\ndeclare const map: Map<string, number>;\nconst o = { other: 1, ...map };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noMapSpreadInObject"},
 		},
 		{
 			"upstream invalid 37",
 			"file.ts",
 			"\ndeclare const map: ReadonlyMap<string, number>;\nconst o = { ...map };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noMapSpreadInObject"},
 		},
 		{
 			"upstream invalid 38",
 			"file.ts",
 			"\ndeclare const map: WeakMap<{ a: number }, string>;\nconst o = { ...map };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noMapSpreadInObject"},
 		},
 		{
 			"upstream invalid 39",
 			"file.ts",
 			"\ndeclare const map: Map<string, number> | { a: number };\nconst o = { ...map };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noMapSpreadInObject"},
 		},
 		{
 			"upstream invalid 40",
 			"file.ts",
 			"\ndeclare function getMap(): Map<string, number>;\nconst o = { ...getMap() };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noMapSpreadInObject"},
 		},
 		{
 			"upstream invalid 41",
 			"file.ts",
 			"\ndeclare const a: Map<boolean, string> & Set<number>;\nconst o = { ...a };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noMapSpreadInObject"},
 		},
 		{
 			"upstream invalid 42",
 			"file.ts",
 			"\nconst ref = new WeakRef({ a: 1 });\nconst o = { ...ref };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noClassInstanceSpreadInObject"},
 		},
 		{
 			"upstream invalid 43",
 			"file.ts",
 			"\nconst promise = new Promise(() => {});\nconst o = { ...promise };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noPromiseSpreadInObject"},
 		},
 		{
 			"upstream invalid 44",
 			"file.ts",
 			"\ndeclare const promise: Promise<{ a: 1 }>;\nasync function foo() {\n  return { ...(promise || {}) };\n}\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noPromiseSpreadInObject"},
 		},
 		{
 			"upstream invalid 45",
 			"file.ts",
 			"\ndeclare const promise: Promise<any>;\nasync function foo() {\n  return { ...(Math.random() < 0.5 ? promise : {}) };\n}\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noPromiseSpreadInObject"},
 		},
 		{
 			"upstream invalid 46",
 			"file.ts",
 			"\nfunction withPromise<P extends Promise<void>>(promise: P) {\n  return { ...promise };\n}\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noPromiseSpreadInObject"},
 		},
 		{
 			"upstream invalid 47",
 			"file.ts",
 			"\ndeclare const maybePromise: Promise<number> | { a: number };\nconst o = { ...maybePromise };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noPromiseSpreadInObject"},
 		},
 		{
 			"upstream invalid 48",
 			"file.ts",
 			"\ndeclare const promise: Promise<number> & { a: number };\nconst o = { ...promise };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noPromiseSpreadInObject"},
 		},
 		{
 			"upstream invalid 49",
 			"file.ts",
 			"\ndeclare function getPromise(): Promise<number>;\nconst o = { ...getPromise() };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noPromiseSpreadInObject"},
 		},
 		{
 			"upstream invalid 50",
 			"file.ts",
 			"\ndeclare function getPromise<T extends Promise<number>>(arg: T): T;\nconst o = { ...getPromise() };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noPromiseSpreadInObject"},
 		},
 		{
 			"upstream invalid 51",
 			"file.ts",
 			"\nfunction f() {}\n\nconst o = { ...f };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noFunctionSpreadInObject"},
 		},
 		{
 			"upstream invalid 52",
 			"file.ts",
 			"\ninterface FunctionWithProps {\n  (): string;\n  prop: boolean;\n}\n\ntype FunctionWithoutProps = () => string;\n\ndeclare const obj: FunctionWithProps | FunctionWithoutProps | object;\n\nconst o = { ...obj };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noFunctionSpreadInObject"},
 		},
 		{
 			"upstream invalid 53",
 			"file.ts",
 			"\nconst f = () => {};\n\nconst o = { ...f };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noFunctionSpreadInObject"},
 		},
 		{
 			"upstream invalid 54",
 			"file.ts",
 			"\ndeclare function f(): void;\n\nconst o = { ...f };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noFunctionSpreadInObject"},
 		},
 		{
 			"upstream invalid 55",
 			"file.ts",
 			"\ndeclare function getFunction(): () => void;\n\nconst o = { ...getFunction() };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noFunctionSpreadInObject"},
 		},
 		{
 			"upstream invalid 56",
 			"file.ts",
 			"\ndeclare const f: () => void;\n\nconst o = { ...f };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noFunctionSpreadInObject"},
 		},
 		{
 			"upstream invalid 57",
 			"file.ts",
 			"\ndeclare const f: () => void | { a: number };\n\nconst o = { ...f };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noFunctionSpreadInObject"},
 		},
 		{
 			"upstream invalid 58",
 			"file.ts",
 			"\nfunction* generator() {}\n\nconst o = { ...generator };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noFunctionSpreadInObject"},
 		},
 		{
 			"upstream invalid 59",
 			"file.ts",
 			"\nconst iterator = {\n  *[Symbol.iterator]() {\n    yield 'test';\n  },\n};\n\nconst o = { ...iterator };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noIterableSpreadInObject"},
 		},
 		{
 			"upstream invalid 60",
 			"file.ts",
 			"\ntype CustomIterable = {\n  [Symbol.iterator]: () => Generator<string>;\n};\n\nconst iterator: CustomIterable = {\n  *[Symbol.iterator]() {\n    yield 'test';\n  },\n};\n\nconst a = { ...iterator };\n      ",
-			NoMisusedSpreadOptions{AllowInline: []string{"AnotherIterable"}},
+			rule.Configured(NoMisusedSpreadOptions{AllowInline: []string{"AnotherIterable"}}),
 			[]string{"noIterableSpreadInObject"},
 		},
 		{
 			"upstream invalid 62",
 			"file.ts",
 			"\ndeclare const iterator: Iterable<string>;\n\nconst o = { ...iterator };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noIterableSpreadInObject"},
 		},
 		{
 			"upstream invalid 63",
 			"file.ts",
 			"\ndeclare const iterator: Iterable<string> | { a: number };\n\nconst o = { ...iterator };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noIterableSpreadInObject"},
 		},
 		{
 			"upstream invalid 64",
 			"file.ts",
 			"\ndeclare function getIterable(): Iterable<string>;\n\nconst o = { ...getIterable() };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noIterableSpreadInObject"},
 		},
 		{
 			"upstream invalid 65",
 			"file.ts",
 			"\nclass A {\n  [Symbol.iterator]() {\n    return {\n      next() {\n        return { done: true, value: undefined };\n      },\n    };\n  }\n}\n\nconst a = { ...new A() };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noIterableSpreadInObject"},
 		},
 		{
 			"upstream invalid 66",
 			"file.ts",
 			"\nconst o = { ...new Date() };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noClassInstanceSpreadInObject"},
 		},
 		{
 			"upstream invalid 67",
 			"file.ts",
 			"\ndeclare class HTMLElementLike {}\ndeclare const element: HTMLElementLike;\nconst o = { ...element };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noClassInstanceSpreadInObject"},
 		},
 		{
 			"upstream invalid 68",
 			"file.ts",
 			"\ndeclare const regex: RegExp;\nconst o = { ...regex };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noClassInstanceSpreadInObject"},
 		},
 		{
 			"upstream invalid 77",
 			"file.ts",
 			"\nclass A {}\n\nconst o = { ...A };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noClassDeclarationSpreadInObject"},
 		},
 		{
 			"upstream invalid 78",
 			"file.ts",
 			"\nconst A = class {};\n\nconst o = { ...A };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noClassDeclarationSpreadInObject"},
 		},
 		{
 			"upstream invalid 79",
 			"file.ts",
 			"\nclass Declaration {\n  declaration?: boolean;\n}\nconst Expression = class {\n  expression?: boolean;\n};\n\ndeclare const either: typeof Declaration | typeof Expression;\n\nconst o = { ...either };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noClassDeclarationSpreadInObject"},
 		},
 		{
 			"upstream invalid 80",
 			"file.ts",
 			"\nconst A = Set<number>;\n\nconst o = { ...A };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noClassDeclarationSpreadInObject"},
 		},
 		{
 			"upstream invalid 81",
 			"file.ts",
 			"\nconst a = {\n  ...class A {\n    static value = 1;\n    nonStatic = 2;\n  },\n};\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noClassDeclarationSpreadInObject"},
 		},
 		{
 			"upstream invalid 82",
 			"file.ts",
 			"\n        const a = { ...(class A { static value = 1 }) }\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noClassDeclarationSpreadInObject"},
 		},
 		{
 			"upstream invalid 84",
 			"file.tsx",
 			"\nconst o = <div {...[1, 2, 3]} />;\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noArraySpreadInObject"},
 		},
 		{
 			"upstream invalid 85",
 			"file.tsx",
 			"\nclass A {}\n\nconst o = <div {...A} />;\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noClassDeclarationSpreadInObject"},
 		},
 		{
 			"upstream invalid 86",
 			"file.tsx",
 			"\nconst o = <div {...new Date()} />;\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noClassInstanceSpreadInObject"},
 		},
 		{
 			"upstream invalid 87",
 			"file.tsx",
 			"\nfunction f() {}\n\nconst o = <div {...f} />;\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noFunctionSpreadInObject"},
 		},
 		{
 			"upstream invalid 88",
 			"file.tsx",
 			"\nconst o = <div {...new Set([1, 2, 3])} />;\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noIterableSpreadInObject"},
 		},
 		{
 			"upstream invalid 89",
 			"file.tsx",
 			"\ndeclare const map: Map<string, number>;\n\nconst o = <div {...map} />;\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noMapSpreadInObject"},
 		},
 		{
 			"upstream invalid 90",
 			"file.tsx",
 			"\nconst promise = new Promise(() => {});\n\nconst o = <div {...promise} />;\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			[]string{"noPromiseSpreadInObject"},
 		}}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(
+			result := rule_testing.RunTypedGiven(
 				test,
 				NoMisusedSpread,
 				testCase.fileName,
@@ -802,15 +874,15 @@ func TestNoMisusedSpreadLeavesStringSpreadAlone(test *testing.T) {
 			test.Parallel()
 			rule_testing.ExpectClean(
 				test,
-				rule_testing.RunTypedWithOptions(test, NoMisusedSpread, noMisusedSpreadFile, testCase.sourceText, nil),
+				rule_testing.RunTyped(test, NoMisusedSpread, noMisusedSpreadFile, testCase.sourceText),
 			)
 		})
 	}
 
 	test.Run("control: an array spread into an object in the same harness still reports", func(test *testing.T) {
 		test.Parallel()
-		rule_testing.ExpectFindings(test, rule_testing.RunTypedWithOptions(test, NoMisusedSpread, noMisusedSpreadFile,
-			"declare const s: string;\nconst x = [...s];\nconst o = { ...[...s] };", nil), "noArraySpreadInObject")
+		rule_testing.ExpectFindings(test, rule_testing.RunTyped(test, NoMisusedSpread, noMisusedSpreadFile,
+			"declare const s: string;\nconst x = [...s];\nconst o = { ...[...s] };"), "noArraySpreadInObject")
 	})
 }
 
@@ -833,7 +905,7 @@ func TestNoMisusedSpreadSuggestions(test *testing.T) {
 		name       string
 		fileName   string
 		sourceText string
-		options    any
+		options    rule.Given[NoMisusedSpreadOptions]
 		wantId     string
 		wantOutput string
 	}{
@@ -841,7 +913,7 @@ func TestNoMisusedSpreadSuggestions(test *testing.T) {
 			"upstream invalid 30",
 			"file.ts",
 			"\nconst o = {\n  ...new Map([\n    ['test-1', 1],\n    ['test-2', 2],\n  ]),\n};\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			"replaceMapSpreadInObject",
 			"\nconst o = Object.fromEntries(new Map([\n    ['test-1', 1],\n    ['test-2', 2],\n  ]));\n      ",
 		},
@@ -849,7 +921,7 @@ func TestNoMisusedSpreadSuggestions(test *testing.T) {
 			"upstream invalid 31",
 			"file.ts",
 			"\nconst map = new Map([\n  ['test-1', 1],\n  ['test-2', 2],\n]);\n\nconst o = { ...map };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			"replaceMapSpreadInObject",
 			"\nconst map = new Map([\n  ['test-1', 1],\n  ['test-2', 2],\n]);\n\nconst o = Object.fromEntries(map);\n      ",
 		},
@@ -857,7 +929,7 @@ func TestNoMisusedSpreadSuggestions(test *testing.T) {
 			"upstream invalid 32",
 			"file.ts",
 			"\ndeclare const map: Map<string, number>;\nconst o = { ...map };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			"replaceMapSpreadInObject",
 			"\ndeclare const map: Map<string, number>;\nconst o = Object.fromEntries(map);\n      ",
 		},
@@ -865,7 +937,7 @@ func TestNoMisusedSpreadSuggestions(test *testing.T) {
 			"upstream invalid 33",
 			"file.ts",
 			"\n        declare const map: Map<string, number>;\n        const o = { ...(map) };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			"replaceMapSpreadInObject",
 			"\n        declare const map: Map<string, number>;\n        const o = Object.fromEntries(map);\n      ",
 		},
@@ -873,7 +945,7 @@ func TestNoMisusedSpreadSuggestions(test *testing.T) {
 			"upstream invalid 34",
 			"file.ts",
 			"\ndeclare const map: Map<string, number>;\nconst o = { ...(map, map) };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			"replaceMapSpreadInObject",
 			"\ndeclare const map: Map<string, number>;\nconst o = Object.fromEntries((map, map));\n      ",
 		},
@@ -881,7 +953,7 @@ func TestNoMisusedSpreadSuggestions(test *testing.T) {
 			"upstream invalid 35",
 			"file.ts",
 			"\ndeclare const map: Map<string, number>;\nconst others = { a: 1 };\nconst o = { ...map, ...others };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			"replaceMapSpreadInObject",
 			"\ndeclare const map: Map<string, number>;\nconst others = { a: 1 };\nconst o = { ...Object.fromEntries(map), ...others };\n      ",
 		},
@@ -889,7 +961,7 @@ func TestNoMisusedSpreadSuggestions(test *testing.T) {
 			"upstream invalid 36",
 			"file.ts",
 			"\ndeclare const map: Map<string, number>;\nconst o = { other: 1, ...map };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			"replaceMapSpreadInObject",
 			"\ndeclare const map: Map<string, number>;\nconst o = { other: 1, ...Object.fromEntries(map) };\n      ",
 		},
@@ -897,7 +969,7 @@ func TestNoMisusedSpreadSuggestions(test *testing.T) {
 			"upstream invalid 37",
 			"file.ts",
 			"\ndeclare const map: ReadonlyMap<string, number>;\nconst o = { ...map };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			"replaceMapSpreadInObject",
 			"\ndeclare const map: ReadonlyMap<string, number>;\nconst o = Object.fromEntries(map);\n      ",
 		},
@@ -905,7 +977,7 @@ func TestNoMisusedSpreadSuggestions(test *testing.T) {
 			"upstream invalid 38",
 			"file.ts",
 			"\ndeclare const map: WeakMap<{ a: number }, string>;\nconst o = { ...map };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			"replaceMapSpreadInObject",
 			"\ndeclare const map: WeakMap<{ a: number }, string>;\nconst o = Object.fromEntries(map);\n      ",
 		},
@@ -913,7 +985,7 @@ func TestNoMisusedSpreadSuggestions(test *testing.T) {
 			"upstream invalid 40",
 			"file.ts",
 			"\ndeclare function getMap(): Map<string, number>;\nconst o = { ...getMap() };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			"replaceMapSpreadInObject",
 			"\ndeclare function getMap(): Map<string, number>;\nconst o = Object.fromEntries(getMap());\n      ",
 		},
@@ -921,7 +993,7 @@ func TestNoMisusedSpreadSuggestions(test *testing.T) {
 			"upstream invalid 41",
 			"file.ts",
 			"\ndeclare const a: Map<boolean, string> & Set<number>;\nconst o = { ...a };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			"replaceMapSpreadInObject",
 			"\ndeclare const a: Map<boolean, string> & Set<number>;\nconst o = Object.fromEntries(a);\n      ",
 		},
@@ -929,7 +1001,7 @@ func TestNoMisusedSpreadSuggestions(test *testing.T) {
 			"upstream invalid 43",
 			"file.ts",
 			"\nconst promise = new Promise(() => {});\nconst o = { ...promise };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			"addAwait",
 			"\nconst promise = new Promise(() => {});\nconst o = { ...await promise };\n      ",
 		},
@@ -937,7 +1009,7 @@ func TestNoMisusedSpreadSuggestions(test *testing.T) {
 			"upstream invalid 44",
 			"file.ts",
 			"\ndeclare const promise: Promise<{ a: 1 }>;\nasync function foo() {\n  return { ...(promise || {}) };\n}\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			"addAwait",
 			"\ndeclare const promise: Promise<{ a: 1 }>;\nasync function foo() {\n  return { ...(await (promise || {})) };\n}\n      ",
 		},
@@ -945,7 +1017,7 @@ func TestNoMisusedSpreadSuggestions(test *testing.T) {
 			"upstream invalid 45",
 			"file.ts",
 			"\ndeclare const promise: Promise<any>;\nasync function foo() {\n  return { ...(Math.random() < 0.5 ? promise : {}) };\n}\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			"addAwait",
 			"\ndeclare const promise: Promise<any>;\nasync function foo() {\n  return { ...(await (Math.random() < 0.5 ? promise : {})) };\n}\n      ",
 		},
@@ -953,7 +1025,7 @@ func TestNoMisusedSpreadSuggestions(test *testing.T) {
 			"upstream invalid 46",
 			"file.ts",
 			"\nfunction withPromise<P extends Promise<void>>(promise: P) {\n  return { ...promise };\n}\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			"addAwait",
 			"\nfunction withPromise<P extends Promise<void>>(promise: P) {\n  return { ...await promise };\n}\n      ",
 		},
@@ -961,7 +1033,7 @@ func TestNoMisusedSpreadSuggestions(test *testing.T) {
 			"upstream invalid 47",
 			"file.ts",
 			"\ndeclare const maybePromise: Promise<number> | { a: number };\nconst o = { ...maybePromise };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			"addAwait",
 			"\ndeclare const maybePromise: Promise<number> | { a: number };\nconst o = { ...await maybePromise };\n      ",
 		},
@@ -969,7 +1041,7 @@ func TestNoMisusedSpreadSuggestions(test *testing.T) {
 			"upstream invalid 48",
 			"file.ts",
 			"\ndeclare const promise: Promise<number> & { a: number };\nconst o = { ...promise };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			"addAwait",
 			"\ndeclare const promise: Promise<number> & { a: number };\nconst o = { ...await promise };\n      ",
 		},
@@ -977,7 +1049,7 @@ func TestNoMisusedSpreadSuggestions(test *testing.T) {
 			"upstream invalid 49",
 			"file.ts",
 			"\ndeclare function getPromise(): Promise<number>;\nconst o = { ...getPromise() };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			"addAwait",
 			"\ndeclare function getPromise(): Promise<number>;\nconst o = { ...await getPromise() };\n      ",
 		},
@@ -985,7 +1057,7 @@ func TestNoMisusedSpreadSuggestions(test *testing.T) {
 			"upstream invalid 50",
 			"file.ts",
 			"\ndeclare function getPromise<T extends Promise<number>>(arg: T): T;\nconst o = { ...getPromise() };\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			"addAwait",
 			"\ndeclare function getPromise<T extends Promise<number>>(arg: T): T;\nconst o = { ...await getPromise() };\n      ",
 		},
@@ -993,7 +1065,7 @@ func TestNoMisusedSpreadSuggestions(test *testing.T) {
 			"upstream invalid 89",
 			"file.tsx",
 			"\ndeclare const map: Map<string, number>;\n\nconst o = <div {...map} />;\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			"replaceMapSpreadInObject",
 			"\ndeclare const map: Map<string, number>;\n\nconst o = <div {...Object.fromEntries(map)} />;\n      ",
 		},
@@ -1001,14 +1073,14 @@ func TestNoMisusedSpreadSuggestions(test *testing.T) {
 			"upstream invalid 90",
 			"file.tsx",
 			"\nconst promise = new Promise(() => {});\n\nconst o = <div {...promise} />;\n      ",
-			nil,
+			rule.Given[NoMisusedSpreadOptions]{},
 			"addAwait",
 			"\nconst promise = new Promise(() => {});\n\nconst o = <div {...await promise} />;\n      ",
 		}}
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(
+			result := rule_testing.RunTypedGiven(
 				test,
 				NoMisusedSpread,
 				testCase.fileName,
@@ -1117,12 +1189,11 @@ func TestNoMisusedSpreadSpans(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(
+			result := rule_testing.RunTyped(
 				test,
 				NoMisusedSpread,
 				testCase.fileName,
 				testCase.sourceText,
-				nil,
 			)
 			if len(result.Diagnostics) != len(testCase.wantSpans) {
 				test.Fatalf("want %d findings, got %d", len(testCase.wantSpans), len(result.Diagnostics))
@@ -1167,12 +1238,11 @@ func TestNoMisusedSpreadCaseThatCannotBeExpressedHere(test *testing.T) {
 
 	test.Run("the same iterable shape without an ambient module reports", func(test *testing.T) {
 		test.Parallel()
-		result := rule_testing.RunTypedWithOptions(
+		result := rule_testing.RunTyped(
 			test,
 			NoMisusedSpread,
 			noMisusedSpreadFile,
 			"type CustomIterable = {\n  [Symbol.iterator]: () => string;\n};\ndeclare const iterator: CustomIterable;\nconst a = { ...iterator };",
-			nil,
 		)
 		rule_testing.ExpectFindings(test, result, "noIterableSpreadInObject")
 	})
@@ -1240,12 +1310,11 @@ func TestNoMisusedSpreadCascadeOrdering(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(
+			result := rule_testing.RunTyped(
 				test,
 				NoMisusedSpread,
 				noMisusedSpreadFile,
 				testCase.sourceText,
-				nil,
 			)
 			rule_testing.ExpectFindings(test, result, testCase.wantId)
 		})
@@ -1307,7 +1376,7 @@ func TestNoMisusedSpreadSurvivesMalformedSpreads(test *testing.T) {
 		test.Run(fmt.Sprintf("shape-%d", index), func(test *testing.T) {
 			test.Parallel()
 			// A panic fails the test. Findings are deliberately unasserted.
-			rule_testing.RunTypedWithOptions(test, NoMisusedSpread, noMisusedSpreadFile, source, nil)
+			rule_testing.RunTyped(test, NoMisusedSpread, noMisusedSpreadFile, source)
 		})
 	}
 }
@@ -1327,8 +1396,7 @@ func TestNoMisusedSpreadDecoder(test *testing.T) {
 		if decodeNoMisusedSpreadOptionsError != nil {
 			test.Fatalf("decoding %s: %v", raw, decodeNoMisusedSpreadOptionsError)
 		}
-		options, _ := decoded.(NoMisusedSpreadOptions)
-		return options
+		return decoded
 	}
 
 	test.Run("an empty object allows nothing", func(test *testing.T) {
@@ -1429,12 +1497,11 @@ func TestNoMisusedSpreadMapSuggestionKeepsExistingParentheses(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(
+			result := rule_testing.RunTyped(
 				test,
 				NoMisusedSpread,
 				noMisusedSpreadFile,
 				testCase.sourceText,
-				nil,
 			)
 			rule_testing.ExpectFindings(test, result, "noMapSpreadInObject")
 
@@ -1477,12 +1544,11 @@ func TestNoMisusedSpreadMergedClassDeclarations(test *testing.T) {
 	for _, testCase := range cases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(
+			result := rule_testing.RunTyped(
 				test,
 				NoMisusedSpread,
 				noMisusedSpreadFile,
 				testCase.sourceText,
-				nil,
 			)
 			rule_testing.ExpectFindings(test, result, "noClassInstanceSpreadInObject")
 		})
@@ -1558,7 +1624,7 @@ func TestNoMisusedSpreadExemptsAClassWhoseCopyIsComplete(test *testing.T) {
 			test.Parallel()
 			rule_testing.ExpectClean(
 				test,
-				rule_testing.RunTypedWithOptions(test, NoMisusedSpread, noMisusedSpreadFile, testCase.sourceText, nil),
+				rule_testing.RunTyped(test, NoMisusedSpread, noMisusedSpreadFile, testCase.sourceText),
 			)
 		})
 	}
@@ -1638,12 +1704,11 @@ func TestNoMisusedSpreadExemptsAClassWhoseCopyIsComplete(test *testing.T) {
 	for _, testCase := range reported {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunTypedWithOptions(
+			result := rule_testing.RunTyped(
 				test,
 				NoMisusedSpread,
 				noMisusedSpreadFile,
 				testCase.sourceText,
-				nil,
 			)
 			rule_testing.ExpectFindings(test, result, testCase.wantId)
 		})

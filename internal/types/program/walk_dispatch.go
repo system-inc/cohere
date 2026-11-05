@@ -67,7 +67,7 @@ type fileDispatcher struct {
 // tally, and every rule applicable to the file, replayed ones included, as the rules that ran.
 type directiveReplay struct {
 	withheld []LintCacheWithheld
-	rules    []rule.Rule
+	rules    []rule.Entry
 }
 
 // ruleSlot is one rule on one worker: what dispatching the rule needs that does not change between files.
@@ -222,12 +222,12 @@ func (slot *ruleSlot) hear(meter *workerMeter, listener func(node *ast.Node), no
 func (dispatcher *fileDispatcher) dispatchFileSafely(
 	sourceFile *ast.SourceFile,
 	report func(rule.Diagnostic),
-	rules []rule.Rule,
+	rules []rule.Entry,
 	slots []*ruleSlot,
 	fileChecker *checker.Checker,
 	listeningCounts map[string]int,
 	offeredCounts map[string]int,
-	ruleOptions map[string]any,
+	ruleOptions map[string]rule.Bound,
 	measureOnly map[string]bool,
 	resolution configuration.Resolved,
 ) (
@@ -278,12 +278,12 @@ func (dispatcher *fileDispatcher) dispatchFileSafely(
 func (dispatcher *fileDispatcher) dispatchFile(
 	sourceFile *ast.SourceFile,
 	report func(rule.Diagnostic),
-	rules []rule.Rule,
+	rules []rule.Entry,
 	slots []*ruleSlot,
 	fileChecker *checker.Checker,
 	listeningCounts map[string]int,
 	offeredCounts map[string]int,
-	ruleOptions map[string]any,
+	ruleOptions map[string]rule.Bound,
 	measureOnly map[string]bool,
 	resolution configuration.Resolved,
 ) (visitedNodes int, silenced suppressionTally, notes RuleNotes, ruleCrashes []RuleCrash, readiness *fileReadiness) {
@@ -330,16 +330,13 @@ func (dispatcher *fileDispatcher) dispatchFile(
 		// slot rather than built for each file.
 		context := rule.Context{
 			SourceFile:  sourceFile,
-			Program:     slot.programView.Point(dispatcher.graph.Program, sourceFile, subject),
+			Program:     slot.programView.Point(dispatcher.graph.Program, sourceFile, subject.Traits),
 			TypeChecker: fileChecker,
 			FileCache:   fileCache,
 			Report:      slot.report,
 			RecordNote:  slot.recordNote,
 		}
 
-		// Options are decoded to the type the rule declares rather than handed through as JSON. A
-		// rule that receives the wrong shape fails its type assertion and declines every file, which
-		// looks exactly like a rule with nothing to report.
 		// Counted before Run rather than after, because the question this answers is whether anything
 		// ever handed this rule a file. A rule that panics or declines has still been offered one; a
 		// rule nobody wired never reaches this line at all.
@@ -347,14 +344,18 @@ func (dispatcher *fileDispatcher) dispatchFile(
 
 		slot.containment = ruleContainment{ruleName: subject.Name, fileName: sourceFile.FileName().AsString()}
 
+		// The rule runs bound to the options its selection decoded, to the type the rule declares rather than
+		// handed through as JSON.
+		bound := boundIn(ruleOptions, subject)
+
 		// Branched rather than always passing a closure, which would allocate once per rule per file on
 		// every run to serve a flag most runs don't set.
 		var listeners rule.Listeners
 		if meter == nil {
-			listeners = slot.containment.run(subject, context, ruleOptions[subject.Name])
+			listeners = slot.containment.run(bound, context)
 		} else {
 			meter.setup(slot.timing, func() {
-				listeners = slot.containment.run(subject, context, ruleOptions[subject.Name])
+				listeners = slot.containment.run(bound, context)
 			})
 		}
 		if slot.containment.crash != nil {

@@ -96,12 +96,12 @@ import (
 // `Diagnostic` carries a single `Range`, so the primary span is kept where upstream puts it and the
 // creation site moves into the message text. No information is dropped, but a reader comparing
 // against React's goldens should know the shape differs deliberately.
-var StaticComponents = rule.Rule{
+var StaticComponents = rule.Rule[CompilerRuleOptions]{
 	Name:             "react-hooks/static-components",
 	NeedsTypeChecker: true,
 	// Reads other files only through shape readers (rule.ExportNameIn), so its findings key on imports' shapes.
 	TypeReach: rule.TypeReachShapes,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[CompilerRuleOptions]) rule.Listeners {
 		return rule.Listeners{
 			// The whole file is taken at once rather than listening on each function kind, because
 			// lowering already descends into nested functions through the function arena. Listening

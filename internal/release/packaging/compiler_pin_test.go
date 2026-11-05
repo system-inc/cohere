@@ -162,7 +162,11 @@ func TestCompilerPinAcceptsARelativeModuleDirectory(test *testing.T) {
 	}
 	relative, relativePathError := filepath.Rel(workingDirectory, fixture.Module)
 	if relativePathError != nil || filepath.IsAbs(relative) {
-		test.Fatalf("could not name the fixture relatively (%q, %v), so this test would prove nothing", relative, relativePathError)
+		test.Fatalf(
+			"could not name the fixture relatively (%q, %v), so this test would prove nothing",
+			relative,
+			relativePathError,
+		)
 	}
 
 	if _, readCompilerPinError := readCompilerPin(relative); readCompilerPinError != nil {

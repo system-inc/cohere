@@ -244,8 +244,8 @@ func plantShapesClaim(source []byte) ([]byte, error) {
 		if !ok {
 			return true
 		}
-		selector, ok := candidate.Type.(*ast.SelectorExpr)
-		if !ok || selector.Sel.Name != "Rule" {
+		selector, isRule := ruleLiteralSelector(candidate.Type)
+		if !isRule {
 			return true
 		}
 		if identifier, ok := selector.X.(*ast.Ident); ok && len(candidate.Elts) > 0 {

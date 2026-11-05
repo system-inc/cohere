@@ -30,9 +30,9 @@ func messageNoHorizontalRuleElement() rule.Message {
 //	valid:   <Link href="/about">About</Link>
 //	valid:   an <a> inside components/navigation/Link.tsx
 //	invalid: <a href="/about">About</a>
-var ReactElementNoAnchor = rule.Rule{
+var ReactElementNoAnchor = rule.Rule[rule.NoOptions]{
 	Name: "structure/react-element-no-anchor",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		fileContext := FileContextFor(ruleContext.SourceFile.FileName().AsString())
 		if fileContext.IsLinkComponentFile {
 			return nil
@@ -46,9 +46,9 @@ var ReactElementNoAnchor = rule.Rule{
 //	valid:   <HorizontalRule />
 //	valid:   an <hr> inside components/layout/HorizontalRule.tsx
 //	invalid: <hr />
-var ReactElementNoHorizontalRule = rule.Rule{
+var ReactElementNoHorizontalRule = rule.Rule[rule.NoOptions]{
 	Name: "structure/react-element-no-horizontal-rule",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		fileContext := FileContextFor(ruleContext.SourceFile.FileName().AsString())
 		if fileContext.IsHorizontalRuleComponentFile {
 			return nil

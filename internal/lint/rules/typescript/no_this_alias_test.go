@@ -15,7 +15,7 @@ const thisAliasFile = "/repository/source/Thing.ts"
 // than by building the internal struct directly. That is deliberate: the decoder is where the
 // `allowDestructuring` inversion and the `allowNames` alias live, so a fixture that skipped it
 // would test the rule while leaving the two most breakable lines in the port unasserted.
-func decodeThisAliasOptionsForTest(test *testing.T, configuration string) any {
+func decodeThisAliasOptionsForTest(test *testing.T, configuration string) NoThisAliasOptions {
 	test.Helper()
 	options, decodeNoThisAliasOptionsError := DecodeNoThisAliasOptions(json.RawMessage(configuration))
 	if decodeNoThisAliasOptionsError != nil {
@@ -339,20 +339,16 @@ func TestNoThisAliasDecodeMapsUpstreamSpellings(test *testing.T) {
 			if decodeNoThisAliasOptionsError != nil {
 				test.Fatalf("decoding: %v", decodeNoThisAliasOptionsError)
 			}
-			options, ok := decoded.(NoThisAliasOptions)
-			if !ok {
-				test.Fatalf("decoder produced %T", decoded)
-			}
-			if options.ReportDestructuring != testCase.wantReportDestructuring {
+			if decoded.ReportDestructuring != testCase.wantReportDestructuring {
 				test.Errorf("ReportDestructuring is %v, wanted %v",
-					options.ReportDestructuring, testCase.wantReportDestructuring)
+					decoded.ReportDestructuring, testCase.wantReportDestructuring)
 			}
-			if len(options.AllowedNames) != len(testCase.wantAllowedNames) {
-				test.Fatalf("AllowedNames is %v, wanted %v", options.AllowedNames, testCase.wantAllowedNames)
+			if len(decoded.AllowedNames) != len(testCase.wantAllowedNames) {
+				test.Fatalf("AllowedNames is %v, wanted %v", decoded.AllowedNames, testCase.wantAllowedNames)
 			}
 			for index, name := range testCase.wantAllowedNames {
-				if options.AllowedNames[index] != name {
-					test.Errorf("AllowedNames[%d] is %q, wanted %q", index, options.AllowedNames[index], name)
+				if decoded.AllowedNames[index] != name {
+					test.Errorf("AllowedNames[%d] is %q, wanted %q", index, decoded.AllowedNames[index], name)
 				}
 			}
 		})

@@ -24,12 +24,14 @@ const preferStatelessFunctionFile = "/repository/source/Pure.tsx"
 // [severity, options] tuple before dispatch, so copying ESLint's spelling fails on every row.
 func runPreferStatelessFunction(test *testing.T, sourceText string, rawOptions string) rule_testing.Result {
 	test.Helper()
-	var decoded any
+	var decoded PreferStatelessFunctionOptions
 	var decodePreferStatelessFunctionOptionsError error
 	if rawOptions == "" {
 		decoded, decodePreferStatelessFunctionOptionsError = DecodePreferStatelessFunctionOptions(nil)
 	} else {
-		decoded, decodePreferStatelessFunctionOptionsError = DecodePreferStatelessFunctionOptions(json.RawMessage(rawOptions))
+		decoded, decodePreferStatelessFunctionOptionsError = DecodePreferStatelessFunctionOptions(
+			json.RawMessage(rawOptions),
+		)
 	}
 	if decodePreferStatelessFunctionOptionsError != nil {
 		test.Fatalf("decoding %q: %v", rawOptions, decodePreferStatelessFunctionOptionsError)
@@ -579,7 +581,7 @@ func TestPreferStatelessFunctionReturnBoundary(test *testing.T) {
 // TestPreferStatelessFunctionDecodesOptions exercises the decoder directly, including the
 // unconfigured path.
 //
-// A rule configured as a bare severity is handed nil rather than a struct, and the port brief
+// A rule configured as a bare severity hands its decoder empty input rather than an object, and the port brief
 // records a rule that registered on 3,407 files and was completely inert because nothing in its
 // suite reached that path. Every fixture above goes through the decoder, so this covers the nil
 // input and the wire name.
@@ -592,11 +594,7 @@ func TestPreferStatelessFunctionDecodesOptions(test *testing.T) {
 		if decodePreferStatelessFunctionOptionsError != nil {
 			test.Fatalf("decoding nil: %v", decodePreferStatelessFunctionOptionsError)
 		}
-		options, ok := decoded.(PreferStatelessFunctionOptions)
-		if !ok {
-			test.Fatalf("decoded to %T, want PreferStatelessFunctionOptions", decoded)
-		}
-		if options.IgnorePureComponents {
+		if decoded.IgnorePureComponents {
 			test.Fatal("ignorePureComponents defaulted to true, upstream defaults it to false")
 		}
 	})
@@ -609,11 +607,7 @@ func TestPreferStatelessFunctionDecodesOptions(test *testing.T) {
 		if decodePreferStatelessFunctionOptionsError != nil {
 			test.Fatalf("decoding: %v", decodePreferStatelessFunctionOptionsError)
 		}
-		options, ok := decoded.(PreferStatelessFunctionOptions)
-		if !ok {
-			test.Fatalf("decoded to %T, want PreferStatelessFunctionOptions", decoded)
-		}
-		if !options.IgnorePureComponents {
+		if !decoded.IgnorePureComponents {
 			test.Fatal("the option did not decode")
 		}
 	})
@@ -643,8 +637,8 @@ func TestPreferStatelessFunctionDecodesOptions(test *testing.T) {
 		// Bypasses the decoder entirely, which is the path every other fixture misses. A
 		// PureComponent is the case that measures anything: it reports under the real default and
 		// would be clean under a wrong fallback of ignorePureComponents true.
-		result := rule_testing.RunWithOptions(test, PreferStatelessFunction, preferStatelessFunctionFile,
-			"class Foo extends React.PureComponent { render() { return <div/>; } }", nil)
+		result := rule_testing.Run(test, PreferStatelessFunction, preferStatelessFunctionFile,
+			"class Foo extends React.PureComponent { render() { return <div/>; } }")
 		rule_testing.ExpectFindings(test, result, "componentShouldBePure")
 	})
 }

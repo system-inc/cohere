@@ -39,7 +39,7 @@ type noElseReturnWireShape struct {
 // distinguishable. That is not decoration: the default is true, so a decoder falling back to the
 // zero value inverts the rule rather than disabling it, and every fixture routed through a struct
 // built by hand would pass anyway.
-func DecodeNoElseReturnOptions(raw []byte) (any, error) {
+func DecodeNoElseReturnOptions(raw []byte) (NoElseReturnSettings, error) {
 	if len(raw) == 0 {
 		return DefaultNoElseReturnSettings(), nil
 	}
@@ -118,15 +118,15 @@ func DecodeNoElseReturnOptions(raw []byte) (any, error) {
 // inside the block is carried through unchanged rather than reconstructed. Fixtures below assert
 // exactly that on annotated declarations, a generic, and a satisfies expression, and the guard was
 // mutated to confirm they fail without it.
-var NoElseReturn = rule.Rule{
+var NoElseReturn = rule.Rule[NoElseReturnSettings]{
 	Name: "no-else-return",
 
 	// The collision check asks what names are already in scope at the `if`, which only resolution
 	// can answer. The rule reports without it, and declines to repair.
 	NeedsTypeChecker: true,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, ok := rule.OptionsAs[NoElseReturnSettings](options)
+	Run: func(ruleContext rule.Context, options rule.Given[NoElseReturnSettings]) rule.Listeners {
+		settings, ok := options.Read()
 		if !ok {
 			settings = DefaultNoElseReturnSettings()
 		}

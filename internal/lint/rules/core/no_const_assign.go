@@ -125,7 +125,7 @@ var messageNoConstAssign = rule.Message{
 // No fix. The repair is either changing the declaration to `let`, which the rule cannot know is
 // wanted and which is wrong when the write was the mistake, or introducing a new binding, which
 // means choosing a name. Both are judgment.
-var NoConstAssign = rule.Rule{
+var NoConstAssign = rule.Rule[rule.NoOptions]{
 	Name: "no-const-assign",
 
 	// See the doc above: upstream's shadow cases are textually identical to failing ones and differ
@@ -134,7 +134,7 @@ var NoConstAssign = rule.Rule{
 	// Reads only this file's declarations (rule.DeclarationsIn), so its findings key on imports' shapes.
 	TypeReach: rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// Each constant declaration on the shared walk, reading the writes to its names from the
 		// file's identifier index.
 		//

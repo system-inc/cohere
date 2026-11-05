@@ -504,7 +504,7 @@ func ruleLiteralTypeReach(file *ast.File) (string, bool) {
 		if !ok {
 			return true
 		}
-		if selector, ok := literal.Type.(*ast.SelectorExpr); !ok || selector.Sel.Name != "Rule" {
+		if _, isRule := ruleLiteralSelector(literal.Type); !isRule {
 			return true
 		}
 		for _, element := range literal.Elts {

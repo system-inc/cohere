@@ -38,10 +38,10 @@ func TestGlobalLoadsRetainBindingProvenance(test *testing.T) {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			visited, loads := 0, 0
-			probe := rule.Rule{
+			probe := rule.Rule[rule.NoOptions]{
 				Name:             "global-load-provenance",
 				NeedsTypeChecker: true,
-				Run: func(ruleContext rule.Context, options any) rule.Listeners {
+				Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 					return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
 						forEachFunctionLike(node, func(node *ast.Node) {
 							if node.Name() == nil || node.Name().Text() != "Component" {

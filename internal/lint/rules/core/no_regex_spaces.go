@@ -85,9 +85,9 @@ var messageRegexSpaces = rule.Message{
 // A pattern the scanner cannot make sense of is skipped rather than reported, matching upstream and
 // for the same reason as the sibling regex rules: an unterminated construct is a syntax error the
 // parser has already refused, so a second complaint here is noise on a file that does not compile.
-var NoRegexSpaces = rule.Rule{
+var NoRegexSpaces = rule.Rule[rule.NoOptions]{
 	Name: "no-regex-spaces",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// reportLiteral walks a regex literal's pattern and reports its first unquantified,
 		// unclassed run of two or more spaces. A literal's source text and the pattern the engine
 		// receives are the same bytes, so no cooking or offset mapping is involved here; the

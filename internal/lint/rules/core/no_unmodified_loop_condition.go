@@ -91,7 +91,7 @@ var messageUnmodifiedLoopCondition = rule.Message{
 //
 // The repair is either updating the variable in the body or rewriting the condition, and which one
 // is wanted is the whole question the finding asks. Upstream ships no fixer either.
-var NoUnmodifiedLoopCondition = rule.Rule{
+var NoUnmodifiedLoopCondition = rule.Rule[rule.NoOptions]{
 	Name: "no-unmodified-loop-condition",
 
 	// The discrimination is name resolution. `while (foo) { update(); } function update(foo) {
@@ -101,7 +101,7 @@ var NoUnmodifiedLoopCondition = rule.Rule{
 	// Reads only this file's declarations (rule.DeclarationsIn), so its findings key on imports' shapes.
 	TypeReach: rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// The judgment is the whole file's, made once, at the first loop that has a condition. A file
 		// with none cannot report, and most files have none, so they never build the reference index.
 		judged := false

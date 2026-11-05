@@ -55,7 +55,7 @@ type NoRestrictedPropertiesOptions struct {
 // `allowObjects` would otherwise be accepted and silently have no effect. The `{"restrictions": [...]}`
 // wrapper this decoder used to read, when the config layer could deliver only one element, is gone
 // with it: it was never upstream's spelling.
-func DecodeNoRestrictedPropertiesOptions(list []byte) (any, error) {
+func DecodeNoRestrictedPropertiesOptions(list []byte) (NoRestrictedPropertiesOptions, error) {
 	var options NoRestrictedPropertiesOptions
 	if len(list) == 0 {
 		return options, nil
@@ -132,10 +132,10 @@ func DecodeNoRestrictedPropertiesOptions(list []byte) (any, error) {
 // A consequence worth stating because it looks like a bug: `foo.bar.baz` with `object: "bar"` is
 // clean, because the receiver of `.baz` is a member expression rather than an identifier and has no
 // name to compare. Measured against the installed build.
-var NoRestrictedProperties = rule.Rule{
+var NoRestrictedProperties = rule.Rule[NoRestrictedPropertiesOptions]{
 	Name: "no-restricted-properties",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, configured := rule.OptionsAs[NoRestrictedPropertiesOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[NoRestrictedPropertiesOptions]) rule.Listeners {
+		settings, configured := options.Read()
 		if !configured || len(settings.Restrictions) == 0 {
 			// Upstream returns an empty visitor object here rather than a no-op listener, so the
 			// rule costs nothing at all when it has nothing to enforce.

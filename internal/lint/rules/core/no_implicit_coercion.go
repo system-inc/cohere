@@ -70,7 +70,7 @@ func DefaultNoImplicitCoercionSettings() NoImplicitCoercionOptions {
 // rule reads nil as a zero-valued struct with every boolean false, which disables three of the four
 // judgments. That is the live config's own shape for a rule configured as a bare severity, so it is
 // the ordinary path rather than a corner.
-func DecodeNoImplicitCoercionOptions(raw []byte) (any, error) {
+func DecodeNoImplicitCoercionOptions(raw []byte) (NoImplicitCoercionOptions, error) {
 	settings := DefaultNoImplicitCoercionSettings()
 	if len(raw) == 0 {
 		return settings, nil
@@ -168,12 +168,12 @@ func noImplicitCoercionAllows(settings NoImplicitCoercionOptions, operator strin
 // Measured: `~foo.indexOf(x)` and `~foo.lastIndexOf(x)` report, `~foo['indexOf'](x)` reports because
 // the key is static, and `~foo[indexOf](x)`, `~foo.someOther(x)`, `~foo` and `~foo.indexOf` are all
 // clean.
-var NoImplicitCoercion = rule.Rule{
+var NoImplicitCoercion = rule.Rule[NoImplicitCoercionOptions]{
 	Name:             "no-implicit-coercion",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, _ := rule.OptionsAs[NoImplicitCoercionOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[NoImplicitCoercionOptions]) rule.Listeners {
+		settings, _ := options.Read()
 		defaults := DefaultNoImplicitCoercionSettings()
 		if settings.Boolean == nil {
 			settings.Boolean = defaults.Boolean

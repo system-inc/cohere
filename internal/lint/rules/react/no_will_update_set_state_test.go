@@ -564,8 +564,8 @@ func TestNoWillUpdateSetStateReportsAtTheCallee(test *testing.T) {
 
 // An unconfigured rule gets the permissive default, and the option is what changes that answer.
 //
-// `rule_testing.Run` hands the rule a nil options value rather than a zero-valued struct, so a rule
-// reading its options with an unchecked type assertion panics on every real file while every
+// `rule_testing.Run` hands the rule the zero `rule.Given` rather than a decoded struct, so a rule
+// reading its options without checking what `Read` returns runs on the zero struct on every real file while every
 // fixture using `RunWithOptions` stays green. This asserts the plain harness works, which is the
 // shape the linter actually runs in for a rule configured with a bare severity.
 func TestNoWillUpdateSetStateDefaultsToAllowingNestedFunctions(test *testing.T) {

@@ -43,9 +43,9 @@ import (
 // same way, which is why its 57 failing inputs produce 34 diagnostics. A port reporting per
 // character disagrees with the snapshot on every multi-character case while passing any fixture
 // written from the input list alone.
-var NoControlRegex = rule.Rule{
+var NoControlRegex = rule.Rule[rule.NoOptions]{
 	Name: "no-control-regex",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindRegularExpressionLiteral: func(node *ast.Node) {
 				text := node.Text()

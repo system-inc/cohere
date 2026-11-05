@@ -15,6 +15,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/lint/testing"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -89,9 +90,9 @@ func TestATimedWalkBillsCPUNotWaiting(test *testing.T) {
 	// clock are of the thread the meter reads.
 	var sleptTotal atomic.Int64
 	var spunTotal atomic.Int64
-	sleeper := rule.Rule{
+	sleeper := rule.Rule[rule.NoOptions]{
 		Name: "planted-sleeper",
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
 				start := time.Now()
 				time.Sleep(sleepPerFile)
@@ -99,9 +100,9 @@ func TestATimedWalkBillsCPUNotWaiting(test *testing.T) {
 			}}
 		},
 	}
-	spinner := rule.Rule{
+	spinner := rule.Rule[rule.NoOptions]{
 		Name: "planted-spinner",
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
 				start := threadCPU()
 				spin(iterations)
@@ -111,7 +112,11 @@ func TestATimedWalkBillsCPUNotWaiting(test *testing.T) {
 	}
 
 	graph.CollectTimings = true
-	result, walkError := graph.Walk(context.Background(), graph.ProjectFiles(), []rule.Rule{sleeper, spinner})
+	result, walkError := graph.Walk(
+		context.Background(),
+		graph.ProjectFiles(),
+		rule_testing.EntriesOf(test, sleeper, spinner),
+	)
 	if walkError != nil {
 		test.Fatalf("walk: %v", walkError)
 	}

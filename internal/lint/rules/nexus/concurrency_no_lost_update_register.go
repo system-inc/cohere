@@ -10,5 +10,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // No decoder: the rule takes no options. The judgment is structural, and an option naming targets to
 // ignore would be an allowance.
 func init() {
-	rule.Register(rule.Registration{Rule: ConcurrencyNoLostUpdate})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: ConcurrencyNoLostUpdate})
 }

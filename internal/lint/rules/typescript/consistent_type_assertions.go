@@ -67,7 +67,7 @@ type consistentTypeAssertionsRawOptions struct {
 // the other two styles carry the two literal settings. The union is not reproduced as a type here,
 // because the rule's own body already ignores both literal settings when the style is never, and a
 // second representation of that fact is a second place for it to drift.
-func DecodeConsistentTypeAssertionsOptions(raw []byte) (any, error) {
+func DecodeConsistentTypeAssertionsOptions(raw []byte) (ConsistentTypeAssertionsOptions, error) {
 	options := DefaultConsistentTypeAssertionsSettings()
 	if len(raw) == 0 {
 		return options, nil
@@ -77,20 +77,19 @@ func DecodeConsistentTypeAssertionsOptions(raw []byte) (any, error) {
 	if decodeOptionsError != nil {
 		return options, decodeOptionsError
 	}
-	wire, _ := decoded.(consistentTypeAssertionsRawOptions)
 
-	if wire.AssertionStyle != nil {
-		switch ConsistentTypeAssertionsStyle(*wire.AssertionStyle) {
+	if decoded.AssertionStyle != nil {
+		switch ConsistentTypeAssertionsStyle(*decoded.AssertionStyle) {
 		case ConsistentTypeAssertionsAs,
 			ConsistentTypeAssertionsAngleBracket,
 			ConsistentTypeAssertionsNever:
-			options.AssertionStyle = ConsistentTypeAssertionsStyle(*wire.AssertionStyle)
+			options.AssertionStyle = ConsistentTypeAssertionsStyle(*decoded.AssertionStyle)
 		}
 	}
 	options.ObjectLiteralTypeAssertion = consistentTypeAssertionsLiteralSettingOf(
-		wire.ObjectLiteralTypeAssertion, options.ObjectLiteralTypeAssertion)
+		decoded.ObjectLiteralTypeAssertion, options.ObjectLiteralTypeAssertion)
 	options.ArrayLiteralTypeAssertion = consistentTypeAssertionsLiteralSettingOf(
-		wire.ArrayLiteralTypeAssertion, options.ArrayLiteralTypeAssertion)
+		decoded.ArrayLiteralTypeAssertion, options.ArrayLiteralTypeAssertion)
 	return options, nil
 }
 
@@ -162,11 +161,11 @@ func consistentTypeAssertionsLiteralSettingOf(
 // Two rare anchors and no checker: every decision here is syntactic. The rule declares no type
 // checker for that reason, which is worth stating because upstream reaches for parser services in
 // its fixer, purely to map a node across trees rather than to ask a type question.
-var ConsistentTypeAssertions = rule.Rule{
+var ConsistentTypeAssertions = rule.Rule[ConsistentTypeAssertionsOptions]{
 	Name: "@typescript-eslint/consistent-type-assertions",
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, isSettings := rule.OptionsAs[ConsistentTypeAssertionsOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[ConsistentTypeAssertionsOptions]) rule.Listeners {
+		settings, isSettings := options.Read()
 		if !isSettings {
 			settings = DefaultConsistentTypeAssertionsSettings()
 		}

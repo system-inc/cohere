@@ -107,7 +107,12 @@ func (testGraph) EndsInReturn(block *testBlock) bool { return block.returns != n
 func (testGraph) InstructionCount(function *testFunction, block *testBlock) int {
 	return len(block.instructions)
 }
-func (testGraph) EachInstructionPlace(function *testFunction, block *testBlock, index int, visit func(*testPlace, ssa.Role)) {
+func (testGraph) EachInstructionPlace(
+	function *testFunction,
+	block *testBlock,
+	index int,
+	visit func(*testPlace, ssa.Role),
+) {
 	instruction := block.instructions[index]
 	for index := range instruction.uses {
 		visit(&instruction.uses[index], ssa.Use)
@@ -322,7 +327,9 @@ func TestFrozenParametersDropAConditionalMutation(test *testing.T) {
 		entry := function.block()
 		entry.add(&testInstruction{uses: []testPlace{place(identifierId)}})
 		entry.add(&testInstruction{uses: []testPlace{place(identifierId)},
-			effects: []AliasingEffect[testPlace]{MutationEffect(AliasingEffectMutateConditionally, place(identifierId))}})
+			effects: []AliasingEffect[testPlace]{
+				MutationEffect(AliasingEffectMutateConditionally, place(identifierId)),
+			}})
 
 		table := ranges(function, Options{})
 		want := MutableRange{Start: 1, End: 3}

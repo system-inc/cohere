@@ -3,6 +3,7 @@ package core
 import (
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	rule_testing "github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -12,12 +13,12 @@ const sortVarsFile = "/repository/source/SortVars.ts"
 // sortVarsOf builds the settings a config carrying this option would decode to.
 //
 // The argument is the option as JSON text, exactly the bytes the config layer hands the decoder.
-func sortVarsOf(optionJson string) any {
+func sortVarsOf(optionJson string) rule.Given[SortVarsSettings] {
 	settings, decodeSortVariablesOptionsError := DecodeSortVarsOptions([]byte(optionJson))
 	if decodeSortVariablesOptionsError != nil {
 		panic(decodeSortVariablesOptionsError)
 	}
-	return settings
+	return rule.Configured(settings)
 }
 
 // pointerTo distinguishes "the corpus declared no output" from "the output is this string".
@@ -61,60 +62,54 @@ func TestSortVarsFires(test *testing.T) {
 
 	cases := []struct {
 		source   string
-		settings any
+		settings rule.Given[SortVarsSettings]
 		findings int
 		// fixed is the source after one fix pass, which is what upstream's `output` records.
 		fixed *string
 		// declinesRepair marks upstream's `output: null`: reported, deliberately not fixed.
 		declinesRepair bool
 	}{
-		{source: "var b, a", settings: nil, findings: 1, fixed: pointerTo("var a, b"), declinesRepair: false},
-		{source: "var b , a", settings: nil, findings: 1, fixed: pointerTo("var a , b"), declinesRepair: false},
+		{source: "var b, a", findings: 1, fixed: pointerTo("var a, b"), declinesRepair: false},
+		{source: "var b , a", findings: 1, fixed: pointerTo("var a , b"), declinesRepair: false},
 		{
 			source:         "var b,\n    a;",
-			settings:       nil,
 			findings:       1,
 			fixed:          pointerTo("var a,\n    b;"),
 			declinesRepair: false,
 		},
 		{
 			source:         "var b=10, a=20;",
-			settings:       nil,
 			findings:       1,
 			fixed:          pointerTo("var a=20, b=10;"),
 			declinesRepair: false,
 		},
 		{
 			source:         "var b=10, a=20, c=30;",
-			settings:       nil,
 			findings:       1,
 			fixed:          pointerTo("var a=20, b=10, c=30;"),
 			declinesRepair: false,
 		},
 		{
 			source:         "var all=10, a = 1",
-			settings:       nil,
 			findings:       1,
 			fixed:          pointerTo("var a = 1, all=10"),
 			declinesRepair: false,
 		},
 		{
 			source:         "var b, c, a, d",
-			settings:       nil,
 			findings:       1,
 			fixed:          pointerTo("var a, b, c, d"),
 			declinesRepair: false,
 		},
 		{
 			source:         "var c, d, a, b",
-			settings:       nil,
 			findings:       2,
 			fixed:          pointerTo("var a, b, c, d"),
 			declinesRepair: false,
 		},
-		{source: "var a, A;", settings: nil, findings: 1, fixed: pointerTo("var A, a;"), declinesRepair: false},
-		{source: "var a, B;", settings: nil, findings: 1, fixed: pointerTo("var B, a;"), declinesRepair: false},
-		{source: "var a, B, c;", settings: nil, findings: 1, fixed: pointerTo("var B, a, c;"), declinesRepair: false},
+		{source: "var a, A;", findings: 1, fixed: pointerTo("var A, a;"), declinesRepair: false},
+		{source: "var a, B;", findings: 1, fixed: pointerTo("var B, a;"), declinesRepair: false},
+		{source: "var a, B, c;", findings: 1, fixed: pointerTo("var B, a, c;"), declinesRepair: false},
 		{
 			source:         "var B, a;",
 			settings:       sortVarsOf("{\"ignoreCase\": true}"),
@@ -150,19 +145,19 @@ func TestSortVarsFires(test *testing.T) {
 			fixed:          pointerTo("var {} = 1, a, b"),
 			declinesRepair: false,
 		},
-		{source: "var b=10, a=f();", settings: nil, findings: 1, fixed: nil, declinesRepair: true},
-		{source: "var b=10, a=b;", settings: nil, findings: 1, fixed: nil, declinesRepair: true},
-		{source: "var b = 0, a = `${b}`;", settings: nil, findings: 1, fixed: nil, declinesRepair: true},
-		{source: "var b = 0, a = `${f()}`", settings: nil, findings: 1, fixed: nil, declinesRepair: true},
-		{source: "var b = 0, c = b, a;", settings: nil, findings: 1, fixed: nil, declinesRepair: true},
-		{source: "var b = 0, c = 0, a = b + c;", settings: nil, findings: 1, fixed: nil, declinesRepair: true},
-		{source: "var b = f(), c, d, a;", settings: nil, findings: 1, fixed: nil, declinesRepair: true},
-		{source: "var b = `${f()}`, c, d, a;", settings: nil, findings: 1, fixed: nil, declinesRepair: true},
-		{source: "var c, a = b = 0", settings: nil, findings: 1, fixed: nil, declinesRepair: true},
+		{source: "var b=10, a=f();", findings: 1, fixed: nil, declinesRepair: true},
+		{source: "var b=10, a=b;", findings: 1, fixed: nil, declinesRepair: true},
+		{source: "var b = 0, a = `${b}`;", findings: 1, fixed: nil, declinesRepair: true},
+		{source: "var b = 0, a = `${f()}`", findings: 1, fixed: nil, declinesRepair: true},
+		{source: "var b = 0, c = b, a;", findings: 1, fixed: nil, declinesRepair: true},
+		{source: "var b = 0, c = 0, a = b + c;", findings: 1, fixed: nil, declinesRepair: true},
+		{source: "var b = f(), c, d, a;", findings: 1, fixed: nil, declinesRepair: true},
+		{source: "var b = `${f()}`, c, d, a;", findings: 1, fixed: nil, declinesRepair: true},
+		{source: "var c, a = b = 0", findings: 1, fixed: nil, declinesRepair: true},
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunWithOptions(test, SortVars, sortVarsFile, testCase.source, testCase.settings)
+		result := rule_testing.RunGiven(test, SortVars, sortVarsFile, testCase.source, testCase.settings)
 		if len(result.Diagnostics) != testCase.findings {
 			test.Errorf("%q with %+v: expected %d findings, got %d %v",
 				testCase.source, testCase.settings, testCase.findings,
@@ -197,51 +192,50 @@ func TestSortVarsStaysSilent(test *testing.T) {
 
 	cases := []struct {
 		source   string
-		settings any
+		settings rule.Given[SortVarsSettings]
 	}{
-		{source: "var a=10, b=4, c='abc'", settings: nil},
-		{source: "var a, b, c, d", settings: nil},
-		{source: "var b; var a; var d;", settings: nil},
-		{source: "var _a, a", settings: nil},
-		{source: "var A, a", settings: nil},
-		{source: "var A, b", settings: nil},
+		{source: "var a=10, b=4, c='abc'"},
+		{source: "var a, b, c, d"},
+		{source: "var b; var a; var d;"},
+		{source: "var _a, a"},
+		{source: "var A, a"},
+		{source: "var A, b"},
 		{source: "var a, A;", settings: sortVarsOf("{\"ignoreCase\": true}")},
 		{source: "var A, a;", settings: sortVarsOf("{\"ignoreCase\": true}")},
 		{source: "var a, B, c;", settings: sortVarsOf("{\"ignoreCase\": true}")},
 		{source: "var A, b, C;", settings: sortVarsOf("{\"ignoreCase\": true}")},
 		{source: "var {a, b, c} = x;", settings: sortVarsOf("{\"ignoreCase\": true}")},
 		{source: "var {A, b, C} = x;", settings: sortVarsOf("{\"ignoreCase\": true}")},
-		{source: "var test = [1,2,3];", settings: nil},
-		{source: "var {a,b} = [1,2];", settings: nil},
+		{source: "var test = [1,2,3];"},
+		{source: "var {a,b} = [1,2];"},
 		{source: "var [a, B, c] = [1, 2, 3];", settings: sortVarsOf("{\"ignoreCase\": true}")},
 		{source: "var [A, B, c] = [1, 2, 3];", settings: sortVarsOf("{\"ignoreCase\": true}")},
 		{source: "var [A, b, C] = [1, 2, 3];", settings: sortVarsOf("{\"ignoreCase\": true}")},
-		{source: "let {a, b, c} = x;", settings: nil},
-		{source: "let [a, b, c] = [1, 2, 3];", settings: nil},
+		{source: "let {a, b, c} = x;"},
+		{source: "let [a, b, c] = [1, 2, 3];"},
 		{source: "const {a, b, c} = {a: 1, b: true, c: \"Moo\"};", settings: sortVarsOf("{\"ignoreCase\": true}")},
 		{source: "const [a, b, c] = [1, true, \"Moo\"];", settings: sortVarsOf("{\"ignoreCase\": true}")},
 		{source: "const [c, a, b] = [1, true, \"Moo\"];", settings: sortVarsOf("{\"ignoreCase\": true}")},
-		{source: "var {a, x: {b, c}} = {};", settings: nil},
-		{source: "var {c, x: {a, c}} = {};", settings: nil},
-		{source: "var {a, x: [b, c]} = {};", settings: nil},
-		{source: "var [a, {b, c}] = {};", settings: nil},
-		{source: "var [a, {x: {b, c}}] = {};", settings: nil},
-		{source: "var a = 42, {b, c } = {};", settings: nil},
-		{source: "var b = 42, {a, c } = {};", settings: nil},
-		{source: "var [b, {x: {a, c}}] = {};", settings: nil},
-		{source: "var [b, d, a, c] = {};", settings: nil},
-		{source: "var e, [a, c, d] = {};", settings: nil},
+		{source: "var {a, x: {b, c}} = {};"},
+		{source: "var {c, x: {a, c}} = {};"},
+		{source: "var {a, x: [b, c]} = {};"},
+		{source: "var [a, {b, c}] = {};"},
+		{source: "var [a, {x: {b, c}}] = {};"},
+		{source: "var a = 42, {b, c } = {};"},
+		{source: "var b = 42, {a, c } = {};"},
+		{source: "var [b, {x: {a, c}}] = {};"},
+		{source: "var [b, d, a, c] = {};"},
+		{source: "var e, [a, c, d] = {};"},
 		{source: "var a, [E, c, D] = [];", settings: sortVarsOf("{\"ignoreCase\": true}")},
-		{source: "var a, f, [e, c, d] = [1,2,3];", settings: nil},
+		{source: "var a, f, [e, c, d] = [1,2,3];"},
 		{
-			source:   "export default class {\n    render () {\n        let {\n            b\n        } = this,\n            a,\n            c;\n    }\n}",
-			settings: nil,
+			source: "export default class {\n    render () {\n        let {\n            b\n        } = this,\n            a,\n            c;\n    }\n}",
 		},
 		{source: "var {} = 1, a", settings: sortVarsOf("{\"ignoreCase\": true}")},
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunWithOptions(test, SortVars, sortVarsFile, testCase.source, testCase.settings)
+		result := rule_testing.RunGiven(test, SortVars, sortVarsFile, testCase.source, testCase.settings)
 		rule_testing.ExpectClean(test, result)
 	}
 }
@@ -287,7 +281,7 @@ func TestSortVarsLiteralSetDecidesFixability(test *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunWithOptions(test, SortVars, sortVarsFile, testCase.source, nil)
+		result := rule_testing.Run(test, SortVars, sortVarsFile, testCase.source)
 		if len(result.Diagnostics) != 1 {
 			test.Errorf("%q: expected exactly 1 finding, got %d %v",
 				testCase.source, len(result.Diagnostics), result.MessageIds())
@@ -349,7 +343,7 @@ func TestSortVarsRepairKeepsTheTextBetweenDeclarators(test *testing.T) {
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunWithOptions(test, SortVars, sortVarsFile, testCase.source, nil)
+		result := rule_testing.Run(test, SortVars, sortVarsFile, testCase.source)
 		if len(result.Diagnostics) == 0 {
 			test.Errorf("%q: expected a finding, got none", testCase.source)
 			continue

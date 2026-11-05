@@ -44,10 +44,10 @@ func reactiveNames(test *testing.T, source string) []string {
 	test.Helper()
 
 	found := map[string]bool{}
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name:             "reactive-names-harness",
 		NeedsTypeChecker: true,
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
 					if ruleContext.TypeChecker == nil {
@@ -224,10 +224,10 @@ func phiResultIsReactive(test *testing.T, source string, binding string) bool {
 	test.Helper()
 
 	found, sawPhi := false, false
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name:             "reactive-phi-result-harness",
 		NeedsTypeChecker: true,
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
 					forEachFunctionLike(node, func(functionNode *ast.Node) {
@@ -595,10 +595,10 @@ export function Component(props: {c: boolean, n: number}) {
 `
 	var first []string
 	var second []string
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name:             "reactive-idempotent-harness",
 		NeedsTypeChecker: true,
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
 					forEachFunctionLike(node, func(functionNode *ast.Node) {
@@ -659,9 +659,9 @@ export function Component(props: {n: number}) {
 }
 `
 	var names []string
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name: "reactive-no-checker-harness",
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
 					forEachFunctionLike(node, func(functionNode *ast.Node) {
@@ -723,10 +723,10 @@ export function Component(props: {a: boolean, b: number, items: number[]}) {
 }
 `
 	worst := 0
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name:             "reactive-rounds-harness",
 		NeedsTypeChecker: true,
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
 					forEachFunctionLike(node, func(functionNode *ast.Node) {

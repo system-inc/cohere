@@ -87,7 +87,7 @@ func DefaultUnicodeBomSettings() UnicodeBomOptions {
 // An unrecognised string is an error rather than a silent fallback to the default. A config saying
 // `"alway"` is a mistake somebody made, and turning it into `never` would enforce the opposite of
 // what they wrote with nothing anywhere saying so.
-func DecodeUnicodeBomOptions(raw []byte) (any, error) {
+func DecodeUnicodeBomOptions(raw []byte) (UnicodeBomOptions, error) {
 	if len(raw) == 0 {
 		return DefaultUnicodeBomSettings(), nil
 	}
@@ -183,13 +183,13 @@ func (setting *unicodeBomUnknownSetting) Error() string {
 // A mark written at the end of a file is clean under `never`, which is upstream's own third valid case. A mark
 // anywhere but position zero is an ordinary zero-width no-break space character, so the test is a
 // prefix test rather than a search.
-var UnicodeBom = rule.Rule{
+var UnicodeBom = rule.Rule[UnicodeBomOptions]{
 	Name: "unicode-bom",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[UnicodeBomOptions]) rule.Listeners {
 		// A rule configured as a bare severity is handed nil, which the type assertion turns into a
 		// zero-valued struct whose Require is nil. That is the live config's shape, so the fallback
 		// below is the ordinary path rather than a defensive one.
-		settings, _ := rule.OptionsAs[UnicodeBomOptions](options)
+		settings, _ := options.Read()
 		if settings.Require == nil {
 			settings = DefaultUnicodeBomSettings()
 		}

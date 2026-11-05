@@ -114,12 +114,12 @@ var assignmentOperators = map[ast.Kind]bool{
 // measured shape: a block-scoped shadow that has already closed. Upstream reads the global scope
 // rather than the lexical chain, so `{ const location = {}; } location.assign('/x')` reports there,
 // and the walk below agrees because the closed block is not an enclosing scope of the use.
-var NoLocationAssignRelativeDestination = rule.Rule{
+var NoLocationAssignRelativeDestination = rule.Rule[rule.NoOptions]{
 	// Bare, with no family prefix. The config writes `nextjs/no-location-assign-relative-destination`
 	// and the matcher strips the namespace on a `/` boundary, so a prefixed name here matches
 	// nothing and the rule runs on no files while every fixture passes.
 	Name: "@next/next/no-location-assign-relative-destination",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				call := node.AsCallExpression()

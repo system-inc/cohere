@@ -68,7 +68,7 @@ func noHtmlLinkForPagesMessage(hrefPath string) rule.Message {
 // Here a bare href has no route to match, so the anchor is silent, and a bare target is not
 // `_blank`, so it does not exempt. Two more are in the route model: a page name that is not a valid
 // regular expression, and a file named `pages`.
-var NoHtmlLinkForPages = rule.Rule{
+var NoHtmlLinkForPages = rule.Rule[NoHtmlLinkForPagesOptions]{
 	// No family prefix. The config writes `nextjs/no-html-link-for-pages` and matching strips the
 	// namespace on a `/` boundary, so a prefixed name matches nothing and runs on no files.
 	Name: "@next/next/no-html-link-for-pages",
@@ -76,8 +76,8 @@ var NoHtmlLinkForPages = rule.Rule{
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsOtherFiles,
 	// A file's verdict reads its own bytes and the route model, so the model is the whole fingerprint.
 	ProgramFingerprint: noHtmlLinkForPagesFingerprint,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, _ := rule.OptionsAs[NoHtmlLinkForPagesOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[NoHtmlLinkForPagesOptions]) rule.Listeners {
+		settings, _ := options.Read()
 		// A harness that builds its Context by hand has no program and so no disk to read, which is
 		// upstream's no-directory case: an empty visitor.
 		if ruleContext.Program == nil {

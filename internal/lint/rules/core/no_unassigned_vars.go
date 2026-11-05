@@ -91,7 +91,7 @@ var messageNoUnassignedVars = rule.Message{
 //
 // No fix. The repair is either an initializer whose value the rule cannot know, or a deletion that
 // is only correct if every read was also a mistake.
-var NoUnassignedVars = rule.Rule{
+var NoUnassignedVars = rule.Rule[rule.NoOptions]{
 	Name: "no-unassigned-vars",
 
 	// See the doc above: the discrimination is which binding a write names, and the shape that
@@ -100,7 +100,7 @@ var NoUnassignedVars = rule.Rule{
 	// Reads only this file's declarations (rule.DeclarationsIn), so its findings key on imports' shapes.
 	TypeReach: rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindVariableDeclaration: func(node *ast.Node) {
 				// The engine hands every rule a nil checker when the program could not be built,

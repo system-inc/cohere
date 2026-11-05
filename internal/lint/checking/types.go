@@ -119,10 +119,14 @@ func IsBooleanLiteralType(subjectType *checker.Type) bool {
 	return IsTypeFlagSet(subjectType, checker.TypeFlagsBoolean)
 }
 func IsTrueLiteralType(subjectType *checker.Type) bool {
-	return IsBooleanLiteralType(subjectType) && IsIntrinsicType(subjectType) && subjectType.AsIntrinsicType().IntrinsicName() == "true"
+	return IsBooleanLiteralType(subjectType) &&
+		IsIntrinsicType(subjectType) &&
+		subjectType.AsIntrinsicType().IntrinsicName() == "true"
 }
 func IsFalseLiteralType(subjectType *checker.Type) bool {
-	return IsBooleanLiteralType(subjectType) && IsIntrinsicType(subjectType) && subjectType.AsIntrinsicType().IntrinsicName() == "false"
+	return IsBooleanLiteralType(subjectType) &&
+		IsIntrinsicType(subjectType) &&
+		subjectType.AsIntrinsicType().IntrinsicName() == "false"
 }
 
 func GetCallSignatures(typeChecker *checker.Checker, subjectType *checker.Type) []*checker.Signature {
@@ -174,7 +178,11 @@ func IsCallback(
 	if parameter.ValueDeclaration != nil &&
 		ast.IsParameterDeclaration(parameter.ValueDeclaration) &&
 		parameter.ValueDeclaration.AsParameterDeclaration().DotDotDotToken != nil {
-		subjectType = checker.Checker_getIndexTypeOfType(typeChecker, subjectType, checker.Checker_numberType(typeChecker))
+		subjectType = checker.Checker_getIndexTypeOfType(
+			typeChecker,
+			subjectType,
+			checker.Checker_numberType(typeChecker),
+		)
 		if subjectType == nil {
 			return false
 		}
@@ -225,7 +233,11 @@ func IsThenableType(
 	return false
 }
 
-func GetWellKnownSymbolPropertyOfType(subjectType *checker.Type, name string, typeChecker *checker.Checker) *ast.Symbol {
+func GetWellKnownSymbolPropertyOfType(
+	subjectType *checker.Type,
+	name string,
+	typeChecker *checker.Checker,
+) *ast.Symbol {
 	return checker.Checker_getPropertyOfType(
 		typeChecker,
 		subjectType,

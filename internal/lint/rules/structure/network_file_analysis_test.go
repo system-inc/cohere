@@ -14,9 +14,9 @@ import (
 //
 // A probe rule is the harness: it reports one finding per hook found, so the fixtures read the
 // analysis through the same path a real rule will.
-var networkAnalysisProbe = rule.Rule{
+var networkAnalysisProbe = rule.Rule[rule.NoOptions]{
 	Name: "network-analysis-probe",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
 				analysis := NetworkFileAnalysisFor(ruleContext)

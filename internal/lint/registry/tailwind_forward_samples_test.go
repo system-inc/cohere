@@ -1,6 +1,7 @@
 package registry
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -106,13 +107,9 @@ func isTailwindPorted(ruleName string, key string) bool {
 // compactJson is a sample's element without whitespace, so a refused value is named one way.
 func compactJson(test *testing.T, raw json.RawMessage) []byte {
 	test.Helper()
-	var value any
-	if decodeError := json.Unmarshal(raw, &value); decodeError != nil {
-		test.Fatal(decodeError)
+	var compacted bytes.Buffer
+	if compactError := json.Compact(&compacted, raw); compactError != nil {
+		test.Fatal(compactError)
 	}
-	encoded, encodeError := json.Marshal(value)
-	if encodeError != nil {
-		test.Fatal(encodeError)
-	}
-	return encoded
+	return compacted.Bytes()
 }

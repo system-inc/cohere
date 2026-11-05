@@ -34,11 +34,7 @@ func decodeRootForTest(test *testing.T, root string, base rule.OptionsBase) (Imp
 	if decodeImportRequirePathAliasOptionsError != nil {
 		return ImportRequirePathAliasOptions{}, decodeImportRequirePathAliasOptionsError
 	}
-	options, isOptions := decoded.(ImportRequirePathAliasOptions)
-	if !isOptions {
-		test.Fatalf("the options decoded to a %T, want ImportRequirePathAliasOptions", decoded)
-	}
-	return options, nil
+	return decoded, nil
 }
 
 func TestImportRequirePathAliasRootIsAnchored(test *testing.T) {

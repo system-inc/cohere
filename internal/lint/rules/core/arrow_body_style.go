@@ -53,7 +53,7 @@ type ArrowBodyStyleOptions struct {
 // three modes disagree about every input, so a typo would silently select a fourth behaviour of
 // reporting nothing at all. A second element beside `always` or `never` is refused rather than
 // ignored, which is upstream's schema: its `anyOf` gives those two a one-element list.
-func DecodeArrowBodyStyleOptions(list []byte) (any, error) {
+func DecodeArrowBodyStyleOptions(list []byte) (ArrowBodyStyleOptions, error) {
 	options := ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded}
 	elements, optionElementsError := rule.OptionElements(list, 2)
 	if optionElementsError != nil || len(elements) == 0 {
@@ -174,11 +174,11 @@ var (
 // initializer, `in` is claimed by the `for...in` grammar, so the fixer wraps the returned value in
 // parentheses whenever an `in` is anywhere inside an arrow being shortened inside a for initializer.
 // Nothing else in this rule is about parsing rather than style.
-var ArrowBodyStyle = rule.Rule{
+var ArrowBodyStyle = rule.Rule[ArrowBodyStyleOptions]{
 	Name: "arrow-body-style",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[ArrowBodyStyleOptions]) rule.Listeners {
 		settings := ArrowBodyStyleOptions{Mode: ArrowBodyStyleAsNeeded}
-		if decoded, configured := rule.OptionsAs[ArrowBodyStyleOptions](options); configured {
+		if decoded, configured := options.Read(); configured {
 			settings = decoded
 			if settings.Mode == "" {
 				// A rule configured as a bare severity is handed nil, and `options.(T)` on nil

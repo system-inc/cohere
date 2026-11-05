@@ -91,18 +91,18 @@ var messageSwitchOnNaN = rule.Message{
 // relational operators, where there is no equivalent, and the negated form needs `!Number.isNaN(x)`.
 // Getting that wrong changes a branch that never runs into one that runs sometimes, which is a
 // behavior change wearing a lint fix.
-var UseIsNaN = rule.Rule{
+var UseIsNaN = rule.Rule[UseIsNaNOptions]{
 	Name: "use-isnan",
 	// Asked only whether a name spelled NaN or Number is declared in this file, so its findings key
 	// on the closure's shapes. A NaN anywhere is rare, so the checker is consulted rarely.
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[UseIsNaNOptions]) rule.Listeners {
 		// Defaults to on, matching ESLint 9 and this tree's configuration. An option that only relaxes the
 		// rule gets the strict reading when the config says nothing, so a misconfiguration cannot
 		// quietly disable half the rule.
 		enforceForSwitchCase := true
-		settings, hasSettings := rule.OptionsAs[UseIsNaNOptions](options)
+		settings, hasSettings := options.Read()
 		if hasSettings && settings.EnforceForSwitchCase != nil {
 			enforceForSwitchCase = *settings.EnforceForSwitchCase
 		}

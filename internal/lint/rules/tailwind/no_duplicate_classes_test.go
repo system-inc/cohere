@@ -306,9 +306,9 @@ func TestAttributeOnlyReadingLosesFindings(test *testing.T) {
 		}
 
 		// The narrowed reader must not, which is what makes it dangerous.
-		narrowed := rule_testing.Run(test, rule.Rule{
+		narrowed := rule_testing.Run(test, rule.Rule[rule.NoOptions]{
 			Name: "attribute-only-control",
-			Run: func(ruleContext rule.Context, _ any) rule.Listeners {
+			Run: func(ruleContext rule.Context, _ rule.Given[rule.NoOptions]) rule.Listeners {
 				listeners := rule.Listeners{}
 				for _, kind := range ListenerKinds() {
 					listeners[kind] = func(node *ast.Node) {

@@ -107,13 +107,11 @@ func classMethodsUseThisMissingThis(name string) rule.Message {
 // either. They are implemented against the schema and the reference implementation rather than
 // against fixtures, and each carries its own test written here rather than imported, because a
 // TypeScript tree is exactly where they matter and upstream had no way to write one.
-var ClassMethodsUseThis = rule.Rule{
+var ClassMethodsUseThis = rule.Rule[ClassMethodsUseThisOptions]{
 	Name: "class-methods-use-this",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[ClassMethodsUseThisOptions]) rule.Listeners {
 		resolved := DefaultClassMethodsUseThisOptions()
-		if given, isClassMethodsUseThisOptions := rule.OptionsAs[ClassMethodsUseThisOptions](
-			options,
-		); isClassMethodsUseThisOptions {
+		if given, isClassMethodsUseThisOptions := options.Read(); isClassMethodsUseThisOptions {
 			resolved = given
 		}
 		enforceForClassFields := true
@@ -567,7 +565,7 @@ func DefaultClassMethodsUseThisOptions() ClassMethodsUseThisOptions {
 // the generic helper would decode an absent option to false and silently drop every class-field
 // finding. A bare `"error"` configuration also arrives as empty input, which the generic decoder
 // errors on.
-func DecodeClassMethodsUseThisOptions(raw []byte) (any, error) {
+func DecodeClassMethodsUseThisOptions(raw []byte) (ClassMethodsUseThisOptions, error) {
 	options := DefaultClassMethodsUseThisOptions()
 	if len(raw) == 0 {
 		return options, nil

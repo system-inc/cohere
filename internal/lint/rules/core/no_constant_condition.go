@@ -84,11 +84,11 @@ func (checkLoops *NoConstantConditionCheckLoops) UnmarshalJSON(raw []byte) error
 // local shadows. We treat the names as the globals. Shadowing either is vanishingly rare and doing
 // it deliberately to defeat a lint rule is not a thing anyone does, so the exposure is a false
 // positive on code that redefines `undefined`, which has larger problems.
-var NoConstantCondition = rule.Rule{
+var NoConstantCondition = rule.Rule[NoConstantConditionOptions]{
 	Name: "no-constant-condition",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoConstantConditionOptions]) rule.Listeners {
 		checkLoops := NoConstantConditionCheckLoops("allExceptWhileTrue")
-		if parsed, ok := rule.OptionsAs[NoConstantConditionOptions](options); ok && parsed.CheckLoops != "" {
+		if parsed, ok := options.Read(); ok && parsed.CheckLoops != "" {
 			checkLoops = parsed.CheckLoops
 		}
 

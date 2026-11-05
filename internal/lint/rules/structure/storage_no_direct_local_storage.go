@@ -59,9 +59,9 @@ func messageWindowLocalStorage() rule.Message {
 // The six other direct uses in `services/network/internal/` all carry per-line disable comments, so
 // the rule fires on them and the suppression layer withholds the findings, exactly as under the
 // gate.
-var StorageNoDirectLocalStorage = rule.Rule{
+var StorageNoDirectLocalStorage = rule.Rule[rule.NoOptions]{
 	Name: "structure/storage-no-direct-local-storage",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if FileContextFor(ruleContext.SourceFile.FileName().AsString()).IsLocalStorageServiceFile {
 			// The service itself has to reach the real thing, or the rule forbids the thing it
 			// recommends.

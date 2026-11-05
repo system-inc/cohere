@@ -84,7 +84,8 @@ func (printer *stableTypePrinter) print(subjectType *checker.Type, depth int) st
 		return printer.typeChecker.TypeToString(subjectType)
 	}
 	if slices.Contains(printer.stack, subjectType) || depth > printer.maximumDepth {
-		if symbol := subjectType.Symbol(); symbol != nil && subjectType.ObjectFlags()&checker.ObjectFlagsAnonymous == 0 {
+		if symbol := subjectType.Symbol(); symbol != nil &&
+			subjectType.ObjectFlags()&checker.ObjectFlagsAnonymous == 0 {
 			return symbol.Name
 		}
 		return "..."
@@ -98,7 +99,9 @@ func (printer *stableTypePrinter) print(subjectType *checker.Type, depth int) st
 		if len(arguments) > 0 {
 			element = printer.operand(arguments[0], depth+1)
 		}
-		if subjectType.Target() != nil && subjectType.Target().Symbol() != nil && subjectType.Target().Symbol().Name == "ReadonlyArray" {
+		if subjectType.Target() != nil &&
+			subjectType.Target().Symbol() != nil &&
+			subjectType.Target().Symbol().Name == "ReadonlyArray" {
 			return "readonly " + element + "[]"
 		}
 		return element + "[]"
@@ -106,9 +109,12 @@ func (printer *stableTypePrinter) print(subjectType *checker.Type, depth int) st
 	if checker.IsTupleType(subjectType) {
 		return printer.tuple(subjectType, depth)
 	}
-	if subjectType.ObjectFlags()&checker.ObjectFlagsReference != 0 && subjectType.Target() != nil && subjectType.Target().Symbol() != nil {
+	if subjectType.ObjectFlags()&checker.ObjectFlagsReference != 0 &&
+		subjectType.Target() != nil &&
+		subjectType.Target().Symbol() != nil {
 		arguments := printer.typeChecker.GetTypeArguments(subjectType)
-		if target := subjectType.Target().TargetInterfaceType(); target != nil && len(target.TypeParameters()) <= len(arguments) {
+		if target := subjectType.Target().TargetInterfaceType(); target != nil &&
+			len(target.TypeParameters()) <= len(arguments) {
 			arguments = arguments[:len(target.TypeParameters())]
 		}
 		return printer.named(subjectType.Target().Symbol().Name, arguments, depth)
@@ -136,7 +142,8 @@ func (printer *stableTypePrinter) named(name string, arguments []*checker.Type, 
 func (printer *stableTypePrinter) operand(subjectType *checker.Type, depth int) string {
 	text := printer.print(subjectType, depth)
 	if subjectType.Alias() == nil &&
-		(subjectType.Flags()&(checker.TypeFlagsUnion|checker.TypeFlagsIntersection) != 0 || strings.Contains(text, "=>")) {
+		(subjectType.Flags()&(checker.TypeFlagsUnion|checker.TypeFlagsIntersection) != 0 ||
+			strings.Contains(text, "=>")) {
 		return "(" + text + ")"
 	}
 	return text

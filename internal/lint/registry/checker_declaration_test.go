@@ -147,7 +147,7 @@ func checkerDeclarationsOnDisk(test *testing.T) []checkerDeclaration {
 	return found
 }
 
-// ruleNameDeclaredIn returns the Name of the first `rule.Rule{...}` literal in a file.
+// ruleNameDeclaredIn returns the Name of the first `rule.Rule[Options]{...}` literal in a file.
 func ruleNameDeclaredIn(parsed *ast.File) (string, bool) {
 	name := ""
 	ast.Inspect(parsed, func(node ast.Node) bool {
@@ -155,15 +155,7 @@ func ruleNameDeclaredIn(parsed *ast.File) (string, bool) {
 			return false
 		}
 		composite, isComposite := node.(*ast.CompositeLit)
-		if !isComposite {
-			return true
-		}
-		selector, isSelector := composite.Type.(*ast.SelectorExpr)
-		if !isSelector {
-			return true
-		}
-		identifier, isIdentifier := selector.X.(*ast.Ident)
-		if !isIdentifier || identifier.Name != "rule" || selector.Sel.Name != "Rule" {
+		if !isComposite || !isRuleLiteral(composite) {
 			return true
 		}
 		for _, element := range composite.Elts {

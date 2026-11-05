@@ -14,10 +14,10 @@ import (
 
 // offeredSites is a rule that reports every site the file's walker offers, at the site's value, so a test
 // can see which targets the walk is handed at all. The three relation rules judge only what this sees.
-var offeredSites = rule.Rule{
+var offeredSites = rule.Rule[rule.NoOptions]{
 	Name:             "adamic/offered-sites",
 	NeedsTypeChecker: true,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.TypeChecker == nil || ruleContext.SourceFile == nil {
 			return nil
 		}

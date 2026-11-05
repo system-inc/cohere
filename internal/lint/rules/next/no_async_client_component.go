@@ -69,7 +69,7 @@ var messageNoAsyncClientComponent = rule.Message{
 //
 // No fix. The repair is to remove `async` and rewrite whatever the body awaited, which the rule
 // cannot know how to do.
-var NoAsyncClientComponent = rule.Rule{
+var NoAsyncClientComponent = rule.Rule[rule.NoOptions]{
 	Name: "@next/next/no-async-client-component",
 
 	// The indirect shapes resolve an exported identifier back to its declaration, which upstream
@@ -78,7 +78,7 @@ var NoAsyncClientComponent = rule.Rule{
 	// top-level statements, which is what the `@next` original does, is not the same rule.
 	NeedsTypeChecker: true,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			// The whole rule is one pass over the top-level statements, matching upstream's
 			// `run_once`. A `KindSourceFile` listener fires before its children, so the walk is

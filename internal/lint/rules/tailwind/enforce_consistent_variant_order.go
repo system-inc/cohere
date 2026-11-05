@@ -75,11 +75,11 @@ type EnforceConsistentVariantOrderOptions struct {
 //
 // The name matches the upstream rule's, without a `tailwind-` prefix, so it answers to the
 // `better-tailwindcss/enforce-consistent-variant-order` line a project already has.
-var EnforceConsistentVariantOrder = rule.Rule{
+var EnforceConsistentVariantOrder = rule.Rule[EnforceConsistentVariantOrderOptions]{
 	Name: "better-tailwindcss/enforce-consistent-variant-order",
 	// The design system: its stylesheets, read through the recording file system (DesignSystemFS).
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDesignSystem,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[EnforceConsistentVariantOrderOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}
@@ -87,7 +87,7 @@ var EnforceConsistentVariantOrder = rule.Rule{
 		// Read before the design system is resolved: reading is pure, and a run that declines for want
 		// of a Tailwind entry point must still reach it, or the registry's decoder agreement check
 		// never looks at this rule (#zwd43jn).
-		configured, isConfigured := rule.OptionsAs[EnforceConsistentVariantOrderOptions](options)
+		configured, isConfigured := options.Read()
 
 		designSystem := DesignSystemForProgramAt(ruleContext.Program, configured.Location())
 		if designSystem.Error != nil {

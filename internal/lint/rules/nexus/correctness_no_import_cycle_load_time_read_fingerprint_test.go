@@ -18,7 +18,7 @@ func correctnessNoImportCycleLoadTimeReadFingerprintOf(
 	test.Helper()
 	var fingerprint [sha256.Size]byte
 	probe := CorrectnessNoImportCycleLoadTimeRead
-	probe.Run = func(ruleContext rule.Context, options any) rule.Listeners {
+	probe.Run = func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		fingerprint = CorrectnessNoImportCycleLoadTimeRead.ProgramFingerprint(ruleContext.Program, options)
 		return nil
 	}

@@ -120,7 +120,7 @@ const (
 //
 // What a failed spawn should do is the author's call: reject the promise around it, log and carry
 // on, or fall back to another binary. A listener written in by a fixer would swallow the failure.
-var CorrectnessRequireChildProcessErrorListener = rule.Rule{
+var CorrectnessRequireChildProcessErrorListener = rule.Rule[rule.NoOptions]{
 	Name:             "nexus/correctness-require-child-process-error-listener",
 	NeedsTypeChecker: true,
 
@@ -128,7 +128,7 @@ var CorrectnessRequireChildProcessErrorListener = rule.Rule{
 	// and the dispatch scan cannot prove that read stops short of a body, so a shape-keyed replay is not
 	// claimed (TestRulesClaimShapesOnlyWhereTheScanAllowsIt).
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.TypeChecker == nil {
 			// Telling node's `spawn` from any other function of that name is a question for the
 			// checker. With none, the rule declines rather than guess by name.

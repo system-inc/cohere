@@ -13,7 +13,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // `oneOf(object, enum:[true])`, which no struct tag can express and which the generic decoder would
 // reject outright.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[PreferNullishCoalescingOptions]{
 		Rule:   PreferNullishCoalescing,
 		Decode: DecodePreferNullishCoalescingOptions,
 	})

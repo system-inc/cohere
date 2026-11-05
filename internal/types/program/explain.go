@@ -76,7 +76,11 @@ type Explanation struct {
 // A separate path from Walk rather than a flag on it. Walk is the hot path across thousands of
 // files and must stay free of per-rule bookkeeping; this runs once, on one file, where the overhead
 // is irrelevant and completeness matters more than speed.
-func (graph *Graph) Explain(callerContext context.Context, sourceFile *ast.SourceFile, rules []rule.Rule) (*Explanation, error) {
+func (graph *Graph) Explain(
+	callerContext context.Context,
+	sourceFile *ast.SourceFile,
+	rules []rule.Entry,
+) (*Explanation, error) {
 	if sourceFile == nil {
 		return nil, fmt.Errorf("no file to explain")
 	}
@@ -115,7 +119,7 @@ func (graph *Graph) Explain(callerContext context.Context, sourceFile *ast.Sourc
 			}
 		}
 
-		options, decodeError := graph.RuleOptions.Decode(subject.Name, resolution.RawOptionsFor(subject.Name))
+		bound, decodeError := graph.Bind(subject, resolution.RawOptionsFor(subject.Name))
 		if decodeError != nil {
 			account.DeclinedBecause = fmt.Sprintf("its options could not be read: %v", decodeError)
 			explanation.Accounts = append(explanation.Accounts, account)
@@ -143,13 +147,13 @@ func (graph *Graph) Explain(callerContext context.Context, sourceFile *ast.Sourc
 		}
 
 		start := time.Now()
-		listeners := subject.Run(rule.Context{
+		listeners := bound.Run(rule.Context{
 			SourceFile:  sourceFile,
-			Program:     rule.ViewProgram(graph.Program, sourceFile, subject),
+			Program:     rule.ViewProgram(graph.Program, sourceFile, subject.Traits),
 			TypeChecker: fileChecker,
 			FileCache:   fileCache,
 			Report:      report,
-		}, options)
+		})
 
 		if len(listeners) == 0 {
 			// The rule looked at the file and declined it. Recorded rather than skipped, because a

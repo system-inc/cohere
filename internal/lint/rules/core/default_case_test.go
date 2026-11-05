@@ -195,7 +195,7 @@ var defaultCaseSilentCases = []defaultCaseCase{
 }
 
 // decodedDefaultCase routes a row's raw JSON through the rule's own exported decoder.
-func decodedDefaultCase(test *testing.T, raw string) any {
+func decodedDefaultCase(test *testing.T, raw string) DefaultCaseOptions {
 	test.Helper()
 	decoded, decodeDefaultCaseOptionsError := DecodeDefaultCaseOptions([]byte(raw))
 	if decodeDefaultCaseOptionsError != nil {

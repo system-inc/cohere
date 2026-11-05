@@ -66,7 +66,7 @@ func correctnessNoWriteOnlyCollectionMessage() rule.Message {
 //
 // Deleting the collection and its writes is right when it is dead, and wrong when a reader was meant
 // to exist. Which one is the author's call.
-var CorrectnessNoWriteOnlyCollection = rule.Rule{
+var CorrectnessNoWriteOnlyCollection = rule.Rule[rule.NoOptions]{
 	Name: "nexus/correctness-no-write-only-collection",
 
 	// Symbol identity finds every reference to the binding through shadowing and shorthand properties,
@@ -76,7 +76,7 @@ var CorrectnessNoWriteOnlyCollection = rule.Rule{
 	// Whether `Map`, `Set` and the mutating methods are the default library's, through type_checking.
 	ProgramReads: rule.ReadsCompilerOptions | rule.ReadsDefaultLibrary,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.TypeChecker == nil {
 			return nil
 		}

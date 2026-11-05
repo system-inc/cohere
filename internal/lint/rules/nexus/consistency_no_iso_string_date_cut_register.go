@@ -11,5 +11,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // implicit zone the rule exists to make explicit, and the one helper that defines the shape,
 // `dateIso8601`, is fixed rather than exempted.
 func init() {
-	rule.Register(rule.Registration{Rule: ConsistencyNoIsoStringDateCut})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: ConsistencyNoIsoStringDateCut})
 }

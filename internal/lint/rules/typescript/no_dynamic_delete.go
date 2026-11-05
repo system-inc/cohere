@@ -94,10 +94,10 @@ import (
 //
 // `KindDeleteExpression` is a rare anchor and the listener exits on the first test for anything that
 // is not an element access. No checker, no program, no per-file state.
-var NoDynamicDelete = rule.Rule{
+var NoDynamicDelete = rule.Rule[rule.NoOptions]{
 	Name: "@typescript-eslint/no-dynamic-delete",
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindDeleteExpression: func(node *ast.Node) {
 				// SkipParentheses dereferences its argument, so the operand is read from the node

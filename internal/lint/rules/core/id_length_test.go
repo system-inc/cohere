@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	rule_testing "github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -15,7 +16,7 @@ const idLengthFile = "/repository/source/IdLength.ts"
 // The argument is the option as JSON text, exactly the bytes the config layer hands the decoder, so
 // a fixture cannot bypass the decoder or test a shape a config could not deliver. That is section
 // 7c of the standard applied at the fixture rather than only in a contract test.
-func idLengthOf(optionJson string) any {
+func idLengthOf(optionJson string) IdLengthSettings {
 	settings, decodeIdLengthOptionsError := DecodeIdLengthOptions([]byte(optionJson))
 	if decodeIdLengthOptionsError != nil {
 		panic(decodeIdLengthOptionsError)
@@ -42,231 +43,223 @@ func TestIdLengthFires(test *testing.T) {
 	cases := []struct {
 		source string
 		// settings is what the rule's own decoder produces for this case's options.
-		settings any
+		settings rule.Given[IdLengthSettings]
 		// findings is one message id per expected finding, taken from what the installed rule
 		// produced: this rule has four ids and no count could tell them apart.
 		findings []string
 	}{
-		{source: "var x = 1;", settings: nil, findings: []string{messageIdLengthTooShort.Id}},
-		{source: "var x;", settings: nil, findings: []string{messageIdLengthTooShort.Id}},
-		{source: "obj.e = document.body;", settings: nil, findings: []string{messageIdLengthTooShort.Id}},
-		{source: "function x() {};", settings: nil, findings: []string{messageIdLengthTooShort.Id}},
-		{source: "function xyz(a) {};", settings: nil, findings: []string{messageIdLengthTooShort.Id}},
-		{source: "var obj = { a: 1, bc: 2 };", settings: nil, findings: []string{messageIdLengthTooShort.Id}},
+		{source: "var x = 1;", findings: []string{messageIdLengthTooShort.Id}},
+		{source: "var x;", findings: []string{messageIdLengthTooShort.Id}},
+		{source: "obj.e = document.body;", findings: []string{messageIdLengthTooShort.Id}},
+		{source: "function x() {};", findings: []string{messageIdLengthTooShort.Id}},
+		{source: "function xyz(a) {};", findings: []string{messageIdLengthTooShort.Id}},
+		{source: "var obj = { a: 1, bc: 2 };", findings: []string{messageIdLengthTooShort.Id}},
 		{
 			source:   "try { blah(); } catch (e) { /* pass */ }",
-			settings: nil,
 			findings: []string{messageIdLengthTooShort.Id},
 		},
-		{source: "var handler = function (e) {};", settings: nil, findings: []string{messageIdLengthTooShort.Id}},
+		{source: "var handler = function (e) {};", findings: []string{messageIdLengthTooShort.Id}},
 		{
 			source:   "for (var i=0; i < 10; i++) { console.log(i); }",
-			settings: nil,
 			findings: []string{messageIdLengthTooShort.Id},
 		},
 		{
 			source:   "var j=0; while (j > -10) { console.log(--j); }",
-			settings: nil,
 			findings: []string{messageIdLengthTooShort.Id},
 		},
-		{source: "var [i] = arr;", settings: nil, findings: []string{messageIdLengthTooShort.Id}},
+		{source: "var [i] = arr;", findings: []string{messageIdLengthTooShort.Id}},
 		{
 			source:   "var [,i,a] = arr;",
-			settings: nil,
 			findings: []string{messageIdLengthTooShort.Id, messageIdLengthTooShort.Id},
 		},
-		{source: "function foo([a]) {}", settings: nil, findings: []string{messageIdLengthTooShort.Id}},
-		{source: "import x from 'module';", settings: nil, findings: []string{messageIdLengthTooShort.Id}},
-		{source: "import { x as z } from 'module';", settings: nil, findings: []string{messageIdLengthTooShort.Id}},
-		{source: "import { foo as z } from 'module';", settings: nil, findings: []string{messageIdLengthTooShort.Id}},
-		{source: "import { 'foo' as z } from 'module';", settings: nil, findings: []string{messageIdLengthTooShort.Id}},
-		{source: "import * as x from 'module';", settings: nil, findings: []string{messageIdLengthTooShort.Id}},
+		{source: "function foo([a]) {}", findings: []string{messageIdLengthTooShort.Id}},
+		{source: "import x from 'module';", findings: []string{messageIdLengthTooShort.Id}},
+		{source: "import { x as z } from 'module';", findings: []string{messageIdLengthTooShort.Id}},
+		{source: "import { foo as z } from 'module';", findings: []string{messageIdLengthTooShort.Id}},
+		{source: "import { 'foo' as z } from 'module';", findings: []string{messageIdLengthTooShort.Id}},
+		{source: "import * as x from 'module';", findings: []string{messageIdLengthTooShort.Id}},
 		{
 			source:   "import longName from 'module';",
-			settings: idLengthOf("{\"max\": 5}"),
+			settings: rule.Configured(idLengthOf("{\"max\": 5}")),
 			findings: []string{messageIdLengthTooLong.Id},
 		},
 		{
 			source:   "import * as longName from 'module';",
-			settings: idLengthOf("{\"max\": 5}"),
+			settings: rule.Configured(idLengthOf("{\"max\": 5}")),
 			findings: []string{messageIdLengthTooLong.Id},
 		},
 		{
 			source:   "import { foo as longName } from 'module';",
-			settings: idLengthOf("{\"max\": 5}"),
+			settings: rule.Configured(idLengthOf("{\"max\": 5}")),
 			findings: []string{messageIdLengthTooLong.Id},
 		},
 		{
 			source:   "var _$xt_$ = Foo(42)",
-			settings: idLengthOf("{\"min\": 2, \"max\": 4}"),
+			settings: rule.Configured(idLengthOf("{\"min\": 2, \"max\": 4}")),
 			findings: []string{messageIdLengthTooLong.Id},
 		},
 		{
 			source:   "var _$x$_t$ = Foo(42)",
-			settings: idLengthOf("{\"min\": 2, \"max\": 4}"),
+			settings: rule.Configured(idLengthOf("{\"min\": 2, \"max\": 4}")),
 			findings: []string{messageIdLengthTooLong.Id},
 		},
-		{source: "var toString;", settings: idLengthOf("{\"max\": 5}"), findings: []string{messageIdLengthTooLong.Id}},
-		{source: "(a) => { a * a };", settings: nil, findings: []string{messageIdLengthTooShort.Id}},
-		{source: "function foo(x = 0) { }", settings: nil, findings: []string{messageIdLengthTooShort.Id}},
-		{source: "class x { }", settings: nil, findings: []string{messageIdLengthTooShort.Id}},
-		{source: "class Foo { x() {} }", settings: nil, findings: []string{messageIdLengthTooShort.Id}},
-		{source: "function foo(...x) { }", settings: nil, findings: []string{messageIdLengthTooShort.Id}},
-		{source: "function foo({x}) { }", settings: nil, findings: []string{messageIdLengthTooShort.Id}},
-		{source: "function foo({x: a}) { }", settings: nil, findings: []string{messageIdLengthTooShort.Id}},
-		{source: "function foo({x: a, longName}) { }", settings: nil, findings: []string{messageIdLengthTooShort.Id}},
+		{
+			source:   "var toString;",
+			settings: rule.Configured(idLengthOf("{\"max\": 5}")),
+			findings: []string{messageIdLengthTooLong.Id},
+		},
+		{source: "(a) => { a * a };", findings: []string{messageIdLengthTooShort.Id}},
+		{source: "function foo(x = 0) { }", findings: []string{messageIdLengthTooShort.Id}},
+		{source: "class x { }", findings: []string{messageIdLengthTooShort.Id}},
+		{source: "class Foo { x() {} }", findings: []string{messageIdLengthTooShort.Id}},
+		{source: "function foo(...x) { }", findings: []string{messageIdLengthTooShort.Id}},
+		{source: "function foo({x}) { }", findings: []string{messageIdLengthTooShort.Id}},
+		{source: "function foo({x: a}) { }", findings: []string{messageIdLengthTooShort.Id}},
+		{source: "function foo({x: a, longName}) { }", findings: []string{messageIdLengthTooShort.Id}},
 		{
 			source:   "function foo({ longName: a }) {}",
-			settings: idLengthOf("{\"min\": 3, \"max\": 5}"),
+			settings: rule.Configured(idLengthOf("{\"min\": 3, \"max\": 5}")),
 			findings: []string{messageIdLengthTooShort.Id},
 		},
 		{
 			source:   "function foo({ prop: longName }) {};",
-			settings: idLengthOf("{\"min\": 3, \"max\": 5}"),
+			settings: rule.Configured(idLengthOf("{\"min\": 3, \"max\": 5}")),
 			findings: []string{messageIdLengthTooLong.Id},
 		},
 		{
 			source:   "function foo({ a: b }) {};",
-			settings: idLengthOf("{\"exceptions\": [\"a\"]}"),
+			settings: rule.Configured(idLengthOf("{\"exceptions\": [\"a\"]}")),
 			findings: []string{messageIdLengthTooShort.Id},
 		},
 		{
 			source:   "var hasOwnProperty;",
-			settings: idLengthOf("{\"max\": 10, \"exceptions\": []}"),
+			settings: rule.Configured(idLengthOf("{\"max\": 10, \"exceptions\": []}")),
 			findings: []string{messageIdLengthTooLong.Id},
 		},
 		{
 			source:   "function foo({ a: { b: { c: d, e } } }) { }",
-			settings: nil,
 			findings: []string{messageIdLengthTooShort.Id, messageIdLengthTooShort.Id},
 		},
-		{source: "var { x} = {};", settings: nil, findings: []string{messageIdLengthTooShort.Id}},
-		{source: "var { x: a} = {};", settings: nil, findings: []string{messageIdLengthTooShort.Id}},
-		{source: "var { a: a} = {};", settings: nil, findings: []string{messageIdLengthTooShort.Id}},
-		{source: "var { prop: a } = {};", settings: nil, findings: []string{messageIdLengthTooShort.Id}},
+		{source: "var { x} = {};", findings: []string{messageIdLengthTooShort.Id}},
+		{source: "var { x: a} = {};", findings: []string{messageIdLengthTooShort.Id}},
+		{source: "var { a: a} = {};", findings: []string{messageIdLengthTooShort.Id}},
+		{source: "var { prop: a } = {};", findings: []string{messageIdLengthTooShort.Id}},
 		{
 			source:   "var { longName: a } = {};",
-			settings: idLengthOf("{\"min\": 3, \"max\": 5}"),
+			settings: rule.Configured(idLengthOf("{\"min\": 3, \"max\": 5}")),
 			findings: []string{messageIdLengthTooShort.Id},
 		},
-		{source: "var { prop: [x] } = {};", settings: nil, findings: []string{messageIdLengthTooShort.Id}},
-		{source: "var { prop: [[x]] } = {};", settings: nil, findings: []string{messageIdLengthTooShort.Id}},
+		{source: "var { prop: [x] } = {};", findings: []string{messageIdLengthTooShort.Id}},
+		{source: "var { prop: [[x]] } = {};", findings: []string{messageIdLengthTooShort.Id}},
 		{
 			source:   "var { prop: longName } = {};",
-			settings: idLengthOf("{\"min\": 3, \"max\": 5}"),
+			settings: rule.Configured(idLengthOf("{\"min\": 3, \"max\": 5}")),
 			findings: []string{messageIdLengthTooLong.Id},
 		},
 		{
 			source:   "var { x: a} = {};",
-			settings: idLengthOf("{\"exceptions\": [\"x\"]}"),
+			settings: rule.Configured(idLengthOf("{\"exceptions\": [\"x\"]}")),
 			findings: []string{messageIdLengthTooShort.Id},
 		},
-		{source: "var { a: { b: { c: d } } } = {};", settings: nil, findings: []string{messageIdLengthTooShort.Id}},
+		{source: "var { a: { b: { c: d } } } = {};", findings: []string{messageIdLengthTooShort.Id}},
 		{
 			source:   "var { a: { b: { c: d, e } } } = {};",
-			settings: nil,
 			findings: []string{messageIdLengthTooShort.Id, messageIdLengthTooShort.Id},
 		},
 		{
 			source:   "var { a: { b: { c, e: longName } } } = {};",
-			settings: nil,
 			findings: []string{messageIdLengthTooShort.Id},
 		},
 		{
 			source:   "var { a: { b: { c: d, e: longName } } } = {};",
-			settings: nil,
 			findings: []string{messageIdLengthTooShort.Id},
 		},
 		{
 			source:   "var { a, b: { c: d, e: longName } } = {};",
-			settings: nil,
 			findings: []string{messageIdLengthTooShort.Id, messageIdLengthTooShort.Id},
 		},
-		{source: "import x from 'y';", settings: nil, findings: []string{messageIdLengthTooShort.Id}},
-		{source: "export var x = 0;", settings: nil, findings: []string{messageIdLengthTooShort.Id}},
-		{source: "({ a: obj.x.y.z } = {});", settings: nil, findings: []string{messageIdLengthTooShort.Id}},
-		{source: "({ prop: obj.x } = {});", settings: nil, findings: []string{messageIdLengthTooShort.Id}},
+		{source: "import x from 'y';", findings: []string{messageIdLengthTooShort.Id}},
+		{source: "export var x = 0;", findings: []string{messageIdLengthTooShort.Id}},
+		{source: "({ a: obj.x.y.z } = {});", findings: []string{messageIdLengthTooShort.Id}},
+		{source: "({ prop: obj.x } = {});", findings: []string{messageIdLengthTooShort.Id}},
 		{
 			source:   "var x = 1;",
-			settings: idLengthOf("{\"properties\": \"never\"}"),
+			settings: rule.Configured(idLengthOf("{\"properties\": \"never\"}")),
 			findings: []string{messageIdLengthTooShort.Id},
 		},
 		{
 			source:   "var {prop: x} = foo;",
-			settings: idLengthOf("{\"properties\": \"never\"}"),
+			settings: rule.Configured(idLengthOf("{\"properties\": \"never\"}")),
 			findings: []string{messageIdLengthTooShort.Id},
 		},
 		{
 			source:   "var foo = {x: prop};",
-			settings: idLengthOf("{\"properties\": \"always\"}"),
+			settings: rule.Configured(idLengthOf("{\"properties\": \"always\"}")),
 			findings: []string{messageIdLengthTooShort.Id},
 		},
 		{
 			source:   "function BEFORE_send() {};",
-			settings: idLengthOf("{\"min\": 3, \"max\": 5}"),
+			settings: rule.Configured(idLengthOf("{\"min\": 3, \"max\": 5}")),
 			findings: []string{messageIdLengthTooLong.Id},
 		},
 		{
 			source:   "function NOTMATCHED_send() {};",
-			settings: idLengthOf("{\"min\": 3, \"max\": 5, \"exceptionPatterns\": [\"^BEFORE_\"]}"),
+			settings: rule.Configured(idLengthOf("{\"min\": 3, \"max\": 5, \"exceptionPatterns\": [\"^BEFORE_\"]}")),
 			findings: []string{messageIdLengthTooLong.Id},
 		},
 		{
 			source:   "function N() {};",
-			settings: idLengthOf("{\"min\": 3, \"max\": 5, \"exceptionPatterns\": [\"^BEFORE_\"]}"),
+			settings: rule.Configured(idLengthOf("{\"min\": 3, \"max\": 5, \"exceptionPatterns\": [\"^BEFORE_\"]}")),
 			findings: []string{messageIdLengthTooShort.Id},
 		},
-		{source: "class Foo { #x() {} }", settings: nil, findings: []string{messageIdLengthTooShortPrivate.Id}},
-		{source: "class Foo { x = 1 }", settings: nil, findings: []string{messageIdLengthTooShort.Id}},
-		{source: "class Foo { #x = 1 }", settings: nil, findings: []string{messageIdLengthTooShortPrivate.Id}},
+		{source: "class Foo { #x() {} }", findings: []string{messageIdLengthTooShortPrivate.Id}},
+		{source: "class Foo { x = 1 }", findings: []string{messageIdLengthTooShort.Id}},
+		{source: "class Foo { #x = 1 }", findings: []string{messageIdLengthTooShortPrivate.Id}},
 		{
 			source:   "class Foo { #abcdefg() {} }",
-			settings: idLengthOf("{\"max\": 3}"),
+			settings: rule.Configured(idLengthOf("{\"max\": 3}")),
 			findings: []string{messageIdLengthTooLongPrivate.Id},
 		},
 		{
 			source:   "class Foo { abcdefg = 1 }",
-			settings: idLengthOf("{\"max\": 3}"),
+			settings: rule.Configured(idLengthOf("{\"max\": 3}")),
 			findings: []string{messageIdLengthTooLong.Id},
 		},
 		{
 			source:   "class Foo { #abcdefg = 1 }",
-			settings: idLengthOf("{\"max\": 3}"),
+			settings: rule.Configured(idLengthOf("{\"max\": 3}")),
 			findings: []string{messageIdLengthTooLongPrivate.Id},
 		},
-		{source: "var \U00020b9f = 2", settings: nil, findings: []string{messageIdLengthTooShort.Id}},
-		{source: "var \u845b\U000e0100 = 2", settings: nil, findings: []string{messageIdLengthTooShort.Id}},
-		{source: "var myObj = { \U00010318: 1 };", settings: nil, findings: []string{messageIdLengthTooShort.Id}},
+		{source: "var \U00020b9f = 2", findings: []string{messageIdLengthTooShort.Id}},
+		{source: "var \u845b\U000e0100 = 2", findings: []string{messageIdLengthTooShort.Id}},
+		{source: "var myObj = { \U00010318: 1 };", findings: []string{messageIdLengthTooShort.Id}},
 		{
 			source:   "(\U00010318) => { \U00010318 * \U00010318 };",
-			settings: nil,
 			findings: []string{messageIdLengthTooShort.Id},
 		},
-		{source: "class \U00020b9f { }", settings: nil, findings: []string{messageIdLengthTooShort.Id}},
-		{source: "class Foo { \U00010318() {} }", settings: nil, findings: []string{messageIdLengthTooShort.Id}},
+		{source: "class \U00020b9f { }", findings: []string{messageIdLengthTooShort.Id}},
+		{source: "class Foo { \U00010318() {} }", findings: []string{messageIdLengthTooShort.Id}},
 		{
 			source:   "class Foo1 { #\U00010318() {} }",
-			settings: nil,
 			findings: []string{messageIdLengthTooShortPrivate.Id},
 		},
-		{source: "class Foo2 { \U00010318 = 1 }", settings: nil, findings: []string{messageIdLengthTooShort.Id}},
+		{source: "class Foo2 { \U00010318 = 1 }", findings: []string{messageIdLengthTooShort.Id}},
 		{
 			source:   "class Foo3 { #\U00010318 = 1 }",
-			settings: nil,
 			findings: []string{messageIdLengthTooShortPrivate.Id},
 		},
-		{source: "function foo1(...\U00010318) { }", settings: nil, findings: []string{messageIdLengthTooShort.Id}},
-		{source: "function foo([\U00010318]) { }", settings: nil, findings: []string{messageIdLengthTooShort.Id}},
-		{source: "var [ \U00010318 ] = arr;", settings: nil, findings: []string{messageIdLengthTooShort.Id}},
-		{source: "var { prop: [\U00010318]} = {};", settings: nil, findings: []string{messageIdLengthTooShort.Id}},
-		{source: "function foo({\U00010318}) { }", settings: nil, findings: []string{messageIdLengthTooShort.Id}},
-		{source: "var { \U00010318 } = {};", settings: nil, findings: []string{messageIdLengthTooShort.Id}},
-		{source: "var { prop: \U00010318} = {};", settings: nil, findings: []string{messageIdLengthTooShort.Id}},
-		{source: "({ prop: obj.\U00010318 } = {});", settings: nil, findings: []string{messageIdLengthTooShort.Id}},
+		{source: "function foo1(...\U00010318) { }", findings: []string{messageIdLengthTooShort.Id}},
+		{source: "function foo([\U00010318]) { }", findings: []string{messageIdLengthTooShort.Id}},
+		{source: "var [ \U00010318 ] = arr;", findings: []string{messageIdLengthTooShort.Id}},
+		{source: "var { prop: [\U00010318]} = {};", findings: []string{messageIdLengthTooShort.Id}},
+		{source: "function foo({\U00010318}) { }", findings: []string{messageIdLengthTooShort.Id}},
+		{source: "var { \U00010318 } = {};", findings: []string{messageIdLengthTooShort.Id}},
+		{source: "var { prop: \U00010318} = {};", findings: []string{messageIdLengthTooShort.Id}},
+		{source: "({ prop: obj.\U00010318 } = {});", findings: []string{messageIdLengthTooShort.Id}},
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunWithOptions(test, IdLength, idLengthFile, testCase.source, testCase.settings)
+		result := rule_testing.RunGiven(test, IdLength, idLengthFile, testCase.source, testCase.settings)
 		if len(result.Diagnostics) != len(testCase.findings) {
 			test.Errorf("%q with %+v: expected %d findings, got %d %v",
 				testCase.source, testCase.settings, len(testCase.findings),
@@ -284,152 +277,181 @@ func TestIdLengthStaysSilent(test *testing.T) {
 
 	cases := []struct {
 		source   string
-		settings any
+		settings rule.Given[IdLengthSettings]
 	}{
-		{source: "var xyz;", settings: nil},
-		{source: "var xy = 1;", settings: nil},
-		{source: "function xyz() {};", settings: nil},
-		{source: "function xyz(abc, de) {};", settings: nil},
-		{source: "var obj = { abc: 1, de: 2 };", settings: nil},
-		{source: "var obj = { 'a': 1, bc: 2 };", settings: nil},
-		{source: "var obj = {}; obj['a'] = 2;", settings: nil},
-		{source: "abc = d;", settings: nil},
-		{source: "try { blah(); } catch (err) { /* pass */ }", settings: nil},
-		{source: "var handler = function ($e) {};", settings: nil},
-		{source: "var _a = 2", settings: nil},
-		{source: "var _ad$$ = new $;", settings: nil},
-		{source: "var xyz = new \u03a3\u03a3();", settings: nil},
-		{source: "unrelatedExpressionThatNeedsToBeIgnored();", settings: nil},
-		{source: "var obj = { 'a': 1, bc: 2 }; obj.tk = obj.a;", settings: nil},
-		{source: "var query = location.query.q || '';", settings: nil},
-		{source: "var query = location.query.q ? location.query.q : ''", settings: nil},
-		{source: "let {a: foo} = bar;", settings: nil},
-		{source: "let foo = { [a]: 1 };", settings: nil},
-		{source: "let foo = { [a + b]: 1 };", settings: nil},
-		{source: "var x = Foo(42)", settings: idLengthOf("{\"min\": 1}")},
-		{source: "var x = Foo(42)", settings: idLengthOf("{\"min\": 0}")},
-		{source: "foo.$x = Foo(42)", settings: idLengthOf("{\"min\": 1}")},
-		{source: "var lalala = Foo(42)", settings: idLengthOf("{\"max\": 6}")},
+		{source: "var xyz;"},
+		{source: "var xy = 1;"},
+		{source: "function xyz() {};"},
+		{source: "function xyz(abc, de) {};"},
+		{source: "var obj = { abc: 1, de: 2 };"},
+		{source: "var obj = { 'a': 1, bc: 2 };"},
+		{source: "var obj = {}; obj['a'] = 2;"},
+		{source: "abc = d;"},
+		{source: "try { blah(); } catch (err) { /* pass */ }"},
+		{source: "var handler = function ($e) {};"},
+		{source: "var _a = 2"},
+		{source: "var _ad$$ = new $;"},
+		{source: "var xyz = new \u03a3\u03a3();"},
+		{source: "unrelatedExpressionThatNeedsToBeIgnored();"},
+		{source: "var obj = { 'a': 1, bc: 2 }; obj.tk = obj.a;"},
+		{source: "var query = location.query.q || '';"},
+		{source: "var query = location.query.q ? location.query.q : ''"},
+		{source: "let {a: foo} = bar;"},
+		{source: "let foo = { [a]: 1 };"},
+		{source: "let foo = { [a + b]: 1 };"},
+		{source: "var x = Foo(42)", settings: rule.Configured(idLengthOf("{\"min\": 1}"))},
+		{source: "var x = Foo(42)", settings: rule.Configured(idLengthOf("{\"min\": 0}"))},
+		{source: "foo.$x = Foo(42)", settings: rule.Configured(idLengthOf("{\"min\": 1}"))},
+		{source: "var lalala = Foo(42)", settings: rule.Configured(idLengthOf("{\"max\": 6}"))},
 		{
 			source:   "for (var q, h=0; h < 10; h++) { console.log(h); q++; }",
-			settings: idLengthOf("{\"exceptions\": [\"h\", \"q\"]}"),
+			settings: rule.Configured(idLengthOf("{\"exceptions\": [\"h\", \"q\"]}")),
 		},
-		{source: "(num) => { num * num };", settings: nil},
-		{source: "function foo(num = 0) { }", settings: nil},
-		{source: "class MyClass { }", settings: nil},
-		{source: "class Foo { method() {} }", settings: nil},
-		{source: "function foo(...args) { }", settings: nil},
-		{source: "var { prop } = {};", settings: nil},
-		{source: "var { [a]: prop } = {};", settings: nil},
-		{source: "var { a: foo } = {};", settings: idLengthOf("{\"min\": 3}")},
-		{source: "var { prop: foo } = {};", settings: idLengthOf("{\"max\": 3}")},
-		{source: "var { longName: foo } = {};", settings: idLengthOf("{\"min\": 3, \"max\": 5}")},
-		{source: "var { foo: a } = {};", settings: idLengthOf("{\"exceptions\": [\"a\"]}")},
-		{source: "var { a: { b: { c: longName } } } = {};", settings: nil},
-		{source: "({ a: obj.x.y.z } = {});", settings: idLengthOf("{\"properties\": \"never\"}")},
-		{source: "import something from 'y';", settings: nil},
-		{source: "export var num = 0;", settings: nil},
-		{source: "import * as something from 'y';", settings: nil},
-		{source: "import { x } from 'y';", settings: nil},
-		{source: "import { x as x } from 'y';", settings: nil},
-		{source: "import { 'x' as x } from 'y';", settings: nil},
-		{source: "import { x as foo } from 'y';", settings: nil},
-		{source: "import { longName } from 'y';", settings: idLengthOf("{\"max\": 5}")},
-		{source: "import { x as bar } from 'y';", settings: idLengthOf("{\"max\": 5}")},
-		{source: "({ prop: obj.x.y.something } = {});", settings: nil},
-		{source: "({ prop: obj.longName } = {});", settings: nil},
-		{source: "var obj = { a: 1, bc: 2 };", settings: idLengthOf("{\"properties\": \"never\"}")},
-		{source: "var obj = { [a]: 2 };", settings: idLengthOf("{\"properties\": \"never\"}")},
-		{source: "var obj = {}; obj.a = 1; obj.bc = 2;", settings: idLengthOf("{\"properties\": \"never\"}")},
-		{source: "({ prop: obj.x } = {});", settings: idLengthOf("{\"properties\": \"never\"}")},
-		{source: "var obj = { aaaaa: 1 };", settings: idLengthOf("{\"max\": 4, \"properties\": \"never\"}")},
-		{source: "var obj = {}; obj.aaaaa = 1;", settings: idLengthOf("{\"max\": 4, \"properties\": \"never\"}")},
-		{source: "({ a: obj.x.y.z } = {});", settings: idLengthOf("{\"max\": 4, \"properties\": \"never\"}")},
-		{source: "({ prop: obj.xxxxx } = {});", settings: idLengthOf("{\"max\": 4, \"properties\": \"never\"}")},
-		{source: "var arr = [i,j,f,b]", settings: nil},
-		{source: "function foo([arr]) {}", settings: nil},
-		{source: "var {x} = foo;", settings: idLengthOf("{\"properties\": \"never\"}")},
-		{source: "var {x, y: {z}} = foo;", settings: idLengthOf("{\"properties\": \"never\"}")},
-		{source: "let foo = { [a]: 1 };", settings: idLengthOf("{\"properties\": \"always\"}")},
-		{source: "let foo = { [a + b]: 1 };", settings: idLengthOf("{\"properties\": \"always\"}")},
+		{source: "(num) => { num * num };"},
+		{source: "function foo(num = 0) { }"},
+		{source: "class MyClass { }"},
+		{source: "class Foo { method() {} }"},
+		{source: "function foo(...args) { }"},
+		{source: "var { prop } = {};"},
+		{source: "var { [a]: prop } = {};"},
+		{source: "var { a: foo } = {};", settings: rule.Configured(idLengthOf("{\"min\": 3}"))},
+		{source: "var { prop: foo } = {};", settings: rule.Configured(idLengthOf("{\"max\": 3}"))},
+		{source: "var { longName: foo } = {};", settings: rule.Configured(idLengthOf("{\"min\": 3, \"max\": 5}"))},
+		{source: "var { foo: a } = {};", settings: rule.Configured(idLengthOf("{\"exceptions\": [\"a\"]}"))},
+		{source: "var { a: { b: { c: longName } } } = {};"},
+		{source: "({ a: obj.x.y.z } = {});", settings: rule.Configured(idLengthOf("{\"properties\": \"never\"}"))},
+		{source: "import something from 'y';"},
+		{source: "export var num = 0;"},
+		{source: "import * as something from 'y';"},
+		{source: "import { x } from 'y';"},
+		{source: "import { x as x } from 'y';"},
+		{source: "import { 'x' as x } from 'y';"},
+		{source: "import { x as foo } from 'y';"},
+		{source: "import { longName } from 'y';", settings: rule.Configured(idLengthOf("{\"max\": 5}"))},
+		{source: "import { x as bar } from 'y';", settings: rule.Configured(idLengthOf("{\"max\": 5}"))},
+		{source: "({ prop: obj.x.y.something } = {});"},
+		{source: "({ prop: obj.longName } = {});"},
+		{source: "var obj = { a: 1, bc: 2 };", settings: rule.Configured(idLengthOf("{\"properties\": \"never\"}"))},
+		{source: "var obj = { [a]: 2 };", settings: rule.Configured(idLengthOf("{\"properties\": \"never\"}"))},
 		{
-			source:   "function BEFORE_send() {};",
-			settings: idLengthOf("{\"min\": 3, \"max\": 5, \"exceptionPatterns\": [\"^BEFORE_\"]}"),
+			source:   "var obj = {}; obj.a = 1; obj.bc = 2;",
+			settings: rule.Configured(idLengthOf("{\"properties\": \"never\"}")),
+		},
+		{source: "({ prop: obj.x } = {});", settings: rule.Configured(idLengthOf("{\"properties\": \"never\"}"))},
+		{
+			source:   "var obj = { aaaaa: 1 };",
+			settings: rule.Configured(idLengthOf("{\"max\": 4, \"properties\": \"never\"}")),
 		},
 		{
-			source:   "function BEFORE_send() {};",
-			settings: idLengthOf("{\"min\": 3, \"max\": 5, \"exceptionPatterns\": [\"^BEFORE_\", \"send$\"]}"),
+			source:   "var obj = {}; obj.aaaaa = 1;",
+			settings: rule.Configured(idLengthOf("{\"max\": 4, \"properties\": \"never\"}")),
 		},
 		{
-			source:   "function BEFORE_send() {};",
-			settings: idLengthOf("{\"min\": 3, \"max\": 5, \"exceptionPatterns\": [\"^BEFORE_\", \"^A\", \"^Z\"]}"),
+			source:   "({ a: obj.x.y.z } = {});",
+			settings: rule.Configured(idLengthOf("{\"max\": 4, \"properties\": \"never\"}")),
 		},
 		{
-			source:   "function BEFORE_send() {};",
-			settings: idLengthOf("{\"min\": 3, \"max\": 5, \"exceptionPatterns\": [\"^A\", \"^BEFORE_\", \"^Z\"]}"),
+			source:   "({ prop: obj.xxxxx } = {});",
+			settings: rule.Configured(idLengthOf("{\"max\": 4, \"properties\": \"never\"}")),
 		},
-		{source: "var x = 1 ;", settings: idLengthOf("{\"min\": 3, \"max\": 5, \"exceptionPatterns\": [\"[x-z]\"]}")},
+		{source: "var arr = [i,j,f,b]"},
+		{source: "function foo([arr]) {}"},
+		{source: "var {x} = foo;", settings: rule.Configured(idLengthOf("{\"properties\": \"never\"}"))},
+		{source: "var {x, y: {z}} = foo;", settings: rule.Configured(idLengthOf("{\"properties\": \"never\"}"))},
+		{source: "let foo = { [a]: 1 };", settings: rule.Configured(idLengthOf("{\"properties\": \"always\"}"))},
+		{source: "let foo = { [a + b]: 1 };", settings: rule.Configured(idLengthOf("{\"properties\": \"always\"}"))},
+		{
+			source:   "function BEFORE_send() {};",
+			settings: rule.Configured(idLengthOf("{\"min\": 3, \"max\": 5, \"exceptionPatterns\": [\"^BEFORE_\"]}")),
+		},
+		{
+			source: "function BEFORE_send() {};",
+			settings: rule.Configured(
+				idLengthOf("{\"min\": 3, \"max\": 5, \"exceptionPatterns\": [\"^BEFORE_\", \"send$\"]}"),
+			),
+		},
+		{
+			source: "function BEFORE_send() {};",
+			settings: rule.Configured(
+				idLengthOf("{\"min\": 3, \"max\": 5, \"exceptionPatterns\": [\"^BEFORE_\", \"^A\", \"^Z\"]}"),
+			),
+		},
+		{
+			source: "function BEFORE_send() {};",
+			settings: rule.Configured(
+				idLengthOf("{\"min\": 3, \"max\": 5, \"exceptionPatterns\": [\"^A\", \"^BEFORE_\", \"^Z\"]}"),
+			),
+		},
+		{
+			source:   "var x = 1 ;",
+			settings: rule.Configured(idLengthOf("{\"min\": 3, \"max\": 5, \"exceptionPatterns\": [\"[x-z]\"]}")),
+		},
 		// #7mztrdd: a pattern is read as JavaScript reads it, `new RegExp(pattern, "u")`. RE2 refuses a lookahead and a
 		// lookbehind, so these did not even decode; in Node both test true on BEFORE_send.
 		{
-			source:   "function BEFORE_send() {};",
-			settings: idLengthOf("{\"min\": 3, \"max\": 5, \"exceptionPatterns\": [\"^(?=BEFORE_)\"]}"),
+			source: "function BEFORE_send() {};",
+			settings: rule.Configured(
+				idLengthOf("{\"min\": 3, \"max\": 5, \"exceptionPatterns\": [\"^(?=BEFORE_)\"]}"),
+			),
 		},
 		{
 			source:   "function BEFORE_send() {};",
-			settings: idLengthOf("{\"min\": 3, \"max\": 5, \"exceptionPatterns\": [\"(?<=_)send$\"]}"),
+			settings: rule.Configured(idLengthOf("{\"min\": 3, \"max\": 5, \"exceptionPatterns\": [\"(?<=_)send$\"]}")),
 		},
-		{source: "class Foo { #xyz() {} }", settings: nil},
-		{source: "class Foo { xyz = 1 }", settings: nil},
-		{source: "class Foo { #xyz = 1 }", settings: nil},
-		{source: "class Foo { #abc() {} }", settings: idLengthOf("{\"max\": 3}")},
-		{source: "class Foo { abc = 1 }", settings: idLengthOf("{\"max\": 3}")},
-		{source: "class Foo { #abc = 1 }", settings: idLengthOf("{\"max\": 3}")},
-		{source: "var \U00020b9f = 2", settings: idLengthOf("{\"min\": 1, \"max\": 1}")},
-		{source: "var \u845b\U000e0100 = 2", settings: idLengthOf("{\"min\": 1, \"max\": 1}")},
-		{source: "var a = { \U00010318: 1 };", settings: idLengthOf("{\"min\": 1, \"max\": 1}")},
-		{source: "(\U00010318) => { \U00010318 * \U00010318 };", settings: idLengthOf("{\"min\": 1, \"max\": 1}")},
-		{source: "class \U00020b9f { }", settings: idLengthOf("{\"min\": 1, \"max\": 1}")},
-		{source: "class F { \U00010318() {} }", settings: idLengthOf("{\"min\": 1, \"max\": 1}")},
-		{source: "class F { #\U00010318() {} }", settings: idLengthOf("{\"min\": 1, \"max\": 1}")},
-		{source: "class F { \U00010318 = 1 }", settings: idLengthOf("{\"min\": 1, \"max\": 1}")},
-		{source: "class F { #\U00010318 = 1 }", settings: idLengthOf("{\"min\": 1, \"max\": 1}")},
-		{source: "function f(...\U00010318) { }", settings: idLengthOf("{\"min\": 1, \"max\": 1}")},
-		{source: "function f([\U00010318]) { }", settings: idLengthOf("{\"min\": 1, \"max\": 1}")},
-		{source: "var [ \U00010318 ] = a;", settings: idLengthOf("{\"min\": 1, \"max\": 1}")},
-		{source: "var { p: [\U00010318]} = {};", settings: idLengthOf("{\"min\": 1, \"max\": 1}")},
-		{source: "function f({\U00010318}) { }", settings: idLengthOf("{\"min\": 1, \"max\": 1}")},
-		{source: "var { \U00010318 } = {};", settings: idLengthOf("{\"min\": 1, \"max\": 1}")},
-		{source: "var { p: \U00010318} = {};", settings: idLengthOf("{\"min\": 1, \"max\": 1}")},
-		{source: "({ prop: o.\U00010318 } = {});", settings: idLengthOf("{\"min\": 1, \"max\": 1}")},
+		{source: "class Foo { #xyz() {} }"},
+		{source: "class Foo { xyz = 1 }"},
+		{source: "class Foo { #xyz = 1 }"},
+		{source: "class Foo { #abc() {} }", settings: rule.Configured(idLengthOf("{\"max\": 3}"))},
+		{source: "class Foo { abc = 1 }", settings: rule.Configured(idLengthOf("{\"max\": 3}"))},
+		{source: "class Foo { #abc = 1 }", settings: rule.Configured(idLengthOf("{\"max\": 3}"))},
+		{source: "var \U00020b9f = 2", settings: rule.Configured(idLengthOf("{\"min\": 1, \"max\": 1}"))},
+		{source: "var \u845b\U000e0100 = 2", settings: rule.Configured(idLengthOf("{\"min\": 1, \"max\": 1}"))},
+		{source: "var a = { \U00010318: 1 };", settings: rule.Configured(idLengthOf("{\"min\": 1, \"max\": 1}"))},
+		{
+			source:   "(\U00010318) => { \U00010318 * \U00010318 };",
+			settings: rule.Configured(idLengthOf("{\"min\": 1, \"max\": 1}")),
+		},
+		{source: "class \U00020b9f { }", settings: rule.Configured(idLengthOf("{\"min\": 1, \"max\": 1}"))},
+		{source: "class F { \U00010318() {} }", settings: rule.Configured(idLengthOf("{\"min\": 1, \"max\": 1}"))},
+		{source: "class F { #\U00010318() {} }", settings: rule.Configured(idLengthOf("{\"min\": 1, \"max\": 1}"))},
+		{source: "class F { \U00010318 = 1 }", settings: rule.Configured(idLengthOf("{\"min\": 1, \"max\": 1}"))},
+		{source: "class F { #\U00010318 = 1 }", settings: rule.Configured(idLengthOf("{\"min\": 1, \"max\": 1}"))},
+		{source: "function f(...\U00010318) { }", settings: rule.Configured(idLengthOf("{\"min\": 1, \"max\": 1}"))},
+		{source: "function f([\U00010318]) { }", settings: rule.Configured(idLengthOf("{\"min\": 1, \"max\": 1}"))},
+		{source: "var [ \U00010318 ] = a;", settings: rule.Configured(idLengthOf("{\"min\": 1, \"max\": 1}"))},
+		{source: "var { p: [\U00010318]} = {};", settings: rule.Configured(idLengthOf("{\"min\": 1, \"max\": 1}"))},
+		{source: "function f({\U00010318}) { }", settings: rule.Configured(idLengthOf("{\"min\": 1, \"max\": 1}"))},
+		{source: "var { \U00010318 } = {};", settings: rule.Configured(idLengthOf("{\"min\": 1, \"max\": 1}"))},
+		{source: "var { p: \U00010318} = {};", settings: rule.Configured(idLengthOf("{\"min\": 1, \"max\": 1}"))},
+		{source: "({ prop: o.\U00010318 } = {});", settings: rule.Configured(idLengthOf("{\"min\": 1, \"max\": 1}"))},
 		{
 			source:   "import foo from 'foo.json' with { type: 'json' }",
-			settings: idLengthOf("{\"min\": 1, \"max\": 3, \"properties\": \"always\"}"),
+			settings: rule.Configured(idLengthOf("{\"min\": 1, \"max\": 3, \"properties\": \"always\"}")),
 		},
 		{
 			source:   "export * from 'foo.json' with { type: 'json' }",
-			settings: idLengthOf("{\"min\": 1, \"max\": 3, \"properties\": \"always\"}"),
+			settings: rule.Configured(idLengthOf("{\"min\": 1, \"max\": 3, \"properties\": \"always\"}")),
 		},
 		{
 			source:   "export { default } from 'foo.json' with { type: 'json' }",
-			settings: idLengthOf("{\"min\": 1, \"max\": 3, \"properties\": \"always\"}"),
+			settings: rule.Configured(idLengthOf("{\"min\": 1, \"max\": 3, \"properties\": \"always\"}")),
 		},
 		{
 			source:   "import('foo.json', { with: { type: 'json' } })",
-			settings: idLengthOf("{\"min\": 1, \"max\": 3, \"properties\": \"always\"}"),
+			settings: rule.Configured(idLengthOf("{\"min\": 1, \"max\": 3, \"properties\": \"always\"}")),
 		},
 		{
 			source:   "import('foo.json', { 'with': { type: 'json' } })",
-			settings: idLengthOf("{\"min\": 1, \"max\": 3, \"properties\": \"always\"}"),
+			settings: rule.Configured(idLengthOf("{\"min\": 1, \"max\": 3, \"properties\": \"always\"}")),
 		},
 		{
 			source:   "import('foo.json', { with: { type } })",
-			settings: idLengthOf("{\"min\": 1, \"max\": 3, \"properties\": \"always\"}"),
+			settings: rule.Configured(idLengthOf("{\"min\": 1, \"max\": 3, \"properties\": \"always\"}")),
 		},
 	}
 
 	for _, testCase := range cases {
-		result := rule_testing.RunWithOptions(test, IdLength, idLengthFile, testCase.source, testCase.settings)
+		result := rule_testing.RunGiven(test, IdLength, idLengthFile, testCase.source, testCase.settings)
 		if len(result.Diagnostics) != 0 {
 			test.Errorf("%q with %+v: expected no findings, got %d: %v",
 				testCase.source, testCase.settings, len(result.Diagnostics), result.MessageIds())
@@ -471,7 +493,7 @@ func TestIdLengthCountsGraphemesNotRunes(test *testing.T) {
 
 	cases := []struct {
 		source   string
-		settings any
+		settings IdLengthSettings
 		findings []string
 	}{
 		{
@@ -542,7 +564,7 @@ func TestIdLengthDestructuringArmsCoverWhatTheCorpusDoesNot(test *testing.T) {
 
 	cases := []struct {
 		source   string
-		settings any
+		settings IdLengthSettings
 		findings int
 		// reported names the identifier the single finding must cover, so a rule reporting the key
 		// instead of the binding fails even where the count matches.
@@ -612,7 +634,7 @@ func TestIdLengthSpansAndMessages(test *testing.T) {
 
 	cases := []struct {
 		source   string
-		settings any
+		settings IdLengthSettings
 		spans    []string
 		messages []string
 	}{
@@ -682,15 +704,11 @@ func TestIdLengthSpansAndMessages(test *testing.T) {
 func TestIdLengthDecoderReadsEveryOption(test *testing.T) {
 	test.Parallel()
 
-	decoded, decodeIdLengthOptionsError := DecodeIdLengthOptions(
+	settings, decodeIdLengthOptionsError := DecodeIdLengthOptions(
 		[]byte(`{"min": 3, "max": 9, "properties": "never", "exceptions": ["x"], "exceptionPatterns": ["^_"]}`),
 	)
 	if decodeIdLengthOptionsError != nil {
 		test.Fatalf("decoding a full option object: %v", decodeIdLengthOptionsError)
-	}
-	settings, ok := decoded.(IdLengthSettings)
-	if !ok {
-		test.Fatalf("expected IdLengthSettings, got %T", decoded)
 	}
 	if settings.Minimum != 3 || settings.Maximum != 9 || !settings.HasMaximum {
 		test.Errorf("expected min 3 and max 9, got %+v", settings)
@@ -703,11 +721,10 @@ func TestIdLengthDecoderReadsEveryOption(test *testing.T) {
 	}
 
 	// The defaults, which the zero value does not supply.
-	decoded, decodeError := DecodeIdLengthOptions(nil)
+	settings, decodeError := DecodeIdLengthOptions(nil)
 	if decodeError != nil {
 		test.Fatalf("expected no options to decode to the defaults, got %v", decodeError)
 	}
-	settings, _ = decoded.(IdLengthSettings)
 	if settings.Minimum != 2 || !settings.CheckProperties || settings.HasMaximum {
 		test.Errorf("expected the documented defaults (min 2, properties on, no maximum), got %+v", settings)
 	}
@@ -721,13 +738,13 @@ func TestIdLengthDecoderReadsEveryOption(test *testing.T) {
 	}
 
 	// End to end: a rule handed nil options enforces the default minimum rather than nothing.
-	result := rule_testing.RunWithOptions(test, IdLength, idLengthFile, "var a = 1;", nil)
+	result := rule_testing.Run(test, IdLength, idLengthFile, "var a = 1;")
 	if len(result.Diagnostics) != 1 {
 		test.Errorf("expected the default minimum of 2 to report once, got %d: %v",
 			len(result.Diagnostics), result.MessageIds())
 	}
 	// And the control: with properties on by default, an object key is checked too.
-	result = rule_testing.RunWithOptions(test, IdLength, idLengthFile, "var obj = { a: 1 };", nil)
+	result = rule_testing.Run(test, IdLength, idLengthFile, "var obj = { a: 1 };")
 	if len(result.Diagnostics) != 1 {
 		test.Errorf("expected properties to be checked by default, got %d: %v",
 			len(result.Diagnostics), result.MessageIds())

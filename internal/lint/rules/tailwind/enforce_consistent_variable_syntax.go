@@ -75,16 +75,16 @@ const (
 //
 // Not fixable, for the reason its siblings are not: a class literal here wraps across lines with
 // indentation that carries intent, and a fixer would be the first thing to reflow it.
-var EnforceConsistentVariableSyntax = rule.Rule{
+var EnforceConsistentVariableSyntax = rule.Rule[EnforceConsistentVariableSyntaxOptions]{
 	Name: "better-tailwindcss/enforce-consistent-variable-syntax",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[EnforceConsistentVariableSyntaxOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		surfaces := DefaultClassLiteralSurfaces()
 		syntax := variableSyntaxShorthand
-		if configured, isConfigured := rule.OptionsAs[EnforceConsistentVariableSyntaxOptions](options); isConfigured {
+		if configured, isConfigured := options.Read(); isConfigured {
 			surfaces = configured.ClassLiteralSurfaces()
 			if configured.Syntax == variableSyntaxVariable {
 				syntax = variableSyntaxVariable

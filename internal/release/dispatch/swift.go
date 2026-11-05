@@ -97,7 +97,11 @@ func ResolveSwiftEngine(paths Paths, commit string, contract int) (string, bool,
 		return binaryPath, false, nil
 	}
 
-	if buildSwiftProductError := buildSwiftProduct(paths.SwiftEngineDirectory(), paths.SwiftBuildDirectory(), binaryPath); buildSwiftProductError != nil {
+	if buildSwiftProductError := buildSwiftProduct(
+		paths.SwiftEngineDirectory(),
+		paths.SwiftBuildDirectory(),
+		binaryPath,
+	); buildSwiftProductError != nil {
 		return "", false, buildSwiftProductError
 	}
 	return binaryPath, true, nil

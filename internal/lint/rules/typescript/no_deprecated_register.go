@@ -12,7 +12,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // rule reads, and whose `from` is an enum rather than a string. The generic decoder cannot express
 // either, so without this the option would silently do nothing.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[NoDeprecatedOptions]{
 		Rule:   NoDeprecated,
 		Decode: DecodeNoDeprecatedOptions,
 	})

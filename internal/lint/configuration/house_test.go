@@ -214,7 +214,9 @@ func TestSelectorValidationSkipsTheSetsOwnOverrides(test *testing.T) {
 		test.Fatal(loadHouseError)
 	}
 	validateSelectorsError := loaded.ValidateSelectors([]string{filepath.Join(directory, "index.ts")})
-	if validateSelectorsError == nil || strings.Contains(validateSelectorsError.Error(), "generated") || !strings.Contains(validateSelectorsError.Error(), "missing/**") {
+	if validateSelectorsError == nil ||
+		strings.Contains(validateSelectorsError.Error(), "generated") ||
+		!strings.Contains(validateSelectorsError.Error(), "missing/**") {
 		test.Errorf("want only the project's own vacuous selector refused, got %v", validateSelectorsError)
 	}
 }

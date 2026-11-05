@@ -3,5 +3,7 @@ package react
 import "github.com/system-inc/cohere/internal/lint/rule"
 
 func init() {
-	rule.Register(rule.Registration{Rule: NoDerivingStateInEffects, Decode: DecodeCompilerRuleOptions})
+	rule.Register(
+		rule.Registration[CompilerRuleOptions]{Rule: NoDerivingStateInEffects, Decode: DecodeCompilerRuleOptions},
+	)
 }

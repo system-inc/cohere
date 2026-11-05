@@ -61,7 +61,7 @@ var nonCallableTraceMap = func() map[string]*reference.TraceMap {
 // naming both when it does not (`j()` calling JSON). A callee with no name of its own,
 // `(a ? JSON : b)()`, is the second kind. One call reaching two of them, `(a ? JSON : Math)()`,
 // reports twice, once for each.
-var NoObjCalls = rule.Rule{
+var NoObjCalls = rule.Rule[rule.NoOptions]{
 	Name: "no-obj-calls",
 
 	// A local that shares a global's spelling is told apart from the global by asking where its
@@ -69,7 +69,7 @@ var NoObjCalls = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
 				if ruleContext.TypeChecker == nil {

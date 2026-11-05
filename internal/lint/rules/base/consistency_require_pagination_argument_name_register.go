@@ -11,5 +11,5 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // carries no CohereSettings.json of its own, and ahra's config names no `base/` rule. Where these
 // get turned on is Kirk's call rather than a porter's.
 func init() {
-	rule.Register(rule.Registration{Rule: ConsistencyRequirePaginationArgumentName})
+	rule.Register(rule.Registration[rule.NoOptions]{Rule: ConsistencyRequirePaginationArgumentName})
 }

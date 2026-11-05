@@ -23,10 +23,10 @@ func effectsFor(test *testing.T, source string) (*Function, *AliasingEffects) {
 
 	var function *Function
 	var table *AliasingEffects
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name:             "effects-harness",
 		NeedsTypeChecker: true,
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
 					if ruleContext.TypeChecker == nil {
@@ -317,7 +317,7 @@ func TestMemoFreezeRefinesAnUnknownMethodMutation(test *testing.T) {
 		property := place("callback")
 		function.AddInstruction(block, &Instruction{
 			LValue: property,
-			Value:  &Primitive{Value: "callback"},
+			Value:  &Primitive{Value: PrimitiveString("callback")},
 		})
 		result := place("")
 		call := &Instruction{
@@ -393,7 +393,7 @@ func TestFreezeFollowsOnlySharedAssignIdentity(test *testing.T) {
 			function.AddInstruction(block, sourceInstruction)
 
 			alias := newPlace("alias")
-			aliasInstruction := &Instruction{LValue: alias, Value: &Primitive{}}
+			aliasInstruction := &Instruction{LValue: alias, Value: &Primitive{Value: PrimitiveUndefined{}}}
 			function.AddInstruction(block, aliasInstruction)
 
 			freezeInstruction := &Instruction{
@@ -403,7 +403,7 @@ func TestFreezeFollowsOnlySharedAssignIdentity(test *testing.T) {
 			function.AddInstruction(block, freezeInstruction)
 
 			callResult := newPlace("")
-			callInstruction := &Instruction{LValue: callResult, Value: &Primitive{}}
+			callInstruction := &Instruction{LValue: callResult, Value: &Primitive{Value: PrimitiveUndefined{}}}
 			function.AddInstruction(block, callInstruction)
 			block.Terminal = &Return{Value: callResult}
 			Finalize(function)
@@ -572,7 +572,7 @@ func TestStartMemoizeFreezeRequiresAnInitializedAbstractValue(test *testing.T) {
 		property := place("")
 		function.AddInstruction(block, &Instruction{
 			LValue: property,
-			Value:  &Primitive{Value: "method"},
+			Value:  &Primitive{Value: PrimitiveString("method")},
 		})
 		result := place("")
 		call := &Instruction{

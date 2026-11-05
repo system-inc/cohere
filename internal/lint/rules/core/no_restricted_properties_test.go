@@ -14,7 +14,7 @@ const noRestrictedPropertiesFile = "/repository/source/NoRestrictedProperties.ts
 // noRestrictedPropertiesCase is one imported corpus row.
 type noRestrictedPropertiesCase struct {
 	sourceText string
-	options    any
+	options    NoRestrictedPropertiesOptions
 	wantIds    []string
 }
 
@@ -28,16 +28,8 @@ func runNoRestrictedProperties(
 	testCase noRestrictedPropertiesCase,
 ) rule_testing.Result {
 	test.Helper()
-	if testCase.options == nil {
-		return rule_testing.Run(test, NoRestrictedProperties, noRestrictedPropertiesFile,
-			testCase.sourceText)
-	}
-	options, ok := testCase.options.(NoRestrictedPropertiesOptions)
-	if !ok {
-		test.Fatalf("the case carries %T options, not NoRestrictedPropertiesOptions", testCase.options)
-	}
 	// Written the way upstream's config writes it: each restriction its own element.
-	encoded, encodeError := json.Marshal(options.Restrictions)
+	encoded, encodeError := json.Marshal(testCase.options.Restrictions)
 	if encodeError != nil {
 		test.Fatalf("could not encode options: %v", encodeError)
 	}
@@ -788,11 +780,7 @@ func TestDecodeNoRestrictedPropertiesOptions(test *testing.T) {
 		if decodeNoRestrictedPropertiesOptionsError != nil {
 			test.Fatalf("unexpected error: %v", decodeNoRestrictedPropertiesOptionsError)
 		}
-		options, ok := decoded.(NoRestrictedPropertiesOptions)
-		if !ok {
-			test.Fatalf("the decoder returned %T, not NoRestrictedPropertiesOptions", decoded)
-		}
-		if len(options.Restrictions) != 0 {
+		if len(decoded.Restrictions) != 0 {
 			test.Error("nil input produced restrictions")
 		}
 	})
@@ -828,11 +816,7 @@ func TestDecodeNoRestrictedPropertiesOptions(test *testing.T) {
 		if decodeNoRestrictedPropertiesOptionsError != nil {
 			test.Fatalf("unexpected error: %v", decodeNoRestrictedPropertiesOptionsError)
 		}
-		options, ok := decoded.(NoRestrictedPropertiesOptions)
-		if !ok {
-			test.Fatalf("the decoder returned %T, not NoRestrictedPropertiesOptions", decoded)
-		}
-		restrictions := options.Restrictions
+		restrictions := decoded.Restrictions
 		if len(restrictions) != 2 || restrictions[1].Property != "__proto__" || restrictions[1].Message != "No." {
 			test.Errorf("the second element was not read as a restriction: %+v", restrictions)
 		}
@@ -873,15 +857,15 @@ func TestDecodeNoRestrictedPropertiesOptions(test *testing.T) {
 func TestNoRestrictedPropertiesRegistersNothingUnconfigured(test *testing.T) {
 	test.Parallel()
 
-	listenersFor := func(options any) rule.Listeners {
+	listenersFor := func(options rule.Given[NoRestrictedPropertiesOptions]) rule.Listeners {
 		return NoRestrictedProperties.Run(rule.Context{}, options)
 	}
 
-	if got := len(listenersFor(nil)); got != 0 {
-		test.Errorf("nil options registered %d listeners, wanted none: an unconfigured rule that "+
+	if got := len(listenersFor(rule.Given[NoRestrictedPropertiesOptions]{})); got != 0 {
+		test.Errorf("no options registered %d listeners, wanted none: an unconfigured rule that "+
 			"walks the tree costs every file for a lookup that cannot match", got)
 	}
-	if got := len(listenersFor(NoRestrictedPropertiesOptions{})); got != 0 {
+	if got := len(listenersFor(rule.Configured(NoRestrictedPropertiesOptions{}))); got != 0 {
 		test.Errorf("an empty restriction list registered %d listeners, wanted none", got)
 	}
 
@@ -890,7 +874,7 @@ func TestNoRestrictedPropertiesRegistersNothingUnconfigured(test *testing.T) {
 	configured := NoRestrictedPropertiesOptions{
 		Restrictions: []NoRestrictedPropertiesRestriction{{Property: "bar"}},
 	}
-	if got := len(listenersFor(configured)); got == 0 {
+	if got := len(listenersFor(rule.Configured(configured))); got == 0 {
 		test.Error("a configured restriction registered no listeners")
 	}
 }

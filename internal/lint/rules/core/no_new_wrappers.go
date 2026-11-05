@@ -76,7 +76,7 @@ var wrapperObjects = map[string]bool{
 // explicitly: `var a = new String('hello');` is columns 9 through 28, which is `new String('hello')`.
 // This differs from `no-new-native-nonconstructor` beside it, which reports on the callee, so the
 // two rules are not interchangeable on this point and the fixtures assert the text.
-var NoNewWrappers = rule.Rule{
+var NoNewWrappers = rule.Rule[rule.NoOptions]{
 	Name: "no-new-wrappers",
 
 	// See the doc above: four of seven upstream valid cases are shadowing, and nothing structural
@@ -84,7 +84,7 @@ var NoNewWrappers = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindNewExpression: func(node *ast.Node) {
 				// No nil guard on the callee, and that is measured rather than assumed.

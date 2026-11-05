@@ -22,11 +22,11 @@ var ambientFieldText = policy.MessageOf("adamic/no-ambient-declarations", "ambie
 // Type-only bindings are erased contracts, not runtime reads. An unbacked field
 // or a field narrowing its inherited type can instead promise a value absent at
 // runtime; same-type inherited fields and class-assigned fields stay quiet.
-var NoAmbientDeclarations = rule.Rule{
+var NoAmbientDeclarations = rule.Rule[rule.NoOptions]{
 	Name:             "adamic/no-ambient-declarations",
 	NeedsTypeChecker: true,
 	ProgramReads:     rule.ReadsOtherFiles,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		file := ruleContext.SourceFile
 		if file == nil || file.IsDeclarationFile {
 			return nil

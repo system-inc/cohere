@@ -11,7 +11,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // an object: `["error", "always", {"exceptRange": true}]`. The decoder is hand rolled because that
 // heterogeneous list is something the generic helper cannot express.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[YodaSettings]{
 		Rule:             Yoda,
 		DecodeOptionList: DecodeYodaOptions,
 	})

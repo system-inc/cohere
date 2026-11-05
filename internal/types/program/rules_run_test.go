@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/configuration"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/lint/testing"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -34,21 +35,30 @@ func TestRulesRunCountsOnlyTheRulesOfferedAFile(test *testing.T) {
 		test.Fatalf("loading the config: %v", err)
 	}
 
-	listens := func(name string) rule.Rule {
-		return rule.Rule{Name: name, Run: func(ruleContext rule.Context, options any) rule.Listeners {
-			return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
-				// Listens and reports nothing: the test counts which rules were offered a file, not what they found.
-			}}
-		}}
+	listens := func(name string) rule.Rule[rule.NoOptions] {
+		return rule.Rule[rule.NoOptions]{
+			Name: name,
+			Run: func(rule.Context, rule.Given[rule.NoOptions]) rule.Listeners {
+				return rule.Listeners{ast.KindVariableDeclaration: func(node *ast.Node) {
+					// Listens and reports nothing: the test counts which rules were offered a file, not what they
+					// found.
+				}}
+			},
+		}
 	}
-	declines := rule.Rule{
+	declines := rule.Rule[rule.NoOptions]{
 		Name: "test-declines",
-		Run:  func(ruleContext rule.Context, options any) rule.Listeners { return nil },
+		Run:  func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners { return nil },
 	}
-	rules := []rule.Rule{listens("test-listens"), declines, listens("test-off"), listens("test-only-in-special"),
-		listens("test-nobody-configured")}
+	rules := []rule.Rule[rule.NoOptions]{
+		listens("test-listens"),
+		declines,
+		listens("test-off"),
+		listens("test-only-in-special"),
+		listens("test-nobody-configured"),
+	}
 
-	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), rules)
+	result, err := graph.Walk(context.Background(), graph.ProjectFiles(), rule_testing.EntriesOf(test, rules...))
 	if err != nil {
 		test.Fatalf("walking: %v", err)
 	}

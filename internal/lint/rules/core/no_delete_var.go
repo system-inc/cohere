@@ -32,9 +32,9 @@ var messageUnexpectedDeleteVar = rule.Message{
 // No fix. The two repairs are opposite in meaning: assigning undefined keeps the binding and clears
 // the value, while deleting a property removes the key. The rule cannot know which the author meant,
 // and guessing wrong changes what the code does rather than how it reads.
-var NoDeleteVar = rule.Rule{
+var NoDeleteVar = rule.Rule[rule.NoOptions]{
 	Name: "no-delete-var",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindDeleteExpression: func(node *ast.Node) {
 				target := ast.SkipParentheses(node.AsDeleteExpression().Expression)

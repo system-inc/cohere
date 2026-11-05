@@ -65,9 +65,9 @@ var messageGuardForIn = rule.Message{
 // No fix. The repair is a guard, and which guard depends on what the loop meant: `hasOwnProperty`,
 // a key filter, or a rewrite to `Object.keys`. The rule cannot know which, and each changes what
 // the loop does.
-var GuardForIn = rule.Rule{
+var GuardForIn = rule.Rule[rule.NoOptions]{
 	Name: "guard-for-in",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			// `for-of` is deliberately absent. It iterates values through the iteration protocol
 			// and never walks the prototype chain, so it has nothing to guard. The two share

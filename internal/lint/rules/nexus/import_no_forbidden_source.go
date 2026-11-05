@@ -69,9 +69,9 @@ var forbiddenSources = []forbiddenSource{
 // module's export shape from inside a rule that cannot see it. Rewriting the string is the part
 // that is always correct; if the bindings also need to change, the compiler says so immediately and
 // a human makes that call with the module in front of them.
-var ImportNoForbiddenSource = rule.Rule{
+var ImportNoForbiddenSource = rule.Rule[rule.NoOptions]{
 	Name: "nexus/import-no-forbidden-source",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		// The finding is anchored on the specifier, which is both the thing that gets rewritten and
 		// the thing a reader has to change.
 		//

@@ -45,9 +45,9 @@ var forbiddenArgumentsProperties = map[string]bool{
 // and referring to it, which requires choosing a name, and `arguments.caller` has no replacement at
 // all: the information it carried is not available another way. A rule offering a fix here would be
 // offering to guess.
-var NoCaller = rule.Rule{
+var NoCaller = rule.Rule[rule.NoOptions]{
 	Name: "no-caller",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindPropertyAccessExpression: func(node *ast.Node) {
 				access := node.AsPropertyAccessExpression()

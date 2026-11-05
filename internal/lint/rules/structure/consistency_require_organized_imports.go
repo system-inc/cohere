@@ -86,9 +86,9 @@ func messageImportsNotOrganized() rule.Message {
 // including the ones where the import that is out of place is somewhere else entirely, and
 // including the `'use client'` cases where the thing that is wrong is the directive's comment. The
 // span is that declaration's own text.
-var ConsistencyRequireOrganizedImports = rule.Rule{
+var ConsistencyRequireOrganizedImports = rule.Rule[rule.NoOptions]{
 	Name: "structure/consistency-require-organized-imports",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		return rule.Listeners{
 			ast.KindSourceFile: func(node *ast.Node) {
 				checkImportOrganization(ruleContext, node)

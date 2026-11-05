@@ -27,7 +27,7 @@ import (
 
 // decodeNoInnerDeclarationsForTest turns a fixture's JSON into options the way the config layer
 // does. An empty string stands for a rule configured as a bare severity.
-func decodeNoInnerDeclarationsForTest(test *testing.T, optionsJson string) any {
+func decodeNoInnerDeclarationsForTest(test *testing.T, optionsJson string) NoInnerDeclarationsOptions {
 	test.Helper()
 	decoded, decodeNoInnerDeclarationsOptionsError := DecodeNoInnerDeclarationsOptions([]byte(optionsJson))
 	if decodeNoInnerDeclarationsOptionsError != nil {
@@ -382,19 +382,15 @@ func TestDecodeNoInnerDeclarationsOptions(test *testing.T) {
 			if decodeNoInnerDeclarationsOptionsError != nil {
 				test.Fatalf("decoding %q: %v", testCase.optionsJson, decodeNoInnerDeclarationsOptionsError)
 			}
-			settings, isSettings := decoded.(NoInnerDeclarationsOptions)
-			if !isSettings {
-				test.Fatalf("decoded to %T", decoded)
-			}
-			if settings.Both == nil || settings.BlockScopedFunctions == nil {
+			if decoded.Both == nil || decoded.BlockScopedFunctions == nil {
 				test.Fatalf("a nil field would leave the rule reading a default it did not choose")
 			}
-			if *settings.Both != testCase.wantBoth {
-				test.Errorf("both: got %v, want %v", *settings.Both, testCase.wantBoth)
+			if *decoded.Both != testCase.wantBoth {
+				test.Errorf("both: got %v, want %v", *decoded.Both, testCase.wantBoth)
 			}
-			if *settings.BlockScopedFunctions != testCase.wantBlockScopedFunctions {
+			if *decoded.BlockScopedFunctions != testCase.wantBlockScopedFunctions {
 				test.Errorf("blockScopedFunctions: got %v, want %v",
-					*settings.BlockScopedFunctions, testCase.wantBlockScopedFunctions)
+					*decoded.BlockScopedFunctions, testCase.wantBlockScopedFunctions)
 			}
 		})
 	}
@@ -417,7 +413,7 @@ func TestDecodeNoInnerDeclarationsOptions(test *testing.T) {
 	}
 }
 
-// A rule configured as a bare severity is handed nil, and the zero value of the options struct
+// A rule configured as a bare severity is handed no options, and the zero value of the options struct
 // carries a nil BlockScopedFunctions. Since that option defaults to true, reading nil as false
 // would invert the rule and report every block-scoped function in the tree. Every fixture above
 // routes through the decoder, so nothing there could see it.
@@ -425,16 +421,16 @@ func TestNoInnerDeclarationsHandlesNilOptions(test *testing.T) {
 	test.Parallel()
 
 	// Strict code, default options: a block-scoped function declaration is exempt.
-	rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoInnerDeclarations, "file.ts",
-		"export {};\nif (test) { function doSomething() { } }", nil))
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NoInnerDeclarations, "file.ts",
+		"export {};\nif (test) { function doSomething() { } }"))
 
 	// Sloppy code, default options: it reports, so the nil path is not simply inert.
-	rule_testing.ExpectFindings(test, rule_testing.RunWithOptions(test, NoInnerDeclarations, "file.ts",
-		"if (test) { function doSomething() { } }", nil), "moveDeclToRoot")
+	rule_testing.ExpectFindings(test, rule_testing.Run(test, NoInnerDeclarations, "file.ts",
+		"if (test) { function doSomething() { } }"), "moveDeclToRoot")
 
 	// And `var` is not checked under the default, which is the other half of the nil path.
-	rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoInnerDeclarations, "file.ts",
-		"if (test) { var foo; }", nil))
+	rule_testing.ExpectClean(test, rule_testing.Run(test, NoInnerDeclarations, "file.ts",
+		"if (test) { var foo; }"))
 }
 
 // A partially built options struct, which is the shape no other test here can produce.

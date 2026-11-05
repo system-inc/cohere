@@ -30,10 +30,10 @@ const stylePropObjectFile = "/repository/source/StylePropObject.tsx"
 
 // stylePropObjectOptions decodes a raw option body the way the config layer does.
 //
-// An empty body is the nil-options case, which here means an empty allow list and therefore full
+// An empty body is the bare-severity case, which here means an empty allow list and therefore full
 // enforcement. That is the opposite direction from the sibling forbid rules, where an empty list
 // means the rule declines everything.
-func stylePropObjectOptions(test *testing.T, raw string) any {
+func stylePropObjectOptions(test *testing.T, raw string) StylePropObjectOptions {
 	test.Helper()
 	decoded, decodeStylePropertyObjectOptionsError := DecodeStylePropObjectOptions([]byte(raw))
 	if decodeStylePropertyObjectOptionsError != nil {
@@ -487,7 +487,7 @@ func TestStylePropObjectIsNonNullLiteral(test *testing.T) {
 	}
 }
 
-// TestDecodeStylePropObjectOptions covers the allow list and the nil-options path.
+// TestDecodeStylePropObjectOptions covers the allow list and the empty-body path.
 func TestDecodeStylePropObjectOptions(test *testing.T) {
 	test.Parallel()
 
@@ -497,12 +497,8 @@ func TestDecodeStylePropObjectOptions(test *testing.T) {
 		if decodeStylePropertyObjectOptionsError != nil {
 			test.Fatalf("decoding an empty body: %v", decodeStylePropertyObjectOptionsError)
 		}
-		options, ok := decoded.(StylePropObjectOptions)
-		if !ok {
-			test.Fatalf("decoded to %T, want StylePropObjectOptions", decoded)
-		}
-		if len(options.Allow) != 0 {
-			test.Fatalf("allow list is %v, want empty", options.Allow)
+		if len(decoded.Allow) != 0 {
+			test.Fatalf("allow list is %v, want empty", decoded.Allow)
 		}
 	})
 
@@ -514,12 +510,8 @@ func TestDecodeStylePropObjectOptions(test *testing.T) {
 		if decodeStylePropertyObjectOptionsError != nil {
 			test.Fatalf("decoding a named allow list: %v", decodeStylePropertyObjectOptionsError)
 		}
-		options, ok := decoded.(StylePropObjectOptions)
-		if !ok {
-			test.Fatalf("decoded to %T, want StylePropObjectOptions", decoded)
-		}
-		if len(options.Allow) != 2 || options.Allow[0] != "MyComponent" || options.Allow[1] != "Other" {
-			test.Fatalf("allow list is %v", options.Allow)
+		if len(decoded.Allow) != 2 || decoded.Allow[0] != "MyComponent" || decoded.Allow[1] != "Other" {
+			test.Fatalf("allow list is %v", decoded.Allow)
 		}
 	})
 }

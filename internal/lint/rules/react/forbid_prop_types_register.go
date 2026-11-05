@@ -7,5 +7,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // The decoder is hand-written rather than `rule.DecodeOptionsInto` because `forbid` has to be
 // distinguishable as absent; see DecodeForbidPropTypesOptions.
 func init() {
-	rule.Register(rule.Registration{Rule: ForbidPropTypes, Decode: DecodeForbidPropTypesOptions})
+	rule.Register(
+		rule.Registration[ForbidPropTypesOptions]{Rule: ForbidPropTypes, Decode: DecodeForbidPropTypesOptions},
+	)
 }

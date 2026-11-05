@@ -43,7 +43,7 @@ type CheckedRequiresOnChangeOrReadOnlyOptions struct {
 // it, since `Object.assign({}, defaultOptions, context.options[0])` with an undefined second source
 // is just the defaults, so the empty path has to answer both-false rather than fail. Every default
 // here is the Go zero value, so nothing else needs translating.
-func DecodeCheckedRequiresOnChangeOrReadOnlyOptions(raw []byte) (any, error) {
+func DecodeCheckedRequiresOnChangeOrReadOnlyOptions(raw []byte) (CheckedRequiresOnChangeOrReadOnlyOptions, error) {
 	var options CheckedRequiresOnChangeOrReadOnlyOptions
 	if len(raw) == 0 {
 		return options, nil
@@ -140,12 +140,12 @@ var checkedRequiresTargetProperties = map[string]bool{
 // `settings.react.pragma`, and cohere reads no React settings, so the second is unreachable by any
 // route. The first is reachable and is not implemented; see `pragmaFromJsxComment` below for the
 // measurement and the reasoning.
-var CheckedRequiresOnChangeOrReadOnly = rule.Rule{
+var CheckedRequiresOnChangeOrReadOnly = rule.Rule[CheckedRequiresOnChangeOrReadOnlyOptions]{
 	Name:             "react/checked-requires-onchange-or-readonly",
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, _ := rule.OptionsAs[CheckedRequiresOnChangeOrReadOnlyOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[CheckedRequiresOnChangeOrReadOnlyOptions]) rule.Listeners {
+		settings, _ := options.Read()
 
 		report := func(node *ast.Node, present map[string]bool) {
 			if !present["checked"] {

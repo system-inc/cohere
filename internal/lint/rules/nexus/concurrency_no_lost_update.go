@@ -135,14 +135,14 @@ func concurrencyNoLostUpdateStoreMessage(read string) rule.Message {
 //
 // No fix and no suggestion: the repair is a restructuring (re-read after the suspension, a lock, or
 // an atomic update on the store), and which one is right is the author's call.
-var ConcurrencyNoLostUpdate = rule.Rule{
+var ConcurrencyNoLostUpdate = rule.Rule[rule.NoOptions]{
 	Name: "nexus/concurrency-no-lost-update",
 
 	// Symbol identity is what makes a read and a write the same variable, and what tells an outer
 	// variable from a shadowing local of the same spelling.
 	NeedsTypeChecker: true,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.TypeChecker == nil {
 			return nil
 		}

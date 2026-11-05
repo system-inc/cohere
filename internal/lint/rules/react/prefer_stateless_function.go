@@ -35,7 +35,7 @@ func DefaultPreferStatelessFunctionOptions() PreferStatelessFunctionOptions {
 // nil options. Answering the documented default explicitly makes the unconfigured path a decision
 // rather than a coincidence, which is the failure the port brief records costing a rule 3,407 inert
 // registrations.
-func DecodePreferStatelessFunctionOptions(raw []byte) (any, error) {
+func DecodePreferStatelessFunctionOptions(raw []byte) (PreferStatelessFunctionOptions, error) {
 	options := DefaultPreferStatelessFunctionOptions()
 	if len(raw) == 0 {
 		return options, nil
@@ -163,10 +163,10 @@ var messagePreferStatelessFunction = rule.Message{
 // The option exempts a class extending PureComponent. `react.IsEs6ComponentClass` accepts Component
 // and PureComponent alike and is therefore the wrong predicate for the option, while being the right
 // predicate for the outer gate. Both are used here, for their two different questions.
-var PreferStatelessFunction = rule.Rule{
+var PreferStatelessFunction = rule.Rule[PreferStatelessFunctionOptions]{
 	Name: "react/prefer-stateless-function",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
-		settings, ok := rule.OptionsAs[PreferStatelessFunctionOptions](options)
+	Run: func(ruleContext rule.Context, options rule.Given[PreferStatelessFunctionOptions]) rule.Listeners {
+		settings, ok := options.Read()
 		if !ok {
 			settings = DefaultPreferStatelessFunctionOptions()
 		}

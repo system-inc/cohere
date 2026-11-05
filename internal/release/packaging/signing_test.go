@@ -97,7 +97,9 @@ func TestReadNotaryVerdictReadsTheStatus(test *testing.T) {
 	accepted, readNotaryVerdictError := readNotaryVerdict(
 		[]byte(`{"id":"2efe2717-52ef-43a5-96dc-0797e4ca1041","message":"Processing complete","status":"Accepted"}`),
 	)
-	if readNotaryVerdictError != nil || accepted.Status != "Accepted" || accepted.Identifier != "2efe2717-52ef-43a5-96dc-0797e4ca1041" {
+	if readNotaryVerdictError != nil ||
+		accepted.Status != "Accepted" ||
+		accepted.Identifier != "2efe2717-52ef-43a5-96dc-0797e4ca1041" {
 		test.Fatalf("an Accepted answer read as %+v, %v", accepted, readNotaryVerdictError)
 	}
 

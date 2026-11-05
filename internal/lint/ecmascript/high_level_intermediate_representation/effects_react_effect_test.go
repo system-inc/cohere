@@ -57,10 +57,10 @@ func TestEffectHookSignaturesFollowImportOrigin(test *testing.T) {
 					testCase.callee +
 					`(() => {}, []); }`
 				visited := 0
-				probe := rule.Rule{
+				probe := rule.Rule[rule.NoOptions]{
 					Name:             "effect-hook-signature",
 					NeedsTypeChecker: true,
-					Run: func(ruleContext rule.Context, options any) rule.Listeners {
+					Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 						return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
 							forEachFunctionLike(node, func(node *ast.Node) {
 								function := Lower(node, ruleContext.TypeChecker)
@@ -206,10 +206,10 @@ return <div onClick={callback}>{items.map(item => <span>{item}</span>)}</div>;
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
 			findings, markers := 0, 0
-			probe := rule.Rule{
+			probe := rule.Rule[rule.NoOptions]{
 				Name:             "effect-hook-memoization",
 				NeedsTypeChecker: true,
-				Run: func(ruleContext rule.Context, options any) rule.Listeners {
+				Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 					return rule.Listeners{ast.KindSourceFile: func(node *ast.Node) {
 						forEachFunctionLike(node, func(node *ast.Node) {
 							function := Lower(node, ruleContext.TypeChecker)

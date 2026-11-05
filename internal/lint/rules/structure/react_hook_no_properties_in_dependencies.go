@@ -66,9 +66,9 @@ var hooksWithDependencies = map[string]bool{
 // On the offending element inside the array rather than on the call, matching the original. An array
 // listing `properties` twice reports twice, which is what the original does, and anchoring on the
 // call would collapse them into one finding at a line the author has to search.
-var ReactHookNoPropertiesInDependencies = rule.Rule{
+var ReactHookNoPropertiesInDependencies = rule.Rule[rule.NoOptions]{
 	Name: "structure/react-hook-no-properties-in-dependencies",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil || !FileContextFor(ruleContext.SourceFile.FileName().AsString()).IsReactFile {
 			return nil
 		}

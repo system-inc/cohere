@@ -29,10 +29,10 @@ import (
 func lowerTypedForSSA(test *testing.T, code string) *Function {
 	test.Helper()
 	var lowered *Function
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name:             "ssa-test-harness",
 		NeedsTypeChecker: true,
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			return rule.Listeners{
 				ast.KindSourceFile: func(node *ast.Node) {
 					if ruleContext.TypeChecker == nil {
@@ -329,7 +329,7 @@ func TestMutatingVisitorCoversEveryValue(test *testing.T) {
 		&UnaryExpression{Value: place(1)},
 		&PrefixUpdate{LValue: place(1), Value: place(2)},
 		&PostfixUpdate{LValue: place(1), Value: place(2)},
-		&Primitive{Value: nil},
+		&Primitive{Value: PrimitiveUndefined{}},
 		&RegExpLiteral{},
 		&TemplateLiteral{Subexprs: []Place{place(1)}},
 		&TaggedTemplateExpression{Tag: place(1), Subexprs: []Place{place(2)}},

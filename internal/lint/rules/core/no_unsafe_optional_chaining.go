@@ -138,15 +138,15 @@ var relationalOperators = map[ast.Kind]bool{
 // `(obj?.foo && obj?.baz).bar` reports twice. The short circuit propagates through both operands
 // of `&&`, so both chains reach the unsafe access and each is separately something the author
 // must fix. This is why upstream's 18 failing inputs produce 20 diagnostics.
-var NoUnsafeOptionalChaining = rule.Rule{
+var NoUnsafeOptionalChaining = rule.Rule[NoUnsafeOptionalChainingOptions]{
 	Name: "no-unsafe-optional-chaining",
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[NoUnsafeOptionalChainingOptions]) rule.Listeners {
 		if ruleContext.SourceFile == nil {
 			return nil
 		}
 
 		disallowArithmeticOperators := false
-		if settings, hasSettings := rule.OptionsAs[NoUnsafeOptionalChainingOptions](options); hasSettings {
+		if settings, hasSettings := options.Read(); hasSettings {
 			disallowArithmeticOperators = settings.DisallowArithmeticOperators
 		}
 

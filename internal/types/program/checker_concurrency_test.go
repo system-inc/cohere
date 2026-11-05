@@ -8,6 +8,7 @@ import (
 
 	"github.com/microsoft/TypeScript/tsc/shim/ast"
 	"github.com/system-inc/cohere/internal/lint/rule"
+	"github.com/system-inc/cohere/internal/lint/testing"
 	"github.com/system-inc/cohere/internal/types/program"
 )
 
@@ -66,7 +67,7 @@ func TestCheckerSurvivesTheParallelWalk(test *testing.T) {
 
 	// Counted atomically: the listeners run on every worker at once, which is the point of the test.
 	var queries atomic.Int64
-	probe := rule.Rule{
+	probe := rule.Rule[rule.NoOptions]{
 		Name: "test-checker-under-concurrency",
 
 		// Declared, because the walk hands out a checker only to rules that ask for one. Without
@@ -74,7 +75,7 @@ func TestCheckerSurvivesTheParallelWalk(test *testing.T) {
 		// assertion, which is the guard working, and is why that assertion is worth keeping.
 		NeedsTypeChecker: true,
 
-		Run: func(ruleContext rule.Context, options any) rule.Listeners {
+		Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 			if ruleContext.TypeChecker == nil {
 				test.Error("a rule was dispatched without a checker")
 				return nil
@@ -96,7 +97,11 @@ func TestCheckerSurvivesTheParallelWalk(test *testing.T) {
 		test.Fatalf("expected the project to hold many files, got %d", len(projectFiles))
 	}
 
-	if _, walkError := graph.Walk(context.Background(), projectFiles, []rule.Rule{probe}); walkError != nil {
+	if _, walkError := graph.Walk(
+		context.Background(),
+		projectFiles,
+		rule_testing.EntriesOf(test, probe),
+	); walkError != nil {
 		test.Fatalf("walking with a type-querying rule: %v", walkError)
 	}
 

@@ -145,14 +145,14 @@ func correctnessNoProcessExitAfterOutputMessage() rule.Message {
 // an exit inside a loop or a nested block needs the function to leave from there, and an exit used as
 // `never` (`if(!value) { console.error(...); process.exit(1); } use(value);`) narrows a type that a
 // `return` has to keep narrowed. A fixer would get some of those wrong.
-var CorrectnessNoProcessExitAfterOutput = rule.Rule{
+var CorrectnessNoProcessExitAfterOutput = rule.Rule[rule.NoOptions]{
 	Name: "nexus/correctness-no-process-exit-after-output",
 
 	// Symbol identity is what tells the global `console` from a local one, `NodeJS.Process.exit` from
 	// any other `exit`, and the process's own `stdout` from any other stream with a `write`.
 	NeedsTypeChecker: true,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[rule.NoOptions]) rule.Listeners {
 		if ruleContext.TypeChecker == nil {
 			return nil
 		}

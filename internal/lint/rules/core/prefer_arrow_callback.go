@@ -39,7 +39,7 @@ type preferArrowCallbackRawOptions struct {
 // Hand rolled because one default is true: a rule configured as a bare "error" is handed nil, the
 // generic decoder errors on empty input, and the resulting zero value would say
 // `allowUnboundThis: false`. That is not a weaker configuration, it is a different rule.
-func DecodePreferArrowCallbackOptions(raw []byte) (any, error) {
+func DecodePreferArrowCallbackOptions(raw []byte) (PreferArrowCallbackSettings, error) {
 	settings := DefaultPreferArrowCallbackSettings()
 	if len(raw) == 0 {
 		return settings, nil
@@ -56,8 +56,8 @@ func DecodePreferArrowCallbackOptions(raw []byte) (any, error) {
 }
 
 // preferArrowCallbackSettingsFrom recovers the settings from whatever the config layer handed over.
-func preferArrowCallbackSettingsFrom(options any) PreferArrowCallbackSettings {
-	if settings, ok := rule.OptionsAs[PreferArrowCallbackSettings](options); ok {
+func preferArrowCallbackSettingsFrom(options rule.Given[PreferArrowCallbackSettings]) PreferArrowCallbackSettings {
+	if settings, ok := options.Read(); ok {
 		return settings
 	}
 	return DefaultPreferArrowCallbackSettings()
@@ -128,7 +128,7 @@ var messagePreferArrowCallbackPreferArrowCallback = rule.Message{
 // A callback containing either is never reported at all, so the fixer never sees one. That is
 // upstream's structure and it is reproduced: the gate is in the report condition rather than in the
 // repair.
-var PreferArrowCallback = rule.Rule{
+var PreferArrowCallback = rule.Rule[PreferArrowCallbackSettings]{
 	Name: "prefer-arrow-callback",
 
 	// Telling a genuine self-reference from a shadowed one is name resolution. See the judgment
@@ -136,7 +136,7 @@ var PreferArrowCallback = rule.Rule{
 	NeedsTypeChecker: true,
 	TypeReach:        rule.TypeReachShapes,
 
-	Run: func(ruleContext rule.Context, options any) rule.Listeners {
+	Run: func(ruleContext rule.Context, options rule.Given[PreferArrowCallbackSettings]) rule.Listeners {
 		settings := preferArrowCallbackSettingsFrom(options)
 		if ruleContext.TypeChecker == nil {
 			return nil

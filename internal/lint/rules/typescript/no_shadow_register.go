@@ -10,7 +10,7 @@ import "github.com/system-inc/cohere/internal/lint/rule"
 // The decoder is the rule's own rather than `rule.DecodeOptionsInto`, because two of its options
 // default to true and the generic helper cannot tell an absent key from an explicit false.
 func init() {
-	rule.Register(rule.Registration{
+	rule.Register(rule.Registration[NoShadowOptions]{
 		Rule:   NoShadow,
 		Decode: DecodeNoShadowOptions,
 	})

@@ -190,7 +190,7 @@ func (reuse *FindingsReuse) settleDesignSystem() (key *DesignSystemKey, keepRepl
 // ShapeClasses splits CacheClasses' type-aware rules by what they can see of imported files: those that
 // declare rule.TypeReachShapes, keyed on the shape fingerprint, and the rest, keyed on the type
 // fingerprint.
-func ShapeClasses(typeAware []rule.Rule) (shaped []rule.Rule, typed []rule.Rule) {
+func ShapeClasses(typeAware []rule.Entry) (shaped []rule.Entry, typed []rule.Entry) {
 	for _, subject := range typeAware {
 		if subject.TypeReach == rule.TypeReachShapes {
 			shaped = append(shaped, subject)
@@ -300,7 +300,7 @@ func (reuse *FindingsReuse) keep(entry LintCacheEntry) {
 }
 
 // ruleNames lists rules by name, in order.
-func ruleNames(rules []rule.Rule) []string {
+func ruleNames(rules []rule.Entry) []string {
 	names := make([]string, len(rules))
 	for index, subject := range rules {
 		names[index] = subject.Name
