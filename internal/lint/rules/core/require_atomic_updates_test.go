@@ -38,7 +38,7 @@ func TestRequireAtomicUpdatesStaysSilent(test *testing.T) {
 	test.Parallel()
 
 	for _, testCase := range requireAtomicUpdatesCleanCases {
-		result := rule_testing.RunTypedWithOptions(
+		result := rule_testing.RunTypedGiven(
 			test, RequireAtomicUpdates, "clean.ts", testCase.source, testCase.options)
 		if len(result.Diagnostics) != 0 {
 			test.Errorf("reported %v on a clean case\n%s",
@@ -65,7 +65,7 @@ func TestRequireAtomicUpdatesFires(test *testing.T) {
 			// declaration and gets upstream's two findings.
 			continue
 		}
-		result := rule_testing.RunTypedWithOptions(
+		result := rule_testing.RunTypedGiven(
 			test, RequireAtomicUpdates, "fires.ts", testCase.source, testCase.options)
 		got := result.MessageIds()
 		if len(got) != len(testCase.wantIds) {
@@ -241,7 +241,7 @@ func TestRequireAtomicUpdatesOptionsDecode(test *testing.T) {
 		// This is the shape a bare `"error"` produces. It reaches the rule without ever passing
 		// through the decoder above, so no fixture routed through `decode` can see it.
 		property := `async function a(foo) { if (foo.bar) { foo.bar = await something; } }`
-		result := rule_testing.RunTypedWithOptions(test, RequireAtomicUpdates, "opt.ts", property, nil)
+		result := rule_testing.RunTyped(test, RequireAtomicUpdates, "opt.ts", property)
 		rule_testing.ExpectFindings(test, result, "nonAtomicObjectUpdate")
 	})
 

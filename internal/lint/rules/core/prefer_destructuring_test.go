@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	rule_testing "github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -35,16 +36,19 @@ type preferDestructuringCase struct {
 }
 
 // decodePreferDestructuringOptionsForTest routes a case's options through the shipped decoder.
-func decodePreferDestructuringOptionsForTest(test *testing.T, optionsJson string) any {
+func decodePreferDestructuringOptionsForTest(
+	test *testing.T,
+	optionsJson string,
+) rule.Given[PreferDestructuringOptions] {
 	test.Helper()
 	if optionsJson == "" {
-		return nil
+		return rule.Given[PreferDestructuringOptions]{}
 	}
 	decoded, decodePreferDestructuringOptionsError := DecodePreferDestructuringOptions(json.RawMessage(optionsJson))
 	if decodePreferDestructuringOptionsError != nil {
 		test.Fatalf("the decoder refused %s: %v", optionsJson, decodePreferDestructuringOptionsError)
 	}
-	return decoded
+	return rule.Configured(decoded)
 }
 
 // preferDestructuringOffsetOf converts a 1-based line and column into a byte offset.
@@ -63,7 +67,7 @@ func preferDestructuringOffsetOf(test *testing.T, source string, line int, colum
 
 func runPreferDestructuring(test *testing.T, testCase preferDestructuringCase) rule_testing.Result {
 	test.Helper()
-	return rule_testing.RunWithOptions(test, PreferDestructuring, preferDestructuringFile,
+	return rule_testing.RunGiven(test, PreferDestructuring, preferDestructuringFile,
 		testCase.source, decodePreferDestructuringOptionsForTest(test, testCase.optionsJson))
 }
 

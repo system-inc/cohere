@@ -52,7 +52,7 @@ type oneVarFixCase struct {
 //
 // An empty string means the config carried no options at all, which is what a bare `"error"`
 // delivers, and the decoder answers with upstream's `defaultOptions: ["always"]`.
-func decodedOneVar(test *testing.T, raw string) any {
+func decodedOneVar(test *testing.T, raw string) OneVarSettings {
 	test.Helper()
 	decoded, decodeOneVariableOptionsError := DecodeOneVarOptions([]byte(raw))
 	if decodeOneVariableOptionsError != nil {

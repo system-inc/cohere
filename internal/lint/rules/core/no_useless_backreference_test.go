@@ -495,9 +495,9 @@ func TestNoUselessBackreferenceStaysSilentOnAPatternTheEngineWouldRefuse(test *t
 func TestNoUselessBackreferenceIsRegistered(test *testing.T) {
 	test.Parallel()
 
-	var found *rule.Registration
-	for index, registration := range rule.Registered() {
-		if registration.Rule.Name == "no-useless-backreference" {
+	var found *rule.Entry
+	for index, entry := range rule.Registered() {
+		if entry.Name == "no-useless-backreference" {
 			found = &rule.Registered()[index]
 			break
 		}
@@ -507,7 +507,7 @@ func TestNoUselessBackreferenceIsRegistered(test *testing.T) {
 	}
 	// The global RegExp is told from a local one, and a constant argument followed to its binding,
 	// through the checker, so a registered copy without it would find no call at all.
-	if !found.Rule.NeedsTypeChecker {
+	if !found.NeedsTypeChecker {
 		test.Error("the registered copy does not declare NeedsTypeChecker, so it would check no RegExp call")
 	}
 }

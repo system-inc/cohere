@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/system-inc/cohere/internal/lint/rule"
 	"github.com/system-inc/cohere/internal/lint/testing"
 )
 
@@ -28,19 +29,22 @@ func stringPointer(value string) *string { return new(value) }
 
 // decodeUselessComputedKeyOptionsForTest routes a case's options through the shipped decoder.
 //
-// A nil `optionsJson` is upstream writing no `options` at all, which reaches a rule configured as a
-// bare severity as nil, so it is passed through as nil rather than as an empty object. The two are
-// different inputs to the decoder and both have to work.
-func decodeUselessComputedKeyOptionsForTest(test *testing.T, optionsJson string) any {
+// An empty `optionsJson` is upstream writing no `options` at all, which reaches a rule configured as a
+// bare severity as no options, so it is passed through unconfigured rather than as an empty object. The two
+// are different inputs to the decoder and both have to work.
+func decodeUselessComputedKeyOptionsForTest(
+	test *testing.T,
+	optionsJson string,
+) rule.Given[NoUselessComputedKeySettings] {
 	test.Helper()
 	if optionsJson == "" {
-		return nil
+		return rule.Given[NoUselessComputedKeySettings]{}
 	}
 	decoded, decodeNoUselessComputedKeyOptionsError := DecodeNoUselessComputedKeyOptions(json.RawMessage(optionsJson))
 	if decodeNoUselessComputedKeyOptionsError != nil {
 		test.Fatalf("decoding options %q: %v", optionsJson, decodeNoUselessComputedKeyOptionsError)
 	}
-	return decoded
+	return rule.Configured(decoded)
 }
 
 // The valid cases, verbatim from upstream. Extracted by evaluating the corpus against a stub
@@ -478,7 +482,7 @@ func TestNoUselessComputedKeyFires(test *testing.T) {
 	for _, testCase := range noUselessComputedKeyFiringCases {
 		test.Run(testCase.source, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, NoUselessComputedKey, uselessComputedKeyFile,
+			result := rule_testing.RunGiven(test, NoUselessComputedKey, uselessComputedKeyFile,
 				testCase.source, decodeUselessComputedKeyOptionsForTest(test, testCase.optionsJson))
 
 			wantIds := make([]string, len(testCase.properties))
@@ -527,7 +531,7 @@ func TestNoUselessComputedKeyStaysSilent(test *testing.T) {
 	for _, testCase := range noUselessComputedKeyCleanCases {
 		test.Run(testCase.source, func(test *testing.T) {
 			test.Parallel()
-			rule_testing.ExpectClean(test, rule_testing.RunWithOptions(test, NoUselessComputedKey,
+			rule_testing.ExpectClean(test, rule_testing.RunGiven(test, NoUselessComputedKey,
 				uselessComputedKeyFile, testCase.source,
 				decodeUselessComputedKeyOptionsForTest(test, testCase.optionsJson)))
 		})
@@ -722,7 +726,7 @@ func TestNoUselessComputedKeyAddedCases(test *testing.T) {
 	for _, testCase := range noUselessComputedKeyAddedCases {
 		test.Run(testCase.name, func(test *testing.T) {
 			test.Parallel()
-			result := rule_testing.RunWithOptions(test, NoUselessComputedKey, uselessComputedKeyFile,
+			result := rule_testing.RunGiven(test, NoUselessComputedKey, uselessComputedKeyFile,
 				testCase.source, decodeUselessComputedKeyOptionsForTest(test, testCase.optionsJson))
 
 			if len(result.Diagnostics) != testCase.findings {
@@ -829,8 +833,7 @@ func TestNoUselessComputedKeyDecoderDefaultsToEnforcingClassMembers(test *testin
 	// A rule configured as a bare severity is handed nil options rather than a struct, and the
 	// zero value narrows the rule instead of disabling it. This is the nil-options fallback the
 	// brief calls for, asserted by bypassing the decoder entirely.
-	result := rule_testing.RunWithOptions(test, NoUselessComputedKey, uselessComputedKeyFile,
-		"class Foo { ['x']() {} }", nil)
+	result := rule_testing.Run(test, NoUselessComputedKey, uselessComputedKeyFile, "class Foo { ['x']() {} }")
 	rule_testing.ExpectFindings(test, result, "unnecessarilyComputedProperty")
 }
 
