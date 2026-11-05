@@ -217,6 +217,8 @@ func TestANullIsRefusedBeforeAnyDecoderSeesIt(test *testing.T) {
 		{"single", []string{`null`}, "element 1 is null"},
 		{"single", []string{`{"b": 1, "a": {"c": [0, null]}}`}, "element 1 at a.c.1 is null"},
 		{"listed", []string{`"always"`, `{"null": null}`}, "element 2 at null is null"},
+		// A number past float64's range once failed the untyped decode and let the null beside it through.
+		{"single", []string{`{"a": 1e400, "b": null}`}, "element 1 at b is null"},
 	} {
 		elements := make([]json.RawMessage, 0, len(testCase.elements))
 		for _, element := range testCase.elements {
